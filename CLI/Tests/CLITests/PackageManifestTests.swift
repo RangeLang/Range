@@ -10,18 +10,24 @@ struct PackageManifestTests {
             .appendingPathComponent("range-package-manifest-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 
-        let packageFile = root.appendingPathComponent("Package.range", isDirectory: false)
+        let packageFile = root.appendingPathComponent("Project.range", isDirectory: false)
         try """
-            @package
-            construct Fixture {
-                let name: Title("Fixture")
-                let version: Version(1.2.3)
-                let author: "Test Author"
-                let remote: String("https://github.com/acme/fixture.git")
-                let remotes: Array<Remote>([
-                    Remote(url: "https://github.com/acme/fixture.git"),
-                    Remote(url: "git@github.com:acme/fixture.git"),
-                ])
+            @construct(name: "Fixture") {
+                @let(name: "name") {
+                    @value(type: "Title", current: "Title(\\\"Fixture\\\")")
+                }
+                @let(name: "version") {
+                    @value(type: "Version", current: "Version(1.2.3)")
+                }
+                @let(name: "author") {
+                    @value(type: "String", current: "String(\\\"Test Author\\\")")
+                }
+                @let(name: "remote") {
+                    @value(type: "String", current: "String(\\\"https://github.com/acme/fixture.git\\\")")
+                }
+                @let(name: "remotes") {
+                    @value(type: "String", current: "String(\\\"[Remote(url: \\\\\\\"https://github.com/acme/fixture.git\\\\\\\"), Remote(url: \\\\\\\"git@github.com:acme/fixture.git\\\\\\\")]\\\")")
+                }
             }
             """.write(to: packageFile, atomically: true, encoding: .utf8)
 
@@ -43,21 +49,26 @@ struct PackageManifestTests {
             .appendingPathComponent("range-package-manifest-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 
-        let packageFile = root.appendingPathComponent("Package.range", isDirectory: false)
+        let packageFile = root.appendingPathComponent("Project.range", isDirectory: false)
         try """
-            @package
-            construct Fixture {
-                let name: Title("Fixture")
-                let version: Int(1)
-                let author: "Test Author"
+            @construct(name: "Fixture") {
+                @let(name: "name") {
+                    @value(type: "Title", current: "Title(\\\"Fixture\\\")")
+                }
+                @let(name: "version") {
+                    @value(type: "Int", current: "Int(1)")
+                }
+                @let(name: "author") {
+                    @value(type: "String", current: "String(\\\"Test Author\\\")")
+                }
             }
             """.write(to: packageFile, atomically: true, encoding: .utf8)
 
         do {
             _ = try PackageManifestLoader.load(from: packageFile)
-            Issue.record("Expected Package.range validation to reject an untyped package version.")
+            Issue.record("Expected Project.range validation to reject an untyped package version.")
         } catch {
-            #expect(String(describing: error).contains("requires let version: Version"))
+            #expect(String(describing: error).contains("requires @let version value Version"))
         }
     }
 
@@ -69,13 +80,18 @@ struct PackageManifestTests {
         try run("git", "init", in: root)
         try run("git", "remote", "add", "origin", "https://github.com/acme/fixture.git", in: root)
 
-        let packageFile = root.appendingPathComponent("Package.range", isDirectory: false)
+        let packageFile = root.appendingPathComponent("Project.range", isDirectory: false)
         try """
-            @package
-            construct Fixture {
-                let name: Title("Fixture")
-                let version: Version(1.2.3)
-                let author: "Test Author"
+            @construct(name: "Fixture") {
+                @let(name: "name") {
+                    @value(type: "Title", current: "Title(\\\"Fixture\\\")")
+                }
+                @let(name: "version") {
+                    @value(type: "Version", current: "Version(1.2.3)")
+                }
+                @let(name: "author") {
+                    @value(type: "String", current: "String(\\\"Test Author\\\")")
+                }
             }
             """.write(to: packageFile, atomically: true, encoding: .utf8)
 

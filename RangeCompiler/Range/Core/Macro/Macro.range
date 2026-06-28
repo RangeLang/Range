@@ -1,41 +1,95 @@
 @syntax
 @graph(role: .declaration)
-construct MacroTarget {
-    @let kind: String
-    @let name: String
-    @let type: Optional<TypeReference>
-    @let elements: Array<MacroTarget>
-    @let written: WrittenSyntax
+@construct(name: "MacroTarget") {
+    @let(name: "kind") {
+        @value(type: "String")
+    }
+    @let(name: "name") {
+        @value(type: "String")
+    }
+    @let(name: "type") {
+        @value(type: "Optional<TypeReference>")
+    }
+    @let(name: "elements") {
+        @value(type: "Array<MacroTarget>")
+    }
+    @let(name: "written") {
+        @value(type: "WrittenSyntax")
+    }
 }
 
 @graph(role: .declaration)
 @syntax
-construct Macro {
-    @let name: String
-    @let identifier: Identifier
-    @let macros: Array<Macro.Application>
-    @let generics: Array<Generic>
-    @let parameters: Array<Parameter>
-    @let target: Optional<MacroTarget>
-    @let expansionType: Optional<TypeReference>
-    @let expansionTypeName: String
-    @let writtenBody: WrittenSyntax
-    @let parsedBody: Parsed<Block>
-    @let body: String
-    @let syntaxBody: String
+@construct(name: "Macro") {
+    @let(name: "name") {
+        @value(type: "String")
+    }
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "macros") {
+        @value(type: "Array<Macro.Application>")
+    }
+    @let(name: "generics") {
+        @value(type: "Array<Generic>")
+    }
+    @let(name: "parameters") {
+        @value(type: "Array<Parameter>")
+    }
+    @let(name: "target") {
+        @value(type: "Optional<MacroTarget>")
+    }
+    @let(name: "expansionType") {
+        @value(type: "Optional<TypeReference>")
+    }
+    @let(name: "expansionTypeName") {
+        @value(type: "String")
+    }
+    @let(name: "writtenBody") {
+        @value(type: "WrittenSyntax")
+    }
+    @let(name: "parsedBody") {
+        @value(type: "Parsed<Block>")
+    }
+    @let(name: "body") {
+        @value(type: "String")
+    }
+    @let(name: "syntaxBody") {
+        @value(type: "String")
+    }
 }
 
 @graph(role: .application)
 @syntax
-construct Macro<Value> {
-    @let name: String
-    @let identifier: Identifier
-    @let genericArguments: Array<TypeReference>
-    @let generics: Array<TypeReference>
-    @let argumentClause: String
-    @let arguments: Array<Expression>
-    @let rawBody: WrittenSyntax
-    @let declaration: Optional<Macro>
-    @let valueType: TypeReference
-    @let value: Value
+@construct(name: "Macro<Value>") {
+    @let(name: "name") {
+        @value(type: "String")
+    }
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "genericArguments") {
+        @value(type: "Array<TypeReference>")
+    }
+    @let(name: "generics") {
+        @value(type: "Array<TypeReference>")
+    }
+    @let(name: "argumentClause") {
+        @value(type: "String")
+    }
+    @let(name: "arguments") {
+        @value(type: "Array<Expression>")
+    }
+    @let(name: "rawBody") {
+        @value(type: "WrittenSyntax")
+    }
+    @let(name: "declaration") {
+        @value(type: "Optional<Macro>")
+    }
+    @let(name: "valueType") {
+        @value(type: "TypeReference")
+    }
+    @let(name: "value") {
+        @value(type: "Value")
+    }
 }

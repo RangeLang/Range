@@ -218,26 +218,23 @@ struct PackageSubscriptionManager {
     private func parseModules(from source: String) -> Set<String> {
         guard
             let modulesRegex = try? NSRegularExpression(
-                pattern: #"\blet\s+modules\s*:\s*\[(.*?)\]"#,
+                pattern: #"@let\s*\(\s*name:\s*"modules"\s*\)\s*\{.*?@value\s*\(\s*type:\s*"String"\s*,\s*current:\s*"String\(\\\"([^\\\"]*)\\\"\)"\s*\).*?\}"#,
                 options: [.dotMatchesLineSeparators]
-            ),
-            let stringRegex = try? NSRegularExpression(pattern: #""([^"]+)""#)
+            )
         else {
             return []
         }
 
         let range = NSRange(source.startIndex..<source.endIndex, in: source)
-        let moduleRanges = modulesRegex.matches(in: source, range: range)
-            .compactMap { Range($0.range(at: 1), in: source) }
-        let matches = moduleRanges.flatMap { moduleRange in
-            stringRegex.matches(in: source, range: NSRange(moduleRange, in: source))
-        }
         return Set(
-            matches.compactMap { match in
+            modulesRegex.matches(in: source, range: range).flatMap { match -> [String] in
                 guard let groupRange = Range(match.range(at: 1), in: source) else {
-                    return nil
+                    return []
                 }
                 return String(source[groupRange])
+                    .split(separator: ",")
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
             }
         )
     }
@@ -252,34 +249,31 @@ struct PackageSubscriptionManager {
             lines.remove(at: closingBraceIndex - 1)
         }
 
-        if let modulesLineIndex = lines.firstIndex(where: {
-            let trimmed = $0.trimmingCharacters(in: .whitespaces)
-            return trimmed.hasPrefix("let modules: [")
-        }) {
-            let line = lines[modulesLineIndex]
-            if let bracketIndex = line.lastIndex(of: "]") {
-                let prefix = String(line[..<bracketIndex])
-                let separator = prefix.trimmingCharacters(in: .whitespaces).hasSuffix("[") ? "" : ", "
-                lines[modulesLineIndex] =
-                    prefix + separator + "\"\(package)\"]"
-                    + String(line[line.index(after: bracketIndex)...])
-                return lines.joined(separator: "\n") + (source.hasSuffix("\n") ? "\n" : "")
+        let modulesPattern =
+            #"@let\s*\(\s*name:\s*"modules"\s*\)\s*\{.*?@value\s*\(\s*type:\s*"String"\s*,\s*current:\s*"String\(\\\"([^\\\"]*)\\\"\)"\s*\).*?\}"#
+        if let modulesRegex = try? NSRegularExpression(
+            pattern: modulesPattern,
+            options: [.dotMatchesLineSeparators]
+        ) {
+            let range = NSRange(source.startIndex..<source.endIndex, in: source)
+            if let match = modulesRegex.firstMatch(in: source, range: range),
+                let valueRange = Range(match.range(at: 1), in: source)
+            {
+                let existing = String(source[valueRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let separator = existing.isEmpty ? "" : ", "
+                return source.replacingCharacters(in: valueRange, with: existing + separator + package)
             }
-
-            guard
-                let closingArrayIndex = lines[modulesLineIndex...].firstIndex(where: {
-                    $0.trimmingCharacters(in: .whitespaces) == "]"
-                })
-            else {
-                throw ValidationError("Project.range modules declaration must end with ].")
-            }
-
-            lines.insert("        \"\(package)\",", at: closingArrayIndex)
-            return lines.joined(separator: "\n") + (source.hasSuffix("\n") ? "\n" : "")
         }
 
         let insertionIndex = lines.lastIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "}" })!
-        lines.insert("    let modules: [\"\(package)\"]", at: insertionIndex)
+        lines.insert(
+            """
+                @let(name: "modules") {
+                    @value(type: "String", current: "String(\\\"\(package)\\\")")
+                }
+            """,
+            at: insertionIndex
+        )
         return lines.joined(separator: "\n") + (source.hasSuffix("\n") ? "\n" : "")
     }
 }

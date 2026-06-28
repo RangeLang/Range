@@ -1,2 +1,2 @@
-construct SyntaxEmittable {
+@construct(name: "SyntaxEmittable") {
 }

@@ -1325,25 +1325,11 @@ public struct DeclarationMemberResolver: Sendable {
             return constructedType
         }
 
-        guard let returnType = signature.returnType else {
-            return constructedType
-        }
-
-        var substitution = genericSubstitution(for: members, arguments: context.arguments)
-        substitution["Self"] = constructedType
-        let substitutedReturnType = Self.substitute(returnType, using: substitution)
-
-        guard case .generic(let base, let resultArguments) = substitutedReturnType,
-            case .named("Result") = base,
-            resultArguments.count == 2
-        else {
-            return constructedType
-        }
-
-        return .generic(
-            base: .named("Result"),
-            arguments: [constructedType, resultArguments[1]]
-        )
+        return signature.returnType.map {
+            var substitution = genericSubstitution(for: members, arguments: context.arguments)
+            substitution["Self"] = constructedType
+            return Self.substitute($0, using: substitution)
+        } ?? constructedType
     }
 
     private func initializerArguments(

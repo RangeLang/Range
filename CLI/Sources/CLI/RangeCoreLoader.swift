@@ -61,11 +61,6 @@ enum RangeCoreLoader {
             .appendingPathComponent("RangeCompiler", isDirectory: true)
             .appendingPathComponent("Range", isDirectory: true)
             .appendingPathComponent("Core", isDirectory: true)
-        let legacyInstalledCompilerCoreRoot = executableDirectory
-            .appendingPathComponent("RangeCompiler", isDirectory: true)
-            .appendingPathComponent("Core", isDirectory: true)
-        let installedCoreRoot = executableDirectory
-            .appendingPathComponent("RangeCore", isDirectory: true)
 
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -76,20 +71,11 @@ enum RangeCoreLoader {
             .appendingPathComponent("RangeCompiler", isDirectory: true)
             .appendingPathComponent("Range", isDirectory: true)
             .appendingPathComponent("Core", isDirectory: true)
-        let legacySourceCompilerCoreRoot = repositoryRoot
-            .appendingPathComponent("RangeCompiler", isDirectory: true)
-            .appendingPathComponent("Core", isDirectory: true)
-        let sourceCoreRoot = repositoryRoot
-            .appendingPathComponent("RangeCore", isDirectory: true)
 
         return [
             explicitPath,
             installedCompilerCoreRoot,
-            legacyInstalledCompilerCoreRoot,
-            installedCoreRoot,
             sourceCompilerCoreRoot,
-            legacySourceCompilerCoreRoot,
-            sourceCoreRoot,
         ].compactMap(\.self)
     }
 
@@ -200,8 +186,7 @@ enum RangeCoreLoader {
     }
 
     static func isCorePath(_ path: String) -> Bool {
-        path.contains("/RangeCore/")
-            || path.contains("/RangeCompiler/Range/Core/")
+        path.contains("/RangeCompiler/Range/Core/")
             || path.contains("/RangeCompiler/Range/Foundation/")
             || path.contains("/RangeCompiler/Range/Lexer/")
     }

@@ -3,7 +3,7 @@
         @value(type: "String")
     }
     @state(name: "members", value: "String(\"\")")
-    @state(name: "index", value: "0")
+    @state(name: "index", value: "Int(0)")
     @state(name: "memberBodyText", value: "target.declaration.bodyText")
 
     @while("index < memberBodyText.count(of: \"\\n\") + Int(1)") {
@@ -22,6 +22,6 @@
     @return(value: "member|kind=parameter|name="
         + name
         + "|ordinal="
-        + "\(target.ordinal)"
+        + String(target.ordinal)
         + members)
 }

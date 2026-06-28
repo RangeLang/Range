@@ -1,3 +1,4 @@
-construct SyntaxOmittable {
-    function omit()
+@construct(name: "SyntaxOmittable") {
+    @function(name: "omit", result: "Void") {
+    }
 }

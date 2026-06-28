@@ -142,7 +142,7 @@ extension CLI.Package {
                 }
 
                 print("    " + TerminalLog.subtleStdout(result.url.absoluteString))
-                print("    " + TerminalLog.subtleStdout("Project.range: let modules: [\"\(result.package)\"]"))
+                print("    " + TerminalLog.subtleStdout("Project.range: @let(name: \"modules\") { @value(type: \"String\", current: \"String(\\\"\(result.package)\\\")\") }"))
             }
         }
 

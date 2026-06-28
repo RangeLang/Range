@@ -1,2 +1,3 @@
 @macro(name: "init", result: "Void", target: "@function"){
+    @return(value: "")
 }

@@ -7,9 +7,7 @@ public struct MacroDeclaration {
     public let parameters: [RangeFunctionParameter]
     public let target: MacroTarget?
     public let expansionType: TypeReference?
-    public let bindings: MacroBindings?
     public let body: [Statement]
-    public let syntaxBody: EmittedCodeBlock?
 }
 
 public struct MacroMetadataDeclaration {
@@ -18,7 +16,6 @@ public struct MacroMetadataDeclaration {
     public let parameters: [RangeFunctionParameter]
     public let target: MacroTarget
     public let valueType: TypeReference
-    public let bindings: MacroBindings?
     public let body: [Statement]
 
     public var hasMetadataSlotEffect: Bool {
@@ -38,46 +35,6 @@ public struct MacroMetadataDeclaration {
         }
         return parameters[0].typeReference?.foreignBodyLanguageName
     }
-}
-
-public struct EmittedCodeBlock {
-    public let parts: [EmittedCodePart]
-
-    public init(parts: [EmittedCodePart]) {
-        self.parts = parts
-    }
-}
-
-public enum EmittedSyntaxKind: String {
-    case declaration
-    case expression
-    case expressionList
-    case typeReference
-    case nominalTypeReference
-    case callableName
-
-    var diagnosticDescription: String {
-        switch self {
-        case .declaration:
-            return "a declaration"
-        case .expression:
-            return "an expression"
-        case .expressionList:
-            return "an expression list"
-        case .typeReference:
-            return "a type reference"
-        case .nominalTypeReference:
-            return "a nominal type reference"
-        case .callableName:
-            return "a callable name"
-        }
-    }
-}
-
-public enum EmittedCodePart {
-    case text(String)
-    case splice(expression: Expression, expected: EmittedSyntaxKind)
-    case syntaxMacroInvocation(name: String, arguments: [CallArgument])
 }
 
 public struct MacroApplication {
@@ -149,18 +106,6 @@ public indirect enum MacroTarget {
             return targets.flatMap(\.typeReferences)
         }
     }
-}
-
-public struct MacroBindings: Sendable {
-    public let target: String
-    public let diagnostics: String
-    public let graph: String?
-
-    static let implicit = MacroBindings(
-        target: "target",
-        diagnostics: "diagnostics",
-        graph: "graph"
-    )
 }
 
 extension TypeReference {

@@ -6,8 +6,8 @@
     @state(name: "index", value: "Int(0)")
 
     @while("index < application.generics.count") {
-        @let(name: "generic", value: "application.generics.element(index: index)")
-        @let(name: "typeName", value: "generic.name")
+        @state(name: "generic", value: "application.generics.element(index: index)")
+        @state(name: "typeName", value: "generic.name")
 
         @if("!typeName.isEmpty") {
             @assignment(target: "hasElement", value: "Bool(true)")

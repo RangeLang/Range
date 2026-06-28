@@ -8,7 +8,6 @@ struct PackageManifest {
     let author: String
     let remote: String?
     let remoteURLs: [String]
-    let declaration: ConstructDeclaration?
 }
 
 enum PackageManifestLoader {
@@ -20,23 +19,10 @@ enum PackageManifestLoader {
         )
 
         let sourceFile = try parser.parseSourceFile()
-        switch sourceFile {
-        case .mainBlock:
-            throw ValidationError("Project.range must declare @project construct Name { ... }.")
-        case .extensions:
-            throw ValidationError("Project.range must declare @project construct Name { ... }.")
-        case .module(let module):
-            if let manifest = try blockMacroManifest(from: module, fileURL: fileURL) {
-                return manifest
-            }
-            throw ValidationError("Project.range must declare @construct(name: \"Name\") { ... }.")
-        case .construct:
-            throw ValidationError("Project.range must declare @construct(name: \"Name\") { ... }.")
-        case .enumeration:
-            throw ValidationError("Project.range must declare @project construct Name { ... }.")
-        case .macro:
-            throw ValidationError("Project.range must declare @project construct Name { ... }.")
+        if let manifest = try blockMacroManifest(from: sourceFile, fileURL: fileURL) {
+            return manifest
         }
+        throw ValidationError("Project.range must declare @construct(name: \"Name\") { ... }.")
     }
 
     private static func blockMacroManifest(
@@ -56,30 +42,36 @@ enum PackageManifestLoader {
         let version = try versionString(from: members["version"])
         let author = try quotedString(from: members["author"])
         let remote = try members["remote"].map(quotedString(from:)) ?? nil
-        let remoteURLs =
-            remote.map { [$0] } ?? gitRemoteURLs(in: fileURL.deletingLastPathComponent())
+        let explicitRemoteURLs = remoteURLs(from: members["remotes"])
+            + remoteURLs(from: members["remoteURLs"])
+        let remoteURLs = uniqueStrings([remote].compactMap { $0 } + explicitRemoteURLs)
+        let resolvedRemoteURLs = remoteURLs.isEmpty
+            ? gitRemoteURLs(in: fileURL.deletingLastPathComponent())
+            : remoteURLs
 
         return PackageManifest(
             name: name,
             version: version,
             author: author,
             remote: remote,
-            remoteURLs: remoteURLs,
-            declaration: nil
+            remoteURLs: resolvedRemoteURLs
         )
     }
 
     private static func blockMemberValues(in block: BlockMacroNode) -> [String: String] {
         var values: [String: String] = [:]
         for statement in block.body {
-            guard case .macroApplication(let name, let arguments) = statement,
-                name == "let",
-                let memberName = stringArgument(named: "name", in: arguments),
-                let value = stringArgument(named: "value", in: arguments)
-            else {
+            switch statement {
+            case .macroInvocation(let name, let argumentClause, let body) where name == "let":
+                guard let memberName = stringArgument(named: "name", in: argumentClause),
+                    let value = valueCurrent(in: body)
+                else {
+                    continue
+                }
+                values[memberName] = value
+            default:
                 continue
             }
-            values[memberName] = value
         }
         return values
     }
@@ -110,6 +102,42 @@ enum PackageManifestLoader {
         }
     }
 
+    private static func stringArgument(named name: String, in argumentClause: String?) -> String? {
+        guard let argumentClause else {
+            return nil
+        }
+        let pattern = #"\b\#(NSRegularExpression.escapedPattern(for: name))\s*:\s*"((?:\\"|[^"])*)""#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return nil
+        }
+        let range = NSRange(argumentClause.startIndex..<argumentClause.endIndex, in: argumentClause)
+        guard let match = regex.firstMatch(in: argumentClause, range: range),
+            match.numberOfRanges > 1,
+            let valueRange = Range(match.range(at: 1), in: argumentClause)
+        else {
+            return nil
+        }
+        return String(argumentClause[valueRange])
+    }
+
+    private static func valueCurrent(in statements: [Statement]) -> String? {
+        for statement in statements {
+            switch statement {
+            case .macroApplication(let name, let arguments) where name == "value":
+                if let current = stringArgument(named: "current", in: arguments) {
+                    return current
+                }
+            case .macroInvocation(let name, let argumentClause, _) where name == "value":
+                if let current = stringArgument(named: "current", in: argumentClause) {
+                    return current
+                }
+            default:
+                continue
+            }
+        }
+        return nil
+    }
+
     private static func titleString(from value: String?) throws -> String? {
         guard let value else {
             return nil
@@ -136,145 +164,39 @@ enum PackageManifestLoader {
         guard let value else {
             throw ValidationError("Project.range requires quoted string value.")
         }
+        if value.hasPrefix("String("), value.hasSuffix(")") {
+            return try quotedString(from: String(value.dropFirst("String(".count).dropLast()))
+        }
+        if value.hasPrefix("\\\""), value.hasSuffix("\\\""), value.count >= 4 {
+            return String(value.dropFirst(2).dropLast(2))
+        }
         guard value.hasPrefix("\""), value.hasSuffix("\""), value.count >= 2 else {
             return value
         }
         return String(value.dropFirst().dropLast())
     }
 
-    private static func requiredStringValue(
-        named name: String,
-        in values: [ValueDeclaration]
-    ) throws -> String {
-        let value = try requireValue(named: name, typeName: "String", in: values)
-        guard case .string(let string)? = value.value else {
-            throw ValidationError("Project.range requires let \(name): \"...\".")
-        }
-        return string
-    }
-
-    private static func requiredTitleValue(
-        named name: String,
-        in values: [ValueDeclaration]
-    ) throws -> String {
-        guard let title = try titleValue(named: name, in: values) else {
-            throw ValidationError("Project.range requires let \(name): Title(\"...\").")
-        }
-        return title
-    }
-
-    private static func titleValue(
-        named name: String,
-        in values: [ValueDeclaration]
-    ) throws -> String? {
-        guard let value = values.first(where: { $0.name == name }) else {
-            return nil
-        }
-        guard value.typeName == "Title" else {
-            throw ValidationError(
-                "Project.range requires let \(name): Title, got \(value.typeName)."
-            )
-        }
-        guard case .call(let callName, let arguments)? = value.value, callName == "Title" else {
-            throw ValidationError("Project.range requires let \(name): Title(\"...\").")
-        }
-        guard arguments.count == 1, arguments[0].label == nil,
-            case .string(let title) = arguments[0].value
-        else {
-            throw ValidationError("Project.range Title requires one string value.")
-        }
-        return title
-    }
-
-    private static func requiredVersionValue(
-        named name: String,
-        in values: [ValueDeclaration]
-    ) throws -> String {
-        let value = try requireValue(named: name, typeNames: ["Version"], in: values)
-        guard case .call(let callName, let arguments)? = value.value, callName == "Version" else {
-            throw ValidationError("Project.range requires let \(name): Version(0.1.0).")
-        }
-        guard arguments.count == 1, arguments[0].label == nil else {
-            throw ValidationError("Project.range Version requires one unlabeled semantic version.")
-        }
-        guard case .string(let raw) = arguments[0].value else {
-            throw ValidationError("Project.range Version requires a semantic version like Version(0.1.0).")
-        }
-        _ = try SemanticVersion.parse(raw)
-        return raw
-    }
-
-    private static func requireValue(
-        named name: String,
-        typeName: String,
-        in values: [ValueDeclaration]
-    ) throws -> ValueDeclaration {
-        try requireValue(named: name, typeNames: [typeName], in: values)
-    }
-
-    private static func requireValue(
-        named name: String,
-        typeNames: [String],
-        in values: [ValueDeclaration]
-    ) throws -> ValueDeclaration {
-        guard let value = values.first(where: { $0.name == name }) else {
-            throw ValidationError("Project.range requires let \(name): \(typeNames[0]).")
-        }
-        guard typeNames.contains(value.typeName) else {
-            throw ValidationError(
-                "Project.range requires let \(name): \(typeNames.joined(separator: " or ")), got \(value.typeName)."
-            )
-        }
-        return value
-    }
-
-    private static func stringValue(named name: String, in values: [ValueDeclaration])
-        -> String?
-    {
-        values.first { $0.name == name }.flatMap { value in
-            guard case .string(let string)? = value.value else {
-                return nil
-            }
-            return string
-        }
-    }
-
-    private static func remoteURLs(remote: String?, in values: [ValueDeclaration]) -> [String] {
-        uniqueStrings(
-            [remote].compactMap { $0 }
-                + stringArrayValue(named: "remotes", in: values)
-                + stringArrayValue(named: "remoteURLs", in: values)
-        )
-    }
-
-    private static func stringArrayValue(named name: String, in values: [ValueDeclaration])
-        -> [String]
-    {
-        guard
-            let value = values.first(where: { $0.name == name }),
-            case .array(let expressions)? = value.value
-        else {
+    private static func remoteURLs(from value: String?) -> [String] {
+        guard let value else {
             return []
         }
 
-        return expressions.compactMap { expression in
-            remoteURL(from: expression)
+        let pattern = #"(?:Remote\s*\(\s*url:\s*)?\\?"([^"\\]+)\\?"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return []
         }
-    }
-
-    private static func remoteURL(from expression: RangeCompiler.Expression) -> String? {
-        switch expression {
-        case .string(let string):
-            return string
-        case .call(let name, let arguments) where name == "Remote":
-            return arguments.first { $0.label == "url" }.flatMap { argument in
-                guard case .string(let string) = argument.value else {
-                    return nil
-                }
-                return string
+        let range = NSRange(value.startIndex..<value.endIndex, in: value)
+        return regex.matches(in: value, range: range).compactMap { match in
+            guard match.numberOfRanges > 1,
+                let matchRange = Range(match.range(at: 1), in: value)
+            else {
+                return nil
             }
-        default:
-            return nil
+            let candidate = String(value[matchRange])
+            guard candidate.contains("://") || candidate.contains("@") else {
+                return nil
+            }
+            return candidate
         }
     }
 

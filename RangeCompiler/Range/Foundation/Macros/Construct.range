@@ -1,47 +1,3 @@
-function constructLLVMType(line: String): String {
-    @if("line.contains(value: \"integer|bits=64\")") {
-        @return(value: "i64")
-    }
-
-    @if("line.contains(value: \"bool\")") {
-        @return(value: "i1")
-    }
-
-    @if("line.contains(value: \"string\")") {
-        @return(value: "%Range.String")
-    }
-
-    @if("line.contains(value: \"void\")") {
-        @return(value: "")
-    }
-
-    @if("line.contains(value: \"|type=Int\")") {
-        @return(value: "i64")
-    }
-
-    @if("line.contains(value: \"|current=Int(\")") {
-        @return(value: "i64")
-    }
-
-    @if("line.contains(value: \"|type=Bool\")") {
-        @return(value: "i1")
-    }
-
-    @if("line.contains(value: \"|current=Bool(\")") {
-        @return(value: "i1")
-    }
-
-    @if("line.contains(value: \"|type=String\")") {
-        @return(value: "%Range.String")
-    }
-
-    @if("line.contains(value: \"|current=String(\")") {
-        @return(value: "%Range.String")
-    }
-
-    @return(value: "")
-}
-
 @macro(name: "construct", result: "String", target: "@syntax"){
     @parameter(name: "name") {
         @value(type: "String")
@@ -89,19 +45,15 @@ function constructLLVMType(line: String): String {
         @state(name: "wasPendingState", value: "pendingState")
 
         @if("line.contains(value: \"integer|bits=\")") {
-            @assignment(target: "lineLLVM", value: "constructLLVMType(line: line)")
+            @assignment(target: "lineLLVM", value: "String(\"i64\")")
         }
 
         @if("line.contains(value: \"bool\")") {
-            @assignment(target: "lineLLVM", value: "constructLLVMType(line: line)")
+            @assignment(target: "lineLLVM", value: "String(\"i1\")")
         }
 
         @if("line.contains(value: \"string\")") {
-            @assignment(target: "lineLLVM", value: "constructLLVMType(line: line)")
-        }
-
-        @if("line.contains(value: \"void\")") {
-            @assignment(target: "lineLLVM", value: "constructLLVMType(line: line)")
+            @assignment(target: "lineLLVM", value: "String(\"%Range.String\")")
         }
 
         @if("line.contains(value: \"|llvm=\")") {
@@ -114,7 +66,29 @@ function constructLLVMType(line: String): String {
 
         @if("wasPendingState == \"true\"") {
             @if("line.contains(value: \"member|kind=value\")") {
-                @assignment(target: "lineLLVM", value: "constructLLVMType(line: line)")
+                @if("line.contains(value: \"|type=Int\")") {
+                    @assignment(target: "lineLLVM", value: "String(\"i64\")")
+                }
+
+                @if("line.contains(value: \"|current=Int(\")") {
+                    @assignment(target: "lineLLVM", value: "String(\"i64\")")
+                }
+
+                @if("line.contains(value: \"|type=Bool\")") {
+                    @assignment(target: "lineLLVM", value: "String(\"i1\")")
+                }
+
+                @if("line.contains(value: \"|current=Bool(\")") {
+                    @assignment(target: "lineLLVM", value: "String(\"i1\")")
+                }
+
+                @if("line.contains(value: \"|type=String\")") {
+                    @assignment(target: "lineLLVM", value: "String(\"%Range.String\")")
+                }
+
+                @if("line.contains(value: \"|current=String(\")") {
+                    @assignment(target: "lineLLVM", value: "String(\"%Range.String\")")
+                }
             }
 
             @assignment(target: "pendingState", value: "String(\"false\")")

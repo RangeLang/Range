@@ -17,15 +17,15 @@ extension CLI {
                     at: input ?? ".",
                     options: .init(requireManifestForDirectory: true)
                 )
-                let program = try ProjectSourceValidator.validatedCompiledProgram(for: project)
-                try validateBuild(program: program)
+                let program = try ProjectSourceValidator.compiledProgram(for: project)
+                try checkMainBlock(program: program)
             } catch {
                 ErrorPresenter.printError(error)
                 throw ExitCode.failure
             }
         }
 
-        private func validateBuild(program: CompiledProgram) throws {
+        private func checkMainBlock(program: CompiledProgram) throws {
             let mainCount = program.projectExpandedFiles.reduce(0) { count, file in
                 count + mainBlockCount(in: file.sourceFile)
             }
@@ -43,18 +43,11 @@ extension CLI {
                 throw ValidationError("Range build failed.")
             }
 
-            TerminalLog.out("Range build emitted LLVM IR for clang.", level: .success)
+            TerminalLog.out("Range build checked project source.", level: .success)
         }
 
-        private func mainBlockCount(in sourceFile: SourceFileNode) -> Int {
-            switch sourceFile {
-            case .mainBlock:
-                return 1
-            case .module(let module):
-                return module.mainBlock == nil ? 0 : 1
-            case .construct, .enumeration, .macro, .extensions:
-                return 0
-            }
+        private func mainBlockCount(in sourceFile: ModuleFileNode) -> Int {
+            sourceFile.blockMacros.filter { $0.macros.first?.name == "main" }.count
         }
     }
 }

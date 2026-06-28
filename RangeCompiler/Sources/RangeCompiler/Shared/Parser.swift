@@ -1,201 +1,16 @@
 import Foundation
 
 public struct Parser {
-    struct OperatorEnvironment {
-        var precedenceGroups: [String: PrecedenceGroupDeclaration]
-        var infixOperators: [String: OperatorDeclaration]
-        var prefixOperators: Set<String>
-        var postfixOperators: Set<String>
-
-        static func bootstrap() -> OperatorEnvironment {
-            let groups = [
-                PrecedenceGroupDeclaration(
-                    name: "LogicalDisjunctionPrecedence",
-                    associativity: .left,
-                    higherThan: [],
-                    lowerThan: [],
-                    assignment: nil
-                ),
-                PrecedenceGroupDeclaration(
-                    name: "LogicalConjunctionPrecedence",
-                    associativity: .left,
-                    higherThan: ["LogicalDisjunctionPrecedence"],
-                    lowerThan: [],
-                    assignment: nil
-                ),
-                PrecedenceGroupDeclaration(
-                    name: "ComparisonPrecedence",
-                    associativity: OperatorAssociativity.none,
-                    higherThan: ["LogicalConjunctionPrecedence"],
-                    lowerThan: [],
-                    assignment: nil
-                ),
-                PrecedenceGroupDeclaration(
-                    name: "NilCoalescingPrecedence",
-                    associativity: .right,
-                    higherThan: ["RangeFormationPrecedence"],
-                    lowerThan: [],
-                    assignment: nil
-                ),
-                PrecedenceGroupDeclaration(
-                    name: "RangeFormationPrecedence",
-                    associativity: OperatorAssociativity.none,
-                    higherThan: ["ComparisonPrecedence"],
-                    lowerThan: [],
-                    assignment: nil
-                ),
-                PrecedenceGroupDeclaration(
-                    name: "AdditionPrecedence",
-                    associativity: .left,
-                    higherThan: ["NilCoalescingPrecedence"],
-                    lowerThan: [],
-                    assignment: nil
-                ),
-                PrecedenceGroupDeclaration(
-                    name: "MultiplicationPrecedence",
-                    associativity: .left,
-                    higherThan: ["AdditionPrecedence"],
-                    lowerThan: [],
-                    assignment: nil
-                ),
-            ]
-
-            let operators = [
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "+",
-                    precedenceGroup: "AdditionPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "-",
-                    precedenceGroup: "AdditionPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "*",
-                    precedenceGroup: "MultiplicationPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "/",
-                    precedenceGroup: "MultiplicationPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "%",
-                    precedenceGroup: "MultiplicationPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "??",
-                    precedenceGroup: "NilCoalescingPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "==",
-                    precedenceGroup: "ComparisonPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "!=",
-                    precedenceGroup: "ComparisonPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "<",
-                    precedenceGroup: "ComparisonPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "<=",
-                    precedenceGroup: "ComparisonPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: ">",
-                    precedenceGroup: "ComparisonPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: ">=",
-                    precedenceGroup: "ComparisonPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "&&",
-                    precedenceGroup: "LogicalConjunctionPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "||",
-                    precedenceGroup: "LogicalDisjunctionPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "..<",
-                    precedenceGroup: "RangeFormationPrecedence"
-                ),
-                OperatorDeclaration(
-                    fixity: .infix,
-                    symbol: "...",
-                    precedenceGroup: "RangeFormationPrecedence"
-                ),
-            ]
-
-            return OperatorEnvironment(
-                precedenceGroups: Dictionary(uniqueKeysWithValues: groups.map { ($0.name, $0) }),
-                infixOperators: Dictionary(uniqueKeysWithValues: operators.map { ($0.symbol, $0) }),
-                prefixOperators: ["!"],
-                postfixOperators: ["..."]
-            )
-        }
-
-        mutating func register(precedenceGroup: PrecedenceGroupDeclaration) {
-            precedenceGroups[precedenceGroup.name] = precedenceGroup
-        }
-
-        mutating func register(operator declaration: OperatorDeclaration) {
-            switch declaration.fixity {
-            case .infix:
-                infixOperators[declaration.symbol] = declaration
-            case .prefix:
-                prefixOperators.insert(declaration.symbol)
-            case .postfix:
-                postfixOperators.insert(declaration.symbol)
-            }
-        }
-
-        func precedence(of groupName: String) -> Int {
-            if let group = precedenceGroups[groupName], !group.higherThan.isEmpty {
-                return group.higherThan.map { precedence(of: $0) + 1 }.max() ?? 0
-            }
-            return 0
-        }
-    }
-
     let tokens: [LexedToken]
     var index: Int = 0
-    var currentStateNames: Set<String> = []
-    var currentMutableStateNames: Set<String> = []
-    var currentStateTypes: [String: TypeReference] = [:]
-    var currentCallableReturnTypes: [String: TypeReference] = [:]
-    var currentBindingNames: Set<String> = []
-    var currentSelfAvailable: Bool = false
-    var currentSelfType: TypeReference?
     var currentExpressionTerminators: [Token] = []
-    var operatorEnvironment: OperatorEnvironment
     var literalBridgeResolver: LiteralBridgeResolver
     var declarationMemberResolver: DeclarationMemberResolver
     var declarationOperatorResolver: DeclarationOperatorResolver
     var declarationMacroExpansionResolver: DeclarationMacroExpansionResolver
-    var discoveredCallableReturnTypes: [String: TypeReference]
     var macroDeclarationsByName: [String: MacroDeclaration]
     var macroMetadataByName: [String: MacroMetadataDeclaration]
     var macroExpansionTypes: [String: TypeReference] = [:]
-    var allowInitializerDeclarations: Bool
-    var currentMacroBodyDepth: Int = 0
-    var currentClosureBaseLocalBindings: [String: LocalBindingSymbol] = [:]
 
     public init(
         source: String,
@@ -203,11 +18,9 @@ public struct Parser {
         declarationMemberResolver: DeclarationMemberResolver = .empty,
         declarationOperatorResolver: DeclarationOperatorResolver = .empty,
         declarationMacroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
-        discoveredCallableReturnTypes: [String: TypeReference] = [:],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
         macroMetadataByName: [String: MacroMetadataDeclaration] = [:],
-        macroExpansionTypes: [String: TypeReference] = [:],
-        allowInitializerDeclarations: Bool = false
+        macroExpansionTypes: [String: TypeReference] = [:]
     ) throws {
         let foreignBodies = macroMetadataByName.values.compactMap { metadata -> LexerForeignBody? in
             guard let language = metadata.foreignBodyLanguage else {
@@ -217,16 +30,13 @@ public struct Parser {
         }
         var lexer = Lexer(source: source, foreignBodies: foreignBodies)
         self.tokens = try lexer.tokenize()
-        self.operatorEnvironment = .bootstrap()
         self.literalBridgeResolver = literalBridgeResolver
         self.declarationMemberResolver = declarationMemberResolver
         self.declarationOperatorResolver = declarationOperatorResolver
         self.declarationMacroExpansionResolver = declarationMacroExpansionResolver
-        self.discoveredCallableReturnTypes = discoveredCallableReturnTypes
         self.macroDeclarationsByName = macroDeclarationsByName
         self.macroMetadataByName = macroMetadataByName
         self.macroExpansionTypes = macroExpansionTypes
-        self.allowInitializerDeclarations = allowInitializerDeclarations
     }
 
     mutating func registerMacroDeclaration(_ declaration: MacroDeclaration) {
@@ -253,52 +63,11 @@ public struct Parser {
         currentExpressionTerminators.contains(where: { $0 == token })
     }
 
-    public mutating func parseSourceFile() throws -> SourceFileNode {
-        currentStateTypes = [:]
-        currentCallableReturnTypes = discoveredCallableReturnTypes
-
-        var mainBlock: MainBlockNode?
+    public mutating func parseSourceFile() throws -> ModuleFileNode {
         var blockMacros: [BlockMacroNode] = []
-        var topLevelStates: [StateDeclaration] = []
-        var topLevelCallables: [CallableDeclaration] = []
-        var constructs: [ConstructDeclaration] = []
-        var enumerations: [EnumDeclaration] = []
         var macros: [MacroDeclaration] = []
-        var precedenceGroups: [PrecedenceGroupDeclaration] = []
-        var operators: [OperatorDeclaration] = []
-        var extensions: [ExtensionDeclaration] = []
 
         while peek() != .eof {
-            if isMainBlockStart() {
-                guard mainBlock == nil else {
-                    throw ParseError("Only one @main block is allowed per file.")
-                }
-                mainBlock = try parseMainBlock(requiresEOF: false)
-                continue
-            }
-
-            if isExtensionDeclarationStart() {
-                extensions.append(try parseExtensionDeclaration())
-                continue
-            }
-
-            if isStateDeclarationStart() {
-                let state = try parseState()
-                topLevelStates.append(state)
-                currentStateTypes[state.name] = state.type
-                continue
-            }
-
-            if isCallableStart() {
-                topLevelCallables.append(try parseCallableDeclaration())
-                continue
-            }
-
-            if isEnumDeclarationStart() {
-                enumerations.append(try parseEnumDeclaration(requiresEOF: false))
-                continue
-            }
-
             if isMacroDeclarationStart() {
                 let declaration = try parseMacroDeclaration()
                 macros.append(declaration)
@@ -311,143 +80,26 @@ public struct Parser {
                 continue
             }
 
-            if isPrecedenceGroupDeclarationStart() {
-                let declaration = try parsePrecedenceGroupDeclaration(requiresEOF: false)
-                precedenceGroups.append(declaration)
-                operatorEnvironment.register(precedenceGroup: declaration)
-                continue
-            }
-
-            if isOperatorDeclarationStart() {
-                let declaration = try parseOperatorDeclaration(requiresEOF: false)
-                operators.append(declaration)
-                operatorEnvironment.register(operator: declaration)
-                continue
-            }
-
-            if isConstructDeclarationStart() || isBuilderDeclarationStart() {
-                constructs.append(try parseConstructDeclaration(requiresEOF: false))
-                continue
-            }
-
             throw ParseError(
-                "Expected top-level state, extension, enum, protocol, macro, precedencegroup, operator declaration, or declaration."
+                "Range source accepts only @macro declarations and top-level macro blocks."
             )
         }
 
         try consume(.eof)
-        try validateBuilderDeclarations(in: constructs)
-        try validateCallableDeclarations(topLevelCallables)
 
-        if let mainBlock,
-            topLevelStates.isEmpty, topLevelCallables.isEmpty, enumerations.isEmpty,
-            constructs.isEmpty,
-            macros.isEmpty,
-            precedenceGroups.isEmpty,
-            operators.isEmpty,
-            extensions.isEmpty,
-            blockMacros.isEmpty
-        {
-            return .mainBlock(mainBlock)
-        }
-
-        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty,
-            enumerations.isEmpty,
-            constructs.count == 1,
-            macros.isEmpty,
-            precedenceGroups.isEmpty,
-            operators.isEmpty,
-            extensions.isEmpty,
-            blockMacros.isEmpty
-        {
-            return .construct(constructs[0])
-        }
-
-        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
-            macros.isEmpty,
-            precedenceGroups.isEmpty,
-            operators.isEmpty,
-            enumerations.count == 1, extensions.isEmpty,
-            blockMacros.isEmpty
-        {
-            return .enumeration(enumerations[0])
-        }
-
-        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
-            enumerations.isEmpty,
-            macros.count == 1,
-            precedenceGroups.isEmpty,
-            operators.isEmpty,
-            extensions.isEmpty,
-            blockMacros.isEmpty
-        {
-            return .macro(macros[0])
-        }
-
-        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
-            enumerations.isEmpty,
-            macros.isEmpty,
-            precedenceGroups.isEmpty,
-            operators.isEmpty,
-            !extensions.isEmpty,
-            blockMacros.isEmpty
-        {
-            return .extensions(extensions)
-        }
-
-        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
-            enumerations.isEmpty,
-            macros.isEmpty,
-            precedenceGroups.isEmpty,
-            operators.isEmpty,
-            extensions.isEmpty,
-            blockMacros.isEmpty
-        {
-        }
-
-        return .module(
-            ModuleFileNode(
-                mainBlock: mainBlock,
-                blockMacros: blockMacros,
-                states: topLevelStates,
-                callables: topLevelCallables,
-                constructs: constructs,
-                enumerations: enumerations,
-                macros: macros,
-                precedenceGroups: precedenceGroups,
-                operators: operators,
-                extensions: extensions
-            )
+        return ModuleFileNode(
+            blockMacros: blockMacros,
+            constructs: [],
+            enumerations: [],
+            macros: macros,
+            extensions: []
         )
     }
 
-    public mutating func parseSourceFileForDeclarationDiscovery() throws -> SourceFileNode {
-        currentStateTypes = [:]
-        currentCallableReturnTypes = [:]
-        var topLevelCallables: [CallableDeclaration] = []
-        var constructs: [ConstructDeclaration] = []
-        var enumerations: [EnumDeclaration] = []
-        var extensions: [ExtensionDeclaration] = []
+    public mutating func parseSourceFileForDeclarationDiscovery() throws -> ModuleFileNode {
         var macros: [MacroDeclaration] = []
-        var precedenceGroups: [PrecedenceGroupDeclaration] = []
-        var operators: [OperatorDeclaration] = []
 
         while peek() != .eof {
-            if isMainBlockStart() {
-                try skipMainBlockForDeclarationDiscovery()
-                continue
-            }
-
-            if isStateDeclarationStart() {
-                try skipStateDeclarationForDeclarationDiscovery()
-                continue
-            }
-
-            if isCallableStart() {
-                topLevelCallables.append(try parseCallableDeclaration(signatureOnly: true))
-                continue
-            }
-
             if isMacroDeclarationStart() {
                 let declaration = try parseMacroDeclaration(signatureOnly: true)
                 macros.append(declaration)
@@ -460,52 +112,18 @@ public struct Parser {
                 continue
             }
 
-            if isPrecedenceGroupDeclarationStart() {
-                let declaration = try parsePrecedenceGroupDeclaration(requiresEOF: false)
-                precedenceGroups.append(declaration)
-                operatorEnvironment.register(precedenceGroup: declaration)
-                continue
-            }
-
-            if isOperatorDeclarationStart() {
-                let declaration = try parseOperatorDeclaration(requiresEOF: false)
-                operators.append(declaration)
-                operatorEnvironment.register(operator: declaration)
-                continue
-            }
-
-            if isExtensionDeclarationStart() {
-                extensions.append(try parseExtensionDeclarationForDeclarationDiscovery())
-                continue
-            }
-
-            if isConstructDeclarationStart() || isBuilderDeclarationStart() {
-                constructs.append(try parseConstructDeclarationForDeclarationDiscovery())
-                continue
-            }
-
-            if isEnumDeclarationStart() {
-                enumerations.append(try parseEnumDeclaration(requiresEOF: false))
-                continue
-            }
-
-            advance()
+            throw ParseError(
+                "Range source accepts only @macro declarations and top-level macro blocks."
+            )
         }
 
         try consume(.eof)
 
-        return .module(
-            ModuleFileNode(
-                mainBlock: nil,
-                states: [],
-                callables: topLevelCallables,
-                constructs: constructs,
-                enumerations: enumerations,
-                macros: macros,
-                precedenceGroups: precedenceGroups,
-                operators: operators,
-                extensions: extensions
-            )
+        return ModuleFileNode(
+            constructs: [],
+            enumerations: [],
+            macros: macros,
+            extensions: []
         )
     }
 

@@ -21,7 +21,7 @@ extension CLI {
                     at: input ?? ".",
                     options: .init(requireManifestForDirectory: true)
                 )
-                let compiledProgram = try ProjectSourceValidator.validatedCompiledProgram(
+                let compiledProgram = try ProjectSourceValidator.compiledProgram(
                     for: project
                 )
                 let emitter = CapabilityLLVMEmitter()

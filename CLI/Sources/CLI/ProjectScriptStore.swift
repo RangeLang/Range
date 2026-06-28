@@ -79,7 +79,7 @@ struct ProjectScriptStore {
     private func starterScript(named name: String) -> String {
         """
         @main {
-          Logger.info("Running \(name)")
+          @return(value: "Int(0)")
         }
         """
     }

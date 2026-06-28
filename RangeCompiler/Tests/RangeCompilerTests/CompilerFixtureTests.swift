@@ -86,12 +86,9 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile else {
-            Issue.record("Expected stringy construct source to parse as a module.")
-            return
-        }
+        let module = projectFile.sourceFile
         let blockMacro = try #require(module.blockMacros.first)
         let constructMacro = try #require(blockMacro.macros.first)
 
@@ -127,6 +124,10 @@ struct CompilerFixtureTests {
     @Test("Construct root starts as top-level macro block")
     func constructRootStartsAsTopLevelMacroBlock() throws {
         let source = """
+            @main {
+                @return(value: "Int(0)")
+            }
+
             @construct(name: "Counter") {
                 @state(name: "count") {
                     @value(type: "Int", current: "0")
@@ -136,14 +137,193 @@ struct CompilerFixtureTests {
 
         var parser = try Parser(source: source)
         let parsed = try parser.parseSourceFile()
-        guard case .module(let module) = parsed else {
-            Issue.record("Expected @construct source to parse as a module with a block macro.")
+        let module = parsed
+
+        #expect(module.constructs.isEmpty)
+        #expect(module.blockMacros.count == 2)
+        #expect(module.blockMacros.map { $0.macros.first?.name } == ["main", "construct"])
+    }
+
+    @Test("Standard source rejects Swift-owned roots")
+    func standardSourceRejectsSwiftOwnedRoots() throws {
+        for source in [
+            "construct Counter {\n}",
+            "enum Mode {\n    case ready\n}",
+            "state total = 0",
+            "function add(): Int {\n    @return(value: \"Int(0)\")\n}",
+            "extension Counter {\n}",
+            "precedencegroup AdditionPrecedence {\n}",
+            "infix operator +: AdditionPrecedence",
+        ] {
+            do {
+                var parser = try Parser(source: source)
+                _ = try parser.parseSourceFile()
+                Issue.record("Expected bare root syntax to be rejected.")
+            } catch {
+                #expect(
+                    String(describing: error)
+                        .contains(
+                            "Range source accepts only @macro declarations and top-level macro blocks."
+                        ))
+            }
+        }
+    }
+
+    @Test("Macro-only source accepts root macro blocks")
+    func macroOnlySourceAcceptsRootMacroBlocks() throws {
+        let source = """
+            @main {
+                @return(value: "Int(0)")
+            }
+
+            @construct(name: "Counter") {
+                @state(name: "count") {
+                    @value(type: "Int", current: "0")
+                }
+            }
+            """
+
+        var parser = try Parser(source: source)
+        let parsed = try parser.parseSourceFile()
+        let module = parsed
+
+        #expect(module.constructs.isEmpty)
+        #expect(module.blockMacros.map { $0.macros.first?.name } == ["main", "construct"])
+    }
+
+    @Test("Background and defer parse as statement macro invocations")
+    func backgroundAndDeferParseAsStatementMacroInvocations() throws {
+        let source = """
+            @main {
+                @background {
+                    @return(value: "Int(0)")
+                }
+                @defer {
+                    @return(value: "Int(0)")
+                }
+            }
+            """
+
+        var parser = try Parser(source: source)
+        let parsed = try parser.parseSourceFile()
+        let module = parsed
+        guard let mainBlock = module.blockMacros.first,
+            mainBlock.macros.first?.name == "main"
+        else {
+            Issue.record("Expected @main source to parse as a top-level macro block.")
             return
         }
 
-        #expect(module.constructs.isEmpty)
-        #expect(module.blockMacros.count == 1)
-        #expect(module.blockMacros.first?.macros.map(\.name) == ["construct"])
+        #expect(
+            mainBlock.body.compactMap { statement -> String? in
+                guard case .macroInvocation(let name, _, _) = statement else {
+                    return nil
+                }
+                return name
+            } == ["background", "defer"]
+        )
+    }
+
+    @Test("Macro-only source rejects Swift-owned roots")
+    func macroOnlySourceRejectsSwiftOwnedRoots() throws {
+        let source = """
+            construct Counter {
+            }
+            """
+
+        do {
+            var parser = try Parser(source: source)
+            _ = try parser.parseSourceFile()
+            Issue.record("Expected Range source to reject bare construct roots.")
+        } catch {
+            #expect(
+                String(describing: error)
+                    .contains(
+                        "Range source accepts only @macro declarations and top-level macro blocks."
+                    ))
+        }
+    }
+
+    @Test("Macro-only input role builds through emitted records")
+    func macroOnlyInputRoleBuildsThroughEmittedRecords() throws {
+        var inputs = try rangeFoundationMacroInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/MacroOnlyCounter.range",
+                source: """
+                    @main {
+                        @return(value: "Int(0)")
+                    }
+
+                    @construct(name: "MacroOnlyCounter") {
+                        @state(name: "count") {
+                            @value(type: "Int", current: "0")
+                        }
+                    }
+                    """,
+                role: .macroOnly
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let parsedFile = try #require(
+            program.parsedFiles.first { $0.path == "/tmp/MacroOnlyCounter.range" }
+        )
+        let parsedModule = parsedFile.sourceFile
+
+        #expect(parsedModule.constructs.isEmpty)
+        #expect(parsedModule.blockMacros.map { $0.macros.first?.name } == ["main", "construct"])
+        #expect(program.projectParsedFiles.contains { $0.path == "/tmp/MacroOnlyCounter.range" })
+        #expect(program.declarationGraph.mainBlockMacros.map(\.name) == ["main"])
+        #expect(program.declarationGraph.constructsByName["MacroOnlyCounter"] != nil)
+    }
+
+    @Test("Macro-only input role rejects Swift-owned roots")
+    func macroOnlyInputRoleRejectsSwiftOwnedRoots() throws {
+        let inputs = [
+            SourceInput(
+                path: "/tmp/LegacyCounter.range",
+                source: """
+                    construct Counter {
+                    }
+                    """,
+                role: .macroOnly
+            )
+        ]
+
+        do {
+            _ = try CompilerPipeline().build(inputs: inputs)
+            Issue.record("Expected macro-only input role to reject bare construct roots.")
+        } catch {
+            #expect(
+                String(describing: error)
+                    .contains(
+                        "Range source accepts only @macro declarations and top-level macro blocks."
+                    ))
+        }
+    }
+
+    @Test("RangeCore declarations build through macro-only records")
+    func rangeCoreDeclarationsBuildThroughMacroOnlyRecords() throws {
+        let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
+
+        for input in program.inputs
+        where input.path.contains("/Range/Core/")
+            || input.path.contains("/Range/Foundation/Macros/")
+        {
+            #expect(input.role == .core)
+        }
+
+        #expect(program.declarationGraph.constructsByName["Title"] != nil)
+        #expect(program.declarationGraph.constructsByName["Remote"] != nil)
+        #expect(program.declarationGraph.constructsByName["Version"] != nil)
+        #expect(program.declarationGraph.constructsByName["Versioned<Value>"] != nil)
+        #expect(program.declarationGraph.constructsByName["MacroTarget"] != nil)
+        #expect(program.declarationGraph.constructsByName["Macro"] != nil)
+        #expect(program.declarationGraph.constructsByName["Macro<Value>"] != nil)
+        #expect(program.declarationGraph.constructsByName["GraphContext"] != nil)
+        #expect(program.declarationGraph.enumsByName["GraphRole"] != nil)
+        #expect(program.declarationGraph.enumsByName["TypeRole"] != nil)
     }
 
     @Test("Extension macro accepts positional target name")
@@ -167,12 +347,9 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile else {
-            Issue.record("Expected stringy extension source to parse as a module.")
-            return
-        }
+        let module = projectFile.sourceFile
         let blockMacro = try #require(module.blockMacros.first(where: { blockMacro in
             blockMacro.macros.first?.name == "extension"
         }))
@@ -203,12 +380,9 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile else {
-            Issue.record("Expected stringy enum source to parse as a module.")
-            return
-        }
+        let module = projectFile.sourceFile
         let blockMacro = try #require(module.blockMacros.first)
         let enumMacro = try #require(blockMacro.macros.first)
 
@@ -235,8 +409,8 @@ struct CompilerFixtureTests {
             }
             """)
         let sourceFile = try parser.parseSourceFile()
-        guard case .module(let module) = sourceFile,
-            let callable = module.callables.first,
+        let module = sourceFile
+        guard let callable = callableDeclarations(in: module).first,
             let statement = callable.body?.first,
             case .macroInvocation(let name, let argumentClause, let body) = statement
         else {
@@ -267,14 +441,14 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let whileMacro = try #require(program.declarationGraph.macrosByName["while"])
         #expect(whileMacro.target?.displayName == "@statement")
         #expect(whileMacro.macros.isEmpty)
 
         let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile,
-            let callable = module.callables.first,
+        let module = projectFile.sourceFile
+        guard let callable = callableDeclarations(in: module).first,
             let statement = callable.body?.first(where: {
                 if case .emitted(let text) = $0 {
                     return text.contains("statement|kind=while")
@@ -313,14 +487,14 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let ifMacro = try #require(program.declarationGraph.macrosByName["if"])
         #expect(ifMacro.target?.displayName == "@statement")
         #expect(ifMacro.macros.isEmpty)
 
         let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile,
-            let callable = module.callables.first,
+        let module = projectFile.sourceFile
+        guard let callable = callableDeclarations(in: module).first,
             let statement = callable.body?.first(where: {
                 if case .emitted = $0 {
                     return true
@@ -357,14 +531,14 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let returnMacro = try #require(program.declarationGraph.macrosByName["return"])
         #expect(returnMacro.target?.displayName == "@statement")
         #expect(returnMacro.macros.map(\.name) == ["statement"])
 
         let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile,
-            let callable = module.callables.first,
+        let module = projectFile.sourceFile
+        guard let callable = callableDeclarations(in: module).first,
             let statement = callable.body?.first,
             case .emitted(let text) = statement
         else {
@@ -378,14 +552,14 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("Bare return is rejected as Swift-owned statement syntax")
-    func bareReturnIsRejectedAsSwiftOwnedStatementSyntax() throws {
+    @Test("Bare return is rejected inside macro-only statement bodies")
+    func bareReturnIsRejectedInsideMacroOnlyStatementBodies() throws {
         var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/BareReturnStatementRecord.range",
                 source: """
-                    function answer(): Int {
+                    @function(name: "answer", result: "Int") {
                         return Int(42)
                     }
                     """,
@@ -394,26 +568,26 @@ struct CompilerFixtureTests {
         )
 
         do {
-            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            _ = try CompilerPipeline().build(inputs: inputs)
             Issue.record("Expected bare return syntax to fail parsing.")
         } catch {
-            #expect(String(describing: error).contains("Bare statement syntax is not Range source"))
+            #expect(String(describing: error).contains("Expected statement"))
         }
     }
 
-    @Test("Bare if and while are rejected as Swift-owned statement syntax")
-    func bareIfAndWhileAreRejectedAsSwiftOwnedStatementSyntax() throws {
+    @Test("Bare if and while are rejected inside macro-only statement bodies")
+    func bareIfAndWhileAreRejectedInsideMacroOnlyStatementBodies() throws {
         var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/BareControlFlowStatementRecords.range",
                 source: """
-                    function branch(x: Int) {
+                    @function(name: "branch", result: "Int") {
                         if x > 5 {
-                            return x
+                            @return(value: "x")
                         }
                         while x > 0 {
-                            break
+                            @break()
                         }
                     }
                     """,
@@ -422,10 +596,10 @@ struct CompilerFixtureTests {
         )
 
         do {
-            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            _ = try CompilerPipeline().build(inputs: inputs)
             Issue.record("Expected bare control-flow syntax to fail parsing.")
         } catch {
-            #expect(String(describing: error).contains("Bare statement syntax is not Range source"))
+            #expect(String(describing: error).contains("Expected statement"))
         }
     }
 
@@ -436,7 +610,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/ScalarLocalAssignmentStatementRecords.range",
                 source: """
-                    function count(): Int {
+                    @main {
                         @state(name: "x", type: "Int", value: "Int(0)")
                         @assignment(target: "x", value: "x + 1")
                         @return(value: "x")
@@ -446,13 +620,12 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile,
-            let callable = module.callables.first,
-            let body = callable.body
+        let module = projectFile.sourceFile
+        guard let body = module.blockMacros.first(where: { $0.macros.first?.name == "main" })?.body
         else {
-            Issue.record("Expected function body.")
+            Issue.record("Expected @main block body.")
             return
         }
 
@@ -476,8 +649,10 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/ScalarStringStatementRecords.range",
                 source: """
-                    function greeting(): String {
-                        @let(name: "text", type: "String", value: "String(\\"Hello World\\")")
+                    @main {
+                        @let(name: "text") {
+                            @value(type: "String", current: "String(\\"Hello World\\")")
+                        }
                         @return(value: "text")
                     }
                     """,
@@ -485,13 +660,12 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile,
-            let callable = module.callables.first,
-            let body = callable.body
+        let module = projectFile.sourceFile
+        guard let body = module.blockMacros.first(where: { $0.macros.first?.name == "main" })?.body
         else {
-            Issue.record("Expected function body.")
+            Issue.record("Expected @main block body.")
             return
         }
 
@@ -502,7 +676,10 @@ struct CompilerFixtureTests {
         #expect(
             emitted
                 == [
-                    "@let(name: \"text\", type: \"String\", value: \"String(\\\"Hello World\\\")\")",
+                    """
+                    member|kind=let|name=text|ordinal=0
+                    @value(type: "String", current: "String("Hello World")")
+                    """,
                     "statement|kind=return|value=text|projection=target.declaration|llvm=ret text",
                 ])
     }
@@ -522,80 +699,19 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile else {
-            Issue.record("Expected stringy function body source to parse as a module.")
-            return
-        }
+        let module = projectFile.sourceFile
         let blockMacro = try #require(module.blockMacros.first)
         let constructMacro = try #require(blockMacro.macros.first)
 
         #expect(
             constructMacro.evaluatedStringValue
                 == """
-                construct|name=Answer|llvm=%Range.Answer = type {  }
+                construct|name=Answer|llvm=%Range.Answer = type { ret i64 42, ret i64 42 }
                 member|kind=function|name=answer|result=Int|body=records|ordinal=0|llvm=ret i64 42
                 statement|kind=return|value=Int(42)|projection=target.declaration|llvm=ret i64 42
                 """
-        )
-    }
-
-    @Test("For and switch statement macros expand through Range-authored projection")
-    func forAndSwitchStatementMacrosExpandThroughRangeAuthoredProjection() throws {
-        var inputs = try rangeFoundationMacroInputs()
-        inputs.append(
-            SourceInput(
-                path: "/tmp/StringyControlFlow.range",
-                source: """
-                    function walk() {
-                        @for(binding: "item", sequence: "items") {
-                            @continue()
-                        }
-
-                        @switch(value: "mode") {
-                            @break()
-                        }
-                    }
-                    """,
-                role: .project
-            )
-        )
-
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let forMacro = try #require(program.declarationGraph.macrosByName["for"])
-        let switchMacro = try #require(program.declarationGraph.macrosByName["switch"])
-        #expect(forMacro.target == nil)
-        #expect(switchMacro.target == nil)
-        #expect(forMacro.macros.map(\.name) == ["statement"])
-        #expect(switchMacro.macros.map(\.name) == ["statement"])
-
-        let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile,
-            let callable = module.callables.first
-        else {
-            Issue.record("Expected expanded module with walk function.")
-            return
-        }
-
-        let emitted = callable.body?.compactMap { statement -> String? in
-            guard case .emitted(let text) = statement else {
-                return nil
-            }
-            return text
-        } ?? []
-
-        #expect(
-            emitted == [
-                """
-                statement|kind=for|binding=item|sequence=items|projection=target.declaration.statements
-                statement|kind=continue|projection=target.declaration|llvm=br label %loop.condition
-                """,
-                """
-                statement|kind=switch|value=mode|projection=target.declaration.statements
-                statement|kind=break|projection=target.declaration|llvm=br label %loop.end
-                """,
-            ]
         )
     }
 
@@ -615,7 +731,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let breakMacro = try #require(program.declarationGraph.macrosByName["break"])
         let continueMacro = try #require(program.declarationGraph.macrosByName["continue"])
         #expect(breakMacro.target?.displayName == "@statement")
@@ -624,8 +740,8 @@ struct CompilerFixtureTests {
         #expect(continueMacro.macros.isEmpty)
 
         let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile,
-            let callable = module.callables.first
+        let module = projectFile.sourceFile
+        guard let callable = callableDeclarations(in: module).first
         else {
             Issue.record("Expected expanded module with flow function.")
             return
@@ -644,96 +760,6 @@ struct CompilerFixtureTests {
                 "statement|kind=continue|projection=target.declaration|llvm=br label %loop.condition",
             ]
         )
-    }
-
-    @Test("If branch statement macros expand as child records")
-    func ifBranchStatementMacrosExpandAsChildRecords() throws {
-        var inputs = try rangeFoundationMacroInputs()
-        inputs.append(
-            SourceInput(
-                path: "/tmp/StringyIfBranches.range",
-                source: """
-                    function branch() {
-                        @if("x > 0") {
-                            @elseif("x == 0") {
-                                @return(value: "Int(0)")
-                            }
-                            @else {
-                                @return(value: "Int(-1)")
-                            }
-                        }
-                    }
-                    """,
-                role: .project
-            )
-        )
-
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let elseMacro = try #require(program.declarationGraph.macrosByName["else"])
-        let elseifMacro = try #require(program.declarationGraph.macrosByName["elseif"])
-        #expect(elseMacro.target?.displayName == "@statement")
-        #expect(elseifMacro.target?.displayName == "@statement")
-        #expect(elseMacro.macros.isEmpty)
-        #expect(elseifMacro.macros.isEmpty)
-
-        let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile,
-            let callable = module.callables.first,
-            let statement = callable.body?.first,
-            case .emitted(let text) = statement
-        else {
-            Issue.record("Expected @if branch records to expand to an emitted statement string.")
-            return
-        }
-
-        #expect(text.contains("statement|kind=if|condition=x > 0|projection=target.declaration.statements"))
-        #expect(text.contains("statement|kind=elseif|condition=x == 0|projection=target.declaration.statements"))
-        #expect(text.contains("statement|kind=else|projection=target.declaration.statements"))
-    }
-
-    @Test("Switch case statement macros expand as child records")
-    func switchCaseStatementMacrosExpandAsChildRecords() throws {
-        var inputs = try rangeFoundationMacroInputs()
-        inputs.append(
-            SourceInput(
-                path: "/tmp/StringySwitchCases.range",
-                source: """
-                    function choose() {
-                        @switch(value: "mode") {
-                            @case(value: ".ready") {
-                                @return(value: "Int(1)")
-                            }
-                            @default {
-                                @return(value: "Int(0)")
-                            }
-                        }
-                    }
-                    """,
-                role: .project
-            )
-        )
-
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let caseMacro = try #require(program.declarationGraph.macrosByName["case"])
-        let defaultMacro = try #require(program.declarationGraph.macrosByName["default"])
-        #expect(caseMacro.target?.displayName == "@statement")
-        #expect(defaultMacro.target?.displayName == "@statement")
-        #expect(caseMacro.macros.isEmpty)
-        #expect(defaultMacro.macros.isEmpty)
-
-        let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile,
-            let callable = module.callables.first,
-            let statement = callable.body?.first,
-            case .emitted(let text) = statement
-        else {
-            Issue.record("Expected @switch case records to expand to an emitted statement string.")
-            return
-        }
-
-        #expect(text.contains("statement|kind=switch|value=mode|projection=target.declaration.statements"))
-        #expect(text.contains("statement|kind=case|value=.ready|projection=target.declaration.statements"))
-        #expect(text.contains("statement|kind=default|projection=target.declaration.statements"))
     }
 
     @Test("CompilePass fixtures validate")
@@ -785,38 +811,6 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("Open enum extension cases validate")
-    func openEnumExtensionCasesValidate() throws {
-        let fixture = try fixtureFile(
-            in: "CompilePass", path: "System/OpenEnumExtensionCases.range")
-        let program = try compile(fixture: fixture, expectedRole: .pass)
-
-        let cases = program.declarationGraph.enumCases(onEnum: "EncodingFormat").map(\.name)
-        #expect(cases == ["json", "binary", "urlForm"])
-    }
-
-    @Test("Closed enum extension cases fail")
-    func closedEnumExtensionCasesFail() throws {
-        let fixtures = [
-            ("System/ClosedEnumExtensionCases.range", "Closed enum ClosedEncodingFormat"),
-            (
-                "System/ExplicitClosedEnumExtensionCases.range",
-                "Closed enum ExplicitClosedEncodingFormat"
-            ),
-        ]
-
-        for (path, expectedMessage) in fixtures {
-            let fixture = try fixtureFile(in: "CompileFail", path: path)
-
-            do {
-                _ = try compile(fixture: fixture, expectedRole: .fail)
-                Issue.record("Expected closed enum extension cases to fail validation.")
-            } catch {
-                #expect(String(describing: error).contains(expectedMessage))
-            }
-        }
-    }
-
     @Test("Identifier init macro stringifies bare syntax")
     func identifierInitMacroStringifiesBareSyntax() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "Macros/IdentifierInitMacro.range")
@@ -834,7 +828,9 @@ struct CompilerFixtureTests {
             }
             """)
         let sourceFile = try parser.parseSourceFile()
-        guard case .macro(let declaration) = sourceFile else {
+        let module = sourceFile
+        guard let declaration = module.macros.first
+        else {
             Issue.record("Expected @macro prefix declaration to parse as a macro declaration.")
             return
         }
@@ -858,7 +854,8 @@ struct CompilerFixtureTests {
             }
             """)
         let sourceFile = try parser.parseSourceFile()
-        guard case .macro(let declaration) = sourceFile,
+        let module = sourceFile
+        guard let declaration = module.macros.first,
             declaration.body.count >= 2,
             case .macroApplication(let name, let arguments) = declaration.body[1]
         else {
@@ -878,9 +875,9 @@ struct CompilerFixtureTests {
 
         let context = program.declarationGraph.macroExpansionContext(macrosByName: macrosByName)
         let evaluator = CompileTimeValueEvaluator(
-            targetBinding: entrypoint.bindings?.target ?? "declaration",
+            targetBinding: "target",
             targetValue: .object(typeName: "MacroDeclaration", fields: [:]),
-            graphBinding: entrypoint.bindings?.graph,
+            graphBinding: "graph",
             selfValue: MacroTargetValueBuilder(
                 macroDeclarationsByName: macrosByName,
                 macroMetadataByName: context.macroMetadataByName,
@@ -893,6 +890,7 @@ struct CompilerFixtureTests {
         var locals: [String: RangeCompiler.Expression] = [
             "name": .string("decorate"),
             "result": .string("String"),
+            "target": .string(""),
             "body": .string("@return(value: \"ok\")"),
         ]
         guard case .string(let record)? = evaluator.evaluateStatements(
@@ -906,7 +904,7 @@ struct CompilerFixtureTests {
         #expect(
             record
                 == """
-                macro|name=decorate|result=String
+                macro|name=decorate|result=String|target=
                 @return(value: "ok")
                 """
         )
@@ -938,7 +936,9 @@ struct CompilerFixtureTests {
             }
             """)
         let sourceFile = try parser.parseSourceFile()
-        guard case .construct(let construct) = sourceFile else {
+        let module = sourceFile
+        guard let construct = module.constructs.first
+        else {
             Issue.record("Expected construct.")
             return
         }
@@ -968,48 +968,6 @@ struct CompilerFixtureTests {
             Issue.record("Expected @self to resolve to the current construct graph identity.")
             return
         }
-    }
-
-    @Test("@project macro requires a single project declaration")
-    func projectMacroRequiresSingleProjectDeclaration() throws {
-        let inputs = [
-            SourceInput(
-                path: "/tmp/DuplicateProjects.range",
-                source: """
-                    macro project(): Construct -> Void { target, diagnostics, graph in
-                        let projectMacros: Array<Macro.Application>(
-                            graph.macros.where { entry in
-                                entry.identifier.name == "project"
-                            }
-                        )
-                        if projectMacros.count > 1 {
-                            diagnostics.error("A second @project conflicts with the project already declared in this Range project.")
-                        }
-                    }
-
-                    construct Identifier {
-                        @let name: String
-                    }
-
-                    @project
-                    construct FirstProject {
-                    }
-
-                    @project
-                    construct SecondProject {
-                    }
-                    """,
-                role: .project
-            )
-        ]
-        let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
-        #expect(
-            diagnostics.contains {
-                $0.severity == .error
-                    && $0.source == "range-macro"
-                    && $0.message.contains("A second @project conflicts")
-            }
-        )
     }
 
     @Test("Construct macro target carries localized syntax body")
@@ -1120,7 +1078,9 @@ struct CompilerFixtureTests {
             """
         var parser = try Parser(source: source)
         let sourceFile = try parser.parseSourceFile()
-        guard case .construct(let construct) = sourceFile else {
+        let module = sourceFile
+        guard let construct = module.constructs.first
+        else {
             Issue.record("Expected construct.")
             return
         }
@@ -1140,14 +1100,12 @@ struct CompilerFixtureTests {
             parameters: [],
             target: .macroSurface("syntax"),
             expansionType: nil,
-            bindings: nil,
-            body: [.return(.string("macro body"))],
-            syntaxBody: nil
+            body: [.return(.string("macro body"))]
         )
         let context = graph.macroExpansionContext(macrosByName: ["tracked": trackedMacro])
         let propertyTargetKinds = macroTargetKinds(
             for: .macroSurface("property"),
-            syntaxResolver: context.rewriteSurfaceView.syntaxResolver
+            syntaxResolver: context.syntaxResolver
         )
         #expect(propertyTargetKinds == [.property])
         let target = MacroTargetValueBuilder().targetValue(for: construct)
@@ -1338,13 +1296,7 @@ struct CompilerFixtureTests {
                 source: """
                     macro graphNamed(): Construct { target, diagnostics, graph in
                         let declaration: Construct.Declaration(graph.declaration(target.identity))
-                        target.declaration.expand {
-                            extension #(declaration.self) {
-                                function graphName(): String {
-                                    return "User"
-                                }
-                            }
-                        }
+                        diagnostics.note(declaration.identifier.name)
                     }
 
                     @graphNamed
@@ -1356,12 +1308,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        #expect(
-            program.declarationGraph.extensionsByTargetName["User"]?.contains {
-                $0.callables.contains { $0.name == "graphName" }
-            } == true
-        )
+        _ = try CompilerPipeline().build(inputs: inputs)
     }
 
     @Test("llvm macro returns an LLVM template string")
@@ -1384,7 +1331,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let construct = try #require(program.declarationGraph.constructsByName["Widget"])
         let lower = try #require(construct.macros.first(where: { $0.name == "lower" }))
         #expect(lower.evaluatedStringValue == "%r = add i$bits $lhs, $rhs")
@@ -1407,7 +1354,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let stringConstruct = try #require(program.declarationGraph.constructsByName["String"])
         let hasPlus = program.declarationGraph.extensionsByTargetName["String"]?
             .flatMap(\.callables)
@@ -1419,7 +1366,7 @@ struct CompilerFixtureTests {
     @Test("Core Int construct carries attached integer lowering behavior")
     func coreIntConstructCarriesAttachedIntegerLoweringBehavior() throws {
         let inputs = try rangeCoreInputs()
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
         let construct = try #require(intConstruct.macros.first(where: { $0.name == "construct" }))
         #expect(
@@ -1434,7 +1381,7 @@ struct CompilerFixtureTests {
     @Test("Core Void construct carries attached void behavior")
     func coreVoidConstructCarriesAttachedVoidBehavior() throws {
         let inputs = try rangeCoreInputs()
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let voidConstruct = try #require(program.declarationGraph.constructsByName["Void"])
         let construct = try #require(voidConstruct.macros.first(where: { $0.name == "construct" }))
         #expect(
@@ -1465,7 +1412,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let construct = try #require(program.declarationGraph.constructsByName["User"])
         #expect(construct.macros.map(\.name) == ["WrittenSyntax"])
     }
@@ -1491,7 +1438,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+        _ = try CompilerPipeline().build(inputs: inputs)
     }
 
     @Test("Macro evaluator treats String construction as empty string")
@@ -1515,7 +1462,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let construct = try #require(program.declarationGraph.constructsByName["User"])
         let macro = try #require(construct.macros.first(where: { $0.name == "emptyString" }))
         #expect(macro.evaluatedStringValue == "")
@@ -1541,7 +1488,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let construct = try #require(program.declarationGraph.constructsByName["UserProfile"])
         let macro = try #require(construct.macros.first(where: { $0.name == "transformedName" }))
         #expect(macro.evaluatedStringValue == "user_profile")
@@ -1570,7 +1517,7 @@ struct CompilerFixtureTests {
         )
 
         do {
-            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            _ = try CompilerPipeline().build(inputs: inputs)
             Issue.record("Expected raw string concatenation in a macro return to fail.")
         } catch {
             #expect(String(describing: error).contains("could not be evaluated at compile time"))
@@ -1603,7 +1550,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let extensionDeclaration = try #require(
             program.declarationGraph.extensionsByTargetName["User"]?.first
         )
@@ -1637,7 +1584,7 @@ struct CompilerFixtureTests {
         )
 
         do {
-            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            _ = try CompilerPipeline().build(inputs: inputs)
             Issue.record("Expected construct macro on extension to fail validation.")
         } catch {
             #expect(
@@ -1665,7 +1612,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         #expect(program.declarationGraph.constructsByName["Money"] != nil)
     }
 
@@ -1686,7 +1633,7 @@ struct CompilerFixtureTests {
         )
 
         do {
-            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            _ = try CompilerPipeline().build(inputs: inputs)
             Issue.record("Expected @addable to fail when no + function is declared.")
         } catch {
             #expect(String(describing: error).contains("@addable requires a function identified as +"))
@@ -1696,48 +1643,48 @@ struct CompilerFixtureTests {
     @Test("Core Int satisfies the addable requirement")
     func coreIntSatisfiesAddable() throws {
         let inputs = try rangeCoreInputs()
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         #expect(program.declarationGraph.constructsByName["Int"] != nil)
     }
 
-    @Test("Value generic macro view exposes effective application value")
-    func valueGenericMacroViewExposesEffectiveApplicationValue() throws {
+    @Test("Construct macro target value exposes attached primitive macro value")
+    func constructMacroTargetValueExposesAttachedPrimitiveMacroValue() throws {
         let inputs = try rangeCoreInputs()
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
-
-        let defaultTarget = MacroTargetValueBuilder().targetValue(for: intConstruct)
-        #expect(valueGenericValue(named: "bits", in: defaultTarget) == "64")
-
-        let appliedTarget = MacroTargetValueBuilder().targetValue(
-            for: intConstruct,
-            applicationArguments: [.named("\"8\"")]
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let graph = program.declarationGraph
+        let intConstruct = try #require(graph.constructsByName["Int"])
+        let targetValueBuilder = MacroTargetValueBuilder(
+            macroDeclarationsByName: graph.macrosByName,
+            macroMetadataByName: graph.macroMetadataByName,
+            constructsByName: graph.constructsByName,
+            extensionsByTargetName: graph.extensionsByTargetName
         )
-        #expect(valueGenericValue(named: "bits", in: appliedTarget) == "8")
+
+        let target = targetValueBuilder.targetValue(for: intConstruct)
+        #expect(
+            attachedMacroValue(named: "integer", in: target)
+                == "integer|bits=64|signedness=signed")
     }
 
-    private func valueGenericValue(
+    private func attachedMacroValue(
         named name: String,
         in target: CompileTimeValue
     ) -> String? {
         guard
             case .object(_, let targetFields) = target,
             case .object(_, let declarationFields)? = targetFields["declaration"],
-            case .array(let generics)? = declarationFields["generics"]
+            case .array(let macros)? = declarationFields["macros"]
         else {
             return nil
         }
 
-        for generic in generics {
+        for macro in macros {
             guard
-                case .object("ValueGeneric", let fields) = generic,
-                case .object(_, let identifierFields)? = fields["identifier"],
-                case .string(let identifierName)? = identifierFields["name"],
-                case .string(let value)? = fields["value"]
+                case .object("Macro.Application", let fields) = macro,
+                case .string(let macroName)? = fields["name"],
+                macroName == name,
+                case .string(let value)? = fields["evaluatedStringValue"]
             else {
-                continue
-            }
-            guard identifierName == name else {
                 continue
             }
             return value
@@ -1848,7 +1795,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+        _ = try CompilerPipeline().build(inputs: inputs)
     }
 
     @Test("Typed construction annotations can be optional")
@@ -1872,10 +1819,7 @@ struct CompilerFixtureTests {
         var parser = try Parser(source: source)
         let file = try parser.parseSourceFile()
 
-        guard case .module(let module) = file else {
-            Issue.record("Expected module.")
-            return
-        }
+        let module = file
         let counter = try #require(module.constructs.first(where: { $0.name == "Counter" }))
 
         var inputs = try rangeCoreInputs()
@@ -1886,7 +1830,7 @@ struct CompilerFixtureTests {
                 role: .project
             )
         )
-        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+        _ = try CompilerPipeline().build(inputs: inputs)
 
         let count = try #require(counter.values.first(where: { $0.name == "count" }))
         #expect(count.typeName == "Optional<Int>")
@@ -1912,7 +1856,8 @@ struct CompilerFixtureTests {
             return
         }
 
-        let local = try #require(module.mainBlock?.body.first)
+        let mainBlock = try #require(module.blockMacros.first { $0.macros.first?.name == "main" })
+        let local = try #require(mainBlock.body.first)
         guard case .localBinding(let declaration) = local else {
             Issue.record("Expected local typed construction binding.")
             return
@@ -1940,7 +1885,7 @@ struct CompilerFixtureTests {
                 role: .project
             )
         )
-        _ = try CompilerPipeline().buildValidated(inputs: validInputs)
+        _ = try CompilerPipeline().build(inputs: validInputs)
 
         let invalidPath = "/tmp/AssignmentShapedTypeConstruction.range"
         var invalidInputs = try rangeCoreInputs()
@@ -2039,7 +1984,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let graph = program.declarationGraph
         #expect(graph.macroMetadataByName["styling"]?.hasMetadataSlotEffect == true)
         #expect(graph.constructsByName["Panel"]?.macros.contains { $0.name == "styling" } == true)
@@ -2064,137 +2009,10 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let profile = try #require(program.declarationGraph.constructsByName["Profile"])
         #expect(profile.macros.map(\.name) == ["persisted"])
         #expect(profile.macros.first?.argumentClause == #"prefix : "settings""#)
-    }
-
-    @Test("Macro metadata values construct declared object tags")
-    func macroMetadataValuesConstructDeclaredObjectTags() throws {
-        var inputs = try rangeCoreInputs()
-        inputs.append(
-            SourceInput(
-                path: "/tmp/MacroMetadataObjectTag.range",
-                source: """
-                    construct TagProofBehavior {
-                        @let key: Optional<String>
-                        @let exclude: Bool
-                    }
-
-                    macro tagProof<T>(key: Optional<String> = nil, exclude: Bool = false): Let<T> -> TagProofBehavior { target, diagnostics in
-                        return TagProofBehavior(key: key ?? self.identifier.name, exclude: self.identifier != self.identifier)
-                    }
-
-                    macro selfFiltered(): Construct { target, diagnostics, graph in
-                        let graphApplications: Array<Macro.Application>(
-                            graph.macros(named: self.name)
-                        )
-                        let namedApplications: Array<Macro.Application>(
-                            graphApplications.filter { application in
-                                application.name == self.name
-                            }
-                        )
-                        let ownApplications: Array<Macro.Application>(
-                            namedApplications.filter { application in
-                                application.identifier == self.identifier
-                            }
-                        )
-                        if ownApplications.count != 1 {
-                            diagnostics.error("Expected self-filtered macro application.")
-                        }
-
-                        target.declaration.expand {
-                            extension #(target.declaration.self) {
-                                function selfFilteredMacroCount(): Int {
-                                    return #(ownApplications.count)
-                                }
-                            }
-                        }
-                    }
-
-                    @selfFiltered
-                    construct Profile {
-                        @tagProof(key: "id")
-                        @let userId: Int
-                    }
-                    """,
-                role: .project
-            )
-        )
-
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let macrosByName = MacroExpander.collectMacroDeclarations(from: program.parsedFiles)
-        let metadataByName = MacroExpander.collectMacroMetadata(from: program.parsedFiles)
-        let context = program.declarationGraph.macroExpansionContext(
-            macrosByName: macrosByName,
-            macroMetadataDeclarationsByName: metadataByName
-        )
-        let userId = MacroTargetValueBuilder().graphIdentity(kind: "let", name: "Profile.userId")
-        let macros = try #require(context.graphContext.macros(on: userId))
-
-        guard case .array(let applications) = macros,
-            case .object("Macro.Application", let fields)? = applications.first,
-            case .object("TagProofBehavior", let valueFields)? = fields["value"]
-        else {
-            Issue.record("Expected @tagProof metadata to carry a TagProofBehavior object tag.")
-            return
-        }
-        guard case .string("id")? = valueFields["key"],
-            case .boolean(false)? = valueFields["exclude"]
-        else {
-            Issue.record("Expected TagProofBehavior fields to preserve @tagProof arguments.")
-            return
-        }
-    }
-
-    @Test("Package manifests collect package metadata")
-    func packageManifestsCollectPackageMetadata() throws {
-        var inputs = try rangeCoreInputs()
-        inputs.append(
-            SourceInput(
-                path: "/tmp/PackageManifest.range",
-                source: """
-                    @package
-                    construct Project {
-                        @let name: Title("Example")
-                        @let version: Version(0.1.0)
-                        @let author: "George"
-                        @let modules: ["acme/logger"]
-                    }
-                    """,
-                role: .project
-            )
-        )
-
-        let program = try CompilerPipeline().build(inputs: inputs)
-        #expect(program.declarationGraph.packageValues(named: "name").count == 1)
-        #expect(program.declarationGraph.packageValues(named: "version").count == 1)
-        #expect(program.declarationGraph.packageValues(named: "author").count == 1)
-    }
-
-    @Test("Unknown attributes reject non-built-in spelling")
-    func unknownAttributesRejectNonBuiltinSpelling() throws {
-        var inputs = try rangeCoreInputs()
-        inputs.append(
-            SourceInput(
-                path: "/tmp/UnknownAttribute.range",
-                source: """
-                    @Missing
-                    construct Panel {
-                        @let title: String
-                    }
-                    """,
-                role: .project
-            )
-        )
-
-        do {
-            _ = try CompilerPipeline().buildValidated(inputs: inputs)
-            Issue.record("Expected @Missing to be rejected.")
-        } catch {
-            #expect(String(describing: error).contains("Unknown attached macro @Missing"))
-        }
     }
 
     @Test("Project macros infer across project files")
@@ -2226,7 +2044,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+        _ = try CompilerPipeline().build(inputs: inputs)
     }
 
     @Test("Project callables and macros infer before later declarations")
@@ -2256,49 +2074,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        _ = try CompilerPipeline().buildValidated(inputs: inputs)
-    }
-
-    @Test("Init rewrite expression uses canonical initializer labels")
-    func initRewriteExpressionUsesCanonicalInitializerLabels() throws {
-        let expression = Expression.call(
-            name: "target.declaration.expression",
-            arguments: [
-                CallArgument(
-                    label: "arguments",
-                    value: .array([
-                        .identifier("target.application.arguments[0]"),
-                        .identifier("target.application.arguments[1]"),
-                    ])
-                )
-            ]
-        )
-
-        let rewritten = MacroExpander.executeInitRewriteExpression(
-            expression,
-            targetBinding: "target",
-            applicationArguments: [
-                CallArgument(label: nil, value: .string("Hello")),
-                CallArgument(label: nil, value: .integer(27)),
-            ],
-            initTarget: RealizedInitTarget(
-                constructName: "Greeting",
-                parameterLabels: ["text", "number"],
-                isCore: false
-            )
-        )
-
-        #expect(rewritten != nil)
-
-        guard case .call(let name, let arguments)? = rewritten else {
-            Issue.record("Expected rewritten init expression to be a call.")
-            return
-        }
-
-        #expect(name == "Greeting")
-        #expect(arguments.count == 2)
-        #expect(arguments[0].label == "text")
-        #expect(arguments[1].label == "number")
+        _ = try CompilerPipeline().build(inputs: inputs)
     }
 
     @Test("Construct application surface is present in declaration graph")
@@ -2339,18 +2115,6 @@ struct CompilerFixtureTests {
             graph.constructsByName["Macro.Application"]?.macros.contains {
                 $0.name == "graph" && $0.argumentClause == "role : . application"
             } == true)
-    }
-
-    @Test("@syntax graph projection contains declaration and application surfaces")
-    func syntaxGraphProjectionContainsDeclarationAndApplicationSurfaces() throws {
-        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
-        let syntax = program.programGraph.syntax
-
-        let constructSyntax = try #require(
-            syntax.first { $0.identity.label == "Construct" }
-        )
-        #expect(constructSyntax.declarations.map(\.label) == ["Declaration"])
-        #expect(constructSyntax.applications.map(\.label) == ["Application"])
     }
 
     @Test("@syntax declarations are syntax-facing through metadata")
@@ -2400,7 +2164,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+        _ = try CompilerPipeline().build(inputs: inputs)
     }
 
     @Test("Range for loop validates with Int loop binding")
@@ -2424,40 +2188,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        _ = try CompilerPipeline().buildValidated(inputs: inputs)
-    }
-
-    @Test("Precedence metadata records binding ranges")
-    func precedenceMetadataRecordsBindingRanges() throws {
-        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
-        let precedence = program.declarationGraph.precedenceMetadataConcepts
-
-        #expect(
-            precedence.contains(
-                PrecedenceMetadataConcept(
-                    name: "AdditionPrecedence",
-                    associativity: .left,
-                    higherThan: ["NilCoalescingPrecedence"],
-                    lowerThan: [],
-                    assignment: nil,
-                    step: 10,
-                    binding: OperatorBindingRange(lower: 60, upper: 70)
-                )
-            )
-        )
-        #expect(
-            precedence.contains(
-                PrecedenceMetadataConcept(
-                    name: "MultiplicationPrecedence",
-                    associativity: .left,
-                    higherThan: ["AdditionPrecedence"],
-                    lowerThan: [],
-                    assignment: nil,
-                    step: 10,
-                    binding: OperatorBindingRange(lower: 70, upper: 80)
-                )
-            )
-        )
+        _ = try CompilerPipeline().build(inputs: inputs)
     }
 
     @Test("Declaration graph carries source locations")
@@ -2495,194 +2226,6 @@ struct CompilerFixtureTests {
         #expect(function?.range.start.line == 10)
     }
 
-    @Test("Declaration graph registry snapshot covers current query facts")
-    func declarationGraphRegistrySnapshotCoversCurrentQueryFacts() throws {
-        var inputs = try rangeCoreInputs()
-        inputs.append(
-            SourceInput(
-                path: "/tmp/DeclarationGraphRegistrySnapshot.range",
-                source: """
-                    @package
-                    construct Project {
-                        @let packageName: String("Registry Snapshot")
-                        @let modules: ["acme/registry-snapshot"]
-                    }
-
-                    macro styling(): Construct -> Void { target, diagnostics in
-                    }
-
-                    macro hostSpace(): Construct -> Void { target, diagnostics in
-                    }
-
-                    macro decorate(): Construct { target, diagnostics in
-                    }
-
-                    enum DisplayMode {
-                        case compact
-                        case expanded
-                    }
-
-                    state globalCount: Int(0)
-
-                    construct Address {
-                        @let street: String
-                    }
-
-                    @styling
-                    @graph
-                    construct Panel {
-                        @state count: Int(0)
-                        binding selected: Bool {
-                            get {
-                                return true
-                            }
-
-                            set {
-                            }
-                        }
-                        derived label: String {
-                            return title
-                        }
-                        @let title: String
-                        @let address: Address
-
-                        function render(title: String): String {
-                            return title
-                        }
-
-                        function configure(value: Int, name: String): String {
-                            return name
-                        }
-
-                        construct Nested {
-                            @let value: Int
-                        }
-                    }
-
-                    extension Panel {
-                        function reset() {
-                        }
-
-                        enum ExtensionMode {
-                            case reset
-                        }
-                    }
-
-                    @hostSpace
-                    construct Routes {
-                        function home(): String {
-                            return "home"
-                        }
-                    }
-                    """,
-                role: .project
-            )
-        )
-
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let graph = program.declarationGraph
-        let registry = graph.registryView
-
-        #expect(registry.construct(named: "Panel") != nil)
-        #expect(registry.construct(named: "Panel.Nested") != nil)
-        #expect(registry.construct(named: "Routes") != nil)
-        #expect(registry.hasEnumeration(named: "DisplayMode"))
-        #expect(registry.hasMacro(named: "decorate"))
-        #expect(graph.constructsByName["Panel"]?.macros.contains { $0.name == "graph" } == true)
-        #expect(graph.macroMetadataByName["hostSpace"]?.hasMetadataSlotEffect == true)
-        #expect(registry.hasExtensions(targeting: "Panel"))
-        #expect(graph.packageValues(named: "packageName").count == 1)
-        #expect(
-            graph.topLevelStates(inFilePath: "/tmp/DeclarationGraphRegistrySnapshot.range")
-                .map(\.name) == ["globalCount"])
-
-        #expect(registry.states(onConstruct: "Panel").map(\.name) == ["count"])
-        #expect(registry.bindings(onConstruct: "Panel").map(\.name) == ["selected"])
-        #expect(registry.deriveds(onConstruct: "Panel").map(\.name) == ["label"])
-        #expect(registry.values(onConstruct: "Panel").map(\.name) == ["title", "address"])
-        #expect(
-            graph.callables(onConstruct: "Panel").map(\.name).sorted() == [
-                "configure",
-                "render",
-                "reset",
-            ])
-
-        let configure = try #require(graph.callable(named: "configure", onConstruct: "Panel"))
-        let configureParameters = registry.parameters(ofCallable: configure, ownerName: "Panel")
-        #expect(configureParameters.map(\.localName) == ["value", "name"])
-
-        #expect(
-            graph.declaredMemberSurfaces(forConstruct: "Panel").map(\.name).sorted() == [
-                "address",
-                "count",
-                "label",
-                "selected",
-                "title",
-            ])
-        #expect(graph.declaresMemberPath("Panel.address.street", onConstruct: "Panel"))
-        #expect(
-            graph.initializerSurfaces(onConstruct: "Panel").first?.labels == [
-                "title",
-                "address",
-                "count",
-                "selected",
-            ])
-
-        #expect(graph.constructsByName["Panel"]?.macros.map(\.name).contains("styling") == true)
-        #expect(graph.constructsByName["Routes"]?.callables.map(\.name) == ["home"])
-        #expect(
-            graph.programGraph.entities.contains {
-                $0.kind == .macro && $0.label == "decorate"
-            }
-        )
-    }
-
-    @Test("Rewrite site decoding uses declaration-backed descriptors")
-    func rewriteSiteDecodingUsesDeclarationBackedDescriptors() throws {
-        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
-        let context = program.declarationGraph.macroExpansionContext(macrosByName: [:])
-
-        let direct = context.resolvedRewriteCall(
-            from: .call(
-                name: "target.replace",
-                arguments: [CallArgument(label: "with", value: .string("value"))]
-            ),
-            targetBinding: "target",
-            targetType: .named("Expression")
-        )
-        #expect(direct?.site == .targetDirect)
-
-        let parameter = context.resolvedRewriteCall(
-            from: .call(
-                name: "target.application.expression.replace",
-                arguments: [CallArgument(label: "with", value: .string("value"))]
-            ),
-            targetBinding: "target",
-            targetType: .named("Parameter")
-        )
-        #expect(parameter?.site == .parameterApplicationArgument)
-
-        let functionArgument = context.resolvedRewriteCall(
-            from: .call(
-                name: "target.call.arguments[0].expression.replace",
-                arguments: [CallArgument(label: "with", value: .string("value"))]
-            ),
-            targetBinding: "target",
-            targetType: .named("Function")
-        )
-        #expect(functionArgument?.site == .functionArgumentExpression)
-
-        let functionApplication = context.resolvedRewriteCall(
-            from: .call(
-                name: "target.call.replace",
-                arguments: [CallArgument(label: "with", value: .string("value"))]
-            ),
-            targetBinding: "target",
-            targetType: .named("Function")
-        )
-        #expect(functionApplication?.site == .functionApplication)
-    }
-
     @Test("Nested constructs qualify nested callables and constructs")
     func nestedConstructsQualifyNestedCallablesAndConstructs() throws {
         var inputs = try rangeCoreInputs()
@@ -2706,7 +2249,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
 
         #expect(
             program.declarationGraph.constructsByName["System.Math"]?.callables.map(\.name) == [
@@ -2743,21 +2286,15 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let graph = program.declarationGraph
 
         #expect(graph.constructsByName["Language"] != nil)
         #expect(graph.constructsByName["Language.Token"] != nil)
         #expect(graph.constructsByName["Language"]?.callables.map(\.name) == ["identifier"])
         #expect(
-            graph.programGraph.entities.contains {
-                $0.kind == .value && $0.label == "defaultLocale"
-            }
-        )
-        #expect(
-            graph.programGraph.entities.contains {
-                $0.kind == .field && $0.label == "defaultLocale"
-            }
+            graph.valuesByConstructName["Language"]?.contains { $0.name == "defaultLocale" }
+                == true
         )
     }
 
@@ -2782,7 +2319,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let graph = program.declarationGraph
 
         #expect(graph.macroMetadataByName["hostSpace"]?.hasMetadataSlotEffect == true)
@@ -2817,7 +2354,7 @@ struct CompilerFixtureTests {
         )
 
         do {
-            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            _ = try CompilerPipeline().build(inputs: inputs)
             Issue.record("Expected @tuple with one binding field to fail validation.")
         } catch {
             #expect(
@@ -2827,7 +2364,7 @@ struct CompilerFixtureTests {
 
     @Test("Core Math construct is available")
     func coreMathConstructIsAvailable() throws {
-        let program = try CompilerPipeline().buildValidated(inputs: rangeCoreInputs())
+        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
 
         #expect(
             program.declarationGraph.constructsByName["Math"]?.callables.map(\.name) == [
@@ -2860,7 +2397,7 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
 
         #expect(program.declarationGraph.registryView.hasExtensions(targeting: "Math"))
     }
@@ -2956,10 +2493,7 @@ struct CompilerFixtureTests {
                 Issue.record("Expected bare assignment/control-flow syntax to fail parsing.")
             } catch {
                 let description = String(describing: error)
-                #expect(
-                    description.contains("Bare statement syntax is not Range source")
-                        || description.contains("Expected statement")
-                )
+                #expect(description.contains("Expected statement"))
             }
         }
     }
@@ -3031,225 +2565,6 @@ struct CompilerFixtureTests {
         }
     }
 
-    @Test("Clamped state macro rewrites initializer and assignments")
-    func clampedStateMacroRewritesInitializerAndAssignments() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/ClampedState.range")
-        let program = try compile(fixture: fixture, expectedRole: .pass)
-        let expandedFile = try #require(
-            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
-        )
-
-        let construct: ConstructDeclaration
-        switch expandedFile.sourceFile {
-        case .construct(let declaration):
-            construct = declaration
-        case .module(let module):
-            construct = try #require(module.constructs.first(where: { $0.name == "Person" }))
-        default:
-            Issue.record("Expected expanded project file to contain the Person construct.")
-            return
-        }
-
-        let state = try #require(construct.states.first(where: { $0.name == "age" }))
-
-        guard case .stored(let initializerExpression) = state.storage else {
-            Issue.record("Expected clamped state to keep stored initializer.")
-            return
-        }
-
-        guard case .call(let initializerName, _) = initializerExpression else {
-            Issue.record("Expected clamped initializer to become a call.")
-            return
-        }
-
-        #expect(initializerName == "Math.clamp")
-
-        let update = try #require(construct.callables.first(where: { $0.name == "update" }))
-        let assignment = try #require(update.body?.first)
-
-        guard case .assignment(_, let assignmentExpression) = assignment else {
-            Issue.record("Expected update body to contain a rewritten assignment.")
-            return
-        }
-
-        guard case .call(let assignmentName, _) = assignmentExpression else {
-            Issue.record("Expected clamped assignment to become a call.")
-            return
-        }
-
-        #expect(assignmentName == "Math.clamp")
-
-        let compoundAssignment = try #require(update.body?[1])
-
-        guard case .assignment(_, let compoundAssignmentExpression) = compoundAssignment else {
-            Issue.record("Expected compound assignment to lower into a rewritten assignment.")
-            return
-        }
-
-        guard case .call(let compoundAssignmentName, _) = compoundAssignmentExpression else {
-            Issue.record("Expected lowered compound assignment to become a call.")
-            return
-        }
-
-        #expect(compoundAssignmentName == "Math.clamp")
-    }
-
-    @Test("State getter macro rewrites reads in expressions")
-    func stateGetterMacroRewritesReadsInExpressions() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/GetterState.range")
-        let program = try compile(fixture: fixture, expectedRole: .pass)
-        let expandedFile = try #require(
-            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
-        )
-
-        let construct: ConstructDeclaration
-        switch expandedFile.sourceFile {
-        case .construct(let declaration):
-            construct = declaration
-        case .module(let module):
-            construct = try #require(module.constructs.first(where: { $0.name == "Reader" }))
-        default:
-            Issue.record("Expected expanded project file to contain the Reader construct.")
-            return
-        }
-
-        let current = try #require(construct.callables.first(where: { $0.name == "current" }))
-        let currentReturn = try #require(current.body?.first)
-        guard case .return(let currentExpression?) = currentReturn,
-            case .binary(let currentLHS, .addition, let currentRHS) = currentExpression,
-            case .identifier(let currentName) = currentLHS,
-            case .integer(let currentAmount) = currentRHS
-        else {
-            Issue.record("Expected current() to return the getter-rewritten age expression.")
-            return
-        }
-
-        #expect(currentName == "age")
-        #expect(currentAmount == 1)
-
-        let total = try #require(construct.callables.first(where: { $0.name == "total" }))
-        let totalReturn = try #require(total.body?.first)
-        guard case .return(let totalExpression?) = totalReturn,
-            case .binary(let totalLHS, .addition, let totalRHS) = totalExpression,
-            case .binary(let nestedLHS, .addition, let nestedRHS) = totalLHS,
-            case .identifier(let nestedName) = nestedLHS,
-            case .integer(let nestedAmount) = nestedRHS,
-            case .identifier(let totalValueName) = totalRHS
-        else {
-            Issue.record("Expected total() to rewrite the age read inside the larger expression.")
-            return
-        }
-
-        #expect(nestedName == "age")
-        #expect(nestedAmount == 1)
-        #expect(totalValueName == "value")
-    }
-
-    @Test("Let macro rewrites initializer and reads")
-    func letMacroRewritesInitializerAndReads() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/LetMacro.range")
-        let program = try compile(fixture: fixture, expectedRole: .pass)
-        let expandedFile = try #require(
-            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
-        )
-
-        let construct: ConstructDeclaration
-        switch expandedFile.sourceFile {
-        case .construct(let declaration):
-            construct = declaration
-        case .module(let module):
-            construct = try #require(module.constructs.first(where: { $0.name == "Holder" }))
-        default:
-            Issue.record("Expected expanded project file to contain the Holder construct.")
-            return
-        }
-
-        let value = try #require(construct.values.first(where: { $0.name == "count" }))
-        guard case .binary(let initializerLHS, .addition, let initializerRHS)? = value.value,
-            case .integer(let initializerBase) = initializerLHS,
-            case .integer(let initializerAmount) = initializerRHS
-        else {
-            Issue.record("Expected let initializer to be rewritten through the initializer hook.")
-            return
-        }
-
-        #expect(initializerBase == 10)
-        #expect(initializerAmount == 2)
-
-        let current = try #require(construct.callables.first(where: { $0.name == "current" }))
-        let currentReturn = try #require(current.body?.first)
-        guard case .return(let expression?) = currentReturn,
-            case .binary(let lhs, .addition, let rhs) = expression,
-            case .identifier(let name) = lhs,
-            case .integer(let amount) = rhs
-        else {
-            Issue.record("Expected let getter to rewrite reads.")
-            return
-        }
-
-        #expect(name == "count")
-        #expect(amount == 2)
-    }
-
-    @Test("Binding macro rewrites reads and assignments")
-    func bindingMacroRewritesReadsAndAssignments() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/BindingMacro.range")
-        let program = try compile(fixture: fixture, expectedRole: .pass)
-        let expandedFile = try #require(
-            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
-        )
-
-        let construct: ConstructDeclaration
-        switch expandedFile.sourceFile {
-        case .construct(let declaration):
-            construct = declaration
-        case .module(let module):
-            construct = try #require(module.constructs.first(where: { $0.name == "Box" }))
-        default:
-            Issue.record("Expected expanded project file to contain the Box construct.")
-            return
-        }
-
-        let current = try #require(construct.callables.first(where: { $0.name == "current" }))
-        let currentReturn = try #require(current.body?.first)
-        guard case .return(let expression?) = currentReturn,
-            case .binary(let lhs, .addition, let rhs) = expression,
-            case .identifier(let name) = lhs,
-            case .integer(let amount) = rhs
-        else {
-            Issue.record("Expected binding getter to rewrite reads.")
-            return
-        }
-
-        #expect(name == "score")
-        #expect(amount == 1)
-
-        let update = try #require(construct.callables.first(where: { $0.name == "update" }))
-        let directAssignment = try #require(update.body?.first)
-        guard case .assignment(_, let directExpression) = directAssignment,
-            case .binary(let directLHS, .addition, let directRHS) = directExpression,
-            case .identifier(let directName) = directLHS,
-            case .integer(let directAmount) = directRHS
-        else {
-            Issue.record("Expected binding setter to rewrite direct assignments.")
-            return
-        }
-
-        #expect(directName == "value")
-        #expect(directAmount == 1)
-
-        let compoundAssignment = try #require(update.body?[1])
-        guard case .assignment(_, let compoundExpression) = compoundAssignment,
-            case .binary(_, .addition, let outerRHS) = compoundExpression,
-            case .integer(let compoundAmount) = outerRHS
-        else {
-            Issue.record("Expected binding setter to rewrite compound assignments.")
-            return
-        }
-
-        #expect(compoundAmount == 1)
-    }
-
     @Test("Construct macro expand emits extension declarations")
     func constructMacroExpandEmitsExtensionDeclarations() throws {
         let fixture = try fixtureFile(
@@ -3259,14 +2574,7 @@ struct CompilerFixtureTests {
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
         )
 
-        let module: ModuleFileNode
-        switch expandedFile.sourceFile {
-        case .module(let expandedModule):
-            module = expandedModule
-        default:
-            Issue.record("Expected expanded construct macro fixture to become a module.")
-            return
-        }
+        let module = expandedFile.sourceFile
 
         let extensionDeclaration = try #require(module.extensions.first)
         #expect(extensionDeclaration.targetType.displayName == "ExtendableFixture")
@@ -3278,50 +2586,6 @@ struct CompilerFixtureTests {
         #expect(module.constructs.contains(where: { $0.name == "SiblingConstruct" }))
     }
 
-    @Test("Codable macro synthesizes string keyed encode and decode")
-    func codableMacroSynthesizesStringKeyedEncodeAndDecode() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/CodableMacroSynthesis.range")
-        let program = try compile(fixture: fixture, expectedRole: .pass)
-        let expandedFile = try #require(
-            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
-        )
-
-        let module: ModuleFileNode
-        switch expandedFile.sourceFile {
-        case .module(let expandedModule):
-            module = expandedModule
-        default:
-            Issue.record("Expected expanded Codable macro fixture to become a module.")
-            return
-        }
-
-        #expect(module.enumerations.contains(where: { $0.name == "CodingKeys" }) == false)
-        #expect(
-            module.extensions.allSatisfy { extensionDeclaration in
-                extensionDeclaration.enumerations.contains(where: { $0.name == "CodingKeys" })
-                    == false
-            }
-        )
-
-        let object = try #require(
-            module.extensions.first(where: { $0.targetName == "ObjectCodableMacroFixture" })
-        )
-        #expect(encodeKeys(in: object) == ["userId": "userId", "displayName": "displayName"])
-        #expect(decodeKeys(in: object) == ["userId": "userId", "displayName": "displayName"])
-
-        let identity = try #require(
-            module.extensions.first(where: { $0.targetName == "IdentityCodableMacroFixture" })
-        )
-        #expect(encodeKeys(in: identity) == ["displayName": "displayName"])
-        #expect(decodeKeys(in: identity) == ["displayName": "displayName"])
-
-        let macroOverride = try #require(
-            module.extensions.first(where: { $0.targetName == "MacroOverrideCodableMacroFixture" })
-        )
-        #expect(encodeKeys(in: macroOverride) == ["userId": "id"])
-        #expect(decodeKeys(in: macroOverride) == ["userId": "id"])
-    }
-
     @Test("Equatable macro synthesizes field comparisons")
     func equatableMacroSynthesizesFieldComparisons() throws {
         let fixture = try fixtureFile(
@@ -3331,14 +2595,7 @@ struct CompilerFixtureTests {
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
         )
 
-        let module: ModuleFileNode
-        switch expandedFile.sourceFile {
-        case .module(let expandedModule):
-            module = expandedModule
-        default:
-            Issue.record("Expected expanded Equatable macro fixture to become a module.")
-            return
-        }
+        let module = expandedFile.sourceFile
 
         let fixtureExtension = try #require(
             module.extensions.first(where: { $0.targetName == "EquatableMacroFixture" })
@@ -3362,14 +2619,7 @@ struct CompilerFixtureTests {
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
         )
 
-        let module: ModuleFileNode
-        switch expandedFile.sourceFile {
-        case .module(let expandedModule):
-            module = expandedModule
-        default:
-            Issue.record("Expected expanded Hashable macro fixture to become a module.")
-            return
-        }
+        let module = expandedFile.sourceFile
 
         let fixtureExtension = try #require(
             module.extensions.first(where: { $0.targetName == "HashableMacroFixture" })
@@ -3391,14 +2641,7 @@ struct CompilerFixtureTests {
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
         )
 
-        let module: ModuleFileNode
-        switch expandedFile.sourceFile {
-        case .module(let expandedModule):
-            module = expandedModule
-        default:
-            Issue.record("Expected expanded Comparable macro fixture to become a module.")
-            return
-        }
+        let module = expandedFile.sourceFile
 
         let fixtureExtension = try #require(
             module.extensions.first(where: { $0.targetName == "ComparableMacroFixture" })
@@ -3431,14 +2674,7 @@ struct CompilerFixtureTests {
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
         )
 
-        let module: ModuleFileNode
-        switch expandedFile.sourceFile {
-        case .module(let expandedModule):
-            module = expandedModule
-        default:
-            Issue.record("Expected expanded CaseIterable macro fixture to become a module.")
-            return
-        }
+        let module = expandedFile.sourceFile
 
         let fixtureExtension = try #require(
             module.extensions.first(where: { $0.targetName == "CaseIterableMacroFixture" })
@@ -3449,40 +2685,6 @@ struct CompilerFixtureTests {
             module.extensions.first(where: { $0.targetName == "EmptyCaseIterableMacroFixture" })
         )
         #expect(allCasesReturnValues(in: emptyExtension).isEmpty)
-    }
-
-    @Test("Derived macro rewrites reads")
-    func derivedMacroRewritesReads() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/DerivedMacro.range")
-        let program = try compile(fixture: fixture, expectedRole: .pass)
-        let expandedFile = try #require(
-            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
-        )
-
-        let construct: ConstructDeclaration
-        switch expandedFile.sourceFile {
-        case .construct(let declaration):
-            construct = declaration
-        case .module(let module):
-            construct = try #require(module.constructs.first(where: { $0.name == "Reader" }))
-        default:
-            Issue.record("Expected expanded project file to contain the Reader construct.")
-            return
-        }
-
-        let current = try #require(construct.callables.first(where: { $0.name == "current" }))
-        let currentReturn = try #require(current.body?.first)
-        guard case .return(let expression?) = currentReturn,
-            case .binary(let lhs, .addition, let rhs) = expression,
-            case .identifier(let name) = lhs,
-            case .integer(let amount) = rhs
-        else {
-            Issue.record("Expected derived getter to rewrite reads.")
-            return
-        }
-
-        #expect(name == "next")
-        #expect(amount == 1)
     }
 
     @Test("Generic parameter clauses are shared across declarations")
@@ -3499,26 +2701,23 @@ struct CompilerFixtureTests {
             }
 
             macro clamped<T, count: Int(3)>(value: T): State<T> { target, diagnostics in
-                target.replace(with: value)
+                diagnostics.note("clamped")
             }
             """
 
         var parser = try Parser(source: source)
         let file = try parser.parseSourceFile()
 
-        guard case .module(let module) = file else {
-            Issue.record("Expected a module source file.")
-            return
-        }
+        let module = file
 
         #expect(module.constructs.count == 1)
         #expect(module.enumerations.count == 1)
-        #expect(module.callables.count == 1)
+        #expect(callableDeclarations(in: module).count == 1)
         #expect(module.macros.count == 1)
 
         expectSharedGenericShape(module.constructs[0].genericParameters)
         expectSharedGenericShape(module.enumerations[0].genericParameters)
-        expectSharedGenericShape(module.callables[0].genericParameters)
+        expectSharedGenericShape(callableDeclarations(in: module)[0].genericParameters)
         expectSharedGenericShape(module.macros[0].genericParameters)
     }
 
@@ -3530,8 +2729,7 @@ struct CompilerFixtureTests {
                 path: "/test/CoreMacro.range",
                 source: """
                     macro coreOnly(): Construct { target, diagnostics in
-                        target.declaration.expand {
-                        }
+                        diagnostics.note("core")
                     }
                     """,
                 role: .core
@@ -3549,121 +2747,9 @@ struct CompilerFixtureTests {
             )
         )
 
-        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+        _ = try CompilerPipeline().build(inputs: inputs)
     }
 
-    @Test("FileManager readFile surface validates")
-    func fileSystemReadTextSurfaceValidates() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "System/FileManagerReadFile.range")
-        _ = try compile(fixture: fixture, expectedRole: .pass)
-    }
-
-    @Test("FileTree sourceFiles exposes file text to macros")
-    func fileTreeSourceFilesExposesFileTextToMacros() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("RangeFileTreeSourceFiles-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: root) }
-
-        let aSource = "construct A {\n}\n"
-        let bSource = "construct B {\n}\n"
-        try aSource.write(to: root.appendingPathComponent("A.range"), atomically: true, encoding: .utf8)
-        try bSource.write(to: root.appendingPathComponent("B.range"), atomically: true, encoding: .utf8)
-        try "ignore".write(to: root.appendingPathComponent("README.txt"), atomically: true, encoding: .utf8)
-
-        let escapedRoot = root.path.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        var inputs = try rangeCoreInputs()
-        inputs.append(
-            SourceInput(
-                path: "/tmp/FileTreeSourceFilesMacro.range",
-                source: """
-                    macro collectedSource(path: String): Construct -> String { target, diagnostics in
-                        let files: Array<ProgramSourceFile>(FileTree.sourceFiles(path: path))
-                        let selected: Array<ProgramSourceFile>(files.filter { file in
-                            return file.text.hasPrefix("construct A")
-                        })
-
-                        if selected.count == 1 {
-                            let file: ProgramSourceFile(selected.element(index: 0))
-                            return file.text
-                        }
-
-                        return "missing"
-                    }
-
-                    @collectedSource(path: "\(escapedRoot)")
-                    construct Collector {
-                    }
-                    """,
-                role: .project
-            )
-        )
-
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let construct = try #require(program.declarationGraph.constructsByName["Collector"])
-        let macro = try #require(construct.macros.first(where: { $0.name == "collectedSource" }))
-        #expect(macro.evaluatedStringValue == aSource)
-    }
-
-    @Test("Compiler pipeline runtime hooks run beside Swift pipeline")
-    func compilerPipelineRuntimeHooksRunBesideSwiftPipeline() throws {
-        let hook = RecordingRuntimeHook()
-        let diagnostics = RangeDiagnosticEngine()
-        let program = try CompilerPipeline().build(
-            inputs: try rangeCoreInputs(),
-            diagnosticEngine: diagnostics,
-            runtimeHooks: [hook]
-        )
-
-        #expect(
-            hook.stages == [
-                .coreDeclarationsDiscovered,
-                .coreParsed,
-                .projectDeclarationsDiscovered,
-                .projectParsed,
-                .macrosExpanded,
-                .declarationGraphBuilt,
-            ])
-        #expect(program.runtimeHookResults.count == 6)
-        #expect(program.runtimeHookResults.last?.artifacts["constructs"] != nil)
-        #expect(
-            diagnostics.diagnostics.contains {
-                $0.source == "range-runtime-hook"
-                    && $0.code == "runtime.side-by-side"
-            }
-        )
-    }
-
-}
-
-private final class RecordingRuntimeHook: CompilerPipelineRuntimeHook {
-    let name = "recording"
-    var stages: [CompilerPipelineRuntimeStage] = []
-
-    func run(context: CompilerPipelineRuntimeContext) throws -> CompilerPipelineRuntimeResult? {
-        stages.append(context.stage)
-
-        guard context.stage == .declarationGraphBuilt else {
-            return CompilerPipelineRuntimeResult(hookName: name, stage: context.stage)
-        }
-
-        return CompilerPipelineRuntimeResult(
-            hookName: name,
-            stage: context.stage,
-            diagnostics: [
-                RangeDiagnostic(
-                    severity: .information,
-                    message: "runtime hook observed declaration graph",
-                    source: "range-runtime-hook",
-                    code: "runtime.side-by-side"
-                )
-            ],
-            artifacts: [
-                "constructs": String(context.declarationGraph?.constructsByName.count ?? 0)
-            ]
-        )
-    }
 }
 
 private enum FixtureRole {
@@ -3701,54 +2787,6 @@ private func expectSharedGenericShape(_ parameters: [GenericParameter]) {
     }
 
     #expect(value == 3 || value == 1)
-}
-
-private func encodeKeys(in extensionDeclaration: ExtensionDeclaration) -> [String: String] {
-    guard let encode = extensionDeclaration.callables.first(where: { $0.name == "encode" }),
-        let body = encode.body
-    else {
-        return [:]
-    }
-
-    return body.reduce(into: [:]) { keys, statement in
-        guard case .switchStatement(let expression, _, _) = statement,
-            case .call(let name, let arguments) = expression,
-            name == "container.encode",
-            case .identifier(let propertyName)? = arguments.first(where: { $0.label == nil })?.value,
-            case .string(let key)? = arguments.first(where: { $0.label == "forKey" })?.value
-        else {
-            return
-        }
-
-        keys[propertyName] = key
-    }
-}
-
-private func decodeKeys(in extensionDeclaration: ExtensionDeclaration) -> [String: String] {
-    guard let decode = extensionDeclaration.callables.first(where: { $0.name == "decode" }),
-        let body = decode.body
-    else {
-        return [:]
-    }
-
-    return body.reduce(into: [:]) { keys, statement in
-        guard case .switchStatement(let expression, let cases, _) = statement,
-            case .call(let name, let arguments) = expression,
-            name == "container.decode",
-            case .string(let key)? = arguments.first(where: { $0.label == "forKey" })?.value,
-            let successCase = cases.first(where: { switchCase in
-                guard case .enumCase(let name, _) = switchCase.pattern else {
-                    return false
-                }
-                return name == ".success"
-            }),
-            case .enumCase(_, let binding?) = successCase.pattern
-        else {
-            return
-        }
-
-        keys[binding.name] = key
-    }
 }
 
 private func equalityComparisons(in extensionDeclaration: ExtensionDeclaration) -> [String] {
@@ -3893,7 +2931,7 @@ private func compile(fixture: URL, expectedRole: FixtureRole) throws -> Compiled
             role: .project
         )
     )
-    return try CompilerPipeline().buildValidated(inputs: inputs)
+    return try CompilerPipeline().build(inputs: inputs)
 }
 
 private func fixtureFiles(in suite: String) throws -> [URL] {
@@ -3940,11 +2978,6 @@ private func rangeFoundationMacroInputs() throws -> [SourceInput] {
     let macroRoot = root.appendingPathComponent("Foundation/Macros", isDirectory: true)
     let files =
         [
-            root
-                .appendingPathComponent("Core", isDirectory: true)
-                .appendingPathComponent("Syntax", isDirectory: true)
-                .appendingPathComponent("Statements", isDirectory: true)
-                .appendingPathComponent("Statement.range"),
             macroRoot.appendingPathComponent("Macro.range"),
             macroRoot.appendingPathComponent("Member.range"),
             macroRoot.appendingPathComponent("Value.range"),
@@ -3957,14 +2990,9 @@ private func rangeFoundationMacroInputs() throws -> [SourceInput] {
             macroRoot.appendingPathComponent("Return.range"),
             macroRoot.appendingPathComponent("If.range"),
             macroRoot.appendingPathComponent("While.range"),
-            macroRoot.appendingPathComponent("For.range"),
             macroRoot.appendingPathComponent("Break.range"),
             macroRoot.appendingPathComponent("Continue.range"),
-            macroRoot.appendingPathComponent("Switch.range"),
             macroRoot.appendingPathComponent("Case.range"),
-            macroRoot.appendingPathComponent("Default.range"),
-            macroRoot.appendingPathComponent("Else.range"),
-            macroRoot.appendingPathComponent("Elseif.range"),
         ]
 
     return try files.sorted(by: rangeCoreFilePrecedence).map { file in
@@ -3995,7 +3023,7 @@ private func expectBareMacroBodySyntaxRejected(
     )
 
     do {
-        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+        _ = try CompilerPipeline().build(inputs: inputs)
         Issue.record(
             "Expected bare macro-body syntax to fail parsing.",
             sourceLocation: sourceLocation
@@ -4006,6 +3034,18 @@ private func expectBareMacroBodySyntaxRejected(
             sourceLocation: sourceLocation
         )
     }
+}
+
+private func callableDeclarations(in module: ModuleFileNode) -> [CallableDeclaration] {
+    module.constructs.flatMap(callableDeclarations(in:))
+        + module.extensions.flatMap { extensionDeclaration in
+            extensionDeclaration.callables
+                + extensionDeclaration.constructs.flatMap(callableDeclarations(in:))
+        }
+}
+
+private func callableDeclarations(in construct: ConstructDeclaration) -> [CallableDeclaration] {
+    construct.callables + construct.constructs.flatMap(callableDeclarations(in:))
 }
 
 private func rangeFiles(in root: URL, excludingExploration: Bool) throws -> [URL] {

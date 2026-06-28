@@ -1,11 +1,41 @@
-construct GraphContext {
-    @let macros: Array<Macro<Void>>
+@construct(name: "GraphContext") {
+    @let(name: "macros") {
+        @value(type: "Array<Macro<Void>>")
+    }
 
-    function declaration(identity: GraphIdentity): GraphEntry
-    function parent(identity: GraphIdentity): Optional<GraphIdentity>
-    function members(identity: GraphIdentity): Array<GraphIdentity>
-    function sourcePath(identity: GraphIdentity): String
-    function sourceDirectory(identity: GraphIdentity): String
-    function macros(identity: GraphIdentity): Array<Macro<Void>>
-    function macros(named: String): Array<Macro<Void>>
+    @function(name: "declaration", result: "GraphEntry") {
+        @parameter(name: "identity") {
+            @value(type: "GraphIdentity")
+        }
+    }
+    @function(name: "parent", result: "Optional<GraphIdentity>") {
+        @parameter(name: "identity") {
+            @value(type: "GraphIdentity")
+        }
+    }
+    @function(name: "members", result: "Array<GraphIdentity>") {
+        @parameter(name: "identity") {
+            @value(type: "GraphIdentity")
+        }
+    }
+    @function(name: "sourcePath", result: "String") {
+        @parameter(name: "identity") {
+            @value(type: "GraphIdentity")
+        }
+    }
+    @function(name: "sourceDirectory", result: "String") {
+        @parameter(name: "identity") {
+            @value(type: "GraphIdentity")
+        }
+    }
+    @function(name: "macros", result: "Array<Macro<Void>>") {
+        @parameter(name: "identity") {
+            @value(type: "GraphIdentity")
+        }
+    }
+    @function(name: "macros", result: "Array<Macro<Void>>") {
+        @parameter(name: "named") {
+            @value(type: "String")
+        }
+    }
 }

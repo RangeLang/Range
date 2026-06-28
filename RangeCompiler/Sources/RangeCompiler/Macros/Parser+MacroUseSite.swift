@@ -2,7 +2,7 @@ import Foundation
 
 extension Parser {
     func isMacroApplicationStart() -> Bool {
-        if case .macroAttribute(let name, _) = peek(), isMacroApplicationAttribute(name) {
+        if case .macroAttribute = peek() {
             return true
         }
         return false
@@ -92,22 +92,11 @@ extension Parser {
 
     func macroApplicationName(at offset: Int, excluding excludedNames: Set<String> = []) -> String? {
         switch peek(offset: offset) {
-        case .macroAttribute(let name, _) where !excludedNames.contains(name)
-            && isMacroApplicationAttribute(name, offset: offset):
+        case .macroAttribute(let name, _) where !excludedNames.contains(name):
             return name
         default:
             return nil
         }
-    }
-
-    func isMacroApplicationAttribute(_ name: String, offset: Int = 0) -> Bool {
-        if macroDeclarationsByName[name] != nil {
-            return true
-        }
-        guard !RangeSyntax.attributeIdentifiers.contains(name) else {
-            return false
-        }
-        return true
     }
 
     mutating func consumeMacroAttribute(named expectedName: String) throws {

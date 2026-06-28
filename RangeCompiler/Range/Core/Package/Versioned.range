@@ -1,5 +1,11 @@
-construct Versioned<Value> {
-    @let current: Value
-    @let next: Optional<Value>
-    @let version: Version
+@construct(name: "Versioned<Value>") {
+    @let(name: "current") {
+        @value(type: "Value")
+    }
+    @let(name: "next") {
+        @value(type: "Optional<Value>")
+    }
+    @let(name: "version") {
+        @value(type: "Version")
+    }
 }

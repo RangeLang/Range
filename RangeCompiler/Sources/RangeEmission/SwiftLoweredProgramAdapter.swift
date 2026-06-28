@@ -28,8 +28,12 @@ struct SwiftLoweredProgramAdapter {
         )
     }
 
-    private func lower(mainBlock: MainBlockNode) -> MainBlockNode {
-        MainBlockNode(macros: mainBlock.macros, body: lower(statements: mainBlock.body))
+    private func lower(mainBlock: BlockMacroNode) -> BlockMacroNode {
+        BlockMacroNode(
+            macros: mainBlock.macros,
+            body: lower(statements: mainBlock.body),
+            rawBody: mainBlock.rawBody
+        )
     }
 
     private func lower(construct: ConstructDeclaration) -> ConstructDeclaration {
@@ -99,20 +103,7 @@ struct SwiftLoweredProgramAdapter {
     }
 
     private func lower(statements: [RangeStatement]) -> [RangeStatement] {
-        statements.flatMap(lower(statementsFor:))
-    }
-
-    private func lower(statementsFor statement: RangeStatement) -> [RangeStatement] {
-        if case .forEach(let name, let sequence, let body) = statement,
-            let loweredRangeLoop = lowerRangeForEach(
-                name: name,
-                sequence: sequence,
-                body: body
-            )
-        {
-            return loweredRangeLoop
-        }
-        return [lower(statement: statement)]
+        statements.map(lower(statement:))
     }
 
     private func lower(statement: RangeStatement) -> RangeStatement {
@@ -127,14 +118,6 @@ struct SwiftLoweredProgramAdapter {
                 argumentClause: argumentClause,
                 body: lower(statements: body)
             )
-        case .expand, .replace:
-            return statement
-        case .background(let background):
-            return .background(
-                Background(macros: background.macros, body: lower(statements: background.body))
-            )
-        case .deferBlock(let deferred):
-            return .deferBlock(DeferredBlock(body: lower(statements: deferred.body)))
         case .localBinding(let declaration):
             return .localBinding(
                 LocalBindingDeclaration(
@@ -145,37 +128,10 @@ struct SwiftLoweredProgramAdapter {
                     expression: lower(expression: declaration.expression)
                 )
             )
-        case .localCallable(let declaration):
-            return .localCallable(
-                LocalCallableDeclaration(
-                    macros: declaration.macros,
-                    attribute: declaration.attribute,
-                    name: declaration.name,
-                    genericParameters: declaration.genericParameters,
-                    hasExplicitParameterClause: declaration.hasExplicitParameterClause,
-                    parameters: declaration.parameters,
-                    returnType: declaration.returnType,
-                    body: lower(statements: declaration.body)
-                )
-            )
-        case .derived(let name, let typeName, let body):
-            return .derived(name: name, typeName: typeName, body: lower(statements: body))
         case .assignment(let target, let expression):
             return .assignment(target: target, expression: lower(expression: expression))
-        case .compoundAssignment(let target, let operatorSymbol, let expression):
-            return .compoundAssignment(
-                target: target,
-                operatorSymbol: operatorSymbol,
-                expression: lower(expression: expression)
-            )
         case .expression(let expression):
             return .expression(lower(expression: expression))
-        case .forEach(let name, let sequence, let body):
-            return .forEach(
-                name: name,
-                sequence: lower(expression: sequence),
-                body: lower(statements: body)
-            )
         case .whileLoop(let condition, let body):
             return .whileLoop(
                 condition: lower(expression: condition), body: lower(statements: body))
@@ -190,84 +146,6 @@ struct SwiftLoweredProgramAdapter {
             )
         case .return(let expression):
             return .return(expression.map(lower(expression:)))
-        case .break, .continue:
-            return statement
-        case .switchStatement(let expression, let cases, let defaultBody):
-            return .switchStatement(
-                expression: lower(expression: expression),
-                cases: cases.map { switchCase in
-                    SwitchCase(
-                        pattern: lower(switchCasePattern: switchCase.pattern),
-                        body: lower(statements: switchCase.body)
-                    )
-                },
-                defaultBody: defaultBody.map(lower(statements:))
-            )
-        }
-    }
-
-    private func lowerRangeForEach(
-        name: String,
-        sequence: RangeExpression,
-        body: [RangeStatement]
-    ) -> [RangeStatement]? {
-        guard case .binary(let lowerBound, let operatorSymbol, let upperBound) = sequence,
-            operatorSymbol == .rangeUntil || operatorSymbol == .closedRange
-        else {
-            return nil
-        }
-
-        let loweredLowerBound = lower(expression: lowerBound)
-        let loweredUpperBound = lower(expression: upperBound)
-        let comparison: BinaryOperator = operatorSymbol == .rangeUntil ? .less : .lessEqual
-        let indexName = "__range_\(name)_index"
-        let loweredBody = lower(statements: body)
-
-        return [
-            .localBinding(
-                LocalBindingDeclaration(
-                    kind: .mutable,
-                    name: indexName,
-                    hasExplicitTypeAnnotation: true,
-                    type: .named("Int"),
-                    expression: loweredLowerBound
-                )
-            ),
-            .whileLoop(
-                condition: .binary(
-                    lhs: .identifier(indexName),
-                    operatorSymbol: comparison,
-                    rhs: loweredUpperBound
-                ),
-                body: [
-                    .localBinding(
-                        LocalBindingDeclaration(
-                            kind: .constant,
-                            name: name,
-                            hasExplicitTypeAnnotation: true,
-                            type: .named("Int"),
-                            expression: .identifier(indexName)
-                        )
-                    ),
-                    .assignment(
-                        target: .local(indexName),
-                        expression: .binary(
-                            lhs: .identifier(indexName),
-                            operatorSymbol: .addition,
-                            rhs: .integer(1)
-                        )
-                    ),
-                ] + loweredBody
-            ),
-        ]
-    }
-
-    private func lower(switchCasePattern: SwitchCasePattern) -> SwitchCasePattern {
-        switch switchCasePattern {
-        case .expression(let expression):
-            return .expression(lower(expression: expression))
-        case .enumCase(let name, let binding):
-            return .enumCase(name: name, binding: binding)
         }
     }
 
@@ -314,19 +192,6 @@ struct SwiftLoweredProgramAdapter {
                 operatorSymbol: operatorSymbol,
                 rhs: lower(expression: rhs)
             )
-        case .interpolatedString(let string):
-            lowered = .interpolatedString(
-                InterpolatedString(
-                    segments: string.segments.map { segment in
-                        switch segment {
-                        case .text:
-                            return segment
-                        case .expression(let nested):
-                            return .expression(lower(expression: nested))
-                        }
-                    }
-                )
-            )
         case .integer, .double, .string, .boolean, .nilLiteral, .identifier, .bindingReference:
             lowered = expression
         }
@@ -350,7 +215,6 @@ struct SwiftLoweredProgramAdapter {
         switch (name, value) {
         case ("Int", .integer),
             ("String", .string),
-            ("String", .interpolatedString),
             ("Bool", .boolean),
             ("Float", .double),
             ("Double", .double),

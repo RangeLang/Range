@@ -27,11 +27,11 @@ struct ProjectBinaryLinkerTests {
         #expect(receiptSource.contains(#""versionedBinary" : "\#(versionedBinary.path)""#))
     }
 
-    @Test("Package file path resolves to package root")
-    func packageFilePathResolvesToPackageRoot() throws {
+    @Test("Project file path resolves to package root")
+    func projectFilePathResolvesToPackageRoot() throws {
         let fixture = try temporaryPackage()
         let link = try ProjectBinaryLinker(
-            projectPath: fixture.root.appendingPathComponent("Package.range").path,
+            projectPath: fixture.root.appendingPathComponent("Project.range").path,
             binaryPath: fixture.binary.path
         ).run()
 
@@ -66,13 +66,18 @@ struct ProjectBinaryLinkerTests {
             .appendingPathComponent("range-binary-link-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try """
-            @package
-            construct Project {
-                let name: Title("Linked")
-                let version: Version(0.1.0)
-                let author: "Test Author"
+            @construct(name: "Project") {
+                @let(name: "name") {
+                    @value(type: "Title", current: "Title(\\\"Linked\\\")")
+                }
+                @let(name: "version") {
+                    @value(type: "Version", current: "Version(0.1.0)")
+                }
+                @let(name: "author") {
+                    @value(type: "String", current: "String(\\\"Test Author\\\")")
+                }
             }
-            """.write(to: root.appendingPathComponent("Package.range"), atomically: true, encoding: .utf8)
+            """.write(to: root.appendingPathComponent("Project.range"), atomically: true, encoding: .utf8)
 
         let binary = root.appendingPathComponent("installed-range", isDirectory: false)
         try "#!/usr/bin/env bash\nexit 0\n".write(to: binary, atomically: true, encoding: .utf8)

@@ -41,9 +41,9 @@ extension Parser {
         advance()
     }
 
-    mutating func consumeKeyword(_ keyword: RangeSyntax.Keyword) throws {
-        guard peek() == .keyword(keyword.rawValue) else {
-            throw ParseError("Expected keyword \(keyword.rawValue).", range: currentRange())
+    mutating func consumeKeyword(_ keyword: String) throws {
+        guard peek() == .keyword(keyword) else {
+            throw ParseError("Expected keyword \(keyword).", range: currentRange())
         }
         advance()
     }
@@ -242,7 +242,6 @@ extension Parser {
             return expression
         case ("Int", .integer),
             ("String", .string),
-            ("String", .interpolatedString),
             ("Bool", .boolean),
             ("Float", .double),
             ("Double", .double):
@@ -350,12 +349,6 @@ extension Parser {
         case .stringLiteral(let value):
             advance()
             return .named("\"\(value)\"")
-        case .keyword("true"):
-            advance()
-            return .named("true")
-        case .keyword("false"):
-            advance()
-            return .named("false")
         case .dot:
             try consume(.dot)
             return .named(".\(try consumeTypeName())")

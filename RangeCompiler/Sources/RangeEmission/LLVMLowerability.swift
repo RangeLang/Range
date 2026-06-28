@@ -117,6 +117,16 @@ enum LLVMLowerability {
         }
 
         init?(integerMacroValue value: String) {
+            if value.hasPrefix("integer|"),
+                let bitsText = Self.recordField("bits", in: value),
+                let bits = Int(bitsText),
+                bits > 0
+            {
+                let signedness = Self.recordField("signedness", in: value) ?? "signed"
+                self = .int(bits: bits, signed: signedness != "unsigned")
+                return
+            }
+
             guard value.hasPrefix("i") else {
                 return nil
             }
@@ -132,10 +142,22 @@ enum LLVMLowerability {
         }
 
         init?(boolMacroValue value: String) {
-            guard value == "i1" else {
+            guard value == "i1" || value == "bool" else {
                 return nil
             }
             self = .bool
+        }
+
+        private static func recordField(_ name: String, in value: String) -> String? {
+            let prefix = "\(name)="
+            guard let range = value.range(of: prefix) else {
+                return nil
+            }
+            let afterPrefix = value[range.upperBound...]
+            if let end = afterPrefix.firstIndex(of: "|") {
+                return String(afterPrefix[..<end])
+            }
+            return String(afterPrefix)
         }
     }
 
@@ -492,17 +514,6 @@ enum LLVMLowerability {
                 ) else {
                     return false
                 }
-            case .compoundAssignment(let target, let operatorSymbol, let expression):
-                guard canLowerCompoundAssignment(
-                    target: target,
-                    operatorSymbol: operatorSymbol,
-                    expression: expression,
-                    locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures,
-                    constructLayouts: constructLayouts
-                ) else {
-                    return false
-                }
             case .whileLoop(let condition, let body):
                 guard canLower(
                     condition,
@@ -540,28 +551,6 @@ enum LLVMLowerability {
                 ) {
                     sawReturn = true
                 }
-            case .switchStatement(let expression, let cases, let defaultBody):
-                guard canLowerSwitch(
-                    expression: expression,
-                    cases: cases,
-                    defaultBody: defaultBody,
-                    returnType: returnType,
-                    locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures,
-                    constructLayouts: constructLayouts
-                ) else {
-                    return false
-                }
-                if switchAlwaysReturns(
-                    cases: cases,
-                    defaultBody: defaultBody,
-                    returnType: returnType,
-                    locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures,
-                    constructLayouts: constructLayouts
-                ) {
-                    sawReturn = true
-                }
             case .expression(let expression):
                 guard canLowerSideEffectExpression(
                     expression,
@@ -584,8 +573,7 @@ enum LLVMLowerability {
                     return false
                 }
                 sawReturn = true
-            case .return(nil), .macroInvocation, .expand, .replace, .background, .deferBlock,
-                .localCallable, .derived, .forEach, .break, .continue:
+            case .return(nil), .macroInvocation:
                 return false
             }
         }
@@ -886,30 +874,6 @@ enum LLVMLowerability {
                 guard canConvert(expressionType, to: type) else {
                     return "assignment to \(name) is \(expressionType), expected \(type)"
                 }
-            case .compoundAssignment(let target, let operatorSymbol, let expression):
-                guard case .plusEquals = operatorSymbol else {
-                    return "compound assignment \(operatorSymbol.rawValue) is unsupported"
-                }
-                guard case .local(let name) = target else {
-                    return "compound assignment target is not local state"
-                }
-                guard let type = locals[name] else {
-                    return "compound assignment target \(name) is unknown"
-                }
-                guard let rhsType = canLower(
-                    expression,
-                    locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
-                ) else {
-                    return expressionRejectionReason(
-                        expression,
-                        locals: locals,
-                        lowerableFunctionSignatures: lowerableFunctionSignatures
-                    )
-                }
-                guard resultType(for: .addition, lhs: type, rhs: rhsType) == type else {
-                    return "compound assignment \(name) += value cannot preserve \(type)"
-                }
             case .whileLoop(let condition, let body):
                 guard canLower(
                     condition,
@@ -935,17 +899,6 @@ enum LLVMLowerability {
                 ) {
                     return "conditional contains unsupported LLVM statements"
                 }
-            case .switchStatement(let expression, let cases, let defaultBody):
-                if let reason = switchRejectionReason(
-                    expression: expression,
-                    cases: cases,
-                    defaultBody: defaultBody,
-                    returnType: returnType,
-                    locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
-                ) {
-                    return reason
-                }
             case .return(let expression?):
                 guard let expressionType = canLower(
                     expression,
@@ -962,20 +915,8 @@ enum LLVMLowerability {
                     return "return expression is \(expressionType), expected \(returnType)"
                 }
                 sawReturn = true
-            case .return(nil):
-                return "uses bare return"
-            case .macroInvocation:
-                return "uses a statement macro invocation"
-            case .expand, .replace:
-                return "uses expand"
-            case .background:
-                return "uses background"
-            case .deferBlock:
-                return "uses defer"
-            case .localCallable:
-                return "uses a local function"
-            case .derived:
-                return "uses derived"
+            case .return(nil), .macroInvocation:
+                return "uses an unsupported statement"
             case .expression(let expression):
                 guard canLowerSideEffectExpression(
                     expression,
@@ -984,12 +925,6 @@ enum LLVMLowerability {
                 ) else {
                     return "uses an unsupported expression statement"
                 }
-            case .forEach:
-                return "uses forEach"
-            case .break:
-                return "uses break outside a lowerable loop body"
-            case .continue:
-                return "uses continue outside a lowerable loop body"
             }
         }
         return sawReturn ? nil : "does not end with an explicit return"
@@ -1118,8 +1053,6 @@ enum LLVMLowerability {
             return "ternary expression should be lowerable"
         case .string:
             return "literal expression should be lowerable"
-        case .interpolatedString:
-            return "uses interpolated String"
         case .nilLiteral:
             return "uses nil"
         case .macroInvocation:
@@ -1162,16 +1095,6 @@ enum LLVMLowerability {
                 ) else {
                     return false
                 }
-            case .compoundAssignment(let target, let operatorSymbol, let expression):
-                guard canLowerCompoundAssignment(
-                    target: target,
-                    operatorSymbol: operatorSymbol,
-                    expression: expression,
-                    locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
-                ) else {
-                    return false
-                }
             case .whileLoop(let condition, let body):
                 guard canLower(
                     condition,
@@ -1197,17 +1120,6 @@ enum LLVMLowerability {
                 ) else {
                     return false
                 }
-            case .switchStatement(let expression, let cases, let defaultBody):
-                guard canLowerSwitch(
-                    expression: expression,
-                    cases: cases,
-                    defaultBody: defaultBody,
-                    returnType: .defaultInt,
-                    locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
-                ) else {
-                    return false
-                }
             case .expression(let expression):
                 guard canLowerSideEffectExpression(
                     expression,
@@ -1216,162 +1128,12 @@ enum LLVMLowerability {
                 ) else {
                     return false
                 }
-            case .macroInvocation, .expand, .replace, .background, .deferBlock, .localCallable,
-                .derived, .forEach, .return:
+            case .macroInvocation, .return:
                 return false
-            case .break, .continue:
-                continue
             }
         }
 
         return true
-    }
-
-    private static func canLowerSwitch(
-        expression: Expression,
-        cases: [SwitchCase],
-        defaultBody: [Statement]?,
-        returnType: ScalarType,
-        locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature],
-        constructLayouts: [String: ConstructLayout] = [:]
-    ) -> Bool {
-        switchRejectionReason(
-            expression: expression,
-            cases: cases,
-            defaultBody: defaultBody,
-            returnType: returnType,
-            locals: locals,
-            lowerableFunctionSignatures: lowerableFunctionSignatures
-        ) == nil
-    }
-
-    private static func switchRejectionReason(
-        expression: Expression,
-        cases: [SwitchCase],
-        defaultBody: [Statement]?,
-        returnType: ScalarType,
-        locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature],
-        constructLayouts: [String: ConstructLayout] = [:]
-    ) -> String? {
-        guard let subjectType = canLower(
-            expression,
-            locals: locals,
-            lowerableFunctionSignatures: lowerableFunctionSignatures
-        ) else {
-            return expressionRejectionReason(
-                expression,
-                locals: locals,
-                lowerableFunctionSignatures: lowerableFunctionSignatures
-            )
-        }
-        guard subjectType.isInteger || subjectType == .bool else {
-            return "switch subject \(subjectType) is not Int or Bool"
-        }
-        guard !cases.isEmpty else {
-            return "switch has no cases"
-        }
-        guard let defaultBody else {
-            return "switch has no default"
-        }
-
-        var literals = Set<String>()
-        for switchCase in cases {
-            guard let literal = switchCaseLiteral(switchCase.pattern, subjectType: subjectType) else {
-                return "switch case pattern is not a \(subjectType) literal"
-            }
-            guard literals.insert(literal).inserted else {
-                return "switch has duplicate case \(literal)"
-            }
-
-            var returningBranchLocals = locals
-            var nonReturningBranchLocals = locals
-            guard canLower(
-                switchCase.body,
-                returnType: returnType,
-                locals: &returningBranchLocals,
-                lowerableFunctionSignatures: lowerableFunctionSignatures
-            )
-                || canLowerLoopBody(
-                    switchCase.body,
-                    locals: &nonReturningBranchLocals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
-                )
-            else {
-                return "switch case contains unsupported LLVM statements"
-            }
-        }
-
-        var returningDefaultLocals = locals
-        var nonReturningDefaultLocals = locals
-        guard canLower(
-            defaultBody,
-            returnType: returnType,
-            locals: &returningDefaultLocals,
-            lowerableFunctionSignatures: lowerableFunctionSignatures
-        )
-            || canLowerLoopBody(
-                defaultBody,
-                locals: &nonReturningDefaultLocals,
-                lowerableFunctionSignatures: lowerableFunctionSignatures
-            )
-        else {
-            return "switch default contains unsupported LLVM statements"
-        }
-
-        return nil
-    }
-
-    private static func switchAlwaysReturns(
-        cases: [SwitchCase],
-        defaultBody: [Statement]?,
-        returnType: ScalarType,
-        locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature],
-        constructLayouts: [String: ConstructLayout] = [:]
-    ) -> Bool {
-        guard let defaultBody else {
-            return false
-        }
-
-        var defaultLocals = locals
-        guard canLower(
-            defaultBody,
-            returnType: returnType,
-            locals: &defaultLocals,
-            lowerableFunctionSignatures: lowerableFunctionSignatures
-        ) else {
-            return false
-        }
-
-        return cases.allSatisfy { switchCase in
-            var branchLocals = locals
-            return canLower(
-                switchCase.body,
-                returnType: returnType,
-                locals: &branchLocals,
-                lowerableFunctionSignatures: lowerableFunctionSignatures
-            )
-        }
-    }
-
-    private static func switchCaseLiteral(
-        _ pattern: SwitchCasePattern,
-        subjectType: ScalarType
-    ) -> String? {
-        guard case .expression(let expression) = pattern else {
-            return nil
-        }
-
-        switch (subjectType, expression) {
-        case (.int(_, _), .integer(let value)):
-            return String(value)
-        case (.bool, .boolean(let value)):
-            return value ? "1" : "0"
-        default:
-            return nil
-        }
     }
 
     private static func canLowerLocalBinding(
@@ -1421,30 +1183,6 @@ enum LLVMLowerability {
                 ),
                 to: type
             )
-        else {
-            return false
-        }
-        return true
-    }
-
-    private static func canLowerCompoundAssignment(
-        target: AssignmentTarget,
-        operatorSymbol: CompoundOperator,
-        expression: Expression,
-        locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature],
-        constructLayouts: [String: ConstructLayout] = [:]
-    ) -> Bool {
-        guard case .plusEquals = operatorSymbol,
-            case .local(let name) = target,
-            let type = locals[name],
-            let rhsType = canLower(
-                expression,
-                locals: locals,
-                lowerableFunctionSignatures: lowerableFunctionSignatures,
-                constructLayouts: constructLayouts
-            ),
-            resultType(for: .addition, lhs: type, rhs: rhsType) == type
         else {
             return false
         }
@@ -1650,7 +1388,7 @@ enum LLVMLowerability {
                 return nil
             }
             return ternaryResultType(trueType, falseType)
-        case .interpolatedString, .nilLiteral, .macroInvocation, .block,
+        case .nilLiteral, .macroInvocation, .block,
             .bindingReference, .array, .dictionary:
             return nil
         }

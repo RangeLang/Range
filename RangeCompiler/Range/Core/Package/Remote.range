@@ -1,3 +1,5 @@
-construct Remote {
-    @let url: String
+@construct(name: "Remote") {
+    @let(name: "url") {
+        @value(type: "String")
+    }
 }

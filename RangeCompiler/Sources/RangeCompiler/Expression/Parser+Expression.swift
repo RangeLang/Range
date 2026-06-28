@@ -1,5 +1,11 @@
 import Foundation
 
+private enum ExpressionOperatorAssociativity {
+    case none
+    case left
+    case right
+}
+
 extension Parser {
     mutating func parseInvocationArgumentsIfPresent() throws -> [CallArgument] {
         guard peek() == .leftParen else { return [] }
@@ -79,7 +85,7 @@ extension Parser {
                 break
             }
 
-            let precedence = operatorEnvironment.precedence(of: infix.precedenceGroup)
+            let precedence = infix.precedence
             guard precedence >= minimumPrecedence else {
                 break
             }
@@ -118,13 +124,10 @@ extension Parser {
             return .double(value)
         case .stringLiteral(let value):
             advance()
-            if value.contains("\\(") {
-                return .interpolatedString(parseInterpolatedString(value))
-            }
             return .string(value)
         case .macroAttribute(let name, _) where isSingleCapturedSyntaxExpressionMacro(name):
             return try parseCapturedSyntaxExpressionMacroInvocation(name: name)
-        case .macroAttribute(let name, _) where isMacroApplicationAttribute(name):
+        case .macroAttribute(let name, _):
             advance()
             var fullName = name
             try appendPostfixAccesses(to: &fullName)
@@ -143,15 +146,6 @@ extension Parser {
             )
         case .identifier(let name), .keyword(let name):
             advance()
-            if name == "true" {
-                return .boolean(true)
-            }
-            if name == "false" {
-                return .boolean(false)
-            }
-            if name == "nil" {
-                return .nilLiteral
-            }
             var fullName = name
             try appendPostfixAccesses(to: &fullName)
             fullName += try parseGenericArgumentClauseIfPresent()
@@ -168,15 +162,13 @@ extension Parser {
             var fullName = ".\(name)"
             fullName += try parseGenericArgumentClauseIfPresent()
             return try parseCalledOrReferencedExpression(named: fullName)
-        case .leftBracket:
-            return try parseCollectionLiteral()
         case .leftParen:
             try consume(.leftParen)
             let expression = try parseExpression()
             try consume(.rightParen)
             return expression
         case .leftBrace:
-            return .block(try parseStatementBlock(baseLocalBindings: [:]))
+            return .block(try parseStatementBlock())
         default:
             throw ParseError("Expected expression.")
         }
@@ -192,15 +184,6 @@ extension Parser {
 
         if peek() == .leftBrace, isClosureExpressionStart() {
             arguments.append(CallArgument(label: nil, value: try parseClosureExpression()))
-        }
-
-        if peek() == .leftBrace, fullName.hasSuffix(".replace") {
-            arguments.append(
-                CallArgument(
-                    label: nil,
-                    value: .block(try parseStatementBlock(baseLocalBindings: [:]))
-                )
-            )
         }
 
         guard hadArgumentClause || !arguments.isEmpty else {
@@ -269,7 +252,7 @@ extension Parser {
                 case .comma:
                     offset += 1
                     continue
-                case .keyword(RangeSyntax.Keyword.inKeyword.rawValue):
+                case .keyword("in"):
                     return true
                 default:
                     return false
@@ -301,19 +284,11 @@ extension Parser {
             break
         }
 
-        try consumeKeyword(.inKeyword)
+        try consumeKeyword("in")
 
-        var localBindings = currentClosureBaseLocalBindings
-        for (name, binding) in Dictionary(
-            uniqueKeysWithValues: parameterNames.map {
-                ($0, LocalBindingSymbol(kind: .constant, type: .named("Unknown")))
-            }
-        ) {
-            localBindings[name] = binding
-        }
         var statements: [Statement] = []
         while peek() != .rightBrace {
-            statements.append(try parseStatement(localBindings: &localBindings))
+            statements.append(try parseStatement())
         }
 
         try consume(.rightBrace)
@@ -347,119 +322,8 @@ extension Parser {
                 }
             }
 
-            if peek() == .leftBracket {
-                try consume(.leftBracket)
-                guard case .integer(let index) = peek() else {
-                    throw ParseError("Expected integer index.")
-                }
-                advance()
-                try consume(.rightBracket)
-                fullName += "[\(index)]"
-                continue
-            }
-
             return
         }
-    }
-
-    func parseInterpolatedString(_ value: String) -> InterpolatedString {
-        var segments: [StringSegment] = []
-        var currentText = ""
-        let characters = Array(value)
-        var index = 0
-
-        func flushText() {
-            guard !currentText.isEmpty else { return }
-            segments.append(.text(currentText))
-            currentText.removeAll(keepingCapacity: true)
-        }
-
-        while index < characters.count {
-            let character = characters[index]
-            if character == "\\" && index + 1 < characters.count && characters[index + 1] == "(" {
-                flushText()
-                index += 2
-                var expressionText = ""
-                var depth = 1
-
-                while index < characters.count {
-                    let current = characters[index]
-                    if current == "(" {
-                        depth += 1
-                    } else if current == ")" {
-                        depth -= 1
-                        if depth == 0 {
-                            index += 1
-                            break
-                        }
-                    }
-
-                    expressionText.append(current)
-                    index += 1
-                }
-
-                var parser = try? Parser(
-                    source: expressionText,
-                    literalBridgeResolver: literalBridgeResolver
-                )
-                if let expression = try? parser?.parseExpression() {
-                    segments.append(.expression(expression))
-                } else {
-                    segments.append(.text("\\(\(expressionText))"))
-                }
-                continue
-            }
-
-            currentText.append(character)
-            index += 1
-        }
-
-        flushText()
-        return InterpolatedString(segments: segments)
-    }
-
-    mutating func parseCollectionLiteral() throws -> Expression {
-        try consume(.leftBracket)
-
-        if peek() == .colon {
-            try consume(.colon)
-            try consume(.rightBracket)
-            return .dictionary([])
-        }
-
-        if peek() == .rightBracket {
-            try consume(.rightBracket)
-            return .array([])
-        }
-
-        let firstExpression = try parseExpression()
-        if peek() == .colon {
-            advance()
-            let firstValue = try parseExpression()
-            var elements = [DictionaryElement(key: firstExpression, value: firstValue)]
-
-            while peek() == .comma {
-                advance()
-                guard peek() != .rightBracket else { break }
-                let key = try parseExpression()
-                try consume(.colon)
-                let value = try parseExpression()
-                elements.append(DictionaryElement(key: key, value: value))
-            }
-
-            try consume(.rightBracket)
-            return .dictionary(elements)
-        }
-
-        var elements: [Expression] = [firstExpression]
-        while peek() == .comma {
-            advance()
-            guard peek() != .rightBracket else { break }
-            elements.append(try parseExpression())
-        }
-
-        try consume(.rightBracket)
-        return .array(elements)
     }
 
     mutating func parseGenericArgumentClauseIfPresent() throws -> String {
@@ -520,7 +384,7 @@ extension Parser {
         return try ExpressionTypeSemantics.inferType(
             of: expression,
             accessibleTypes: typedAccessibleTypes,
-            callableReturnTypes: currentCallableReturnTypes,
+            callableReturnTypes: [:],
             macroExpansionTypes: macroExpansionTypes,
             resolver: literalBridgeResolver,
             memberResolver: declarationMemberResolver,
@@ -565,14 +429,10 @@ extension Parser {
         ExpressionTypeSemantics.isCompatibleNamedType(expected: expected, actual: actual)
     }
 
-    func currentPrefixOperator() -> UnaryOperator? {
+    private func currentPrefixOperator() -> UnaryOperator? {
         guard let symbol = operatorSymbol(for: peek()) else {
             return nil
         }
-        guard operatorEnvironment.prefixOperators.contains(symbol) else {
-            return nil
-        }
-
         switch symbol {
         case "!":
             return .not
@@ -581,32 +441,53 @@ extension Parser {
         }
     }
 
-    func currentInfixOperatorInfo() -> (
-        operatorSymbol: BinaryOperator, precedenceGroup: String,
-        associativity: OperatorAssociativity
+    private func currentInfixOperatorInfo() -> (
+        operatorSymbol: BinaryOperator, precedence: Int,
+        associativity: ExpressionOperatorAssociativity
     )? {
         guard let symbol = operatorSymbol(for: peek()) else {
-            return nil
-        }
-        guard let declaration = operatorEnvironment.infixOperators[symbol],
-            let precedenceGroup = declaration.precedenceGroup,
-            let group = operatorEnvironment.precedenceGroups[precedenceGroup]
-        else {
             return nil
         }
 
         guard let operatorSymbol = binaryOperator(for: symbol) else {
             return nil
         }
+        guard let bindingPower = expressionOperatorBindingPower(for: symbol) else {
+            return nil
+        }
 
         return (
             operatorSymbol: operatorSymbol,
-            precedenceGroup: precedenceGroup,
-            associativity: group.associativity ?? .none
+            precedence: bindingPower.precedence,
+            associativity: bindingPower.associativity
         )
     }
 
-    func operatorSymbol(for token: Token) -> String? {
+    private func expressionOperatorBindingPower(for symbol: String) -> (
+        precedence: Int,
+        associativity: ExpressionOperatorAssociativity
+    )? {
+        switch symbol {
+        case "||":
+            return (0, .left)
+        case "&&":
+            return (1, .left)
+        case "==", "!=", "<", "<=", ">", ">=":
+            return (2, .none)
+        case "..<", "...":
+            return (3, .none)
+        case "??":
+            return (4, .right)
+        case "+", "-":
+            return (5, .left)
+        case "*", "/", "%":
+            return (6, .left)
+        default:
+            return nil
+        }
+    }
+
+    private func operatorSymbol(for token: Token) -> String? {
         switch token {
         case .minus:
             return "-"
@@ -647,7 +528,7 @@ extension Parser {
         }
     }
 
-    func binaryOperator(for symbol: String) -> BinaryOperator? {
+    private func binaryOperator(for symbol: String) -> BinaryOperator? {
         switch symbol {
         case "+":
             return .addition

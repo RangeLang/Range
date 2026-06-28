@@ -41,9 +41,7 @@ struct CompileTimeValueEvaluator {
         evaluate(expression, locals: locals)
     }
 
-    // Macro bodies execute through the explicit statement macro surface. The
-    // parser may still model legacy statement records for older compatibility
-    // paths, but macro-local execution should not give those records meaning.
+    // Macro bodies execute through the explicit statement macro surface.
     // Returns the produced value from @return or a value-producing expression.
     // `locals` is threaded mutably so @assignment and loop accumulation persist.
     func evaluateStatements(
@@ -156,7 +154,7 @@ struct CompileTimeValueEvaluator {
         return expression
     }
 
-    private func macroConditionExpression(argumentClause: String?) -> Expression? {
+    func macroConditionExpression(argumentClause: String?) -> Expression? {
         guard let argumentClause = argumentClause?.trimmingCharacters(in: .whitespacesAndNewlines),
             !argumentClause.isEmpty,
             let arguments = try? MacroExpander.parsedMacroArguments(argumentClause: argumentClause)
@@ -191,8 +189,6 @@ struct CompileTimeValueEvaluator {
         switch expression {
         case .string(let value):
             return .string(StringLiteral.decodeEscapes(value))
-        case .interpolatedString(let string):
-            return evaluateInterpolatedString(string, locals: locals)
         case .integer(let value):
             return .integer(value)
         case .double(let value):
@@ -256,16 +252,6 @@ struct CompileTimeValueEvaluator {
             ) {
                 return functionValue
             }
-            if let context,
-                let rewritten = try? MacroExpander.applyInitMacroRewritesIfNeeded(
-                    callName: name,
-                    callArguments: arguments,
-                    macros: macroDeclarationsByName,
-                    context: context
-                )
-            {
-                return evaluate(rewritten, locals: locals)
-            }
             if let graphValue = evaluateGraphCall(
                 name: name,
                 arguments: arguments,
@@ -313,13 +299,6 @@ struct CompileTimeValueEvaluator {
                 dot < name.index(before: name.endIndex)
             {
                 return enumCaseValue(named: String(name[name.index(after: dot)...]))
-            }
-            if let transformed = evaluateArrayTransform(
-                name: name,
-                arguments: arguments,
-                locals: locals
-            ) {
-                return transformed
             }
             if let element = evaluateArrayElementAccess(
                 name: name,
@@ -823,11 +802,11 @@ struct CompileTimeValueEvaluator {
         "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
         "Macro.Application", "Macro.Declaration", "Macro.Target", "CodingBehavior",
         "ValueGeneric", "Parameter.Declaration",
-        "Void", "Identity", "UUID", "UUIDStorage", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
-        "SwitchCase", "Return", "Break", "Assignment",
+        "Void", "Identity", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "LocalBinding",
+        "Return", "Break", "Assignment",
         "ProgramSourceFile", "ProgramArtifact", "ProgramResult", "RangeProgram", "RangeGraph", "RangeProject",
         "WrittenExpression",
-        "ArrayExpression", "EnumCaseExpression", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook",
+        "ArrayExpression", "EnumCaseExpression",
     ]
 
     private func evaluatePrimitiveConstruction(
@@ -877,10 +856,21 @@ struct CompileTimeValueEvaluator {
             return .string(left + right)
         }
 
-        guard case .string = evaluate(expression, locals: locals) else {
+        guard let value = evaluate(expression, locals: locals) else {
             return nil
         }
-        return evaluate(expression, locals: locals)
+        switch value {
+        case .string(let string):
+            return .string(string)
+        case .integer(let integer):
+            return .string(String(integer))
+        case .double(let double):
+            return .string(String(double))
+        case .boolean(let boolean):
+            return .string(boolean ? "true" : "false")
+        default:
+            return nil
+        }
     }
 
     private func evaluateGraphCall(
@@ -963,27 +953,11 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
-        if name == "FileManager.createFile" {
-            guard arguments.count == 2,
-                let pathArgument = arguments.first(where: { $0.label == "path" }),
-                let textArgument = arguments.first(where: { $0.label == "text" }),
-                case .string(let path) = evaluate(pathArgument.value, locals: locals),
-                case .string(let text) = evaluate(textArgument.value, locals: locals)
-            else {
-                return nil
-            }
-            return createFileResult(path: path, text: text)
-        }
-
         guard arguments.count == 1,
             arguments[0].label == "path",
             case .string(let path) = evaluate(arguments[0].value, locals: locals)
         else {
             return nil
-        }
-
-        if name == "FileManager.readFile" {
-            return readFileResult(path: path)
         }
 
         guard name == "FileTree.rangeFiles" || name == "FileTree.sourceFiles" else {
@@ -1104,33 +1078,6 @@ struct CompileTimeValueEvaluator {
         return files.sorted { $0.path < $1.path }
     }
 
-    private func readFileResult(path: String) -> CompileTimeValue {
-        guard let text = try? String(contentsOf: URL(fileURLWithPath: path), encoding: .utf8) else {
-            return enumCaseValue(named: "failure", associatedValues: [
-                "cause": enumCaseValue(named: "unreadable")
-            ])
-        }
-        return enumCaseValue(named: "success", associatedValues: ["result": .string(text)])
-    }
-
-    private func createFileResult(path: String, text: String) -> CompileTimeValue {
-        do {
-            let url = URL(fileURLWithPath: path)
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try text.write(to: url, atomically: true, encoding: .utf8)
-            return enumCaseValue(named: "success", associatedValues: [
-                "result": .object(typeName: "Void", fields: [:])
-            ])
-        } catch {
-            return enumCaseValue(named: "failure", associatedValues: [
-                "cause": enumCaseValue(named: "unwritable")
-            ])
-        }
-    }
-
     private func evaluateStringTransform(
         name: String,
         arguments: [CallArgument],
@@ -1188,44 +1135,6 @@ struct CompileTimeValueEvaluator {
         return result
     }
 
-    private func evaluateInterpolatedString(
-        _ string: InterpolatedString,
-        locals: [String: Expression]
-    ) -> CompileTimeValue? {
-        var result = ""
-
-        for segment in string.segments {
-            switch segment {
-            case .text(let text):
-                result.append(StringLiteral.decodeEscapes(text))
-            case .expression(let expression):
-                guard let value = evaluate(expression, locals: locals),
-                    let string = interpolatedStringValue(value)
-                else {
-                    return nil
-                }
-                result.append(string)
-            }
-        }
-
-        return .string(result)
-    }
-
-    private func interpolatedStringValue(_ value: CompileTimeValue) -> String? {
-        switch value {
-        case .string(let string):
-            return string
-        case .integer(let integer):
-            return String(integer)
-        case .double(let double):
-            return String(double)
-        case .boolean(let boolean):
-            return boolean ? "true" : "false"
-        default:
-            return nil
-        }
-    }
-
     private func evaluateArrayElementAccess(
         name: String,
         arguments: [CallArgument],
@@ -1251,26 +1160,7 @@ struct CompileTimeValueEvaluator {
             return nil
         }
 
-        let candidates: [CompileTimeValue]
-        if let predicate = argument("where", in: arguments) {
-            candidates = elements.filter { element in
-                guard case .call("Closure", let closureArguments) = predicate else {
-                    return false
-                }
-                guard case .boolean(true) = evaluateSingleParameterClosure(
-                    closureArguments,
-                    element: element,
-                    locals: locals
-                ) else {
-                    return false
-                }
-                return true
-            }
-        } else {
-            candidates = elements
-        }
-
-        if let first = candidates.first {
+        if let first = elements.first {
             return first
         }
 
@@ -1278,198 +1168,6 @@ struct CompileTimeValueEvaluator {
             return nil
         }
         return evaluate(defaultExpression, locals: locals)
-    }
-
-    private func evaluateArrayTransform(
-        name: String,
-        arguments: [CallArgument],
-        locals: [String: Expression]
-    ) -> CompileTimeValue? {
-        let supportedSuffixes = [".map", ".compactMap", ".flatMap", ".filter", ".where"]
-        guard let suffix = supportedSuffixes.first(where: { name.hasSuffix($0) }),
-            arguments.count == 1,
-            arguments[0].label == nil,
-            case .call("Closure", let closureArguments) = arguments[0].value,
-            let source = evaluatePath(String(name.dropLast(suffix.count)), locals: locals),
-            case .array(let elements) = source
-        else {
-            return nil
-        }
-
-        let transformed = elements.compactMap { element -> CompileTimeValue? in
-            evaluateSingleParameterClosure(
-                closureArguments,
-                element: element,
-                locals: locals
-            )
-        }
-
-        switch suffix {
-        case ".map":
-            guard transformed.count == elements.count else {
-                return nil
-            }
-            return .array(transformed)
-        case ".compactMap":
-            return .array(transformed)
-        case ".flatMap":
-            var flattened: [CompileTimeValue] = []
-            for value in transformed {
-                guard case .array(let nested) = value else {
-                    return nil
-                }
-                flattened.append(contentsOf: nested)
-            }
-            return .array(flattened)
-        case ".filter", ".where":
-            var filtered: [CompileTimeValue] = []
-            for (element, value) in zip(elements, transformed) {
-                guard case .boolean(let include) = value else {
-                    return nil
-                }
-                if include {
-                    filtered.append(element)
-                }
-            }
-            return .array(filtered)
-        default:
-            return nil
-        }
-    }
-
-    private func evaluateSingleParameterClosure(
-        _ closureArguments: [CallArgument],
-        element: CompileTimeValue,
-        locals: [String: Expression]
-    ) -> CompileTimeValue? {
-        guard let parameterExpression = argument("parameters", in: closureArguments),
-            case .array(let parameterExpressions) = parameterExpression,
-            parameterExpressions.count == 1,
-            case .identifier(let parameterName) = parameterExpressions[0],
-            let bodyExpression = argument("body", in: closureArguments),
-            case .block(let body) = bodyExpression
-        else {
-            return nil
-        }
-
-        var nestedLocals = locals
-        nestedLocals[parameterName] = element.expression
-
-        for statement in body {
-            switch statement {
-            case .localBinding(let declaration):
-                nestedLocals[declaration.name] = declaration.expression
-            case .macroApplication(let name, let arguments) where name == "return":
-                guard let valueArgument = arguments.first(where: { $0.label == "value" }) else {
-                    return .object(typeName: "Void", fields: [:])
-                }
-                return evaluate(valueArgument.value, locals: nestedLocals)
-            case .macroApplication(let name, let arguments):
-                guard let macro = macroDeclarationsByName[name], let context else {
-                    return nil
-                }
-                let resolvedArguments = arguments.map { argument in
-                    if let value = evaluate(argument.value, locals: nestedLocals),
-                        let expression = value.expression
-                    {
-                        return CallArgument(label: argument.label, value: expression)
-                    }
-                    return argument
-                }
-                return try? MacroExpander.evaluateFreestandingSyntaxMacro(
-                    macro,
-                    arguments: resolvedArguments,
-                    callerLocals: nestedLocals,
-                    callerTargetBinding: targetBinding,
-                    callerTargetValue: targetValue,
-                    callerSelfValue: selfValue,
-                    context: context
-                )
-            case .macroInvocation(let name, let argumentClause, _):
-                guard let macro = macroDeclarationsByName[name] else {
-                    return nil
-                }
-                let arguments: [CallArgument]
-                if let argumentClause = argumentClause?.trimmingCharacters(in: .whitespacesAndNewlines),
-                    !argumentClause.isEmpty
-                {
-                    var parser = try? Parser(source: "macro(\(argumentClause))")
-                    guard parser != nil else {
-                        return nil
-                    }
-                    _ = try? parser?.consumeCallableName()
-                    guard let parsedArguments = try? parser?.parseInvocationArgumentsIfPresent() else {
-                        return nil
-                    }
-                    arguments = parsedArguments
-                } else {
-                    arguments = []
-                }
-                guard let context,
-                    let value = try? MacroExpander.evaluateFreestandingSyntaxMacro(
-                        macro,
-                        arguments: arguments,
-                        callerLocals: nestedLocals,
-                        callerTargetBinding: targetBinding,
-                        callerTargetValue: targetValue,
-                        callerSelfValue: selfValue,
-                        context: context
-                    )
-                else {
-                    return nil
-                }
-                return value
-            case .expression(let expression):
-                if case .macroInvocation(let name, let arguments) = expression,
-                    let macro = macroDeclarationsByName[name],
-                    let context
-                {
-                    let resolvedArguments = arguments.map { argument in
-                        if let value = evaluate(argument.value, locals: nestedLocals),
-                            let expression = value.expression
-                        {
-                            return CallArgument(label: argument.label, value: expression)
-                        }
-                        return argument
-                    }
-                    return try? MacroExpander.evaluateFreestandingSyntaxMacro(
-                        macro,
-                        arguments: resolvedArguments,
-                        callerLocals: nestedLocals,
-                        callerTargetBinding: targetBinding,
-                        callerTargetValue: targetValue,
-                        callerSelfValue: selfValue,
-                        context: context
-                    )
-                }
-                let value = evaluate(expression, locals: nestedLocals)
-                return value
-            case .return(let expression?):
-                return evaluate(expression, locals: nestedLocals)
-            case .switchStatement:
-                return try? MacroExpander.statementSyntaxValue(statement)
-            case .conditional(let branches):
-                for branch in branches {
-                    if let condition = branch.condition {
-                        guard case .boolean(true) = evaluate(condition, locals: nestedLocals) else {
-                            continue
-                        }
-                    }
-                    return evaluateSingleParameterClosure(
-                        [
-                            CallArgument(label: "parameters", value: .array([.identifier(parameterName)])),
-                            CallArgument(label: "body", value: .block(branch.body)),
-                        ],
-                        element: element,
-                        locals: nestedLocals
-                    )
-                }
-            default:
-                return nil
-            }
-        }
-
-        return nil
     }
 
     private func argument(_ label: String, in arguments: [CallArgument]) -> Expression? {

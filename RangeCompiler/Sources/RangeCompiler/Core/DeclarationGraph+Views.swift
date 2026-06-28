@@ -30,7 +30,6 @@ public struct DeclarationRegistryView {
     private let enumsByName: [String: EnumDeclaration]
     private let macrosByName: [String: MacroDeclaration]
     private let extensionsByTargetName: [String: [ExtensionDeclaration]]
-    private let topLevelStatesByFilePath: [String: [StateDeclaration]]
     private let statesByConstructName: [String: [StateDeclaration]]
     private let bindingsByConstructName: [String: [BindingDeclaration]]
     private let derivedsByConstructName: [String: [DerivedDeclaration]]
@@ -45,7 +44,6 @@ public struct DeclarationRegistryView {
         enumsByName: [String: EnumDeclaration],
         macrosByName: [String: MacroDeclaration],
         extensionsByTargetName: [String: [ExtensionDeclaration]],
-        topLevelStatesByFilePath: [String: [StateDeclaration]],
         statesByConstructName: [String: [StateDeclaration]],
         bindingsByConstructName: [String: [BindingDeclaration]],
         derivedsByConstructName: [String: [DerivedDeclaration]],
@@ -59,7 +57,6 @@ public struct DeclarationRegistryView {
         self.enumsByName = enumsByName
         self.macrosByName = macrosByName
         self.extensionsByTargetName = extensionsByTargetName
-        self.topLevelStatesByFilePath = topLevelStatesByFilePath
         self.statesByConstructName = statesByConstructName
         self.bindingsByConstructName = bindingsByConstructName
         self.derivedsByConstructName = derivedsByConstructName
@@ -88,10 +85,6 @@ public struct DeclarationRegistryView {
 
     public func extensions(targeting targetName: String) -> [ExtensionDeclaration] {
         extensionsByTargetName[targetName, default: []]
-    }
-
-    public func topLevelStates(inFilePath path: String) -> [StateDeclaration] {
-        topLevelStatesByFilePath[path, default: []]
     }
 
     public func states(onConstruct named: String) -> [StateDeclaration] {
@@ -169,10 +162,6 @@ public struct DeclarationRegistryView {
 
     public func hasExtensions(targeting targetName: String) -> Bool {
         !(extensionsByTargetName[targetName] ?? []).isEmpty
-    }
-
-    public func hasTopLevelStates(inFilePath path: String) -> Bool {
-        !(topLevelStatesByFilePath[path] ?? []).isEmpty
     }
 
     public func hasStates(onConstruct named: String) -> Bool {
@@ -271,20 +260,15 @@ public struct DeclarationSyntaxResolver {
     private static let bootstrapSyntaxBoundaryTypeNames: Set<String> = [
         "ArrayExpression",
         "Assignment",
-        "Background",
         "Block",
         "Break",
         "Closure",
-        "Defer",
         "EnumCaseExpression",
         "Expression",
-        "For",
         "Identifier",
         "If",
         "LocalBinding",
         "Return",
-        "Switch",
-        "SwitchCase",
         "TypeReference",
         "While",
         "WrittenExpression",

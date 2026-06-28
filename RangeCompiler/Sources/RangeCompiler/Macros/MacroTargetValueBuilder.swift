@@ -419,12 +419,10 @@ struct MacroTargetValueBuilder {
             }
             return value
         }
-        let metadataBindings = metadata.bindings
-
         let evaluator = CompileTimeValueEvaluator(
-            targetBinding: metadataBindings?.target ?? "__metadata_target__",
+            targetBinding: "target",
             targetValue: targetValue,
-            graphBinding: metadataBindings?.graph,
+            graphBinding: "graph",
             selfValue: MacroTargetValueBuilder(knownObjectTypeNames: knownObjectTypeNames)
                 .value(for: metadata),
             localBindings: initialBindings,
@@ -549,7 +547,6 @@ struct MacroTargetValueBuilder {
                     diagnostics: []
                 ),
                 "body": .string(bodyText),
-                "syntaxBody": .string(renderEmittedCodeBlock(declaration.syntaxBody)),
             ]
         )
     }
@@ -573,7 +570,6 @@ struct MacroTargetValueBuilder {
                     diagnostics: []
                 ),
                 "body": .string(bodyText),
-                "syntaxBody": .string(""),
             ]
         )
     }
@@ -713,13 +709,6 @@ struct MacroTargetValueBuilder {
             )
         case .expression(let expression):
             return writtenSyntax(MacroExpander.renderExpressionForStringify(expression))
-        case .background(let background):
-            return .object(
-                typeName: "Background", fields: ["body": blockValue(for: background.body)])
-        case .deferBlock(let deferred):
-            return .object(typeName: "Defer", fields: ["body": blockValue(for: deferred.body)])
-        case .break:
-            return .object(typeName: "Break", fields: [:])
         default:
             return writtenSyntax(renderStatement(statement))
         }
@@ -750,35 +739,9 @@ struct MacroTargetValueBuilder {
         case .macroInvocation(let name, let argumentClause, let body):
             let arguments = argumentClause.map { "(\($0))" } ?? ""
             return "@\(name)\(arguments) { \(renderStatements(body)) }"
-        case .expand(let targetPath, _):
-            return [targetPath, "expand"].compactMap { $0 }.joined(separator: ".")
-        case .replace(let targetPath, _):
-            return [targetPath, "replace"].compactMap { $0 }.joined(separator: ".")
         default:
             return String(describing: statement)
         }
-    }
-
-    private func renderEmittedCodeBlock(_ block: EmittedCodeBlock?) -> String {
-        guard let block else {
-            return ""
-        }
-
-        return block.parts.map { part in
-            switch part {
-            case .text(let text):
-                return text
-            case .splice(let expression, let expected):
-                return
-                    "#(\(MacroExpander.renderExpressionForStringify(expression)): \(expected.rawValue))"
-            case .syntaxMacroInvocation(let name, let arguments):
-                let renderedArguments = arguments.map { argument in
-                    let value = MacroExpander.renderExpressionForStringify(argument.value)
-                    return argument.label.map { "\($0): \(value)" } ?? value
-                }.joined(separator: ", ")
-                return "#\(name)(\(renderedArguments))"
-            }
-        }.joined()
     }
 
     private func argumentValues(for application: MacroApplication) -> [CompileTimeValue] {

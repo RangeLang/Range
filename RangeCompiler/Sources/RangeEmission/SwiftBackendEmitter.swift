@@ -71,7 +71,6 @@ struct SwiftBackendEmitter {
     }
 
     private struct SwiftEmissionContext {
-        var failableInitializersByConstructName: [String: [FailableInitializerSignature]] = [:]
         var genericParameterNames: Set<String> = []
         var constructsByName: [String: ConstructDeclaration] = [:]
         var macrosByName: [String: MacroDeclaration] = [:]
@@ -87,13 +86,6 @@ struct SwiftBackendEmitter {
         init() {}
 
         init(program: LoweredProgram) {
-            self.failableInitializersByConstructName = Self.collectFailableInitializers(
-                from: Self.allDeclarations(in: program)
-            )
-            self.failableInitializersByConstructName.merge(
-                Self.collectFailableInitializers(from: Self.allExtensions(in: program)),
-                uniquingKeysWith: { lhs, rhs in lhs + rhs }
-            )
             self.genericParameterNames = Self.collectGenericParameterNames(from: program)
             self.constructsByName = Self.allDeclarations(in: program).reduce(into: [:]) {
                 result, declaration in
@@ -194,32 +186,8 @@ struct SwiftBackendEmitter {
             return collected
         }
 
-        /// Extracts the LLVM template string from an `@llvm` application. The
-        /// template is authored as a labelled quoted `String` argument
-        /// (`@llvm(body: "i$bits")`); a raw foreign body is still accepted for
-        /// forward compatibility. The string content between the first pair of
-        /// double quotes is the template body.
         private static func llvmBody(from application: MacroApplication) -> String? {
-            // Prefer the macro's evaluated output: the Range-authored @llvm macro
-            // processes its template (e.g. splice substitution) and the result is
-            // carried here, so emission consumes the macro's output, not its input.
-            if let processed = application.evaluatedStringValue {
-                return processed
-            }
-            if let rawBody = application.rawBody, application.rawBodyLanguage == "LLVM" {
-                return rawBody
-            }
-            guard let clause = application.argumentClause else {
-                return nil
-            }
-            guard let firstQuote = clause.firstIndex(of: "\""),
-                let lastQuote = clause.lastIndex(of: "\""),
-                firstQuote < lastQuote
-            else {
-                return nil
-            }
-            let start = clause.index(after: firstQuote)
-            return String(clause[start..<lastQuote])
+            application.evaluatedStringValue
         }
 
         private static func collectCallableParameterLabels(
@@ -460,12 +428,6 @@ struct SwiftBackendEmitter {
                         record(element.key)
                         record(element.value)
                     }
-                case .interpolatedString(let string):
-                    for segment in string.segments {
-                        if case .expression(let expression) = segment {
-                            record(expression)
-                        }
-                    }
                 case .ternary(let condition, let trueExpression, let falseExpression):
                     record(condition)
                     record(trueExpression)
@@ -497,9 +459,6 @@ struct SwiftBackendEmitter {
                     case .assignment(let target, let expression):
                         record(target)
                         record(expression)
-                    case .compoundAssignment(let target, _, let expression):
-                        record(target)
-                        record(expression)
                     case .expression(let expression):
                         record(expression)
                     case .return(let expression?):
@@ -511,34 +470,12 @@ struct SwiftBackendEmitter {
                             }
                             record(branch.body)
                         }
-                    case .forEach(_, let sequence, let body):
-                        record(sequence)
-                        record(body)
                     case .whileLoop(let condition, let body):
                         record(condition)
                         record(body)
-                    case .switchStatement(let expression, let cases, let defaultBody):
-                        record(expression)
-                        for switchCase in cases {
-                            if case .expression(let expression) = switchCase.pattern {
-                                record(expression)
-                            }
-                            record(switchCase.body)
-                        }
-                        if let defaultBody {
-                            record(defaultBody)
-                        }
-                    case .background(let background):
-                        record(background.body)
-                    case .deferBlock(let deferred):
-                        record(deferred.body)
-                    case .localCallable(let declaration):
-                        record(declaration.body)
-                    case .derived(_, _, let body):
-                        record(body)
                     case .macroInvocation(_, _, let body):
                         record(body)
-                    case .expand, .replace, .return(nil), .break, .continue:
+                    case .return(nil):
                         break
                     }
                 }
@@ -557,76 +494,6 @@ struct SwiftBackendEmitter {
             return declarations
         }
 
-        private static func collectFailableInitializers(
-            from declarations: [ConstructDeclaration]
-        ) -> [String: [FailableInitializerSignature]] {
-            var signatures: [String: [FailableInitializerSignature]] = [:]
-
-            for declaration in declarations {
-                for initializer in declaration.initializers {
-                    guard let returnType = initializer.returnType,
-                        let failureType = resultSelfFailureType(returnType)
-                    else {
-                        continue
-                    }
-
-                    signatures[declaration.name, default: []].append(
-                        FailableInitializerSignature(
-                            constructName: declaration.name,
-                            labels: initializer.parameters.map(\.name),
-                            failureType: failureType
-                        )
-                    )
-                }
-            }
-
-            return signatures
-        }
-
-        private static func collectFailableInitializers(
-            from extensions: [ExtensionDeclaration]
-        ) -> [String: [FailableInitializerSignature]] {
-            var signatures: [String: [FailableInitializerSignature]] = [:]
-
-            for declaration in extensions {
-                for initializer in declaration.initializers {
-                    guard let returnType = initializer.returnType,
-                        let failureType = resultSelfFailureType(returnType)
-                    else {
-                        continue
-                    }
-
-                    signatures[declaration.targetName, default: []].append(
-                        FailableInitializerSignature(
-                            constructName: declaration.targetName,
-                            labels: initializer.parameters.map(\.name),
-                            failureType: failureType
-                        )
-                    )
-                }
-            }
-
-            return signatures
-        }
-
-        private static func resultSelfFailureType(_ typeReference: TypeReference) -> TypeReference?
-        {
-            guard case .generic(let base, let arguments) = typeReference,
-                case .named("Result") = base,
-                arguments.count == 2,
-                case .named("Self") = arguments[0]
-            else {
-                return nil
-            }
-
-            return arguments[1]
-        }
-    }
-
-    private struct FailableInitializerSignature {
-        var constructName: String
-        var labels: [String?]
-        var failureType: TypeReference
     }
 
     private struct EmissionScope {
@@ -680,33 +547,23 @@ struct SwiftBackendEmitter {
         "Any",
         "Array",
         "Bool",
-        "Data",
         "Dictionary",
         "Double",
         "Float",
         "Int",
         "Never",
         "Optional",
-        "ClosedRange",
-        "Range",
         "Self",
         "Set",
         "String",
-        "UUID",
         "Void",
     ]
 
     private let swiftNativeStorageTypeNames: [String: String] = [
         "BoolStorage": "Bool",
-        "DataStorage": "Data",
-        "Date": "__RangeDateOnly",
-        "DateStorage": "__RangeDateOnly",
-        "DateTime": "__RangeDateTime",
-        "DateTimeStorage": "__RangeDateTime",
         "FloatStorage": "Float",
         "IntStorage": "Int",
         "StringStorage": "String",
-        "UUIDStorage": "UUID",
     ]
 
     private typealias RangeExpression = RangeCompiler.Expression
@@ -766,7 +623,7 @@ struct SwiftBackendEmitter {
         let main = try emitMain(program.mainBlock)
 
         let sections = [
-            emitRuntimeSupport(includeFoundationImport: false),
+            emitRuntimeSupport(),
             emitLLVMBridgeDeclarations(),
             enumerations,
             declarations,
@@ -827,7 +684,7 @@ struct SwiftBackendEmitter {
         )
 
         let runtimeSwift = [
-            emitRuntimeSupport(includeFoundationImport: false),
+            emitRuntimeSupport(),
             emitLLVMBridgeDeclarations(),
         ].filter { !$0.isEmpty }.joined(separator: "\n\n")
 
@@ -892,710 +749,9 @@ struct SwiftBackendEmitter {
         return lines.joined(separator: "\n") + "\n"
     }
 
-    private func emitRuntimeSupport(includeFoundationImport: Bool) -> String {
+    private func emitRuntimeSupport() -> String {
         let support = """
-            // Backend implementation for RangeCore's Promise, Result, memory, threads, ChannelStorage, and Logger surface.
-            // RangeCore declares the language-visible API; Swift runtime support lives here.
-            enum Range_Promise<Success, Failure> {
-                case loading
-                case success(result: Success)
-                case failure(cause: Failure)
-            }
-
-            enum Range_Result<Success, Failure> {
-                case success(result: Success)
-                case failure(cause: Failure)
-            }
-
-            enum Range_POSIXMemory {
-                static func allocate(byteCount: Int, alignment: Int) -> Range_Result<Range_MemoryRegion, Range_MemoryAccessError> {
-                    guard byteCount >= 0 && alignment > 0 else {
-                        return .failure(cause: .invalid)
-                    }
-
-                    let minimumAlignment = MemoryLayout<UnsafeRawPointer>.alignment
-                    let normalizedAlignment = max(alignment, minimumAlignment)
-                    guard normalizedAlignment > 0 && normalizedAlignment & (normalizedAlignment - 1) == 0 else {
-                        return .failure(cause: .invalid)
-                    }
-
-                    var rawPointer: UnsafeMutableRawPointer?
-                    let status = posix_memalign(&rawPointer, normalizedAlignment, byteCount)
-                    guard status == 0, let allocated = rawPointer else {
-                        return .failure(cause: .outOfMemory)
-                    }
-
-                    return .success(
-                        result: Range_MemoryRegion(
-                            address: Range_MemoryAddress(raw: Int(bitPattern: allocated)),
-                            byteCount: byteCount,
-                            alignment: normalizedAlignment
-                        )
-                    )
-                }
-
-                static func deallocate(region: Range_MemoryRegion) -> Range_Result<Void, Range_MemoryAccessError> {
-                    guard region.address.raw != 0 else {
-                        return .failure(cause: .invalid)
-                    }
-
-                    free(UnsafeMutableRawPointer(bitPattern: region.address.raw))
-                    return .success(result: Void())
-                }
-
-                static func zero(region: Range_MemoryRegion) -> Range_Result<Void, Range_MemoryAccessError> {
-                    return fill(region: region, byte: 0)
-                }
-
-                static func fill(region: Range_MemoryRegion, byte: UInt8) -> Range_Result<Void, Range_MemoryAccessError> {
-                    guard let pointer = UnsafeMutableRawPointer(bitPattern: region.address.raw), region.byteCount >= 0 else {
-                        return .failure(cause: .invalid)
-                    }
-
-                    memset(pointer, Int32(byte), region.byteCount)
-                    return .success(result: Void())
-                }
-
-                static func copy(source: Range_MemoryRegion, destination: Range_MemoryRegion) -> Range_Result<Void, Range_MemoryAccessError> {
-                    guard let sourcePointer = UnsafeRawPointer(bitPattern: source.address.raw),
-                          let destinationPointer = UnsafeMutableRawPointer(bitPattern: destination.address.raw),
-                          source.byteCount >= 0,
-                          destination.byteCount >= source.byteCount
-                    else {
-                        return .failure(cause: .invalid)
-                    }
-
-                    memcpy(destinationPointer, sourcePointer, source.byteCount)
-                    return .success(result: Void())
-                }
-
-                static func readByte(address: Range_MemoryAddress) -> Range_Result<UInt8, Range_MemoryAccessError> {
-                    guard let pointer = UnsafeRawPointer(bitPattern: address.raw) else {
-                        return .failure(cause: .invalid)
-                    }
-
-                    return .success(result: pointer.load(as: UInt8.self))
-                }
-
-                static func writeByte(address: Range_MemoryAddress, byte: UInt8) -> Range_Result<Void, Range_MemoryAccessError> {
-                    guard let pointer = UnsafeMutableRawPointer(bitPattern: address.raw) else {
-                        return .failure(cause: .invalid)
-                    }
-
-                    pointer.storeBytes(of: byte, as: UInt8.self)
-                    return .success(result: Void())
-                }
-
-                static func pageSize() -> Int {
-                    Int(sysconf(_SC_PAGESIZE))
-                }
-            }
-
-            enum Range_Memory {
-                static func allocate(byteCount: Int, alignment: Int) -> Range_Result<Range_MemoryRegion, Range_MemoryAccessError> {
-                    return Range_POSIXMemory.allocate(byteCount: byteCount, alignment: alignment)
-                }
-
-                static func deallocate(region: Range_MemoryRegion) -> Range_Result<Void, Range_MemoryAccessError> {
-                    return Range_POSIXMemory.deallocate(region: region)
-                }
-
-                static func zero(region: Range_MemoryRegion) -> Range_Result<Void, Range_MemoryAccessError> {
-                    return Range_POSIXMemory.zero(region: region)
-                }
-
-                static func fill(region: Range_MemoryRegion, byte: UInt8) -> Range_Result<Void, Range_MemoryAccessError> {
-                    return Range_POSIXMemory.fill(region: region, byte: byte)
-                }
-
-                static func copy(source: Range_MemoryRegion, destination: Range_MemoryRegion) -> Range_Result<Void, Range_MemoryAccessError> {
-                    return Range_POSIXMemory.copy(source: source, destination: destination)
-                }
-
-                static func readByte(address: Range_MemoryAddress) -> Range_Result<UInt8, Range_MemoryAccessError> {
-                    return Range_POSIXMemory.readByte(address: address)
-                }
-
-                static func writeByte(address: Range_MemoryAddress, byte: UInt8) -> Range_Result<Void, Range_MemoryAccessError> {
-                    return Range_POSIXMemory.writeByte(address: address, byte: byte)
-                }
-
-                static func pageSize() -> Int {
-                    return Range_POSIXMemory.pageSize()
-                }
-            }
-
-            enum Range_CPU {
-                static func logicalCoreCount() -> Int {
-                    Int(sysconf(_SC_NPROCESSORS_ONLN))
-                }
-
-                static func cacheLineSize() -> Int {
-                    #if os(macOS)
-                    var value = 0
-                    var size = MemoryLayout<Int>.size
-                    if sysctlbyname("hw.cachelinesize", &value, &size, nil, 0) == 0 {
-                        return value
-                    }
-                    #endif
-                    return 64
-                }
-            }
-
-            final class Range_ThreadStart {
-                let body: () -> Void
-
-                init(body: @escaping () -> Void) {
-                    self.body = body
-                }
-            }
-
-            enum Range_POSIXThread {
-                static func spawn(_ body: @escaping () -> Void) -> Range_Result<Range_ThreadHandle, Range_ThreadError> {
-                    var thread: pthread_t?
-                    let context = Unmanaged.passRetained(Range_ThreadStart(body: body)).toOpaque()
-                    let status = pthread_create(&thread, nil, { rawContext in
-                        let start = Unmanaged<Range_ThreadStart>
-                            .fromOpaque(rawContext)
-                            .takeRetainedValue()
-                        start.body()
-                        return nil
-                    }, context)
-
-                    guard status == 0, let thread else {
-                        Unmanaged<Range_ThreadStart>.fromOpaque(context).release()
-                        return .failure(cause: .unavailable)
-                    }
-
-                    return .success(result: Range_ThreadHandle(raw: Int(bitPattern: thread)))
-                }
-
-                static func join(_ handle: Range_ThreadHandle) -> Range_Result<Void, Range_ThreadError> {
-                    guard let thread = pthread_t(bitPattern: handle.raw) else {
-                        return .failure(cause: .invalid)
-                    }
-
-                    return pthread_join(thread, nil) == 0
-                        ? .success(result: Void())
-                        : .failure(cause: .invalid)
-                }
-
-                static func detach(_ handle: Range_ThreadHandle) -> Range_Result<Void, Range_ThreadError> {
-                    guard let thread = pthread_t(bitPattern: handle.raw) else {
-                        return .failure(cause: .invalid)
-                    }
-
-                    return pthread_detach(thread) == 0
-                        ? .success(result: Void())
-                        : .failure(cause: .invalid)
-                }
-
-                static func current() -> Range_ThreadHandle {
-                    Range_ThreadHandle(raw: Int(bitPattern: pthread_self()))
-                }
-
-                static func yield() {
-                    sched_yield()
-                }
-
-                static func sleep(milliseconds: Int) {
-                    guard milliseconds > 0 else {
-                        return
-                    }
-
-                    let clamped = min(milliseconds, Int(UInt32.max / 1000))
-                    usleep(useconds_t(clamped * 1000))
-                }
-            }
-
-            enum Range_Thread {
-                static func spawn(_ body: @escaping () -> Void) -> Range_Result<Range_ThreadHandle, Range_ThreadError> {
-                    return Range_POSIXThread.spawn(body)
-                }
-
-                static func join(_ handle: Range_ThreadHandle) -> Range_Result<Void, Range_ThreadError> {
-                    return Range_POSIXThread.join(handle)
-                }
-
-                static func detach(_ handle: Range_ThreadHandle) -> Range_Result<Void, Range_ThreadError> {
-                    return Range_POSIXThread.detach(handle)
-                }
-
-                static func current() -> Range_ThreadHandle {
-                    return Range_POSIXThread.current()
-                }
-
-                static func yield() {
-                    Range_POSIXThread.yield()
-                }
-
-                static func sleep(milliseconds: Int) {
-                    Range_POSIXThread.sleep(milliseconds: milliseconds)
-                }
-            }
-
-            enum Range_POSIXFileSystem {
-                static func readData(path: String) -> Range_Result<Data, Range_FileReadError> {
-                    let descriptor = open(path, O_RDONLY)
-                    guard descriptor >= 0 else {
-                        return errno == ENOENT
-                            ? .failure(cause: .missing)
-                            : .failure(cause: .unreadable)
-                    }
-                    defer { close(descriptor) }
-
-                    var metadata = stat()
-                    guard fstat(descriptor, &metadata) == 0 else {
-                        return .failure(cause: .unreadable)
-                    }
-
-                    let byteCount = Int(metadata.st_size)
-                    guard byteCount >= 0 else {
-                        return .failure(cause: .unreadable)
-                    }
-
-                    var bytes = [UInt8](repeating: 0, count: byteCount)
-                    var offset = 0
-                    while offset < byteCount {
-                        let readCount = bytes.withUnsafeMutableBufferPointer { buffer in
-                            read(descriptor, buffer.baseAddress! + offset, byteCount - offset)
-                        }
-
-                        if readCount < 0 {
-                            if errno == EINTR {
-                                continue
-                            }
-                            return .failure(cause: .unreadable)
-                        }
-
-                        if readCount == 0 {
-                            return .failure(cause: .unreadable)
-                        }
-
-                        offset += readCount
-                    }
-
-                    return .success(result: Data(bytes))
-                }
-
-                static func writeData(path: String, data: Data) -> Range_Result<Void, Range_FileWriteError> {
-                    switch createParentDirectory(for: path) {
-                    case .success:
-                        break
-                    case .failure(let error):
-                        return .failure(cause: error)
-                    }
-
-                    let descriptor = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
-                    guard descriptor >= 0 else {
-                        return .failure(cause: .unwritable)
-                    }
-                    defer { close(descriptor) }
-
-                    let byteCount = data.bytes.count
-                    var offset = 0
-                    while offset < byteCount {
-                        let writeCount = data.bytes.withUnsafeBufferPointer { buffer in
-                            write(descriptor, buffer.baseAddress! + offset, byteCount - offset)
-                        }
-
-                        if writeCount < 0 {
-                            if errno == EINTR {
-                                continue
-                            }
-                            return .failure(cause: .unwritable)
-                        }
-
-                        if writeCount == 0 {
-                            return .failure(cause: .unwritable)
-                        }
-
-                        offset += writeCount
-                    }
-
-                    return .success(result: Void())
-                }
-
-                static func createDirectory(path: String) -> Range_Result<Void, Range_FileWriteError> {
-                    guard !path.isEmpty && path != "." else {
-                        return .success(result: Void())
-                    }
-
-                    let normalizedPath = path.hasSuffix("/") && path.count > 1
-                        ? String(path.dropLast())
-                        : path
-                    let components = normalizedPath.split(separator: "/", omittingEmptySubsequences: true)
-                    var current = normalizedPath.hasPrefix("/") ? "/" : ""
-
-                    for component in components {
-                        if current.isEmpty || current == "/" {
-                            current += component
-                        } else {
-                            current += "/\\(component)"
-                        }
-
-                        if mkdir(current, 0o755) == 0 {
-                            continue
-                        }
-
-                        if errno == EEXIST {
-                            var metadata = stat()
-                            guard lstat(current, &metadata) == 0,
-                                  (metadata.st_mode & S_IFMT) == S_IFDIR else {
-                                return .failure(cause: .unwritable)
-                            }
-                            continue
-                        }
-
-                        return .failure(cause: .unwritable)
-                    }
-
-                    return .success(result: Void())
-                }
-
-                private static func createParentDirectory(for path: String) -> Range_Result<Void, Range_FileWriteError> {
-                    guard let slashIndex = path.lastIndex(of: "/") else {
-                        return .success(result: Void())
-                    }
-
-                    let parent = String(path[..<slashIndex])
-                    guard !parent.isEmpty else {
-                        return .success(result: Void())
-                    }
-
-                    return createDirectory(path: parent)
-                }
-
-                static func listEntries(path: String) -> Range_Result<[Range_FileSystemEntry], Range_FileReadError> {
-                    guard let directory = opendir(path) else {
-                        return errno == ENOENT
-                            ? .failure(cause: .missing)
-                            : .failure(cause: .unreadable)
-                    }
-                    defer { closedir(directory) }
-
-                    var entries: [Range_FileSystemEntry] = []
-                    while let entry = readdir(directory) {
-                        let name = withUnsafePointer(to: entry.pointee.d_name) { pointer in
-                            pointer.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: entry.pointee.d_name)) {
-                                String(cString: $0)
-                            }
-                        }
-
-                        if name == "." || name == ".." {
-                            continue
-                        }
-
-                        let childPath: String
-                        if path == "/" || path.hasSuffix("/") {
-                            childPath = "\\(path)\\(name)"
-                        } else {
-                            childPath = "\\(path)/\\(name)"
-                        }
-                        var metadata = stat()
-                        guard lstat(childPath, &metadata) == 0 else {
-                            return .failure(cause: .unreadable)
-                        }
-
-                        let kind: Range_FileSystemEntryKind =
-                            (metadata.st_mode & S_IFMT) == S_IFDIR ? .directory : .file
-                        entries.append(
-                            Range_FileSystemEntry(
-                                path: childPath,
-                                name: name,
-                                kind: kind
-                            )
-                        )
-                    }
-
-                    return .success(result: entries)
-                }
-            }
-
-            enum Range_HostFileSystem {
-                static func readData(path: String) -> Range_Result<Data, Range_FileReadError> {
-                    return Range_POSIXFileSystem.readData(path: path)
-                }
-
-                static func writeData(path: String, data: Data) -> Range_Result<Void, Range_FileWriteError> {
-                    return Range_POSIXFileSystem.writeData(path: path, data: data)
-                }
-
-                static func createDirectory(path: String) -> Range_Result<Void, Range_FileWriteError> {
-                    return Range_POSIXFileSystem.createDirectory(path: path)
-                }
-
-                static func listEntries(path: String) -> Range_Result<[Range_FileSystemEntry], Range_FileReadError> {
-                    return Range_POSIXFileSystem.listEntries(path: path)
-                }
-            }
-
-            enum Range_FileManager {
-                static func readData(path: String) -> Range_Result<Data, Range_FileReadError> {
-                    return Range_POSIXFileSystem.readData(path: path)
-                }
-
-                static func readFile(path: String) -> Range_Result<String, Range_FileReadError> {
-                    switch readData(path: path) {
-                    case .success(let data):
-                        return .success(result: Range_UTF8.decode(data: data))
-                    case .failure(let error):
-                        return .failure(cause: error)
-                    }
-                }
-
-                static func writeData(path: String, data: Data) -> Range_Result<Void, Range_FileWriteError> {
-                    return Range_POSIXFileSystem.writeData(path: path, data: data)
-                }
-
-                static func createFile(path: String, text: String) -> Range_Result<Void, Range_FileWriteError> {
-                    return writeData(path: path, data: Range_UTF8.encode(text: text))
-                }
-
-                static func createFolder(path: String) -> Range_Result<Void, Range_FileWriteError> {
-                    return Range_POSIXFileSystem.createDirectory(path: path)
-                }
-
-                static func listEntries(path: String) -> Range_Result<[Range_FileSystemEntry], Range_FileReadError> {
-                    return Range_POSIXFileSystem.listEntries(path: path)
-                }
-            }
-
-            enum Range_UTF8 {
-                static func decode(data: Data) -> String {
-                    return String(decoding: data.bytes, as: UTF8.self)
-                }
-
-                static func encode(text: String) -> Data {
-                    return Data(Array(text.utf8))
-                }
-            }
-
-            enum Range_SHA256 {
-                private static let initialHash: [UInt32] = [
-                    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-                    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-                ]
-
-                private static let roundConstants: [UInt32] = [
-                    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
-                    0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-                    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
-                    0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-                    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
-                    0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-                    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
-                    0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-                    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
-                    0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-                    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
-                    0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-                    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
-                    0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-                    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
-                    0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-                ]
-
-                static func digest(string: String) -> Data {
-                    return digest(data: Range_UTF8.encode(text: string))
-                }
-
-                static func digest(data: Data) -> Data {
-                    var message = data.bytes
-                    let bitLength = UInt64(message.count) * 8
-                    message.append(0x80)
-                    while message.count % 64 != 56 {
-                        message.append(0)
-                    }
-                    for shift in stride(from: 56, through: 0, by: -8) {
-                        message.append(UInt8((bitLength >> UInt64(shift)) & 0xff))
-                    }
-
-                    var hash = initialHash
-
-                    for chunkStart in stride(from: 0, to: message.count, by: 64) {
-                        var words = Array(repeating: UInt32(0), count: 64)
-                        for index in 0..<16 {
-                            let offset = chunkStart + index * 4
-                            words[index] =
-                                (UInt32(message[offset]) << 24)
-                                | (UInt32(message[offset + 1]) << 16)
-                                | (UInt32(message[offset + 2]) << 8)
-                                | UInt32(message[offset + 3])
-                        }
-                        for index in 16..<64 {
-                            let s0 = rotateRight(words[index - 15], by: 7)
-                                ^ rotateRight(words[index - 15], by: 18)
-                                ^ (words[index - 15] >> 3)
-                            let s1 = rotateRight(words[index - 2], by: 17)
-                                ^ rotateRight(words[index - 2], by: 19)
-                                ^ (words[index - 2] >> 10)
-                            words[index] = words[index - 16]
-                                &+ s0
-                                &+ words[index - 7]
-                                &+ s1
-                        }
-
-                        var a = hash[0]
-                        var b = hash[1]
-                        var c = hash[2]
-                        var d = hash[3]
-                        var e = hash[4]
-                        var f = hash[5]
-                        var g = hash[6]
-                        var h = hash[7]
-
-                        for index in 0..<64 {
-                            let s1 = rotateRight(e, by: 6) ^ rotateRight(e, by: 11) ^ rotateRight(e, by: 25)
-                            let ch = (e & f) ^ (~e & g)
-                            let temp1 = h &+ s1 &+ ch &+ roundConstants[index] &+ words[index]
-                            let s0 = rotateRight(a, by: 2) ^ rotateRight(a, by: 13) ^ rotateRight(a, by: 22)
-                            let maj = (a & b) ^ (a & c) ^ (b & c)
-                            let temp2 = s0 &+ maj
-
-                            h = g
-                            g = f
-                            f = e
-                            e = d &+ temp1
-                            d = c
-                            c = b
-                            b = a
-                            a = temp1 &+ temp2
-                        }
-
-                        hash[0] = hash[0] &+ a
-                        hash[1] = hash[1] &+ b
-                        hash[2] = hash[2] &+ c
-                        hash[3] = hash[3] &+ d
-                        hash[4] = hash[4] &+ e
-                        hash[5] = hash[5] &+ f
-                        hash[6] = hash[6] &+ g
-                        hash[7] = hash[7] &+ h
-                    }
-
-                    var bytes: [UInt8] = []
-                    for word in hash {
-                        bytes.append(UInt8((word >> 24) & 0xff))
-                        bytes.append(UInt8((word >> 16) & 0xff))
-                        bytes.append(UInt8((word >> 8) & 0xff))
-                        bytes.append(UInt8(word & 0xff))
-                    }
-                    return Data(bytes)
-                }
-
-                private static func rotateRight(_ value: UInt32, by amount: UInt32) -> UInt32 {
-                    return (value >> amount) | (value << (32 - amount))
-                }
-            }
-
-            final class Range_ChannelStorage<Element>: @unchecked Sendable {
-                private var buffer: [Element] = []
-                private let capacity: Int
-                private var closed = false
-
-                init() {
-                    self.capacity = 0
-                }
-
-                init(capacity: Int) {
-                    self.capacity = max(0, capacity)
-                }
-
-                func send(element: Element) {
-                    precondition(!closed, "Cannot send to a closed channel.")
-                    precondition(capacity == 0 || buffer.count < capacity, "Channel buffer is full.")
-                    buffer.append(element)
-                }
-
-                func receive() -> Element {
-                    if buffer.isEmpty {
-                        preconditionFailure(
-                            "Cannot receive from an empty channel in the single-threaded Swift backend."
-                        )
-                    }
-
-                    return buffer.removeFirst()
-                }
-
-                func close() {
-                    closed = true
-                }
-            }
-
-            enum Range_Logger {
-                static func log(_ value: String) {
-                    print(value)
-                }
-
-                static func log(_ value: Int) {
-                    print(value)
-                }
-
-                static func log(_ value: Bool) {
-                    print(value ? "true" : "false")
-                }
-
-                static func log(_ value: Float) {
-                    print(value)
-                }
-
-                static func log(_ value: Double) {
-                    print(value)
-                }
-
-                static func debug(_ value: String) {
-                    print(value)
-                }
-
-                static func info(_ value: String) {
-                    print(value)
-                }
-
-                static func success(_ value: String) {
-                    print(value)
-                }
-
-                static func warning(_ value: String) {
-                    print(value)
-                }
-
-                static func error(_ value: String) {
-                    print(value)
-                }
-            }
-
-            struct Data: Hashable, Sendable {
-                var bytes: [UInt8]
-
-                init() {
-                    self.bytes = []
-                }
-
-                init(_ bytes: [UInt8]) {
-                    self.bytes = bytes
-                }
-
-            }
-
-            struct UUID: Hashable, CustomStringConvertible, Sendable {
-                let uuidString: String
-
-                init() {
-                    self.uuidString = "00000000-0000-0000-0000-000000000000"
-                }
-
-                init?(uuidString: String) {
-                    guard !uuidString.isEmpty else {
-                        return nil
-                    }
-                    self.uuidString = uuidString
-                }
-
-                var description: String {
-                    uuidString
-                }
-            }
-
+            // Generic Swift bridge support that generated workspaces still reference.
             extension String {
                 func __rangeCharacter(index: Int) -> String {
                     let position = self.index(startIndex, offsetBy: index)
@@ -1635,113 +791,6 @@ struct SwiftBackendEmitter {
                 }
             }
 
-            struct __RangeDateOnly: Hashable, Comparable, CustomStringConvertible, Sendable {
-                let year: Int
-                let month: Int
-                let day: Int
-
-                init() {
-                    self.init(posixTime: time(nil))
-                }
-
-                init(posixTime: time_t) {
-                    var rawTime = posixTime
-                    var utc = tm()
-                    gmtime_r(&rawTime, &utc)
-                    self.year = Int(utc.tm_year + 1900)
-                    self.month = Int(utc.tm_mon + 1)
-                    self.day = Int(utc.tm_mday)
-                }
-
-                init(iso8601String: String) throws {
-                    let parts = iso8601String.split(separator: "-")
-                    guard parts.count == 3,
-                        let year = Int(parts[0]),
-                        let month = Int(parts[1]),
-                        let day = Int(parts[2])
-                    else {
-                        throw __RangeThrownFailure<Range_DecodingError>(failure: .failed)
-                    }
-
-                    self.year = year
-                    self.month = month
-                    self.day = day
-                }
-
-                var description: String {
-                    "\\(Self.padded(year, width: 4))-\\(Self.padded(month, width: 2))-\\(Self.padded(day, width: 2))"
-                }
-
-                static func < (lhs: Self, rhs: Self) -> Bool {
-                    (lhs.year, lhs.month, lhs.day) < (rhs.year, rhs.month, rhs.day)
-                }
-
-                static func parse(iso8601String: String) -> Range_Result<Self, Range_DecodingError> {
-                    do {
-                        return .success(result: try Self(iso8601String: iso8601String))
-                    } catch {
-                        return .failure(cause: .failed)
-                    }
-                }
-
-                private static func padded(_ value: Int, width: Int) -> String {
-                    let string = String(value)
-                    if string.count >= width {
-                        return string
-                    }
-                    return String(repeating: "0", count: width - string.count) + string
-                }
-            }
-
-            struct __RangeDateTime: Hashable, Comparable, CustomStringConvertible, Sendable {
-                let storage: String
-
-                init() {
-                    self.init(posixTime: time(nil))
-                }
-
-                init(posixTime: time_t) {
-                    var rawTime = posixTime
-                    var utc = tm()
-                    gmtime_r(&rawTime, &utc)
-                    let year = Self.padded(Int(utc.tm_year + 1900), width: 4)
-                    let month = Self.padded(Int(utc.tm_mon + 1), width: 2)
-                    let day = Self.padded(Int(utc.tm_mday), width: 2)
-                    let hour = Self.padded(Int(utc.tm_hour), width: 2)
-                    let minute = Self.padded(Int(utc.tm_min), width: 2)
-                    let second = Self.padded(Int(utc.tm_sec), width: 2)
-                    self.storage = "\\(year)-\\(month)-\\(day)T\\(hour):\\(minute):\\(second)Z"
-                }
-
-                init(iso8601String: String) throws {
-                    self.storage = iso8601String
-                }
-
-                var description: String {
-                    storage
-                }
-
-                static func < (lhs: Self, rhs: Self) -> Bool {
-                    lhs.storage < rhs.storage
-                }
-
-                static func parse(iso8601String: String) -> Range_Result<Self, Range_DecodingError> {
-                    do {
-                        return .success(result: try Self(iso8601String: iso8601String))
-                    } catch {
-                        return .failure(cause: .failed)
-                    }
-                }
-
-                private static func padded(_ value: Int, width: Int) -> String {
-                    let string = String(value)
-                    if string.count >= width {
-                        return string
-                    }
-                    return String(repeating: "0", count: width - string.count) + string
-                }
-            }
-
             final class __RangeBinding<Value> {
                 private var storedValue: Value?
                 private let getter: () -> Value
@@ -1769,42 +818,6 @@ struct SwiftBackendEmitter {
                         }
                     }
                 }
-            }
-
-            struct __RangeThrownFailure<Failure>: Error, @unchecked Sendable {
-                let failure: Failure
-            }
-
-            func __rangeUUID(uuidString: String) throws -> UUID {
-                guard let value = UUID(uuidString: uuidString) else {
-                    throw __RangeThrownFailure<Range_DecodingError>(failure: .failed)
-                }
-
-                return value
-            }
-
-            func __rangeDate(iso8601String: String) throws -> __RangeDateOnly {
-                try __RangeDateOnly(iso8601String: iso8601String)
-            }
-
-            func __rangeDateTime(iso8601String: String) throws -> __RangeDateTime {
-                try __RangeDateTime(iso8601String: iso8601String)
-            }
-
-            extension UUID {
-                static func parse(uuidString: String) -> Range_Result<UUID, Range_DecodingError> {
-                    guard let value = UUID(uuidString: uuidString) else {
-                        return .failure(cause: .failed)
-                    }
-                    return .success(result: value)
-                }
-            }
-
-            enum __RangeDeferredControlFlow: Error {
-                case returnValue(Any)
-                case returnVoid
-                case breakLoop
-                case continueLoop
             }
 
             struct __RangeLLVMString {
@@ -1862,16 +875,7 @@ struct SwiftBackendEmitter {
             }
             """
 
-        let hostIOImport = """
-            #if os(Linux)
-            import Glibc
-            #else
-            import Darwin
-            #endif
-            """
-        let imports =
-            includeFoundationImport ? "import Foundation\n\n\(hostIOImport)" : hostIOImport
-        return "\(imports)\n\n\(support)"
+        return support
     }
 
     private func emitLLVMBridgeDeclarations() -> String {
@@ -1971,7 +975,7 @@ struct SwiftBackendEmitter {
         return sections.joined(separator: "\n\n") + "\n"
     }
 
-    private func emitMain(_ mainBlock: MainBlockNode) throws -> String {
+    private func emitMain(_ mainBlock: BlockMacroNode) throws -> String {
         let body = try emitStatements(
             mainBlock.body, indent: 2, enclosingReturnType: .named("Void"))
 
@@ -2012,26 +1016,6 @@ struct SwiftBackendEmitter {
             \(functionBody)
             }
             """
-    }
-
-    private func emitLocalCallableDeclaration(
-        _ declaration: LocalCallableDeclaration,
-        indent: Int
-    ) throws -> String {
-        let callable = CallableDeclaration(
-            macros: declaration.macros,
-            attribute: declaration.attribute,
-            targetType: nil,
-            receiverType: nil,
-            name: declaration.name,
-            genericParameters: declaration.genericParameters,
-            hasExplicitParameterClause: declaration.hasExplicitParameterClause,
-            parameters: declaration.parameters,
-            returnType: declaration.returnType,
-            body: declaration.body
-        )
-
-        return indentBlock(try emitFunction(callable), level: indent)
     }
 
     private func emitEnum(_ declaration: EnumDeclaration) throws -> String {
@@ -2139,53 +1123,7 @@ struct SwiftBackendEmitter {
         var parameters: [String] = []
         var assignments: [String] = []
 
-        for value in declaration.values
-        where value.value == nil
-            && propertyForwardsInitializer(macros: value.macros)
-        {
-            guard let forwardedConstruct = context.constructsByName[value.typeName] else {
-                continue
-            }
-            let forwardedParameters = forwardedInitializerParameters(for: forwardedConstruct)
-            parameters.append(
-                contentsOf: try forwardedParameters.map {
-                    try emitParameter($0, genericParameterNames: genericParameterNames)
-                })
-            let arguments = forwardedParameters.map { parameter in
-                CallArgument(
-                    label: parameter.name,
-                    value: .identifier(parameter.name)
-                )
-            }
-            assignments.append(
-                "self.\(value.name) = \(try emitRawCall(name: value.typeName, arguments: arguments))"
-            )
-        }
-
-        for state in declaration.states where propertyForwardsInitializer(macros: state.macros) {
-            guard let forwardedConstruct = context.constructsByName[state.type.displayName] else {
-                continue
-            }
-            let forwardedParameters = forwardedInitializerParameters(for: forwardedConstruct)
-            parameters.append(
-                contentsOf: try forwardedParameters.map {
-                    try emitParameter($0, genericParameterNames: genericParameterNames)
-                })
-            let arguments = forwardedParameters.map { parameter in
-                CallArgument(
-                    label: parameter.name,
-                    value: .identifier(parameter.name)
-                )
-            }
-            assignments.append(
-                "self.\(state.name) = \(try emitRawCall(name: state.type.displayName, arguments: arguments))"
-            )
-        }
-
         for value in declaration.values where value.value == nil {
-            guard !propertyForwardsInitializer(macros: value.macros) else {
-                continue
-            }
             let typeName = emitDeclaredTypeName(
                 value.typeName,
                 genericParameterNames: genericParameterNames
@@ -2195,9 +1133,6 @@ struct SwiftBackendEmitter {
         }
 
         for state in declaration.states {
-            guard !propertyForwardsInitializer(macros: state.macros) else {
-                continue
-            }
             guard case .declared = state.storage else {
                 continue
             }
@@ -2240,112 +1175,6 @@ struct SwiftBackendEmitter {
             return "[]"
         }
         return nil
-    }
-
-    private func forwardedInitializerParameters(
-        for construct: ConstructDeclaration,
-        activeConstructs: Set<String> = []
-    ) -> [RangeFunctionParameter] {
-        let activeConstructs = activeConstructs.union([construct.name])
-        let forwardedValues = construct.values.flatMap { value -> [RangeFunctionParameter] in
-            guard propertyForwardsInitializer(macros: value.macros),
-                !activeConstructs.contains(value.typeName),
-                let nested = context.constructsByName[value.typeName]
-            else {
-                return []
-            }
-            return forwardedInitializerParameters(for: nested, activeConstructs: activeConstructs)
-        }
-        let forwardedStates = construct.states.flatMap { state -> [RangeFunctionParameter] in
-            guard propertyForwardsInitializer(macros: state.macros),
-                !activeConstructs.contains(state.type.displayName),
-                let nested = context.constructsByName[state.type.displayName]
-            else {
-                return []
-            }
-            return forwardedInitializerParameters(for: nested, activeConstructs: activeConstructs)
-        }
-        let values = construct.values.compactMap { value -> RangeFunctionParameter? in
-            guard !propertyForwardsInitializer(macros: value.macros) else { return nil }
-            let defaultValue =
-                value.value ?? (value.typeName.hasPrefix("Optional<") ? .nilLiteral : nil)
-            return RangeFunctionParameter(
-                macros: [],
-                name: value.name,
-                typeReference: .named(value.typeName),
-                defaultValue: defaultValue,
-                slotName: nil
-            )
-        }
-        let states = construct.states.compactMap { state -> RangeFunctionParameter? in
-            guard !propertyForwardsInitializer(macros: state.macros) else { return nil }
-            let defaultValue: RangeExpression?
-            switch state.storage {
-            case .stored(let expression):
-                defaultValue = expression
-            case .declared:
-                defaultValue = nil
-            }
-            return RangeFunctionParameter(
-                macros: [],
-                name: state.name,
-                typeReference: state.type,
-                defaultValue: defaultValue,
-                slotName: nil
-            )
-        }
-        return forwardedValues + forwardedStates + values + states
-    }
-
-    private func propertyForwardsInitializer(macros applications: [MacroApplication]) -> Bool {
-        applications.contains(where: { application in
-            guard let macro = context.macrosByName[application.name],
-                let targetBinding = macro.bindings?.target
-            else {
-                return false
-            }
-            return macroOperationExpressions(in: macro.body).contains { expression in
-                guard case .call(let name, let arguments) = expression else {
-                    return false
-                }
-                return name == "\(targetBinding).initializer.forward" && arguments.isEmpty
-            }
-        })
-    }
-
-    private func macroOperationExpressions(in statements: [RangeStatement]) -> [RangeExpression] {
-        var expressions: [RangeExpression] = []
-        for statement in statements {
-            switch statement {
-            case .emitted, .macroApplication, .expand, .replace:
-                continue
-            case .expression(let expression):
-                expressions.append(expression)
-            case .conditional(let branches):
-                for branch in branches {
-                    expressions.append(contentsOf: macroOperationExpressions(in: branch.body))
-                }
-            case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body):
-                expressions.append(contentsOf: macroOperationExpressions(in: body))
-            case .background(let background):
-                expressions.append(contentsOf: macroOperationExpressions(in: background.body))
-            case .deferBlock(let deferred):
-                expressions.append(contentsOf: macroOperationExpressions(in: deferred.body))
-            case .localCallable(let declaration):
-                expressions.append(contentsOf: macroOperationExpressions(in: declaration.body))
-            case .switchStatement(_, let cases, let defaultBody):
-                for switchCase in cases {
-                    expressions.append(contentsOf: macroOperationExpressions(in: switchCase.body))
-                }
-                if let defaultBody {
-                    expressions.append(contentsOf: macroOperationExpressions(in: defaultBody))
-                }
-            case .localBinding, .assignment, .compoundAssignment, .return, .macroInvocation,
-                .break, .continue:
-                continue
-            }
-        }
-        return expressions
     }
 
     private func emitExtension(_ declaration: ExtensionDeclaration) throws -> String {
@@ -2445,8 +1274,6 @@ struct SwiftBackendEmitter {
             return ["Key", "Value"]
         case "Optional":
             return ["Wrapped"]
-        case "Result":
-            return ["Success", "Failure"]
         case "Set":
             return ["Element"]
         default:
@@ -2617,8 +1444,6 @@ struct SwiftBackendEmitter {
         case "Int", "IntStorage", "UInt", "Int64", "UInt64", "Double":
             return SwiftLayoutEstimate(size: 8, alignment: 8)
         case "String", "StringStorage":
-            return SwiftLayoutEstimate(size: 16, alignment: 8)
-        case "Data", "Date", "DateStorage", "DateTime", "DateTimeStorage", "UUID", "UUIDStorage":
             return SwiftLayoutEstimate(size: 16, alignment: 8)
         default:
             return nil
@@ -2842,9 +1667,8 @@ struct SwiftBackendEmitter {
         let parameters = try initializer.parameters.map {
             try emitParameter($0, genericParameterNames: genericParameterNames)
         }.joined(separator: ", ")
-        let throwsClause = isFailableInitializerReturnType(initializer.returnType) ? " throws" : ""
         guard let body = initializer.body else {
-            return "init(\(parameters))\(throwsClause) {}"
+            return "init(\(parameters)) {}"
         }
 
         let bindingParameterNames = Set(initializer.parameters.filter(\.isBinding).map(\.name))
@@ -2857,7 +1681,7 @@ struct SwiftBackendEmitter {
             scope: scope
         )
         return """
-            init(\(parameters))\(throwsClause) {
+            init(\(parameters)) {
             \(functionBody)
             }
             """
@@ -2996,12 +1820,7 @@ struct SwiftBackendEmitter {
         switch statement {
         case .localBinding(let declaration):
             return expressionReferencesInstanceSelf(declaration.expression)
-        case .derived(_, _, let body):
-            return statementsReferenceInstanceSelf(body)
         case .assignment(let target, let expression):
-            return assignmentTargetReferencesInstanceSelf(target)
-                || expressionReferencesInstanceSelf(expression)
-        case .compoundAssignment(let target, _, let expression):
             return assignmentTargetReferencesInstanceSelf(target)
                 || expressionReferencesInstanceSelf(expression)
         case .expression(let expression):
@@ -3016,25 +1835,12 @@ struct SwiftBackendEmitter {
                 (branch.condition.map { expressionReferencesInstanceSelf($0) } ?? false)
                     || statementsReferenceInstanceSelf(branch.body)
             }
-        case .forEach(_, let sequence, let body):
-            return expressionReferencesInstanceSelf(sequence)
-                || statementsReferenceInstanceSelf(body)
         case .whileLoop(let condition, let body):
             return expressionReferencesInstanceSelf(condition)
                 || statementsReferenceInstanceSelf(body)
-        case .switchStatement(let expression, let cases, let defaultBody):
-            return expressionReferencesInstanceSelf(expression)
-                || cases.contains { statementsReferenceInstanceSelf($0.body) }
-                || (defaultBody.map(statementsReferenceInstanceSelf) ?? false)
-        case .background(let background):
-            return statementsReferenceInstanceSelf(background.body)
-        case .deferBlock(let deferred):
-            return statementsReferenceInstanceSelf(deferred.body)
-        case .localCallable(let declaration):
-            return statementsReferenceInstanceSelf(declaration.body)
         case .macroInvocation(_, _, let body):
             return statementsReferenceInstanceSelf(body)
-        case .emitted, .macroApplication, .expand, .replace, .break, .continue:
+        case .emitted, .macroApplication:
             return false
         }
     }
@@ -3054,13 +1860,6 @@ struct SwiftBackendEmitter {
             return elements.contains {
                 expressionReferencesInstanceSelf($0.key)
                     || expressionReferencesInstanceSelf($0.value)
-            }
-        case .interpolatedString(let string):
-            return string.segments.contains { segment in
-                guard case .expression(let expression) = segment else {
-                    return false
-                }
-                return expressionReferencesInstanceSelf(expression)
             }
         case .ternary(let condition, let trueExpression, let falseExpression):
             return expressionReferencesInstanceSelf(condition)
@@ -3097,39 +1896,22 @@ struct SwiftBackendEmitter {
     private func statementsMutateInstanceSelf(_ statements: [RangeStatement]) -> Bool {
         for statement in statements {
             switch statement {
-            case .assignment(let target, _), .compoundAssignment(let target, _, _):
+            case .assignment(let target, _):
                 if assignmentTargetReferencesInstanceSelf(target) {
                     return true
                 }
-            case .emitted, .macroApplication, .expand, .replace:
+            case .emitted, .macroApplication:
                 continue
             case .macroInvocation(_, _, let body),
-                .forEach(_, _, let body),
-                .whileLoop(_, let body),
-                .derived(_, _, let body):
+                .whileLoop(_, let body):
                 if statementsMutateInstanceSelf(body) {
-                    return true
-                }
-            case .background(let background):
-                if statementsMutateInstanceSelf(background.body) {
-                    return true
-                }
-            case .deferBlock(let deferred):
-                if statementsMutateInstanceSelf(deferred.body) {
                     return true
                 }
             case .conditional(let branches):
                 if branches.contains(where: { statementsMutateInstanceSelf($0.body) }) {
                     return true
                 }
-            case .switchStatement(_, let cases, let defaultBody):
-                if cases.contains(where: { statementsMutateInstanceSelf($0.body) }) {
-                    return true
-                }
-                if let defaultBody, statementsMutateInstanceSelf(defaultBody) {
-                    return true
-                }
-            case .localBinding, .localCallable, .expression, .return, .break, .continue:
+            case .localBinding, .expression, .return:
                 continue
             }
         }
@@ -3148,7 +1930,7 @@ struct SwiftBackendEmitter {
                 if expressionCallsKnownMutatingMemberOnInstanceSelf(declaration.expression) {
                     return true
                 }
-            case .assignment(_, let expression), .compoundAssignment(_, _, let expression):
+            case .assignment(_, let expression):
                 if expressionCallsKnownMutatingMemberOnInstanceSelf(expression) {
                     return true
                 }
@@ -3158,41 +1940,13 @@ struct SwiftBackendEmitter {
                 }) {
                     return true
                 }
-            case .switchStatement(let expression, let cases, let defaultBody):
-                if expressionCallsKnownMutatingMemberOnInstanceSelf(expression) {
-                    return true
-                }
-                if cases.contains(where: { statementsCallKnownMutatingMemberOnInstanceSelf($0.body) }) {
-                    return true
-                }
-                if let defaultBody, statementsCallKnownMutatingMemberOnInstanceSelf(defaultBody) {
-                    return true
-                }
-            case .forEach(_, let sequence, let body):
-                if expressionCallsKnownMutatingMemberOnInstanceSelf(sequence)
-                    || statementsCallKnownMutatingMemberOnInstanceSelf(body)
-                {
-                    return true
-                }
             case .whileLoop(let condition, let body):
                 if expressionCallsKnownMutatingMemberOnInstanceSelf(condition)
                     || statementsCallKnownMutatingMemberOnInstanceSelf(body)
                 {
                     return true
                 }
-            case .background(let background):
-                if statementsCallKnownMutatingMemberOnInstanceSelf(background.body) {
-                    return true
-                }
-            case .deferBlock(let deferred):
-                if statementsCallKnownMutatingMemberOnInstanceSelf(deferred.body) {
-                    return true
-                }
-            case .derived(_, _, let body):
-                if statementsCallKnownMutatingMemberOnInstanceSelf(body) {
-                    return true
-                }
-            case .emitted, .macroApplication, .localCallable, .macroInvocation, .expand, .replace, .return(nil), .break, .continue:
+            case .emitted, .macroApplication, .macroInvocation, .return(nil):
                 continue
             }
         }
@@ -3227,7 +1981,7 @@ struct SwiftBackendEmitter {
         case .binary(let lhs, _, let rhs):
             return expressionCallsKnownMutatingMemberOnInstanceSelf(lhs)
                 || expressionCallsKnownMutatingMemberOnInstanceSelf(rhs)
-        case .integer, .double, .string, .interpolatedString, .boolean, .nilLiteral,
+        case .integer, .double, .string, .boolean, .nilLiteral,
             .macroInvocation, .identifier, .bindingReference:
             return false
         }
@@ -3301,17 +2055,6 @@ struct SwiftBackendEmitter {
             return "\(prefix)self.__binding_\(bindingName) = \(parameterName)"
         }
 
-        if isFailableInitializerReturnType(initializerReturnType),
-            case .return(let expression) = statement
-        {
-            return try emitFailableInitializerReturn(
-                expression,
-                initializerReturnType: initializerReturnType,
-                indent: indent,
-                scope: scope
-            )
-        }
-
         switch statement {
         case .conditional(let branches):
             return try emitInitializerConditional(
@@ -3322,28 +2065,6 @@ struct SwiftBackendEmitter {
                 initializerReturnType: initializerReturnType,
                 scope: scope
             )
-        case .switchStatement(let expression, let cases, let defaultBody):
-            return try emitInitializerSwitch(
-                subject: expression,
-                cases: cases,
-                defaultBody: defaultBody,
-                indent: indent,
-                bindingNames: bindingNames,
-                bindingParameterNames: bindingParameterNames,
-                initializerReturnType: initializerReturnType,
-                scope: scope
-            )
-        case .forEach(let name, let sequence, let body):
-            let bodyText = try emitInitializerStatements(
-                body,
-                indent: indent + 1,
-                bindingNames: bindingNames,
-                bindingParameterNames: bindingParameterNames,
-                initializerReturnType: initializerReturnType,
-                scope: scope
-            )
-            return
-                "\(prefix)for \(name) in \(try emitExpression(sequence, scope: scope)) {\n\(bodyText)\n\(prefix)}"
         case .whileLoop(let condition, let body):
             let bodyText = try emitInitializerStatements(
                 body,
@@ -3400,86 +2121,6 @@ struct SwiftBackendEmitter {
         return rendered.joined(separator: " ")
     }
 
-    private func emitInitializerSwitch(
-        subject: RangeExpression,
-        cases: [SwitchCase],
-        defaultBody: [RangeStatement]?,
-        indent: Int,
-        bindingNames: Set<String>,
-        bindingParameterNames: Set<String>,
-        initializerReturnType: TypeReference?,
-        scope: EmissionScope = .empty
-    ) throws -> String {
-        let prefix = String(repeating: "    ", count: indent)
-        var lines: [String] = ["\(prefix)switch \(try emitExpression(subject, scope: scope)) {"]
-
-        for switchCase in cases {
-            lines.append("\(prefix)case \(try emitSwitchCasePattern(switchCase.pattern)):")
-            lines.append(
-                try emitInitializerStatements(
-                    switchCase.body,
-                    indent: indent + 1,
-                    bindingNames: bindingNames,
-                    bindingParameterNames: bindingParameterNames,
-                    initializerReturnType: initializerReturnType,
-                    scope: scope
-                )
-            )
-        }
-
-        if let defaultBody {
-            lines.append("\(prefix)default:")
-            lines.append(
-                try emitInitializerStatements(
-                    defaultBody,
-                    indent: indent + 1,
-                    bindingNames: bindingNames,
-                    bindingParameterNames: bindingParameterNames,
-                    initializerReturnType: initializerReturnType,
-                    scope: scope
-                )
-            )
-        } else {
-            lines.append("\(prefix)default:")
-            lines.append(
-                "\(prefix)    fatalError(\"Non-exhaustive Range switch reached at runtime.\")")
-        }
-
-        lines.append("\(prefix)}")
-        return lines.joined(separator: "\n")
-    }
-
-    private func emitFailableInitializerReturn(
-        _ expression: RangeExpression?,
-        initializerReturnType: TypeReference?,
-        indent: Int,
-        scope: EmissionScope = .empty
-    ) throws -> String {
-        let prefix = String(repeating: "    ", count: indent)
-        guard let expression else {
-            return "\(prefix)return"
-        }
-
-        if let failureExpression = resultFailurePayloadExpression(expression) {
-            guard let failureType = resultSelfFailureType(initializerReturnType) else {
-                throw SwiftBackendError(
-                    "Swift backend requires Result<Self, Failure> for failable initializer lowering."
-                )
-            }
-
-            return
-                "\(prefix)throw __RangeThrownFailure<\(emitTypeName(failureType))>(failure: \(try emitExpression(failureExpression, scope: scope)))"
-        }
-
-        if isResultSuccessExpression(expression) {
-            return "\(prefix)return"
-        }
-
-        throw SwiftBackendError(
-            "Swift backend can only lower failable initializer returns as .success(...) or .failure(...)."
-        )
-    }
-
     private func selfBindingAssignmentName(_ target: AssignmentTarget) -> String? {
         guard case .member(let base, let name) = target else {
             return nil
@@ -3506,58 +2147,15 @@ struct SwiftBackendEmitter {
             return ""
         case .macroInvocation:
             throw SwiftBackendError("Macro invocations must be expanded before Swift emission.")
-        case .expand, .replace:
-            throw SwiftBackendError(
-                "Macro expansion statements must be expanded before Swift emission.")
-        case .background(let background):
-            let bodyText = try emitStatements(
-                background.body,
-                indent: indent + 1,
-                enclosingReturnType: enclosingReturnType,
-                scope: scope
-            )
-            return """
-                \(prefix)switch Range_POSIXThread.spawn({
-                \(bodyText)
-                \(prefix)}) {
-                \(prefix)case .success(let handle):
-                \(prefix)    _ = Range_POSIXThread.detach(handle)
-                \(prefix)case .failure:
-                \(prefix)    Range_Logger.error("@background failed to spawn thread.")
-                \(prefix)}
-                """
-        case .deferBlock(let deferred):
-            return try emitDeferredBlock(
-                deferred.body,
-                indent: indent,
-                enclosingReturnType: enclosingReturnType
-            )
-        case .localCallable(let declaration):
-            return try emitLocalCallableDeclaration(declaration, indent: indent)
         case .localBinding(let declaration):
             let keyword = declaration.kind == .constant ? "let" : "var"
             let typeAnnotation =
                 declaration.hasExplicitTypeAnnotation ? ": \(emitTypeName(declaration.type))" : ""
             return
                 "\(prefix)\(keyword) \(declaration.name)\(typeAnnotation) = \(try emitLocalBindingExpression(declaration, scope: scope))"
-        case .derived(let name, let typeName, let body):
-            let bodyText = try emitStatements(
-                body,
-                indent: indent + 2,
-                enclosingReturnType: .named(typeName),
-                scope: scope
-            )
-            return """
-                \(prefix)let \(name): \(typeName) = {
-                \(bodyText)
-                \(prefix)}()
-                """
         case .assignment(let target, let expression):
             return
                 "\(prefix)\(try emitAssignmentTarget(target)) = \(try emitExpression(expression, scope: scope))"
-        case .compoundAssignment(let target, .plusEquals, let expression):
-            return
-                "\(prefix)\(try emitAssignmentTarget(target)) += \(try emitExpression(expression, scope: scope))"
         case .expression(let expression):
             return "\(prefix)\(try emitExpression(expression, scope: scope))"
         case .return(let expression):
@@ -3572,15 +2170,6 @@ struct SwiftBackendEmitter {
                 enclosingReturnType: enclosingReturnType,
                 scope: scope
             )
-        case .forEach(let name, let sequence, let body):
-            let header = "\(prefix)for \(name) in \(try emitExpression(sequence, scope: scope)) {"
-            let bodyText = try emitStatements(
-                body,
-                indent: indent + 1,
-                enclosingReturnType: enclosingReturnType,
-                scope: scope
-            )
-            return "\(header)\n\(bodyText)\n\(prefix)}"
         case .whileLoop(let condition, let body):
             let header = "\(prefix)while \(try emitExpression(condition, scope: scope)) {"
             let bodyText = try emitStatements(
@@ -3590,19 +2179,6 @@ struct SwiftBackendEmitter {
                 scope: scope
             )
             return "\(header)\n\(bodyText)\n\(prefix)}"
-        case .break:
-            return "\(prefix)break"
-        case .continue:
-            return "\(prefix)continue"
-        case .switchStatement(let expression, let cases, let defaultBody):
-            return try emitSwitch(
-                subject: expression,
-                cases: cases,
-                defaultBody: defaultBody,
-                indent: indent,
-                enclosingReturnType: enclosingReturnType,
-                scope: scope
-            )
         }
     }
 
@@ -3637,63 +2213,6 @@ struct SwiftBackendEmitter {
         return rendered.joined(separator: " ")
     }
 
-    private func emitSwitch(
-        subject: RangeExpression,
-        cases: [SwitchCase],
-        defaultBody: [RangeStatement]?,
-        indent: Int,
-        enclosingReturnType: TypeReference? = nil,
-        scope: EmissionScope = .empty
-    ) throws -> String {
-        let prefix = String(repeating: "    ", count: indent)
-        var lines: [String] = ["\(prefix)switch \(try emitExpression(subject, scope: scope)) {"]
-
-        for switchCase in cases {
-            lines.append("\(prefix)case \(try emitSwitchCasePattern(switchCase.pattern)):")
-            lines.append(
-                try emitStatements(
-                    switchCase.body,
-                    indent: indent + 1,
-                    enclosingReturnType: enclosingReturnType,
-                    scope: scope
-                )
-            )
-        }
-
-        if let defaultBody {
-            lines.append("\(prefix)default:")
-            lines.append(
-                try emitStatements(
-                    defaultBody,
-                    indent: indent + 1,
-                    enclosingReturnType: enclosingReturnType,
-                    scope: scope
-                )
-            )
-        } else {
-            lines.append("\(prefix)default:")
-            lines.append(
-                "\(prefix)    fatalError(\"Non-exhaustive Range switch reached at runtime.\")")
-        }
-
-        lines.append("\(prefix)}")
-        return lines.joined(separator: "\n")
-    }
-
-    private func emitSwitchCasePattern(_ pattern: SwitchCasePattern) throws -> String {
-        switch pattern {
-        case .expression(let expression):
-            return try emitExpression(expression)
-        case .enumCase(let name, let binding):
-            let caseName = normalizedEnumCaseName(name)
-            if let binding {
-                let bindingKeyword = binding.kind == .constant ? "let" : "state"
-                return ".\(caseName)(\(bindingKeyword) \(binding.name))"
-            }
-            return ".\(caseName)"
-        }
-    }
-
     private func normalizedEnumCaseName(_ name: String) -> String {
         name.hasPrefix(".") ? String(name.dropFirst()) : name
     }
@@ -3725,8 +2244,6 @@ struct SwiftBackendEmitter {
             return "\(value)"
         case .string(let value):
             return "\"\(escapeString(StringLiteral.decodeEscapes(value)))\""
-        case .interpolatedString(let value):
-            return "\"\(try emitInterpolatedString(value, scope: scope))\""
         case .boolean(let value):
             return value ? "true" : "false"
         case .nilLiteral:
@@ -3743,31 +2260,12 @@ struct SwiftBackendEmitter {
             {
                 return closure
             }
-            if let lowered = try emitKnownSystemCall(
-                name: name,
-                arguments: arguments,
-                scope: scope
-            ) {
-                return lowered
-            }
             if let lowered = try emitKnownCollectionCall(
                 name: name,
                 arguments: arguments,
                 scope: scope
             ) {
                 return lowered
-            }
-            if let failableInitializer = failableInitializerSignature(
-                forConstructorCallName: name,
-                arguments: arguments,
-                scope: scope
-            ) {
-                return try emitFailableInitializerCall(
-                    failableInitializer,
-                    name: name,
-                    arguments: arguments,
-                    scope: scope
-                )
             }
             return try emitRawCall(name: name, arguments: arguments, scope: scope)
         case .bindingReference(let name):
@@ -3794,32 +2292,6 @@ struct SwiftBackendEmitter {
             return
                 "(\(try emitExpression(lhs, scope: scope)) \(operatorSymbol.rawValue) \(try emitExpression(rhs, scope: scope)))"
         }
-    }
-
-    private func normalizedSwiftTypeName(_ rawName: String) -> String {
-        guard rawName.hasPrefix("Channel<"), rawName.hasSuffix(">") else {
-            return rawName
-        }
-
-        let start = rawName.index(rawName.startIndex, offsetBy: "Channel<".count)
-        let end = rawName.index(before: rawName.endIndex)
-        let argumentsText = String(rawName[start..<end])
-
-        var depth = 0
-        for character in argumentsText {
-            switch character {
-            case "<":
-                depth += 1
-            case ">":
-                depth -= 1
-            case "," where depth == 0:
-                return rawName
-            default:
-                break
-            }
-        }
-
-        return rawName
     }
 
     private func emitSwiftSymbolName(_ name: String) -> String {
@@ -4056,37 +2528,6 @@ struct SwiftBackendEmitter {
         return labels
     }
 
-    private func emitKnownSystemCall(
-        name: String,
-        arguments: [CallArgument],
-        scope: EmissionScope = .empty
-    ) throws -> String? {
-        let directPOSIXTargets: [String: String] = [
-            "Memory.allocate": "Range_POSIXMemory.allocate",
-            "Memory.deallocate": "Range_POSIXMemory.deallocate",
-            "Memory.zero": "Range_POSIXMemory.zero",
-            "Memory.fill": "Range_POSIXMemory.fill",
-            "Memory.copy": "Range_POSIXMemory.copy",
-            "Memory.readByte": "Range_POSIXMemory.readByte",
-            "Memory.writeByte": "Range_POSIXMemory.writeByte",
-            "Memory.pageSize": "Range_POSIXMemory.pageSize",
-            "Thread.spawn": "Range_POSIXThread.spawn",
-            "Thread.join": "Range_POSIXThread.join",
-            "Thread.detach": "Range_POSIXThread.detach",
-            "Thread.current": "Range_POSIXThread.current",
-            "Thread.yield": "Range_POSIXThread.yield",
-            "Thread.sleep": "Range_POSIXThread.sleep",
-            "SHA256.digest": "Range_SHA256.digest",
-        ]
-
-        guard let target = directPOSIXTargets[name] else {
-            return nil
-        }
-
-        let rendered = try emitCallArguments(arguments, for: name, scope: scope)
-        return "\(target)(\(rendered))"
-    }
-
     private func emitKnownCollectionCall(
         name: String,
         arguments: [CallArgument],
@@ -4209,291 +2650,6 @@ struct SwiftBackendEmitter {
         return "{\n\(bodyText)\n}"
     }
 
-    private func emitDeferredBlock(
-        _ statements: [RangeStatement],
-        indent: Int,
-        enclosingReturnType: TypeReference?
-    ) throws -> String {
-        let prefix = String(repeating: "    ", count: indent)
-        let bodyPrefix = String(repeating: "    ", count: indent + 1)
-        var lines: [String] = [
-            "\(prefix)do {",
-            "\(bodyPrefix)var __rangeDeferredControlFlow: __RangeDeferredControlFlow?",
-        ]
-
-        for statement in statements {
-            lines.append(
-                try emitDeferredProtectedStatement(
-                    statement,
-                    indent: indent + 1,
-                    enclosingReturnType: enclosingReturnType
-                )
-            )
-        }
-
-        lines.append(
-            try emitDeferredFlowResume(
-                indent: indent + 1,
-                enclosingReturnType: enclosingReturnType
-            )
-        )
-        lines.append("\(prefix)}")
-        return lines.joined(separator: "\n")
-    }
-
-    private func emitDeferredProtectedStatement(
-        _ statement: RangeStatement,
-        indent: Int,
-        enclosingReturnType: TypeReference?
-    ) throws -> String {
-        let prefix = String(repeating: "    ", count: indent)
-        let bodyText = try emitDeferredInnerStatement(
-            statement,
-            indent: indent + 2,
-            enclosingReturnType: enclosingReturnType
-        )
-
-        return """
-            \(prefix)do {
-            \(prefix)    try ({ () throws in
-            \(bodyText)
-            \(prefix)    })()
-            \(prefix)} catch let flow as __RangeDeferredControlFlow {
-            \(prefix)    if __rangeDeferredControlFlow == nil {
-            \(prefix)        __rangeDeferredControlFlow = flow
-            \(prefix)    }
-            \(prefix)}
-            """
-    }
-
-    private func emitDeferredInnerStatement(
-        _ statement: RangeStatement,
-        indent: Int,
-        enclosingReturnType: TypeReference?
-    ) throws -> String {
-        let prefix = String(repeating: "    ", count: indent)
-
-        switch statement {
-        case .emitted, .macroApplication:
-            return ""
-        case .macroInvocation:
-            throw SwiftBackendError("Macro invocations must be expanded before Swift emission.")
-        case .expand, .replace:
-            throw SwiftBackendError(
-                "Macro expansion statements must be expanded before Swift emission.")
-        case .background(let background):
-            let bodyText = try emitStatements(
-                background.body,
-                indent: indent + 1,
-                enclosingReturnType: enclosingReturnType
-            )
-            return """
-                \(prefix)switch Range_POSIXThread.spawn({
-                \(bodyText)
-                \(prefix)}) {
-                \(prefix)case .success(let handle):
-                \(prefix)    _ = Range_POSIXThread.detach(handle)
-                \(prefix)case .failure:
-                \(prefix)    Range_Logger.error("@background failed to spawn thread.")
-                \(prefix)}
-                """
-        case .deferBlock(let deferred):
-            return try emitDeferredBlock(
-                deferred.body,
-                indent: indent,
-                enclosingReturnType: enclosingReturnType
-            )
-        case .localCallable(let declaration):
-            return try emitLocalCallableDeclaration(declaration, indent: indent)
-        case .localBinding(let declaration):
-            let keyword = declaration.kind == .constant ? "let" : "var"
-            let typeAnnotation =
-                declaration.hasExplicitTypeAnnotation ? ": \(emitTypeName(declaration.type))" : ""
-            return
-                "\(prefix)\(keyword) \(declaration.name)\(typeAnnotation) = \(try emitLocalBindingExpression(declaration))"
-        case .derived(let name, let typeName, let body):
-            let bodyText = try emitStatements(
-                body,
-                indent: indent + 2,
-                enclosingReturnType: .named(typeName)
-            )
-            return """
-                \(prefix)let \(name): \(typeName) = {
-                \(bodyText)
-                \(prefix)}()
-                """
-        case .assignment(let target, let expression):
-            return
-                "\(prefix)\(try emitAssignmentTarget(target)) = \(try emitExpression(expression))"
-        case .compoundAssignment(let target, .plusEquals, let expression):
-            return
-                "\(prefix)\(try emitAssignmentTarget(target)) += \(try emitExpression(expression))"
-        case .expression(let expression):
-            return "\(prefix)\(try emitExpression(expression))"
-        case .return(let expression):
-            if let expression {
-                return
-                    "\(prefix)throw __RangeDeferredControlFlow.returnValue(\(try emitExpression(expression)))"
-            }
-            return "\(prefix)throw __RangeDeferredControlFlow.returnVoid"
-        case .conditional(let branches):
-            return try emitDeferredConditional(
-                branches,
-                indent: indent,
-                enclosingReturnType: enclosingReturnType
-            )
-        case .forEach(let name, let sequence, let body):
-            let header = "\(prefix)for \(name) in \(try emitExpression(sequence)) {"
-            let bodyText = try emitDeferredInnerStatements(
-                body,
-                indent: indent + 1,
-                enclosingReturnType: enclosingReturnType
-            )
-            return "\(header)\n\(bodyText)\n\(prefix)}"
-        case .whileLoop(let condition, let body):
-            let header = "\(prefix)while \(try emitExpression(condition)) {"
-            let bodyText = try emitDeferredInnerStatements(
-                body,
-                indent: indent + 1,
-                enclosingReturnType: enclosingReturnType
-            )
-            return "\(header)\n\(bodyText)\n\(prefix)}"
-        case .break:
-            return "\(prefix)throw __RangeDeferredControlFlow.breakLoop"
-        case .continue:
-            return "\(prefix)throw __RangeDeferredControlFlow.continueLoop"
-        case .switchStatement(let expression, let cases, let defaultBody):
-            return try emitDeferredSwitch(
-                subject: expression,
-                cases: cases,
-                defaultBody: defaultBody,
-                indent: indent,
-                enclosingReturnType: enclosingReturnType
-            )
-        }
-    }
-
-    private func emitDeferredInnerStatements(
-        _ statements: [RangeStatement],
-        indent: Int,
-        enclosingReturnType: TypeReference?
-    ) throws -> String {
-        try statements
-            .map {
-                try emitDeferredInnerStatement(
-                    $0, indent: indent, enclosingReturnType: enclosingReturnType)
-            }
-            .joined(separator: "\n")
-    }
-
-    private func emitDeferredConditional(
-        _ branches: [StatementConditionalBranch],
-        indent: Int,
-        enclosingReturnType: TypeReference?
-    ) throws -> String {
-        let prefix = String(repeating: "    ", count: indent)
-        var rendered: [String] = []
-
-        for (index, branch) in branches.enumerated() {
-            let bodyText = try emitDeferredInnerStatements(
-                branch.body,
-                indent: indent + 1,
-                enclosingReturnType: enclosingReturnType
-            )
-            if let condition = branch.condition {
-                let keyword = index == 0 ? "if" : "else if"
-                rendered.append(
-                    "\(prefix)\(keyword) \(try emitExpression(condition)) {\n\(bodyText)\n\(prefix)}"
-                )
-            } else {
-                rendered.append("\(prefix)else {\n\(bodyText)\n\(prefix)}")
-            }
-        }
-
-        return rendered.joined(separator: " ")
-    }
-
-    private func emitDeferredSwitch(
-        subject: RangeExpression,
-        cases: [SwitchCase],
-        defaultBody: [RangeStatement]?,
-        indent: Int,
-        enclosingReturnType: TypeReference?
-    ) throws -> String {
-        let prefix = String(repeating: "    ", count: indent)
-        var lines: [String] = ["\(prefix)switch \(try emitExpression(subject)) {"]
-
-        for switchCase in cases {
-            lines.append("\(prefix)case \(try emitSwitchCasePattern(switchCase.pattern)):")
-            lines.append(
-                try emitDeferredInnerStatements(
-                    switchCase.body,
-                    indent: indent + 1,
-                    enclosingReturnType: enclosingReturnType
-                )
-            )
-        }
-
-        if let defaultBody {
-            lines.append("\(prefix)default:")
-            lines.append(
-                try emitDeferredInnerStatements(
-                    defaultBody,
-                    indent: indent + 1,
-                    enclosingReturnType: enclosingReturnType
-                )
-            )
-        }
-
-        lines.append("\(prefix)}")
-        return lines.joined(separator: "\n")
-    }
-
-    private func emitDeferredFlowResume(
-        indent: Int,
-        enclosingReturnType: TypeReference?
-    ) throws -> String {
-        let prefix = String(repeating: "    ", count: indent)
-        var lines: [String] = [
-            "\(prefix)if let __rangeDeferredControlFlow {",
-            "\(prefix)    switch __rangeDeferredControlFlow {",
-        ]
-
-        if let enclosingReturnType, emitTypeName(enclosingReturnType) != "Void" {
-            lines.append(
-                "\(prefix)    case .returnValue(let value): return value as! \(emitTypeName(enclosingReturnType))"
-            )
-            lines.append("\(prefix)    case .returnVoid: return")
-        } else {
-            lines.append("\(prefix)    case .returnValue: return")
-            lines.append("\(prefix)    case .returnVoid: return")
-        }
-
-        lines.append("\(prefix)    case .breakLoop: break")
-        lines.append("\(prefix)    case .continueLoop: continue")
-        lines.append("\(prefix)    }")
-        lines.append("\(prefix)}")
-        return lines.joined(separator: "\n")
-    }
-
-    private func emitInterpolatedString(
-        _ string: InterpolatedString,
-        scope: EmissionScope = .empty
-    ) throws -> String {
-        var result = ""
-
-        for segment in string.segments {
-            switch segment {
-            case .text(let text):
-                result += escapeString(StringLiteral.decodeEscapes(text))
-            case .expression(let expression):
-                result += "\\(\(try emitExpression(expression, scope: scope)))"
-            }
-        }
-
-        return result
-    }
-
     private func escapeString(_ value: String) -> String {
         value
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -4510,14 +2666,6 @@ struct SwiftBackendEmitter {
     ) throws -> String {
         if let llvmCall = try emitLLVMBridgeCall(name: name, arguments: arguments, scope: scope) {
             return llvmCall
-        }
-
-        if let knownInitializer = try emitKnownCoreStorageInitializer(
-            name: name,
-            arguments: arguments,
-            scope: scope
-        ) {
-            return knownInitializer
         }
 
         let rendered = try emitCallArguments(arguments, for: name, scope: scope)
@@ -4628,140 +2776,6 @@ struct SwiftBackendEmitter {
         }
     }
 
-    private func emitKnownCoreStorageInitializer(
-        name: String,
-        arguments: [CallArgument],
-        scope: EmissionScope = .empty
-    ) throws -> String? {
-        let baseName = name.split(separator: "<", maxSplits: 1).first.map(String.init) ?? name
-
-        func singleArgument(label: String?) -> RangeCompiler.Expression? {
-            guard arguments.count == 1, arguments[0].label == label else {
-                return nil
-            }
-            return arguments[0].value
-        }
-
-        switch baseName {
-        case "DataStorage":
-            guard arguments.isEmpty else { return nil }
-            return "Data()"
-        case "Data":
-            guard let storage = singleArgument(label: "storage") else { return nil }
-            return try emitExpression(storage, scope: scope)
-        case "Range":
-            guard arguments.count == 2,
-                let lowerBound = arguments.first(where: { $0.label == "lowerBound" })?.value,
-                let upperBound = arguments.first(where: { $0.label == "upperBound" })?.value
-            else { return nil }
-            return
-                "\(try emitExpression(lowerBound, scope: scope)) ..< \(try emitExpression(upperBound, scope: scope))"
-        case "ClosedRange":
-            guard arguments.count == 2,
-                let lowerBound = arguments.first(where: { $0.label == "lowerBound" })?.value,
-                let upperBound = arguments.first(where: { $0.label == "upperBound" })?.value
-            else { return nil }
-            return
-                "\(try emitExpression(lowerBound, scope: scope)) ... \(try emitExpression(upperBound, scope: scope))"
-        case "DateStorage":
-            if arguments.isEmpty {
-                return "__RangeDateOnly()"
-            }
-            guard let string = singleArgument(label: "iso8601String") else { return nil }
-            return "__rangeDate(iso8601String: \(try emitExpression(string, scope: scope)))"
-        case "Date":
-            if arguments.isEmpty {
-                return "__RangeDateOnly()"
-            }
-            if let storage = singleArgument(label: "storage") {
-                return try emitExpression(storage, scope: scope)
-            }
-            guard let string = singleArgument(label: "iso8601String") else { return nil }
-            return "__rangeDate(iso8601String: \(try emitExpression(string, scope: scope)))"
-        case "DateTimeStorage":
-            if arguments.isEmpty {
-                return "__RangeDateTime()"
-            }
-            guard let string = singleArgument(label: "iso8601String") else { return nil }
-            return "__rangeDateTime(iso8601String: \(try emitExpression(string, scope: scope)))"
-        case "DateTime":
-            if arguments.isEmpty {
-                return "__RangeDateTime()"
-            }
-            if let storage = singleArgument(label: "storage") {
-                return try emitExpression(storage, scope: scope)
-            }
-            guard let string = singleArgument(label: "iso8601String") else { return nil }
-            return "__rangeDateTime(iso8601String: \(try emitExpression(string, scope: scope)))"
-        case "UUIDStorage":
-            if arguments.isEmpty {
-                return "UUID()"
-            }
-            guard let string = singleArgument(label: "uuidString") else { return nil }
-            return "__rangeUUID(uuidString: \(try emitExpression(string, scope: scope)))"
-        case "UUID":
-            if let storage = singleArgument(label: "storage") {
-                return try emitExpression(storage, scope: scope)
-            }
-            guard let string = singleArgument(label: "uuidString") else { return nil }
-            return "__rangeUUID(uuidString: \(try emitExpression(string, scope: scope)))"
-        default:
-            return nil
-        }
-    }
-
-    private func emitFailableInitializerCall(
-        _ signature: FailableInitializerSignature,
-        name: String,
-        arguments: [CallArgument],
-        scope: EmissionScope = .empty
-    ) throws -> String {
-        let constructedType = emitSwiftReferenceName(signature.constructName, scope: scope)
-        let failureType = emitTypeName(signature.failureType)
-        let call = try emitRawCall(name: name, arguments: arguments, scope: scope)
-
-        return """
-            ({ () -> Range_Result<\(constructedType), \(failureType)> in
-                do {
-                    return .success(result: try \(call))
-                } catch let failure as __RangeThrownFailure<\(failureType)> {
-                    return .failure(cause: failure.failure)
-                } catch {
-                    fatalError("Unexpected Swift error thrown from Range failable initializer: \\(error)")
-                }
-            })()
-            """
-    }
-
-    private func failableInitializerSignature(
-        forConstructorCallName name: String,
-        arguments: [CallArgument],
-        scope: EmissionScope = .empty
-    ) -> FailableInitializerSignature? {
-        let constructName = constructorConstructName(from: name)
-        _ = scope
-        guard let signatures = context.failableInitializersByConstructName[constructName] else {
-            return nil
-        }
-
-        return matchingFailableInitializer(in: signatures, arguments: arguments)
-    }
-
-    private func matchingFailableInitializer(
-        in signatures: [FailableInitializerSignature],
-        arguments: [CallArgument]
-    ) -> FailableInitializerSignature? {
-        signatures.first { signature in
-            guard signature.labels.count == arguments.count else {
-                return false
-            }
-
-            return zip(signature.labels, arguments).allSatisfy { expectedLabel, argument in
-                expectedLabel == argument.label
-            }
-        }
-    }
-
     private func nominalTypeName(_ typeReference: TypeReference) -> String? {
         switch typeReference {
         case .named(let name):
@@ -4775,68 +2789,6 @@ struct SwiftBackendEmitter {
         }
     }
 
-    private func constructorConstructName(from callName: String) -> String {
-        guard let genericStart = callName.firstIndex(of: "<") else {
-            return callName
-        }
-
-        return String(callName[..<genericStart])
-    }
-
-    private func isFailableInitializerReturnType(_ typeReference: TypeReference?) -> Bool {
-        resultSelfFailureType(typeReference) != nil
-    }
-
-    private func resultSelfFailureType(_ typeReference: TypeReference?) -> TypeReference? {
-        guard let typeReference else {
-            return nil
-        }
-
-        guard case .generic(let base, let arguments) = typeReference,
-            case .named("Result") = base,
-            arguments.count == 2,
-            case .named("Self") = arguments[0]
-        else {
-            return nil
-        }
-
-        return arguments[1]
-    }
-
-    private func resultFailurePayloadExpression(_ expression: RangeExpression) -> RangeExpression? {
-        guard case .call(let name, let arguments) = expression,
-            enumCaseTail(name) == "failure"
-        else {
-            return nil
-        }
-
-        if let cause = arguments.first(where: { $0.label == "cause" }) {
-            return cause.value
-        }
-
-        guard arguments.count == 1, arguments[0].label == nil else {
-            return nil
-        }
-
-        return arguments[0].value
-    }
-
-    private func isResultSuccessExpression(_ expression: RangeExpression) -> Bool {
-        guard case .call(let name, _) = expression else {
-            return false
-        }
-
-        return enumCaseTail(name) == "success"
-    }
-
-    private func enumCaseTail(_ name: String) -> String {
-        let normalized = normalizedEnumCaseName(name)
-        guard let dot = normalized.lastIndex(of: ".") else {
-            return normalized
-        }
-
-        return String(normalized[normalized.index(after: dot)...])
-    }
 }
 
 private extension LLVMLowerability.ScalarType {

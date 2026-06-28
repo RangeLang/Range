@@ -1,3 +1,7 @@
-construct SyntaxExpandable<Target> {
-    function expand(expansion: () -> Array<@syntax>)
+@construct(name: "SyntaxExpandable<Target>") {
+    @function(name: "expand", result: "Void") {
+        @parameter(name: "expansion") {
+            @value(type: "() -> Array<@syntax>")
+        }
+    }
 }

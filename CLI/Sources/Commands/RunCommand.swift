@@ -12,16 +12,13 @@ extension CLI {
         @Argument(help: "Project directory or source .range file to run.")
         var input: String?
 
-        @Flag(help: "Accepted for compatibility. Native LLVM linking currently uses clang defaults.")
-        var release = false
-
         mutating func run() throws {
             do {
                 let project = try ProjectLoader.load(
                     at: input ?? ".",
                     options: .init(requireManifestForDirectory: true)
                 )
-                let compiledProgram = try ProjectSourceValidator.validatedCompiledProgram(
+                let compiledProgram = try ProjectSourceValidator.compiledProgram(
                     for: project
                 )
                 let backend = SwiftBackend()

@@ -48,14 +48,6 @@ public struct CompilationArtifactsEmitter {
         )
     }
 
-    public func renderGraph(files: [ParsedSourceFile]) -> String {
-        ApplicationGraphBuilder().build(files: files).render()
-    }
-
-    public func renderGraphHTML(files: [ParsedSourceFile], title: String) -> String {
-        ApplicationGraphBuilder().build(files: files).renderHTML(title: title)
-    }
-
     private func render(_ token: Token) -> String {
         switch token {
         case .hash:

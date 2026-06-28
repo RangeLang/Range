@@ -1,4 +1,8 @@
-construct MacroContext {
-    @let current: GraphIdentity
-    @let graph: GraphContext
+@construct(name: "MacroContext") {
+    @let(name: "current") {
+        @value(type: "GraphIdentity")
+    }
+    @let(name: "graph") {
+        @value(type: "GraphContext")
+    }
 }

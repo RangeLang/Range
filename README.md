@@ -30,4 +30,4 @@ Run it:
 range run
 ```
 
-`range run` reads `Package.range`, compiles the project to generated Swift, enables Swift Embedded for that package, and launches it through SwiftPM.
+`range run` reads `Project.range`, compiles the project to generated Swift, enables Swift Embedded for that package, and launches it through SwiftPM.

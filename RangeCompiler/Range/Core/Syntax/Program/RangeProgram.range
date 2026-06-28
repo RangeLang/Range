@@ -88,9 +88,9 @@
     }
 }
 
-enum GraphRole {
-    case declaration
-    case application
+@enum(name: "GraphRole") {
+    @case(name: "declaration")
+    @case(name: "application")
 }
 
 @construct(name: "RangeGraphIdentity") {

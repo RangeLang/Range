@@ -18,22 +18,8 @@ public struct CapabilityScalarDeclaration: Equatable {
 public struct CapabilityLLVMModule: Equatable {
     public let scalarApplications: [CapabilityScalarApplication]
     public let scalarDeclarations: [CapabilityScalarDeclaration]
-    public let functions: [CapabilityLLVMFunction]
     public let mainIR: String?
     public let ir: String
-}
-
-public struct CapabilityLLVMFunction: Equatable {
-    public let rangeName: String
-    public let llvmName: String
-    public let returnType: String
-    public let parameters: [CapabilityLLVMParameter]
-    public let body: [String]
-}
-
-public struct CapabilityLLVMParameter: Equatable {
-    public let name: String
-    public let llvmType: String
 }
 
 public struct CapabilityLLVMEmitter {
@@ -42,19 +28,26 @@ public struct CapabilityLLVMEmitter {
     public init() {}
 
     public func emitModule(compiledProgram: CompiledProgram) -> CapabilityLLVMModule {
-        emitModule(files: compiledProgram.expandedFiles)
+        let mainIR = collectMainIR(files: compiledProgram.expandedFiles)
+        return emitModule(declarationGraph: compiledProgram.declarationGraph, mainIR: mainIR)
     }
 
     public func emitModule(files: [ParsedSourceFile]) -> CapabilityLLVMModule {
-        let applications = collectScalarApplications(files: files)
+        let mainIR = collectMainIR(files: files)
+        return emitModule(declarationGraph: DeclarationGraph(files: files), mainIR: mainIR)
+    }
+
+    private func emitModule(
+        declarationGraph: DeclarationGraph,
+        mainIR: String?
+    ) -> CapabilityLLVMModule {
+        let applications = collectScalarApplications(declarationGraph: declarationGraph)
         let declarations = resolveScalarDeclarations(applications: applications)
-        let functions = collectLLVMFunctions(files: files, scalarDeclarations: declarations)
         return CapabilityLLVMModule(
             scalarApplications: applications,
             scalarDeclarations: declarations,
-            functions: functions,
-            mainIR: collectMainIR(files: files),
-            ir: collectMainIR(files: files) ?? renderIR(functions: functions)
+            mainIR: mainIR,
+            ir: mainIR ?? ""
         )
     }
 
@@ -74,22 +67,14 @@ public struct CapabilityLLVMEmitter {
     public func collectScalarApplications(
         files: [ParsedSourceFile]
     ) -> [CapabilityScalarApplication] {
-        files.flatMap { file in
-            constructDeclarations(in: file.sourceFile).flatMap { declaration in
-                declaration.macros.compactMap { application in
-                    guard scalarMacroNames.contains(application.name),
-                        let resolvedValue = application.evaluatedStringValue
-                    else {
-                        return nil
-                    }
-                    return CapabilityScalarApplication(
-                        macroName: application.name,
-                        targetName: declaration.name,
-                        resolvedValue: resolvedValue,
-                        path: file.path
-                    )
-                }
-            }
+        collectScalarApplications(declarationGraph: DeclarationGraph(files: files))
+    }
+
+    public func collectScalarApplications(
+        declarationGraph: DeclarationGraph
+    ) -> [CapabilityScalarApplication] {
+        constructDeclarations(in: declarationGraph).flatMap { declaration in
+            scalarApplications(in: declaration)
         }
         .sorted {
             ($0.targetName, $0.macroName, $0.path) < ($1.targetName, $1.macroName, $1.path)
@@ -112,167 +97,91 @@ public struct CapabilityLLVMEmitter {
         }
     }
 
-    public func collectLLVMFunctions(
-        files: [ParsedSourceFile],
-        scalarDeclarations: [CapabilityScalarDeclaration]
-    ) -> [CapabilityLLVMFunction] {
-        let scalarTypes = scalarDeclarations.reduce(into: [String: String]()) { result, declaration in
-            result[declaration.targetName] = result[declaration.targetName] ?? declaration.llvmType
-        }
-
-        return files.flatMap { file in
-            callableDeclarations(in: file.sourceFile).compactMap { callable in
-                lowerCallable(callable, scalarTypes: scalarTypes)
-            }
-        }
-        .sorted { $0.rangeName < $1.rangeName }
-    }
-
     public func collectMainIR(files: [ParsedSourceFile]) -> String? {
         files.compactMap { file -> String? in
-            switch file.sourceFile {
-            case .mainBlock(let mainBlock):
-                return mainBlock.macros.first(where: { $0.name == "main" })?.evaluatedStringValue
-            case .module(let module):
-                return module.mainBlock?.macros.first(where: { $0.name == "main" })?
-                    .evaluatedStringValue
-            case .construct, .enumeration, .macro, .extensions:
-                return nil
-            }
+            file.sourceFile.blockMacros
+                .compactMap { block -> String? in
+                    guard block.macros.first?.name == "main" else {
+                        return nil
+                    }
+                    return block.macros.first(where: { $0.name == "main" })?
+                        .evaluatedStringValue
+                }
+                .first
         }.first
     }
 
-    private func lowerCallable(
-        _ callable: CallableDeclaration,
-        scalarTypes: [String: String]
-    ) -> CapabilityLLVMFunction? {
-        guard callable.targetType == nil,
-            callable.genericParameters.isEmpty,
-            let returnTypeName = callable.returnType?.displayName,
-            let returnType = scalarTypes[returnTypeName],
-            let body = callable.body,
-            body.count == 1,
-            case .return(let expression?) = body[0],
-            case .binary(let lhs, .addition, let rhs) = expression,
-            case .identifier(let lhsName) = lhs,
-            case .identifier(let rhsName) = rhs
-        else {
-            return nil
-        }
+    private func constructDeclarations(in declarationGraph: DeclarationGraph) -> [ConstructDeclaration] {
+        declarationGraph.constructsByName.values.sorted { $0.name < $1.name }
+    }
 
-        let parameters = callable.parameters.compactMap { parameter -> CapabilityLLVMParameter? in
-            guard let typeName = parameter.typeReference?.displayName,
-                let llvmType = scalarTypes[typeName]
-            else {
-                return nil
+    private func scalarApplications(in declaration: ConstructDeclaration)
+        -> [CapabilityScalarApplication]
+    {
+        declaration.macros.flatMap { application -> [CapabilityScalarApplication] in
+            guard let payload = application.evaluatedStringValue else {
+                return []
             }
-            return CapabilityLLVMParameter(name: parameter.name, llvmType: llvmType)
+            return payload
+                .split(separator: "\n", omittingEmptySubsequences: true)
+                .compactMap { line in
+                    scalarApplication(
+                        from: String(line),
+                        targetName: declaration.name
+                    )
+                }
         }
-        guard parameters.count == callable.parameters.count,
-            parameters.count == 2,
-            parameters[0].name == lhsName,
-            parameters[1].name == rhsName,
-            parameters[0].llvmType == returnType,
-            parameters[1].llvmType == returnType
-        else {
+    }
+
+    private func scalarApplication(from line: String, targetName: String)
+        -> CapabilityScalarApplication?
+    {
+        let parts = line.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+        guard let macroName = parts.first, scalarMacroNames.contains(macroName) else {
             return nil
         }
-
-        return CapabilityLLVMFunction(
-            rangeName: callable.name,
-            llvmName: callable.name == "main" ? "main" : "RangeLLVM_\(callable.name)",
-            returnType: returnType,
-            parameters: parameters,
-            body: [
-                "  %1 = add \(returnType) %\(lhsName), %\(rhsName)",
-                "  ret \(returnType) %1",
-            ]
+        let fields = recordFields(in: parts)
+        guard let llvmType = scalarLLVMType(macroName: macroName, fields: fields) else {
+            return nil
+        }
+        return CapabilityScalarApplication(
+            macroName: macroName,
+            targetName: targetName,
+            resolvedValue: llvmType,
+            path: ""
         )
     }
 
-    private func renderIR(functions: [CapabilityLLVMFunction]) -> String {
-        var lines = [
-            "; ModuleID = 'RangeScalar'",
-            "source_filename = \"RangeScalar.range\"",
-            "",
-        ]
-
-        for function in functions {
-            let renderedParameters = function.parameters
-                .map { "\($0.llvmType) %\($0.name)" }
-                .joined(separator: ", ")
-            lines += [
-                "define \(function.returnType) @\(function.llvmName)(\(renderedParameters)) {",
-                "entry:",
-            ]
-            lines += function.body
-            lines += [
-                "}",
-                "",
-            ]
-        }
-
-        if let addFunction = functions.first(where: { $0.rangeName == "add" }),
-            addFunction.parameters.count == 2,
-            addFunction.returnType.hasPrefix("i")
-        {
-            lines += [
-                "define i3 @main() {",
-                "entry:",
-                "  %1 = call \(addFunction.returnType) @\(addFunction.llvmName)(\(addFunction.returnType) 1, \(addFunction.returnType) 2)",
-                "  %2 = trunc \(addFunction.returnType) %1 to i3",
-                "  ret i3 %2",
-                "}",
-                "",
-            ]
-            return lines.joined(separator: "\n")
-        }
-
-        lines += [
-            "define i3 @main() {",
-            "entry:",
-            "  ret i3 0",
-            "}",
-            "",
-        ]
-        return lines.joined(separator: "\n")
-    }
-
-    private func callableDeclarations(in sourceFile: SourceFileNode) -> [CallableDeclaration] {
-        switch sourceFile {
-        case .construct(let declaration):
-            return callableDeclarations(in: declaration)
-        case .module(let module):
-            return module.callables
-                + module.constructs.flatMap(callableDeclarations(in:))
-                + module.extensions.flatMap {
-                    $0.callables + $0.constructs.flatMap(callableDeclarations(in:))
-                }
-        case .extensions(let declarations):
-            return declarations.flatMap {
-                $0.callables + $0.constructs.flatMap(callableDeclarations(in:))
+    private func scalarLLVMType(macroName: String, fields: [String: String]) -> String? {
+        switch macroName {
+        case "integer":
+            guard let bits = fields["bits"], !bits.isEmpty else { return nil }
+            return "i\(bits)"
+        case "bool", "boolean":
+            return "i1"
+        case "float":
+            if let llvm = fields["llvm"], !llvm.isEmpty {
+                return llvm
             }
-        case .enumeration, .macro, .mainBlock:
-            return []
+            if fields["precision"] == "32" || fields["bits"] == "32" {
+                return "float"
+            }
+            return "double"
+        default:
+            return nil
         }
     }
 
-    private func callableDeclarations(in declaration: ConstructDeclaration) -> [CallableDeclaration] {
-        declaration.callables + declaration.constructs.flatMap(callableDeclarations(in:))
-    }
-
-    private func constructDeclarations(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
-        switch sourceFile {
-        case .construct(let declaration):
-            return [declaration] + declaration.constructs.flatMap(constructDeclarations(in:))
-        case .module(let module):
-            return module.constructs.flatMap { [$0] + $0.constructs.flatMap(constructDeclarations(in:)) }
-        case .enumeration, .extensions, .macro, .mainBlock:
-            return []
+    private func recordFields(in parts: [String]) -> [String: String] {
+        var fields: [String: String] = [:]
+        for part in parts.dropFirst() {
+            let pieces = part.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard pieces.count == 2 else {
+                continue
+            }
+            fields[String(pieces[0])] = String(pieces[1])
         }
+        return fields
     }
 
-    private func constructDeclarations(in declaration: ConstructDeclaration) -> [ConstructDeclaration] {
-        [declaration] + declaration.constructs.flatMap(constructDeclarations(in:))
-    }
 }

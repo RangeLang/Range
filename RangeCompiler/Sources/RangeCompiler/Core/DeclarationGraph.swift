@@ -26,14 +26,12 @@ public struct DeclarationSourceLocation {
 }
 
 public struct DeclarationGraph {
-    public let packageValues: [ValueDeclaration]
     public let constructsByName: [String: ConstructDeclaration]
     public let enumsByName: [String: EnumDeclaration]
     public let macrosByName: [String: MacroDeclaration]
     public let macroMetadataByName: [String: MacroMetadataDeclaration]
     public let extensionsByTargetName: [String: [ExtensionDeclaration]]
     public let mainBlockMacros: [MacroApplication]
-    public let topLevelStatesByFilePath: [String: [StateDeclaration]]
     public let statesByConstructName: [String: [StateDeclaration]]
     public let bindingsByConstructName: [String: [BindingDeclaration]]
     public let derivedsByConstructName: [String: [DerivedDeclaration]]
@@ -43,12 +41,9 @@ public struct DeclarationGraph {
     public let parametersByInitializerIdentity: [String: [RangeFunctionParameter]]
     public let callablesByName: [String: [CallableDeclaration]]
     public let operatorCallablesByName: [String: [CallableDeclaration]]
-    public let precedenceGroupsByName: [String: PrecedenceGroupDeclaration]
     public let sourceTextByPath: [String: String]
     public let sourceLocations: [DeclarationSourceLocation]
     public let realizedLiteralBridges: [RealizedLiteralBridge]
-    public let realizedInitMacroTargets: [RealizedInitMacroTarget]
-    public let programGraph: ProgramGraph
 
     public init(files: [ParsedSourceFile]) {
         let sourceTextByPath = Dictionary(
@@ -56,7 +51,6 @@ public struct DeclarationGraph {
                 file.source.map { (file.path, $0) }
             }
         )
-        let packageValues = Self.collectPackageManifestValues(from: files)
         let macroMetadata = Self.collectMacroMetadata(from: files)
         let metadataSlotMacros = Self.metadataSlotMacroNames(in: macroMetadata)
         let extensions = Self.collectExtensions(from: files)
@@ -67,7 +61,6 @@ public struct DeclarationGraph {
         )
         let enumerations = Self.collectEnums(from: files)
         let macros = Self.collectMacros(from: files)
-        let topLevelStates = Self.collectTopLevelStates(from: files)
         let statesByConstructName = Self.collectStatesByConstructName(from: constructs)
         let bindingsByConstructName = Self.collectBindingsByConstructName(from: constructs)
         let derivedsByConstructName = Self.collectDerivedsByConstructName(from: constructs)
@@ -76,23 +69,26 @@ public struct DeclarationGraph {
             from: constructs,
             extensions: extensions
         )
-        let callables = Self.collectCallables(from: files)
-        let operatorCallables = Self.collectOperatorCallables(from: files)
-        let precedenceGroups = Self.collectPrecedenceGroups(from: files)
-        let parametersByCallableIdentity = Self.collectParametersByCallableIdentity(from: files)
+        let callables = Self.collectCallables(from: constructs, extensions: extensions)
+        let operatorCallables = Self.collectOperatorCallables(
+            from: constructs,
+            extensions: extensions
+        )
+        let parametersByCallableIdentity = Self.collectParametersByCallableIdentity(
+            from: constructs,
+            extensions: extensions
+        )
         let parametersByInitializerIdentity = Self.collectParametersByInitializerIdentity(
             from: constructs,
             extensions: extensions
         )
 
-        self.packageValues = packageValues
         self.constructsByName = constructs
         self.enumsByName = enumerations
         self.macrosByName = macros
         self.macroMetadataByName = macroMetadata
         self.extensionsByTargetName = extensions
         self.mainBlockMacros = mainBlockMacros
-        self.topLevelStatesByFilePath = topLevelStates
         self.statesByConstructName = statesByConstructName
         self.bindingsByConstructName = bindingsByConstructName
         self.derivedsByConstructName = derivedsByConstructName
@@ -102,22 +98,9 @@ public struct DeclarationGraph {
         self.parametersByInitializerIdentity = parametersByInitializerIdentity
         self.callablesByName = callables
         self.operatorCallablesByName = operatorCallables
-        self.precedenceGroupsByName = precedenceGroups
         self.sourceTextByPath = sourceTextByPath
         self.sourceLocations = Self.collectSourceLocations(from: files)
-        let syntaxResolver = DeclarationSyntaxResolver(
-            constructsByName: constructs,
-            macrosByName: macros,
-            extensionsByTargetName: extensions
-        )
-
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
-        self.realizedInitMacroTargets = Self.collectRealizedInitMacroTargets(
-            from: constructs,
-            macrosByName: macros,
-            syntaxResolver: syntaxResolver
-        )
-        self.programGraph = Self.collectProgramGraph(from: files)
     }
 
     public var views: DeclarationGraphViews {
@@ -139,7 +122,6 @@ public struct DeclarationGraph {
                 enumsByName: enumsByName,
                 macrosByName: macrosByName,
                 extensionsByTargetName: extensionsByTargetName,
-                topLevelStatesByFilePath: topLevelStatesByFilePath,
                 statesByConstructName: statesByConstructName,
                 bindingsByConstructName: bindingsByConstructName,
                 derivedsByConstructName: derivedsByConstructName,
@@ -181,10 +163,6 @@ public struct DeclarationGraph {
         views.registryView
     }
 
-    public func topLevelStates(inFilePath path: String) -> [StateDeclaration] {
-        registryView.topLevelStates(inFilePath: path)
-    }
-
     public func states(onConstruct named: String) -> [StateDeclaration] {
         statesByConstructName[named, default: []]
     }
@@ -199,10 +177,6 @@ public struct DeclarationGraph {
 
     public func values(onConstruct named: String) -> [ValueDeclaration] {
         valuesByConstructName[named, default: []]
-    }
-
-    public func packageValues(named name: String) -> [ValueDeclaration] {
-        packageValues.filter { $0.name == name }
     }
 
     public func initializers(onConstruct named: String) -> [InitializerDeclaration] {
@@ -259,8 +233,8 @@ public struct DeclarationGraph {
 
     public func memberKinds(
         forConstruct named: String
-    ) -> [String: ApplicationGraphNodeKind] {
-        var result: [String: ApplicationGraphNodeKind] = [:]
+    ) -> [String: DeclaredMemberKind] {
+        var result: [String: DeclaredMemberKind] = [:]
         for state in states(onConstruct: named) { result[state.name] = .state }
         for binding in bindings(onConstruct: named) { result[binding.name] = .binding }
         for derived in deriveds(onConstruct: named) { result[derived.name] = .derived }
@@ -424,17 +398,6 @@ public struct DeclarationGraph {
         onConstruct named: String
     ) -> [DeclaredInitializerSurface] {
         var surfaces: [DeclaredInitializerSurface] = []
-        if Self.hasCoreRuntimeDefaultInitializer(named) {
-            surfaces.append(
-                DeclaredInitializerSurface(
-                    ownerConstructName: named,
-                    labels: [],
-                    parameterTypeNames: [],
-                    parameters: [],
-                    returnTypeName: nil
-                )
-            )
-        }
         if let construct = constructsByName[named] {
             let parameters = directConstructApplicationParameters(for: construct)
             if !parameters.isEmpty || construct.initializers.isEmpty {
@@ -465,79 +428,16 @@ public struct DeclarationGraph {
         return surfaces
     }
 
-    private static func hasCoreRuntimeDefaultInitializer(_ constructName: String) -> Bool {
-        constructName == "Date" || constructName == "DateTime"
-    }
-
     public func directConstructApplicationParameters(
         for construct: ConstructDeclaration
     ) -> [RangeFunctionParameter] {
-        Self.directConstructApplicationParameters(
-            for: construct,
-            constructsByName: constructsByName,
-            macrosByName: macrosByName,
-            activeConstructs: []
-        )
+        Self.directConstructApplicationParameters(for: construct)
     }
 
     static func directConstructApplicationParameters(
         for construct: ConstructDeclaration
     ) -> [RangeFunctionParameter] {
-        directConstructApplicationParameters(
-            for: construct,
-            constructsByName: [:],
-            macrosByName: [:],
-            activeConstructs: []
-        )
-    }
-
-    private static func directConstructApplicationParameters(
-        for construct: ConstructDeclaration,
-        constructsByName: [String: ConstructDeclaration],
-        macrosByName: [String: MacroDeclaration],
-        activeConstructs: Set<String>
-    ) -> [RangeFunctionParameter] {
-        let activeConstructs = activeConstructs.union([construct.name])
-
-        let forwardedValues = construct.values.flatMap { value -> [RangeFunctionParameter] in
-            if propertyForwardsInitializer(macros: value.macros, macrosByName: macrosByName),
-                let forwardedConstruct = forwardedConstruct(
-                    named: value.typeName,
-                    constructsByName: constructsByName,
-                    activeConstructs: activeConstructs
-                )
-            {
-                return directConstructApplicationParameters(
-                    for: forwardedConstruct,
-                    constructsByName: constructsByName,
-                    macrosByName: macrosByName,
-                    activeConstructs: activeConstructs
-                )
-            }
-            return []
-        }
-        let forwardedStates = construct.states.flatMap { state -> [RangeFunctionParameter] in
-            if propertyForwardsInitializer(macros: state.macros, macrosByName: macrosByName),
-                let forwardedConstruct = forwardedConstruct(
-                    named: state.type.displayName,
-                    constructsByName: constructsByName,
-                    activeConstructs: activeConstructs
-                )
-            {
-                return directConstructApplicationParameters(
-                    for: forwardedConstruct,
-                    constructsByName: constructsByName,
-                    macrosByName: macrosByName,
-                    activeConstructs: activeConstructs
-                )
-            }
-            return []
-        }
-
-        let values = construct.values.compactMap { value -> RangeFunctionParameter? in
-            if propertyForwardsInitializer(macros: value.macros, macrosByName: macrosByName) {
-                return nil
-            }
+        let values = construct.values.map { value -> RangeFunctionParameter in
             let defaultValue =
                 value.value ?? (value.typeName.hasPrefix("Optional<") ? .nilLiteral : nil)
             return RangeFunctionParameter(
@@ -550,10 +450,7 @@ public struct DeclarationGraph {
                 capturesSyntax: false
             )
         }
-        let states = construct.states.compactMap { state -> RangeFunctionParameter? in
-            if propertyForwardsInitializer(macros: state.macros, macrosByName: macrosByName) {
-                return nil
-            }
+        let states = construct.states.map { state -> RangeFunctionParameter in
             let defaultValue: Expression?
             switch state.storage {
             case .stored(let expression):
@@ -584,47 +481,7 @@ public struct DeclarationGraph {
                 capturesSyntax: false
             )
         }
-        return forwardedValues + forwardedStates + values + states + bindings
-    }
-
-    private static func propertyForwardsInitializer(
-        macros applications: [MacroApplication],
-        macrosByName: [String: MacroDeclaration]
-    ) -> Bool {
-        applications.contains { application in
-            guard let macro = macrosByName[application.name],
-                let targetBinding = macro.bindings?.target
-            else {
-                return false
-            }
-
-            return MacroExpander.macroOperationExpressions(in: macro.body).contains { expression in
-                guard case .call(let name, let arguments) = expression else {
-                    return false
-                }
-                return name == "\(targetBinding).initializer.forward" && arguments.isEmpty
-            }
-        }
-    }
-
-    private static func forwardedConstruct(
-        named rawName: String,
-        constructsByName: [String: ConstructDeclaration],
-        activeConstructs: Set<String>
-    ) -> ConstructDeclaration? {
-        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !activeConstructs.contains(name) else {
-            return nil
-        }
-        return constructsByName[name]
-    }
-
-    static func collectPackageManifestValues(from files: [ParsedSourceFile]) -> [ValueDeclaration] {
-        files.flatMap { parsedFile in
-            constructs(in: parsedFile.sourceFile, metadataSlotMacros: [])
-                .filter { $0.macros.contains { $0.name == "package" } }
-                .flatMap(\.values)
-        }
+        return values + states + bindings
     }
 
     static func collectConstructs(
@@ -644,12 +501,8 @@ public struct DeclarationGraph {
         return registry
     }
 
-    private static func emittedConstructs(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
-        guard case .module(let module) = sourceFile else {
-            return []
-        }
-
-        return module.blockMacros.flatMap { blockMacro in
+    private static func emittedConstructs(in sourceFile: ModuleFileNode) -> [ConstructDeclaration] {
+        sourceFile.blockMacros.flatMap { blockMacro in
             blockMacro.macros.compactMap { application in
                 guard let payload = application.evaluatedStringValue else {
                     return nil
@@ -754,13 +607,13 @@ public struct DeclarationGraph {
         }
         let valueFields = valueLine.map(emittedRecordFields) ?? [:]
         let type = valueFields["type"] ?? fields["type"] ?? ""
-        let current = valueFields["current"] ?? fields["value"] ?? ""
+        let current = valueFields["current"] ?? ""
 
         return StateDeclaration(
             macros: [],
             name: name,
             hasExplicitTypeAnnotation: true,
-            type: emittedTypeReference(value: current, fallback: type),
+            type: emittedTypeReference(typeName: type),
             storage: current.isEmpty ? .declared : .stored(.identifier(current))
         )
     }
@@ -803,13 +656,13 @@ public struct DeclarationGraph {
             return nil
         }
         let valueFields = valueLine.map(emittedRecordFields) ?? [:]
-        let type = valueFields["type"] ?? fields["type"] ?? fields["value"] ?? ""
+        let type = valueFields["type"] ?? fields["type"] ?? ""
         let current = valueFields["current"] ?? ""
 
         return ValueDeclaration(
             macros: [],
             name: name,
-            typeName: emittedTypeReference(value: current, fallback: type).displayName,
+            typeName: emittedTypeReference(typeName: type).displayName,
             value: current.isEmpty ? nil : .identifier(current)
         )
     }
@@ -879,7 +732,7 @@ public struct DeclarationGraph {
             genericParameters: [],
             hasExplicitParameterClause: true,
             parameters: parameters,
-            returnType: emittedTypeReference(name: fields["result"]),
+            returnType: emittedTypeReference(typeName: fields["result"]),
             body: body
         )
     }
@@ -919,7 +772,7 @@ public struct DeclarationGraph {
             return nil
         }
         let valueFields = valueLine.map(emittedRecordFields) ?? [:]
-        let type = valueFields["type"] ?? fields["value"] ?? ""
+        let type = valueFields["type"] ?? fields["type"] ?? ""
         let defaultValue = valueFields["current"].flatMap { current -> Expression? in
             current.isEmpty ? nil : .identifier(current)
         }
@@ -927,7 +780,7 @@ public struct DeclarationGraph {
         return RangeFunctionParameter(
             macros: [],
             name: name,
-            typeReference: emittedTypeReference(value: type, fallback: fields["type"] ?? type),
+            typeReference: emittedTypeReference(typeName: type),
             defaultValue: defaultValue,
             slotName: nil
         )
@@ -946,21 +799,11 @@ public struct DeclarationGraph {
         return fields
     }
 
-    private static func emittedTypeReference(value: String, fallback: String?) -> TypeReference {
-        if let fallback, !fallback.isEmpty {
-            return emittedTypeReference(name: fallback) ?? .named(fallback)
+    private static func emittedTypeReference(typeName: String?) -> TypeReference {
+        guard let typeName, !typeName.isEmpty else {
+            return .named("Unknown")
         }
-        if let paren = value.firstIndex(of: "("), paren > value.startIndex {
-            return .named(String(value[..<paren]))
-        }
-        return .named("Unknown")
-    }
-
-    private static func emittedTypeReference(name: String?) -> TypeReference? {
-        guard let name, !name.isEmpty else {
-            return nil
-        }
-        return .named(name)
+        return .named(typeName)
     }
 
     static func collectEnums(from files: [ParsedSourceFile]) -> [String: EnumDeclaration] {
@@ -973,12 +816,8 @@ public struct DeclarationGraph {
         return registry
     }
 
-    private static func emittedEnums(in sourceFile: SourceFileNode) -> [EnumDeclaration] {
-        guard case .module(let module) = sourceFile else {
-            return []
-        }
-
-        return module.blockMacros.flatMap { blockMacro in
+    private static func emittedEnums(in sourceFile: ModuleFileNode) -> [EnumDeclaration] {
+        sourceFile.blockMacros.flatMap { blockMacro in
             blockMacro.macros.compactMap { application in
                 guard let payload = application.evaluatedStringValue else {
                     return nil
@@ -1159,24 +998,11 @@ public struct DeclarationGraph {
         return registry
     }
 
-    static func collectTopLevelStates(from files: [ParsedSourceFile]) -> [String: [StateDeclaration]] {
-        var registry: [String: [StateDeclaration]] = [:]
-        for parsedFile in files {
-            registry[parsedFile.path] = topLevelStates(in: parsedFile.sourceFile)
-        }
-        return registry.filter { !$0.value.isEmpty }
-    }
-
     static func collectMainBlockMacros(from files: [ParsedSourceFile]) -> [MacroApplication] {
         files.flatMap { parsedFile -> [MacroApplication] in
-            switch parsedFile.sourceFile {
-            case .mainBlock(let mainBlock):
-                return mainBlock.macros
-            case .module(let module):
-                return module.mainBlock?.macros ?? []
-            default:
-                return []
-            }
+            parsedFile.sourceFile.blockMacros
+                .filter { $0.macros.first?.name == "main" }
+                .flatMap(\.macros)
         }
     }
 
@@ -1238,35 +1064,32 @@ public struct DeclarationGraph {
     }
 
     static func collectParametersByCallableIdentity(
-        from files: [ParsedSourceFile]
+        from constructs: [String: ConstructDeclaration],
+        extensions: [String: [ExtensionDeclaration]]
     ) -> [String: [RangeFunctionParameter]] {
         var registry: [String: [RangeFunctionParameter]] = [:]
 
-        for parsedFile in files {
-            switch parsedFile.sourceFile {
-            case .module(let module):
-                for callable in module.callables {
-                    let identity = callableIdentity(
-                        ownerName: nil,
-                        declaration: callable
-                    )
-                    registry[identity] = callable.parameters
+        for (constructName, construct) in constructs {
+            for callable in construct.callables {
+                registry[
+                    callableIdentity(ownerName: constructName, declaration: callable)
+                ] = callable.parameters
+            }
+        }
+        for (targetName, declarations) in extensions {
+            for extensionDeclaration in declarations {
+                for callable in extensionDeclaration.callables {
+                    registry[
+                        callableIdentity(ownerName: targetName, declaration: callable)
+                    ] = callable.parameters
                 }
-                for construct in module.constructs {
+                for construct in extensionDeclaration.constructs {
                     collectCallableParameters(
                         in: construct,
                         registry: &registry,
-                        ownerName: construct.name
+                        ownerName: "\(targetName).\(construct.name)"
                     )
                 }
-            case .construct(let construct):
-                collectCallableParameters(
-                    in: construct,
-                    registry: &registry,
-                    ownerName: construct.name
-                )
-            case .enumeration, .macro, .mainBlock, .extensions:
-                continue
             }
         }
 
@@ -1380,40 +1203,49 @@ public struct DeclarationGraph {
         )
     }
 
-    static func collectCallables(from files: [ParsedSourceFile]) -> [String: [CallableDeclaration]]
-    {
+    static func collectCallables(
+        from constructs: [String: ConstructDeclaration],
+        extensions: [String: [ExtensionDeclaration]]
+    ) -> [String: [CallableDeclaration]] {
         var registry: [String: [CallableDeclaration]] = [:]
-        for parsedFile in files {
-            for declaration in callables(in: parsedFile.sourceFile) {
-                registry[declaration.name, default: []].append(declaration)
+        var seen: Set<String> = []
+
+        func append(_ declaration: CallableDeclaration, ownerName: String) {
+            let identity = callableIdentity(ownerName: ownerName, declaration: declaration)
+            guard seen.insert(identity).inserted else {
+                return
+            }
+            registry[declaration.name, default: []].append(declaration)
+        }
+
+        for (constructName, construct) in constructs {
+            for declaration in construct.callables {
+                append(declaration, ownerName: constructName)
             }
         }
-        return registry
-    }
-
-    static func collectOperatorCallables(from files: [ParsedSourceFile]) -> [String: [CallableDeclaration]]
-    {
-        var registry = collectCallables(from: files)
-        let operatorSymbols = Set(files.flatMap { operators(in: $0.sourceFile).map(\.symbol) })
-        let extensions = collectExtensions(from: files)
-        for declarations in extensions.values {
-            for declaration in declarations {
-                for callable in declaration.callables where operatorSymbols.contains(callable.name) {
-                    registry[callable.name, default: []].append(callable)
+        for (targetName, declarations) in extensions {
+            for extensionDeclaration in declarations {
+                for declaration in extensionDeclaration.callables {
+                    append(declaration, ownerName: targetName)
+                }
+                for construct in extensionDeclaration.constructs {
+                    collectCallables(
+                        in: construct,
+                        ownerName: "\(targetName).\(construct.name)",
+                        registry: &registry,
+                        seen: &seen
+                    )
                 }
             }
         }
         return registry
     }
 
-    static func collectPrecedenceGroups(
-        from files: [ParsedSourceFile]
-    ) -> [String: PrecedenceGroupDeclaration] {
-        Dictionary(
-            uniqueKeysWithValues: files
-                .flatMap { precedenceGroups(in: $0.sourceFile) }
-                .map { ($0.name, $0) }
-        )
+    static func collectOperatorCallables(
+        from constructs: [String: ConstructDeclaration],
+        extensions: [String: [ExtensionDeclaration]]
+    ) -> [String: [CallableDeclaration]] {
+        collectCallables(from: constructs, extensions: extensions)
     }
 
     static func collectRealizedLiteralBridges(
@@ -1447,99 +1279,11 @@ public struct DeclarationGraph {
         }
     }
 
-    static func collectRealizedInitMacroTargets(
-        from constructs: [String: ConstructDeclaration],
-        macrosByName: [String: MacroDeclaration],
-        syntaxResolver: DeclarationSyntaxResolver
-    ) -> [RealizedInitMacroTarget] {
-        constructs.values.flatMap { construct in
-            var targets = construct.initializers.compactMap { initializer -> RealizedInitMacroTarget? in
-                guard !initializer.macros.isEmpty else {
-                    return nil
-                }
-
-                return RealizedInitMacroTarget(
-                    initTarget: RealizedInitTarget(
-                        constructName: construct.name,
-                        parameterLabels: initializer.parameters.map { Optional($0.name) },
-                        isCore: construct.isCore
-                    ),
-                    macros: initializer.macros
-                )
-            }
-
-            let constructInitMacros = construct.macros.filter { application in
-                guard let macro = macrosByName[application.name], let target = macro.target else {
-                    return false
-                }
-                return macroTargetAllows(target, kind: .initializer, syntaxResolver: syntaxResolver)
-            }
-
-            if !constructInitMacros.isEmpty {
-                let parameters = directConstructApplicationParameters(
-                    for: construct,
-                    constructsByName: constructs,
-                    macrosByName: macrosByName,
-                    activeConstructs: []
-                )
-                let rewriteLabels = parameters.map { Optional($0.name) }
-                let applicationLabels: [String?] = parameters.count == 1 ? [nil] : rewriteLabels
-                targets.append(
-                    RealizedInitMacroTarget(
-                        initTarget: RealizedInitTarget(
-                            constructName: construct.name,
-                            parameterLabels: applicationLabels,
-                            isCore: construct.isCore
-                        ),
-                        rewriteInitTarget: RealizedInitTarget(
-                            constructName: construct.name,
-                            parameterLabels: rewriteLabels,
-                            isCore: construct.isCore
-                        ),
-                        macros: constructInitMacros
-                    )
-                )
-            }
-
-            for callable in construct.callables {
-                guard callable.macros.contains(where: { $0.name == "init" }),
-                    let returnType = callable.returnType
-                else {
-                    continue
-                }
-                targets.append(
-                    RealizedInitMacroTarget(
-                        initTarget: RealizedInitTarget(
-                            constructName: returnType.displayName,
-                            parameterLabels: callable.parameters.map { Optional($0.name) },
-                            isCore: callable.isCore || construct.isCore
-                        ),
-                        rewriteInitTarget: RealizedInitTarget(
-                            constructName: callable.name,
-                            parameterLabels: callable.parameters.map { Optional($0.name) },
-                            isCore: callable.isCore || construct.isCore
-                        ),
-                        macros: []
-                    )
-                )
-            }
-
-            return targets
-        }
-    }
-
     static func constructs(
-        in sourceFile: SourceFileNode,
+        in sourceFile: ModuleFileNode,
         metadataSlotMacros: Set<String>
     ) -> [ConstructDeclaration] {
-        switch sourceFile {
-        case .construct(let declaration):
-            return [declaration]
-        case .module(let module):
-            return module.constructs
-        case .enumeration, .mainBlock, .macro, .extensions:
-            return []
-        }
+        sourceFile.constructs
     }
 
     static func metadataSlotMacroNames(
@@ -1548,73 +1292,16 @@ public struct DeclarationGraph {
         Set(macroMetadata.values.filter(\.hasMetadataSlotEffect).map(\.name))
     }
 
-    static func topLevelStates(in sourceFile: SourceFileNode) -> [StateDeclaration] {
-        switch sourceFile {
-        case .module(let module):
-            return module.states
-        case .construct, .enumeration, .macro, .mainBlock, .extensions:
-            return []
-        }
+    static func enumerations(in sourceFile: ModuleFileNode) -> [EnumDeclaration] {
+        sourceFile.enumerations
     }
 
-    static func enumerations(in sourceFile: SourceFileNode) -> [EnumDeclaration] {
-        switch sourceFile {
-        case .enumeration(let declaration):
-            return [declaration]
-        case .module(let module):
-            return module.enumerations
-        case .construct, .mainBlock, .macro, .extensions:
-            return []
-        }
+    static func macros(in sourceFile: ModuleFileNode) -> [MacroDeclaration] {
+        sourceFile.macros
     }
 
-    static func macros(in sourceFile: SourceFileNode) -> [MacroDeclaration] {
-        switch sourceFile {
-        case .macro(let declaration):
-            return [declaration]
-        case .module(let module):
-            return module.macros
-        case .construct, .enumeration, .mainBlock, .extensions:
-            return []
-        }
-    }
-
-    static func extensions(in sourceFile: SourceFileNode) -> [ExtensionDeclaration] {
-        switch sourceFile {
-        case .extensions(let declarations):
-            return declarations
-        case .module(let module):
-            return module.extensions
-        case .construct, .enumeration, .mainBlock, .macro:
-            return []
-        }
-    }
-
-    static func operators(in sourceFile: SourceFileNode) -> [OperatorDeclaration] {
-        switch sourceFile {
-        case .module(let module):
-            return module.operators
-        case .construct, .enumeration, .mainBlock, .macro, .extensions:
-            return []
-        }
-    }
-
-    static func precedenceGroups(in sourceFile: SourceFileNode) -> [PrecedenceGroupDeclaration] {
-        switch sourceFile {
-        case .module(let module):
-            return module.precedenceGroups
-        case .construct, .enumeration, .mainBlock, .macro, .extensions:
-            return []
-        }
-    }
-
-    static func callables(in sourceFile: SourceFileNode) -> [CallableDeclaration] {
-        switch sourceFile {
-        case .module(let module):
-            return module.callables
-        case .construct, .enumeration, .mainBlock, .macro, .extensions:
-            return []
-        }
+    static func extensions(in sourceFile: ModuleFileNode) -> [ExtensionDeclaration] {
+        sourceFile.extensions
     }
 
     private static func collectCallableParameters(
@@ -1637,6 +1324,30 @@ public struct DeclarationGraph {
         }
     }
 
+    private static func collectCallables(
+        in construct: ConstructDeclaration,
+        ownerName: String,
+        registry: inout [String: [CallableDeclaration]],
+        seen: inout Set<String>
+    ) {
+        for callable in construct.callables {
+            let identity = callableIdentity(ownerName: ownerName, declaration: callable)
+            guard seen.insert(identity).inserted else {
+                continue
+            }
+            registry[callable.name, default: []].append(callable)
+        }
+
+        for child in construct.constructs {
+            collectCallables(
+                in: child,
+                ownerName: "\(ownerName).\(child.name)",
+                registry: &registry,
+                seen: &seen
+            )
+        }
+    }
+
     static func callableIdentity(
         ownerName: String?,
         declaration: CallableDeclaration
@@ -1653,401 +1364,6 @@ public struct DeclarationGraph {
     }
 
     static func renderParameterList(_ parameters: [RangeFunctionParameter]) -> String {
-        parameters.map { parameter in
-            let typeName =
-                parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
-                ?? "_"
-            let label = parameter.name
-            return "\(label):\(typeName)"
-        }.joined(separator: ",")
-    }
-
-    static func collectProgramGraph(from files: [ParsedSourceFile]) -> ProgramGraph {
-        var collector = SemanticGraphCollector()
-        for parsedFile in files.sorted(by: { $0.path < $1.path }) {
-            collector.add(parsedFile)
-        }
-        return collector.build()
-    }
-}
-
-private struct SemanticGraphCollector {
-    private var entitiesByID: [String: SemanticGraphEntity] = [:]
-    private var relations: Set<SemanticGraphRelation> = []
-    private var syntaxByID: [String: SyntaxProjectionAccumulator] = [:]
-
-    mutating func build() -> ProgramGraph {
-        ProgramGraph(
-            entities: Array(entitiesByID.values),
-            relations: Array(relations),
-            syntax: syntaxByID.values.map(\.syntax)
-        )
-    }
-
-    mutating func add(_ parsedFile: ParsedSourceFile) {
-        let fileID = "file:\(parsedFile.path)"
-        let fileLabel = URL(fileURLWithPath: parsedFile.path).lastPathComponent
-        addEntity(id: fileID, kind: .file, label: fileLabel)
-
-        switch parsedFile.sourceFile {
-        case .construct(let declaration):
-            addConstruct(declaration, parentID: fileID)
-        case .enumeration(let declaration):
-            addEnumeration(declaration, parentID: fileID)
-        case .macro(let declaration):
-            addMacroDeclaration(declaration, parentID: fileID)
-        case .extensions(let declarations):
-            for declaration in declarations {
-                addExtension(declaration, parentID: fileID)
-            }
-        case .module(let module):
-            if module.mainBlock != nil {
-                let mainID = "\(fileID)/main"
-                addEntity(id: mainID, kind: .mainBlock, label: "@main")
-                addRelation(from: fileID, to: mainID, kind: .contains)
-                addMacroApplications(module.mainBlock?.macros ?? [], parentID: mainID)
-            }
-            for state in module.states {
-                addState(state, parentID: fileID)
-            }
-            for callable in module.callables {
-                addCallable(callable, parentID: fileID)
-            }
-            for declaration in module.constructs {
-                addConstruct(declaration, parentID: fileID)
-            }
-            for declaration in module.enumerations {
-                addEnumeration(declaration, parentID: fileID)
-            }
-            for declaration in module.macros {
-                addMacroDeclaration(declaration, parentID: fileID)
-            }
-            for declaration in module.extensions {
-                addExtension(declaration, parentID: fileID)
-            }
-        case .mainBlock:
-            let mainID = "\(fileID)/main"
-            addEntity(id: mainID, kind: .mainBlock, label: "@main")
-            addRelation(from: fileID, to: mainID, kind: .contains)
-            if case .mainBlock(let mainBlock) = parsedFile.sourceFile {
-                addMacroApplications(mainBlock.macros, parentID: mainID)
-            }
-        }
-    }
-
-private struct SyntaxProjectionAccumulator {
-    let identity: SemanticGraphEntity
-    let declarations: [SemanticGraphEntity]
-    let applications: [SemanticGraphEntity]
-
-    var syntax: ProgramGraphSyntax {
-        ProgramGraphSyntax(
-            identity: identity,
-            declarations: declarations,
-            applications: applications
-        )
-    }
-}
-
-    private mutating func addConstruct(_ declaration: ConstructDeclaration, parentID: String) {
-        let constructID = "\(parentID)/construct:\(declaration.name)"
-        let label = declaration.name
-        let entity = SemanticGraphEntity(id: constructID, kind: .construct, label: label)
-        addEntity(entity)
-        addRelation(from: parentID, to: constructID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: constructID)
-        collectSyntaxProjection(
-            identity: entity,
-            macros: declaration.macros,
-            nestedConstructs: declaration.constructs,
-            ownerID: constructID
-        )
-
-        for state in declaration.states {
-            addState(state, parentID: constructID)
-        }
-        for binding in declaration.bindings {
-            addBinding(binding, parentID: constructID)
-        }
-        for derived in declaration.deriveds {
-            addDerived(derived, parentID: constructID)
-        }
-        for value in declaration.values {
-            addValue(value, parentID: constructID)
-        }
-        for initializer in declaration.initializers {
-            addInitializer(initializer, parentID: constructID)
-        }
-        for callable in declaration.callables {
-            addCallable(callable, parentID: constructID)
-        }
-        for nested in declaration.constructs {
-            addConstruct(nested, parentID: constructID)
-        }
-    }
-
-    private mutating func addEnumeration(_ declaration: EnumDeclaration, parentID: String) {
-        let enumID = "\(parentID)/enum:\(declaration.name)"
-        addEntity(id: enumID, kind: .enumeration, label: declaration.name)
-        addRelation(from: parentID, to: enumID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: enumID)
-    }
-
-    private mutating func addMacroDeclaration(_ declaration: MacroDeclaration, parentID: String) {
-        let macroID = "\(parentID)/macro:\(declaration.name)"
-        addEntity(id: macroID, kind: .macro, label: declaration.name)
-        addRelation(from: parentID, to: macroID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: macroID)
-        if let target = declaration.target {
-            addTypeReferences(target.typeReferences, from: macroID, kind: .targetsMacro)
-        }
-        if let expansionType = declaration.expansionType {
-            addTypeReference(expansionType, from: macroID, kind: .referencesType)
-        }
-    }
-
-    private mutating func addExtension(_ declaration: ExtensionDeclaration, parentID: String) {
-        let extensionID = "\(parentID)/extension:\(declaration.targetType.displayName)"
-        addEntity(id: extensionID, kind: .typeExtension, label: declaration.targetType.displayName)
-        addRelation(from: parentID, to: extensionID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: extensionID)
-        addTypeReference(declaration.targetType, from: extensionID, kind: .extends)
-    }
-
-    private mutating func addState(_ declaration: StateDeclaration, parentID: String) {
-        let stateID = "\(parentID)/state:\(declaration.name)"
-        addField(
-            name: declaration.name,
-            macros: declaration.macros,
-            typeReference: declaration.type,
-            parentID: parentID,
-            declarationID: stateID
-        )
-        addEntity(id: stateID, kind: .state, label: declaration.name)
-        addRelation(from: parentID, to: stateID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: stateID)
-        addStorageTypeReference(declaration.type, from: stateID)
-    }
-
-    private mutating func addBinding(_ declaration: BindingDeclaration, parentID: String) {
-        let bindingID = "\(parentID)/binding:\(declaration.name)"
-        addField(
-            name: declaration.name,
-            macros: declaration.macros,
-            typeReference: .named(declaration.typeName),
-            parentID: parentID,
-            declarationID: bindingID
-        )
-        addEntity(id: bindingID, kind: .binding, label: declaration.name)
-        addRelation(from: parentID, to: bindingID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: bindingID)
-        addStorageTypeReference(.named(declaration.typeName), from: bindingID)
-    }
-
-    private mutating func addDerived(_ declaration: DerivedDeclaration, parentID: String) {
-        let derivedID = "\(parentID)/derived:\(declaration.name)"
-        addField(
-            name: declaration.name,
-            macros: declaration.macros,
-            typeReference: .named(declaration.typeName),
-            parentID: parentID,
-            declarationID: derivedID
-        )
-        addEntity(id: derivedID, kind: .derived, label: declaration.name)
-        addRelation(from: parentID, to: derivedID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: derivedID)
-        addStorageTypeReference(.named(declaration.typeName), from: derivedID)
-        if let builderName = declaration.builderName {
-            addTypeReference(.named(builderName), from: derivedID, kind: .referencesType)
-        }
-    }
-
-    private mutating func addValue(_ declaration: ValueDeclaration, parentID: String) {
-        let valueID = "\(parentID)/value:\(declaration.name)"
-        addField(
-            name: declaration.name,
-            macros: declaration.macros,
-            typeReference: .named(declaration.typeName),
-            parentID: parentID,
-            declarationID: valueID
-        )
-        addEntity(id: valueID, kind: .value, label: declaration.name)
-        addRelation(from: parentID, to: valueID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: valueID)
-        addStorageTypeReference(.named(declaration.typeName), from: valueID)
-    }
-
-    private mutating func addField(
-        name: String,
-        macros: [MacroApplication],
-        typeReference: TypeReference,
-        parentID: String,
-        declarationID: String
-    ) {
-        let fieldID = "\(parentID)/field:\(name)"
-        addEntity(id: fieldID, kind: .field, label: name)
-        addRelation(from: parentID, to: fieldID, kind: .contains)
-        addRelation(from: fieldID, to: declarationID, kind: .resolvesTo)
-        addMacroApplications(macros, parentID: fieldID)
-        addStorageTypeReference(typeReference, from: fieldID)
-    }
-
-    private mutating func addInitializer(_ declaration: InitializerDeclaration, parentID: String) {
-        let initializerID = "\(parentID)/init:\(renderParameterList(declaration.parameters))"
-        addEntity(id: initializerID, kind: .initializer, label: "init")
-        addRelation(from: parentID, to: initializerID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: initializerID)
-        if let returnType = declaration.returnType {
-            addTypeReference(returnType, from: initializerID, kind: .referencesType)
-        }
-        for parameter in declaration.parameters {
-            addParameter(parameter, parentID: initializerID)
-        }
-    }
-
-    private mutating func addCallable(_ declaration: CallableDeclaration, parentID: String) {
-        let callableID =
-            "\(parentID)/function:\(declaration.name)(\(renderParameterList(declaration.parameters)))"
-        addEntity(id: callableID, kind: .function, label: declaration.name)
-        addRelation(from: parentID, to: callableID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: callableID)
-        if let targetType = declaration.targetType {
-            addTypeReference(targetType, from: callableID, kind: .referencesType)
-        }
-        if let returnType = declaration.returnType {
-            addTypeReference(returnType, from: callableID, kind: .referencesType)
-        }
-        for parameter in declaration.parameters {
-            addParameter(parameter, parentID: callableID)
-        }
-    }
-
-    private mutating func addParameter(_ parameter: RangeFunctionParameter, parentID: String) {
-        let label = parameter.name
-        let parameterID = "\(parentID)/parameter:\(label):\(parameter.localName)"
-        addEntity(id: parameterID, kind: .parameter, label: parameter.localName)
-        addRelation(from: parentID, to: parameterID, kind: .contains)
-        addMacroApplications(parameter.macros, parentID: parameterID)
-        if let typeReference = parameter.typeReference {
-            addStorageTypeReference(typeReference, from: parameterID)
-        }
-    }
-
-    private mutating func addStorageTypeReference(_ reference: TypeReference, from sourceID: String) {
-        addTypeReference(reference, from: sourceID, kind: .referencesType)
-    }
-
-    private mutating func addMacroApplications(_ macros: [MacroApplication], parentID: String) {
-        for macro in macros {
-            let macroID = "\(parentID)/macro-application:#\(macro.name)"
-            addEntity(id: macroID, kind: .macroApplication, label: "@\(macro.name)")
-            addRelation(from: parentID, to: macroID, kind: .appliesMacro)
-        }
-    }
-
-    private mutating func addTypeReferences(
-        _ references: [TypeReference],
-        from sourceID: String,
-        kind: SemanticGraphRelationKind
-    ) {
-        for reference in references {
-            addTypeReference(reference, from: sourceID, kind: kind)
-        }
-    }
-
-    private mutating func addTypeReference(
-        _ reference: TypeReference,
-        from sourceID: String,
-        kind: SemanticGraphRelationKind
-    ) {
-        let typeID = "type:\(reference.displayName)"
-        addEntity(id: typeID, kind: .typeReference, label: reference.displayName)
-        addRelation(from: sourceID, to: typeID, kind: kind)
-    }
-
-    private mutating func addEntity(
-        id: String,
-        kind: SemanticGraphEntityKind,
-        label: String
-    ) {
-        addEntity(SemanticGraphEntity(id: id, kind: kind, label: label))
-    }
-
-    private mutating func addEntity(_ entity: SemanticGraphEntity) {
-        entitiesByID[entity.id] = entity
-    }
-
-    private mutating func collectSyntaxProjection(
-        identity: SemanticGraphEntity,
-        macros: [MacroApplication],
-        nestedConstructs: [ConstructDeclaration],
-        ownerID: String
-    ) {
-        guard hasMacro("syntax", in: macros) else { return }
-
-        var declarations: [SemanticGraphEntity] = []
-        var applications: [SemanticGraphEntity] = []
-
-        if hasGraphRole(.declaration, in: macros) {
-            declarations.append(identity)
-        }
-        if hasGraphRole(.application, in: macros) {
-            applications.append(identity)
-        }
-
-        for nested in nestedConstructs {
-            let nestedID = "\(ownerID)/construct:\(nested.name)"
-            let nestedLabel = nested.name
-            let nestedEntity = SemanticGraphEntity(
-                id: nestedID,
-                kind: .construct,
-                label: nestedLabel
-            )
-
-            if hasGraphRole(.declaration, in: nested.macros) {
-                declarations.append(nestedEntity)
-            }
-            if hasGraphRole(.application, in: nested.macros) {
-                applications.append(nestedEntity)
-            }
-        }
-
-        guard !declarations.isEmpty || !applications.isEmpty else { return }
-
-        syntaxByID[identity.id] = SyntaxProjectionAccumulator(
-            identity: identity,
-            declarations: declarations,
-            applications: applications
-        )
-    }
-
-    private func hasMacro(_ name: String, in macros: [MacroApplication]) -> Bool {
-        macros.contains { $0.name == name }
-    }
-
-    private enum GraphRoleMarker {
-        case declaration
-        case application
-    }
-
-    private func hasGraphRole(_ role: GraphRoleMarker, in macros: [MacroApplication]) -> Bool {
-        let expected = role == .declaration ? ".declaration" : ".application"
-        return macros.contains { macro in
-            guard macro.name == "graph" else { return false }
-            let clause = macro.argumentClause?.replacingOccurrences(of: " ", with: "")
-            return clause == expected || clause == "role:\(expected)"
-        }
-    }
-
-    private mutating func addRelation(
-        from sourceID: String,
-        to targetID: String,
-        kind: SemanticGraphRelationKind
-    ) {
-        relations.insert(SemanticGraphRelation(sourceID: sourceID, targetID: targetID, kind: kind))
-    }
-
-    private func renderParameterList(_ parameters: [RangeFunctionParameter]) -> String {
         parameters.map { parameter in
             let typeName =
                 parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName

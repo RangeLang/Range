@@ -5,7 +5,7 @@ import RangeCompiler
 extension CLI {
     struct Artifacts: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Write lexer, parser, and graph artifacts for a Range file or project."
+            abstract: "Write lexer and parser artifacts for a Range file or project."
         )
 
         @Argument(help: "Project directory or source .range file to inspect.")
@@ -82,22 +82,6 @@ extension CLI {
                         )
                     }
                 }
-
-                let graph = renderer.renderGraph(files: compiledProgram.expandedFiles)
-                try graph.write(
-                    to: outputRoot.appendingPathComponent("03-graph.txt"),
-                    atomically: true,
-                    encoding: .utf8
-                )
-                let graphHTML = renderer.renderGraphHTML(
-                    files: compiledProgram.expandedFiles,
-                    title: "Range Playground Application Graph"
-                )
-                try graphHTML.write(
-                    to: outputRoot.appendingPathComponent("04-graph.html"),
-                    atomically: true,
-                    encoding: .utf8
-                )
 
                 TerminalLog.out("Wrote artifacts to \(outputRoot.path).", level: .success)
             } catch {

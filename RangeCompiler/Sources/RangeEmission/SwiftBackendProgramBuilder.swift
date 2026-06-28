@@ -20,11 +20,7 @@ struct SwiftBackendProgramBuilder {
         project: SwiftBackendProject,
         compiledProgram: CompiledProgram
     ) throws -> LoweredProgram {
-        try build(
-            compiledProgram: compiledProgram,
-            requireMain: false,
-            lowerMainBlockToFunction: true
-        )
+        try build(compiledProgram: compiledProgram, requireMain: false)
     }
 
     private func build(
@@ -39,218 +35,95 @@ struct SwiftBackendProgramBuilder {
             throw SwiftBackendError("Failed to expand \(fileURL.lastPathComponent).")
         }
 
-        let supportUnits = coreSupportUnits(in: compiledProgram)
-        let sourceFile = parsedFile.sourceFile
-
-        switch sourceFile {
-        case .mainBlock(let mainBlock):
-            return .init(
-                macrosByName: compiledProgram.declarationGraph.macrosByName,
-                callables: [],
-                enumerations: [],
-                declarations: supportUnits.flatMap(\.declarations),
-                extensions: supportUnits.flatMap(\.extensions),
-                mainBlock: mainBlock,
-                units: [
-                    .init(
-                        outputFileName: fileURL.deletingPathExtension().lastPathComponent + ".swift",
-                        enumerations: [],
-                        declarations: [],
-                        extensions: [],
-                        callables: [],
-                        mainBlock: mainBlock
-                    )
-                ] + supportUnits
-            )
-
-        case .module(let module):
-            guard let mainBlock = module.mainBlock else {
-                throw SwiftBackendError(
-                    "Swift backend requires a file with @main { ... } when compiling a single file."
-                )
-            }
-
-            let moduleDeclarations = module.constructs.filter {
-                $0.kind == .declaration || $0.kind == .entry
-            }
-            let extendedCasesByEnumName = Dictionary(
-                grouping: module.extensions.flatMap { extensionDeclaration in
-                    extensionDeclaration.enumCases.map { (extensionDeclaration.targetName, $0) }
-                },
-                by: \.0
-            ).mapValues { entries in
-                entries.map(\.1)
-            }
-            let moduleEnumerations = mergeExtendedEnumCases(
-                into: module.enumerations,
-                extendedCasesByEnumName: extendedCasesByEnumName
-            )
-
-            return .init(
-                macrosByName: compiledProgram.declarationGraph.macrosByName,
-                callables: module.callables,
-                enumerations: moduleEnumerations,
-                declarations: supportUnits.flatMap(\.declarations) + moduleDeclarations,
-                extensions: supportUnits.flatMap(\.extensions) + module.extensions,
-                mainBlock: mainBlock,
-                units: [
-                    .init(
-                        outputFileName: fileURL.deletingPathExtension().lastPathComponent + ".swift",
-                        enumerations: moduleEnumerations,
-                        declarations: moduleDeclarations,
-                        extensions: module.extensions,
-                        callables: module.callables,
-                        mainBlock: mainBlock
-                    )
-                ] + supportUnits
-            )
-
-        case .construct, .enumeration, .macro:
+        let module = parsedFile.sourceFile
+        guard let mainBlock = synthesizedMainBlock(in: module) else {
             throw SwiftBackendError(
                 "Swift backend requires a file with @main { ... } when compiling a single file."
             )
-
-        case .extensions:
-            throw SwiftBackendError("Extension-only files cannot be compiled to Swift directly.")
         }
+
+        let moduleDeclarations = module.constructs.filter {
+            $0.kind == .declaration || $0.kind == .entry
+        }
+        let extendedCasesByEnumName = Dictionary(
+            grouping: module.extensions.flatMap { extensionDeclaration in
+                extensionDeclaration.enumCases.map { (extensionDeclaration.targetName, $0) }
+            },
+            by: \.0
+        ).mapValues { entries in
+            entries.map(\.1)
+        }
+        let moduleEnumerations = mergeExtendedEnumCases(
+            into: module.enumerations,
+            extendedCasesByEnumName: extendedCasesByEnumName
+        )
+
+        return .init(
+            macrosByName: compiledProgram.declarationGraph.macrosByName,
+            callables: [],
+            enumerations: moduleEnumerations,
+            declarations: moduleDeclarations,
+            extensions: module.extensions,
+            mainBlock: mainBlock,
+            units: [
+                .init(
+                    outputFileName: fileURL.deletingPathExtension().lastPathComponent + ".swift",
+                    enumerations: moduleEnumerations,
+                    declarations: moduleDeclarations,
+                    extensions: module.extensions,
+                    callables: [],
+                    mainBlock: mainBlock
+                )
+            ]
+        )
     }
 
     private func build(
         compiledProgram: CompiledProgram,
-        requireMain: Bool = true,
-        lowerMainBlockToFunction: Bool = false
+        requireMain: Bool = true
     ) throws -> LoweredProgram {
-        var callables: [CallableDeclaration] = []
+        let callables: [CallableDeclaration] = []
         var enumerations: [EnumDeclaration] = []
         var declarations: [ConstructDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
-        var mainBlock: MainBlockNode?
-        var units: [LoweredSourceUnit] = coreSupportUnits(in: compiledProgram)
-
-        enumerations.append(contentsOf: units.flatMap(\.enumerations))
-        declarations.append(contentsOf: units.flatMap(\.declarations))
-        extensions.append(contentsOf: units.flatMap(\.extensions))
+        var mainBlock: BlockMacroNode?
+        var units: [LoweredSourceUnit] = []
 
         for parsedFile in compiledProgram.projectExpandedFiles {
             let fileURL = URL(fileURLWithPath: parsedFile.path)
-            let sourceFile = parsedFile.sourceFile
             let outputFileName = fileURL.deletingPathExtension().lastPathComponent + ".swift"
 
-            switch sourceFile {
-            case .construct(let declaration):
-                if declaration.kind == .declaration || declaration.kind == .entry {
-                    declarations.append(declaration)
-                }
+            let module = parsedFile.sourceFile
+            enumerations.append(contentsOf: module.enumerations)
+            extensions.append(contentsOf: module.extensions)
+            let unitMainBlock = synthesizedMainBlock(in: module)
 
-                units.append(
-                    .init(
-                        outputFileName: outputFileName,
-                        enumerations: [],
-                        declarations: declaration.kind == .declaration || declaration.kind == .entry
-                            ? [declaration] : [],
-                        extensions: [],
-                        callables: [],
-                        mainBlock: nil
-                    )
+            let moduleDeclarations = module.constructs.filter {
+                $0.kind == .declaration || $0.kind == .entry
+            }
+
+            units.append(
+                .init(
+                    outputFileName: outputFileName,
+                    enumerations: module.enumerations,
+                    declarations: moduleDeclarations,
+                    extensions: module.extensions,
+                    callables: [],
+                    mainBlock: unitMainBlock
                 )
+            )
 
-            case .module(let module):
-                callables.append(contentsOf: module.callables)
-                enumerations.append(contentsOf: module.enumerations)
-                extensions.append(contentsOf: module.extensions)
+            declarations.append(contentsOf: moduleDeclarations)
 
-                let moduleDeclarations = module.constructs.filter {
-                    $0.kind == .declaration || $0.kind == .entry
-                }
-
-                units.append(
-                    .init(
-                        outputFileName: outputFileName,
-                        enumerations: module.enumerations,
-                        declarations: moduleDeclarations,
-                        extensions: module.extensions,
-                        callables: module.callables,
-                        mainBlock: module.mainBlock
-                    )
-                )
-
-                declarations.append(contentsOf: moduleDeclarations)
-
-                if mainBlock == nil, let block = module.mainBlock {
-                    mainBlock = block
-                }
-
-            case .mainBlock(let block):
-                if mainBlock == nil {
-                    mainBlock = block
-                }
-                units.append(
-                    .init(
-                        outputFileName: outputFileName,
-                        enumerations: [],
-                        declarations: [],
-                        extensions: [],
-                        callables: [],
-                        mainBlock: block
-                    )
-                )
-
-            case .enumeration(let declaration):
-                enumerations.append(declaration)
-                units.append(
-                    .init(
-                        outputFileName: outputFileName,
-                        enumerations: [declaration],
-                        declarations: [],
-                        extensions: [],
-                        callables: [],
-                        mainBlock: nil
-                    )
-                )
-
-            case .extensions(let declarations):
-                extensions.append(contentsOf: declarations)
-                units.append(
-                    .init(
-                        outputFileName: outputFileName,
-                        enumerations: declarations.flatMap(\.enumerations),
-                        declarations: declarations.flatMap(\.constructs),
-                        extensions: declarations,
-                        callables: [],
-                        mainBlock: nil
-                    )
-                )
-
-            case .macro:
-                continue
+            if mainBlock == nil, let block = unitMainBlock {
+                mainBlock = block
             }
         }
 
         if requireMain && mainBlock == nil {
             throw SwiftBackendError("Missing @main block while generating Swift.")
         }
-        let loweredMainBlock = mainBlock ?? MainBlockNode(macros: [], body: [])
-        if lowerMainBlockToFunction, let mainBlock {
-            guard !callables.contains(where: { $0.name == "main" && $0.parameters.isEmpty }) else {
-                throw SwiftBackendError("@main block conflicts with function main().")
-            }
-            callables.append(try nativeMainCallable(from: mainBlock))
-            units = try units.map { unit in
-                guard let unitMainBlock = unit.mainBlock else {
-                    return unit
-                }
-                let mainCallable = try nativeMainCallable(from: unitMainBlock)
-                return LoweredSourceUnit(
-                    outputFileName: unit.outputFileName,
-                    enumerations: unit.enumerations,
-                    declarations: unit.declarations,
-                    extensions: unit.extensions,
-                    callables: unit.callables + [mainCallable],
-                    mainBlock: nil
-                )
-            }
-        }
-
+        let loweredMainBlock = mainBlock ?? BlockMacroNode(macros: [], body: [])
         let extendedCasesByEnumName = Dictionary(
             grouping: extensions.flatMap { extensionDeclaration in
                 extensionDeclaration.enumCases.map { (extensionDeclaration.targetName, $0) }
@@ -288,39 +161,6 @@ struct SwiftBackendProgramBuilder {
         )
     }
 
-    private func nativeMainCallable(from mainBlock: MainBlockNode) throws -> CallableDeclaration {
-        let localMain = mainBlock.body.compactMap { statement -> LocalCallableDeclaration? in
-            guard case .localCallable(let declaration) = statement,
-                declaration.name == "main",
-                declaration.parameters.isEmpty
-            else {
-                return nil
-            }
-            return declaration
-        }
-
-        guard localMain.count == 1, let declaration = localMain.first else {
-            throw SwiftBackendError("@main macro must expand to a single function main(): Int.")
-        }
-
-        guard declaration.returnType == .named("Int") else {
-            throw SwiftBackendError("@main macro must expand function main() with Int return type.")
-        }
-
-        return CallableDeclaration(
-            macros: declaration.macros,
-            attribute: declaration.attribute,
-            targetType: nil,
-            receiverType: nil,
-            name: declaration.name,
-            genericParameters: declaration.genericParameters,
-            hasExplicitParameterClause: declaration.hasExplicitParameterClause,
-            parameters: declaration.parameters,
-            returnType: declaration.returnType,
-            body: declaration.body
-        )
-    }
-
     private func mergeExtendedEnumCases(
         into enumerations: [EnumDeclaration],
         extendedCasesByEnumName: [String: [EnumCaseDeclaration]]
@@ -343,156 +183,12 @@ struct SwiftBackendProgramBuilder {
         }
     }
 
-    private func coreSupportDeclarations(in compiledProgram: CompiledProgram) -> [ConstructDeclaration] {
-        compiledProgram.expandedFiles.flatMap { parsedFile -> [ConstructDeclaration] in
-            guard compiledProgram.sourceRole(forPath: parsedFile.path) == .core else {
-                return []
-            }
-
-            let declarations: [ConstructDeclaration]
-            switch parsedFile.sourceFile {
-            case .construct(let declaration):
-                declarations = [declaration]
-            case .module(let module):
-                declarations = module.constructs
-            default:
-                declarations = []
-            }
-
-            return declarations.filter {
-                $0.isCore && $0.name == "Channel"
-            }
+    private func synthesizedMainBlock(in module: ModuleFileNode) -> BlockMacroNode? {
+        guard let block = module.blockMacros.first(where: { $0.macros.first?.name == "main" })
+        else {
+            return nil
         }
+        return block
     }
 
-    private func coreSupportUnits(in compiledProgram: CompiledProgram) -> [LoweredSourceUnit] {
-        let includeSyntaxLexingSupport = projectUsesSyntaxLexingSupport(compiledProgram)
-            || rangeProgramUsesSyntaxLexingSupport(compiledProgram)
-        let coreUnits = compiledProgram.expandedFiles.compactMap { parsedFile -> LoweredSourceUnit? in
-            guard compiledProgram.sourceRole(forPath: parsedFile.path) == .core,
-                isCorePath(parsedFile.path, containing: "Encoding/")
-                    || (includeSyntaxLexingSupport
-                        && isCorePath(parsedFile.path, containing: "Syntax/Lexing/"))
-                    || (includeSyntaxLexingSupport
-                        && isCorePath(parsedFile.path, containing: "Syntax/Identifier.range"))
-                    || (includeSyntaxLexingSupport
-                        && isCorePath(parsedFile.path, containing: "Macro/SyntaxEmittable.range"))
-                    || isCorePath(parsedFile.path, containing: "Syntax/Program/")
-                    || isCorePath(parsedFile.path, containing: "System/File/")
-                    || isCorePath(parsedFile.path, containing: "System/Memory/")
-                    || isCorePath(parsedFile.path, containing: "System/Thread/")
-            else {
-                return nil
-            }
-
-            let fileURL = URL(fileURLWithPath: parsedFile.path)
-            let outputFileName = "RangeCore_\(fileURL.deletingPathExtension().lastPathComponent).swift"
-
-            switch parsedFile.sourceFile {
-            case .construct(let declaration):
-                guard shouldEmitCoreSupportConstruct(declaration, in: parsedFile.path) else {
-                    return nil
-                }
-
-                return .init(
-                    outputFileName: outputFileName,
-                    enumerations: [],
-                    declarations: [declaration],
-                    extensions: [],
-                    callables: [],
-                    mainBlock: nil
-                )
-            case .enumeration(let declaration):
-                return .init(
-                    outputFileName: outputFileName,
-                    enumerations: [declaration],
-                    declarations: [],
-                    extensions: [],
-                    callables: [],
-                    mainBlock: nil
-                )
-            case .extensions(let declarations):
-                return .init(
-                    outputFileName: outputFileName,
-                    enumerations: declarations.flatMap(\.enumerations),
-                    declarations: declarations.flatMap(\.constructs),
-                    extensions: declarations,
-                    callables: [],
-                    mainBlock: nil
-                )
-            case .module(let module):
-                let declarations = module.constructs.filter {
-                    ($0.kind == .declaration || $0.kind == .entry)
-                        && shouldEmitCoreSupportConstruct($0, in: parsedFile.path)
-                }
-
-                return .init(
-                    outputFileName: outputFileName,
-                    enumerations: module.enumerations,
-                    declarations: declarations,
-                    extensions: module.extensions,
-                    callables: module.callables,
-                    mainBlock: nil
-                )
-            case .mainBlock, .macro:
-                return nil
-            }
-        }
-
-        let channelDeclarations = coreSupportDeclarations(in: compiledProgram)
-        guard !channelDeclarations.isEmpty else {
-            return coreUnits
-        }
-
-        return [
-            .init(
-                outputFileName: "RangeCoreSupport.swift",
-                enumerations: [],
-                declarations: channelDeclarations,
-                extensions: [],
-                callables: [],
-                mainBlock: nil
-            )
-        ] + coreUnits
-    }
-
-    private func projectUsesSyntaxLexingSupport(_ compiledProgram: CompiledProgram) -> Bool {
-        compiledProgram.projectExpandedFiles.contains { parsedFile in
-            parsedFile.path.contains("/Syntax/")
-                || parsedFile.source?.contains("Lexer") == true
-                || parsedFile.source?.contains("Lexing") == true
-        }
-    }
-
-    private func rangeProgramUsesSyntaxLexingSupport(_ compiledProgram: CompiledProgram) -> Bool {
-        false
-    }
-
-    private func shouldEmitCoreSupportConstruct(
-        _ declaration: ConstructDeclaration,
-        in path: String
-    ) -> Bool {
-        if isCorePath(path, containing: "System/File/") {
-            return declaration.name != "HostFileSystem"
-                && declaration.name != "FileManager"
-                && declaration.name != "UTF8"
-        }
-
-        if isCorePath(path, containing: "System/Memory/") {
-            return declaration.name != "POSIXMemory"
-                && declaration.name != "Memory"
-                && declaration.name != "CPU"
-        }
-
-        if isCorePath(path, containing: "System/Thread/") {
-            return declaration.name != "POSIXThread"
-                && declaration.name != "Thread"
-        }
-
-        return true
-    }
-
-    private func isCorePath(_ path: String, containing suffix: String) -> Bool {
-        path.contains("/RangeCore/\(suffix)") || path.contains("/RangeCompiler/Range/Core/\(suffix)")
-    }
 }

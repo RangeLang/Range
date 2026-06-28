@@ -8,11 +8,11 @@ struct PackageSubscriptionManagerTests {
     func installedPackagesAreSearchable() throws {
         let root = try temporaryProject()
         try writePackage(
-            at: root.appendingPathComponent(".range/Packages/acme/logger/Package.range"),
+            at: root.appendingPathComponent(".range/Packages/acme/logger/Project.range"),
             name: "LoggingTools"
         )
         try writePackage(
-            at: root.appendingPathComponent(".range/Packages/acme/ui/Package.range"),
+            at: root.appendingPathComponent(".range/Packages/acme/ui/Project.range"),
             name: "InterfaceKit"
         )
 
@@ -25,11 +25,11 @@ struct PackageSubscriptionManagerTests {
         #expect(manager.matchingPackages(packages, search: "acme ui").map(\.reference) == ["acme/ui"])
     }
 
-    @Test("Subscribe adds the selected installed module to Package.range")
+    @Test("Subscribe adds the selected installed module to Project.range")
     func subscribeAddsSelectedInstalledModule() throws {
         let root = try temporaryProject()
         try writePackage(
-            at: root.appendingPathComponent(".range/Packages/acme/logger/Package.range"),
+            at: root.appendingPathComponent(".range/Packages/acme/logger/Project.range"),
             name: "LoggingTools"
         )
 
@@ -37,23 +37,24 @@ struct PackageSubscriptionManagerTests {
         let action = try manager.subscribe(search: "logger")
 
         let source = try String(
-            contentsOf: root.appendingPathComponent("Package.range"),
+            contentsOf: root.appendingPathComponent("Project.range"),
             encoding: .utf8
         )
         #expect(action == .subscribed)
-        #expect(source.contains(#"let modules: ["acme/logger"]"#))
-        _ = try PackageManifestLoader.load(from: root.appendingPathComponent("Package.range"))
+        #expect(source.contains(#"@let(name: "modules")"#))
+        #expect(source.contains(#"String(\"acme/logger\")"#))
+        _ = try PackageManifestLoader.load(from: root.appendingPathComponent("Project.range"))
     }
 
     @Test("Subscribe browses when search is empty or ambiguous")
     func subscribeBrowsesWhenSearchIsEmptyOrAmbiguous() throws {
         let root = try temporaryProject()
         try writePackage(
-            at: root.appendingPathComponent(".range/Packages/acme/logger/Package.range"),
+            at: root.appendingPathComponent(".range/Packages/acme/logger/Project.range"),
             name: "LoggingTools"
         )
         try writePackage(
-            at: root.appendingPathComponent(".range/Packages/acme/log-viewer/Package.range"),
+            at: root.appendingPathComponent(".range/Packages/acme/log-viewer/Project.range"),
             name: "LogViewer"
         )
 
@@ -67,7 +68,7 @@ struct PackageSubscriptionManagerTests {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("range-package-subscribe-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try writePackage(at: root.appendingPathComponent("Package.range"), name: "Fixture")
+        try writePackage(at: root.appendingPathComponent("Project.range"), name: "Fixture")
         return root
     }
 
@@ -77,11 +78,16 @@ struct PackageSubscriptionManagerTests {
             withIntermediateDirectories: true
         )
         try """
-            @package
-            construct Project {
-                let name: Title("\(name)")
-                let version: Version(0.1.0)
-                let author: "Test Author"
+            @construct(name: "Project") {
+                @let(name: "name") {
+                    @value(type: "Title", current: "Title(\\\"\(name)\\\")")
+                }
+                @let(name: "version") {
+                    @value(type: "Version", current: "Version(0.1.0)")
+                }
+                @let(name: "author") {
+                    @value(type: "String", current: "String(\\\"Test Author\\\")")
+                }
             }
             """.write(to: url, atomically: true, encoding: .utf8)
     }

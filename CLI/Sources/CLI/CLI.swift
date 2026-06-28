@@ -12,7 +12,6 @@ struct CLI: ParsableCommand {
             Build.self,
             Run.self,
             Compile.self,
-            Graph.self,
             Artifacts.self,
             Update.self,
             Scripts.self,

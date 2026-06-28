@@ -1,30 +1,8 @@
 import Foundation
 
 extension Parser {
-    func isMainBlockStart() -> Bool {
-        guard case .macroAttribute(let name, nil) = peek(), name == "main" else {
-            return false
-        }
-        return peek(offset: 1) == .leftBrace
-    }
-
     func isTopLevelBlockMacroStart() -> Bool {
         topLevelBlockMacroOffset() != nil
-    }
-
-    public mutating func parseMainBlock(requiresEOF: Bool = true) throws -> MainBlockNode {
-        guard case .macroAttribute(let name, nil) = peek(), name == "main" else {
-            throw ParseError("Expected @main block.")
-        }
-        advance()
-        let body = try parseStatementBlock(baseLocalBindings: [:])
-        if requiresEOF {
-            try consume(.eof)
-        }
-        return MainBlockNode(
-            macros: [MacroApplication(name: name, genericArguments: [], argumentClause: nil)],
-            body: body
-        )
     }
 
     mutating func parseTopLevelBlockMacro() throws -> BlockMacroNode {
@@ -33,7 +11,7 @@ extension Parser {
         }
         var applications: [MacroApplication] = []
         while true {
-            guard case .macroAttribute(let name, _) = peek(), name != "main" else {
+            guard case .macroAttribute(let name, _) = peek() else {
                 throw ParseError("Expected top-level block macro.")
             }
             let blockFollows = currentMacroApplicationIsFollowedByBlock()
@@ -42,7 +20,7 @@ extension Parser {
             let argumentClause = try parseMacroArgumentClauseIfPresent()
             if blockFollows {
                 let rawBody = try renderUpcomingBlockBody()
-                let body = try parseStatementBlock(baseLocalBindings: [:])
+                let body = try parseStatementBlock()
                 applications.append(
                     MacroApplication(
                         name: name,
@@ -68,7 +46,7 @@ extension Parser {
             throw ParseError("Expected top-level block macro.")
         }
         while true {
-            guard case .macroAttribute(let name, _) = peek(), name != "main" else {
+            guard case .macroAttribute = peek() else {
                 throw ParseError("Expected top-level block macro.")
             }
             let blockFollows = currentMacroApplicationIsFollowedByBlock()
@@ -88,10 +66,7 @@ extension Parser {
 
     private func topLevelBlockMacroOffset() -> Int? {
         var offset = 0
-        while case .macroAttribute(let name, _) = peek(offset: offset),
-            name != "main",
-            isMacroApplicationAttribute(name)
-        {
+        while case .macroAttribute = peek(offset: offset) {
             guard let endOffset = macroApplicationEndOffset(startingAt: offset) else {
                 return nil
             }

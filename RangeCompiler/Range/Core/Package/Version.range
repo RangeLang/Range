@@ -1,5 +1,11 @@
-construct Version {
-    @state major: Int<.unsigned>
-    @state minor: Int<.unsigned>
-    @state patch: Int<.unsigned>
+@construct(name: "Version") {
+    @state(name: "major") {
+        @value(type: "Int<.unsigned>")
+    }
+    @state(name: "minor") {
+        @value(type: "Int<.unsigned>")
+    }
+    @state(name: "patch") {
+        @value(type: "Int<.unsigned>")
+    }
 }

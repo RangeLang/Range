@@ -1,0 +1,42 @@
+@syntax
+@enum(name: "CompilerPipelineRuntimeStage") {
+    @case(name: "coreDeclarationsDiscovered")
+    @case(name: "coreParsed")
+    @case(name: "projectDeclarationsDiscovered")
+    @case(name: "projectParsed")
+    @case(name: "macrosExpanded")
+    @case(name: "declarationGraphBuilt")
+}
+
+@syntax
+@construct(name: "CompilerPipelineRuntimeContext") {
+    @let(name: "stage") {
+        @value(type: "CompilerPipelineRuntimeStage")
+    }
+}
+
+@syntax
+@construct(name: "CompilerPipelineRuntimeResult") {
+    @let(name: "hookName") {
+        @value(type: "String")
+    }
+    @let(name: "stage") {
+        @value(type: "CompilerPipelineRuntimeStage")
+    }
+    @let(name: "diagnostics") {
+        @value(type: "Array<String>")
+    }
+    @let(name: "artifacts") {
+        @value(type: "Array<String>")
+    }
+}
+
+@syntax
+@construct(name: "CompilerPipelineRuntimeHook") {
+    @let(name: "name") {
+        @value(type: "String")
+    }
+    @let(name: "stages") {
+        @value(type: "Array<CompilerPipelineRuntimeStage>")
+    }
+}

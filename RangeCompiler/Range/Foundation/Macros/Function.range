@@ -68,7 +68,7 @@
             + "|body="
             + bodyField
             + "|ordinal="
-            + "\(target.ordinal)"
+            + String(target.ordinal)
             + members
             + records)
     }
@@ -80,7 +80,7 @@
         + "|body="
         + bodyField
         + "|ordinal="
-        + "\(target.ordinal)"
+        + String(target.ordinal)
         + "|llvm="
         + llvm
         + members

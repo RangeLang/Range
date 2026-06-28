@@ -64,17 +64,21 @@ struct PackagePublisher {
     }
 
     private func updatingVersion(in source: String, to version: String) throws -> String {
-        let versionPattern =
-            #"let\s+version\s*:\s*Version\([0-9]+\.[0-9]+\.[0-9]+\)"#
-        let regex = try NSRegularExpression(pattern: versionPattern)
+        let macroVersionPattern =
+            #"@let\s*\(\s*name:\s*"version"\s*\)\s*\{\s*@value\s*\(\s*type:\s*"Version"\s*,\s*current:\s*"Version\([0-9]+\.[0-9]+\.[0-9]+\)"\s*\)\s*\}"#
+        let macroRegex = try NSRegularExpression(pattern: macroVersionPattern)
         let range = NSRange(source.startIndex..<source.endIndex, in: source)
 
-        if let match = regex.firstMatch(in: source, range: range),
+        if let match = macroRegex.firstMatch(in: source, range: range),
             let matchRange = Range(match.range, in: source)
         {
             return source.replacingCharacters(
                 in: matchRange,
-                with: #"let version: Version(\#(version))"#
+                with: """
+                    @let(name: "version") {
+                        @value(type: "Version", current: "Version(\(version))")
+                    }
+                    """
             )
         }
 
@@ -82,7 +86,14 @@ struct PackagePublisher {
         guard let openingIndex = lines.firstIndex(where: { $0.contains("{") }) else {
             throw ValidationError("Project.range must declare a package body.")
         }
-        lines.insert(#"    let version: Version(\#(version))"#, at: openingIndex + 1)
+        lines.insert(
+            """
+                @let(name: "version") {
+                    @value(type: "Version", current: "Version(\(version))")
+                }
+            """,
+            at: openingIndex + 1
+        )
         return lines.joined(separator: "\n") + (source.hasSuffix("\n") ? "\n" : "")
     }
 }

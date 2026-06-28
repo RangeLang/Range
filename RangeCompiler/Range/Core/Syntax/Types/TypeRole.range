@@ -1,11 +1,11 @@
-enum TypeRole {
-    case nominal
-    case structural
-    case generic
-    case member
-    case function
-    case optional
-    case array
-    case variadic
-    case application
+@enum(name: "TypeRole") {
+    @case(name: "nominal")
+    @case(name: "structural")
+    @case(name: "generic")
+    @case(name: "member")
+    @case(name: "function")
+    @case(name: "optional")
+    @case(name: "array")
+    @case(name: "variadic")
+    @case(name: "application")
 }

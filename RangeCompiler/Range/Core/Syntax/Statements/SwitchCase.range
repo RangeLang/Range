@@ -1,9 +1,0 @@
-@syntax
-@construct(name: "SwitchCase") {
-    @let(name: "pattern") {
-        @value(type: "Expression")
-    }
-    @let(name: "body") {
-        @value(type: "Block")
-    }
-}

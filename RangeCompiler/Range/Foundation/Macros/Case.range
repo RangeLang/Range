@@ -1,21 +1,14 @@
-@macro(name: "case", result: "String", target: "@statement"){
+@macro(name: "case", result: "String", target: "@member"){
     @parameter(name: "name") {
         @value(type: "String", current: "String()")
     }
     @parameter(name: "value") {
         @value(type: "String", current: "String()")
     }
-    @if("!name.isEmpty") {
-        @return(value: "member|kind=case|name="
-            + name
-            + "|value="
-            + value
-            + "|ordinal="
-            + "\(target.ordinal)")
-    }
-
-    @return(value: "statement|kind=case|value="
+    @return(value: "member|kind=case|name="
+        + name
+        + "|value="
         + value
-        + "|projection="
-        + "target.declaration.statements")
+        + "|ordinal="
+        + String(target.ordinal))
 }

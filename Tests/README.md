@@ -2,8 +2,8 @@
 
 This folder holds `.range` source files used by compiler regression tests.
 
-- `CompilePass`: files that must parse, build a semantic graph, and validate.
-- `CompileFail`: files that must fail validation or compilation.
+- `CompilePass`: files that must parse and build through the current compiler pipeline.
+- `CompileFail`: files that must fail parsing, expansion, or emission.
 
 These are compiler fixtures, not the future Range-native testing library.
 
@@ -26,9 +26,9 @@ Create new compiler fixtures in this folder, not inline inside Swift test files.
 
 Current top-level layout:
 
-- `CompilePass/Macros`: macro expansion and validation fixtures
-- `CompilePass/System`: core language/system behavior that should validate
-- `CompilePass/Concurrency`: concurrency semantics that should validate
+- `CompilePass/Macros`: macro expansion fixtures
+- `CompilePass/System`: core language/system behavior that should build
+- `CompilePass/Concurrency`: concurrency behavior that should build
 - `CompileFail/...`: negative fixtures grouped by the same surface areas
 
 The default rule is simple: if it is compiler input worth keeping around, it
@@ -45,10 +45,10 @@ they protect real compiler behavior.
   and exit status.
 - `EmitSwift`: compile through the Swift backend and compare important emitted
   Swift shapes.
-- `Artifacts`: verify compiler artifacts such as declaration graphs, dependency
-  graphs, and lowered IR once those formats stabilize.
+- `Artifacts`: verify compiler artifacts such as tokens, AST dumps, and lowered
+  IR once those formats stabilize.
 - `ParsePass` / `ParseFail`: add parser-only fixtures if syntax work starts
-  changing faster than semantic validation.
+  changing faster than full pipeline checks.
 
 This folder is the high-level testing surface. As Range-native testing grows,
 keep compiler fixtures and user-facing test examples grouped clearly under it.
@@ -87,5 +87,4 @@ The current macro fixtures cover only the supported bootstrap surface:
   `Construct` target macro
 - function nested rewrite execution gap fixture (expected fail until function
   call-site rewrite execution is fully enabled)
-- parameter-targeted `#variadic` rewriting that now validates return semantics
-  against the expanded parameter type
+- parameter-targeted `#variadic` rewriting against the expanded parameter type

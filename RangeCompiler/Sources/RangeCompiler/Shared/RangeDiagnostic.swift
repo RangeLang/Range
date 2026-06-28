@@ -165,14 +165,6 @@ public enum RangeDiagnosticConverter {
                 range: parse.range
             )
         }
-        if let semantic = error as? SemanticValidationError {
-            return RangeDiagnostic(
-                severity: .error,
-                message: semantic.description,
-                source: "range-semantics",
-                path: path
-            )
-        }
         return RangeDiagnostic(
             severity: .error,
             message: "Unknown error",

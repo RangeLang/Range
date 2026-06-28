@@ -7,7 +7,7 @@ struct LoweredSourceUnit {
     let declarations: [ConstructDeclaration]
     let extensions: [ExtensionDeclaration]
     let callables: [CallableDeclaration]
-    let mainBlock: MainBlockNode?
+    let mainBlock: BlockMacroNode?
 }
 
 struct LoweredProgram {
@@ -16,6 +16,6 @@ struct LoweredProgram {
     let enumerations: [EnumDeclaration]
     let declarations: [ConstructDeclaration]
     let extensions: [ExtensionDeclaration]
-    let mainBlock: MainBlockNode
+    let mainBlock: BlockMacroNode
     let units: [LoweredSourceUnit]
 }

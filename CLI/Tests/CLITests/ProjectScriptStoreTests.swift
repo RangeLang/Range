@@ -11,7 +11,11 @@ struct ProjectScriptStoreTests {
 
         #expect(script.path == root.appendingPathComponent(".range/.scripts/build.range").path)
         let source = try String(contentsOf: script, encoding: .utf8)
-        #expect(source.contains(#"Logger.info("Running build")"#))
+        #expect(source == """
+        @main {
+          @return(value: "Int(0)")
+        }
+        """)
     }
 
     @Test("Save normalizes script extension and content")
@@ -53,13 +57,18 @@ struct ProjectScriptStoreTests {
             .appendingPathComponent("range-script-store-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try """
-            @package
-            construct Project {
-                let name: Title("Scripts")
-                let version: Version(0.1.0)
-                let author: "Test Author"
+            @construct(name: "Project") {
+                @let(name: "name") {
+                    @value(type: "Title", current: "Title(\\\"Scripts\\\")")
+                }
+                @let(name: "version") {
+                    @value(type: "Version", current: "Version(0.1.0)")
+                }
+                @let(name: "author") {
+                    @value(type: "String", current: "String(\\\"Test Author\\\")")
+                }
             }
-            """.write(to: root.appendingPathComponent("Package.range"), atomically: true, encoding: .utf8)
+            """.write(to: root.appendingPathComponent("Project.range"), atomically: true, encoding: .utf8)
         return root
     }
 }

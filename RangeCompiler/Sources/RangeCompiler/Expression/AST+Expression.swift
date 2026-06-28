@@ -4,7 +4,6 @@ public indirect enum Expression {
     case integer(Int)
     case double(Double)
     case string(String)
-    case interpolatedString(InterpolatedString)
     case boolean(Bool)
     case nilLiteral
     case macroInvocation(name: String, arguments: [CallArgument])
@@ -60,17 +59,4 @@ public enum BinaryOperator: String {
     case or = "||"
     case rangeUntil = "..<"
     case closedRange = "..."
-}
-
-public struct InterpolatedString {
-    public let segments: [StringSegment]
-
-    public init(segments: [StringSegment]) {
-        self.segments = segments
-    }
-}
-
-public indirect enum StringSegment {
-    case text(String)
-    case expression(Expression)
 }

@@ -1,7 +1,27 @@
-construct MacroDiagnostics {
-    function error(message: String)
-    function warning(message: String)
-    function information(message: String)
-    function note(message: String)
-    function hint(message: String)
+@construct(name: "MacroDiagnostics") {
+    @function(name: "error", result: "Void") {
+        @parameter(name: "message") {
+            @value(type: "String")
+        }
+    }
+    @function(name: "warning", result: "Void") {
+        @parameter(name: "message") {
+            @value(type: "String")
+        }
+    }
+    @function(name: "information", result: "Void") {
+        @parameter(name: "message") {
+            @value(type: "String")
+        }
+    }
+    @function(name: "note", result: "Void") {
+        @parameter(name: "message") {
+            @value(type: "String")
+        }
+    }
+    @function(name: "hint", result: "Void") {
+        @parameter(name: "message") {
+            @value(type: "String")
+        }
+    }
 }

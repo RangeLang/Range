@@ -1,14 +1,6 @@
-enum Delimiter {
-    case comma
-}
-
 @macro(name: "variadic", target: "@parameter"){
     @generic(name: "delimiter") {
-        @value(type: "Delimiter", current: "Delimiter.comma")
+        @value(type: "String", current: "comma")
     }
-    target.declaration.type.replace(replacement:
-        ArrayTypeReference(
-            element: target.declaration.type
-        )
-    )
+    @return(value: "")
 }

@@ -30,8 +30,6 @@ public enum MacroExpander {
                 sourceFile: try expand(
                     sourceFile: parsedFile.sourceFile,
                     macros: registry,
-                    parameterMacroSignatures: context.macroRealizationView.parameterMacroSignatures,
-                    literalBridges: context.macroRealizationView.realizedLiteralBridges,
                     context: context.withCurrentPath(parsedFile.path)
                 )
             )

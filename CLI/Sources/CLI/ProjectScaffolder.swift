@@ -299,11 +299,16 @@ struct ProjectScaffolder {
 
     private func renderProgramPackage(name: String) -> String {
         return """
-            @project
-            construct Project {
-                let name: Title("\(escapedStringLiteral(name))")
-                let version: Version(0.1.0)
-                let author: "\(escapedStringLiteral(NSFullUserName()))"
+            @construct(name: "Project") {
+                @let(name: "name") {
+                    @value(type: "Title", current: "Title(\\\"\(escapedStringLiteral(name))\\\")")
+                }
+                @let(name: "version") {
+                    @value(type: "Version", current: "Version(0.1.0)")
+                }
+                @let(name: "author") {
+                    @value(type: "String", current: "String(\\\"\(escapedStringLiteral(NSFullUserName()))\\\")")
+                }
             }
             """
     }
@@ -311,20 +316,7 @@ struct ProjectScaffolder {
     private func renderProgramPlayground(name: String) -> String {
         return """
             @main {
-              Logger.info("Range program playground")
-
-              let values = [1, 2, 3]
-              state total = 0
-
-              for value in values {
-                total += value
-              }
-
-              if total == 6 {
-                Logger.success("sum = \\(total)")
-              } else {
-                Logger.warning("unexpected sum")
-              }
+                @return(value: "Int(0)")
             }
             """
     }

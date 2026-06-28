@@ -1,4 +1,0 @@
-@macro(name: "statement", result: "String", target: "@expression"){
-    @return(value: "statement|kind=expression|projection=target.declaration")
-}
-

@@ -9,16 +9,6 @@ extension MacroExpander {
             return String(value)
         case .string(let value):
             return "\"\(value)\""
-        case .interpolatedString(let string):
-            let renderedSegments = string.segments.map { segment in
-                switch segment {
-                case .text(let text):
-                    return text
-                case .expression(let expression):
-                    return "\\(\(renderExpressionForStringify(expression)))"
-                }
-            }.joined()
-            return "\"\(renderedSegments)\""
         case .boolean(let value):
             return value ? "true" : "false"
         case .nilLiteral:
@@ -55,38 +45,6 @@ extension MacroExpander {
             return
                 "\(renderExpressionForStringify(lhs)) \(operatorSymbol.rawValue) \(renderExpressionForStringify(rhs))"
         }
-    }
-
-    static func interpretExpressionMacroRewrite(
-        _ expression: Expression,
-        bindings: [String: Expression]
-    ) -> Expression {
-        guard case .interpolatedString(let string) = expression else {
-            return expression
-        }
-
-        let rendered = string.segments.map { segment in
-            switch segment {
-            case .text(let text):
-                return text
-            case .expression(let expression):
-                if let boundExpression = macroBoundExpression(from: expression, bindings: bindings) {
-                    return renderExpressionForStringify(boundExpression)
-                }
-                return "\\(\(renderExpressionForStringify(expression)))"
-            }
-        }.joined()
-        return .string(rendered)
-    }
-
-    static func macroBoundExpression(
-        from expression: Expression,
-        bindings: [String: Expression]
-    ) -> Expression? {
-        guard case .identifier(let name) = expression else {
-            return nil
-        }
-        return bindings[name]
     }
 
     static func renderArgumentsForStringify(_ arguments: [CallArgument]) -> String {

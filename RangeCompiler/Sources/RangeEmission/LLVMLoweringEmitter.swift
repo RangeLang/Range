@@ -503,18 +503,10 @@ private struct LLVMFunctionEmitter {
             try emitLocalBinding(declaration)
         case .assignment(let target, let expression):
             try emitAssignment(target: target, expression: expression)
-        case .compoundAssignment(let target, let operatorSymbol, let expression):
-            try emitCompoundAssignment(
-                target: target,
-                operatorSymbol: operatorSymbol,
-                expression: expression
-            )
         case .whileLoop(let condition, let body):
             try emitWhileLoop(condition: condition, body: body)
         case .conditional(let branches):
             try emitConditional(branches)
-        case .switchStatement(let expression, let cases, let defaultBody):
-            try emitSwitch(expression: expression, cases: cases, defaultBody: defaultBody)
         case .return(let expression?):
             let value = try emitExpression(expression)
             let converted = try convert(value, to: returnType)
@@ -524,20 +516,7 @@ private struct LLVMFunctionEmitter {
             try emitOwnedLocalArrayFrees()
             emit("ret \(returnType.llvmType) \(converted.representation)")
             blockTerminated = true
-        case .return(nil):
-            throw LLVMLoweringError("LLVM lowering does not support bare return.")
-        case .break:
-            guard let target = loopTargets.last else {
-                throw LLVMLoweringError("LLVM break requires an enclosing loop.")
-            }
-            emitBranch(to: target.endLabel)
-        case .continue:
-            guard let target = loopTargets.last else {
-                throw LLVMLoweringError("LLVM continue requires an enclosing loop.")
-            }
-            emitBranch(to: target.conditionLabel)
-        case .macroInvocation, .expand, .replace, .background, .deferBlock, .localCallable, .derived,
-            .forEach:
+        case .return(nil), .macroInvocation:
             throw LLVMLoweringError("LLVM lowering does not support statement \(statement).")
         case .expression(let expression):
             guard try emitLowerableSideEffectExpression(expression) else {
@@ -651,43 +630,6 @@ private struct LLVMFunctionEmitter {
         let converted = try convert(value, to: type)
         guard converted.type == type.llvmType else {
             throw LLVMLoweringError("LLVM assignment value must be \(type.llvmType).")
-        }
-        emit("store \(type.llvmType) \(converted.representation), ptr \(pointer)")
-    }
-
-    private mutating func emitCompoundAssignment(
-        target: AssignmentTarget,
-        operatorSymbol: CompoundOperator,
-        expression: RangeCompiler.Expression
-    ) throws {
-        guard case .plusEquals = operatorSymbol else {
-            throw LLVMLoweringError("LLVM compound assignment currently supports += only.")
-        }
-        guard case .local(let name) = target else {
-            throw LLVMLoweringError("LLVM compound assignment currently supports local state only.")
-        }
-        guard case .stackSlot(let pointer, let type, let mutable, _) = symbols[name],
-            mutable
-        else {
-            throw LLVMLoweringError("LLVM compound assignment target '\(name)' is not mutable local state.")
-        }
-
-        let currentRegister = freshRegister()
-        emit("\(currentRegister) = load \(type.llvmType), ptr \(pointer)")
-        let currentValue = Value(
-            type: type.llvmType,
-            representation: currentRegister,
-            scalarType: type
-        )
-        let rhsValue = try emitExpression(expression)
-        let sum = try emitBinaryExpression(
-            lhsValue: currentValue,
-            operatorSymbol: .addition,
-            rhsValue: rhsValue
-        )
-        let converted = try convert(sum, to: type)
-        guard converted.type == type.llvmType else {
-            throw LLVMLoweringError("LLVM compound assignment value must be \(type.llvmType).")
         }
         emit("store \(type.llvmType) \(converted.representation), ptr \(pointer)")
     }
@@ -848,60 +790,6 @@ private struct LLVMFunctionEmitter {
         }
 
         emitLabel(endLabel)
-    }
-
-    private mutating func emitSwitch(
-        expression: RangeCompiler.Expression,
-        cases: [SwitchCase],
-        defaultBody: [Statement]?
-    ) throws {
-        guard !cases.isEmpty else {
-            throw LLVMLoweringError("LLVM switch requires at least one case.")
-        }
-        guard let defaultBody else {
-            throw LLVMLoweringError("LLVM switch requires a default branch.")
-        }
-
-        let subject = try emitExpression(expression)
-        guard subject.type == "i64" || subject.type == "i1" else {
-            throw LLVMLoweringError("LLVM switch subject must be i64 or i1.")
-        }
-
-        let labelID = freshLabelID()
-        let defaultLabel = "switch.default.\(labelID)"
-        let endLabel = "switch.end.\(labelID)"
-        let caseLabels = cases.indices.map { "switch.case.\(labelID).\($0)" }
-        let caseLiterals = try cases.map { try switchCaseLiteral($0.pattern, subjectType: subject.type) }
-
-        emit("switch \(subject.type) \(subject.representation), label %\(defaultLabel) [")
-        for (literal, label) in zip(caseLiterals, caseLabels) {
-            lines.append("    \(subject.type) \(literal), label %\(label)")
-        }
-        lines.append("  ]")
-        blockTerminated = true
-
-        var allBranchesTerminate = true
-        for (switchCase, label) in zip(cases, caseLabels) {
-            emitLabel(label)
-            try emitStatements(switchCase.body)
-            if !blockTerminated {
-                allBranchesTerminate = false
-                emitBranch(to: endLabel)
-            }
-        }
-
-        emitLabel(defaultLabel)
-        try emitStatements(defaultBody)
-        if !blockTerminated {
-            allBranchesTerminate = false
-            emitBranch(to: endLabel)
-        }
-
-        if allBranchesTerminate {
-            blockTerminated = true
-        } else {
-            emitLabel(endLabel)
-        }
     }
 
     private mutating func emitStatements(_ statements: [Statement]) throws {
@@ -1790,21 +1678,6 @@ private struct LLVMFunctionEmitter {
             return lhs.scalarType
         }
         return rhs.scalarType
-    }
-
-    private func switchCaseLiteral(_ pattern: SwitchCasePattern, subjectType: String) throws -> String {
-        guard case .expression(let expression) = pattern else {
-            throw LLVMLoweringError("LLVM switch only supports literal expression cases.")
-        }
-
-        switch expression {
-        case .integer(let value) where isLLVMIntegerType(subjectType):
-            return String(value)
-        case .boolean(let value) where subjectType == "i1":
-            return value ? "1" : "0"
-        default:
-            throw LLVMLoweringError("LLVM switch case literal must match the switch subject.")
-        }
     }
 
     private func llvmInstruction(

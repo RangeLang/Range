@@ -44,44 +44,23 @@ public struct RealizedLiteralBridge: Hashable, Sendable {
     }
 }
 
-public struct RealizedInitMacroTarget {
-    public let initTarget: RealizedInitTarget
-    public let rewriteInitTarget: RealizedInitTarget
-    public let macros: [MacroApplication]
-
-    public init(
-        initTarget: RealizedInitTarget,
-        rewriteInitTarget: RealizedInitTarget? = nil,
-        macros: [MacroApplication]
-    ) {
-        self.initTarget = initTarget
-        self.rewriteInitTarget = rewriteInitTarget ?? initTarget
-        self.macros = macros
-    }
-
-    public var constructName: String {
-        initTarget.constructName
-    }
-
-    public var parameterLabels: [String?] {
-        initTarget.parameterLabels
-    }
-
-    public var isCore: Bool {
-        initTarget.isCore
-    }
+public enum DeclaredMemberKind: String, Sendable {
+    case state
+    case binding
+    case derived
+    case value
 }
 
 public struct DeclaredMemberSurface {
     public let ownerConstructName: String
     public let name: String
-    public let kind: ApplicationGraphNodeKind
+    public let kind: DeclaredMemberKind
     public let declaredTypeName: String?
 
     public init(
         ownerConstructName: String,
         name: String,
-        kind: ApplicationGraphNodeKind,
+        kind: DeclaredMemberKind,
         declaredTypeName: String?
     ) {
         self.ownerConstructName = ownerConstructName

@@ -3,7 +3,7 @@
         @value(type: "String")
     }
     @state(name: "members", value: "String(\"\")")
-    @state(name: "index", value: "0")
+    @state(name: "index", value: "Int(0)")
     @state(name: "source", value: "target.application.rawBodyText")
 
     @while("index < source.count(of: \"\\n\") + Int(1)") {

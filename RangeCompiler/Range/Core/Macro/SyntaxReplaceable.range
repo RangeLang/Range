@@ -1,3 +1,7 @@
-construct SyntaxReplaceable<T> {
-    function replace(replacement: T): T
+@construct(name: "SyntaxReplaceable<T>") {
+    @function(name: "replace", result: "T") {
+        @parameter(name: "replacement") {
+            @value(type: "T")
+        }
+    }
 }

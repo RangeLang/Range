@@ -1,3 +1,5 @@
-construct Title {
-    @let raw: String
+@construct(name: "Title") {
+    @let(name: "raw") {
+        @value(type: "String")
+    }
 }

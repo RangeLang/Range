@@ -1,2 +1,3 @@
 @macro(name: "member", result: "Void", target: "@construct"){
+    @return(value: "")
 }

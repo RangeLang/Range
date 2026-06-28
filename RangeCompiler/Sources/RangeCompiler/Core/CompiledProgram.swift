@@ -2,7 +2,18 @@ import Foundation
 
 public enum SourceInputRole {
     case core
+    case macroOnly
     case project
+
+    public var isCore: Bool {
+        switch self {
+        case .core:
+            return true
+        case .macroOnly, .project:
+            return false
+        }
+    }
+
 }
 
 public struct SourceInput {
@@ -22,7 +33,6 @@ public struct CompiledProgram {
     public let parsedFiles: [ParsedSourceFile]
     public let expandedFiles: [ParsedSourceFile]
     public let declarationGraph: DeclarationGraph
-    public let runtimeHookResults: [CompilerPipelineRuntimeResult]
 
     private let inputRoleByPath: [String: SourceInputRole]
 
@@ -30,14 +40,12 @@ public struct CompiledProgram {
         inputs: [SourceInput],
         parsedFiles: [ParsedSourceFile],
         expandedFiles: [ParsedSourceFile],
-        declarationGraph: DeclarationGraph,
-        runtimeHookResults: [CompilerPipelineRuntimeResult] = []
+        declarationGraph: DeclarationGraph
     ) {
         self.inputs = inputs
         self.parsedFiles = parsedFiles
         self.expandedFiles = expandedFiles
         self.declarationGraph = declarationGraph
-        self.runtimeHookResults = runtimeHookResults
         self.inputRoleByPath = Dictionary(
             uniqueKeysWithValues: inputs.map { ($0.path, $0.role) }
         )
@@ -47,40 +55,42 @@ public struct CompiledProgram {
         declarationGraph.views
     }
 
-    public var programGraph: ProgramGraph {
-        declarationGraph.programGraph
-    }
-
     public var literalBridgeResolver: LiteralBridgeResolver {
         declarationViews.literalBridgeResolver
     }
 
-    public var applicationGraph: ApplicationGraph {
-        ApplicationGraphBuilder().build(program: self)
-    }
-
-    public var graphProjections: [CompiledProgramGraphProjection] {
-        CompiledProgramGraphFlow().deriveGraphs(from: self)
-    }
-
     public var projectParsedFiles: [ParsedSourceFile] {
-        parsedFiles.filter { inputRoleByPath[$0.path] == .project }
+        parsedFiles.filter { path in
+            guard let role = inputRoleByPath[path.path] else { return false }
+            return !role.isCore
+        }
     }
 
     public var projectExpandedFiles: [ParsedSourceFile] {
-        expandedFiles.filter { inputRoleByPath[$0.path] == .project }
+        expandedFiles.filter { path in
+            guard let role = inputRoleByPath[path.path] else { return false }
+            return !role.isCore
+        }
     }
 
-    public func sourceRole(forPath path: String) -> SourceInputRole? {
-        inputRoleByPath[path]
-    }
 }
 
 public struct CompilerPipeline {
     public init() {}
 
+    private func inputRolePriority(_ role: SourceInputRole) -> Int {
+        switch role {
+        case .core:
+            return 0
+        case .macroOnly:
+            return 1
+        case .project:
+            return 2
+        }
+    }
+
     private func inputPriority(_ input: SourceInput) -> Int {
-        guard input.role == .core,
+        guard input.role.isCore,
             input.path.hasSuffix("/Range/Foundation/Macros/Macro.range")
         else {
             return 1
@@ -90,12 +100,13 @@ public struct CompilerPipeline {
 
     public func build(
         inputs: [SourceInput],
-        diagnosticEngine: RangeDiagnosticEngine? = nil,
-        runtimeHooks: [any CompilerPipelineRuntimeHook] = []
+        diagnosticEngine: RangeDiagnosticEngine? = nil
     ) throws -> CompiledProgram {
         let orderedInputs = inputs.sorted { lhs, rhs in
-            if lhs.role != rhs.role {
-                return lhs.role == .core
+            let lhsRolePriority = inputRolePriority(lhs.role)
+            let rhsRolePriority = inputRolePriority(rhs.role)
+            if lhsRolePriority != rhsRolePriority {
+                return lhsRolePriority < rhsRolePriority
             }
             let lhsPriority = inputPriority(lhs)
             let rhsPriority = inputPriority(rhs)
@@ -105,26 +116,14 @@ public struct CompilerPipeline {
             return lhs.path < rhs.path
         }
 
-        let coreInputs = orderedInputs.filter { $0.role == .core }
-        let projectInputs = orderedInputs.filter { $0.role == .project }
-        var runtimeHookResults: [CompilerPipelineRuntimeResult] = []
+        let coreInputs = orderedInputs.filter { $0.role.isCore }
+        let projectInputs = orderedInputs.filter { !$0.role.isCore }
 
         let discoveredCoreDeclarationFiles = try discoverProjectDeclarationFiles(
             inputs: coreInputs
         )
-        try runRuntimeHooks(
-            runtimeHooks,
-            stage: .coreDeclarationsDiscovered,
-            inputs: orderedInputs,
-            parsedFiles: discoveredCoreDeclarationFiles,
-            diagnosticEngine: diagnosticEngine,
-            results: &runtimeHookResults
-        )
         let discoveredCoreGraph = DeclarationGraph(files: discoveredCoreDeclarationFiles)
         let discoveredCoreViews = discoveredCoreGraph.views
-        let discoveredCoreCallableReturnTypes = collectCallableReturnTypes(
-            from: discoveredCoreDeclarationFiles
-        )
         let discoveredCoreMacrosByName = MacroExpander.collectMacroDeclarations(
             from: discoveredCoreDeclarationFiles
         )
@@ -142,19 +141,9 @@ public struct CompilerPipeline {
             declarationMacroExpansionResolver: DeclarationMacroExpansionResolver(
                 macrosByName: discoveredCoreMacrosByName
             ),
-            discoveredCallableReturnTypes: discoveredCoreCallableReturnTypes,
             macroDeclarationsByName: discoveredCoreMacrosByName,
             macroMetadataDeclarationsByName: discoveredCoreMacroMetadataByName,
             macroExpansionTypes: discoveredCoreMacroExpansionTypes
-        )
-
-        try runRuntimeHooks(
-            runtimeHooks,
-            stage: .coreParsed,
-            inputs: orderedInputs,
-            parsedFiles: parsedCoreFiles,
-            diagnosticEngine: diagnosticEngine,
-            results: &runtimeHookResults
         )
 
         let coreMacrosByName = MacroExpander.collectMacroDeclarations(from: parsedCoreFiles)
@@ -165,21 +154,10 @@ public struct CompilerPipeline {
             macroDeclarationsByName: coreMacrosByName,
             macroMetadataDeclarationsByName: coreMacroMetadataByName
         )
-        try runRuntimeHooks(
-            runtimeHooks,
-            stage: .projectDeclarationsDiscovered,
-            inputs: orderedInputs,
-            parsedFiles: parsedCoreFiles + discoveredProjectDeclarationFiles,
-            diagnosticEngine: diagnosticEngine,
-            results: &runtimeHookResults
-        )
         let discoveredProjectGraph = DeclarationGraph(
             files: parsedCoreFiles + discoveredProjectDeclarationFiles
         )
         let discoveredProjectViews = discoveredProjectGraph.views
-        let discoveredProjectCallableReturnTypes = collectCallableReturnTypes(
-            from: discoveredProjectDeclarationFiles
-        )
         let discoveredProjectMacrosByName = MacroExpander.collectMacroDeclarations(
             from: discoveredProjectDeclarationFiles
         )
@@ -203,7 +181,6 @@ public struct CompilerPipeline {
             declarationMacroExpansionResolver: DeclarationMacroExpansionResolver(
                 macrosByName: projectMacrosByName
             ),
-            discoveredCallableReturnTypes: discoveredProjectCallableReturnTypes,
             macroDeclarationsByName: projectMacrosByName,
             macroMetadataDeclarationsByName: projectMacroMetadataByName,
             macroExpansionTypes: coreMacroExpansionTypes.merging(
@@ -212,112 +189,34 @@ public struct CompilerPipeline {
         )
 
         let parsedFiles = parsedCoreFiles + parsedProjectFiles
-        try runRuntimeHooks(
-            runtimeHooks,
-            stage: .projectParsed,
-            inputs: orderedInputs,
-            parsedFiles: parsedFiles,
-            diagnosticEngine: diagnosticEngine,
-            results: &runtimeHookResults
-        )
 
         let expandedFiles = try MacroExpander.expand(
             files: parsedFiles,
             diagnosticEngine: diagnosticEngine
         )
-        try runRuntimeHooks(
-            runtimeHooks,
-            stage: .macrosExpanded,
-            inputs: orderedInputs,
-            parsedFiles: parsedFiles,
-            expandedFiles: expandedFiles,
-            diagnosticEngine: diagnosticEngine,
-            results: &runtimeHookResults
-        )
         let declarationGraph = DeclarationGraph(files: expandedFiles)
-        try runRuntimeHooks(
-            runtimeHooks,
-            stage: .declarationGraphBuilt,
-            inputs: orderedInputs,
-            parsedFiles: parsedFiles,
-            expandedFiles: expandedFiles,
-            declarationGraph: declarationGraph,
-            diagnosticEngine: diagnosticEngine,
-            results: &runtimeHookResults
-        )
 
         return CompiledProgram(
             inputs: orderedInputs,
             parsedFiles: parsedFiles,
             expandedFiles: expandedFiles,
-            declarationGraph: declarationGraph,
-            runtimeHookResults: runtimeHookResults
+            declarationGraph: declarationGraph
         )
-    }
-
-    public func buildValidated(
-        inputs: [SourceInput],
-        diagnosticEngine: RangeDiagnosticEngine? = nil,
-        runtimeHooks: [any CompilerPipelineRuntimeHook] = []
-    ) throws -> CompiledProgram {
-        let program = try build(
-            inputs: inputs,
-            diagnosticEngine: diagnosticEngine,
-            runtimeHooks: runtimeHooks
-        )
-        try CompiledProgramValidator().validate(program)
-        return program
     }
 
     public func diagnostics(inputs: [SourceInput], fallbackPath: String? = nil) -> [RangeDiagnostic] {
         let diagnosticEngine = RangeDiagnosticEngine()
         do {
-            _ = try buildValidated(inputs: inputs, diagnosticEngine: diagnosticEngine)
+            _ = try build(inputs: inputs, diagnosticEngine: diagnosticEngine)
         } catch {
             diagnosticEngine.emit(
                 RangeDiagnosticConverter.diagnostic(
                     from: error,
-                    path: fallbackPath ?? inputs.first(where: { $0.role == .project })?.path
+                    path: fallbackPath ?? inputs.first(where: { !$0.role.isCore })?.path
                 )
             )
         }
         return diagnosticEngine.diagnostics
-    }
-
-    public func validatePrimaryDeclarations(inputs: [SourceInput]) throws {
-        let program = try build(inputs: inputs)
-        try CompiledProgramValidator().validatePrimaryDeclarations(in: program)
-    }
-
-
-    private func runRuntimeHooks(
-        _ hooks: [any CompilerPipelineRuntimeHook],
-        stage: CompilerPipelineRuntimeStage,
-        inputs: [SourceInput],
-        parsedFiles: [ParsedSourceFile] = [],
-        expandedFiles: [ParsedSourceFile] = [],
-        declarationGraph: DeclarationGraph? = nil,
-        diagnosticEngine: RangeDiagnosticEngine?,
-        results: inout [CompilerPipelineRuntimeResult]
-    ) throws {
-        guard !hooks.isEmpty else { return }
-        let context = CompilerPipelineRuntimeContext(
-            stage: stage,
-            inputs: inputs,
-            parsedFiles: parsedFiles,
-            expandedFiles: expandedFiles,
-            declarationGraph: declarationGraph
-        )
-
-        for hook in hooks {
-            guard let result = try hook.run(context: context) else {
-                continue
-            }
-            results.append(result)
-            for diagnostic in result.diagnostics {
-                diagnosticEngine?.emit(diagnostic)
-            }
-        }
     }
 
     private func parse(
@@ -326,7 +225,6 @@ public struct CompilerPipeline {
         declarationMemberResolver: DeclarationMemberResolver,
         declarationOperatorResolver: DeclarationOperatorResolver,
         declarationMacroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
-        discoveredCallableReturnTypes: [String: TypeReference] = [:],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
         macroMetadataDeclarationsByName: [String: MacroMetadataDeclaration] = [:],
         macroExpansionTypes: [String: TypeReference] = [:]
@@ -344,13 +242,11 @@ public struct CompilerPipeline {
                 declarationMemberResolver: declarationMemberResolver,
                 declarationOperatorResolver: declarationOperatorResolver,
                 declarationMacroExpansionResolver: currentMacroExpansionResolver,
-                discoveredCallableReturnTypes: discoveredCallableReturnTypes,
                 macroDeclarationsByName: currentMacrosByName,
                 macroMetadataByName: currentMacroMetadataByName,
-                macroExpansionTypes: currentMacroExpansionTypes,
-                allowInitializerDeclarations: false
+                macroExpansionTypes: currentMacroExpansionTypes
             )
-            let sourceFile: SourceFileNode
+            let sourceFile: ModuleFileNode
             do {
                 sourceFile = try parser.parseSourceFile()
             } catch let error as ParseError {
@@ -412,10 +308,9 @@ public struct CompilerPipeline {
             var parser = try Parser(
                 source: input.source,
                 macroDeclarationsByName: macrosByName,
-                macroMetadataByName: macroMetadataByName,
-                allowInitializerDeclarations: false
+                macroMetadataByName: macroMetadataByName
             )
-            let sourceFile: SourceFileNode
+            let sourceFile: ModuleFileNode
             do {
                 sourceFile = try parser.parseSourceFileForDeclarationDiscovery()
             } catch let error as ParseError {
@@ -445,10 +340,9 @@ public struct CompilerPipeline {
             var parser = try Parser(
                 source: input.source,
                 macroDeclarationsByName: macrosByName,
-                macroMetadataByName: macroMetadataDeclarationsByName,
-                allowInitializerDeclarations: false
+                macroMetadataByName: macroMetadataDeclarationsByName
             )
-            let sourceFile: SourceFileNode
+            let sourceFile: ModuleFileNode
             do {
                 sourceFile = try parser.parseSourceFileForDeclarationDiscovery()
             } catch let error as ParseError {
@@ -481,10 +375,9 @@ public struct CompilerPipeline {
             var parser = try Parser(
                 source: input.source,
                 macroDeclarationsByName: macroDeclarationsByName,
-                macroMetadataByName: macroMetadataDeclarationsByName,
-                allowInitializerDeclarations: false
+                macroMetadataByName: macroMetadataDeclarationsByName
             )
-            let sourceFile: SourceFileNode
+            let sourceFile: ModuleFileNode
             do {
                 sourceFile = try parser.parseSourceFileForDeclarationDiscovery()
             } catch let error as ParseError {
@@ -504,79 +397,5 @@ public struct CompilerPipeline {
         }
 
         return macroMetadataByName
-    }
-
-    private func collectCallableReturnTypes(
-        from files: [ParsedSourceFile]
-    ) -> [String: TypeReference] {
-        var returnTypes: [String: TypeReference] = [:]
-
-        for parsedFile in files {
-            collectCallableReturnTypes(
-                from: parsedFile.sourceFile,
-                into: &returnTypes
-            )
-        }
-
-        return returnTypes
-    }
-
-    private func collectCallableReturnTypes(
-        from sourceFile: SourceFileNode,
-        into returnTypes: inout [String: TypeReference]
-    ) {
-        switch sourceFile {
-        case .module(let module):
-            for callable in module.callables {
-                collectCallableReturnType(callable, into: &returnTypes)
-            }
-            for declaration in module.extensions {
-                collectCallableReturnTypes(
-                    in: declaration,
-                    qualifiedPrefix: declaration.targetName,
-                    into: &returnTypes
-                )
-            }
-        case .extensions(let declarations):
-            for declaration in declarations {
-                collectCallableReturnTypes(
-                    in: declaration,
-                    qualifiedPrefix: declaration.targetName,
-                    into: &returnTypes
-                )
-            }
-        default:
-            break
-        }
-    }
-
-    private func collectCallableReturnTypes(
-        in declaration: ExtensionDeclaration,
-        qualifiedPrefix: String,
-        into returnTypes: inout [String: TypeReference]
-    ) {
-        for callable in declaration.callables {
-            guard let returnType = callable.returnType else {
-                continue
-            }
-            let qualifiedName = "\(qualifiedPrefix).\(callable.name)"
-            returnTypes[qualifiedName] = returnType
-            if let targetType = callable.targetType {
-                returnTypes["\(targetType.displayName).\(qualifiedName)"] = returnType
-            }
-        }
-    }
-
-    private func collectCallableReturnType(
-        _ callable: CallableDeclaration,
-        into returnTypes: inout [String: TypeReference]
-    ) {
-        guard let returnType = callable.returnType else {
-            return
-        }
-        returnTypes[callable.name] = returnType
-        if let targetType = callable.targetType {
-            returnTypes["\(targetType.displayName).\(callable.name)"] = returnType
-        }
     }
 }

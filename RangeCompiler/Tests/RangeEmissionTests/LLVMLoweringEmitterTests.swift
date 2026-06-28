@@ -5,14 +5,20 @@ import Testing
 
 @Suite("LLVM lowering emission")
 struct LLVMLoweringEmitterTests {
+    private typealias RangeExpression = RangeCompiler.Expression
+
     @Test("Scalar Int function lowers to textual LLVM IR")
     func scalarIntFunctionLowersToTextualLLVMIR() throws {
-        let callable = try parseCallable(
-            """
-            function add(lhs: Int, rhs: Int): Int {
-                return lhs + rhs
-            }
-            """
+        let callable = callable(
+            "add",
+            parameters: [
+                parameter("lhs", "Int"),
+                parameter("rhs", "Int"),
+            ],
+            returnType: .named("Int"),
+            body: [
+                ret(binary(id("lhs"), .addition, id("rhs")))
+            ]
         )
 
         let module = try #require(
@@ -38,12 +44,12 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Top-level main function lowers to native LLVM entrypoint")
     func topLevelMainFunctionLowersToNativeLLVMEntrypoint() throws {
-        let callable = try parseCallable(
-            """
-            function main(): Int {
-                return 0
-            }
-            """
+        let callable = callable(
+            "main",
+            returnType: .named("Int"),
+            body: [
+                ret(.integer(0))
+            ]
         )
 
         let module = try #require(
@@ -58,12 +64,12 @@ struct LLVMLoweringEmitterTests {
 
     @Test("String literal return lowers to LLVM UTF8 storage")
     func stringLiteralReturnLowersToLLVMUTF8Storage() throws {
-        let callable = try parseCallable(
-            """
-            function greeting(): String {
-                return "hello"
-            }
-            """
+        let callable = callable(
+            "greeting",
+            returnType: .named("String"),
+            body: [
+                ret(.string("hello"))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -83,12 +89,15 @@ struct LLVMLoweringEmitterTests {
 
     @Test("String parameters can pass through LLVM functions")
     func stringParametersCanPassThroughLLVMFunctions() throws {
-        let callable = try parseCallable(
-            """
-            function greet(name: String): String {
-                return name
-            }
-            """
+        let callable = callable(
+            "greet",
+            parameters: [
+                parameter("name", "String")
+            ],
+            returnType: .named("String"),
+            body: [
+                ret(id("name"))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -103,12 +112,12 @@ struct LLVMLoweringEmitterTests {
 
     @Test("String literals use UTF8 byte counts")
     func stringLiteralsUseUTF8ByteCounts() throws {
-        let callable = try parseCallable(
-            """
-            function greeting(): String {
-                return "hé"
-            }
-            """
+        let callable = callable(
+            "greeting",
+            returnType: .named("String"),
+            body: [
+                ret(.string("hé"))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -122,31 +131,39 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Calls between LLVM String functions stay in LLVM")
     func callsBetweenLLVMStringFunctionsStayInLLVM() throws {
-        let module = try parseModule(
-            """
-            function echo(value: String): String {
-                return value
-            }
-
-            function greeting(): String {
-                return echo(value: "hello")
-            }
-            """
-        )
+        let callables = [
+            callable(
+                "echo",
+                parameters: [
+                    parameter("value", "String")
+                ],
+                returnType: .named("String"),
+                body: [
+                    ret(id("value"))
+                ]
+            ),
+            callable(
+                "greeting",
+                returnType: .named("String"),
+                body: [
+                    ret(call("echo", argument("value", .string("hello"))))
+                ]
+            ),
+        ]
 
         let signatures = Dictionary(
-            uniqueKeysWithValues: module.callables.compactMap { callable in
+            uniqueKeysWithValues: callables.compactMap { callable in
                 LLVMLowerability.scalarSignature(for: callable).map { (callable.name, $0) }
             }
         )
 
         #expect(
-            module.callables.allSatisfy {
+            callables.allSatisfy {
                 LLVMLowerability.canLower($0, lowerableFunctionSignatures: signatures)
             }
         )
         let emission = try #require(
-            try LLVMLoweringEmitter().emitModule(callables: module.callables)
+            try LLVMLoweringEmitter().emitModule(callables: callables)
         )
 
         #expect(emission.ir.contains("define %Range.String @RangeLLVM_echo(%Range.String %value)"))
@@ -156,37 +173,68 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Construct values lower to LLVM aggregate insert and extract")
     func constructValuesLowerToLLVMAggregateInsertAndExtract() throws {
-        let module = try parseModule(
-            """
-            construct Point {
-                @let x: Int
-                @let y: Int
-            }
-
-            construct Label {
-                @let text: String
-            }
-
-            function sum(point: Point): Int {
-                return point.x + point.y
-            }
-
-            function text(label: Label): String {
-                return label.text
-            }
-
-            function make(): Point {
-                return Point(x: 2, y: 3)
-            }
-
-            function makeSum(): Int {
-                return sum(point: Point(x: 2, y: 3))
-            }
-            """
-        )
-        let layouts = LLVMLowerability.constructLayouts(from: module.constructs)
+        let constructs = [
+            construct(
+                "Point",
+                values: [
+                    value("x", typeName: "Int"),
+                    value("y", typeName: "Int"),
+                ]
+            ),
+            construct(
+                "Label",
+                values: [
+                    value("text", typeName: "String")
+                ]
+            ),
+        ]
+        let callables = [
+            callable(
+                "sum",
+                parameters: [
+                    parameter("point", "Point")
+                ],
+                returnType: .named("Int"),
+                body: [
+                    ret(binary(id("point.x"), .addition, id("point.y")))
+                ]
+            ),
+            callable(
+                "text",
+                parameters: [
+                    parameter("label", "Label")
+                ],
+                returnType: .named("String"),
+                body: [
+                    ret(id("label.text"))
+                ]
+            ),
+            callable(
+                "make",
+                returnType: .named("Point"),
+                body: [
+                    ret(call("Point", argument("x", .integer(2)), argument("y", .integer(3))))
+                ]
+            ),
+            callable(
+                "makeSum",
+                returnType: .named("Int"),
+                body: [
+                    ret(
+                        call(
+                            "sum",
+                            argument(
+                                "point",
+                                call("Point", argument("x", .integer(2)), argument("y", .integer(3)))
+                            )
+                        )
+                    )
+                ]
+            ),
+        ]
+        let layouts = LLVMLowerability.constructLayouts(from: constructs)
         let signatures = Dictionary(
-            uniqueKeysWithValues: module.callables.compactMap { callable in
+            uniqueKeysWithValues: callables.compactMap { callable in
                 LLVMLowerability.scalarSignature(
                     for: callable,
                     constructLayouts: layouts
@@ -196,7 +244,7 @@ struct LLVMLoweringEmitterTests {
 
         #expect(layouts["construct:Point"]?.fields.map(\.name) == ["x", "y"])
         #expect(
-            module.callables.allSatisfy {
+            callables.allSatisfy {
                 LLVMLowerability.canLower(
                     $0,
                     lowerableFunctionSignatures: signatures,
@@ -206,7 +254,7 @@ struct LLVMLoweringEmitterTests {
         )
         let emission = try #require(
             try LLVMLoweringEmitter().emitModule(
-                callables: module.callables,
+                callables: callables,
                 constructLayouts: layouts
             )
         )
@@ -227,20 +275,8 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Duplicate construct display names get distinct LLVM layout identities")
     func duplicateConstructDisplayNamesGetDistinctLLVMLayoutIdentities() throws {
-        let left = try parseConstruct(
-            """
-            construct Thing {
-                @let id: Int
-            }
-            """
-        )
-        let right = try parseConstruct(
-            """
-            construct Thing {
-                @let active: Bool
-            }
-            """
-        )
+        let left = construct("Thing", values: [value("id", typeName: "Int")])
+        let right = construct("Thing", values: [value("active", typeName: "Bool")])
 
         let layouts = LLVMLowerability.constructLayouts(from: [left, right])
 
@@ -259,32 +295,57 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Nested construct fields lower through LLVM aggregate identities")
     func nestedConstructFieldsLowerThroughLLVMAggregateIdentities() throws {
-        let module = try parseModule(
-            """
-            construct Name {
-                @let value: String
-            }
-
-            construct User {
-                @let name: Name
-            }
-
-            function name(user: User): Name {
-                return user.name
-            }
-
-            function value(user: User): String {
-                return user.name.value
-            }
-
-            function make(): User {
-                return User(name: Name(value: "George"))
-            }
-            """
-        )
-        let layouts = LLVMLowerability.constructLayouts(from: module.constructs)
+        let constructs = [
+            construct(
+                "Name",
+                values: [
+                    value("value", typeName: "String")
+                ]
+            ),
+            construct(
+                "User",
+                values: [
+                    value("name", typeName: "Name")
+                ]
+            ),
+        ]
+        let callables = [
+            callable(
+                "name",
+                parameters: [
+                    parameter("user", "User")
+                ],
+                returnType: .named("Name"),
+                body: [
+                    ret(id("user.name"))
+                ]
+            ),
+            callable(
+                "value",
+                parameters: [
+                    parameter("user", "User")
+                ],
+                returnType: .named("String"),
+                body: [
+                    ret(id("user.name.value"))
+                ]
+            ),
+            callable(
+                "make",
+                returnType: .named("User"),
+                body: [
+                    ret(
+                        call(
+                            "User",
+                            argument("name", call("Name", argument("value", .string("George"))))
+                        )
+                    )
+                ]
+            ),
+        ]
+        let layouts = LLVMLowerability.constructLayouts(from: constructs)
         let signatures = Dictionary(
-            uniqueKeysWithValues: module.callables.compactMap { callable in
+            uniqueKeysWithValues: callables.compactMap { callable in
                 LLVMLowerability.scalarSignature(
                     for: callable,
                     constructLayouts: layouts
@@ -295,7 +356,7 @@ struct LLVMLoweringEmitterTests {
         #expect(layouts["construct:Name"]?.fields.map(\.name) == ["value"])
         #expect(layouts["construct:User"]?.fields.map(\.name) == ["name"])
         #expect(
-            module.callables.allSatisfy {
+            callables.allSatisfy {
                 LLVMLowerability.canLower(
                     $0,
                     lowerableFunctionSignatures: signatures,
@@ -305,7 +366,7 @@ struct LLVMLoweringEmitterTests {
         )
         let emission = try #require(
             try LLVMLoweringEmitter().emitModule(
-                callables: module.callables,
+                callables: callables,
                 constructLayouts: layouts
             )
         )
@@ -323,22 +384,31 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Recursive value construct layouts are not LLVM lowerable")
     func recursiveValueConstructLayoutsAreNotLLVMLowerable() throws {
-        let module = try parseModule(
-            """
-            construct Node {
-                @let next: Node
-            }
-
-            function next(node: Node): Node {
-                return node.next
-            }
-            """
-        )
-        let layouts = LLVMLowerability.constructLayouts(from: module.constructs)
+        let constructs = [
+            construct(
+                "Node",
+                values: [
+                    value("next", typeName: "Node")
+                ]
+            )
+        ]
+        let callables = [
+            callable(
+                "next",
+                parameters: [
+                    parameter("node", "Node")
+                ],
+                returnType: .named("Node"),
+                body: [
+                    ret(id("node.next"))
+                ]
+            )
+        ]
+        let layouts = LLVMLowerability.constructLayouts(from: constructs)
 
         #expect(layouts["construct:Node"] == nil)
         #expect(
-            module.callables.allSatisfy {
+            callables.allSatisfy {
                 LLVMLowerability.scalarSignature(for: $0, constructLayouts: layouts) == nil
             }
         )
@@ -346,12 +416,15 @@ struct LLVMLoweringEmitterTests {
 
     @Test("String isEmpty member lowers through LLVM count projection")
     func stringIsEmptyMemberLowersThroughLLVMCountProjection() throws {
-        let callable = try parseCallable(
-            """
-            function empty(value: String): Bool {
-                return value.isEmpty
-            }
-            """
+        let callable = callable(
+            "empty",
+            parameters: [
+                parameter("value", "String")
+            ],
+            returnType: .named("Bool"),
+            body: [
+                ret(id("value.isEmpty"))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -367,12 +440,15 @@ struct LLVMLoweringEmitterTests {
 
     @Test("String byteCount member lowers through LLVM count projection")
     func stringByteCountMemberLowersThroughLLVMCountProjection() throws {
-        let callable = try parseCallable(
-            """
-            function size(value: String): Int {
-                return value.byteCount
-            }
-            """
+        let callable = callable(
+            "size",
+            parameters: [
+                parameter("value", "String")
+            ],
+            returnType: .named("Int"),
+            body: [
+                ret(id("value.byteCount"))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -387,13 +463,13 @@ struct LLVMLoweringEmitterTests {
 
     @Test("String literal local isEmpty lowers through LLVM")
     func stringLiteralLocalIsEmptyLowersThroughLLVM() throws {
-        let callable = try parseCallable(
-            """
-            function literalEmpty(): Bool {
-                let value: String("")
-                return value.isEmpty
-            }
-            """
+        let callable = callable(
+            "literalEmpty",
+            returnType: .named("Bool"),
+            body: [
+                local("value", typeName: "String", expression: call("String", .string(""))),
+                ret(id("value.isEmpty")),
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -410,13 +486,13 @@ struct LLVMLoweringEmitterTests {
 
     @Test("String literal local byteCount uses UTF8 byte count through LLVM")
     func stringLiteralLocalByteCountUsesUTF8ByteCountThroughLLVM() throws {
-        let callable = try parseCallable(
-            """
-            function literalSize(): Int {
-                let value: String("hé")
-                return value.byteCount
-            }
-            """
+        let callable = callable(
+            "literalSize",
+            returnType: .named("Int"),
+            body: [
+                local("value", typeName: "String", expression: call("String", .string("hé"))),
+                ret(id("value.byteCount")),
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -432,30 +508,41 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Int array count and isEmpty lower through LLVM")
     func intArrayCountAndIsEmptyLowerThroughLLVM() throws {
-        let module = try parseModule(
-            """
-            function size(values: Array<Int>): Int {
-                return values.count
-            }
-
-            function empty(values: Array<Int>): Bool {
-                return values.isEmpty
-            }
-            """
-        )
+        let callables = [
+            callable(
+                "size",
+                parameters: [
+                    parameter("values", .array(.named("Int")))
+                ],
+                returnType: .named("Int"),
+                body: [
+                    ret(id("values.count"))
+                ]
+            ),
+            callable(
+                "empty",
+                parameters: [
+                    parameter("values", .array(.named("Int")))
+                ],
+                returnType: .named("Bool"),
+                body: [
+                    ret(id("values.isEmpty"))
+                ]
+            ),
+        ]
         let signatures = Dictionary(
-            uniqueKeysWithValues: module.callables.compactMap { callable in
+            uniqueKeysWithValues: callables.compactMap { callable in
                 LLVMLowerability.scalarSignature(for: callable).map { (callable.name, $0) }
             }
         )
 
         #expect(
-            module.callables.allSatisfy {
+            callables.allSatisfy {
                 LLVMLowerability.canLower($0, lowerableFunctionSignatures: signatures)
             }
         )
         let emission = try #require(
-            try LLVMLoweringEmitter().emitModule(callables: module.callables)
+            try LLVMLoweringEmitter().emitModule(callables: callables)
         )
 
         #expect(emission.ir.contains("%Range.IntArray = type { ptr, i64, i64 }"))
@@ -467,12 +554,15 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Int array element lowers through LLVM pointer load")
     func intArrayElementLowersThroughLLVMPointerLoad() throws {
-        let callable = try parseCallable(
-            """
-            function first(values: Array<Int>): Int {
-                return values.element(index: 0)
-            }
-            """
+        let callable = callable(
+            "first",
+            parameters: [
+                parameter("values", .array(.named("Int")))
+            ],
+            returnType: .named("Int"),
+            body: [
+                ret(call("values.element", argument("index", .integer(0))))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -497,28 +587,44 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Owned Int array allocation and append lower through LLVM memory")
     func ownedIntArrayAllocationAndAppendLowerThroughLLVMMemory() throws {
-        let callable = try parseCallable(
-            """
-            function sumAllocated(limit: Int): Int {
-                state values: Array<Int>(capacity: limit)
-                state index: Int(0)
-
-                while index < limit {
-                    values.append(element: index)
-                    state index: index + 1
-                }
-
-                state total: Int(0)
-                state readIndex: Int(0)
-
-                while readIndex < limit {
-                    state total: total + values.element(index: readIndex)
-                    state readIndex: readIndex + 1
-                }
-
-                return total
-            }
-            """
+        let callable = callable(
+            "sumAllocated",
+            parameters: [
+                parameter("limit", "Int")
+            ],
+            returnType: .named("Int"),
+            body: [
+                state(
+                    "values",
+                    type: .array(.named("Int")),
+                    expression: call("Array<Int>", argument("capacity", id("limit")))
+                ),
+                state("index", type: .named("Int"), expression: .integer(0)),
+                whileLoop(
+                    binary(id("index"), .less, id("limit")),
+                    [
+                        .expression(call("values.append", argument("element", id("index")))),
+                        assign("index", binary(id("index"), .addition, .integer(1))),
+                    ]
+                ),
+                state("total", type: .named("Int"), expression: .integer(0)),
+                state("readIndex", type: .named("Int"), expression: .integer(0)),
+                whileLoop(
+                    binary(id("readIndex"), .less, id("limit")),
+                    [
+                        assign(
+                            "total",
+                            binary(
+                                id("total"),
+                                .addition,
+                                call("values.element", argument("index", id("readIndex")))
+                            )
+                        ),
+                        assign("readIndex", binary(id("readIndex"), .addition, .integer(1))),
+                    ]
+                ),
+                ret(id("total")),
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -551,15 +657,15 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Default Int array append grows from empty storage")
     func defaultIntArrayAppendGrowsFromEmptyStorage() throws {
-        let callable = try parseCallable(
-            """
-            function grown(): Int {
-                state values: Array<Int>
-                values.append(element: 4)
-                values.append(element: 8)
-                return values.element(index: 1)
-            }
-            """
+        let callable = callable(
+            "grown",
+            returnType: .named("Int"),
+            body: [
+                state("values", type: .array(.named("Int")), expression: call("Array<Int>")),
+                .expression(call("values.append", argument("element", .integer(4)))),
+                .expression(call("values.append", argument("element", .integer(8)))),
+                ret(call("values.element", argument("index", .integer(1)))),
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -583,15 +689,28 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Int array update lowers with LLVM bounds check")
     func intArrayUpdateLowersWithLLVMBoundsCheck() throws {
-        let callable = try parseCallable(
-            """
-            function replaceFirst(value: Int): Int {
-                state values: Array<Int>(capacity: 1)
-                values.append(element: 0)
-                values.update(element: value, index: 0)
-                return values.element(index: 0)
-            }
-            """
+        let callable = callable(
+            "replaceFirst",
+            parameters: [
+                parameter("value", "Int")
+            ],
+            returnType: .named("Int"),
+            body: [
+                state(
+                    "values",
+                    type: .array(.named("Int")),
+                    expression: call("Array<Int>", argument("capacity", .integer(1)))
+                ),
+                .expression(call("values.append", argument("element", .integer(0)))),
+                .expression(
+                    call(
+                        "values.update",
+                        argument("element", id("value")),
+                        argument("index", .integer(0))
+                    )
+                ),
+                ret(call("values.element", argument("index", .integer(0)))),
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -610,14 +729,21 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Bool array lowers with detected element type")
     func boolArrayLowersWithDetectedElementType() throws {
-        let callable = try parseCallable(
-            """
-            function firstFlag(value: Bool): Bool {
-                state values: Array<Bool>(capacity: 1)
-                values.append(element: value)
-                return values.element(index: 0)
-            }
-            """
+        let callable = callable(
+            "firstFlag",
+            parameters: [
+                parameter("value", "Bool")
+            ],
+            returnType: .named("Bool"),
+            body: [
+                state(
+                    "values",
+                    type: .array(.named("Bool")),
+                    expression: call("Array<Bool>", argument("capacity", .integer(1)))
+                ),
+                .expression(call("values.append", argument("element", id("value")))),
+                ret(call("values.element", argument("index", .integer(0)))),
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -636,27 +762,7 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Nested Int while loops lower to LLVM basic blocks")
     func nestedIntWhileLoopsLowerToLLVMBasicBlocks() throws {
-        let callable = try parseCallable(
-            """
-            function nestedSum(limit: Int): Int {
-                state outer: Int(0)
-                state total: Int(0)
-
-                while outer < limit {
-                    state inner: Int(0)
-
-                    while inner < limit {
-                        state total: total + outer + inner
-                        state inner: inner + 1
-                    }
-
-                    state outer: outer + 1
-                }
-
-                return total
-            }
-            """
-        )
+        let callable = nestedSumCallable()
 
         #expect(LLVMLowerability.canLower(callable))
         let module = try #require(
@@ -680,18 +786,23 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Let comparison and if lower to LLVM control flow")
     func letComparisonAndIfLowerToLLVMControlFlow() throws {
-        let callable = try parseCallable(
-            """
-            function choose(lhs: Int, rhs: Int): Int {
-                let adjusted: Int(lhs)
-
-                if lhs < rhs {
-                    return rhs
-                } else {
-                    return adjusted
-                }
-            }
-            """
+        let callable = callable(
+            "choose",
+            parameters: [
+                parameter("lhs", "Int"),
+                parameter("rhs", "Int"),
+            ],
+            returnType: .named("Int"),
+            body: [
+                local("adjusted", typeName: "Int", expression: id("lhs")),
+                .conditional([
+                    StatementConditionalBranch(
+                        condition: binary(id("lhs"), .less, id("rhs")),
+                        body: [ret(id("rhs"))]
+                    ),
+                    StatementConditionalBranch(condition: nil, body: [ret(id("adjusted"))]),
+                ]),
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -709,18 +820,67 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Scalar literal operands lower through LLVM")
     func scalarLiteralOperandsLowerThroughLLVM() throws {
-        let callable = try compileCallable(
-            """
-            function adjust(value: Int): Int {
-                let incremented: Int(value + 1)
-
-                if incremented < 10 {
-                    return incremented * 2
-                } else {
-                    return 10 - value
-                }
-            }
-            """
+        let callable = CallableDeclaration(
+            macros: [],
+            attribute: nil,
+            targetType: nil,
+            name: "adjust",
+            genericParameters: [],
+            hasExplicitParameterClause: true,
+            parameters: [
+                RangeFunctionParameter(
+                    macros: [],
+                    name: "value",
+                    typeReference: .named("Int"),
+                    slotName: nil
+                )
+            ],
+            returnType: .named("Int"),
+            body: [
+                .localBinding(
+                    LocalBindingDeclaration(
+                        kind: .constant,
+                        name: "incremented",
+                        hasExplicitTypeAnnotation: true,
+                        type: .named("Int"),
+                        expression: .binary(
+                            lhs: .identifier("value"),
+                            operatorSymbol: .addition,
+                            rhs: .integer(1)
+                        )
+                    )
+                ),
+                .conditional([
+                    StatementConditionalBranch(
+                        condition: .binary(
+                            lhs: .identifier("incremented"),
+                            operatorSymbol: .less,
+                            rhs: .integer(10)
+                        ),
+                        body: [
+                            .return(
+                                .binary(
+                                    lhs: .identifier("incremented"),
+                                    operatorSymbol: .multiplication,
+                                    rhs: .integer(2)
+                                )
+                            )
+                        ]
+                    ),
+                    StatementConditionalBranch(
+                        condition: nil,
+                        body: [
+                            .return(
+                                .binary(
+                                    lhs: .integer(10),
+                                    operatorSymbol: .subtraction,
+                                    rhs: .identifier("value")
+                                )
+                            )
+                        ]
+                    ),
+                ]),
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -737,13 +897,25 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Float arithmetic lowers to LLVM double operations")
     func floatArithmeticLowersToLLVMDoubleOperations() throws {
-        let callable = try parseCallable(
-            """
-            function blend(lhs: Float, rhs: Float): Float {
-                let adjusted: Float(lhs + rhs * 2.0)
-                return adjusted / 3.0
-            }
-            """
+        let callable = callable(
+            "blend",
+            parameters: [
+                parameter("lhs", "Float"),
+                parameter("rhs", "Float"),
+            ],
+            returnType: .named("Float"),
+            body: [
+                local(
+                    "adjusted",
+                    typeName: "Float",
+                    expression: binary(
+                        id("lhs"),
+                        .addition,
+                        binary(id("rhs"), .multiplication, .double(2.0))
+                    )
+                ),
+                ret(binary(id("adjusted"), .division, .double(3.0))),
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -761,12 +933,16 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Mixed Int and Float operands lower through LLVM promotion")
     func mixedIntAndFloatOperandsLowerThroughLLVMPromotion() throws {
-        let callable = try parseCallable(
-            """
-            function mixed(lhs: Float, rhs: Int): Float {
-                return lhs + rhs
-            }
-            """
+        let callable = callable(
+            "mixed",
+            parameters: [
+                parameter("lhs", "Float"),
+                parameter("rhs", "Int"),
+            ],
+            returnType: .named("Float"),
+            body: [
+                ret(binary(id("lhs"), .addition, id("rhs")))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -782,12 +958,16 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Float comparison lowers to LLVM ordered comparison")
     func floatComparisonLowersToLLVMOrderedComparison() throws {
-        let callable = try parseCallable(
-            """
-            function floatLess(lhs: Float, rhs: Int): Bool {
-                return lhs < rhs
-            }
-            """
+        let callable = callable(
+            "floatLess",
+            parameters: [
+                parameter("lhs", "Float"),
+                parameter("rhs", "Int"),
+            ],
+            returnType: .named("Bool"),
+            body: [
+                ret(binary(id("lhs"), .less, id("rhs")))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -803,12 +983,16 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Explicit Int width lowers to matching LLVM integer type")
     func explicitIntWidthLowersToMatchingLLVMIntegerType() throws {
-        let callable = try parseCallable(
-            """
-            function wrapping(value: Int<8, .unsigned>): Int<8, .unsigned> {
-                return value + 1
-            }
-            """
+        let unsigned8 = TypeReference.named("Int<8, .unsigned>")
+        let callable = callable(
+            "wrapping",
+            parameters: [
+                parameter("value", unsigned8)
+            ],
+            returnType: unsigned8,
+            body: [
+                ret(binary(id("value"), .addition, .integer(1)))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -824,12 +1008,17 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Unsigned Int comparison and division use unsigned LLVM operations")
     func unsignedIntComparisonAndDivisionUseUnsignedLLVMOperations() throws {
-        let callable = try parseCallable(
-            """
-            function unsignedOps(lhs: Int<13, .unsigned>, rhs: Int<13, .unsigned>): Bool {
-                return lhs / rhs < rhs
-            }
-            """
+        let unsigned13 = TypeReference.named("Int<13, .unsigned>")
+        let callable = callable(
+            "unsignedOps",
+            parameters: [
+                parameter("lhs", unsigned13),
+                parameter("rhs", unsigned13),
+            ],
+            returnType: .named("Bool"),
+            body: [
+                ret(binary(binary(id("lhs"), .division, id("rhs")), .less, id("rhs")))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -844,12 +1033,17 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Signed custom-width Int comparison uses signed LLVM predicate")
     func signedCustomWidthIntComparisonUsesSignedLLVMPredicate() throws {
-        let callable = try parseCallable(
-            """
-            function signedLess(lhs: Int<13>, rhs: Int<13>): Bool {
-                return lhs < rhs
-            }
-            """
+        let signed13 = TypeReference.named("Int<13>")
+        let callable = callable(
+            "signedLess",
+            parameters: [
+                parameter("lhs", signed13),
+                parameter("rhs", signed13),
+            ],
+            returnType: .named("Bool"),
+            body: [
+                ret(binary(id("lhs"), .less, id("rhs")))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -863,12 +1057,17 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Scalar ternary lowers to LLVM select")
     func scalarTernaryLowersToLLVMSelect() throws {
-        let callable = try parseCallable(
-            """
-            function choose(flag: Bool, lhs: Int, rhs: Int): Int {
-                return flag ? lhs : rhs
-            }
-            """
+        let callable = callable(
+            "choose",
+            parameters: [
+                parameter("flag", "Bool"),
+                parameter("lhs", "Int"),
+                parameter("rhs", "Int"),
+            ],
+            returnType: .named("Int"),
+            body: [
+                ret(.ternary(condition: id("flag"), trueExpression: id("lhs"), falseExpression: id("rhs")))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -883,12 +1082,17 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Mixed scalar ternary promotes Int branch to Float")
     func mixedScalarTernaryPromotesIntBranchToFloat() throws {
-        let callable = try parseCallable(
-            """
-            function chooseFloat(flag: Bool, lhs: Float, rhs: Int): Float {
-                return flag ? lhs : rhs
-            }
-            """
+        let callable = callable(
+            "chooseFloat",
+            parameters: [
+                parameter("flag", "Bool"),
+                parameter("lhs", "Float"),
+                parameter("rhs", "Int"),
+            ],
+            returnType: .named("Float"),
+            body: [
+                ret(.ternary(condition: id("flag"), trueExpression: id("lhs"), falseExpression: id("rhs")))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -946,15 +1150,21 @@ struct LLVMLoweringEmitterTests {
                         rhs: .identifier("limit")
                     ),
                     body: [
-                        .compoundAssignment(
+                        .assignment(
                             target: .local("total"),
-                            operatorSymbol: .plusEquals,
-                            expression: .identifier("index")
+                            expression: .binary(
+                                lhs: .identifier("total"),
+                                operatorSymbol: .addition,
+                                rhs: .identifier("index")
+                            )
                         ),
-                        .compoundAssignment(
+                        .assignment(
                             target: .local("index"),
-                            operatorSymbol: .plusEquals,
-                            expression: .integer(1)
+                            expression: .binary(
+                                lhs: .identifier("index"),
+                                operatorSymbol: .addition,
+                                rhs: .integer(1)
+                            )
                         ),
                     ]
                 ),
@@ -976,12 +1186,16 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Int comparison can return Bool through LLVM")
     func intComparisonCanReturnBoolThroughLLVM() throws {
-        let callable = try parseCallable(
-            """
-            function isLess(lhs: Int, rhs: Int): Bool {
-                return lhs < rhs
-            }
-            """
+        let callable = callable(
+            "isLess",
+            parameters: [
+                parameter("lhs", "Int"),
+                parameter("rhs", "Int"),
+            ],
+            returnType: .named("Bool"),
+            body: [
+                ret(binary(id("lhs"), .less, id("rhs")))
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -996,13 +1210,21 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Bool operators can return Bool through LLVM")
     func boolOperatorsCanReturnBoolThroughLLVM() throws {
-        let callable = try parseCallable(
-            """
-            function both(lhs: Bool, rhs: Bool): Bool {
-                let combined: Bool(lhs && rhs)
-                return !combined
-            }
-            """
+        let callable = callable(
+            "both",
+            parameters: [
+                parameter("lhs", "Bool"),
+                parameter("rhs", "Bool"),
+            ],
+            returnType: .named("Bool"),
+            body: [
+                local(
+                    "combined",
+                    typeName: "Bool",
+                    expression: binary(id("lhs"), .and, id("rhs"))
+                ),
+                ret(.unary(operatorSymbol: .not, expression: id("combined"))),
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -1019,16 +1241,19 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Bool parameter can control Int return through LLVM")
     func boolParameterCanControlIntReturnThroughLLVM() throws {
-        let callable = try parseCallable(
-            """
-            function choose(flag: Bool, value: Int): Int {
-                if flag {
-                    return value
-                } else {
-                    return 0
-                }
-            }
-            """
+        let callable = callable(
+            "choose",
+            parameters: [
+                parameter("flag", "Bool"),
+                parameter("value", "Int"),
+            ],
+            returnType: .named("Int"),
+            body: [
+                .conditional([
+                    StatementConditionalBranch(condition: id("flag"), body: [ret(id("value"))]),
+                    StatementConditionalBranch(condition: nil, body: [ret(.integer(0))]),
+                ])
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -1042,139 +1267,31 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("ret i64 0"))
     }
 
-    @Test("Int switch lowers to LLVM switch")
-    func intSwitchLowersToLLVMSwitch() throws {
-        let callable = try parseCallable(
-            """
-            function classify(value: Int): Int {
-                switch value {
-                case 0:
-                    return 10
-                case 1:
-                    return 20
-                default:
-                    return 30
-                }
-            }
-            """
-        )
-
-        #expect(LLVMLowerability.canLower(callable))
-        let module = try #require(
-            try LLVMLoweringEmitter().emitModule(callables: [callable])
-        )
-
-        #expect(module.ir.contains("define i64 @RangeLLVM_classify(i64 %value)"))
-        #expect(module.ir.contains("switch i64 %value, label %switch.default."))
-        #expect(module.ir.contains("i64 0, label %switch.case."))
-        #expect(module.ir.contains("i64 1, label %switch.case."))
-        #expect(module.ir.contains("ret i64 10"))
-        #expect(module.ir.contains("ret i64 20"))
-        #expect(module.ir.contains("ret i64 30"))
-    }
-
-    @Test("Bool switch lowers to LLVM switch")
-    func boolSwitchLowersToLLVMSwitch() throws {
-        let callable = try parseCallable(
-            """
-            function boolScore(flag: Bool): Int {
-                switch flag {
-                case true:
-                    return 1
-                default:
-                    return 0
-                }
-            }
-            """
-        )
-
-        #expect(LLVMLowerability.canLower(callable))
-        let module = try #require(
-            try LLVMLoweringEmitter().emitModule(callables: [callable])
-        )
-
-        #expect(module.ir.contains("define i64 @RangeLLVM_boolScore(i1 %flag)"))
-        #expect(module.ir.contains("switch i1 %flag, label %switch.default."))
-        #expect(module.ir.contains("i1 1, label %switch.case."))
-        #expect(module.ir.contains("ret i64 1"))
-        #expect(module.ir.contains("ret i64 0"))
-    }
-
-    @Test("Non returning scalar switch branches join after LLVM switch")
-    func nonReturningScalarSwitchBranchesJoinAfterLLVMSwitch() throws {
-        let callable = try parseCallable(
-            """
-            function mapped(value: Int): Int {
-                state result: Int(0)
-
-                switch value {
-                case 0:
-                    state result: 10
-                case 1:
-                    state result: 20
-                default:
-                    state result: 30
-                }
-
-                return result
-            }
-            """
-        )
-
-        #expect(LLVMLowerability.canLower(callable))
-        let module = try #require(
-            try LLVMLoweringEmitter().emitModule(callables: [callable])
-        )
-
-        #expect(module.ir.contains("define i64 @RangeLLVM_mapped(i64 %value)"))
-        #expect(module.ir.contains("switch i64 %value, label %switch.default."))
-        #expect(module.ir.contains("br label %switch.end."))
-        #expect(module.ir.contains("switch.end."))
-        #expect(module.ir.contains("load i64, ptr %result.addr"))
-        #expect(module.ir.contains("ret i64"))
-    }
-
-    @Test("Scalar switch without default is not lowerable")
-    func scalarSwitchWithoutDefaultIsNotLowerable() throws {
-        let callable = try parseCallable(
-            """
-            function classify(value: Int): Int {
-                switch value {
-                case 0:
-                    return 10
-                }
-            }
-            """
-        )
-
-        #expect(LLVMLowerability.canLower(callable) == false)
-        #expect(
-            LLVMLowerability.rejectionReason(
-                for: callable,
-                lowerableFunctionSignatures: [:]
-            ) == "switch has no default"
-        )
-    }
-
     @Test("Bool state mutation in loop lowers to LLVM")
     func boolStateMutationInLoopLowersToLLVM() throws {
-        let callable = try parseCallable(
-            """
-            function reachesThreshold(limit: Int): Bool {
-                state index: Int(0)
-                state found: Bool(false)
-
-                while index < limit {
-                    if index > 10 {
-                        state found: true
-                    }
-
-                    state index: index + 1
-                }
-
-                return found
-            }
-            """
+        let callable = callable(
+            "reachesThreshold",
+            parameters: [
+                parameter("limit", "Int")
+            ],
+            returnType: .named("Bool"),
+            body: [
+                state("index", type: .named("Int"), expression: .integer(0)),
+                state("found", type: .named("Bool"), expression: .boolean(false)),
+                whileLoop(
+                    binary(id("index"), .less, id("limit")),
+                    [
+                        ifStatement(
+                            binary(id("index"), .greater, .integer(10)),
+                            [
+                                assign("found", .boolean(true))
+                            ]
+                        ),
+                        assign("index", binary(id("index"), .addition, .integer(1))),
+                    ]
+                ),
+                ret(id("found")),
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -1193,24 +1310,30 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Break in loop branches to LLVM loop end")
     func breakInLoopBranchesToLLVMLoopEnd() throws {
-        let callable = try parseCallable(
-            """
-            function firstOverTen(limit: Int): Bool {
-                state index: Int(0)
-                state found: Bool(false)
-
-                while index < limit {
-                    if index > 10 {
-                        state found: true
-                        break
-                    }
-
-                    state index: index + 1
-                }
-
-                return found
-            }
-            """
+        let callable = callable(
+            "firstOverTen",
+            parameters: [
+                parameter("limit", "Int")
+            ],
+            returnType: .named("Bool"),
+            body: [
+                state("index", type: .named("Int"), expression: .integer(0)),
+                state("found", type: .named("Bool"), expression: .boolean(false)),
+                whileLoop(
+                    binary(id("index"), .less, id("limit")),
+                    [
+                        ifStatement(
+                            binary(id("index"), .greater, .integer(10)),
+                            [
+                                assign("found", .boolean(true)),
+                                breakStatement(),
+                            ]
+                        ),
+                        assign("index", binary(id("index"), .addition, .integer(1))),
+                    ]
+                ),
+                ret(id("found")),
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -1227,25 +1350,34 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Continue in loop branches to LLVM loop condition")
     func continueInLoopBranchesToLLVMLoopCondition() throws {
-        let callable = try parseCallable(
-            """
-            function sumOdd(limit: Int): Int {
-                state index: Int(0)
-                state total: Int(0)
-
-                while index < limit {
-                    state index: index + 1
-
-                    if index % 2 == 0 {
-                        continue
-                    }
-
-                    state total: total + index
-                }
-
-                return total
-            }
-            """
+        let callable = callable(
+            "sumOdd",
+            parameters: [
+                parameter("limit", "Int")
+            ],
+            returnType: .named("Int"),
+            body: [
+                state("index", type: .named("Int"), expression: .integer(0)),
+                state("total", type: .named("Int"), expression: .integer(0)),
+                whileLoop(
+                    binary(id("index"), .less, id("limit")),
+                    [
+                        assign("index", binary(id("index"), .addition, .integer(1))),
+                        ifStatement(
+                            binary(
+                                binary(id("index"), .remainder, .integer(2)),
+                                .equal,
+                                .integer(0)
+                            ),
+                            [
+                                continueStatement()
+                            ]
+                        ),
+                        assign("total", binary(id("total"), .addition, id("index"))),
+                    ]
+                ),
+                ret(id("total")),
+            ]
         )
 
         #expect(LLVMLowerability.canLower(callable))
@@ -1263,18 +1395,36 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Calls between lowerable Int functions stay in LLVM")
     func callsBetweenLowerableIntFunctionsStayInLLVM() throws {
-        let module = try parseModule(
-            """
-            function add(lhs: Int, rhs: Int): Int {
-                return lhs + rhs
-            }
-
-            function sum3(x: Int, y: Int, z: Int): Int {
-                let partial: Int(add(lhs: x, rhs: y))
-                return add(lhs: partial, rhs: z)
-            }
-            """
-        )
+        let callables = [
+            callable(
+                "add",
+                parameters: [
+                    parameter("lhs", "Int"),
+                    parameter("rhs", "Int"),
+                ],
+                returnType: .named("Int"),
+                body: [
+                    ret(binary(id("lhs"), .addition, id("rhs")))
+                ]
+            ),
+            callable(
+                "sum3",
+                parameters: [
+                    parameter("x", "Int"),
+                    parameter("y", "Int"),
+                    parameter("z", "Int"),
+                ],
+                returnType: .named("Int"),
+                body: [
+                    local(
+                        "partial",
+                        typeName: "Int",
+                        expression: call("add", argument("lhs", id("x")), argument("rhs", id("y")))
+                    ),
+                    ret(call("add", argument("lhs", id("partial")), argument("rhs", id("z")))),
+                ]
+            ),
+        ]
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMCallPlanTests-\(UUID().uuidString)")
         defer {
@@ -1288,14 +1438,14 @@ struct LLVMLoweringEmitterTests {
                 enumerations: [],
                 declarations: [],
                 extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
+                mainBlock: BlockMacroNode(macros: [], body: []),
                 units: [
                     LoweredSourceUnit(
                         outputFileName: "Math.swift",
                         enumerations: [],
                         declarations: [],
                         extensions: [],
-                        callables: module.callables,
+                        callables: callables,
                         mainBlock: nil
                     )
                 ]
@@ -1326,27 +1476,7 @@ struct LLVMLoweringEmitterTests {
 
     @Test("LLVM IR links and runs through clang harness")
     func llvmIRLinksAndRunsThroughClangHarness() throws {
-        let callable = try parseCallable(
-            """
-            function nestedSum(limit: Int): Int {
-                state outer: Int(0)
-                state total: Int(0)
-
-                while outer < limit {
-                    state inner: Int(0)
-
-                    while inner < limit {
-                        state total: total + outer + inner
-                        state inner: inner + 1
-                    }
-
-                    state outer: outer + 1
-                }
-
-                return total
-            }
-            """
-        )
+        let callable = nestedSumCallable()
         let module = try #require(
             try LLVMLoweringEmitter().emitModule(callables: [callable])
         )
@@ -1396,12 +1526,16 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Swift workspace emission writes LLVM IR artifact")
     func swiftWorkspaceEmissionWritesLLVMIRArtifact() throws {
-        let callable = try parseCallable(
-            """
-            function multiply(lhs: Int, rhs: Int): Int {
-                return lhs * rhs
-            }
-            """
+        let callable = callable(
+            "multiply",
+            parameters: [
+                parameter("lhs", "Int"),
+                parameter("rhs", "Int"),
+            ],
+            returnType: .named("Int"),
+            body: [
+                ret(binary(id("lhs"), .multiplication, id("rhs")))
+            ]
         )
 
         let root = FileManager.default.temporaryDirectory
@@ -1417,7 +1551,7 @@ struct LLVMLoweringEmitterTests {
                 enumerations: [],
                 declarations: [],
                 extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
+                mainBlock: BlockMacroNode(macros: [], body: []),
                 units: [
                     LoweredSourceUnit(
                         outputFileName: "Main.swift",
@@ -1444,17 +1578,29 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Swift workspace emission writes hybrid emission report")
     func swiftWorkspaceEmissionWritesHybridEmissionReport() throws {
-        let source = try parseModule(
-            """
-            function add(lhs: Int, rhs: Int): Int {
-                return lhs + rhs
-            }
-
-            function greet(name: String): String {
-                return name
-            }
-            """
-        )
+        let callables = [
+            callable(
+                "add",
+                parameters: [
+                    parameter("lhs", "Int"),
+                    parameter("rhs", "Int"),
+                ],
+                returnType: .named("Int"),
+                body: [
+                    ret(binary(id("lhs"), .addition, id("rhs")))
+                ]
+            ),
+            callable(
+                "greet",
+                parameters: [
+                    parameter("name", "String")
+                ],
+                returnType: .named("String"),
+                body: [
+                    ret(id("name"))
+                ]
+            ),
+        ]
 
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMEmissionReportTests-\(UUID().uuidString)")
@@ -1463,24 +1609,7 @@ struct LLVMLoweringEmitterTests {
         }
 
         try SwiftBackendEmitter().emitWorkspace(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: source.enumerations,
-                declarations: source.constructs,
-                extensions: source.extensions,
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: [
-                    LoweredSourceUnit(
-                        outputFileName: "Main.swift",
-                        enumerations: [],
-                        declarations: [],
-                        extensions: [],
-                        callables: source.callables,
-                        mainBlock: source.mainBlock
-                    )
-                ]
-            ),
+            program: loweredProgram(callables: callables),
             at: root
         )
 
@@ -1498,17 +1627,17 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Swift workspace emission bridges calls to LLVM object")
     func swiftWorkspaceEmissionBridgesCallsToLLVMObject() throws {
-        let source = try parseModule(
-            """
-            function sum3(x: Int, y: Int, z: Int): Int {
-                return x + y + z
-            }
-
-            @main {
-                sum3(x: 1, y: 2, z: 3)
-            }
-            """
-        )
+        let callables = [sum3Callable()]
+        let mainBlockNode = mainBlock([
+            .expression(
+                call(
+                    "sum3",
+                    argument("x", .integer(1)),
+                    argument("y", .integer(2)),
+                    argument("z", .integer(3))
+                )
+            )
+        ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMBridgeTests-\(UUID().uuidString)")
         defer {
@@ -1516,24 +1645,7 @@ struct LLVMLoweringEmitterTests {
         }
 
         try SwiftBackendEmitter().emitWorkspace(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: [],
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: [
-                    LoweredSourceUnit(
-                        outputFileName: "Main.swift",
-                        enumerations: source.enumerations,
-                        declarations: source.constructs,
-                        extensions: source.extensions,
-                        callables: source.callables,
-                        mainBlock: source.mainBlock
-                    )
-                ]
-            ),
+            program: loweredProgram(callables: callables, mainBlock: mainBlockNode),
             at: root
         )
 
@@ -1561,25 +1673,19 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Swift workspace emission bridges mixed Bool and Int LLVM calls")
     func swiftWorkspaceEmissionBridgesMixedBoolAndIntLLVMCalls() throws {
-        let source = try parseModule(
-            """
-            function isLess(lhs: Int, rhs: Int): Bool {
-                return lhs < rhs
-            }
-
-            function choose(flag: Bool, value: Int): Int {
-                if flag {
-                    return value
-                } else {
-                    return 0
-                }
-            }
-
-            @main {
-                choose(flag: isLess(lhs: 1, rhs: 2), value: 42)
-            }
-            """
-        )
+        let callables = [isLessCallable(), chooseCallable()]
+        let mainBlockNode = mainBlock([
+            .expression(
+                call(
+                    "choose",
+                    argument(
+                        "flag",
+                        call("isLess", argument("lhs", .integer(1)), argument("rhs", .integer(2)))
+                    ),
+                    argument("value", .integer(42))
+                )
+            )
+        ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMMixedBridgeTests-\(UUID().uuidString)")
         defer {
@@ -1587,24 +1693,7 @@ struct LLVMLoweringEmitterTests {
         }
 
         try SwiftBackendEmitter().emitWorkspace(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: [],
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: [
-                    LoweredSourceUnit(
-                        outputFileName: "Main.swift",
-                        enumerations: source.enumerations,
-                        declarations: source.constructs,
-                        extensions: source.extensions,
-                        callables: source.callables,
-                        mainBlock: source.mainBlock
-                    )
-                ]
-            ),
+            program: loweredProgram(callables: callables, mainBlock: mainBlockNode),
             at: root
         )
 
@@ -1642,17 +1731,12 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Swift workspace emission bridges Float LLVM calls")
     func swiftWorkspaceEmissionBridgesFloatLLVMCalls() throws {
-        let source = try parseModule(
-            """
-            function mixed(lhs: Float, rhs: Int): Float {
-                return lhs + rhs
-            }
-
-            @main {
-                mixed(lhs: 1.5, rhs: 2)
-            }
-            """
-        )
+        let callables = [mixedCallable()]
+        let mainBlockNode = mainBlock([
+            .expression(
+                call("mixed", argument("lhs", .double(1.5)), argument("rhs", .integer(2)))
+            )
+        ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMFloatBridgeTests-\(UUID().uuidString)")
         defer {
@@ -1660,24 +1744,7 @@ struct LLVMLoweringEmitterTests {
         }
 
         try SwiftBackendEmitter().emitWorkspace(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: [],
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: [
-                    LoweredSourceUnit(
-                        outputFileName: "Main.swift",
-                        enumerations: source.enumerations,
-                        declarations: source.constructs,
-                        extensions: source.extensions,
-                        callables: source.callables,
-                        mainBlock: source.mainBlock
-                    )
-                ]
-            ),
+            program: loweredProgram(callables: callables, mainBlock: mainBlockNode),
             at: root
         )
 
@@ -1703,17 +1770,10 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Swift workspace emission bridges LLVM String returns")
     func swiftWorkspaceEmissionBridgesLLVMStringReturns() throws {
-        let source = try parseModule(
-            """
-            function greeting(): String {
-                return "hello"
-            }
-
-            @main {
-                greeting()
-            }
-            """
-        )
+        let callables = [greetingCallable()]
+        let mainBlockNode = mainBlock([
+            .expression(call("greeting"))
+        ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMStringBridgeTests-\(UUID().uuidString)")
         defer {
@@ -1721,24 +1781,7 @@ struct LLVMLoweringEmitterTests {
         }
 
         try SwiftBackendEmitter().emitWorkspace(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: [],
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: [
-                    LoweredSourceUnit(
-                        outputFileName: "Main.swift",
-                        enumerations: source.enumerations,
-                        declarations: source.constructs,
-                        extensions: source.extensions,
-                        callables: source.callables,
-                        mainBlock: source.mainBlock
-                    )
-                ]
-            ),
+            program: loweredProgram(callables: callables, mainBlock: mainBlockNode),
             at: root
         )
 
@@ -1764,27 +1807,35 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Swift workspace emission keeps construct helpers inside LLVM island")
     func swiftWorkspaceEmissionKeepsConstructHelpersInsideLLVMIsland() throws {
-        let source = try parseModule(
-            """
-            construct Point {
-                @let x: Int
-                @let y: Int
-            }
-
-            function make(): Point {
-                return Point(x: 2, y: 3)
-            }
-
-            function score(): Int {
-                let point: Point(make())
-                return point.x + point.y
-            }
-
-            @main {
-                score()
-            }
-            """
-        )
+        let declarations = [
+            construct(
+                "Point",
+                values: [
+                    value("x", typeName: "Int"),
+                    value("y", typeName: "Int"),
+                ]
+            )
+        ]
+        let callables = [
+            callable(
+                "make",
+                returnType: .named("Point"),
+                body: [
+                    ret(call("Point", argument("x", .integer(2)), argument("y", .integer(3))))
+                ]
+            ),
+            callable(
+                "score",
+                returnType: .named("Int"),
+                body: [
+                    local("point", typeName: "Point", expression: call("make")),
+                    ret(binary(id("point.x"), .addition, id("point.y"))),
+                ]
+            ),
+        ]
+        let mainBlockNode = mainBlock([
+            .expression(call("score"))
+        ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMConstructIslandTests-\(UUID().uuidString)")
         defer {
@@ -1792,23 +1843,10 @@ struct LLVMLoweringEmitterTests {
         }
 
         try SwiftBackendEmitter().emitWorkspace(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: [],
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: [
-                    LoweredSourceUnit(
-                        outputFileName: "Main.swift",
-                        enumerations: source.enumerations,
-                        declarations: source.constructs,
-                        extensions: source.extensions,
-                        callables: source.callables,
-                        mainBlock: source.mainBlock
-                    )
-                ]
+            program: loweredProgram(
+                declarations: declarations,
+                callables: callables,
+                mainBlock: mainBlockNode
             ),
             at: root
         )
@@ -1839,17 +1877,10 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Swift workspace emission bridges LLVM String arguments")
     func swiftWorkspaceEmissionBridgesLLVMStringArguments() throws {
-        let source = try parseModule(
-            """
-            function echo(value: String): String {
-                return value
-            }
-
-            @main {
-                echo(value: "hello")
-            }
-            """
-        )
+        let callables = [echoCallable()]
+        let mainBlockNode = mainBlock([
+            .expression(call("echo", argument("value", .string("hello"))))
+        ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMStringArgumentBridgeTests-\(UUID().uuidString)")
         defer {
@@ -1857,24 +1888,7 @@ struct LLVMLoweringEmitterTests {
         }
 
         try SwiftBackendEmitter().emitWorkspace(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: [],
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: [
-                    LoweredSourceUnit(
-                        outputFileName: "Main.swift",
-                        enumerations: source.enumerations,
-                        declarations: source.constructs,
-                        extensions: source.extensions,
-                        callables: source.callables,
-                        mainBlock: source.mainBlock
-                    )
-                ]
-            ),
+            program: loweredProgram(callables: callables, mainBlock: mainBlockNode),
             at: root
         )
 
@@ -1904,17 +1918,10 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Swift workspace emission bridges LLVM String isEmpty Bool returns")
     func swiftWorkspaceEmissionBridgesLLVMStringIsEmptyBoolReturns() throws {
-        let source = try parseModule(
-            """
-            function empty(value: String): Bool {
-                return value.isEmpty
-            }
-
-            @main {
-                empty(value: "")
-            }
-            """
-        )
+        let callables = [stringEmptyCallable()]
+        let mainBlockNode = mainBlock([
+            .expression(call("empty", argument("value", .string(""))))
+        ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMStringIsEmptyBridgeTests-\(UUID().uuidString)")
         defer {
@@ -1922,24 +1929,7 @@ struct LLVMLoweringEmitterTests {
         }
 
         try SwiftBackendEmitter().emitWorkspace(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: [],
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: [
-                    LoweredSourceUnit(
-                        outputFileName: "Main.swift",
-                        enumerations: source.enumerations,
-                        declarations: source.constructs,
-                        extensions: source.extensions,
-                        callables: source.callables,
-                        mainBlock: source.mainBlock
-                    )
-                ]
-            ),
+            program: loweredProgram(callables: callables, mainBlock: mainBlockNode),
             at: root
         )
 
@@ -1965,17 +1955,10 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Swift workspace emission bridges LLVM String byteCount Int returns")
     func swiftWorkspaceEmissionBridgesLLVMStringByteCountIntReturns() throws {
-        let source = try parseModule(
-            """
-            function size(value: String): Int {
-                return value.byteCount
-            }
-
-            @main {
-                size(value: "hé")
-            }
-            """
-        )
+        let callables = [stringSizeCallable()]
+        let mainBlockNode = mainBlock([
+            .expression(call("size", argument("value", .string("hé"))))
+        ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMStringByteCountBridgeTests-\(UUID().uuidString)")
         defer {
@@ -1983,24 +1966,7 @@ struct LLVMLoweringEmitterTests {
         }
 
         try SwiftBackendEmitter().emitWorkspace(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: [],
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: [
-                    LoweredSourceUnit(
-                        outputFileName: "Main.swift",
-                        enumerations: source.enumerations,
-                        declarations: source.constructs,
-                        extensions: source.extensions,
-                        callables: source.callables,
-                        mainBlock: source.mainBlock
-                    )
-                ]
-            ),
+            program: loweredProgram(callables: callables, mainBlock: mainBlockNode),
             at: root
         )
 
@@ -2026,17 +1992,15 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Swift workspace emission bridges LLVM Int array arguments")
     func swiftWorkspaceEmissionBridgesLLVMIntArrayArguments() throws {
-        let source = try parseModule(
-            """
-            function first(values: Array<Int>): Int {
-                return values.element(index: 0)
-            }
-
-            @main {
-                first(values: [1, 2, 3])
-            }
-            """
-        )
+        let callables = [firstArrayCallable()]
+        let mainBlockNode = mainBlock([
+            .expression(
+                call(
+                    "first",
+                    argument("values", .array([.integer(1), .integer(2), .integer(3)]))
+                )
+            )
+        ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMIntArrayBridgeTests-\(UUID().uuidString)")
         defer {
@@ -2044,24 +2008,7 @@ struct LLVMLoweringEmitterTests {
         }
 
         try SwiftBackendEmitter().emitWorkspace(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: [],
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: [
-                    LoweredSourceUnit(
-                        outputFileName: "Main.swift",
-                        enumerations: source.enumerations,
-                        declarations: source.constructs,
-                        extensions: source.extensions,
-                        callables: source.callables,
-                        mainBlock: source.mainBlock
-                    )
-                ]
-            ),
+            program: loweredProgram(callables: callables, mainBlock: mainBlockNode),
             at: root
         )
 
@@ -2088,21 +2035,30 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Swift workspace emission converts LLVM Float return for Swift wrappers")
     func swiftWorkspaceEmissionConvertsLLVMFloatReturnForSwiftWrappers() throws {
-        let source = try parseModule(
-            """
-            function mixed(lhs: Float, rhs: Int): Float {
-                return lhs + rhs
-            }
-
-            function describe(value: Float): String {
-                return "\\(value)"
-            }
-
-            @main {
-                describe(value: mixed(lhs: 1.5, rhs: 2))
-            }
-            """
-        )
+        let callables = [
+            mixedCallable(),
+            callable(
+                "describe",
+                parameters: [
+                    parameter("value", "Float")
+                ],
+                returnType: .named("String"),
+                body: [
+                    ret(call("String", id("value")))
+                ]
+            ),
+        ]
+        let mainBlockNode = mainBlock([
+            .expression(
+                call(
+                    "describe",
+                    argument(
+                        "value",
+                        call("mixed", argument("lhs", .double(1.5)), argument("rhs", .integer(2)))
+                    )
+                )
+            )
+        ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMFloatWrapperBridgeTests-\(UUID().uuidString)")
         defer {
@@ -2110,24 +2066,7 @@ struct LLVMLoweringEmitterTests {
         }
 
         try SwiftBackendEmitter().emitWorkspace(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: [],
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: [
-                    LoweredSourceUnit(
-                        outputFileName: "Main.swift",
-                        enumerations: source.enumerations,
-                        declarations: source.constructs,
-                        extensions: source.extensions,
-                        callables: source.callables,
-                        mainBlock: source.mainBlock
-                    )
-                ]
-            ),
+            program: loweredProgram(callables: callables, mainBlock: mainBlockNode),
             at: root
         )
 
@@ -2143,33 +2082,7 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Mixed scalar calls between LLVM functions stay in LLVM")
     func mixedScalarCallsBetweenLLVMFunctionsStayInLLVM() throws {
-        let module = try parseModule(
-            """
-            function isLess(lhs: Int, rhs: Int): Bool {
-                return lhs < rhs
-            }
-
-            function invert(value: Bool): Bool {
-                return !value
-            }
-
-            function choose(flag: Bool, value: Int): Int {
-                if flag {
-                    return value
-                } else {
-                    return 0
-                }
-            }
-
-            function chooseLower(lhs: Int, rhs: Int): Int {
-                if isLess(lhs: lhs, rhs: rhs) {
-                    return choose(flag: invert(value: false), value: lhs)
-                } else {
-                    return choose(flag: false, value: rhs)
-                }
-            }
-            """
-        )
+        let callables = mixedScalarCallChain()
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMMixedCallChainTests-\(UUID().uuidString)")
         defer {
@@ -2183,14 +2096,14 @@ struct LLVMLoweringEmitterTests {
                 enumerations: [],
                 declarations: [],
                 extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
+                mainBlock: BlockMacroNode(macros: [], body: []),
                 units: [
                     LoweredSourceUnit(
                         outputFileName: "Math.swift",
                         enumerations: [],
                         declarations: [],
                         extensions: [],
-                        callables: module.callables,
+                        callables: callables,
                         mainBlock: nil
                     )
                 ]
@@ -2221,21 +2134,29 @@ struct LLVMLoweringEmitterTests {
         #expect(!swift.contains("func chooseLower"))
     }
 
-    @Test("Range for loop lowers through adapter into LLVM while")
-    func rangeForLoopLowersThroughAdapterIntoLLVMWhile() throws {
-        let source = try parseModule(
-            """
-            function rangeSum(limit: Int): Int {
-                state total: Int(0)
-
-                for index in 0..<limit {
-                    state total: total + index
-                }
-
-                return total
-            }
-            """
-        )
+    @Test("Explicit while loop lowers through adapter into LLVM while")
+    func explicitWhileLoopLowersThroughAdapterIntoLLVMWhile() throws {
+        let callables = [
+            callable(
+                "rangeSum",
+                parameters: [
+                    parameter("limit", "Int")
+                ],
+                returnType: .named("Int"),
+                body: [
+                    state("total", type: .named("Int"), expression: .integer(0)),
+                    state("index", type: .named("Int"), expression: .integer(0)),
+                    whileLoop(
+                        binary(id("index"), .less, id("limit")),
+                        [
+                            assign("total", binary(id("total"), .addition, id("index"))),
+                            assign("index", binary(id("index"), .addition, .integer(1))),
+                        ]
+                    ),
+                    ret(id("total")),
+                ]
+            )
+        ]
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMRangeForTests-\(UUID().uuidString)")
         defer {
@@ -2243,24 +2164,7 @@ struct LLVMLoweringEmitterTests {
         }
 
         let program = SwiftLoweredProgramAdapter().adapt(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: [],
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: [
-                    LoweredSourceUnit(
-                        outputFileName: "Loops.swift",
-                        enumerations: source.enumerations,
-                        declarations: source.constructs,
-                        extensions: source.extensions,
-                        callables: source.callables,
-                        mainBlock: nil
-                    )
-                ]
-            )
+            program: loweredProgram(outputFileName: "Loops.swift", callables: callables)
         )
 
         try SwiftBackendEmitter().emitWorkspace(
@@ -2278,7 +2182,7 @@ struct LLVMLoweringEmitterTests {
         )
 
         #expect(ir.contains("define i64 @RangeLLVM_rangeSum(i64 %limit)"))
-        #expect(ir.contains("%__range_index_index.addr = alloca i64"))
+        #expect(ir.contains("%index.addr = alloca i64"))
         #expect(ir.contains("while.cond."))
         #expect(ir.contains("icmp slt i64"))
         #expect(ir.contains("add i64"))
@@ -2286,161 +2190,36 @@ struct LLVMLoweringEmitterTests {
         #expect(!swift.contains("func rangeSum"))
     }
 
-    @Test("LLVM fixture folder emits documented scalar support")
-    func llvmFixtureFolderEmitsDocumentedScalarSupport() throws {
-        let fixtureFiles = try llvmFixtureFiles()
-        var inputs = try rangeCoreInputs()
-        inputs.append(
-            contentsOf: try fixtureFiles.map {
-                SourceInput(
-                    path: $0.path,
-                    source: try String(contentsOf: $0, encoding: .utf8),
-                    role: .project
-                )
-            }
-        )
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let units = program.projectExpandedFiles.compactMap { parsedFile -> LoweredSourceUnit? in
-            guard case .module(let module) = parsedFile.sourceFile else {
-                return nil
-            }
-            let fileName =
-                URL(fileURLWithPath: parsedFile.path).deletingPathExtension().lastPathComponent
-                + ".swift"
-            return LoweredSourceUnit(
-                outputFileName: fileName,
-                enumerations: module.enumerations,
-                declarations: module.constructs,
-                extensions: module.extensions,
-                callables: module.callables,
-                mainBlock: module.mainBlock
-            )
-        }
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("RangeLLVMFixtureFolderTests-\(UUID().uuidString)")
-        defer {
-            try? FileManager.default.removeItem(at: root)
-        }
-
-        try SwiftBackendEmitter().emitWorkspace(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: [],
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: units
-            ),
-            at: root
-        )
-
-        let irURL = root.appendingPathComponent("LLVM/RangeScalar.ll")
-        let ir = try String(contentsOf: irURL, encoding: .utf8)
-        let sourceDirectory = root.appendingPathComponent("Sources", isDirectory: true)
-        let emittedSwift = try FileManager.default.contentsOfDirectory(
-            at: sourceDirectory,
-            includingPropertiesForKeys: nil
-        )
-        .filter { $0.pathExtension == "swift" && $0.lastPathComponent != "Runtime.swift" }
-        .map { try String(contentsOf: $0, encoding: .utf8) }
-        .joined(separator: "\n")
-
-        let expectedDefinitions = [
-            "define i64 @RangeLLVM_llvmAdd(i64 %lhs, i64 %rhs)",
-            "define i64 @RangeLLVM_llvmArithmetic(i64 %value)",
-            "define double @RangeLLVM_llvmFloatBlend(double %lhs, double %rhs)",
-            "define double @RangeLLVM_llvmMixedFloat(double %lhs, i64 %rhs)",
-            "define i1 @RangeLLVM_llvmFloatLess(double %lhs, i64 %rhs)",
-            "define double @RangeLLVM_llvmNestedFloatLoop(i64 %limit)",
-            "define i64 @RangeLLVM_llvmChooseInt(i1 %flag, i64 %lhs, i64 %rhs)",
-            "define double @RangeLLVM_llvmChooseFloat(i1 %flag, double %lhs, i64 %rhs)",
-            "define i1 @RangeLLVM_llvmIsLess(i64 %lhs, i64 %rhs)",
-            "define i1 @RangeLLVM_llvmBoth(i1 %lhs, i1 %rhs)",
-            "define i64 @RangeLLVM_llvmChoose(i1 %flag, i64 %value)",
-            "define i64 @RangeLLVM_llvmClassify(i64 %value)",
-            "define i64 @RangeLLVM_llvmBoolScore(i1 %flag)",
-            "define i64 @RangeLLVM_llvmNestedSum(i64 %limit)",
-            "define i1 @RangeLLVM_llvmReachesThreshold(i64 %limit)",
-            "define i1 @RangeLLVM_llvmFirstOverTen(i64 %limit)",
-            "define i64 @RangeLLVM_llvmSumOdd(i64 %limit)",
-            "define i1 @RangeLLVM_llvmInvert(i1 %value)",
-            "define i64 @RangeLLVM_llvmChooseLower(i64 %lhs, i64 %rhs)",
-        ]
-        for definition in expectedDefinitions {
-            #expect(ir.contains(definition))
-        }
-
-        #expect(ir.contains("br label %while.end"))
-        #expect(ir.contains("br label %while.cond"))
-        #expect(ir.contains("call i1 @RangeLLVM_llvmIsLess(i64 %lhs, i64 %rhs)"))
-        #expect(ir.contains("call i64 @RangeLLVM_llvmChoose(i1"))
-        #expect(ir.contains("fadd double"))
-        #expect(ir.contains("sitofp i64 %rhs to double"))
-        #expect(ir.contains("fcmp olt double"))
-        #expect(ir.contains("select i1 %flag, i64 %lhs, i64 %rhs"))
-        #expect(ir.contains("select i1 %flag, double %lhs"))
-        #expect(ir.contains("switch i64 %value, label %switch.default."))
-        #expect(ir.contains("switch i1 %flag, label %switch.default."))
-        #expect(ir.contains("define double @RangeLLVM_llvmNestedFloatLoop"))
-        #expect(ir.contains("sitofp i64"))
-
-        let expectedFunctionNames = [
-            "llvmAdd",
-            "llvmArithmetic",
-            "llvmFloatBlend",
-            "llvmMixedFloat",
-            "llvmFloatLess",
-            "llvmNestedFloatLoop",
-            "llvmChooseInt",
-            "llvmChooseFloat",
-            "llvmIsLess",
-            "llvmBoth",
-            "llvmChoose",
-            "llvmClassify",
-            "llvmBoolScore",
-            "llvmNestedSum",
-            "llvmReachesThreshold",
-            "llvmFirstOverTen",
-            "llvmSumOdd",
-            "llvmInvert",
-            "llvmChooseLower",
-        ]
-        for functionName in expectedFunctionNames {
-            #expect(!emittedSwift.contains("func \(functionName)"))
-        }
-    }
-
     @Test("Core Int carries evaluated @integer scalar metadata")
     func coreIntCarriesEvaluatedIntegerScalarMetadata() throws {
         let inputs = try rangeCoreInputs()
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
         let integerMacro = try #require(
             intConstruct.macros.first(where: { $0.name == "integer" }))
-        #expect(integerMacro.evaluatedStringValue == "i64")
+        #expect(integerMacro.evaluatedStringValue == "integer|bits=64|signedness=signed")
     }
 
     @Test("Int @integer macro evaluated value carries scalar metadata")
     func integerMacroEvaluatedValueCarriesScalarMetadata() throws {
         let inputs = try rangeCoreInputs()
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
         let integerMacro = try #require(
             intConstruct.macros.first(where: { $0.name == "integer" }))
-        #expect(integerMacro.evaluatedStringValue == "i64")
+        #expect(integerMacro.evaluatedStringValue == "integer|bits=64|signedness=signed")
     }
 
     @Test("Core Bool carries evaluated @bool scalar metadata")
     func coreBoolCarriesEvaluatedBoolScalarMetadata() throws {
         let inputs = try rangeCoreInputs()
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let boolConstruct = try #require(program.declarationGraph.constructsByName["Bool"])
         let boolMacro = try #require(
             boolConstruct.macros.first(where: { $0.name == "bool" }))
-        #expect(boolMacro.evaluatedStringValue == "i1")
+        #expect(boolMacro.evaluatedStringValue == "bool")
 
-        let declarations = constructDeclarations(in: program.expandedFiles)
+        let declarations = Array(program.declarationGraph.constructsByName.values)
         let scalarTypes = LLVMLowerability.scalarTypes(from: declarations)
         #expect(scalarTypes["Bool"] == .bool)
     }
@@ -2448,7 +2227,7 @@ struct LLVMLoweringEmitterTests {
     @Test("Capability LLVM emitter gathers scalar applications before declarations")
     func capabilityLLVMEmitterGathersScalarApplicationsBeforeDeclarations() throws {
         let inputs = try rangeCoreInputs()
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
 
         let emitter = CapabilityLLVMEmitter()
         let applications = emitter.collectScalarApplications(files: program.expandedFiles)
@@ -2465,11 +2244,6 @@ struct LLVMLoweringEmitterTests {
             }
         )
         #expect(
-            applications.contains {
-                $0.macroName == "float" && $0.targetName == "Float" && $0.resolvedValue == "double"
-            }
-        )
-        #expect(
             declarations.contains {
                 $0.macroName == "integer" && $0.targetName == "Int" && $0.llvmType == "i64"
             }
@@ -2479,17 +2253,12 @@ struct LLVMLoweringEmitterTests {
                 $0.macroName == "bool" && $0.targetName == "Bool" && $0.llvmType == "i1"
             }
         )
-        #expect(
-            declarations.contains {
-                $0.macroName == "float" && $0.targetName == "Float" && $0.llvmType == "double"
-            }
-        )
     }
 
-    @Test("Capability LLVM emitter keeps scalar declarations out of emitted IR")
-    func capabilityLLVMEmitterKeepsScalarDeclarationsOutOfEmittedIR() throws {
+    @Test("Capability LLVM emitter keeps scalar declarations out of main IR")
+    func capabilityLLVMEmitterKeepsScalarDeclarationsOutOfMainIR() throws {
         let inputs = try rangeCoreInputs()
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let module = CapabilityLLVMEmitter().emitModule(compiledProgram: program)
 
         #expect(
@@ -2502,173 +2271,41 @@ struct LLVMLoweringEmitterTests {
                 $0.targetName == "Bool" && $0.llvmType == "i1"
             }
         )
-        #expect(
-            module.scalarDeclarations.contains {
-                $0.targetName == "Float" && $0.llvmType == "double"
-            }
-        )
         #expect(!module.ir.contains("range.scalar"))
         #expect(!module.ir.contains("%Range.Int"))
         #expect(!module.ir.contains("%Range.Bool"))
-        #expect(!module.ir.contains("%Range.Float"))
-        #expect(module.ir.contains("define i3 @main()"))
-        #expect(module.ir.contains("ret i3 0"))
+        #expect(module.mainIR == nil)
+        #expect(module.ir.isEmpty)
     }
 
-    @Test("Capability LLVM emitter lowers Range integer add function")
-    func capabilityLLVMEmitterLowersRangeIntegerAddFunction() throws {
-        var inputs = try rangeCoreInputs()
-        inputs.append(
-            SourceInput(
-                path: "/tmp/CapabilityIntegerAdd.range",
-                source: """
-                    function add(lhs: Int, rhs: Int): Int {
-                        return lhs + rhs
-                    }
-                    """,
-                role: .project
-            )
-        )
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let module = CapabilityLLVMEmitter().emitModule(compiledProgram: program)
-
-        #expect(
-            module.functions.contains {
-                $0.rangeName == "add" && $0.returnType == "i64"
-            }
-        )
-        #expect(
-            module.ir.contains(
-                """
-                define i64 @RangeLLVM_add(i64 %lhs, i64 %rhs) {
-                entry:
-                  %1 = add i64 %lhs, %rhs
-                  ret i64 %1
-                }
-                """
-            )
-        )
-        #expect(module.ir.contains("call i64 @RangeLLVM_add(i64 1, i64 2)"))
-        #expect(module.ir.contains("ret i3 %2"))
-
-        let clang = URL(fileURLWithPath: "/usr/bin/clang")
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("RangeCapabilityLLVMAddTests-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: root) }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-
-        let irURL = root.appendingPathComponent("RangeScalar.ll")
-        let executableURL = root.appendingPathComponent("integer-add")
-        try module.ir.write(to: irURL, atomically: true, encoding: .utf8)
-
-        let compile = try run(
-            clang,
-            arguments: [irURL.path, "-O3", "-o", executableURL.path]
-        )
-        #expect(compile.status == 0)
-
-        let runResult = try run(executableURL, arguments: [])
-        #expect(runResult.status == 3)
-    }
-
-    @Test("Range @main macro lowers integer add statements to LLVM")
-    func rangeMainMacroLowersIntegerAddStatementsToLLVM() throws {
-        var inputs = try rangeCoreInputs()
-        inputs.append(
-            SourceInput(
-                path: "/tmp/MainIntegerAdd.range",
-                source: """
-                    @main {
-                        let x: Int(1)
-                        let y: Int(2)
-                        return x + y
-                    }
-                    """,
-                role: .project
-            )
-        )
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let module = CapabilityLLVMEmitter().emitModule(compiledProgram: program)
-
-        let mainIR = try #require(module.mainIR)
-        #expect(mainIR.contains("define i3 @main()"))
-        #expect(mainIR.contains("%x = add i64 0, 1"))
-        #expect(mainIR.contains("%y = add i64 0, 2"))
-        #expect(mainIR.contains("add i64 %x, %y"))
-        #expect(mainIR.contains("ret i3"))
-
-        let clang = URL(fileURLWithPath: "/usr/bin/clang")
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("RangeMainMacroLLVMAddTests-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: root) }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-
-        let irURL = root.appendingPathComponent("RangeScalar.ll")
-        let executableURL = root.appendingPathComponent("main-integer-add")
-        try module.ir.write(to: irURL, atomically: true, encoding: .utf8)
-
-        let compile = try run(
-            clang,
-            arguments: [irURL.path, "-O3", "-o", executableURL.path]
-        )
-        #expect(compile.status == 0)
-
-        let runResult = try run(executableURL, arguments: [])
-        #expect(runResult.status == 3)
-    }
-
-    @Test("Core String carries evaluated @string VM layout metadata")
-    func coreStringCarriesEvaluatedStringVMLayoutMetadata() throws {
+    @Test("Core String carries evaluated @string marker metadata")
+    func coreStringCarriesEvaluatedStringMarkerMetadata() throws {
         let inputs = try rangeCoreInputs()
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let stringConstruct = try #require(program.declarationGraph.constructsByName["String"])
         let stringMacro = try #require(
             stringConstruct.macros.first(where: { $0.name == "string" }))
-        let emitted = try #require(stringMacro.evaluatedStringValue)
-        #expect(emitted.contains("%Range.String = type { ptr, i64 }"))
-        #expect(emitted.contains("define %Range.String @RangeString_empty()"))
-        #expect(emitted.contains("define %Range.String @RangeString_fromBytes(ptr %bytes, i64 %length)"))
-        #expect(emitted.contains("define %Range.String @RangeString_concat(%Range.String %lhs, %Range.String %rhs)"))
-        #expect(emitted.contains("ret %Range.String"))
-    }
-
-    @Test("Core Array carries evaluated @array LLVM layout metadata")
-    func coreArrayCarriesEvaluatedArrayLLVMLayoutMetadata() throws {
-        let inputs = try rangeCoreInputs()
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let arrayConstruct = try #require(program.declarationGraph.constructsByName["Array"])
-        let arrayMacro = try #require(
-            arrayConstruct.macros.first(where: { $0.name == "array" }))
-        let emitted = try #require(arrayMacro.evaluatedStringValue)
-        #expect(emitted.contains("; range.array.generics = "))
-        #expect(emitted.contains("; range.array.elements = Element"))
-        #expect(emitted.contains("; range.array.lowering = lane-per-element"))
-        #expect(emitted.contains("; range.array.layout = { ptr, count, capacity }"))
-        #expect(emitted.contains("%Range.IntArray = type { ptr, i64, i64 }"))
-        #expect(emitted.contains("define %Range.IntArray @RangeIntArray_empty()"))
-        #expect(emitted.contains("define %Range.IntArray @RangeIntArray_withCapacity(i64 %capacity)"))
-        #expect(emitted.contains("define %Range.IntArray @RangeIntArray_fromBuffer(ptr %elements, i64 %count)"))
-        #expect(emitted.contains("define i64 @RangeIntArray_count(%Range.IntArray %array)"))
-        #expect(emitted.contains("define i1 @RangeIntArray_isEmpty(%Range.IntArray %array)"))
-        #expect(emitted.contains("define i64 @RangeIntArray_element(%Range.IntArray %array, i64 %index)"))
-        #expect(emitted.contains("define %Range.IntArray @RangeIntArray_update(%Range.IntArray %array, i64 %index, i64 %element)"))
-        #expect(emitted.contains("define %Range.IntArray @RangeIntArray_append(%Range.IntArray %array, i64 %element)"))
+        #expect(stringMacro.evaluatedStringValue == "string")
     }
 
     @Test("LLVM lowerability uses evaluated @integer scalar metadata")
     func llvmLowerabilityUsesEvaluatedIntegerScalarMetadata() throws {
         let inputs = try rangeCoreInputs()
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let declarations = constructDeclarations(in: program.expandedFiles)
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let declarations = Array(program.declarationGraph.constructsByName.values)
         let scalarTypes = LLVMLowerability.scalarTypes(from: declarations)
         #expect(scalarTypes["Int"] == .int(bits: 64, signed: true))
 
-        let callable = try parseCallable(
-            """
-            function add(lhs: Int, rhs: Int): Int {
-                return lhs + rhs
-            }
-            """
+        let callable = callable(
+            "add",
+            parameters: [
+                parameter("lhs", "Int"),
+                parameter("rhs", "Int"),
+            ],
+            returnType: .named("Int"),
+            body: [
+                ret(binary(id("lhs"), .addition, id("rhs")))
+            ]
         )
         let signature = try #require(
             LLVMLowerability.scalarSignature(for: callable, scalarTypes: scalarTypes)
@@ -2686,16 +2323,39 @@ struct LLVMLoweringEmitterTests {
 
     @Test("Extension member lowers directly through receiver scalar metadata")
     func extensionMemberLowersDirectlyThroughReceiverScalarMetadata() throws {
-        let extensionDeclaration = try parseExtension(
-            """
-            extension Int {
-                function +(lhs: Self, rhs: Self): Self {
-                    return lhs + rhs
-                }
-            }
-            """
+        let callable = CallableDeclaration(
+            macros: [],
+            attribute: nil,
+            targetType: nil,
+            receiverType: .named("Int"),
+            name: "+",
+            genericParameters: [],
+            hasExplicitParameterClause: true,
+            parameters: [
+                RangeFunctionParameter(
+                    macros: [],
+                    name: "lhs",
+                    typeReference: .named("Self"),
+                    slotName: nil
+                ),
+                RangeFunctionParameter(
+                    macros: [],
+                    name: "rhs",
+                    typeReference: .named("Self"),
+                    slotName: nil
+                ),
+            ],
+            returnType: .named("Self"),
+            body: [
+                .return(
+                    .binary(
+                        lhs: .identifier("lhs"),
+                        operatorSymbol: .addition,
+                        rhs: .identifier("rhs")
+                    )
+                )
+            ]
         )
-        let callable = try #require(extensionDeclaration.callables.first)
         let scalarTypes: [String: LLVMLowerability.ScalarType] = [
             "Int": .int(bits: 64, signed: true)
         ]
@@ -2714,40 +2374,8 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("define i64 @RangeLLVM_Int__(i64 %lhs, i64 %rhs)"))
     }
 
-    @Test("Swift backend public LLVM emission accepts function-only single file")
-    func swiftBackendPublicLLVMEmissionAcceptsFunctionOnlySingleFile() throws {
-        var inputs = try rangeCoreInputs()
-        let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("FunctionOnly-\(UUID().uuidString).range")
-        inputs.append(
-            SourceInput(
-                path: fileURL.path,
-                source: """
-                    function add(lhs: Int, rhs: Int): Int {
-                        return lhs + rhs
-                    }
-                    """,
-                role: .project
-            )
-        )
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let ir = try SwiftBackend().emitLLVMIR(
-            project: SwiftBackendProject(
-                projectFiles: [fileURL],
-                isSingleFile: true,
-                buildRoot: FileManager.default.temporaryDirectory
-                    .appendingPathComponent("RangeLLVM-\(UUID().uuidString)")
-            ),
-            compiledProgram: program
-        )
-
-        #expect(ir.contains("; ModuleID = 'RangeScalar'"))
-        #expect(ir.contains("define i64 @RangeLLVM_add(i64 %lhs, i64 %rhs)"))
-        #expect(!ir.contains("RangeGenerated"))
-    }
-
-    @Test("Swift backend public LLVM emission lowers @main block to main function")
-    func swiftBackendPublicLLVMEmissionLowersMainBlockToMainFunction() throws {
+    @Test("Swift backend public LLVM emission has no Swift-owned @main fallback")
+    func swiftBackendPublicLLVMEmissionHasNoSwiftOwnedMainFallback() throws {
         var inputs = try rangeCoreInputs()
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("MainBlock-\(UUID().uuidString).range")
@@ -2761,19 +2389,25 @@ struct LLVMLoweringEmitterTests {
                 role: .project
             )
         )
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let ir = try SwiftBackend().emitLLVMIR(
-            project: SwiftBackendProject(
-                projectFiles: [fileURL],
-                isSingleFile: true,
-                buildRoot: FileManager.default.temporaryDirectory
-                    .appendingPathComponent("RangeLLVM-\(UUID().uuidString)")
-            ),
-            compiledProgram: program
-        )
-
-        #expect(ir.contains("define i64 @main()"))
-        #expect(ir.contains("ret i64 0"))
+        let program = try CompilerPipeline().build(inputs: inputs)
+        do {
+            _ = try SwiftBackend().emitLLVMIR(
+                project: SwiftBackendProject(
+                    projectFiles: [fileURL],
+                    isSingleFile: true,
+                    buildRoot: FileManager.default.temporaryDirectory
+                        .appendingPathComponent("RangeLLVM-\(UUID().uuidString)")
+                ),
+                compiledProgram: program
+            )
+            Issue.record("Expected Swift backend LLVM emission to reject @main-only source.")
+        } catch let error as SwiftBackendError {
+            #expect(
+                error.message.contains(
+                    "Range program has no LLVM-lowerable declarations."
+                )
+            )
+        }
     }
 
     @Test("Concrete @llvm body is collected, written, and run through clang")
@@ -2785,19 +2419,21 @@ struct LLVMLoweringEmitterTests {
             SourceInput(
                 path: "/tmp/ConcreteLLVM.range",
                 source: """
-                    macro concreteLLVM(): Construct -> String { target, diagnostics in
-                        return @llvm(body: "define i64 @range_concrete_answer() {\nentry:\n  ret i64 42\n}")
+                    @macro(name: "concreteLLVM", result: "String", target: "@syntax") {
+                        @return(value: "@llvm(body: \\"define i64 @range_concrete_answer() {\\nentry:\\n  ret i64 42\\n}\\")")
                     }
 
                     @concreteLLVM
-                    construct ConcreteAnswer {
-                        @let value: Int
+                    @construct(name: "ConcreteAnswer") {
+                        @let(name: "value") {
+                            @value(type: "Int")
+                        }
                     }
                     """,
                 role: .project
             )
         )
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().build(inputs: inputs)
         let construct = try #require(program.declarationGraph.constructsByName["ConcreteAnswer"])
         let concreteLLVM = try #require(
             construct.macros.first(where: { $0.name == "concreteLLVM" })?
@@ -2833,6 +2469,9 @@ struct LLVMLoweringEmitterTests {
             clang,
             arguments: [irURL.path, harnessURL.path, "-O3", "-o", executableURL.path]
         )
+        if compile.status != 0 {
+            Issue.record("clang failed:\n\(compile.stderr)\nIR:\n\(ir)")
+        }
         #expect(compile.status == 0)
 
         let runResult = try run(executableURL, arguments: [])
@@ -2850,83 +2489,460 @@ struct LLVMLoweringEmitterTests {
         #expect(lines == ["%r = add i32 %lhs, %rhs", "ret i32 %r"])
     }
 
-    private func parseCallable(_ source: String) throws -> CallableDeclaration {
-        var parser = try Parser(source: source)
-        let sourceFile = try parser.parseSourceFile()
-
-        switch sourceFile {
-        case .module(let module):
-            return try #require(module.callables.first)
-        case .construct, .enumeration, .macro, .extensions, .mainBlock:
-            Issue.record("Expected module source file with a callable.")
-            throw LLVMLoweringEmitterTestError.expectedCallable
-        }
+    private func loweredProgram(
+        outputFileName: String = "Main.swift",
+        declarations: [ConstructDeclaration] = [],
+        callables: [CallableDeclaration],
+        mainBlock: BlockMacroNode? = nil
+    ) -> LoweredProgram {
+        LoweredProgram(
+            macrosByName: [:],
+            callables: [],
+            enumerations: [],
+            declarations: [],
+            extensions: [],
+            mainBlock: BlockMacroNode(macros: [], body: []),
+            units: [
+                LoweredSourceUnit(
+                    outputFileName: outputFileName,
+                    enumerations: [],
+                    declarations: declarations,
+                    extensions: [],
+                    callables: callables,
+                    mainBlock: mainBlock
+                )
+            ]
+        )
     }
 
-    private func parseConstruct(_ source: String) throws -> ConstructDeclaration {
-        var parser = try Parser(source: source)
-        let sourceFile = try parser.parseSourceFile()
-
-        switch sourceFile {
-        case .construct(let construct):
-            return construct
-        case .module(let module):
-            return try #require(module.constructs.first)
-        case .enumeration, .macro, .extensions, .mainBlock:
-            Issue.record("Expected construct source file.")
-            throw LLVMLoweringEmitterTestError.expectedCallable
-        }
+    private func mainBlock(_ body: [Statement]) -> BlockMacroNode {
+        BlockMacroNode(
+            macros: [
+                MacroApplication(name: "main", genericArguments: [], argumentClause: nil)
+            ],
+            body: body
+        )
     }
 
-    private func parseModule(_ source: String) throws -> ModuleFileNode {
-        var parser = try Parser(source: source)
-        let sourceFile = try parser.parseSourceFile()
-
-        switch sourceFile {
-        case .module(let module):
-            return module
-        case .construct, .enumeration, .macro, .extensions, .mainBlock:
-            Issue.record("Expected module source file.")
-            throw LLVMLoweringEmitterTestError.expectedCallable
-        }
+    private func callable(
+        _ name: String,
+        parameters: [RangeFunctionParameter] = [],
+        returnType: TypeReference?,
+        body: [Statement]
+    ) -> CallableDeclaration {
+        CallableDeclaration(
+            macros: [],
+            attribute: nil,
+            targetType: nil,
+            name: name,
+            genericParameters: [],
+            hasExplicitParameterClause: true,
+            parameters: parameters,
+            returnType: returnType,
+            body: body
+        )
     }
 
-    private func parseExtension(_ source: String) throws -> ExtensionDeclaration {
-        var parser = try Parser(source: source)
-        let sourceFile = try parser.parseSourceFile()
-
-        switch sourceFile {
-        case .extensions(let declarations):
-            return try #require(declarations.first)
-        case .module(let module):
-            return try #require(module.extensions.first)
-        case .construct, .enumeration, .macro, .mainBlock:
-            Issue.record("Expected extension source file.")
-            throw LLVMLoweringEmitterTestError.expectedCallable
-        }
+    private func parameter(_ name: String, _ typeName: String) -> RangeFunctionParameter {
+        parameter(name, .named(typeName))
     }
 
-    private func compileCallable(_ source: String) throws -> CallableDeclaration {
-        var inputs = try rangeCoreInputs()
-        inputs.append(
-            SourceInput(
-                path: "/tmp/RangeEmissionTests/LLVMFixture.range",
-                source: source,
-                role: .project
+    private func parameter(
+        _ name: String,
+        _ typeReference: TypeReference
+    ) -> RangeFunctionParameter {
+        RangeFunctionParameter(
+            macros: [],
+            name: name,
+            typeReference: typeReference,
+            slotName: nil
+        )
+    }
+
+    private func ret(_ expression: RangeExpression) -> Statement {
+        .return(expression)
+    }
+
+    private func local(
+        _ name: String,
+        typeName: String,
+        expression: RangeExpression
+    ) -> Statement {
+        .localBinding(
+            LocalBindingDeclaration(
+                kind: .constant,
+                name: name,
+                hasExplicitTypeAnnotation: true,
+                type: .named(typeName),
+                expression: expression
             )
         )
+    }
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        for parsedFile in program.projectExpandedFiles {
-            if case .module(let module) = parsedFile.sourceFile,
-                let callable = module.callables.first
-            {
-                return callable
+    private func state(
+        _ name: String,
+        type: TypeReference,
+        expression: RangeExpression
+    ) -> Statement {
+        .localBinding(
+            LocalBindingDeclaration(
+                kind: .mutable,
+                name: name,
+                hasExplicitTypeAnnotation: true,
+                type: type,
+                expression: expression
+            )
+        )
+    }
+
+    private func assign(_ name: String, _ expression: RangeExpression) -> Statement {
+        .assignment(target: .local(name), expression: expression)
+    }
+
+    private func whileLoop(
+        _ condition: RangeExpression,
+        _ body: [Statement]
+    ) -> Statement {
+        .whileLoop(condition: condition, body: body)
+    }
+
+    private func ifStatement(
+        _ condition: RangeExpression,
+        _ body: [Statement]
+    ) -> Statement {
+        .conditional([
+            StatementConditionalBranch(condition: condition, body: body)
+        ])
+    }
+
+    private func breakStatement() -> Statement {
+        .emitted("statement|kind=break")
+    }
+
+    private func continueStatement() -> Statement {
+        .emitted("statement|kind=continue")
+    }
+
+    private func id(_ name: String) -> RangeExpression {
+        .identifier(name)
+    }
+
+    private func call(_ name: String) -> RangeExpression {
+        .call(name: name, arguments: [])
+    }
+
+    private func call(_ name: String, _ arguments: RangeExpression...) -> RangeExpression {
+        .call(
+            name: name,
+            arguments: arguments.map { CallArgument(label: nil, value: $0) }
+        )
+    }
+
+    private func call(_ name: String, _ arguments: CallArgument...) -> RangeExpression {
+        .call(name: name, arguments: arguments)
+    }
+
+    private func argument(_ label: String, _ value: RangeExpression) -> CallArgument {
+        CallArgument(label: label, value: value)
+    }
+
+    private func binary(
+        _ lhs: RangeExpression,
+        _ operatorSymbol: BinaryOperator,
+        _ rhs: RangeExpression
+    ) -> RangeExpression {
+        .binary(lhs: lhs, operatorSymbol: operatorSymbol, rhs: rhs)
+    }
+
+    private func nestedSumCallable() -> CallableDeclaration {
+        callable(
+            "nestedSum",
+            parameters: [
+                parameter("limit", "Int")
+            ],
+            returnType: .named("Int"),
+            body: [
+                state("outer", type: .named("Int"), expression: .integer(0)),
+                state("total", type: .named("Int"), expression: .integer(0)),
+                whileLoop(
+                    binary(id("outer"), .less, id("limit")),
+                    [
+                        state("inner", type: .named("Int"), expression: .integer(0)),
+                        whileLoop(
+                            binary(id("inner"), .less, id("limit")),
+                            [
+                                assign(
+                                    "total",
+                                    binary(
+                                        binary(id("total"), .addition, id("outer")),
+                                        .addition,
+                                        id("inner")
+                                    )
+                                ),
+                                assign("inner", binary(id("inner"), .addition, .integer(1))),
+                            ]
+                        ),
+                        assign("outer", binary(id("outer"), .addition, .integer(1))),
+                    ]
+                ),
+                ret(id("total")),
+            ]
+        )
+    }
+
+    private func sum3Callable() -> CallableDeclaration {
+        callable(
+            "sum3",
+            parameters: [
+                parameter("x", "Int"),
+                parameter("y", "Int"),
+                parameter("z", "Int"),
+            ],
+            returnType: .named("Int"),
+            body: [
+                ret(binary(binary(id("x"), .addition, id("y")), .addition, id("z")))
+            ]
+        )
+    }
+
+    private func isLessCallable() -> CallableDeclaration {
+        callable(
+            "isLess",
+            parameters: [
+                parameter("lhs", "Int"),
+                parameter("rhs", "Int"),
+            ],
+            returnType: .named("Bool"),
+            body: [
+                ret(binary(id("lhs"), .less, id("rhs")))
+            ]
+        )
+    }
+
+    private func chooseCallable() -> CallableDeclaration {
+        callable(
+            "choose",
+            parameters: [
+                parameter("flag", "Bool"),
+                parameter("value", "Int"),
+            ],
+            returnType: .named("Int"),
+            body: [
+                .conditional([
+                    StatementConditionalBranch(condition: id("flag"), body: [ret(id("value"))]),
+                    StatementConditionalBranch(condition: nil, body: [ret(.integer(0))]),
+                ])
+            ]
+        )
+    }
+
+    private func mixedCallable() -> CallableDeclaration {
+        callable(
+            "mixed",
+            parameters: [
+                parameter("lhs", "Float"),
+                parameter("rhs", "Int"),
+            ],
+            returnType: .named("Float"),
+            body: [
+                ret(binary(id("lhs"), .addition, id("rhs")))
+            ]
+        )
+    }
+
+    private func greetingCallable() -> CallableDeclaration {
+        callable(
+            "greeting",
+            returnType: .named("String"),
+            body: [
+                ret(.string("hello"))
+            ]
+        )
+    }
+
+    private func echoCallable() -> CallableDeclaration {
+        callable(
+            "echo",
+            parameters: [
+                parameter("value", "String")
+            ],
+            returnType: .named("String"),
+            body: [
+                ret(id("value"))
+            ]
+        )
+    }
+
+    private func stringEmptyCallable() -> CallableDeclaration {
+        callable(
+            "empty",
+            parameters: [
+                parameter("value", "String")
+            ],
+            returnType: .named("Bool"),
+            body: [
+                ret(id("value.isEmpty"))
+            ]
+        )
+    }
+
+    private func stringSizeCallable() -> CallableDeclaration {
+        callable(
+            "size",
+            parameters: [
+                parameter("value", "String")
+            ],
+            returnType: .named("Int"),
+            body: [
+                ret(id("value.byteCount"))
+            ]
+        )
+    }
+
+    private func firstArrayCallable() -> CallableDeclaration {
+        callable(
+            "first",
+            parameters: [
+                parameter("values", .array(.named("Int")))
+            ],
+            returnType: .named("Int"),
+            body: [
+                ret(call("values.element", argument("index", .integer(0))))
+            ]
+        )
+    }
+
+    private func mixedScalarCallChain() -> [CallableDeclaration] {
+        [
+            callable(
+                "isLess",
+                parameters: [
+                    parameter("lhs", "Int"),
+                    parameter("rhs", "Int"),
+                ],
+                returnType: .named("Bool"),
+                body: [
+                    ret(binary(id("lhs"), .less, id("rhs")))
+                ]
+            ),
+            callable(
+                "invert",
+                parameters: [
+                    parameter("value", "Bool")
+                ],
+                returnType: .named("Bool"),
+                body: [
+                    ret(.unary(operatorSymbol: .not, expression: id("value")))
+                ]
+            ),
+            callable(
+                "choose",
+                parameters: [
+                    parameter("flag", "Bool"),
+                    parameter("value", "Int"),
+                ],
+                returnType: .named("Int"),
+                body: [
+                    .conditional([
+                        StatementConditionalBranch(condition: id("flag"), body: [ret(id("value"))]),
+                        StatementConditionalBranch(condition: nil, body: [ret(.integer(0))]),
+                    ])
+                ]
+            ),
+            callable(
+                "chooseLower",
+                parameters: [
+                    parameter("lhs", "Int"),
+                    parameter("rhs", "Int"),
+                ],
+                returnType: .named("Int"),
+                body: [
+                    .conditional([
+                        StatementConditionalBranch(
+                            condition: call(
+                                "isLess",
+                                argument("lhs", id("lhs")),
+                                argument("rhs", id("rhs"))
+                            ),
+                            body: [
+                                ret(
+                                    call(
+                                        "choose",
+                                        argument(
+                                            "flag",
+                                            call("invert", argument("value", .boolean(false)))
+                                        ),
+                                        argument("value", id("lhs"))
+                                    )
+                                )
+                            ]
+                        ),
+                        StatementConditionalBranch(
+                            condition: nil,
+                            body: [
+                                ret(
+                                    call(
+                                        "choose",
+                                        argument("flag", .boolean(false)),
+                                        argument("value", id("rhs"))
+                                    )
+                                )
+                            ]
+                        ),
+                    ])
+                ]
+            ),
+        ]
+    }
+
+    private func construct(
+        _ name: String,
+        values: [ValueDeclaration] = []
+    ) -> ConstructDeclaration {
+        ConstructDeclaration(
+            macros: [],
+            kind: .declaration,
+            attribute: nil,
+            name: name,
+            genericParameters: [],
+            conformances: [],
+            states: [],
+            bindings: [],
+            deriveds: [],
+            values: values,
+            initializers: [],
+            callables: [],
+            constructs: []
+        )
+    }
+
+    private func value(
+        _ name: String,
+        typeName: String,
+        value: RangeCompiler.Expression? = nil
+    ) -> ValueDeclaration {
+        ValueDeclaration(
+            macros: [],
+            name: name,
+            typeName: typeName,
+            value: value
+        )
+    }
+
+    private func mainBlock(in module: ModuleFileNode) -> BlockMacroNode? {
+        module.blockMacros.first(where: { $0.macros.first?.name == "main" })
+    }
+
+    private func callableDeclarations(in module: ModuleFileNode) -> [CallableDeclaration] {
+        module.constructs.flatMap(callableDeclarations(in:))
+            + module.extensions.flatMap { extensionDeclaration in
+                extensionDeclaration.callables
+                    + extensionDeclaration.constructs.flatMap(callableDeclarations(in:))
             }
-        }
+    }
 
-        Issue.record("Expected compiled project module with a callable.")
-        throw LLVMLoweringEmitterTestError.expectedCallable
+    private func callableDeclarations(in construct: ConstructDeclaration) -> [CallableDeclaration] {
+        construct.callables + construct.constructs.flatMap(callableDeclarations(in:))
     }
 
     private func rangeCoreInputs() throws -> [SourceInput] {
@@ -2943,25 +2959,12 @@ struct LLVMLoweringEmitterTests {
             excludingExploration: true
         )
 
-    return try files.map { file in
+        return try files.map { file in
             SourceInput(
                 path: file.path,
                 source: try String(contentsOf: file, encoding: .utf8),
                 role: .core
             )
-        }
-    }
-
-    private func constructDeclarations(in files: [ParsedSourceFile]) -> [ConstructDeclaration] {
-        files.flatMap { parsedFile -> [ConstructDeclaration] in
-            switch parsedFile.sourceFile {
-            case .module(let module):
-                return module.constructs
-            case .construct(let construct):
-                return [construct]
-            case .enumeration, .macro, .extensions, .mainBlock:
-                return []
-            }
         }
     }
 
@@ -3027,14 +3030,6 @@ struct LLVMLoweringEmitterTests {
             current.deleteLastPathComponent()
         }
         throw LLVMLoweringEmitterTestError.missingDirectory("repository root")
-    }
-
-    private func llvmFixtureFiles() throws -> [URL] {
-        let root = try repositoryRoot()
-            .appendingPathComponent("Tests", isDirectory: true)
-            .appendingPathComponent("Emission", isDirectory: true)
-            .appendingPathComponent("LLVM", isDirectory: true)
-        return try rangeFiles(in: root, excludingExploration: false)
     }
 
     private func run(_ executableURL: URL, arguments: [String]) throws -> (

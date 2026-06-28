@@ -49,7 +49,7 @@ struct PackageSearcherTests {
                 description: "Example Range package",
                 stars: 42,
                 url: URL(string: "https://github.com/range/example-package")!,
-                manifestURL: URL(string: "https://raw.githubusercontent.com/range/example-package/main/Package.range")!,
+                manifestURL: URL(string: "https://raw.githubusercontent.com/range/example-package/main/Project.range")!,
                 pushedAt: "2026-05-01T00:00:00Z"
             )
         ])

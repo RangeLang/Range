@@ -16,7 +16,7 @@ public enum ExpressionTypeSemantics {
             return .intLiteral
         case .double:
             return .floatLiteral
-        case .string, .interpolatedString:
+        case .string:
             return .stringLiteral
         case .boolean:
             return .boolLiteral
@@ -589,7 +589,7 @@ public enum ExpressionTypeSemantics {
 
     public static func isLiteralExpression(_ expression: Expression) -> Bool {
         switch expression {
-        case .integer, .double, .string, .interpolatedString, .boolean, .nilLiteral, .array,
+        case .integer, .double, .string, .boolean, .nilLiteral, .array,
             .dictionary:
             return true
         case .block, .macroInvocation, .identifier, .call, .bindingReference, .ternary, .unary,

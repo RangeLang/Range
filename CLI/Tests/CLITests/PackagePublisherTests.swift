@@ -8,12 +8,12 @@ struct PackagePublisherTests {
     func patchPublishBumpsPackageVersion() throws {
         let root = try temporaryProject(version: "0.1.0")
         let published = try PackagePublisher(projectPath: root.path).publish(.patch)
-        let source = try String(contentsOf: root.appendingPathComponent("Package.range"), encoding: .utf8)
+        let source = try String(contentsOf: root.appendingPathComponent("Project.range"), encoding: .utf8)
 
         #expect(published.name == "Fixture")
         #expect(published.version == "0.1.1")
         #expect(published.git == .skipped("not a git repository"))
-        #expect(source.contains(#"let version: Version(0.1.1)"#))
+        #expect(source.contains(#"@value(type: "Version", current: "Version(0.1.1)")"#))
     }
 
     @Test("Minor and major publish reset lower version components")
@@ -31,7 +31,7 @@ struct PackagePublisherTests {
         try run("git", "init", in: root)
         try run("git", "config", "user.email", "test@example.com", in: root)
         try run("git", "config", "user.name", "Test User", in: root)
-        try run("git", "add", "Package.range", in: root)
+        try run("git", "add", "Project.range", in: root)
         try run("git", "commit", "-m", "Initial package", in: root)
 
         let published = try PackagePublisher(projectPath: root.path).publish(.patch, push: false)
@@ -51,13 +51,18 @@ struct PackagePublisherTests {
             .appendingPathComponent("range-package-publish-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try """
-            @package
-            construct Project {
-                let name: Title("Fixture")
-                let version: Version(\(version))
-                let author: "Test Author"
+            @construct(name: "Project") {
+                @let(name: "name") {
+                    @value(type: "Title", current: "Title(\\\"Fixture\\\")")
+                }
+                @let(name: "version") {
+                    @value(type: "Version", current: "Version(\(version))")
+                }
+                @let(name: "author") {
+                    @value(type: "String", current: "String(\\\"Test Author\\\")")
+                }
             }
-            """.write(to: root.appendingPathComponent("Package.range"), atomically: true, encoding: .utf8)
+            """.write(to: root.appendingPathComponent("Project.range"), atomically: true, encoding: .utf8)
         return root
     }
 

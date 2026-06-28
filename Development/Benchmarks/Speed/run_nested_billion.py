@@ -130,23 +130,19 @@ def main() -> int:
     run(["cc", "-O3", str(c_source), "-o", str(c_binary)])
 
     project_manifest = """
-        @project
-        construct Project {
-            let name: Title("RangeNestedBillion")
-            let version: Version(0.1.0)
-            let author: "George"
-        }
-        """
-    package_manifest = """
-        @package
-        construct RangeNestedBillion {
-            let name: Title("RangeNestedBillion")
-            let version: Version(0.1.0)
-            let author: "George"
+        @construct(name: "Project") {
+            @let(name: "name") {
+                @value(type: "Title", current: "Title(\\"RangeNestedBillion\\")")
+            }
+            @let(name: "version") {
+                @value(type: "Version", current: "Version(0.1.0)")
+            }
+            @let(name: "author") {
+                @value(type: "String", current: "String(\\"George\\")")
+            }
         }
         """
     write_text(range_project / "Project.range", project_manifest)
-    write_text(range_project / "Package.range", package_manifest)
     write_text(
         range_project / "Playground.range",
         f"""

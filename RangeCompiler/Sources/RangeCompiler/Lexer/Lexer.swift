@@ -462,12 +462,11 @@ struct SwiftLexerCursor {
     ) -> Result<String, SwiftLexingError> {
         _ = advance()
         var result = ""
-        var interpolationDepth = 0
 
         while !isAtEnd() {
             let character = currentCharacter()
 
-            if character == "\"" && interpolationDepth == 0 {
+            if character == "\"" {
                 _ = advance()
                 return .success(result)
             }
@@ -484,28 +483,7 @@ struct SwiftLexerCursor {
                 }
                 let escaped = advance()
                 result += "\\" + escaped
-                if escaped == "(" {
-                    interpolationDepth += 1
-                }
                 continue
-            }
-
-            if interpolationDepth > 0 {
-                if character == "\"" {
-                    switch readInterpolatedStringLiteral(start: start) {
-                    case .success(let value):
-                        result += value
-                    case .failure(let error):
-                        return .failure(error)
-                    }
-                    continue
-                }
-
-                if character == "(" {
-                    interpolationDepth += 1
-                } else if character == ")" {
-                    interpolationDepth -= 1
-                }
             }
 
             result += character
@@ -513,42 +491,6 @@ struct SwiftLexerCursor {
         }
 
         return .failure(lexicalFailure(message: "Unterminated string literal.", start: start))
-    }
-
-    mutating func readInterpolatedStringLiteral(
-        start: SwiftLexerPosition
-    ) -> Result<String, SwiftLexingError> {
-        var result = "\""
-        _ = advance()
-
-        while !isAtEnd() {
-            let character = currentCharacter()
-            result += character
-            _ = advance()
-
-            if character == "\\" {
-                if isAtEnd() {
-                    return .failure(
-                        lexicalFailure(
-                            message: "Unterminated escape sequence in string literal.",
-                            start: start
-                        )
-                    )
-                }
-                let escaped = advance()
-                result += escaped
-                continue
-            }
-
-            if character == "\"" {
-                return .success(result)
-            }
-        }
-
-        return .failure(
-            lexicalFailure(
-                message: "Unterminated string literal inside interpolation.", start: start)
-        )
     }
 
     mutating func readForeignBodyBlock(
@@ -655,36 +597,7 @@ struct SwiftLexerCursor {
     }
 
     func isKeyword(_ value: String) -> Bool {
-        value == "let"
-            || value == "state"
-            || value == "binding"
-            || value == "derived"
-            || value == "extension"
-            || value == "for"
-            || value == "in"
-            || value == "case"
-            || value == "if"
-            || value == "else"
-            || value == "while"
-            || value == "return"
-            || value == "break"
-            || value == "continue"
-            || value == "switch"
-            || value == "default"
-            || value == "enum"
-            || value == "protocol"
-            || value == "construct"
-            || value == "macro"
-            || value == "open"
-            || value == "closed"
-            || value == "function"
-            || value == "get"
-            || value == "set"
-            || value == "precedencegroup"
-            || value == "infix"
-            || value == "prefix"
-            || value == "postfix"
-            || value == "operator"
+        value == "in"
     }
 
     private func singleASCIIByte(_ value: String) -> UInt8? {

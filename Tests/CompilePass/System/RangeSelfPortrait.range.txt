@@ -1,0 +1,4 @@
+Historical fixture placeholder.
+
+The old self-portrait fixture read the Swift-hosted application graph artifact.
+That graph artifact path was removed while shrinking the Swift host surface.

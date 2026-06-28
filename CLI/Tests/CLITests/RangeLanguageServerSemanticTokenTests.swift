@@ -4,91 +4,32 @@ import Testing
 
 @Suite("Range LSP semantic tokens")
 struct RangeLanguageServerSemanticTokenTests {
-    @Test("Type declarations and usages are split semantically")
-    func typeDeclarationsAndUsagesSplit() {
+    @Test("Explicit macro applications emit semantic tokens")
+    func explicitMacroApplicationsEmitSemanticTokens() {
         let source = """
-        construct Something {
-            let number: Int
-        }
-
-        @main {
-            let item = Something()
+        @construct(name: "Panel") {
+            @let(name: "enabled") {
+                @value(type: "Bool", current: "Bool(false)")
+            }
+            @state(name: "count", value: "Int(0)")
         }
         """
 
         let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
-        #expect(containsExactToken(tokens, text: "@main", type: .keyword, modifiers: []))
-        #expect(containsToken(tokens, text: "Something", type: .type, modifiers: [.declaration]))
-        #expect(containsToken(tokens, text: "Int", type: .type, modifiers: []))
-        #expect(containsExactToken(tokens, text: "Something", type: .type, modifiers: []))
-    }
-
-    @Test("Functions, variables, parameters, and member semantics are emitted")
-    func declarationsAndMembersEmitSemanticTokens() {
-        let source = """
-        function identity(_ value: Int): Int {
-            let number: Int = 0
-            Logger.info(number)
-            return value
-        }
-
-        function fetchUsername(_ id: Int): String {
-            return ""
-        }
-
-        function refreshUser(_ id: Int) {
-            let username = fetchUsername(id)
-            Logger.info(username)
-        }
-
-        macro arrayifyParameter(): Parameter { target, diagnostics in
-            target.declaration.type.replace(with:
-                ArrayTypeReference(
-                    element: target.declaration.type
-                )
-            )
-        }
-        """
-
-        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
-
-        #expect(containsToken(tokens, text: "identity", type: .function, modifiers: [.declaration]))
-        #expect(containsToken(tokens, text: "number", type: .variable, modifiers: [.declaration]))
-        #expect(containsToken(tokens, text: "number", type: .variable, modifiers: [.argument]))
-        #expect(containsToken(tokens, text: "username", type: .variable, modifiers: [.argument]))
-        #expect(containsToken(tokens, text: "arrayifyParameter", type: .macro, modifiers: [.declaration]))
-        #expect(containsToken(tokens, text: "declaration", type: .property, modifiers: []))
-        #expect(containsToken(tokens, text: "replace", type: .method, modifiers: []))
-    }
-
-    @Test("Constructor argument labels are method-style tokens, not parameter declarations")
-    func constructorArgumentLabelsEmitMethodTokens() {
-        let source = """
-        construct FixtureConstruct {
-            let number: Int
-        }
-
-        @main {
-            let result: FixtureConstruct = FixtureConstruct(number: 1)
-        }
-        """
-
-        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
-
-        #expect(containsExactToken(tokens, text: "number", type: .method, modifiers: []))
-        #expect(!containsToken(tokens, text: "number", type: .parameter, modifiers: [.declaration]))
+        #expect(containsExactToken(tokens, text: "@construct", type: .macro, modifiers: []))
+        #expect(containsExactToken(tokens, text: "@let", type: .macro, modifiers: []))
+        #expect(containsExactToken(tokens, text: "@value", type: .macro, modifiers: []))
+        #expect(containsExactToken(tokens, text: "@state", type: .macro, modifiers: []))
+        #expect(!containsExactToken(tokens, text: "Bool", type: .type, modifiers: []))
+        #expect(!containsExactToken(tokens, text: "Int", type: .type, modifiers: []))
     }
 
     @Test("Type reference argument labels emit type application tokens")
     func typeReferenceArgumentLabelsEmitTypeApplicationTokens() {
         let source = """
-        macro arrayifyParameter(): Parameter { target, diagnostics in
-            target.declaration.type.replace(with:
-                ArrayTypeReference(
-                    element: target.declaration.type
-                )
-            )
+        @main {
+            @return(value: ArrayTypeReference(element: target))
         }
         """
 
@@ -98,194 +39,60 @@ struct RangeLanguageServerSemanticTokenTests {
         #expect(containsExactToken(tokens, text: "element", type: .type, modifiers: [.application]))
     }
 
-    @Test("Generic function declarations emit function and parameter declaration tokens")
-    func genericFunctionDeclarationsEmitDeclarationTokens() {
-        let source = """
-        function load<Value, Failure>(
-            target target: binding Promise<Value, Failure>,
-            @autoclosure task: Result<Value, Failure>
-        ) {
-            switch task() {
-            case .success(let item):
-                target = .success(result: item)
-            }
-        }
-        """
-
-        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
-
-        #expect(containsToken(tokens, text: "load", type: .function, modifiers: [.declaration]))
-        #expect(containsToken(tokens, text: "task", type: .parameter, modifiers: [.declaration]))
-        #expect(!containsExactToken(tokens, text: "task", type: .method, modifiers: []))
-    }
-
-    @Test("Operator function declarations emit declaration tokens")
-    func operatorFunctionDeclarationsEmitDeclarationTokens() {
-        let source = """
-        protocol Comparable: Equatable {
-            function <(lhs: Self, rhs: Self): Bool
-        }
-        """
-
-        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
-
-        #expect(containsExactToken(tokens, text: "function", type: .keyword, modifiers: []))
-        #expect(containsExactToken(tokens, text: "<", type: .function, modifiers: [.declaration]))
-        #expect(containsExactToken(tokens, text: "lhs", type: .parameter, modifiers: [.declaration]))
-        #expect(containsExactToken(tokens, text: "rhs", type: .parameter, modifiers: [.declaration]))
-        #expect(!containsExactToken(tokens, text: "lhs", type: .method, modifiers: []))
-        #expect(!containsExactToken(tokens, text: "rhs", type: .method, modifiers: []))
-    }
-
-    @Test("Switch pattern bindings stay plain text")
-    func switchPatternBindingsStayPlainText() {
-        let source = """
-        function encode(): Result<Void, EncodingError> {
-            switch container.encode(id, forKey: "id") {
-            case .success:
-                break
-            case .failure(let error):
-                return .failure(cause: error)
-            }
-        }
-        """
-
-        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
-
-        #expect(!containsExactToken(tokens, text: "error", type: .variable, modifiers: [.declaration]))
-        #expect(!containsExactToken(tokens, text: "error", type: .variable, modifiers: [.argument]))
-        #expect(!containsExactToken(tokens, text: "error", type: .variable, modifiers: []))
-    }
-
-    @Test("Parameter references stay plain text")
-    func parameterReferencesStayPlainText() {
-        let source = """
-        macro clamped<T: Comparable>(min: T, max: T): State<T> { target, diagnostics in
-            target.initializer { value in
-                Math.clamp(value: value, min: min, max: max)
-            }
-        }
-        """
-
-        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
-        let highlightedParameterReferences = tokens.filter { token in
-            token.line == 2
-                && (token.text == "min" || token.text == "max")
-                && (token.type == .parameter || token.type == .variable)
-        }
-
-        #expect(containsExactToken(tokens, text: "min", type: .parameter, modifiers: [.declaration]))
-        #expect(containsExactToken(tokens, text: "max", type: .parameter, modifiers: [.declaration]))
-        #expect(highlightedParameterReferences.isEmpty)
-    }
-
     @Test("Definition ignores argument labels")
     func definitionIgnoresArgumentLabels() {
         let source = """
-        macro clamped<T: Comparable>(min: T, max: T): State<T> { target, diagnostics in
-            target.initializer { value in
-                Math.clamp(value: value, min: min, max: max)
-            }
-        }
-        """
-        let support = """
-        construct Let<T> {
-            let value: Expression?
-        }
-        """
-
-        let definition = RangeLanguageServer.debugDefinitionSnapshot(
-            in: source,
-            line: 2,
-            character: 20,
-            supportDocuments: [(uri: "file:///Let.range", text: support)]
-        )
-
-        #expect(definition == nil)
-    }
-
-    @Test("Definition resolves core types through graph")
-    func definitionResolvesCoreTypesThroughGraph() {
-        let source = """
         @main {
-            let enabled: Bool(true)
+            @return(value: Math.clamp(value: Int(1), min: Int(0), max: Int(2)))
         }
         """
         let support = """
-        construct Bool {
+        @construct(name: "Math") {
         }
         """
 
         let definition = RangeLanguageServer.debugDefinitionSnapshot(
             in: source,
             line: 1,
-            character: 17,
+            character: 31,
+            supportDocuments: [(uri: "file:///Math.range", text: support)]
+        )
+
+        #expect(definition == nil)
+    }
+
+    @Test("Definition ignores type names inside macro string payloads")
+    func definitionIgnoresTypeNamesInsideMacroStringPayloads() {
+        let source = """
+        @construct(name: "Panel") {
+            @let(name: "enabled") {
+                @value(type: "Bool", current: "Bool(true)")
+            }
+        }
+        """
+        let support = """
+        @construct(name: "Bool") {
+        }
+        """
+
+        let definition = RangeLanguageServer.debugDefinitionSnapshot(
+            in: source,
+            line: 2,
+            character: 27,
             supportDocuments: [(uri: "file:///Bool.range", text: support)]
         )
 
-        #expect(definition?.uri == "file:///Bool.range")
-        #expect(definition?.name == "Bool")
-    }
-
-    @Test("External parameter labels emit plain label semantic tokens")
-    func externalParameterLabelsEmitLabelTokens() {
-        let source = """
-        protocol KeyedDecodingContainer {
-            function decode(_ type: Bool.Type, forKey key: String): Result<Bool, DecodingError>
-        }
-        """
-
-        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
-
-        #expect(containsExactToken(tokens, text: "forKey", type: .label, modifiers: [.declaration]))
-        #expect(containsExactToken(tokens, text: "_", type: .label, modifiers: [.declaration]))
-        #expect(!containsExactToken(tokens, text: "type", type: .parameter, modifiers: [.declaration]))
-        #expect(!containsExactToken(tokens, text: "key", type: .parameter, modifiers: [.declaration]))
-        #expect(!containsExactToken(tokens, text: "forKey", type: .property, modifiers: []))
-    }
-
-    @Test("Two-name parameters keep internal names plain")
-    func twoNameParametersKeepInternalNamesPlain() {
-        let source = """
-        extension User: Encodable {
-            function encode(to encoder: Encoder): Result<Void, EncodingError> {
-                let container: KeyedEncodingContainer = encoder.keyedContainer()
-                return .success(result: Void())
-            }
-        }
-        """
-
-        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
-
-        #expect(containsExactToken(tokens, text: "to", type: .label, modifiers: [.declaration]))
-        #expect(!containsExactToken(tokens, text: "encoder", type: .parameter, modifiers: [.declaration]))
-    }
-
-    @Test("Underscore external labels are declaration tokens")
-    func underscoreExternalLabelsAreDeclarationTokens() {
-        let source = """
-        macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, diagnostics in
-            target.declaration.expand {
-            }
-        }
-        """
-
-        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
-
-        #expect(containsExactToken(tokens, text: "_", type: .label, modifiers: [.declaration]))
-        #expect(!containsExactToken(tokens, text: "strategy", type: .parameter, modifiers: [.declaration]))
+        #expect(definition == nil)
     }
 
     @Test("Macro applications, including parameter macros, emit semantic tokens")
     func macroApplicationsEmitSemanticTokens() {
         let source = """
-        function takeMany(@variadic values: Int): [Int] {
-            return values
+        @parameter(name: "values") {
+            @variadic
+            @value(type: "Array<Int>")
         }
-
-        @main {
-            let text = @stringify(1 + 2)
-        }
+        @stringify(value: "Int(1) + Int(2)")
         """
 
         let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
@@ -297,8 +104,8 @@ struct RangeLanguageServerSemanticTokenTests {
     @Test("String interpolation contents stay plain text")
     func stringInterpolationContentsStayPlainText() {
         let source = #"""
-        macro stringify(_ value: capture Expression): Expression -> String { target, diagnostics in
-            target.replace(with: "\(value)")
+        @macro(name: "stringify", result: "String") {
+            @return(value: "\(value)")
         }
         """#
 
@@ -316,113 +123,108 @@ struct RangeLanguageServerSemanticTokenTests {
     @Test("Macro declarations emit semantic tokens")
     func macroDeclarationsEmitSemanticTokens() {
         let source = """
-        macro codingKey<T>(_ value: String): Let<T> -> String {
-            return value
+        @macro(name: "codingKey", result: "String") {
+            @parameter(name: "value") {
+                @value(type: "String")
+            }
+            @return(value: value)
         }
         """
 
         let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
-        #expect(containsExactToken(tokens, text: "macro", type: .keyword, modifiers: []))
-        #expect(containsToken(tokens, text: "codingKey", type: .macro, modifiers: [.declaration]))
-        #expect(containsExactToken(tokens, text: "_", type: .label, modifiers: [.declaration]))
-        #expect(!containsExactToken(tokens, text: "value", type: .parameter, modifiers: [.declaration]))
-    }
-
-    @Test("Nil emits a keyword semantic token")
-    func nilEmitsKeywordToken() {
-        let source = """
-        function fallback(): String? {
-            return nil
-        }
-        """
-
-        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
-
-        #expect(containsExactToken(tokens, text: "nil", type: .keyword, modifiers: []))
-    }
-
-    @Test("Enum case declarations emit enum member semantic tokens")
-    func enumCaseDeclarationsEmitEnumMemberTokens() {
-        let source = """
-        enum EncodingError {
-            case failed
-        }
-        """
-
-        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
-
-        #expect(containsExactToken(tokens, text: "failed", type: .enumMember, modifiers: [.declaration]))
+        #expect(containsExactToken(tokens, text: "@macro", type: .macro, modifiers: []))
+        #expect(containsExactToken(tokens, text: "@parameter", type: .macro, modifiers: []))
+        #expect(containsExactToken(tokens, text: "@return", type: .macro, modifiers: []))
+        #expect(!containsToken(tokens, text: "codingKey", type: .macro, modifiers: [.declaration]))
     }
 
     @Test("Documented package syntax emits semantic tokens")
     func documentedPackageSyntaxEmitsSemanticTokens() {
         let source = """
-        @package
-        construct Project {
-            let name: Title("Example")
-            let version: Version(0.1.0)
+        @construct(name: "Project") {
+            @let(name: "name") {
+                @value(type: "Title", current: "Title(\\"Example\\")")
+            }
+            @let(name: "version") {
+                @value(type: "Version", current: "Version(0.1.0)")
+            }
         }
 
-        construct Language {
-            let defaultLocale: String("en")
+        @construct(name: "Language") {
+            @let(name: "defaultLocale") {
+                @value(type: "String", current: "String(\\"en\\")")
+            }
         }
 
-        construct Panel {
-            let count: Optional<Int>(5)
-            let value: Optional<Int>
+        @construct(name: "Panel") {
+            @let(name: "count") {
+                @value(type: "Optional<Int>", current: "Optional<Int>(5)")
+            }
+            @let(name: "value") {
+                @value(type: "Optional<Int>")
+            }
         }
         """
 
         let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
-        #expect(containsExactToken(tokens, text: "@package", type: .keyword, modifiers: []))
-        #expect(containsExactToken(tokens, text: "Title", type: .type, modifiers: []))
-        #expect(containsExactToken(tokens, text: "Version", type: .type, modifiers: []))
-        #expect(containsExactToken(tokens, text: "Optional", type: .type, modifiers: []))
-        #expect(containsExactToken(tokens, text: "Int", type: .type, modifiers: []))
+        #expect(containsExactToken(tokens, text: "@construct", type: .macro, modifiers: []))
+        #expect(containsExactToken(tokens, text: "@let", type: .macro, modifiers: []))
+        #expect(containsExactToken(tokens, text: "@value", type: .macro, modifiers: []))
+        #expect(!containsExactToken(tokens, text: "Title", type: .type, modifiers: []))
+        #expect(!containsExactToken(tokens, text: "Version", type: .type, modifiers: []))
+        #expect(!containsExactToken(tokens, text: "Optional", type: .type, modifiers: []))
+        #expect(!containsExactToken(tokens, text: "Int", type: .type, modifiers: []))
     }
 
     @Test("Member call receivers do not emit plain variable read tokens")
     func memberCallReceiversDoNotEmitVariableReadTokens() {
         let source = """
         @main {
-            let output = Channel<String>()
-            output.send("george")
-            state received = output.receive()
+            @return(value: output.send(String("george")))
         }
         """
 
         let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "send", type: .method, modifiers: []))
-        #expect(containsExactToken(tokens, text: "receive", type: .method, modifiers: []))
         #expect(!containsExactToken(tokens, text: "output", type: .variable, modifiers: []))
     }
 
     @Test("Formatting indents documented metadata syntax without counting string braces")
     func formattingIndentsDocumentedMetadataSyntaxWithoutCountingStringBraces() {
         let source = """
-        @package
-        construct Project {
-        let name: Title("Example {")
-        let version: Version(0.1.0) // )
+        @construct(name: "Project") {
+        @let(name: "name") {
+        @value(type: "Title", current: "Title(\\"Example {\\")")
         }
-        construct Panel {
-        let title: String
+        @let(name: "version") {
+        @value(type: "Version", current: "Version(0.1.0)") // )
+        }
+        }
+        @construct(name: "Panel") {
+        @let(name: "title") {
+        @value(type: "String")
+        }
         }
         """
 
         let formatted = RangeLanguageServer.debugFormattedDocument(source)
 
         #expect(formatted == """
-        @package
-        construct Project {
-          let name: Title("Example {")
-          let version: Version(0.1.0) // )
+        @construct(name: "Project") {
+          @let(name: "name") {
+            @value(type: "Title", current: "Title(\\"Example {\\")")
+          }
+          @let(name: "version") {
+            @value(type: "Version", current: "Version(0.1.0)") // )
+          }
         }
-        construct Panel {
-          let title: String
+        @construct(name: "Panel") {
+          @let(name: "title") {
+            @value(type: "String")
+          }
         }
         """)
     }
