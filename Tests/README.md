@@ -1,90 +1,27 @@
 # Tests
 
-This folder holds `.range` source files used by compiler regression tests.
+This folder is a quarantine for historical Range source examples.
 
-- `CompilePass`: files that must parse and build through the current compiler pipeline.
-- `CompileFail`: files that must fail parsing, expansion, or emission.
+Active compiler coverage no longer sweeps `CompilePass`, `CompileFail`, or
+`RunPass` as `.range` input fixtures. Those files described the old model where
+the Range parser/type checker/macro expander (Swift) owned language constructs
+such as bare `construct`, `function`, `let`, `if`, `while`, `return`, literals,
+and operator forms.
 
-These are compiler fixtures, not the future Range-native testing library.
+The macro-first direction keeps active source tests focused on the macro carrier
+surface:
 
-## Adding Fixtures
+- `@macro ...`
+- `@macro(...) { ... }`
+- top-level macro blocks such as `@construct(name: "...") { ... }`
+- explicit macro statement forms such as `@return`, `@if`, `@while`, `@state`,
+  `@let`, and `@assignment`
 
-Create new compiler fixtures in this folder, not inline inside Swift test files.
+Historical examples are retained as `.range.txt` so they can be referenced while
+Range-authored macro surfaces replace the old Swift-owned language model. Do not
+rename those files back to `.range` unless the source has been converted to the
+macro-carrier surface and the test is intentionally reintroduced.
 
-- Put validating examples in `CompilePass/<Category>/Name.range`.
-- Put expected-failure examples in `CompileFail/<Category>/Name.range`.
-- Reuse an existing category when possible. Add a new category only when it
-  reflects a real compiler surface that is starting to accumulate coverage.
-- Name fixtures after the behavior being protected, not after the test method.
-  Good examples: `ClampedState.range`, `InitMacroRewrite.range`,
-  `UnknownAttribute.range`.
-- Keep each fixture focused. Prefer one behavior per file unless the behaviors
-  are inseparable.
-- If a Swift test needs to inspect expanded AST or graph details for one
-  specific fixture, load the fixture file by path from `Tests` rather than
-  embedding the `.range` source directly in the test.
-
-Current top-level layout:
-
-- `CompilePass/Macros`: macro expansion fixtures
-- `CompilePass/System`: core language/system behavior that should build
-- `CompilePass/Concurrency`: concurrency behavior that should build
-- `CompileFail/...`: negative fixtures grouped by the same surface areas
-
-The default rule is simple: if it is compiler input worth keeping around, it
-belongs in `Tests`.
-
-## Roadmap
-
-The current fixture surface is intentionally small. Add categories only when
-they protect real compiler behavior.
-
-- `CompileFail` diagnostics: require specific error text or diagnostic codes,
-  not just "any failure".
-- `RunPass`: compile and run the generated program, then check stdout, stderr,
-  and exit status.
-- `EmitSwift`: compile through the Swift backend and compare important emitted
-  Swift shapes.
-- `Artifacts`: verify compiler artifacts such as tokens, AST dumps, and lowered
-  IR once those formats stabilize.
-- `ParsePass` / `ParseFail`: add parser-only fixtures if syntax work starts
-  changing faster than full pipeline checks.
-
-This folder is the high-level testing surface. As Range-native testing grows,
-keep compiler fixtures and user-facing test examples grouped clearly under it.
-
-## Macro Fixtures
-
-The current macro fixtures cover only the supported bootstrap surface:
-
-- base literal attachment through `@literal` on literal-capable constructs
-- init-targeted call-site rewrite from attached init macros
-- function-targeted macro attachment and rewrite-site validation
-- function nested argument-slot rewrite shape (`target.call.arguments[i].expression.rewrite(...)`)
-- construct-target macro attachment validation
-- construct extension-surface call shape (`target.addExtension(...)`)
-- parameter-targeted `#autoclosure`
-- nested parameter application rewrite (`target.application.expression.rewrite(...)`)
-- parameter declaration type rewrite (`target.declaration.type.rewrite(...)`)
-- parameter single-application rewrite (`target.application.expression.rewrite(...)`)
-- expression-targeted `#stringify(...)`
-- expression-targeted rewrite through `target.rewrite(...)`, including
-  `#unwrap(...)` and a custom macro fixture
-- custom `@capture<Expression>` macro parameters
-- generic expression macro result substitution, for example
-  `#unwrap<T>(...) -> T` inferring the expanded expression result type
-- syntax-category expression macro parameters must use typed `@capture`, for example
-  `@capture<Expression> _ value: Expression`
-- invalid capture usage, for example `@capture<String> _ value: String`
-- missing capture metadata, for example bare `@capture _ value: Expression`
-- invalid rewrite-site usage for a macro target kind, for example a
-  `Parameter` macro using `target.rewrite(...)`
-- invalid nested parameter rewrite-site usage, for example
-  `target.application.rewrite(...)`
-- invalid rewrite-site usage for `Function` target macros, for example
-  `target.rewrite(...)` instead of `target.application.rewrite(...)`
-- invalid construct rewrite-site usage, for example `target.rewrite(...)` on a
-  `Construct` target macro
-- function nested rewrite execution gap fixture (expected fail until function
-  call-site rewrite execution is fully enabled)
-- parameter-targeted `#variadic` rewriting against the expanded parameter type
+Prefer focused Swift tests with inline Range source for now. That keeps each
+active test tied to the current bootstrap contract instead of reviving a broad
+fixture sweep.
