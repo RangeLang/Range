@@ -16,7 +16,6 @@ extension Parser {
             }
             let blockFollows = currentMacroApplicationIsFollowedByBlock()
             advance()
-            let genericArguments = try parseMacroGenericArgumentsIfPresent()
             let argumentClause = try parseMacroArgumentClauseIfPresent()
             if blockFollows {
                 let rawBody = try renderUpcomingBlockBody()
@@ -24,7 +23,7 @@ extension Parser {
                 applications.append(
                     MacroApplication(
                         name: name,
-                        genericArguments: genericArguments,
+                        genericArguments: [],
                         argumentClause: argumentClause,
                         rawBody: rawBody
                     )
@@ -34,7 +33,7 @@ extension Parser {
             applications.append(
                 MacroApplication(
                     name: name,
-                    genericArguments: genericArguments,
+                    genericArguments: [],
                     argumentClause: argumentClause
                 )
             )
@@ -51,7 +50,6 @@ extension Parser {
             }
             let blockFollows = currentMacroApplicationIsFollowedByBlock()
             advance()
-            try skipGenericParameterClauseIfPresent()
             if peek() == .leftParen {
                 try skipParenthesizedClause()
             }
@@ -87,23 +85,6 @@ extension Parser {
 
     private func macroApplicationEndOffset(startingAt startOffset: Int) -> Int? {
         var offset = startOffset + 1
-        if peek(offset: offset) == .less {
-            var depth = 1
-            offset += 1
-            while depth > 0 {
-                switch peek(offset: offset) {
-                case .less:
-                    depth += 1
-                case .greater:
-                    depth -= 1
-                case .eof:
-                    return nil
-                default:
-                    break
-                }
-                offset += 1
-            }
-        }
         if peek(offset: offset) == .leftParen {
             var depth = 1
             offset += 1

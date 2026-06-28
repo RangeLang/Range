@@ -2,15 +2,20 @@
 @property
 @member
 @graph(role: .declaration)
-@construct(name: "State<T>") {
+@construct(name: "State") {
+    @generic(name: "T")
     @let(name: "identity") {
         @value(type: "GraphIdentity")
     }
     @let(name: "parent") {
-        @value(type: "Optional<GraphIdentity>")
+        @value(type: "Optional") {
+            @generic(name: "GraphIdentity")
+        }
     }
     @let(name: "macros") {
-        @value(type: "Array<Macro>")
+        @value(type: "Array") {
+            @generic(name: "Macro")
+        }
     }
     @let(name: "identifier") {
         @value(type: "Identifier")
@@ -19,7 +24,9 @@
         @value(type: "TypeReference")
     }
     @let(name: "value") {
-        @value(type: "Optional<Expression>")
+        @value(type: "Optional") {
+            @generic(name: "Expression")
+        }
     }
 
     @function(name: "initializer", result: "Void", body: "")

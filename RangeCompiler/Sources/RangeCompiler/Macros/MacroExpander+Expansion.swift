@@ -245,13 +245,6 @@ extension MacroExpander {
             )
         case .macroApplication, .macroInvocation:
             return .string(renderStatementForBlockValue(statement))
-        default:
-            return .object(
-                typeName: "UnsupportedStatement",
-                fields: [
-                    "written": .string(renderStatementForBlockValue(statement))
-                ]
-            )
         }
     }
 
@@ -320,8 +313,6 @@ extension MacroExpander {
                 argumentClause: argumentClause,
                 body: renderStatementsForRawBody(body)
             )
-        default:
-            return ""
         }
     }
 

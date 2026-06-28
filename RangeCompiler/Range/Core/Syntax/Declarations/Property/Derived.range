@@ -2,15 +2,20 @@
 @property
 @member
 @graph(role: .declaration)
-@construct(name: "Derived<T>") {
+@construct(name: "Derived") {
+    @generic(name: "T")
     @let(name: "identity") {
         @value(type: "GraphIdentity")
     }
     @let(name: "parent") {
-        @value(type: "Optional<GraphIdentity>")
+        @value(type: "Optional") {
+            @generic(name: "GraphIdentity")
+        }
     }
     @let(name: "macros") {
-        @value(type: "Array<Macro>")
+        @value(type: "Array") {
+            @generic(name: "Macro")
+        }
     }
     @let(name: "identifier") {
         @value(type: "Identifier")
@@ -19,7 +24,9 @@
         @value(type: "TypeReference")
     }
     @let(name: "body") {
-        @value(type: "Optional<Block>")
+        @value(type: "Optional") {
+            @generic(name: "Block")
+        }
     }
 
     @function(name: "getter", result: "Void", body: "")

@@ -1,6 +1,8 @@
 @construct(name: "GraphContext") {
     @let(name: "macros") {
-        @value(type: "Array<Macro<Void>>")
+        @value(type: "Array") {
+            @generic(name: "Macro")
+        }
     }
 
     @function(name: "declaration", result: "GraphEntry") {
@@ -8,12 +10,12 @@
             @value(type: "GraphIdentity")
         }
     }
-    @function(name: "parent", result: "Optional<GraphIdentity>") {
+    @function(name: "parent", result: "Optional") {
         @parameter(name: "identity") {
             @value(type: "GraphIdentity")
         }
     }
-    @function(name: "members", result: "Array<GraphIdentity>") {
+    @function(name: "members", result: "Array") {
         @parameter(name: "identity") {
             @value(type: "GraphIdentity")
         }
@@ -28,12 +30,12 @@
             @value(type: "GraphIdentity")
         }
     }
-    @function(name: "macros", result: "Array<Macro<Void>>") {
+    @function(name: "macros", result: "Array") {
         @parameter(name: "identity") {
             @value(type: "GraphIdentity")
         }
     }
-    @function(name: "macros", result: "Array<Macro<Void>>") {
+    @function(name: "macros", result: "Array") {
         @parameter(name: "named") {
             @value(type: "String")
         }

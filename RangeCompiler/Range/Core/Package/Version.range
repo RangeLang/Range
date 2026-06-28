@@ -1,11 +1,17 @@
 @construct(name: "Version") {
     @state(name: "major") {
-        @value(type: "Int<.unsigned>")
+        @value(type: "Int") {
+            @generic(name: ".unsigned")
+        }
     }
     @state(name: "minor") {
-        @value(type: "Int<.unsigned>")
+        @value(type: "Int") {
+            @generic(name: ".unsigned")
+        }
     }
     @state(name: "patch") {
-        @value(type: "Int<.unsigned>")
+        @value(type: "Int") {
+            @generic(name: ".unsigned")
+        }
     }
 }

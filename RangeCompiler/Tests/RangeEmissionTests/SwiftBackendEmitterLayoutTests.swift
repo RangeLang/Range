@@ -58,8 +58,8 @@ struct SwiftBackendEmitterLayoutTests {
                 mainBlock: BlockMacroNode(
                     macros: [],
                     body: [
-                        .expression(.call(name: "Thread.yield", arguments: [])),
-                        .expression(.call(name: "Memory.pageSize", arguments: [])),
+                        emittedExpression(.call(name: "Thread.yield", arguments: [])),
+                        emittedExpression(.call(name: "Memory.pageSize", arguments: [])),
                     ]
                 ),
                 units: []
@@ -70,5 +70,32 @@ struct SwiftBackendEmitterLayoutTests {
         #expect(swift.contains("Range_Memory.pageSize()"))
         #expect(!swift.contains("Range_POSIXThread.yield()"))
         #expect(!swift.contains("Range_POSIXMemory.pageSize()"))
+    }
+
+    private func emittedExpression(_ expression: Expression) -> Statement {
+        switch expression {
+        case .call(let name, let arguments):
+            let renderedArguments = arguments.map { argument in
+                let value: String
+                switch argument.value {
+                case .integer(let number):
+                    value = "\(number)"
+                case .string(let string):
+                    value = "\"\(string)\""
+                case .identifier(let identifier):
+                    value = identifier
+                default:
+                    value = ""
+                }
+                if let label = argument.label {
+                    return "\(label): \(value)"
+                }
+                return value
+            }
+            .joined(separator: ", ")
+            return .emitted("statement|kind=expression|value=\(name)(\(renderedArguments))")
+        default:
+            return .emitted("statement|kind=expression|value=")
+        }
     }
 }

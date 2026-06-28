@@ -6,10 +6,10 @@
     @return(value: "graph.declaration(context.current)")
 }
 
-@macro(name: "self.parent", result: "Optional<GraphIdentity>"){
+@macro(name: "self.parent", result: "Optional"){
     @return(value: "graph.parent(of: context.current)")
 }
 
-@macro(name: "self.members", result: "Array<GraphIdentity>"){
+@macro(name: "self.members", result: "Array"){
     @return(value: "graph.members(of: context.current)")
 }

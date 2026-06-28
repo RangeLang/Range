@@ -1,10 +1,14 @@
 @syntax
 @construct(name: "Closure") {
     @let(name: "type") {
-        @value(type: "Optional<TypeReference>")
+        @value(type: "Optional") {
+            @generic(name: "TypeReference")
+        }
     }
     @let(name: "parameters") {
-        @value(type: "Array<Parameter>", current: "Array<Parameter>()")
+        @value(type: "Array", current: "Array()") {
+            @generic(name: "Parameter")
+        }
     }
     @let(name: "body") {
         @value(type: "Block")

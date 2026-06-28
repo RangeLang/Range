@@ -320,7 +320,7 @@ extension Parser {
 
         return .value(
             name: genericName,
-            typeReference: try parseMacroMemberTypeReference(type),
+            typeReference: try parseMacroMemberTypeReference(type, generics: valueFields.generics),
             defaultValue: try macroMemberDefaultValue(
                 type: valueFields.type,
                 current: valueFields.current
@@ -349,7 +349,9 @@ extension Parser {
         }
 
         let valueFields = try macroMemberValueFields(in: body)
-        let typeReference = try valueFields.type.map(parseMacroMemberTypeReference)
+        let typeReference = try valueFields.type.map {
+            try parseMacroMemberTypeReference($0, generics: valueFields.generics)
+        }
         let defaultValue = try macroMemberDefaultValue(
             type: valueFields.type,
             current: valueFields.current
@@ -365,14 +367,22 @@ extension Parser {
     }
 
     private func macroMemberValueFields(in body: [Statement]) throws
-        -> (type: String?, current: String?)
+        -> (type: String?, generics: [String], current: String?)
     {
         for statement in body {
-            guard case .macroApplication(let name, let arguments) = statement,
-                name == "value"
-            else {
+            let arguments: [CallArgument]
+            let valueBody: [Statement]
+            switch statement {
+            case .macroApplication(let name, let macroArguments) where name == "value":
+                arguments = macroArguments
+                valueBody = []
+            case .macroInvocation(let name, let clause, let body) where name == "value":
+                arguments = try clause.map(MacroExpander.parsedMacroArguments) ?? []
+                valueBody = body
+            default:
                 continue
             }
+
             var type: String?
             var current: String?
             for argument in arguments {
@@ -388,16 +398,49 @@ extension Parser {
                     continue
                 }
             }
-            return (type, current)
+            let generics = try valueBody.compactMap(macroMemberGenericName)
+            return (type, generics, current)
         }
-        return (nil, nil)
+        return (nil, [], nil)
     }
 
-    private func parseMacroMemberTypeReference(_ source: String) throws -> TypeReference {
+    private func parseMacroMemberTypeReference(
+        _ source: String,
+        generics: [String] = []
+    ) throws -> TypeReference {
         var parser = try Parser(source: source)
-        let typeReference = try parser.parseTypeReferenceNode()
+        let base = try parser.parseTypeReferenceNode()
         try parser.consume(.eof)
-        return typeReference
+        guard !generics.isEmpty else {
+            return base
+        }
+        let arguments = try generics.map { try parseMacroMemberTypeReference($0) }
+        if case .named("Optional") = base, arguments.count == 1 {
+            return .optional(arguments[0])
+        }
+        if case .named("Array") = base, arguments.count == 1 {
+            return .array(arguments[0])
+        }
+        return .generic(base: base, arguments: arguments)
+    }
+
+    private func macroMemberGenericName(from statement: Statement) throws -> String? {
+        let arguments: [CallArgument]
+        switch statement {
+        case .macroApplication(let name, let macroArguments) where name == "generic":
+            arguments = macroArguments
+        case .macroInvocation(let name, let clause, _) where name == "generic":
+            arguments = try clause.map(MacroExpander.parsedMacroArguments) ?? []
+        default:
+            return nil
+        }
+        guard let nameArgument = arguments.first(where: { $0.label == "name" }),
+            case .string(let name) = nameArgument.value,
+            !name.isEmpty
+        else {
+            throw ParseError("@generic macro members must declare name: String.")
+        }
+        return name
     }
 
     private func parseMacroMemberExpression(_ source: String) throws -> Expression {

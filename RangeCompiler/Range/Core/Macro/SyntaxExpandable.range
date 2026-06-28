@@ -1,7 +1,10 @@
-@construct(name: "SyntaxExpandable<Target>") {
+@construct(name: "SyntaxExpandable") {
+    @generic(name: "Target")
     @function(name: "expand", result: "Void") {
         @parameter(name: "expansion") {
-            @value(type: "() -> Array<@syntax>")
+            @value(type: "() -> Array") {
+                @generic(name: "@syntax")
+            }
         }
     }
 }

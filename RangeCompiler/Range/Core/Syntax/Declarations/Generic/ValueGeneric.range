@@ -10,6 +10,8 @@
         @value(type: "String")
     }
     @let(name: "default") {
-        @value(type: "Optional<String>")
+        @value(type: "Optional") {
+            @generic(name: "String")
+        }
     }
 }

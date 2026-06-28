@@ -5,12 +5,18 @@
         @value(type: "NominalTypeReference")
     }
     @let(name: "conformances") {
-        @value(type: "Array<NominalTypeReference>")
+        @value(type: "Array") {
+            @generic(name: "NominalTypeReference")
+        }
     }
     @let(name: "functions") {
-        @value(type: "Array<Function>")
+        @value(type: "Array") {
+            @generic(name: "Function")
+        }
     }
     @let(name: "constructs") {
-        @value(type: "Array<Construct>")
+        @value(type: "Array") {
+            @generic(name: "Construct")
+        }
     }
 }

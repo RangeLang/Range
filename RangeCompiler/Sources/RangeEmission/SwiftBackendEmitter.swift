@@ -2197,7 +2197,14 @@ struct SwiftBackendEmitter {
         let prefix = String(repeating: "    ", count: indent)
 
         switch statement {
-        case .emitted, .ignored:
+        case .emitted(let text):
+            return try emitStringyStatements(
+                StringyStatementRecord.records(in: text),
+                indent: indent,
+                enclosingReturnType: enclosingReturnType,
+                scope: scope
+            )
+        case .ignored:
             return ""
         case .localBinding(let declaration):
             let keyword = declaration.kind == .constant ? "let" : "var"
@@ -2232,6 +2239,96 @@ struct SwiftBackendEmitter {
             )
             return "\(header)\n\(bodyText)\n\(prefix)}"
         }
+    }
+
+    private func emitStringyStatements(
+        _ records: [StringyStatementRecord],
+        indent: Int,
+        enclosingReturnType: TypeReference? = nil,
+        scope: EmissionScope = .empty
+    ) throws -> String {
+        try records.map {
+            try emitStringyStatement(
+                $0,
+                indent: indent,
+                enclosingReturnType: enclosingReturnType,
+                scope: scope
+            )
+        }
+        .joined(separator: "\n")
+    }
+
+    private func emitStringyStatement(
+        _ record: StringyStatementRecord,
+        indent: Int,
+        enclosingReturnType: TypeReference? = nil,
+        scope: EmissionScope = .empty
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+
+        switch record {
+        case .returnStatement(let value?, _):
+            return "\(prefix)return \(try emitExpression(value, scope: scope))"
+        case .returnStatement(nil, _):
+            return "\(prefix)return"
+        case .member(let kind, let name, let type, let value):
+            let keyword = kind == "state" ? "var" : "let"
+            return
+                "\(prefix)\(keyword) \(name): \(emitTypeName(type)) = \(try emitExpression(value, scope: scope))"
+        case .assignment(let target, let value):
+            return "\(prefix)\(target) = \(try emitExpression(value, scope: scope))"
+        case .expression(let expression):
+            return "\(prefix)\(try emitExpression(expression, scope: scope))"
+        case .whileLoop(let condition, let body):
+            let bodyText = try emitStringyStatements(
+                body,
+                indent: indent + 1,
+                enclosingReturnType: enclosingReturnType,
+                scope: scope
+            )
+            return
+                "\(prefix)while \(try emitExpression(condition, scope: scope)) {\n\(bodyText)\n\(prefix)}"
+        case .conditional(let branches):
+            return try emitStringyConditional(
+                branches,
+                indent: indent,
+                enclosingReturnType: enclosingReturnType,
+                scope: scope
+            )
+        case .breakStatement:
+            return "\(prefix)break"
+        case .continueStatement:
+            return "\(prefix)continue"
+        }
+    }
+
+    private func emitStringyConditional(
+        _ branches: [StringyConditionalBranch],
+        indent: Int,
+        enclosingReturnType: TypeReference? = nil,
+        scope: EmissionScope = .empty
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+        var rendered: [String] = []
+
+        for (index, branch) in branches.enumerated() {
+            let bodyText = try emitStringyStatements(
+                branch.body,
+                indent: indent + 1,
+                enclosingReturnType: enclosingReturnType,
+                scope: scope
+            )
+            if let condition = branch.condition {
+                let keyword = index == 0 ? "if" : "else if"
+                rendered.append(
+                    "\(prefix)\(keyword) \(try emitExpression(condition, scope: scope)) {\n\(bodyText)\n\(prefix)}"
+                )
+            } else {
+                rendered.append("\(prefix)else {\n\(bodyText)\n\(prefix)}")
+            }
+        }
+
+        return rendered.joined(separator: " ")
     }
 
     private func emitConditional(

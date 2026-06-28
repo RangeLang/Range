@@ -1,4 +1,5 @@
-@construct(name: "SyntaxReplaceable<T>") {
+@construct(name: "SyntaxReplaceable") {
+    @generic(name: "T")
     @function(name: "replace", result: "T") {
         @parameter(name: "replacement") {
             @value(type: "T")

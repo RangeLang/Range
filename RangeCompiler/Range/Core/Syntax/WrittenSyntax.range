@@ -4,6 +4,8 @@
         @value(type: "String")
     }
     @let(name: "range") {
-        @value(type: "Optional<SourceRange>")
+        @value(type: "Optional") {
+            @generic(name: "SourceRange")
+        }
     }
 }

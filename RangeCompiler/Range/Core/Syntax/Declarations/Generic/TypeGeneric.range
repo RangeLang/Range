@@ -4,10 +4,14 @@
         @value(type: "Identifier")
     }
     @let(name: "constraint") {
-        @value(type: "Optional<TypeReference>")
+        @value(type: "Optional") {
+            @generic(name: "TypeReference")
+        }
     }
     @let(name: "default") {
-        @value(type: "Optional<TypeReference>")
+        @value(type: "Optional") {
+            @generic(name: "TypeReference")
+        }
     }
 }
 

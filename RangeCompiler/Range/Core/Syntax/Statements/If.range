@@ -8,6 +8,8 @@
         @value(type: "Block")
     }
     @let(name: "elseBody") {
-        @value(type: "Optional<Block>")
+        @value(type: "Optional") {
+            @generic(name: "Block")
+        }
     }
 }

@@ -603,7 +603,7 @@ struct LLVMLoweringEmitterTests {
                 whileLoop(
                     binary(id("index"), .less, id("limit")),
                     [
-                        .expression(call("values.append", argument("element", id("index")))),
+                        expr(call("values.append", argument("element", id("index")))),
                         assign("index", binary(id("index"), .addition, .integer(1))),
                     ]
                 ),
@@ -662,8 +662,8 @@ struct LLVMLoweringEmitterTests {
             returnType: .named("Int"),
             body: [
                 state("values", type: .array(.named("Int")), expression: call("Array<Int>")),
-                .expression(call("values.append", argument("element", .integer(4)))),
-                .expression(call("values.append", argument("element", .integer(8)))),
+                expr(call("values.append", argument("element", .integer(4)))),
+                expr(call("values.append", argument("element", .integer(8)))),
                 ret(call("values.element", argument("index", .integer(1)))),
             ]
         )
@@ -701,8 +701,8 @@ struct LLVMLoweringEmitterTests {
                     type: .array(.named("Int")),
                     expression: call("Array<Int>", argument("capacity", .integer(1)))
                 ),
-                .expression(call("values.append", argument("element", .integer(0)))),
-                .expression(
+                expr(call("values.append", argument("element", .integer(0)))),
+                expr(
                     call(
                         "values.update",
                         argument("element", id("value")),
@@ -741,7 +741,7 @@ struct LLVMLoweringEmitterTests {
                     type: .array(.named("Bool")),
                     expression: call("Array<Bool>", argument("capacity", .integer(1)))
                 ),
-                .expression(call("values.append", argument("element", id("value")))),
+                expr(call("values.append", argument("element", id("value")))),
                 ret(call("values.element", argument("index", .integer(0)))),
             ]
         )
@@ -1557,7 +1557,7 @@ struct LLVMLoweringEmitterTests {
     func swiftWorkspaceEmissionBridgesCallsToLLVMObject() throws {
         let callables = [sum3Callable()]
         let mainBlockNode = mainBlock([
-            .expression(
+            expr(
                 call(
                     "sum3",
                     argument("x", .integer(1)),
@@ -1603,7 +1603,7 @@ struct LLVMLoweringEmitterTests {
     func swiftWorkspaceEmissionBridgesMixedBoolAndIntLLVMCalls() throws {
         let callables = [isLessCallable(), chooseCallable()]
         let mainBlockNode = mainBlock([
-            .expression(
+            expr(
                 call(
                     "choose",
                     argument(
@@ -1661,7 +1661,7 @@ struct LLVMLoweringEmitterTests {
     func swiftWorkspaceEmissionBridgesFloatLLVMCalls() throws {
         let callables = [mixedCallable()]
         let mainBlockNode = mainBlock([
-            .expression(
+            expr(
                 call("mixed", argument("lhs", .double(1.5)), argument("rhs", .integer(2)))
             )
         ])
@@ -1700,7 +1700,7 @@ struct LLVMLoweringEmitterTests {
     func swiftWorkspaceEmissionBridgesLLVMStringReturns() throws {
         let callables = [greetingCallable()]
         let mainBlockNode = mainBlock([
-            .expression(call("greeting"))
+            expr(call("greeting"))
         ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMStringBridgeTests-\(UUID().uuidString)")
@@ -1762,7 +1762,7 @@ struct LLVMLoweringEmitterTests {
 		            ),
         ]
         let mainBlockNode = mainBlock([
-            .expression(call("score"))
+            expr(call("score"))
         ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMConstructIslandTests-\(UUID().uuidString)")
@@ -1807,7 +1807,7 @@ struct LLVMLoweringEmitterTests {
     func swiftWorkspaceEmissionBridgesLLVMStringArguments() throws {
         let callables = [echoCallable()]
         let mainBlockNode = mainBlock([
-            .expression(call("echo", argument("value", .string("hello"))))
+            expr(call("echo", argument("value", .string("hello"))))
         ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMStringArgumentBridgeTests-\(UUID().uuidString)")
@@ -1848,7 +1848,7 @@ struct LLVMLoweringEmitterTests {
     func swiftWorkspaceEmissionBridgesLLVMStringIsEmptyBoolReturns() throws {
         let callables = [stringEmptyCallable()]
         let mainBlockNode = mainBlock([
-            .expression(call("empty", argument("value", .string(""))))
+            expr(call("empty", argument("value", .string(""))))
         ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMStringIsEmptyBridgeTests-\(UUID().uuidString)")
@@ -1885,7 +1885,7 @@ struct LLVMLoweringEmitterTests {
     func swiftWorkspaceEmissionBridgesLLVMStringByteCountIntReturns() throws {
         let callables = [stringSizeCallable()]
         let mainBlockNode = mainBlock([
-            .expression(call("size", argument("value", .string("hé"))))
+            expr(call("size", argument("value", .string("hé"))))
         ])
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("RangeLLVMStringByteCountBridgeTests-\(UUID().uuidString)")
@@ -1922,7 +1922,7 @@ struct LLVMLoweringEmitterTests {
     func swiftWorkspaceEmissionBridgesLLVMIntArrayArguments() throws {
         let callables = [firstArrayCallable()]
         let mainBlockNode = mainBlock([
-            .expression(
+            expr(
                 call(
                     "first",
                     argument("values", .array([.integer(1), .integer(2), .integer(3)]))
@@ -1977,7 +1977,7 @@ struct LLVMLoweringEmitterTests {
             ),
         ]
         let mainBlockNode = mainBlock([
-            .expression(
+            expr(
                 call(
                     "describe",
                     argument(
@@ -2509,6 +2509,10 @@ struct LLVMLoweringEmitterTests {
         .emitted("statement|kind=assign|target=\(name)|value=\(expressionSource(expression))")
     }
 
+    private func expr(_ expression: RangeExpression) -> Statement {
+        .emitted("statement|kind=expression|value=\(expressionSource(expression))")
+    }
+
     private func whileLoop(
         _ condition: RangeExpression,
         _ body: [Statement]
@@ -2560,13 +2564,8 @@ struct LLVMLoweringEmitterTests {
         if case .emitted(let text) = statement {
             return text
         }
-        if case .expression(let expression) = statement {
-            return "statement|kind=expression|value=\(expressionSource(expression))"
-        }
-        else {
-            Issue.record("Expected stringy statement record, got \(statement).")
-            return ""
-        }
+        Issue.record("Expected stringy statement record, got \(statement).")
+        return ""
     }
 
     private func expressionSource(_ expression: RangeExpression) -> String {

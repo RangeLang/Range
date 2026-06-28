@@ -1,7 +1,9 @@
 @syntax
 @construct(name: "FunctionTypeReference") {
     @let(name: "parameters") {
-        @value(type: "Array<TypeReference>")
+        @value(type: "Array") {
+            @generic(name: "TypeReference")
+        }
     }
     @let(name: "returnType") {
         @value(type: "TypeReference")

@@ -1,9 +1,12 @@
-@construct(name: "Versioned<Value>") {
+@construct(name: "Versioned") {
+    @generic(name: "Value")
     @let(name: "current") {
         @value(type: "Value")
     }
     @let(name: "next") {
-        @value(type: "Optional<Value>")
+        @value(type: "Optional") {
+            @generic(name: "Value")
+        }
     }
     @let(name: "version") {
         @value(type: "Version")

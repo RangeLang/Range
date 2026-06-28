@@ -118,34 +118,6 @@ struct SwiftLoweredProgramAdapter {
                 argumentClause: argumentClause,
                 body: lower(statements: body)
             )
-        case .localBinding(let declaration):
-            return .localBinding(
-                LocalBindingDeclaration(
-                    kind: declaration.kind,
-                    name: declaration.name,
-                    hasExplicitTypeAnnotation: declaration.hasExplicitTypeAnnotation,
-                    type: declaration.type,
-                    expression: lower(expression: declaration.expression)
-                )
-            )
-        case .assignment(let target, let expression):
-            return .assignment(target: target, expression: lower(expression: expression))
-        case .expression(let expression):
-            return .expression(lower(expression: expression))
-        case .whileLoop(let condition, let body):
-            return .whileLoop(
-                condition: lower(expression: condition), body: lower(statements: body))
-        case .conditional(let branches):
-            return .conditional(
-                branches.map { branch in
-                    StatementConditionalBranch(
-                        condition: branch.condition.map(lower(expression:)),
-                        body: lower(statements: branch.body)
-                    )
-                }
-            )
-        case .return(let expression):
-            return .return(expression.map(lower(expression:)))
         }
     }
 

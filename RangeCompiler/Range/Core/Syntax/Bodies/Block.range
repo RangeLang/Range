@@ -1,10 +1,14 @@
 @syntax
 @construct(name: "Block") {
     @let(name: "body") {
-        @value(type: "Array<@statement>")
+        @value(type: "Array") {
+            @generic(name: "@statement")
+        }
     }
     @let(name: "statements") {
-        @value(type: "Array<@statement>")
+        @value(type: "Array") {
+            @generic(name: "@statement")
+        }
     }
 
     @function(name: "replace", result: "Block", body: "")

@@ -18,21 +18,6 @@ indirect enum LLVMStatement {
             self = .ignored
         case .macroInvocation:
             throw LLVMLoweringError("LLVM lowering does not support statement \(statement).")
-        case .localBinding(let declaration):
-            self = .localBinding(declaration)
-        case .assignment(let target, let expression):
-            self = .assignment(target: target, expression: expression)
-        case .expression(let expression):
-            self = .expression(expression)
-        case .whileLoop(let condition, let body):
-            self = .whileLoop(
-                condition: condition,
-                body: try body.map(LLVMStatement.init(source:))
-            )
-        case .conditional(let branches):
-            self = .conditional(try branches.map(LLVMConditionalBranch.init(source:)))
-        case .return(let expression):
-            self = .return(expression)
         }
     }
 }
@@ -44,10 +29,5 @@ struct LLVMConditionalBranch {
     init(condition: Expression?, body: [LLVMStatement]) {
         self.condition = condition
         self.body = body
-    }
-
-    init(source branch: StatementConditionalBranch) throws {
-        self.condition = branch.condition
-        self.body = try branch.body.map(LLVMStatement.init(source:))
     }
 }

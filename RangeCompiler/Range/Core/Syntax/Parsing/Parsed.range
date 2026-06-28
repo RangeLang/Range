@@ -1,12 +1,17 @@
 @syntax
-@construct(name: "Parsed<Value>") {
+@construct(name: "Parsed") {
+    @generic(name: "Value")
     @let(name: "written") {
         @value(type: "WrittenSyntax")
     }
     @let(name: "value") {
-        @value(type: "Optional<Value>")
+        @value(type: "Optional") {
+            @generic(name: "Value")
+        }
     }
     @let(name: "diagnostics") {
-        @value(type: "Array<String>")
+        @value(type: "Array") {
+            @generic(name: "String")
+        }
     }
 }

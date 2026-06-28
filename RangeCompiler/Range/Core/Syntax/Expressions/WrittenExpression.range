@@ -1,7 +1,9 @@
 @syntax
 @construct(name: "WrittenExpression") {
     @let(name: "type") {
-        @value(type: "Optional<TypeReference>")
+        @value(type: "Optional") {
+            @generic(name: "TypeReference")
+        }
     }
     @let(name: "written") {
         @value(type: "WrittenSyntax")

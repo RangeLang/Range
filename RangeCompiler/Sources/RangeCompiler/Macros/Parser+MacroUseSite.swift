@@ -16,24 +16,6 @@ extension Parser {
             }
 
             offset += 1
-            if peek(offset: offset) == .less {
-                var depth = 1
-                offset += 1
-                while depth > 0 {
-                    switch peek(offset: offset) {
-                    case .less:
-                        depth += 1
-                    case .greater:
-                        depth -= 1
-                    case .eof:
-                        return offset
-                    default:
-                        break
-                    }
-                    offset += 1
-                }
-            }
-
             if peek(offset: offset) == .leftParen {
                 var depth = 1
                 offset += 1
@@ -73,13 +55,12 @@ extension Parser {
             }
 
             advance()
-            let genericArguments = try parseMacroGenericArgumentsIfPresent()
             let argumentClause = try parseMacroArgumentClauseIfPresent()
             let rawBody = try parseMacroRawBodyIfPresent()
             macros.append(
                 MacroApplication(
                     name: name,
-                    genericArguments: genericArguments,
+                    genericArguments: [],
                     argumentClause: argumentClause,
                     rawBodyLanguage: rawBody?.language,
                     rawBody: rawBody?.text
@@ -104,38 +85,6 @@ extension Parser {
             throw ParseError("Expected @\(expectedName).")
         }
         advance()
-    }
-
-    mutating func parseMacroGenericArgumentsIfPresent() throws -> [TypeReference] {
-        guard peek() == .less else {
-            return []
-        }
-
-        try consume(.less)
-        var arguments: [TypeReference] = [try parseMacroGenericArgumentReference()]
-        while peek() == .comma {
-            advance()
-            arguments.append(try parseMacroGenericArgumentReference())
-        }
-        try consume(.greater)
-        return arguments
-    }
-
-    mutating func parseMacroGenericArgumentReference() throws -> TypeReference {
-        switch peek() {
-        case .identifier(let label) where peek(offset: 1) == .colon:
-            advance()
-            try consume(.colon)
-            let value = try parseExpression(terminatingAt: [.comma, .greater])
-            return .named("\(label): \(MacroExpander.renderExpressionForStringify(value))")
-        case .keyword(let label) where peek(offset: 1) == .colon:
-            advance()
-            try consume(.colon)
-            let value = try parseExpression(terminatingAt: [.comma, .greater])
-            return .named("\(label): \(MacroExpander.renderExpressionForStringify(value))")
-        default:
-            return try parseGenericArgumentReferenceNode()
-        }
     }
 
     mutating func parseMacroArgumentClauseIfPresent() throws -> String? {

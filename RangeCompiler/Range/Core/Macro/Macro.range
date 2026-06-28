@@ -8,10 +8,14 @@
         @value(type: "String")
     }
     @let(name: "type") {
-        @value(type: "Optional<TypeReference>")
+        @value(type: "Optional") {
+            @generic(name: "TypeReference")
+        }
     }
     @let(name: "elements") {
-        @value(type: "Array<MacroTarget>")
+        @value(type: "Array") {
+            @generic(name: "MacroTarget")
+        }
     }
     @let(name: "written") {
         @value(type: "WrittenSyntax")
@@ -28,19 +32,29 @@
         @value(type: "Identifier")
     }
     @let(name: "macros") {
-        @value(type: "Array<Macro.Application>")
+        @value(type: "Array") {
+            @generic(name: "Macro.Application")
+        }
     }
     @let(name: "generics") {
-        @value(type: "Array<Generic>")
+        @value(type: "Array") {
+            @generic(name: "Generic")
+        }
     }
     @let(name: "parameters") {
-        @value(type: "Array<Parameter>")
+        @value(type: "Array") {
+            @generic(name: "Parameter")
+        }
     }
     @let(name: "target") {
-        @value(type: "Optional<MacroTarget>")
+        @value(type: "Optional") {
+            @generic(name: "MacroTarget")
+        }
     }
     @let(name: "expansionType") {
-        @value(type: "Optional<TypeReference>")
+        @value(type: "Optional") {
+            @generic(name: "TypeReference")
+        }
     }
     @let(name: "expansionTypeName") {
         @value(type: "String")
@@ -49,7 +63,9 @@
         @value(type: "WrittenSyntax")
     }
     @let(name: "parsedBody") {
-        @value(type: "Parsed<Block>")
+        @value(type: "Parsed") {
+            @generic(name: "Block")
+        }
     }
     @let(name: "body") {
         @value(type: "String")
@@ -61,7 +77,8 @@
 
 @graph(role: .application)
 @syntax
-@construct(name: "Macro<Value>") {
+@construct(name: "Macro") {
+    @generic(name: "Value")
     @let(name: "name") {
         @value(type: "String")
     }
@@ -69,22 +86,30 @@
         @value(type: "Identifier")
     }
     @let(name: "genericArguments") {
-        @value(type: "Array<TypeReference>")
+        @value(type: "Array") {
+            @generic(name: "TypeReference")
+        }
     }
     @let(name: "generics") {
-        @value(type: "Array<TypeReference>")
+        @value(type: "Array") {
+            @generic(name: "TypeReference")
+        }
     }
     @let(name: "argumentClause") {
         @value(type: "String")
     }
     @let(name: "arguments") {
-        @value(type: "Array<Expression>")
+        @value(type: "Array") {
+            @generic(name: "Expression")
+        }
     }
     @let(name: "rawBody") {
         @value(type: "WrittenSyntax")
     }
     @let(name: "declaration") {
-        @value(type: "Optional<Macro>")
+        @value(type: "Optional") {
+            @generic(name: "Macro")
+        }
     }
     @let(name: "valueType") {
         @value(type: "TypeReference")

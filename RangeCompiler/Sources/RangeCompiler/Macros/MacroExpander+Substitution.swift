@@ -29,8 +29,6 @@ extension MacroExpander {
                     )
                 }
             )
-        default:
-            return statement
         }
     }
 

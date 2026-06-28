@@ -190,18 +190,191 @@ enum StringyStatementRecord {
     }
 
     private static func parseExpression(_ text: String) -> Expression? {
-        if text == "true" {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed == "true" {
             return .boolean(true)
         }
-        if text == "false" {
+        if trimmed == "false" {
             return .boolean(false)
         }
         do {
-            var parser = try Parser(source: text)
+            var parser = try Parser(source: trimmed)
             return normalizeBooleanIdentifiers(try parser.parseExpression())
         } catch {
+            return parseArrayLiteral(trimmed) ?? parseCallExpression(trimmed)
+        }
+    }
+
+    private static func parseArrayLiteral(_ text: String) -> Expression? {
+        guard text.hasPrefix("["), text.hasSuffix("]") else {
             return nil
         }
+        let inner = String(text.dropFirst().dropLast())
+        if inner.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .array([])
+        }
+        let elements = splitTopLevel(inner).compactMap(parseExpression)
+        guard elements.count == splitTopLevel(inner).count else {
+            return nil
+        }
+        return .array(elements)
+    }
+
+    private static func parseCallExpression(_ text: String) -> Expression? {
+        guard text.hasSuffix(")"),
+            let openIndex = firstTopLevelOpeningParen(in: text)
+        else {
+            return nil
+        }
+
+        let name = String(text[..<openIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+            return nil
+        }
+
+        let argumentsText = String(text[text.index(after: openIndex)..<text.index(before: text.endIndex)])
+        if argumentsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .call(name: name, arguments: [])
+        }
+
+        let arguments = splitTopLevel(argumentsText).compactMap(parseCallArgument)
+        guard arguments.count == splitTopLevel(argumentsText).count else {
+            return nil
+        }
+        return .call(name: name, arguments: arguments)
+    }
+
+    private static func parseCallArgument(_ text: String) -> CallArgument? {
+        if let colonIndex = firstTopLevelColon(in: text) {
+            let label = String(text[..<colonIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let valueText = String(text[text.index(after: colonIndex)...])
+            guard !label.isEmpty, let value = parseExpression(valueText) else {
+                return nil
+            }
+            return CallArgument(label: label, value: value)
+        }
+        return parseExpression(text).map { CallArgument(label: nil, value: $0) }
+    }
+
+    private static func firstTopLevelOpeningParen(in text: String) -> String.Index? {
+        var squareDepth = 0
+        var inString = false
+        var isEscaped = false
+        for index in text.indices {
+            let character = text[index]
+            if inString {
+                if isEscaped {
+                    isEscaped = false
+                } else if character == "\\" {
+                    isEscaped = true
+                } else if character == "\"" {
+                    inString = false
+                }
+                continue
+            }
+            switch character {
+            case "\"":
+                inString = true
+            case "[":
+                squareDepth += 1
+            case "]":
+                squareDepth -= 1
+            case "(" where squareDepth == 0:
+                return index
+            default:
+                continue
+            }
+        }
+        return nil
+    }
+
+    private static func firstTopLevelColon(in text: String) -> String.Index? {
+        var roundDepth = 0
+        var squareDepth = 0
+        var inString = false
+        var isEscaped = false
+        for index in text.indices {
+            let character = text[index]
+            if inString {
+                if isEscaped {
+                    isEscaped = false
+                } else if character == "\\" {
+                    isEscaped = true
+                } else if character == "\"" {
+                    inString = false
+                }
+                continue
+            }
+            switch character {
+            case "\"":
+                inString = true
+            case "(":
+                roundDepth += 1
+            case ")":
+                roundDepth -= 1
+            case "[":
+                squareDepth += 1
+            case "]":
+                squareDepth -= 1
+            case ":" where roundDepth == 0 && squareDepth == 0:
+                return index
+            default:
+                continue
+            }
+        }
+        return nil
+    }
+
+    private static func splitTopLevel(_ text: String) -> [String] {
+        var parts: [String] = []
+        var current = ""
+        var roundDepth = 0
+        var squareDepth = 0
+        var inString = false
+        var isEscaped = false
+
+        for character in text {
+            if inString {
+                current.append(character)
+                if isEscaped {
+                    isEscaped = false
+                } else if character == "\\" {
+                    isEscaped = true
+                } else if character == "\"" {
+                    inString = false
+                }
+                continue
+            }
+
+            switch character {
+            case "\"":
+                inString = true
+                current.append(character)
+            case "(":
+                roundDepth += 1
+                current.append(character)
+            case ")":
+                roundDepth -= 1
+                current.append(character)
+            case "[":
+                squareDepth += 1
+                current.append(character)
+            case "]":
+                squareDepth -= 1
+                current.append(character)
+            case "," where roundDepth == 0 && squareDepth == 0:
+                parts.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
+                current = ""
+            default:
+                current.append(character)
+            }
+        }
+
+        let final = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !final.isEmpty {
+            parts.append(final)
+        }
+        return parts
     }
 
     private static func normalizeBooleanIdentifiers(_ expression: Expression) -> Expression {

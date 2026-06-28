@@ -2,6 +2,8 @@
 @syntax
 @construct(name: "Return") {
     @let(name: "expression") {
-        @value(type: "Optional<Expression>")
+        @value(type: "Optional") {
+            @generic(name: "Expression")
+        }
     }
 }

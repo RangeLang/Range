@@ -318,23 +318,6 @@ extension Parser {
             result = .member(base: result, name: try consumeTypeName())
         }
 
-        if peek() == .less {
-            try consume(.less)
-            var genericArguments: [TypeReference] = [try parseGenericArgumentReferenceNode()]
-            while peek() == .comma {
-                advance()
-                genericArguments.append(try parseGenericArgumentReferenceNode())
-            }
-            try consume(.greater)
-            if case .named("Optional") = result, genericArguments.count == 1 {
-                return .optional(genericArguments[0])
-            }
-            if case .named("Array") = result, genericArguments.count == 1 {
-                return .array(genericArguments[0])
-            }
-            result = .generic(base: result, arguments: genericArguments)
-        }
-
         return result
     }
 

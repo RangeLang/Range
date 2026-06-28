@@ -556,7 +556,7 @@ public struct DeclarationGraph {
             kind: .declaration,
             attribute: nil,
             name: name,
-            genericParameters: [],
+            genericParameters: emittedGenericParameters(from: memberLines),
             conformances: [],
             states: states,
             bindings: [],
@@ -579,25 +579,16 @@ public struct DeclarationGraph {
             }
 
             let stateLine = lines[index]
-            let valueLine: String?
-            if index + 1 < lines.count,
-                emittedRecordFields(in: lines[index + 1])["kind"] == "value"
-            {
-                valueLine = lines[index + 1]
-                index += 2
-            } else {
-                valueLine = nil
-                index += 1
-            }
+            let valueLines = emittedValueBlock(from: lines, index: &index)
 
-            if let state = emittedState(from: stateLine, valueLine: valueLine) {
+            if let state = emittedState(from: stateLine, valueLines: valueLines) {
                 result.append(state)
             }
         }
         return result
     }
 
-    private static func emittedState(from line: String, valueLine: String?) -> StateDeclaration? {
+    private static func emittedState(from line: String, valueLines: [String]) -> StateDeclaration? {
         let fields = emittedRecordFields(in: line)
         guard fields["kind"] == "state",
             let name = fields["name"],
@@ -605,15 +596,16 @@ public struct DeclarationGraph {
         else {
             return nil
         }
-        let valueFields = valueLine.map(emittedRecordFields) ?? [:]
+        let valueFields = valueLines.first.map(emittedRecordFields) ?? [:]
         let type = valueFields["type"] ?? fields["type"] ?? ""
+        let generics = emittedTypeGenericNames(from: valueLines)
         let current = valueFields["current"] ?? ""
 
         return StateDeclaration(
             macros: [],
             name: name,
             hasExplicitTypeAnnotation: true,
-            type: emittedTypeReference(typeName: type),
+            type: emittedTypeReference(typeName: type, generics: generics),
             storage: current.isEmpty ? .declared : .stored(.identifier(current))
         )
     }
@@ -629,25 +621,16 @@ public struct DeclarationGraph {
             }
 
             let letLine = lines[index]
-            let valueLine: String?
-            if index + 1 < lines.count,
-                emittedRecordFields(in: lines[index + 1])["kind"] == "value"
-            {
-                valueLine = lines[index + 1]
-                index += 2
-            } else {
-                valueLine = nil
-                index += 1
-            }
+            let valueLines = emittedValueBlock(from: lines, index: &index)
 
-            if let value = emittedValue(from: letLine, valueLine: valueLine) {
+            if let value = emittedValue(from: letLine, valueLines: valueLines) {
                 result.append(value)
             }
         }
         return result
     }
 
-    private static func emittedValue(from line: String, valueLine: String?) -> ValueDeclaration? {
+    private static func emittedValue(from line: String, valueLines: [String]) -> ValueDeclaration? {
         let fields = emittedRecordFields(in: line)
         guard fields["kind"] == "let",
             let name = fields["name"],
@@ -655,14 +638,15 @@ public struct DeclarationGraph {
         else {
             return nil
         }
-        let valueFields = valueLine.map(emittedRecordFields) ?? [:]
+        let valueFields = valueLines.first.map(emittedRecordFields) ?? [:]
         let type = valueFields["type"] ?? fields["type"] ?? ""
+        let generics = emittedTypeGenericNames(from: valueLines)
         let current = valueFields["current"] ?? ""
 
         return ValueDeclaration(
             macros: [],
             name: name,
-            typeName: emittedTypeReference(typeName: type).displayName,
+            typeName: emittedTypeReference(typeName: type, generics: generics).displayName,
             value: current.isEmpty ? nil : .identifier(current)
         )
     }
@@ -677,16 +661,25 @@ public struct DeclarationGraph {
                 continue
             }
 
+            var genericLines: [String] = []
             var parameterLines: [String] = []
             var childIndex = index + 1
             while childIndex < lines.count {
                 let childFields = emittedRecordFields(in: lines[childIndex])
+                if childFields["kind"] == "generic" || rawGenericName(in: lines[childIndex]) != nil {
+                    genericLines.append(lines[childIndex])
+                    childIndex += 1
+                    continue
+                }
                 if childFields["kind"] == "parameter" {
                     parameterLines.append(lines[childIndex])
                     childIndex += 1
                     while childIndex < lines.count {
                         let parameterChildFields = emittedRecordFields(in: lines[childIndex])
-                        guard parameterChildFields["kind"] == "value" else {
+                        guard parameterChildFields["kind"] == "value"
+                            || parameterChildFields["kind"] == "generic"
+                            || rawGenericName(in: lines[childIndex]) != nil
+                        else {
                             break
                         }
                         parameterLines.append(lines[childIndex])
@@ -702,6 +695,7 @@ public struct DeclarationGraph {
 
             if let function = emittedFunction(
                 from: lines[index],
+                genericLines: genericLines,
                 parameters: emittedParameters(from: parameterLines)
             ) {
                 result.append(function)
@@ -713,6 +707,7 @@ public struct DeclarationGraph {
 
     private static func emittedFunction(
         from line: String,
+        genericLines: [String] = [],
         parameters: [RangeFunctionParameter] = []
     ) -> CallableDeclaration? {
         let fields = emittedRecordFields(in: line)
@@ -722,17 +717,20 @@ public struct DeclarationGraph {
         else {
             return nil
         }
-        let body = fields["body"].map { [Statement.expression(.identifier($0))] }
+        let body = fields["body"].map { [Statement.emitted("statement|kind=expression|value=\($0)")] }
 
         return CallableDeclaration(
             macros: [],
             attribute: nil,
             targetType: nil,
             name: name,
-            genericParameters: [],
+            genericParameters: emittedGenericParameters(from: genericLines),
             hasExplicitParameterClause: true,
             parameters: parameters,
-            returnType: emittedTypeReference(typeName: fields["result"]),
+            returnType: emittedTypeReference(
+                typeName: fields["result"],
+                generics: []
+            ),
             body: body
         )
     }
@@ -746,24 +744,16 @@ public struct DeclarationGraph {
                 index += 1
                 continue
             }
-            let valueLine: String?
-            if index + 1 < lines.count,
-                emittedRecordFields(in: lines[index + 1])["kind"] == "value"
-            {
-                valueLine = lines[index + 1]
-                index += 2
-            } else {
-                valueLine = nil
-                index += 1
-            }
-            if let parameter = emittedParameter(from: lines[index - (valueLine == nil ? 1 : 2)], valueLine: valueLine) {
+            let parameterLine = lines[index]
+            let valueLines = emittedValueBlock(from: lines, index: &index)
+            if let parameter = emittedParameter(from: parameterLine, valueLines: valueLines) {
                 result.append(parameter)
             }
         }
         return result
     }
 
-    private static func emittedParameter(from line: String, valueLine: String?) -> RangeFunctionParameter? {
+    private static func emittedParameter(from line: String, valueLines: [String]) -> RangeFunctionParameter? {
         let fields = emittedRecordFields(in: line)
         guard fields["kind"] == "parameter",
             let name = fields["name"],
@@ -771,8 +761,9 @@ public struct DeclarationGraph {
         else {
             return nil
         }
-        let valueFields = valueLine.map(emittedRecordFields) ?? [:]
+        let valueFields = valueLines.first.map(emittedRecordFields) ?? [:]
         let type = valueFields["type"] ?? fields["type"] ?? ""
+        let generics = emittedTypeGenericNames(from: valueLines)
         let defaultValue = valueFields["current"].flatMap { current -> Expression? in
             current.isEmpty ? nil : .identifier(current)
         }
@@ -780,7 +771,7 @@ public struct DeclarationGraph {
         return RangeFunctionParameter(
             macros: [],
             name: name,
-            typeReference: emittedTypeReference(typeName: type),
+            typeReference: emittedTypeReference(typeName: type, generics: generics),
             defaultValue: defaultValue,
             slotName: nil
         )
@@ -799,11 +790,77 @@ public struct DeclarationGraph {
         return fields
     }
 
-    private static func emittedTypeReference(typeName: String?) -> TypeReference {
+    private static func emittedValueBlock(from lines: [String], index: inout Int) -> [String] {
+        index += 1
+        guard index < lines.count, emittedRecordFields(in: lines[index])["kind"] == "value" else {
+            return []
+        }
+
+        var valueLines = [lines[index]]
+        index += 1
+        while index < lines.count {
+            let fields = emittedRecordFields(in: lines[index])
+            guard fields["kind"] == "generic" || rawGenericName(in: lines[index]) != nil else {
+                break
+            }
+            valueLines.append(lines[index])
+            index += 1
+        }
+        return valueLines
+    }
+
+    private static func emittedTypeReference(typeName: String?, generics: [String] = []) -> TypeReference {
         guard let typeName, !typeName.isEmpty else {
             return .named("Unknown")
         }
-        return .named(typeName)
+        let base = TypeReference.named(typeName)
+        let arguments = generics.map(TypeReference.named)
+        guard !arguments.isEmpty else {
+            return base
+        }
+        if typeName == "Optional", arguments.count == 1 {
+            return .optional(arguments[0])
+        }
+        if typeName == "Array", arguments.count == 1 {
+            return .array(arguments[0])
+        }
+        return .generic(base: base, arguments: arguments)
+    }
+
+    private static func emittedGenericParameters(from lines: [String]) -> [GenericParameter] {
+        lines.compactMap { line in
+            let fields = emittedRecordFields(in: line)
+            let name = fields["kind"] == "generic" ? fields["name"] : rawGenericName(in: line)
+            guard let name, !name.isEmpty else {
+                return nil
+            }
+            return .type(name: name, constraint: nil, defaultArgument: nil)
+        }
+    }
+
+    private static func emittedTypeGenericNames(from lines: [String]) -> [String] {
+        lines.compactMap { line in
+            let fields = emittedRecordFields(in: line)
+            if fields["kind"] == "generic" {
+                return fields["name"]
+            }
+            return rawGenericName(in: line)
+        }
+    }
+
+    private static func rawGenericName(in line: String) -> String? {
+        guard let nameRange = line.range(of: #"@generic\s*\(\s*name\s*:\s*"([^"]+)""#, options: .regularExpression)
+        else {
+            return nil
+        }
+        let match = String(line[nameRange])
+        guard let firstQuote = match.firstIndex(of: "\""),
+            let lastQuote = match.lastIndex(of: "\""),
+            firstQuote != lastQuote
+        else {
+            return nil
+        }
+        return String(match[match.index(after: firstQuote)..<lastQuote])
     }
 
     static func collectEnums(from files: [ParsedSourceFile]) -> [String: EnumDeclaration] {

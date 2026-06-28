@@ -5,10 +5,15 @@
     @parameter(name: "current") {
         @value(type: "String", current: "String()")
     }
+    @parameter(name: "body") {
+        @value(type: "String", current: "String()")
+    }
     @return(value: "member|kind=value|type="
         + type
         + "|current="
         + current
         + "|ordinal="
-        + String(target.ordinal))
+        + String(target.ordinal)
+        + "\n"
+        + body)
 }

@@ -689,8 +689,6 @@ struct MacroTargetValueBuilder {
         switch statement {
         case .macroApplication, .macroInvocation, .emitted:
             return writtenSyntax(renderStatement(statement))
-        default:
-            return writtenSyntax("")
         }
     }
 
@@ -711,8 +709,6 @@ struct MacroTargetValueBuilder {
         case .macroInvocation(let name, let argumentClause, let body):
             let arguments = argumentClause.map { "(\($0))" } ?? ""
             return "@\(name)\(arguments) { \(renderStatements(body)) }"
-        default:
-            return ""
         }
     }
 

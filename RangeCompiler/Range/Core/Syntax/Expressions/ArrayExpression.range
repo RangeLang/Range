@@ -1,10 +1,14 @@
 @syntax
 @construct(name: "ArrayExpression") {
     @let(name: "type") {
-        @value(type: "Optional<TypeReference>")
+        @value(type: "Optional") {
+            @generic(name: "TypeReference")
+        }
     }
     @let(name: "elements") {
-        @value(type: "Array<Expression>")
+        @value(type: "Array") {
+            @generic(name: "Expression")
+        }
     }
 
     @function(name: "replace", result: "Expression", body: "")

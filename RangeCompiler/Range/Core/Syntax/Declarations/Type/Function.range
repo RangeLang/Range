@@ -5,19 +5,27 @@
         @value(type: "GraphIdentity")
     }
     @let(name: "parent") {
-        @value(type: "Optional<GraphIdentity>")
+        @value(type: "Optional") {
+            @generic(name: "GraphIdentity")
+        }
     }
     @let(name: "identifier") {
         @value(type: "Identifier")
     }
     @let(name: "generics") {
-        @value(type: "Array<Generic>")
+        @value(type: "Array") {
+            @generic(name: "Generic")
+        }
     }
     @let(name: "parameters") {
-        @value(type: "Array<Parameter>")
+        @value(type: "Array") {
+            @generic(name: "Parameter")
+        }
     }
     @let(name: "returnType") {
-        @value(type: "Optional<TypeReference>")
+        @value(type: "Optional") {
+            @generic(name: "TypeReference")
+        }
     }
     @let(name: "body") {
         @value(type: "Block")
@@ -31,7 +39,9 @@
         @value(type: "Identifier")
     }
     @let(name: "arguments") {
-        @value(type: "Array<Parameter>")
+        @value(type: "Array") {
+            @generic(name: "Parameter")
+        }
     }
 
     @function(name: "replace", result: "Expression", body: "")

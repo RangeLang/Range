@@ -6,22 +6,32 @@
 
 @construct(name: "RangeGraph") {
     @let(name: "files") {
-        @value(type: "Array<FileTreeNode>")
+        @value(type: "Array") {
+            @generic(name: "FileTreeNode")
+        }
     }
     @let(name: "sources") {
-        @value(type: "Array<ProgramSourceFile>")
+        @value(type: "Array") {
+            @generic(name: "ProgramSourceFile")
+        }
     }
     @let(name: "artifacts") {
-        @value(type: "Array<ProgramArtifact>")
+        @value(type: "Array") {
+            @generic(name: "ProgramArtifact")
+        }
     }
     @let(name: "topology") {
         @value(type: "RangeGraphTopology")
     }
     @state(name: "main") {
-        @value(type: "Optional<@main>")
+        @value(type: "Optional") {
+            @generic(name: "@main")
+        }
     }
     @state(name: "syntax") {
-        @value(type: "Array<@syntax>")
+        @value(type: "Array") {
+            @generic(name: "@syntax")
+        }
     }
 }
 
@@ -45,10 +55,14 @@
 
 @construct(name: "RangeGraphTopology") {
     @let(name: "nodes") {
-        @value(type: "Array<RangeGraphNode>")
+        @value(type: "Array") {
+            @generic(name: "RangeGraphNode")
+        }
     }
     @let(name: "relationships") {
-        @value(type: "Array<RangeGraphRelationship>")
+        @value(type: "Array") {
+            @generic(name: "RangeGraphRelationship")
+        }
     }
 }
 
@@ -60,7 +74,9 @@
         @value(type: "String")
     }
     @let(name: "labels") {
-        @value(type: "Array<String>")
+        @value(type: "Array") {
+            @generic(name: "String")
+        }
     }
 }
 
@@ -81,10 +97,14 @@
         @value(type: "RangeGraphIdentity")
     }
     @let(name: "declarations") {
-        @value(type: "Array<GraphEntry>")
+        @value(type: "Array") {
+            @generic(name: "GraphEntry")
+        }
     }
     @let(name: "applications") {
-        @value(type: "Array<GraphEntry>")
+        @value(type: "Array") {
+            @generic(name: "GraphEntry")
+        }
     }
 }
 

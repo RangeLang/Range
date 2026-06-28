@@ -5,7 +5,9 @@
         @value(type: "Identifier")
     }
     @let(name: "macros") {
-        @value(type: "Array<@macro>")
+        @value(type: "Array") {
+            @generic(name: "@macro")
+        }
     }
     @let(name: "syntax") {
         @value(type: "WrittenSyntax")

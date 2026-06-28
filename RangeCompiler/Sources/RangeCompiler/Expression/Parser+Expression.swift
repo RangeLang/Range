@@ -148,7 +148,6 @@ extension Parser {
             advance()
             var fullName = name
             try appendPostfixAccesses(to: &fullName)
-            fullName += try parseGenericArgumentClauseIfPresent()
             return try parseCalledOrReferencedExpression(named: fullName)
         case .dollar:
             try consume(.dollar)
@@ -159,8 +158,7 @@ extension Parser {
         case .dot:
             advance()
             let name = try consumeCallableName()
-            var fullName = ".\(name)"
-            fullName += try parseGenericArgumentClauseIfPresent()
+            let fullName = ".\(name)"
             return try parseCalledOrReferencedExpression(named: fullName)
         case .leftParen:
             try consume(.leftParen)
@@ -323,56 +321,6 @@ extension Parser {
             }
 
             return
-        }
-    }
-
-    mutating func parseGenericArgumentClauseIfPresent() throws -> String {
-        guard peek() == .less, isGenericArgumentClauseStart() else {
-            return ""
-        }
-
-        try consume(.less)
-        var arguments: [String] = [try parseGenericArgumentReferenceNode().displayName]
-        while peek() == .comma {
-            advance()
-            arguments.append(try parseGenericArgumentReferenceNode().displayName)
-        }
-        try consume(.greater)
-        return "<\(arguments.joined(separator: ", "))>"
-    }
-
-    func isGenericArgumentClauseStart() -> Bool {
-        switch peek(offset: 1) {
-        case .identifier, .keyword, .integer, .double, .stringLiteral, .dot, .leftBracket,
-            .leftParen:
-            break
-        default:
-            return false
-        }
-
-        var offset = 1
-        var depth = 1
-        while true {
-            switch peek(offset: offset) {
-            case .less:
-                depth += 1
-            case .greater:
-                depth -= 1
-                if depth == 0 {
-                    return true
-                }
-            case .eof, .leftBrace, .rightBrace, .rightParen, .rightBracket, .equal, .equalEqual,
-                .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash,
-                .ampersand, .andAnd, .pipe, .orOr, .dotDotLess,
-                .questionQuestion, .colon, .arrow:
-                return false
-            case .hash, .foreignBody, .macroAttribute, .dollar, .percent, .bang:
-                return false
-            case .identifier, .keyword, .stringLiteral, .integer, .double,
-                .leftBracket, .leftParen, .asterisk, .dot, .ellipsis, .question, .comma:
-                break
-            }
-            offset += 1
         }
     }
 

@@ -4,7 +4,9 @@
         @value(type: "NominalTypeReference")
     }
     @let(name: "arguments") {
-        @value(type: "Array<TypeReference>")
+        @value(type: "Array") {
+            @generic(name: "TypeReference")
+        }
     }
 
     @function(name: "replace", result: "TypeReference", body: "")

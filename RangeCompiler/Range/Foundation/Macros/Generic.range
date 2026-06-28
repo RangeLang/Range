@@ -1,0 +1,10 @@
+@macro(name: "generic", result: "String", target: "@member"){
+    @parameter(name: "name") {
+        @value(type: "String")
+    }
+
+    @return(value: "member|kind=generic|name="
+        + name
+        + "|ordinal="
+        + String(target.ordinal))
+}
