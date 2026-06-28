@@ -243,26 +243,8 @@ extension MacroExpander {
                     "text": .string(text),
                 ]
             )
-        case .localBinding(let declaration):
-            return .object(
-                typeName: "LocalBinding",
-                fields: [
-                    "kind": .string(declaration.kind == .mutable ? "state" : "let"),
-                    "name": .string(declaration.name),
-                    "mutable": .boolean(declaration.kind == .mutable),
-                    "type": .string(declaration.type.displayName),
-                    "expression": expressionValue(declaration.expression),
-                ]
-            )
-        case .return(let expression):
-            return .object(
-                typeName: "Return",
-                fields: [
-                    "expression": expression.map(expressionValue) ?? .nilValue
-                ]
-            )
-        case .expression(let expression):
-            return .string(MacroExpander.renderExpressionForStringify(expression))
+        case .macroApplication, .macroInvocation:
+            return .string(renderStatementForBlockValue(statement))
         default:
             return .object(
                 typeName: "UnsupportedStatement",
@@ -326,17 +308,6 @@ extension MacroExpander {
         switch statement {
         case .emitted(let text):
             return text
-        case .return(let expression?):
-            return "return \(renderExpressionForStringify(expression))"
-        case .return(nil):
-            return "return"
-        case .expression(let expression):
-            return renderExpressionForStringify(expression)
-        case .localBinding(let declaration):
-            let keyword = declaration.kind == .mutable ? "state" : "let"
-            return "\(keyword) \(declaration.name): \(declaration.type.displayName)(\(renderExpressionForStringify(declaration.expression)))"
-        case .assignment(let target, let expression):
-            return "\(renderAssignmentTarget(target)): \(renderExpressionForStringify(expression))"
         case .macroApplication(let name, let arguments):
             let renderedArguments = renderArgumentsForStringify(arguments)
             if renderedArguments.isEmpty {
@@ -350,7 +321,7 @@ extension MacroExpander {
                 body: renderStatementsForRawBody(body)
             )
         default:
-            return String(describing: statement)
+            return ""
         }
     }
 
@@ -721,14 +692,6 @@ extension MacroExpander {
         return processed
     }
 
-    private static func statementMacroAvailable(
-        _ name: String,
-        in macros: [String: MacroDeclaration]
-    ) -> Bool {
-        guard let macro = macros[name] else { return false }
-        return macroTargetsStatementSurface(macro)
-    }
-
     private static func macroTargetsStatementSurface(_ macro: MacroDeclaration) -> Bool {
         if macro.macros.contains(where: { $0.name == "statement" }) {
             return true
@@ -745,19 +708,6 @@ extension MacroExpander {
         case .syntax:
             return false
         }
-    }
-
-    private static func quotedStatementMacroArgument(_ value: String) -> String {
-        "\"\(escapedStatementMacroString(value))\""
-    }
-
-    private static func escapedStatementMacroString(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "\n", with: "\\n")
-            .replacingOccurrences(of: "\r", with: "\\r")
-            .replacingOccurrences(of: "\t", with: "\\t")
     }
 
     static func statementMacroTargetValue(
@@ -1205,222 +1155,6 @@ extension MacroExpander {
                 ]
             }
             return [statement]
-        case .whileLoop(let condition, let body):
-            if !preserveStatementMacroApplications,
-                statementMacroAvailable("while", in: macros)
-            {
-                let expandedCondition = try expand(
-                    expression: condition,
-                    expectedType: .named("Bool"),
-                    macros: macros,
-                    context: context
-                )
-                let expandedBody = try expand(
-                    statements: body,
-                    expectedReturnType: expectedReturnType,
-                    macros: macros,
-                    context: context
-                )
-                return [
-                    .emitted(
-                        try evaluatedStringStatementMacro(
-                            name: "while",
-                            argumentClause: quotedStatementMacroArgument(
-                                renderExpressionForStringify(expandedCondition)
-                            ),
-                            body: expandedBody,
-                            macros: macros,
-                            context: context
-                        )
-                    )
-                ]
-            }
-            return [
-                .whileLoop(
-                    condition: try expand(
-                        expression: condition,
-                        expectedType: .named("Bool"),
-                        macros: macros,
-                        context: context
-                    ),
-                    body: try expand(
-                        statements: body,
-                        expectedReturnType: expectedReturnType,
-                        macros: macros,
-                        context: context
-                    ))
-            ]
-        case .conditional(let branches):
-            if !preserveStatementMacroApplications,
-                branches.count == 1,
-                let branch = branches.first,
-                let condition = branch.condition,
-                statementMacroAvailable("if", in: macros)
-            {
-                let expandedCondition = try expand(
-                    expression: condition,
-                    expectedType: .named("Bool"),
-                    macros: macros,
-                    context: context
-                )
-                let expandedBody = try expand(
-                    statements: branch.body,
-                    expectedReturnType: expectedReturnType,
-                    macros: macros,
-                    context: context
-                )
-                return [
-                    .emitted(
-                        try evaluatedStringStatementMacro(
-                            name: "if",
-                            argumentClause: quotedStatementMacroArgument(
-                                renderExpressionForStringify(expandedCondition)
-                            ),
-                            body: expandedBody,
-                            macros: macros,
-                            context: context
-                        )
-                    )
-                ]
-            }
-            return [
-                .conditional(
-                    try branches.map { branch in
-                        StatementConditionalBranch(
-                            condition: try branch.condition.map {
-                                try expand(
-                                    expression: $0,
-                                    expectedType: .named("Bool"),
-                                    macros: macros,
-                                    context: context)
-                            },
-                            body: try expand(
-                                statements: branch.body,
-                                expectedReturnType: expectedReturnType,
-                                macros: macros,
-                                context: context
-                            )
-                        )
-                    }
-                )
-            ]
-        case .localBinding(let declaration):
-            let expandedExpression = try expand(
-                expression: declaration.expression,
-                expectedType: declaration.hasExplicitTypeAnnotation
-                    ? declaration.type : nil,
-                macros: macros,
-                context: context
-            )
-            let bindingMacroName = declaration.kind == .mutable ? "state" : "let"
-            if expectedReturnType != nil,
-                !preserveStatementMacroApplications,
-                statementMacroAvailable(bindingMacroName, in: macros)
-            {
-                return [
-                    .emitted(
-                        memberStatementRecord(
-                            kind: bindingMacroName,
-                            name: declaration.name,
-                            type: declaration.type,
-                            value: expandedExpression,
-                            host: "function.block"
-                        )
-                    )
-                ]
-            }
-            return [
-                .localBinding(
-                    LocalBindingDeclaration(
-                        kind: declaration.kind,
-                        name: declaration.name,
-                        hasExplicitTypeAnnotation: declaration.hasExplicitTypeAnnotation,
-                        type: declaration.type,
-                        expression: expandedExpression
-                    )
-                )
-            ]
-        case .assignment(let target, let expression):
-            let expandedExpression = try expand(
-                expression: expression,
-                expectedType: nil,
-                macros: macros,
-                context: context
-            )
-            if expectedReturnType != nil,
-                !preserveStatementMacroApplications,
-                statementMacroAvailable("assignment", in: macros)
-            {
-                return [
-                    .emitted(
-                        try evaluatedStringStatementMacro(
-                            name: "assignment",
-                            arguments: [
-                                CallArgument(
-                                    label: "target",
-                                    value: .string(renderAssignmentTarget(target))
-                                ),
-                                CallArgument(
-                                    label: "value",
-                                    value: .string(renderStatementRecordValue(expandedExpression))
-                                ),
-                            ],
-                            macros: macros,
-                            context: context
-                        )
-                    )
-                ]
-            }
-            return [
-                .assignment(
-                    target: target,
-                    expression: expandedExpression
-                )
-            ]
-        case .expression(let expression):
-            return [
-                .expression(
-                    try expand(
-                        expression: expression,
-                        expectedType: nil,
-                        macros: macros,
-                        context: context))
-            ]
-        case .return(let expression):
-            if !preserveStatementMacroApplications,
-                statementMacroAvailable("return", in: macros)
-            {
-                let expandedExpression = try expression.map {
-                    try expand(
-                        expression: $0,
-                        expectedType: expectedReturnType,
-                        macros: macros,
-                        context: context)
-                }
-                let value = expandedExpression.map {
-                    renderStatementRecordValue($0, expectedType: expectedReturnType)
-                } ?? ""
-                return [
-                    .emitted(
-                        try evaluatedStringStatementMacro(
-                            name: "return",
-                            arguments: [CallArgument(label: "value", value: .string(value))],
-                            macros: macros,
-                            context: context
-                        )
-                    )
-                ]
-            }
-            return [
-                .return(
-                    try expression.map {
-                        try expand(
-                            expression: $0,
-                            expectedType: expectedReturnType,
-                            macros: macros,
-                            context: context)
-                    })
-            ]
         default:
             return [statement]
         }
@@ -1918,19 +1652,6 @@ extension MacroExpander {
                     context: context
                 )
                 _ = evaluator.evaluateStatements([statement], locals: &locals)
-            case .expression(let expression):
-                if let diagnostic = try macroDiagnostic(
-                    from: expression,
-                    diagnosticOwnerName: diagnosticOwnerName,
-                    diagnosticsBinding: diagnosticsBinding,
-                    targetBinding: targetBinding,
-                    targetValue: targetValue,
-                    graphBinding: graphBinding,
-                    context: context,
-                    localBindings: locals
-                ) {
-                    diagnostics.append(diagnostic)
-                }
             case .macroInvocation(let name, let argumentClause, let body) where name == "if":
                 let evaluator = CompileTimeValueEvaluator(
                     targetBinding: targetBinding,
@@ -1995,8 +1716,7 @@ extension MacroExpander {
                     locals = bodyResult.locals
                     iterationCount += 1
                 }
-            case .emitted, .macroApplication, .macroInvocation, .localBinding, .assignment,
-                .conditional, .whileLoop, .return:
+            default:
                 continue
             }
         }
@@ -2015,88 +1735,6 @@ extension MacroExpander {
                 ),
             ]
         )
-    }
-
-    static func macroDiagnostic(
-        from expression: Expression,
-        diagnosticOwnerName: String,
-        diagnosticsBinding: String,
-        targetBinding: String,
-        targetValue: CompileTimeValue?,
-        graphBinding: String?,
-        context: MacroExpansionContext,
-        localBindings: [String: Expression]
-    ) throws -> RangeDiagnostic? {
-        guard case .call(let name, let arguments) = expression,
-            isMacroDiagnosticsCall(expression, diagnosticsBinding: diagnosticsBinding)
-        else {
-            return nil
-        }
-
-        guard let firstArgument = arguments.first(where: { $0.label == nil })?.value else {
-            throw ParseError("Macro @\(diagnosticOwnerName) \(name)(...) requires a message.")
-        }
-
-        let evaluator = CompileTimeValueEvaluator(
-            targetBinding: targetBinding,
-            targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
-            graphBinding: graphBinding,
-            selfValue: macroSelfValue(named: diagnosticOwnerName),
-            localBindings: localBindings,
-            macroDeclarationsByName: context.macroDeclarationsByName,
-            context: context
-        )
-        guard case .string(let message) = evaluator.evaluate(firstArgument) else {
-            throw ParseError(
-                "Macro @\(diagnosticOwnerName) \(name)(...) message must evaluate to String.")
-        }
-
-        switch name {
-        case "\(diagnosticsBinding).error":
-            return RangeDiagnostic(
-                severity: .error,
-                message: message,
-                source: "range-macro",
-                code: "macro.diagnostic.error"
-            )
-        case "\(diagnosticsBinding).warning":
-            return RangeDiagnostic(
-                severity: .warning,
-                message: message,
-                source: "range-macro",
-                code: "macro.diagnostic.warning"
-            )
-        case "\(diagnosticsBinding).information", "\(diagnosticsBinding).note":
-            return RangeDiagnostic(
-                severity: .information,
-                message: message,
-                source: "range-macro",
-                code: "macro.diagnostic.information"
-            )
-        case "\(diagnosticsBinding).hint":
-            return RangeDiagnostic(
-                severity: .hint,
-                message: message,
-                source: "range-macro",
-                code: "macro.diagnostic.hint"
-            )
-        default:
-            return nil
-        }
-    }
-
-    static func isMacroDiagnosticsCall(
-        _ expression: Expression,
-        diagnosticsBinding: String
-    ) -> Bool {
-        guard case .call(let name, _) = expression else {
-            return false
-        }
-        return name == "\(diagnosticsBinding).error"
-            || name == "\(diagnosticsBinding).warning"
-            || name == "\(diagnosticsBinding).information"
-            || name == "\(diagnosticsBinding).hint"
-            || name == "\(diagnosticsBinding).note"
     }
 
     static func evaluateFreestandingSyntaxMacro(
@@ -2230,18 +1868,6 @@ extension MacroExpander {
             }
         }
         return stringyArgumentValue(expression)
-    }
-
-    static func memberStatementRecord(
-        kind: String,
-        name: String,
-        type: TypeReference,
-        value: Expression,
-        host: String
-    ) -> String {
-        "member|kind=\(kind)|name=\(name)|type=\(type.displayName)|value="
-            + renderStatementRecordValue(value, expectedType: type)
-            + "|host=\(host)|ordinal=0"
     }
 
 }

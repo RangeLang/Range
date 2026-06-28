@@ -13,44 +13,6 @@ extension MacroExpander {
         switch statement {
         case .emitted:
             return statement
-        case .localBinding(let declaration):
-            return .localBinding(
-                LocalBindingDeclaration(
-                    kind: declaration.kind,
-                    name: declaration.name,
-                    hasExplicitTypeAnnotation: declaration.hasExplicitTypeAnnotation,
-                    type: declaration.type,
-                    expression: substituteMacroBindings(
-                        in: declaration.expression,
-                        bindings: bindings
-                    )
-                )
-            )
-        case .assignment(let target, let expression):
-            return .assignment(
-                target: target,
-                expression: substituteMacroBindings(in: expression, bindings: bindings)
-            )
-        case .expression(let expression):
-            return .expression(substituteMacroBindings(in: expression, bindings: bindings))
-        case .whileLoop(let condition, let body):
-            return .whileLoop(
-                condition: substituteMacroBindings(in: condition, bindings: bindings),
-                body: substituteMacroBindings(in: body, bindings: bindings)
-            )
-        case .conditional(let branches):
-            return .conditional(
-                branches.map { branch in
-                    StatementConditionalBranch(
-                        condition: branch.condition.map {
-                            substituteMacroBindings(in: $0, bindings: bindings)
-                        },
-                        body: substituteMacroBindings(in: branch.body, bindings: bindings)
-                    )
-                }
-            )
-        case .return(let expression):
-            return .return(expression.map { substituteMacroBindings(in: $0, bindings: bindings) })
         case .macroInvocation(let name, let argumentClause, let body):
             return .macroInvocation(
                 name: name,
@@ -67,6 +29,8 @@ extension MacroExpander {
                     )
                 }
             )
+        default:
+            return statement
         }
     }
 

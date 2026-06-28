@@ -42,7 +42,7 @@ struct CompileTimeValueEvaluator {
     }
 
     // Macro bodies execute through the explicit statement macro surface.
-    // Returns the produced value from @return or a value-producing expression.
+    // Returns the produced value from @return.
     // `locals` is threaded mutably so @assignment and loop accumulation persist.
     func evaluateStatements(
         _ statements: [Statement],
@@ -81,10 +81,6 @@ struct CompileTimeValueEvaluator {
                     continue
                 }
                 if let value = evaluateStatements(body, locals: &locals) {
-                    return value
-                }
-            case .expression(let expression):
-                if let value = evaluate(expression, locals: locals) {
                     return value
                 }
             default:

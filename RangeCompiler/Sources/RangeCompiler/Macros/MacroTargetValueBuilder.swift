@@ -687,30 +687,10 @@ struct MacroTargetValueBuilder {
 
     private func statementValue(_ statement: Statement) -> CompileTimeValue {
         switch statement {
-        case .localBinding(let declaration):
-            return .object(
-                typeName: "LocalBinding",
-                fields: [
-                    "mutable": .boolean(declaration.kind == .mutable),
-                    "identifier": identifier(declaration.name),
-                    "type": typeReferenceValue(declaration.type),
-                    "expression": writtenSyntax(
-                        MacroExpander.renderExpressionForStringify(declaration.expression)),
-                ]
-            )
-        case .return(let expression):
-            return .object(
-                typeName: "Return",
-                fields: [
-                    "expression": expression.map {
-                        writtenSyntax(MacroExpander.renderExpressionForStringify($0))
-                    } ?? writtenSyntax("")
-                ]
-            )
-        case .expression(let expression):
-            return writtenSyntax(MacroExpander.renderExpressionForStringify(expression))
-        default:
+        case .macroApplication, .macroInvocation, .emitted:
             return writtenSyntax(renderStatement(statement))
+        default:
+            return writtenSyntax("")
         }
     }
 
@@ -720,16 +700,8 @@ struct MacroTargetValueBuilder {
 
     private func renderStatement(_ statement: Statement) -> String {
         switch statement {
-        case .localBinding(let declaration):
-            let keyword = declaration.kind == .constant ? "let" : "state"
-            let expression = MacroExpander.renderExpressionForStringify(declaration.expression)
-            return "\(keyword) \(declaration.name): \(declaration.type.displayName)(\(expression))"
-        case .return(let expression?):
-            return "return \(MacroExpander.renderExpressionForStringify(expression))"
-        case .return(nil):
-            return "return"
-        case .expression(let expression):
-            return MacroExpander.renderExpressionForStringify(expression)
+        case .emitted(let text):
+            return text
         case .macroApplication(let name, let arguments):
             let renderedArguments = MacroExpander.renderArgumentsForStringify(arguments)
             if renderedArguments.isEmpty {
@@ -740,7 +712,7 @@ struct MacroTargetValueBuilder {
             let arguments = argumentClause.map { "(\($0))" } ?? ""
             return "@\(name)\(arguments) { \(renderStatements(body)) }"
         default:
-            return String(describing: statement)
+            return ""
         }
     }
 
