@@ -6,12 +6,18 @@ enum StringyStatementRecord {
     case assignment(target: String, value: Expression)
     case expression(Expression)
     case whileLoop(condition: Expression, body: [StringyStatementRecord])
-    case conditional(condition: Expression, body: [StringyStatementRecord])
+    case conditional([StringyConditionalBranch])
     case breakStatement
     case continueStatement
 
     static func records(in text: String) -> [StringyStatementRecord] {
-        parseLines(Array(text.split(separator: "\n", omittingEmptySubsequences: false)))
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        guard lines.contains(where: hasExplicitBlockMarker) else {
+            return parseLines(lines)
+        }
+
+        var index = 0
+        return parseExplicitBlock(lines, index: &index)
     }
 
     static func first(in text: String) -> StringyStatementRecord? {
@@ -27,22 +33,89 @@ enum StringyStatementRecord {
         return nil
     }
 
-    private static func parseLines(_ lines: [Substring]) -> [StringyStatementRecord] {
+    private static func parseLines(_ lines: [String]) -> [StringyStatementRecord] {
         guard let first = lines.first else { return [] }
-        let firstLine = String(first)
-        guard let parent = parseLine(firstLine) else {
-            return lines.compactMap { parseLine(String($0)) }
+        guard let parent = parseLine(first) else {
+            return lines.compactMap(parseLine)
         }
 
         let children = parseLines(Array(lines.dropFirst()))
         switch parent {
         case .whileLoop(let condition, _):
             return [.whileLoop(condition: condition, body: children)]
-        case .conditional(let condition, _):
-            return [.conditional(condition: condition, body: children)]
+        case .conditional(let branches):
+            guard let first = branches.first else {
+                return []
+            }
+            return [
+                .conditional([
+                    StringyConditionalBranch(condition: first.condition, body: children)
+                ])
+            ]
         default:
             return [parent] + children
         }
+    }
+
+    private static func parseExplicitBlock(
+        _ lines: [String],
+        index: inout Int
+    ) -> [StringyStatementRecord] {
+        var records: [StringyStatementRecord] = []
+        while index < lines.count {
+            let line = lines[index]
+            guard let kind = field("kind", in: line) else {
+                index += 1
+                continue
+            }
+            if kind == "end" || kind == "else" {
+                break
+            }
+
+            switch kind {
+            case "while":
+                guard let condition = field("condition", in: line).flatMap(parseExpression) else {
+                    index += 1
+                    continue
+                }
+                index += 1
+                let body = parseExplicitBlock(lines, index: &index)
+                consumeEnd(lines, index: &index)
+                records.append(.whileLoop(condition: condition, body: body))
+            case "if":
+                guard let condition = field("condition", in: line).flatMap(parseExpression) else {
+                    index += 1
+                    continue
+                }
+                index += 1
+                let trueBody = parseExplicitBlock(lines, index: &index)
+                var branches = [StringyConditionalBranch(condition: condition, body: trueBody)]
+                if index < lines.count, field("kind", in: lines[index]) == "else" {
+                    index += 1
+                    branches.append(
+                        StringyConditionalBranch(
+                            condition: nil,
+                            body: parseExplicitBlock(lines, index: &index)
+                        )
+                    )
+                }
+                consumeEnd(lines, index: &index)
+                records.append(.conditional(branches))
+            default:
+                if let record = parseLine(line) {
+                    records.append(record)
+                }
+                index += 1
+            }
+        }
+        return records
+    }
+
+    private static func consumeEnd(_ lines: [String], index: inout Int) {
+        guard index < lines.count, field("kind", in: lines[index]) == "end" else {
+            return
+        }
+        index += 1
     }
 
     private static func parseLine(_ line: String) -> StringyStatementRecord? {
@@ -102,7 +175,11 @@ enum StringyStatementRecord {
             else {
                 return nil
             }
-            return .conditional(condition: condition, body: [])
+            return .conditional([
+                StringyConditionalBranch(condition: condition, body: [])
+            ])
+        case "end", "else":
+            return nil
         case "break":
             return .breakStatement
         case "continue":
@@ -121,9 +198,56 @@ enum StringyStatementRecord {
         }
         do {
             var parser = try Parser(source: text)
-            return try parser.parseExpression()
+            return normalizeBooleanIdentifiers(try parser.parseExpression())
         } catch {
             return nil
+        }
+    }
+
+    private static func normalizeBooleanIdentifiers(_ expression: Expression) -> Expression {
+        switch expression {
+        case .identifier("true"):
+            return .boolean(true)
+        case .identifier("false"):
+            return .boolean(false)
+        case .call(let name, let arguments):
+            return .call(
+                name: name,
+                arguments: arguments.map {
+                    CallArgument(label: $0.label, value: normalizeBooleanIdentifiers($0.value))
+                }
+            )
+        case .array(let elements):
+            return .array(elements.map(normalizeBooleanIdentifiers))
+        case .dictionary(let elements):
+            return .dictionary(
+                elements.map {
+                    DictionaryElement(
+                        key: normalizeBooleanIdentifiers($0.key),
+                        value: normalizeBooleanIdentifiers($0.value)
+                    )
+                }
+            )
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            return .ternary(
+                condition: normalizeBooleanIdentifiers(condition),
+                trueExpression: normalizeBooleanIdentifiers(trueExpression),
+                falseExpression: normalizeBooleanIdentifiers(falseExpression)
+            )
+        case .unary(let operatorSymbol, let nested):
+            return .unary(
+                operatorSymbol: operatorSymbol,
+                expression: normalizeBooleanIdentifiers(nested)
+            )
+        case .binary(let lhs, let operatorSymbol, let rhs):
+            return .binary(
+                lhs: normalizeBooleanIdentifiers(lhs),
+                operatorSymbol: operatorSymbol,
+                rhs: normalizeBooleanIdentifiers(rhs)
+            )
+        case .block, .bindingReference, .boolean, .double, .integer, .macroInvocation, .nilLiteral,
+            .string, .identifier:
+            return expression
         }
     }
 
@@ -184,4 +308,21 @@ enum StringyStatementRecord {
         }
         return String(afterPrefix)
     }
+}
+
+struct StringyConditionalBranch {
+    let condition: Expression?
+    let body: [StringyStatementRecord]
+}
+
+private func hasExplicitBlockMarker(_ line: String) -> Bool {
+    let kindPrefix = "kind="
+    guard let range = line.range(of: kindPrefix) else {
+        return false
+    }
+    let afterPrefix = line[range.upperBound...]
+    let kind =
+        afterPrefix.firstIndex(of: "|").map { String(afterPrefix[..<$0]) }
+        ?? String(afterPrefix)
+    return kind == "end" || kind == "else"
 }

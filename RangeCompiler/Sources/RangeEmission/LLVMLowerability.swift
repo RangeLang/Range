@@ -696,24 +696,43 @@ enum LLVMLowerability {
                 ) else {
                     return nil
                 }
-            case .conditional(let condition, let body):
-                guard canLower(
-                    condition,
-                    locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures,
-                    constructLayouts: constructLayouts
-                ) == .bool else {
-                    return nil
+            case .conditional(let branches):
+                for branch in branches {
+                    if let condition = branch.condition {
+                        guard canLower(
+                            condition,
+                            locals: locals,
+                            lowerableFunctionSignatures: lowerableFunctionSignatures,
+                            constructLayouts: constructLayouts
+                        ) == .bool else {
+                            return nil
+                        }
+                    }
+                    var branchLocals = locals
+                    _ = canLowerStringyRecords(
+                        branch.body,
+                        returnType: returnType,
+                        locals: &branchLocals,
+                        lowerableFunctionSignatures: lowerableFunctionSignatures,
+                        constructLayouts: constructLayouts,
+                        scalarTypes: scalarTypes
+                    )
                 }
-                var branchLocals = locals
-                _ = canLowerStringyRecords(
-                    body,
-                    returnType: returnType,
-                    locals: &branchLocals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures,
-                    constructLayouts: constructLayouts,
-                    scalarTypes: scalarTypes
-                )
+                if branches.contains(where: { $0.condition == nil })
+                    && branches.allSatisfy({
+                        var branchLocals = locals
+                        return canLowerStringyRecords(
+                            $0.body,
+                            returnType: returnType,
+                            locals: &branchLocals,
+                            lowerableFunctionSignatures: lowerableFunctionSignatures,
+                            constructLayouts: constructLayouts,
+                            scalarTypes: scalarTypes
+                        ) == true
+                    })
+                {
+                    sawReturn = true
+                }
             case .breakStatement, .continueStatement:
                 return nil
             }
@@ -794,23 +813,27 @@ enum LLVMLowerability {
                 ) else {
                     return false
                 }
-            case .conditional(let condition, let body):
-                guard canLower(
-                    condition,
-                    locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures,
-                    constructLayouts: constructLayouts
-                ) == .bool else {
-                    return false
+            case .conditional(let branches):
+                for branch in branches {
+                    if let condition = branch.condition {
+                        guard canLower(
+                            condition,
+                            locals: locals,
+                            lowerableFunctionSignatures: lowerableFunctionSignatures,
+                            constructLayouts: constructLayouts
+                        ) == .bool else {
+                            return false
+                        }
+                    }
+                    var branchLocals = locals
+                    _ = canLowerStringyLoopBody(
+                        branch.body,
+                        locals: &branchLocals,
+                        lowerableFunctionSignatures: lowerableFunctionSignatures,
+                        constructLayouts: constructLayouts,
+                        scalarTypes: scalarTypes
+                    )
                 }
-                var branchLocals = locals
-                _ = canLowerStringyLoopBody(
-                    body,
-                    locals: &branchLocals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures,
-                    constructLayouts: constructLayouts,
-                    scalarTypes: scalarTypes
-                )
             case .breakStatement, .continueStatement:
                 continue
             }

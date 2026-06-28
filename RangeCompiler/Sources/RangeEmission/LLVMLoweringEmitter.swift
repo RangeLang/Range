@@ -567,8 +567,8 @@ private struct LLVMFunctionEmitter {
             }
         case .whileLoop(let condition, let body):
             try emitStringyWhileLoop(condition: condition, body: body)
-        case .conditional(let condition, let body):
-            try emitStringyConditional(condition: condition, body: body)
+        case .conditional(let branches):
+            try emitStringyConditional(branches)
         case .breakStatement:
             guard let target = loopTargets.last else {
                 throw LLVMLoweringError("LLVM break requires an enclosing loop.")
@@ -767,33 +767,61 @@ private struct LLVMFunctionEmitter {
         }
     }
 
-    private mutating func emitStringyConditional(
-        condition: RangeCompiler.Expression,
-        body: [StringyStatementRecord]
-    ) throws {
-        let labelID = freshLabelID()
-        let bodyLabel = "if.body.\(labelID).0"
-        let endLabel = "if.end.\(labelID)"
-
-        let conditionValue = try emitExpression(condition)
-        guard conditionValue.type == "i1" else {
-            throw LLVMLoweringError("LLVM if condition must be i1.")
+    private mutating func emitStringyConditional(_ branches: [StringyConditionalBranch]) throws {
+        guard !branches.isEmpty else {
+            throw LLVMLoweringError("LLVM conditional requires at least one branch.")
         }
-        emit("br i1 \(conditionValue.representation), label %\(bodyLabel), label %\(endLabel)")
-        blockTerminated = true
 
-        emitLabel(bodyLabel)
-        for record in body {
-            try emitStringyRecord(record)
+        let labelID = freshLabelID()
+        let endLabel = "if.end.\(labelID)"
+        let hasElse = branches.contains { $0.condition == nil }
+        var allBranchesTerminate = hasElse
+
+        for (index, branch) in branches.enumerated() {
+            let bodyLabel = "if.body.\(labelID).\(index)"
+            let nextLabel = "if.next.\(labelID).\(index)"
+
+            if let condition = branch.condition {
+                let conditionValue = try emitExpression(condition)
+                guard conditionValue.type == "i1" else {
+                    throw LLVMLoweringError("LLVM if condition must be i1.")
+                }
+                let falseLabel = index == branches.count - 1 ? endLabel : nextLabel
+                emit(
+                    "br i1 \(conditionValue.representation), label %\(bodyLabel), label %\(falseLabel)"
+                )
+                blockTerminated = true
+            } else {
+                emitBranch(to: bodyLabel)
+            }
+
+            emitLabel(bodyLabel)
+            for record in branch.body {
+                try emitStringyRecord(record)
+                if blockTerminated {
+                    break
+                }
+            }
+
             if blockTerminated {
-                break
+                if branch.condition == nil || index == branches.count - 1 {
+                    allBranchesTerminate = allBranchesTerminate && true
+                }
+            } else {
+                allBranchesTerminate = false
+                emitBranch(to: endLabel)
+            }
+
+            if branch.condition != nil, index < branches.count - 1 {
+                emitLabel(nextLabel)
             }
         }
-        if !blockTerminated {
-            emitBranch(to: endLabel)
-        }
 
-        emitLabel(endLabel)
+        if allBranchesTerminate {
+            blockTerminated = true
+        } else {
+            emitLabel(endLabel)
+        }
     }
 
     private mutating func emitStatements(_ statements: [LLVMStatement]) throws {

@@ -449,6 +449,33 @@ struct SwiftBackendEmitter {
                 }
             }
 
+            func record(_ stringyRecord: StringyStatementRecord) {
+                switch stringyRecord {
+                case .returnStatement(let value?, _):
+                    record(value)
+                case .returnStatement(nil, _):
+                    break
+                case .member(_, _, _, let value):
+                    record(value)
+                case .assignment(_, let value):
+                    record(value)
+                case .expression(let expression):
+                    record(expression)
+                case .whileLoop(let condition, let body):
+                    record(condition)
+                    body.forEach(record)
+                case .conditional(let branches):
+                    for branch in branches {
+                        if let condition = branch.condition {
+                            record(condition)
+                        }
+                        branch.body.forEach(record)
+                    }
+                case .breakStatement, .continueStatement:
+                    break
+                }
+            }
+
             func record(_ statements: [Statement]) {
                 guard let statements = try? statements.map(SwiftEmissionStatement.init(source:))
                 else {
@@ -460,7 +487,9 @@ struct SwiftBackendEmitter {
             func record(_ statements: [SwiftEmissionStatement]) {
                 for statement in statements {
                     switch statement {
-                    case .emitted, .ignored:
+                    case .emitted(let text):
+                        StringyStatementRecord.records(in: text).forEach(record)
+                    case .ignored:
                         continue
                     case .localBinding(let declaration):
                         record(declaration.expression)

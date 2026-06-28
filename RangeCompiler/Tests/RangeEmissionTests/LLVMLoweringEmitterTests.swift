@@ -209,13 +209,13 @@ struct LLVMLoweringEmitterTests {
                     ret(id("label.text"))
                 ]
             ),
-	            callable(
-	                "make",
-	                returnType: .named("Point"),
-	                body: [
-	                    astRet(call("Point", argument("x", .integer(2)), argument("y", .integer(3))))
-	                ]
-	            ),
+		            callable(
+		                "make",
+		                returnType: .named("Point"),
+		                body: [
+		                    ret(call("Point", argument("x", .integer(2)), argument("y", .integer(3))))
+		                ]
+		            ),
             callable(
                 "makeSum",
                 returnType: .named("Int"),
@@ -795,13 +795,11 @@ struct LLVMLoweringEmitterTests {
             returnType: .named("Int"),
             body: [
                 local("adjusted", typeName: "Int", expression: id("lhs")),
-                .conditional([
-                    StatementConditionalBranch(
-                        condition: binary(id("lhs"), .less, id("rhs")),
-                        body: [astRet(id("rhs"))]
-                    ),
-                    StatementConditionalBranch(condition: nil, body: [astRet(id("adjusted"))]),
-                ]),
+                ifElseStatement(
+                    binary(id("lhs"), .less, id("rhs")),
+                    [ret(id("rhs"))],
+                    [ret(id("adjusted"))]
+                ),
             ]
         )
 
@@ -837,49 +835,16 @@ struct LLVMLoweringEmitterTests {
             ],
             returnType: .named("Int"),
             body: [
-                .localBinding(
-                    LocalBindingDeclaration(
-                        kind: .constant,
-                        name: "incremented",
-                        hasExplicitTypeAnnotation: true,
-                        type: .named("Int"),
-                        expression: .binary(
-                            lhs: .identifier("value"),
-                            operatorSymbol: .addition,
-                            rhs: .integer(1)
-                        )
-                    )
+                local(
+                    "incremented",
+                    typeName: "Int",
+                    expression: binary(id("value"), .addition, .integer(1))
                 ),
-                .conditional([
-                    StatementConditionalBranch(
-                        condition: .binary(
-                            lhs: .identifier("incremented"),
-                            operatorSymbol: .less,
-                            rhs: .integer(10)
-                        ),
-                        body: [
-                            astRet(
-                                .binary(
-                                    lhs: .identifier("incremented"),
-                                    operatorSymbol: .multiplication,
-                                    rhs: .integer(2)
-                                )
-                            )
-                        ]
-                    ),
-                    StatementConditionalBranch(
-                        condition: nil,
-                        body: [
-                            astRet(
-                                .binary(
-                                    lhs: .integer(10),
-                                    operatorSymbol: .subtraction,
-                                    rhs: .identifier("value")
-                                )
-                            )
-                        ]
-                    ),
-                ]),
+                ifElseStatement(
+                    binary(id("incremented"), .less, .integer(10)),
+                    [ret(binary(id("incremented"), .multiplication, .integer(2)))],
+                    [ret(binary(.integer(10), .subtraction, id("value")))]
+                ),
             ]
         )
 
@@ -1125,50 +1090,16 @@ struct LLVMLoweringEmitterTests {
             ],
             returnType: .named("Int"),
             body: [
-                .localBinding(
-                    LocalBindingDeclaration(
-                        kind: .mutable,
-                        name: "index",
-                        hasExplicitTypeAnnotation: true,
-                        type: .named("Int"),
-                        expression: .integer(0)
-                    )
-                ),
-                .localBinding(
-                    LocalBindingDeclaration(
-                        kind: .mutable,
-                        name: "total",
-                        hasExplicitTypeAnnotation: true,
-                        type: .named("Int"),
-                        expression: .integer(0)
-                    )
-                ),
-                .whileLoop(
-                    condition: .binary(
-                        lhs: .identifier("index"),
-                        operatorSymbol: .less,
-                        rhs: .identifier("limit")
-                    ),
-                    body: [
-                        .assignment(
-                            target: .local("total"),
-                            expression: .binary(
-                                lhs: .identifier("total"),
-                                operatorSymbol: .addition,
-                                rhs: .identifier("index")
-                            )
-                        ),
-                        .assignment(
-                            target: .local("index"),
-                            expression: .binary(
-                                lhs: .identifier("index"),
-                                operatorSymbol: .addition,
-                                rhs: .integer(1)
-                            )
-                        ),
+                state("index", type: .named("Int"), expression: .integer(0)),
+                state("total", type: .named("Int"), expression: .integer(0)),
+                whileLoop(
+                    binary(id("index"), .less, id("limit")),
+                    [
+                        assign("total", binary(id("total"), .addition, id("index"))),
+                        assign("index", binary(id("index"), .addition, .integer(1))),
                     ]
                 ),
-                .return(.identifier("total")),
+                ret(id("total")),
             ]
         )
 
@@ -1249,10 +1180,7 @@ struct LLVMLoweringEmitterTests {
             ],
             returnType: .named("Int"),
             body: [
-                .conditional([
-                    StatementConditionalBranch(condition: id("flag"), body: [astRet(id("value"))]),
-                    StatementConditionalBranch(condition: nil, body: [astRet(.integer(0))]),
-                ])
+                ifElseStatement(id("flag"), [ret(id("value"))], [ret(.integer(0))])
             ]
         )
 
@@ -1824,14 +1752,14 @@ struct LLVMLoweringEmitterTests {
                     ret(call("Point", argument("x", .integer(2)), argument("y", .integer(3))))
                 ]
             ),
-            callable(
-	                "score",
-	                returnType: .named("Int"),
-	                body: [
-	                    astLocal("point", typeName: "Point", expression: call("make")),
-	                    astRet(binary(id("point.x"), .addition, id("point.y"))),
-	                ]
-	            ),
+		            callable(
+		                "score",
+		                returnType: .named("Int"),
+		                body: [
+		                    local("point", typeName: "Point", expression: call("make")),
+		                    ret(binary(id("point.x"), .addition, id("point.y"))),
+		                ]
+		            ),
         ]
         let mainBlockNode = mainBlock([
             .expression(call("score"))
@@ -2347,13 +2275,7 @@ struct LLVMLoweringEmitterTests {
             ],
             returnType: .named("Self"),
             body: [
-                .return(
-                    .binary(
-                        lhs: .identifier("lhs"),
-                        operatorSymbol: .addition,
-                        rhs: .identifier("rhs")
-                    )
-                )
+                ret(binary(id("lhs"), .addition, id("rhs")))
             ]
         )
         let scalarTypes: [String: LLVMLowerability.ScalarType] = [
@@ -2593,7 +2515,8 @@ struct LLVMLoweringEmitterTests {
     ) -> Statement {
         .emitted(
             (["statement|kind=while|condition=\(expressionSource(condition))"]
-                + body.map(statementRecordSource))
+                + body.map(statementRecordSource)
+                + ["statement|kind=end"])
                 .joined(separator: "\n")
         )
     }
@@ -2604,7 +2527,23 @@ struct LLVMLoweringEmitterTests {
     ) -> Statement {
         .emitted(
             (["statement|kind=if|condition=\(expressionSource(condition))"]
-                + body.map(statementRecordSource))
+                + body.map(statementRecordSource)
+                + ["statement|kind=end"])
+                .joined(separator: "\n")
+        )
+    }
+
+    private func ifElseStatement(
+        _ condition: RangeExpression,
+        _ trueBody: [Statement],
+        _ falseBody: [Statement]
+    ) -> Statement {
+        .emitted(
+            (["statement|kind=if|condition=\(expressionSource(condition))"]
+                + trueBody.map(statementRecordSource)
+                + ["statement|kind=else"]
+                + falseBody.map(statementRecordSource)
+                + ["statement|kind=end"])
                 .joined(separator: "\n")
         )
     }
@@ -2615,53 +2554,6 @@ struct LLVMLoweringEmitterTests {
 
     private func continueStatement() -> Statement {
         .emitted("statement|kind=continue")
-    }
-
-    private func astRet(_ expression: RangeExpression) -> Statement {
-        .return(expression)
-    }
-
-    private func astLocal(
-        _ name: String,
-        typeName: String,
-        expression: RangeExpression
-    ) -> Statement {
-        .localBinding(
-            LocalBindingDeclaration(
-                kind: .constant,
-                name: name,
-                hasExplicitTypeAnnotation: true,
-                type: .named(typeName),
-                expression: expression
-            )
-        )
-    }
-
-    private func astState(
-        _ name: String,
-        type: TypeReference,
-        expression: RangeExpression
-    ) -> Statement {
-        .localBinding(
-            LocalBindingDeclaration(
-                kind: .mutable,
-                name: name,
-                hasExplicitTypeAnnotation: true,
-                type: type,
-                expression: expression
-            )
-        )
-    }
-
-    private func astAssign(_ name: String, _ expression: RangeExpression) -> Statement {
-        .assignment(target: .local(name), expression: expression)
-    }
-
-    private func astWhileLoop(
-        _ condition: RangeExpression,
-        _ body: [Statement]
-    ) -> Statement {
-        .whileLoop(condition: condition, body: body)
     }
 
     private func statementRecordSource(_ statement: Statement) -> String {
@@ -2766,16 +2658,16 @@ struct LLVMLoweringEmitterTests {
             ],
             returnType: .named("Int"),
             body: [
-                astState("outer", type: .named("Int"), expression: .integer(0)),
-                astState("total", type: .named("Int"), expression: .integer(0)),
-                astWhileLoop(
+                state("outer", type: .named("Int"), expression: .integer(0)),
+                state("total", type: .named("Int"), expression: .integer(0)),
+                whileLoop(
                     binary(id("outer"), .less, id("limit")),
                     [
-                        astState("inner", type: .named("Int"), expression: .integer(0)),
-                        astWhileLoop(
+                        state("inner", type: .named("Int"), expression: .integer(0)),
+                        whileLoop(
                             binary(id("inner"), .less, id("limit")),
                             [
-                                astAssign(
+                                assign(
                                     "total",
                                     binary(
                                         binary(id("total"), .addition, id("outer")),
@@ -2783,13 +2675,13 @@ struct LLVMLoweringEmitterTests {
                                         id("inner")
                                     )
                                 ),
-                                astAssign("inner", binary(id("inner"), .addition, .integer(1))),
+                                assign("inner", binary(id("inner"), .addition, .integer(1))),
                             ]
                         ),
-                        astAssign("outer", binary(id("outer"), .addition, .integer(1))),
+                        assign("outer", binary(id("outer"), .addition, .integer(1))),
                     ]
                 ),
-                astRet(id("total")),
+                ret(id("total")),
             ]
         )
     }
@@ -2832,10 +2724,7 @@ struct LLVMLoweringEmitterTests {
             ],
             returnType: .named("Int"),
             body: [
-                .conditional([
-                    StatementConditionalBranch(condition: id("flag"), body: [astRet(id("value"))]),
-                    StatementConditionalBranch(condition: nil, body: [astRet(.integer(0))]),
-                ])
+                ifElseStatement(id("flag"), [ret(id("value"))], [ret(.integer(0))])
             ]
         )
     }
@@ -2947,10 +2836,7 @@ struct LLVMLoweringEmitterTests {
                 ],
                 returnType: .named("Int"),
                 body: [
-                    .conditional([
-                        StatementConditionalBranch(condition: id("flag"), body: [astRet(id("value"))]),
-                        StatementConditionalBranch(condition: nil, body: [astRet(.integer(0))]),
-                    ])
+                    ifElseStatement(id("flag"), [ret(id("value"))], [ret(.integer(0))])
                 ]
             ),
             callable(
@@ -2961,39 +2847,34 @@ struct LLVMLoweringEmitterTests {
                 ],
                 returnType: .named("Int"),
                 body: [
-                    .conditional([
-                        StatementConditionalBranch(
-                            condition: call(
-                                "isLess",
-                                argument("lhs", id("lhs")),
-                                argument("rhs", id("rhs"))
-                            ),
-                            body: [
-                                astRet(
-                                    call(
-                                        "choose",
-                                        argument(
-                                            "flag",
-                                            call("invert", argument("value", .boolean(false)))
-                                        ),
-                                        argument("value", id("lhs"))
-                                    )
-                                )
-                            ]
+                    ifElseStatement(
+                        call(
+                            "isLess",
+                            argument("lhs", id("lhs")),
+                            argument("rhs", id("rhs"))
                         ),
-                        StatementConditionalBranch(
-                            condition: nil,
-                            body: [
-                                astRet(
-                                    call(
-                                        "choose",
-                                        argument("flag", .boolean(false)),
-                                        argument("value", id("rhs"))
-                                    )
+                        [
+                            ret(
+                                call(
+                                    "choose",
+                                    argument(
+                                        "flag",
+                                        call("invert", argument("value", .boolean(false)))
+                                    ),
+                                    argument("value", id("lhs"))
                                 )
-                            ]
-                        ),
-                    ])
+                            )
+                        ],
+                        [
+                            ret(
+                                call(
+                                    "choose",
+                                    argument("flag", .boolean(false)),
+                                    argument("value", id("rhs"))
+                                )
+                            )
+                        ]
+                    )
                 ]
             ),
         ]
