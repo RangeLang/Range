@@ -21,18 +21,13 @@ extension CLI {
                 let compiledProgram = try ProjectSourceValidator.compiledProgram(
                     for: project
                 )
-                let backend = SwiftBackend()
                 let buildRoot = project.defaultBuildRoot
                 if FileManager.default.fileExists(atPath: buildRoot.path) {
                     try FileManager.default.removeItem(at: buildRoot)
                 }
                 let irURL = buildRoot.appendingPathComponent("RangeScalar.ll")
-                _ = try backend.emitLLVMIRFile(
-                    project: SwiftBackendProject(
-                        projectFiles: project.projectFiles,
-                        isSingleFile: project.isSingleFile,
-                        buildRoot: buildRoot
-                    ),
+                let emitter = CapabilityLLVMEmitter()
+                _ = try emitter.emitModuleFile(
                     compiledProgram: compiledProgram,
                     outputURL: irURL
                 )

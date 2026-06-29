@@ -2206,6 +2206,35 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.isEmpty)
     }
 
+    @Test("Capability LLVM emitter uses Range-authored @main IR")
+    func capabilityLLVMEmitterUsesRangeAuthoredMainIR() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/Main.range",
+                source: """
+                    @main {
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let module = CapabilityLLVMEmitter().emitModule(compiledProgram: program)
+
+        #expect(
+            module.mainIR
+                == """
+                define i32 @main() {
+                entry:
+                  ret i32 0
+                }
+                """
+        )
+        #expect(module.ir == module.mainIR)
+    }
+
     @Test("Core String carries evaluated @string marker metadata")
     func coreStringCarriesEvaluatedStringMarkerMetadata() throws {
         let inputs = try rangeCoreInputs()
