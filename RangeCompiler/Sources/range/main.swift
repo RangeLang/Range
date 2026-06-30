@@ -75,7 +75,7 @@ struct Rangec {
         RangecError(
             message: """
                 Usage:
-                  rangec emit-llvm [--range-root PATH] INPUT OUTPUT
+                  range emit-llvm [--range-root PATH] INPUT OUTPUT
                 """
         )
     }

@@ -10,7 +10,7 @@ let package = Package(
     products: [
         .library(name: "RangeCompiler", targets: ["RangeCompiler"]),
         .library(name: "RangeEmission", targets: ["RangeEmission"]),
-        .executable(name: "rangec", targets: ["rangec"]),
+        .executable(name: "range", targets: ["range"]),
     ],
     targets: [
         .target(
@@ -29,9 +29,9 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "rangec",
+            name: "range",
             dependencies: ["RangeCompiler", "RangeEmission"],
-            path: "Sources/rangec"
+            path: "Sources/range"
         ),
         .testTarget(
             name: "RangeCompilerTests",

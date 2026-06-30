@@ -37,7 +37,7 @@ The active package layout is:
 RangeCompiler/
   Sources/RangeCompiler/  Swift compiler pipeline
   Sources/RangeEmission/  Swift-hosted emission and LLVM lowering
-  Sources/rangec/         Tiny Swift compiler host for script-driven LLVM emission
+  Sources/range/          Tiny Swift compiler host for script-driven LLVM emission
   Range/Core/             Range-authored core declarations
   Range/Foundation/       Range-authored bundled macros/features
   Range/Lexer/            Range-authored lexer declarations
@@ -45,7 +45,7 @@ scripts/range             Shell command surface for emit/link/run
 ```
 
 Normal Range program execution currently uses the Range script runner (Bash)
-with the `rangec` compiler host (Swift):
+with the `range` compiler host (Swift):
 
 ```text
 Range source
@@ -56,7 +56,7 @@ Range source
 ```
 
 Range LLVM emitter (Swift) is currently both a legacy scalar lowering path and
-the temporary module text collector used by `rangec` for Range-authored `@main`
+the temporary module text collector used by `range` for Range-authored `@main`
 LLVM output. The active script path writes LLVM IR and links it with Apple
 `clang`.
 

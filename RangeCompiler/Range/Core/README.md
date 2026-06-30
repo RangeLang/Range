@@ -77,7 +77,7 @@ surface.
 
 ## Loading Model
 
-`RangeCore` is loaded by the `rangec` compiler host through the same Swift-based compiler pipeline used for other Range source. The point is not to eliminate the compiler's bootstrap role yet, but to keep that role narrow and explicit.
+`RangeCore` is loaded by the `range` compiler host through the same Swift-based compiler pipeline used for other Range source. The point is not to eliminate the compiler's bootstrap role yet, but to keep that role narrow and explicit.
 
 In short: Swift hosts the compiler today, but Range's basic world should increasingly be described in Range.
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`RangeSyntax` should own Range's compiler pipeline. The script runner and `rangec` compiler host should supply files, load `RangeCore`, choose commands and backends, and report results, but they should not assemble semantic compiler stages ad hoc.
+`RangeSyntax` should own Range's compiler pipeline. The script runner and `range` compiler host should supply files, load `RangeCore`, choose commands and backends, and report results, but they should not assemble semantic compiler stages ad hoc.
 
 ## Pipeline
 
@@ -56,7 +56,7 @@ The split should be:
 - `RangeSyntax`
   owns lexing, parsing, AST construction, declaration-graph construction, semantic resolution, and later graph derivation
 
-- script runner / `rangec`
+- script runner / `range`
   discovers project files, loads `RangeCore`, chooses commands, invokes backends, reports diagnostics, and writes output
 
 That means the host driver should request a semantic artifact from `RangeSyntax` rather than manually rebuilding semantic pipeline steps from raw parsed files.

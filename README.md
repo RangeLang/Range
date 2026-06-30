@@ -17,10 +17,10 @@ Emit LLVM IR without linking:
 scripts/range emit-llvm path/to/Main.range .range/Build/llvm/Main.ll
 ```
 
-The script currently invokes the `rangec` compiler host through SwiftPM:
+The script currently invokes the `range` compiler host through SwiftPM:
 
 ```sh
-swift run --package-path RangeCompiler rangec emit-llvm input.range output.ll
+swift run --package-path RangeCompiler range emit-llvm input.range output.ll
 ```
 
 That Swift host is temporary bootstrap plumbing. The outer command surface is a
