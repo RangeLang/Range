@@ -58,17 +58,15 @@ struct Rangec {
 
         let inputs = try sourceInputs(rangeRoot: resolvedRangeRoot, inputURL: inputURL)
         let program = try CompilerPipeline().build(inputs: inputs)
-        let module = CapabilityLLVMEmitter().emitModule(compiledProgram: program)
-        let ir = module.ir.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !ir.isEmpty else {
-            throw RangecError(message: "Range source did not emit LLVM IR.")
-        }
 
         try FileManager.default.createDirectory(
             at: outputURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        try (ir + "\n").write(to: outputURL, atomically: true, encoding: .utf8)
+        _ = try CapabilityLLVMEmitter().emitModuleFile(
+            compiledProgram: program,
+            outputURL: outputURL
+        )
     }
 
     private func usageError() -> RangecError {

@@ -252,12 +252,10 @@ implementation tracking surface.
 
 ## Verification Snapshot
 
-Last reviewed on 2026-05-19.
+Last reviewed on 2026-06-30.
 
-- `RangeSyntax`: `swift test` passed with 43 tests.
+- `RangeCompiler`: `swift test` passed with 6 tests.
 - `scripts/range run` is the current executable smoke path.
-- `RangeBackendSwift`: `swift test` builds, but exits with `no tests found`
-  because the package has no test target.
 - Fixture inventory at review time:
   - `CompilePass`: 94 fixtures.
   - `CompileFail`: 46 fixtures.

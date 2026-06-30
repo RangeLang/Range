@@ -255,13 +255,6 @@ struct CompileTimeValueEvaluator {
             ) {
                 return graphValue
             }
-            if let llvmValue = evaluateLLVMCall(
-                name: name,
-                arguments: arguments,
-                locals: locals
-            ) {
-                return llvmValue
-            }
             if let projectValue = evaluateRangeProjectCall(
                 name: name,
                 arguments: arguments,
@@ -981,22 +974,6 @@ struct CompileTimeValueEvaluator {
         )
     }
 
-    private func evaluateLLVMCall(
-        name: String,
-        arguments: [CallArgument],
-        locals: [String: Expression]
-    ) -> CompileTimeValue? {
-        guard name == "llvmMain" || name == "LLVM.main",
-            arguments.count == 1,
-            arguments[0].label == "body",
-            case .array(let statements) = evaluate(arguments[0].value, locals: locals)
-        else {
-            return nil
-        }
-
-        return .string(renderLLVMMain(statements: statements))
-    }
-
     private func evaluateRangeProjectCall(
         name: String,
         arguments: [CallArgument],
@@ -1043,14 +1020,6 @@ struct CompileTimeValueEvaluator {
                 )
             }
         )
-    }
-
-    private func renderLLVMMain(statements: [CompileTimeValue]) -> String {
-        var builder = LLVMMainBuilder()
-        for statement in statements {
-            builder.emit(statement: statement)
-        }
-        return builder.module()
     }
 
     private func rangeFileURLs(in path: String) -> [URL] {
@@ -1168,124 +1137,5 @@ struct CompileTimeValueEvaluator {
 
     private func argument(_ label: String, in arguments: [CallArgument]) -> Expression? {
         arguments.first(where: { $0.label == label })?.value
-    }
-}
-
-private struct LLVMMainBuilder {
-    private var lines: [String] = []
-    private var locals: [String: String] = [:]
-    private var nextTemporary = 1
-    private var didReturn = false
-
-    mutating func emit(statement: CompileTimeValue) {
-        guard !didReturn,
-            case .object(let typeName, let fields) = statement
-        else {
-            return
-        }
-
-        switch typeName {
-        case "LocalBinding":
-            guard let name = stringField("name", in: fields),
-                let expression = fields["expression"],
-                let operand = emitExpression(expression)
-            else {
-                return
-            }
-            let register = "%\(name)"
-            lines.append("  \(register) = add i64 0, \(operand)")
-            locals[name] = register
-        case "Return":
-            guard let expression = fields["expression"],
-                let operand = emitExpression(expression)
-            else {
-                lines.append("  ret i3 0")
-                didReturn = true
-                return
-            }
-            let truncated = temporary()
-            lines.append("  \(truncated) = trunc i64 \(operand) to i3")
-            lines.append("  ret i3 \(truncated)")
-            didReturn = true
-        default:
-            return
-        }
-    }
-
-    mutating func module() -> String {
-        if !didReturn {
-            lines.append("  ret i3 0")
-            didReturn = true
-        }
-        return (
-            [
-                "; ModuleID = 'RangeScalar'",
-                "source_filename = \"RangeScalar.range\"",
-                "",
-                "define i3 @main() {",
-                "entry:",
-            ] + lines + [
-                "}",
-                "",
-            ]
-        ).joined(separator: "\n")
-    }
-
-    private mutating func emitExpression(_ expression: CompileTimeValue) -> String? {
-        guard case .object(let typeName, let fields) = expression else {
-            switch expression {
-            case .integer(let value):
-                return "\(value)"
-            default:
-                return nil
-            }
-        }
-
-        switch typeName {
-        case "IntegerLiteralExpression":
-            guard case .integer(let value)? = fields["value"] else { return nil }
-            return "\(value)"
-        case "IdentifierExpression":
-            guard let name = stringField("name", in: fields) else { return nil }
-            return locals[name] ?? "%\(name)"
-        case "CallExpression":
-            guard let name = stringField("name", in: fields),
-                name == "Int",
-                case .array(let arguments)? = fields["arguments"],
-                arguments.count == 1,
-                case .object(_, let argumentFields) = arguments[0],
-                let value = argumentFields["value"]
-            else {
-                return nil
-            }
-            return emitExpression(value)
-        case "BinaryExpression":
-            guard stringField("operator", in: fields) == "+",
-                let lhs = fields["lhs"],
-                let rhs = fields["rhs"],
-                let left = emitExpression(lhs),
-                let right = emitExpression(rhs)
-            else {
-                return nil
-            }
-            let register = temporary()
-            lines.append("  \(register) = add i64 \(left), \(right)")
-            return register
-        default:
-            return nil
-        }
-    }
-
-    private mutating func temporary() -> String {
-        let register = "%\(nextTemporary)"
-        nextTemporary += 1
-        return register
-    }
-
-    private func stringField(_ name: String, in fields: [String: CompileTimeValue]) -> String? {
-        guard case .string(let value)? = fields[name] else {
-            return nil
-        }
-        return value
     }
 }

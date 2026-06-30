@@ -10,7 +10,7 @@ Examples:
 - Range compiler pipeline (Swift)
 - Range parser/type checker/macro expander (Swift)
 - Range lexer declarations (Range)
-- Range Swift-hosted emission pipeline (Swift)
+- Range macro-produced LLVM emission pipeline (Swift)
 - Range LLVM emitter (Swift)
 - Range runtime support (Swift)
 - RangeCore syntax declarations (Range)
@@ -36,7 +36,7 @@ The active package layout is:
 ```text
 RangeCompiler/
   Sources/RangeCompiler/  Swift compiler pipeline
-  Sources/RangeEmission/  Swift-hosted emission and LLVM lowering
+  Sources/RangeEmission/  Macro-produced LLVM artifact collection
   Sources/range/          Tiny Swift compiler host for script-driven LLVM emission
   Range/Core/             Range-authored core declarations
   Range/Foundation/       Range-authored bundled macros/features
@@ -55,13 +55,12 @@ Range source
 -> executable
 ```
 
-Range LLVM emitter (Swift) is currently both a legacy scalar lowering path and
-the temporary module text collector used by `range` for Range-authored `@main`
-LLVM output. The active script path writes LLVM IR and links it with Apple
-`clang`.
+Range LLVM emitter (Swift) is currently a macro-produced module text collector
+used by `range` for Range-authored `@main` LLVM output. The active script path
+writes LLVM IR and links it with Apple `clang`.
 
-Range LLVM emitter (Swift) is verified by tests that compile emitted LLVM IR with
-Apple `clang` and run a small C harness. The script runner is verified by running
+Range LLVM emitter (Swift) is verified by tests that assert macro-produced LLVM
+module text is collected and written. The script runner is verified by running
 `scripts/range run` against `@main {}`.
 
 When explaining execution, say explicitly that Swift remains the current compiler
