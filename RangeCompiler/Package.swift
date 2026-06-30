@@ -10,6 +10,7 @@ let package = Package(
     products: [
         .library(name: "RangeCompiler", targets: ["RangeCompiler"]),
         .library(name: "RangeEmission", targets: ["RangeEmission"]),
+        .executable(name: "rangec", targets: ["rangec"]),
     ],
     targets: [
         .target(
@@ -26,6 +27,11 @@ let package = Package(
             swiftSettings: [
                 .treatWarning("EmbeddedRestrictions", as: .error),
             ]
+        ),
+        .executableTarget(
+            name: "rangec",
+            dependencies: ["RangeCompiler", "RangeEmission"],
+            path: "Sources/rangec"
         ),
         .testTarget(
             name: "RangeCompilerTests",
