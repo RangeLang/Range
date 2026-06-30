@@ -2,7 +2,7 @@ import Foundation
 import RangeCompiler
 import RangeEmission
 
-struct RangecError: LocalizedError {
+struct RangeCompilerHostError: LocalizedError {
     let message: String
 
     var errorDescription: String? {
@@ -10,7 +10,7 @@ struct RangecError: LocalizedError {
     }
 }
 
-struct Rangec {
+struct RangeCompilerHost {
     let arguments: [String]
 
     func run() throws {
@@ -37,7 +37,7 @@ struct Rangec {
             case "--range-root":
                 let valueIndex = index + 1
                 guard valueIndex < arguments.count else {
-                    throw RangecError(message: "Missing value after --range-root.")
+                    throw RangeCompilerHostError(message: "Missing value after --range-root.")
                 }
                 rangeRoot = URL(fileURLWithPath: arguments[valueIndex], isDirectory: true)
                     .standardizedFileURL
@@ -63,14 +63,14 @@ struct Rangec {
             at: outputURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        _ = try CapabilityLLVMEmitter().emitModuleFile(
+        _ = try MacroLLVMArtifactEmitter().emitModuleFile(
             compiledProgram: program,
             outputURL: outputURL
         )
     }
 
-    private func usageError() -> RangecError {
-        RangecError(
+    private func usageError() -> RangeCompilerHostError {
+        RangeCompilerHostError(
             message: """
                 Usage:
                   range emit-llvm [--range-root PATH] INPUT OUTPUT
@@ -94,7 +94,7 @@ struct Rangec {
             return sourceRoot
         }
 
-        throw RangecError(message: "Missing Range root. Pass --range-root PATH.")
+        throw RangeCompilerHostError(message: "Missing Range root. Pass --range-root PATH.")
     }
 
     private func sourceInputs(rangeRoot: URL, inputURL: URL) throws -> [SourceInput] {
@@ -109,7 +109,7 @@ struct Rangec {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: inputURL.path, isDirectory: &isDirectory)
         else {
-            throw RangecError(message: "Missing input at \(inputURL.path).")
+            throw RangeCompilerHostError(message: "Missing input at \(inputURL.path).")
         }
 
         if isDirectory.boolValue {
@@ -119,7 +119,7 @@ struct Rangec {
         }
 
         guard inputURL.pathExtension.lowercased() == "range" else {
-            throw RangecError(message: "Expected a .range file or directory.")
+            throw RangeCompilerHostError(message: "Expected a .range file or directory.")
         }
         return [try sourceInput(fileURL: inputURL, role: .project)]
     }
@@ -140,7 +140,7 @@ struct Rangec {
                 options: [.skipsHiddenFiles]
             )
         else {
-            throw RangecError(message: "Could not inspect Range files in \(root.path).")
+            throw RangeCompilerHostError(message: "Could not inspect Range files in \(root.path).")
         }
 
         var files: [URL] = []
@@ -191,7 +191,7 @@ struct Rangec {
 }
 
 do {
-    try Rangec(arguments: CommandLine.arguments).run()
+    try RangeCompilerHost(arguments: CommandLine.arguments).run()
 } catch {
     let message = (error as? LocalizedError)?.errorDescription ?? "\(error)"
     FileHandle.standardError.write(Data((message + "\n").utf8))

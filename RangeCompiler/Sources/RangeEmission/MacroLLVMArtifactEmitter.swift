@@ -1,38 +1,38 @@
 import Foundation
 import RangeCompiler
 
-public struct CapabilityLLVMModule: Equatable {
+public struct MacroLLVMArtifactModule: Equatable {
     public let ir: String
 }
 
-public struct CapabilityLLVMEmitterError: LocalizedError, Equatable {
+public struct MacroLLVMArtifactEmitterError: LocalizedError, Equatable {
     public let message: String
 
     public var errorDescription: String? {
         message
     }
 
-    static let missingMacroProducedIR = CapabilityLLVMEmitterError(
+    static let missingMacroProducedIR = MacroLLVMArtifactEmitterError(
         message: "Range source did not emit macro-produced LLVM IR."
     )
 }
 
-public struct CapabilityLLVMEmitter {
+public struct MacroLLVMArtifactEmitter {
     public init() {}
 
-    public func emitModule(compiledProgram: CompiledProgram) throws -> CapabilityLLVMModule {
+    public func emitModule(compiledProgram: CompiledProgram) throws -> MacroLLVMArtifactModule {
         try emitModule(files: compiledProgram.expandedFiles)
     }
 
-    public func emitModule(files: [ParsedSourceFile]) throws -> CapabilityLLVMModule {
+    public func emitModule(files: [ParsedSourceFile]) throws -> MacroLLVMArtifactModule {
         guard let ir = collectMainIR(files: files)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
             !ir.isEmpty
         else {
-            throw CapabilityLLVMEmitterError.missingMacroProducedIR
+            throw MacroLLVMArtifactEmitterError.missingMacroProducedIR
         }
 
-        return CapabilityLLVMModule(ir: ir)
+        return MacroLLVMArtifactModule(ir: ir)
     }
 
     public func emitModuleFile(

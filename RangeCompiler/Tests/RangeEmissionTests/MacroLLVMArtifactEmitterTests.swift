@@ -4,8 +4,8 @@ import Testing
 import RangeCompiler
 @testable import RangeEmission
 
-@Suite("Capability LLVM emission")
-struct CapabilityLLVMEmitterTests {
+@Suite("Macro LLVM artifact emission")
+struct MacroLLVMArtifactEmitterTests {
     @Test("uses Range-authored @main IR")
     func usesRangeAuthoredMainIR() throws {
         var inputs = try rangeCoreInputs()
@@ -21,7 +21,7 @@ struct CapabilityLLVMEmitterTests {
         )
 
         let program = try CompilerPipeline().build(inputs: inputs)
-        let module = try CapabilityLLVMEmitter().emitModule(compiledProgram: program)
+        let module = try MacroLLVMArtifactEmitter().emitModule(compiledProgram: program)
 
         #expect(
             module.ir
@@ -39,9 +39,9 @@ struct CapabilityLLVMEmitterTests {
         let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
 
         do {
-            _ = try CapabilityLLVMEmitter().emitModule(compiledProgram: program)
+            _ = try MacroLLVMArtifactEmitter().emitModule(compiledProgram: program)
             Issue.record("Expected missing macro-produced IR to fail.")
-        } catch let error as CapabilityLLVMEmitterError {
+        } catch let error as MacroLLVMArtifactEmitterError {
             #expect(error == .missingMacroProducedIR)
         }
     }
@@ -58,11 +58,11 @@ struct CapabilityLLVMEmitterTests {
         )
         let program = try CompilerPipeline().build(inputs: inputs)
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("RangeCapabilityLLVM-\(UUID().uuidString)")
+            .appendingPathComponent("RangeMacroLLVMArtifact-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
 
         let outputURL = root.appendingPathComponent("Main.ll")
-        _ = try CapabilityLLVMEmitter().emitModuleFile(
+        _ = try MacroLLVMArtifactEmitter().emitModuleFile(
             compiledProgram: program,
             outputURL: outputURL
         )
@@ -111,7 +111,7 @@ private func rangeFiles(in root: URL, excludingExploration: Bool) throws -> [URL
             options: [.skipsHiddenFiles]
         )
     else {
-        throw CapabilityLLVMEmitterTestError.missingDirectory(root.path)
+        throw MacroLLVMArtifactEmitterTestError.missingDirectory(root.path)
     }
 
     var files: [URL] = []
@@ -170,9 +170,9 @@ private func repositoryRoot() throws -> URL {
         }
         current.deleteLastPathComponent()
     }
-    throw CapabilityLLVMEmitterTestError.missingDirectory("repository root")
+    throw MacroLLVMArtifactEmitterTestError.missingDirectory("repository root")
 }
 
-private enum CapabilityLLVMEmitterTestError: Error {
+private enum MacroLLVMArtifactEmitterTestError: Error {
     case missingDirectory(String)
 }
