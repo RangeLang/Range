@@ -37,36 +37,34 @@ The active package layout is:
 RangeCompiler/
   Sources/RangeCompiler/  Swift compiler pipeline
   Sources/RangeEmission/  Swift-hosted emission and LLVM lowering
+  Sources/rangec/         Tiny Swift compiler host for script-driven LLVM emission
   Range/Core/             Range-authored core declarations
   Range/Foundation/       Range-authored bundled macros/features
   Range/Lexer/            Range-authored lexer declarations
-
-CLI/
-  Sources/                command-line shell
+scripts/range             Shell command surface for emit/link/run
 ```
 
-Normal Range program execution currently uses the Range Swift-hosted emission
-pipeline (Swift):
+Normal Range program execution currently uses the Range script runner (Bash)
+with the `rangec` compiler host (Swift):
 
 ```text
 Range source
 -> Range compiler pipeline (Swift)
--> generated Swift workspace
--> optional LLVM IR/object for supported scalar functions
--> Swift compiler
+-> Range-authored macro expansion to LLVM module text
+-> clang
 -> executable
 ```
 
-Range LLVM emitter (Swift) is an internal lowering path of the Swift-hosted
-emission pipeline, not a separate peer backend. It currently emits LLVM IR and a
-linked object file for lowerable scalar `Int` functions. It supports simple
-integer arithmetic, local `state`, `while` loops, and nested `while` loops.
+Range LLVM emitter (Swift) is currently both a legacy scalar lowering path and
+the temporary module text collector used by `rangec` for Range-authored `@main`
+LLVM output. The active script path writes LLVM IR and links it with Apple
+`clang`.
 
 Range LLVM emitter (Swift) is verified by tests that compile emitted LLVM IR with
-Apple `clang` and run a small C harness. It is also wired into normal `range run`
-workspace emission for lowerable scalar functions.
+Apple `clang` and run a small C harness. The script runner is verified by running
+`scripts/range run` against `@main {}`.
 
-When explaining hybrid execution, say explicitly that Swift remains the current
-program driver and LLVM is the native lowering path for supported scalar compute
-inside that generated Swift workspace. Do not describe C, Rust, or other
-imaginary backends as active targets.
+When explaining execution, say explicitly that Swift remains the current compiler
+host, but the command driver is `scripts/range` and the produced executable is
+linked from LLVM IR with `clang`. Do not describe C, Rust, or other imaginary
+backends as active targets.

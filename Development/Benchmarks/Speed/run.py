@@ -550,7 +550,7 @@ def prepare_range_project(case: BenchmarkCase) -> Path:
 
 def build_case(
     case: BenchmarkCase,
-    range_cli: Path,
+    range_script: Path,
     range_env: dict[str, str] | None,
 ) -> list[BenchTarget]:
     case_build = BUILD / "cases" / case.name
@@ -584,12 +584,14 @@ def build_case(
     targets.append(BenchTarget("Python", ["python3", str(python_source), str(case.n)]))
 
     range_project = prepare_range_project(case)
-    range_binary = range_project / ".range" / "Build" / "swift" / ".build" / "debug" / "RangeGenerated"
-    if timed_setup(f"{case.name} Range emit/build", [str(range_cli), "run", str(range_project)]):
+    range_binary = range_project / ".range" / "Build" / "llvm" / case.name
+    if timed_setup(f"{case.name} Range script build", [str(range_script), "run", str(range_project)]):
         if range_binary.is_file():
-            targets.append(BenchTarget("Range", [str(range_binary)]))
+            print(
+                f"{case.name} Range runtime: skipped until Range-authored @main lowers benchmark bodies"
+            )
         else:
-            print(f"{case.name} Range runtime: skipped because generated binary was not found")
+            print(f"{case.name} Range runtime: skipped because native binary was not found")
 
     return targets
 
@@ -638,25 +640,21 @@ def main() -> int:
 
     BUILD.mkdir(parents=True, exist_ok=True)
     range_env = embedded_swift_env()
-    range_cli = ROOT / "CLI" / ".build" / "release" / "CLI"
+    range_script = ROOT / "scripts" / "range"
 
     print(f"base iterations: {ITERATIONS}")
     print(f"runs: {RUNS}")
     print()
 
-    if not timed_setup(
-        "CLI",
-        ["swift", "build", "-c", "release", "--package-path", "CLI", "--product", "CLI"],
-        env=range_env,
-    ):
-        raise SystemExit("CLI setup failed")
+    if not range_script.is_file():
+        raise SystemExit("Range script is missing")
 
     results: dict[str, list[tuple[str, Measurement, float, float, float, str]]] = {}
 
     for case in cases():
         print()
         print(f"== {case.name} (N={case.n}) ==")
-        targets = build_case(case, range_cli, range_env)
+        targets = build_case(case, range_script, range_env)
         wall_baselines: dict[str, float] = {}
         cpu_baselines: dict[str, float] = {}
         rss_baselines: dict[str, int] = {}

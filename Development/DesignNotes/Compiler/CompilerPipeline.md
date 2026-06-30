@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`RangeSyntax` should own Range's compiler pipeline. `CLI` should supply files, load `RangeCore`, choose commands and backends, and report results, but it should not assemble semantic compiler stages ad hoc.
+`RangeSyntax` should own Range's compiler pipeline. The script runner and `rangec` compiler host should supply files, load `RangeCore`, choose commands and backends, and report results, but they should not assemble semantic compiler stages ad hoc.
 
 ## Pipeline
 
@@ -49,21 +49,21 @@ The intended pipeline is:
 - `Emission`
   prints or writes target output
 
-## Boundary Between RangeSyntax And CLI
+## Boundary Between RangeSyntax And Host Driver
 
 The split should be:
 
 - `RangeSyntax`
   owns lexing, parsing, AST construction, declaration-graph construction, semantic resolution, and later graph derivation
 
-- `CLI`
+- script runner / `rangec`
   discovers project files, loads `RangeCore`, chooses commands, invokes backends, reports diagnostics, and writes output
 
-That means `CLI` should request a semantic artifact from `RangeSyntax` rather than manually rebuilding semantic pipeline steps from raw parsed files.
+That means the host driver should request a semantic artifact from `RangeSyntax` rather than manually rebuilding semantic pipeline steps from raw parsed files.
 
 ## Minimal First SemanticProgram
 
-The first version does not need to solve every later graph. It only needs enough structure to stop the CLI from stitching semantic stages together manually.
+The first version does not need to solve every later graph. It only needs enough structure to stop the host driver from stitching semantic stages together manually.
 
 A minimal shape is:
 

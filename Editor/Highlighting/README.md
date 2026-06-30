@@ -6,7 +6,7 @@ The split is:
 
 - `xcode-style-palette.yaml` defines the intended color taxonomy and editable
   Xcode-style palette.
-- `CLI` emits semantic token meaning through the language server.
+- Semantic token emission is currently not wired through the script runner.
 - `Editor/Highlighting` defines how those semantic categories should map to editor style names.
 - Editor extensions generate their local configuration from these files.
 - Tree-sitter query files remain fallback syntax highlighting for files without semantic token support.

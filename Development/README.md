@@ -70,7 +70,7 @@ implementation tracking surface.
       accessible-type state as `BootstrapLiteralType` maps.
 - [ ] The Swift backend still emits and ships runtime/support code with
       Foundation-heavy and host-oriented behavior.
-- [ ] The CLI is intentionally host-bound, but the compiler/backend boundary is
+- [ ] The script runner is intentionally host-bound, but the compiler/backend boundary is
       not yet clean enough for a serious Embedded Swift build lane.
 - [ ] Memory graph and reactivity graph remain design documents, not concrete
       compiler stages.
@@ -194,7 +194,7 @@ implementation tracking surface.
       standard library is enough.
 - [ ] Add an Embedded Swift feasibility build lane when the local toolchain and
       SDK setup can support it.
-- [ ] Keep CLI host adapters outside the compiler core boundary.
+- [ ] Keep script and host adapters outside the compiler core boundary.
 
 ### 10. Tooling And Editor Parity
 
@@ -255,7 +255,7 @@ implementation tracking surface.
 Last reviewed on 2026-05-19.
 
 - `RangeSyntax`: `swift test` passed with 43 tests.
-- `CLI`: `swift test` passed with 36 tests.
+- `scripts/range run` is the current executable smoke path.
 - `RangeBackendSwift`: `swift test` builds, but exits with `no tests found`
   because the package has no test target.
 - Fixture inventory at review time:

@@ -17,10 +17,10 @@ to C per benchmark case.
 JSON encoding and real `@background` concurrency are intentionally not included
 yet because those generated paths are not Embedded Swift-compatible today.
 
-If the current Range Swift backend emits a workspace that does not build on the
-local toolchain, the task still reports CLI build and emit time, then skips
-the Range runtime row. On macOS, the script looks for an installed Swift
-toolchain with `usr/lib/swift/embedded` and uses it for the Range Embedded build.
+If the current Range script runner cannot emit a native binary for a benchmark
+case, the task reports that setup failure and skips the Range runtime row. On
+macOS, the script looks for an installed Swift toolchain with
+`usr/lib/swift/embedded` for historical Swift comparison targets.
 Set `RANGE_SWIFT_TOOLCHAINS` to override the detected toolchain identifier.
 
 Use `VERBOSE=1` to show full setup command output on failures.

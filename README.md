@@ -1,33 +1,42 @@
 # Range
 
-Range runs `.range` projects by generating a small Swift package and building it with Swift Embedded.
+Range runs `.range` programs by expanding Range-authored macros to LLVM IR and
+linking that IR with `clang`.
 
-## Download
+## Run
 
-Install the `range` CLI from the latest GitHub release. macOS is the primary
-release target, with Windows and Linux builds published alongside it:
-
-https://github.com/georgetchelidze/Range/releases/latest
-
-Check that it is on your `PATH`:
+Run a Range source file directly from the repository:
 
 ```sh
-range version
+scripts/range run path/to/Main.range
 ```
 
-## Start
-
-Create a project:
+Emit LLVM IR without linking:
 
 ```sh
-range create MyProject
-cd MyProject
+scripts/range emit-llvm path/to/Main.range .range/Build/llvm/Main.ll
 ```
 
-Run it:
+The script currently invokes the `rangec` compiler host through SwiftPM:
 
 ```sh
-range run
+swift run --package-path RangeCompiler rangec emit-llvm input.range output.ll
 ```
 
-`range run` reads `Project.range`, compiles the project to generated Swift, enables Swift Embedded for that package, and launches it through SwiftPM.
+That Swift host is temporary bootstrap plumbing. The outer command surface is a
+shell script so it can later call a Range-built compiler binary instead.
+
+## Current Minimal Program
+
+```range
+@main {}
+```
+
+The bundled `@main` macro currently emits:
+
+```llvm
+define i32 @main() {
+entry:
+  ret i32 0
+}
+```
