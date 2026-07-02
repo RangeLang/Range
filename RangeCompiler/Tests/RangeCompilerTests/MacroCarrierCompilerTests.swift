@@ -20,30 +20,25 @@ struct MacroCarrierCompilerTests {
         }
     }
 
-    @Test("RangeCore declarations build through macro records")
-    func rangeCoreDeclarationsBuildThroughMacroRecords() throws {
+    @Test("quarantined RangeCore loads minimal macro records")
+    func quarantinedRangeCoreLoadsMinimalMacroRecords() throws {
         let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
 
-        #expect(program.declarationGraph.constructsByName["Int"] != nil)
-        #expect(program.declarationGraph.constructsByName["String"] != nil)
-        #expect(program.declarationGraph.constructsByName["Bool"] != nil)
-        #expect(program.declarationGraph.constructsByName["Void"] != nil)
-        #expect(program.declarationGraph.macrosByName["construct"] != nil)
-        #expect(program.declarationGraph.macrosByName["function"] != nil)
+        #expect(program.declarationGraph.macrosByName["main"] != nil)
+        #expect(program.declarationGraph.macrosByName["int"] != nil)
+        #expect(program.declarationGraph.macrosByName["return"] != nil)
+        #expect(program.declarationGraph.macrosByName["construct"] == nil)
+        #expect(program.declarationGraph.macrosByName["function"] == nil)
     }
 
-    @Test("Top-level macro blocks materialize records")
-    func topLevelMacroBlocksMaterializeRecords() throws {
+    @Test("top-level main macro blocks survive quarantine")
+    func topLevelMainMacroBlocksSurviveQuarantine() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/MacroCarrierCounter.range",
+                path: "/tmp/MacroCarrierMain.range",
                 source: """
-                    @construct(name: "Counter") {
-                        @let(name: "value") {
-                            @value(type: "Int", current: "Int(0)")
-                        }
-                    }
+                    @main {}
                     """,
                 role: .project
             )
@@ -51,9 +46,7 @@ struct MacroCarrierCompilerTests {
 
         let program = try CompilerPipeline().build(inputs: inputs)
 
-        let counter = try #require(program.declarationGraph.constructsByName["Counter"])
-        #expect(counter.macros.first?.name == "construct")
-        #expect(program.declarationGraph.values(onConstruct: "Counter").map(\.name) == ["value"])
+        #expect(program.declarationGraph.mainBlockMacros.map(\.name) == ["main"])
     }
 }
 
