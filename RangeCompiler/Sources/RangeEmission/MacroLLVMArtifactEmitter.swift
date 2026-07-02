@@ -25,7 +25,7 @@ public struct MacroLLVMArtifactEmitter {
     }
 
     public func emitModule(files: [ParsedSourceFile]) throws -> MacroLLVMArtifactModule {
-        guard let ir = collectMainIR(files: files)?
+        guard let ir = collectLLVMModuleIR(files: files)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
             !ir.isEmpty
         else {
@@ -48,17 +48,23 @@ public struct MacroLLVMArtifactEmitter {
         return outputURL
     }
 
-    public func collectMainIR(files: [ParsedSourceFile]) -> String? {
+    public func collectLLVMModuleIR(files: [ParsedSourceFile]) -> String? {
         files.compactMap { file -> String? in
             file.sourceFile.blockMacros
                 .compactMap { block -> String? in
-                    guard block.macros.first?.name == "main" else {
-                        return nil
-                    }
-                    return block.macros.first(where: { $0.name == "main" })?
-                        .evaluatedStringValue
+                    block.macros.compactMap { application in
+                        llvmModuleArtifactBody(application.evaluatedStringValue)
+                    }.first
                 }
                 .first
         }.first
+    }
+
+    private func llvmModuleArtifactBody(_ value: String?) -> String? {
+        let prefix = "artifact|kind=llvm-module|body="
+        guard let value, value.hasPrefix(prefix) else {
+            return nil
+        }
+        return String(value.dropFirst(prefix.count))
     }
 }

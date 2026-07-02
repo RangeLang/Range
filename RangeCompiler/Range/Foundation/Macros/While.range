@@ -1,0 +1,6 @@
+@macro(name: @string("while"), result: @string, target: @statement) {
+    @parameter(name: @string("condition"), value: @string(value: "true"))
+
+    @return(value: @string("effect|kind=loop|condition="
+        + condition))
+}

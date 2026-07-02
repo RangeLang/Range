@@ -1,0 +1,13 @@
+@macro(name: @string("let"), result: @string, target: @statement) {
+    @parameter(name: @string("name"), value: @string(value: ""))
+    @parameter(name: @string("value"), value: @string(value: ""))
+
+    @state(name: @string("valueType"), value: "@llvmField(value: value, name: @string(\"type\"))")
+    @state(name: @string("llvm"), value: "\"effect|kind=environment-set|name=\" + name + \"|value=\" + value")
+
+    @if("!valueType.isEmpty") {
+        @assignment(target: @string("llvm"), value: "\"llvm-effect|kind=llvm-binding|name=\" + name + \"|type=\" + valueType + \"|pointer=%\" + name + \"|body=\" + @llvmField(value: value, name: @string(\"prelude\")) + \"  %\" + name + \" = alloca \" + valueType + \"\\n  store \" + valueType + \" \" + @llvmField(value: value, name: @string(\"operand\")) + \", ptr %\" + name")
+    }
+
+    @return(value: llvm)
+}

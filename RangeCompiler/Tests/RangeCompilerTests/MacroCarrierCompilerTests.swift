@@ -24,9 +24,17 @@ struct MacroCarrierCompilerTests {
     func quarantinedRangeCoreLoadsMinimalMacroRecords() throws {
         let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
 
+        #expect(program.declarationGraph.macrosByName["addition"] != nil)
+        #expect(program.declarationGraph.macrosByName["assignment"] != nil)
+        #expect(program.declarationGraph.macrosByName["if"] != nil)
         #expect(program.declarationGraph.macrosByName["main"] != nil)
         #expect(program.declarationGraph.macrosByName["int"] != nil)
+        #expect(program.declarationGraph.macrosByName["let"] != nil)
+        #expect(program.declarationGraph.macrosByName["llvmField"] != nil)
+        #expect(program.declarationGraph.macrosByName["reference"] != nil)
         #expect(program.declarationGraph.macrosByName["return"] != nil)
+        #expect(program.declarationGraph.macrosByName["state"] != nil)
+        #expect(program.declarationGraph.macrosByName["while"] != nil)
         #expect(program.declarationGraph.macrosByName["construct"] == nil)
         #expect(program.declarationGraph.macrosByName["function"] == nil)
     }

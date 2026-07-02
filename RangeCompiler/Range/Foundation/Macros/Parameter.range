@@ -1,0 +1,26 @@
+@member
+@macro(name: @string("parameter"), result: @string){
+    @parameter(name: @string("name"), value: @string(""))
+    @state(name: @string("members"), value: "String(\"\")")
+    @state(name: @string("index"), value: "Int(0)")
+    @state(name: @string("memberBodyText"), value: "target.declaration.bodyText")
+
+    @while("index < memberBodyText.count(of: \"\\n\") + Int(1)") {
+        @state(
+            name: @string("memberLine"),
+            value: "memberBodyText.segment(index: index, delimiter: \"\n\")"
+        )
+
+        @if("!memberLine.isEmpty") {
+            @assignment(target: @string("members"), value: "members + \"\\n\" + memberLine")
+        }
+
+        @assignment(target: @string("index"), value: "index + Int(1)")
+    }
+
+    @return(value: "member|kind=parameter|name="
+        + name
+        + "|ordinal="
+        + String(target.ordinal)
+        + members)
+}

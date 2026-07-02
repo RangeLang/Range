@@ -1,10 +1,16 @@
 @type
-@macro(name: "int", result: @string, target: @construct){
-    @parameter(name: "bits", value: @string(value: "64"))
-    @parameter(name: "signedness", value: @string(value: "signed"))
+@macro(name: @string("int"), result: @string, target: @construct){
+    @parameter(name: @string("value"), value: @string(value: ""))
+    @parameter(name: @string("bits"), value: @string(value: "64"))
+    @parameter(name: @string("signedness"), value: @string(value: "signed"))
 
-    @return(value: "int|bits="
+    @return(value: @string("llvm-value|type=i"
         + bits
+        + "|operand="
+        + value
         + "|signedness="
-        + signedness)
+        + signedness
+        + "|storage=immediate"
+        + "|needsTrunc=false"
+        + "|prelude="))
 }

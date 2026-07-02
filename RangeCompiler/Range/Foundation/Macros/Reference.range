@@ -1,0 +1,18 @@
+@macro(name: @string("reference"), result: @string){
+    @parameter(name: @string("name"), value: @string(value: ""))
+    @state(name: @string("binding"), value: "@llvmBinding(name: name)")
+    @state(name: @string("operand"), value: "@temporary(prefix: name + @string(\".value\"))")
+
+    @return(value: @string("llvm-value|type="
+        + @llvmField(value: binding, name: @string("type"))
+        + "|operand="
+        + operand
+        + "|storage=temporary"
+        + "|needsTrunc=true"
+        + "|prelude=  "
+        + operand
+        + " = load "
+        + @llvmField(value: binding, name: @string("type"))
+        + ", ptr "
+        + @llvmField(value: binding, name: @string("pointer"))))
+}

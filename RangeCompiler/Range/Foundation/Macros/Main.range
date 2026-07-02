@@ -1,4 +1,8 @@
-@block
-@macro(name: "main", result: @string){
-    @return(value: "define i32 @main() {\nentry:\n  ret i32 0\n}")
+@block(kind: @string("llvm"))
+@macro(name: @string("main"), result: @string){
+    @parameter(name: @string("body"), value: @string(value: "  ret i32 0"))
+
+    @return(value: @string("artifact|kind=llvm-module|body=define i32 @main() {\nentry:\n"
+        + body
+        + "\n}"))
 }

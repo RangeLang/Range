@@ -1,0 +1,5 @@
+@macro(name: @string("llvmBinding"), result: @string){
+    @parameter(name: @string("name"), value: @string(value: ""))
+
+    @return(value: @string(""))
+}

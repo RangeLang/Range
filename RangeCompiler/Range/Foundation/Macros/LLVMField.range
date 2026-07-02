@@ -1,0 +1,6 @@
+@macro(name: @string("llvmField"), result: @string){
+    @parameter(name: @string("value"), value: @string(value: ""))
+    @parameter(name: @string("name"), value: @string(value: ""))
+
+    @return(value: @string(""))
+}

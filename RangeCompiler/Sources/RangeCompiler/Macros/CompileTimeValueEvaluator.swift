@@ -1,5 +1,16 @@
 import Foundation
 
+final class CompileTimeLLVMContext {
+    var bindings: [String: String] = [:]
+    private var temporaryIndex = 0
+
+    func nextTemporary(prefix: String) -> String {
+        let current = temporaryIndex
+        temporaryIndex += 1
+        return "\(prefix).\(current)"
+    }
+}
+
 struct CompileTimeValueEvaluator {
     let targetBinding: String
     let targetValue: CompileTimeValue
@@ -10,6 +21,7 @@ struct CompileTimeValueEvaluator {
     let callableDeclarationsByName: [String: [CallableDeclaration]]
     let knownObjectTypeNames: Set<String>
     let context: MacroExpansionContext?
+    let llvmContext: CompileTimeLLVMContext?
 
     init(
         targetBinding: String,
@@ -20,7 +32,8 @@ struct CompileTimeValueEvaluator {
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
         callableDeclarationsByName: [String: [CallableDeclaration]] = [:],
         knownObjectTypeNames: Set<String> = [],
-        context: MacroExpansionContext? = nil
+        context: MacroExpansionContext? = nil,
+        llvmContext: CompileTimeLLVMContext? = nil
     ) {
         self.targetBinding = targetBinding
         self.targetValue = targetValue
@@ -31,6 +44,7 @@ struct CompileTimeValueEvaluator {
         self.callableDeclarationsByName = callableDeclarationsByName
         self.knownObjectTypeNames = knownObjectTypeNames
         self.context = context
+        self.llvmContext = llvmContext
     }
 
     func evaluate(_ expression: Expression) -> CompileTimeValue? {
@@ -55,33 +69,44 @@ struct CompileTimeValueEvaluator {
                     return .object(typeName: "Void", fields: [:])
                 }
                 return macroReturnValue(valueArgument.value, locals: locals)
-            case .macroApplication(let name, let arguments) where name == "state" || name == "let":
-                guard let binding = macroLocalBinding(arguments: arguments, locals: locals) else {
-                    continue
-                }
-                locals[binding.name] = binding.expression
-            case .macroApplication(let name, let arguments) where name == "assignment":
-                guard let assignment = macroLocalAssignment(arguments: arguments, locals: locals) else {
-                    continue
-                }
-                locals[assignment.name] = assignment.expression
-            case .macroInvocation(let name, let argumentClause, let body) where name == "while":
-                guard let condition = macroConditionExpression(argumentClause: argumentClause) else {
-                    continue
-                }
-                while case .boolean(true) = evaluate(condition, locals: locals) {
-                    if let value = evaluateStatements(body, locals: &locals) {
-                        return value
-                    }
-                }
-            case .macroInvocation(let name, let argumentClause, let body) where name == "if":
-                guard let condition = macroConditionExpression(argumentClause: argumentClause),
-                    case .boolean(true) = evaluate(condition, locals: locals)
+            case .macroApplication(let name, let arguments):
+                _ = evaluateStatementMacroEffect(name: name, arguments: arguments, locals: &locals)
+            case .macroInvocation(let name, let argumentClause, let body):
+                guard
+                    let control = evaluateControlMacroEffect(
+                        name: name,
+                        argumentClause: argumentClause,
+                        locals: locals
+                    )
                 else {
                     continue
                 }
-                if let value = evaluateStatements(body, locals: &locals) {
-                    return value
+                switch control.kind {
+                case "branch":
+                    guard let condition = controlConditionExpression(control.condition, locals: locals),
+                        case .boolean(true) = evaluate(condition, locals: locals)
+                    else {
+                        continue
+                    }
+                    if let value = evaluateStatements(body, locals: &locals) {
+                        return value
+                    }
+                case "loop":
+                    guard let condition = controlConditionExpression(control.condition, locals: locals) else {
+                        continue
+                    }
+                    var iterationCount = 0
+                    while case .boolean(true) = evaluate(condition, locals: locals) {
+                        guard iterationCount < 10_000 else {
+                            return nil
+                        }
+                        if let value = evaluateStatements(body, locals: &locals) {
+                            return value
+                        }
+                        iterationCount += 1
+                    }
+                default:
+                    continue
                 }
             default:
                 continue
@@ -90,32 +115,152 @@ struct CompileTimeValueEvaluator {
         return nil
     }
 
-    private func macroLocalBinding(
-        arguments: [CallArgument],
+    func evaluateControlMacroEffect(
+        name: String,
+        argumentClause: String?,
         locals: [String: Expression]
-    ) -> (name: String, expression: Expression)? {
-        guard let nameArgument = arguments.first(where: { $0.label == "name" }),
-            let valueArgument = arguments.first(where: { $0.label == "value" }),
-            case .string(let name) = evaluate(nameArgument.value, locals: locals)
+    ) -> (kind: String, condition: String)? {
+        guard let macro = macroDeclarationsByName[name],
+            let context
         else {
             return nil
         }
-        return (name, macroLocalValueExpression(valueArgument.value, locals: locals))
+
+        let arguments: [CallArgument]
+        do {
+            arguments = try argumentClause.map(MacroExpander.parsedMacroArguments) ?? []
+        } catch {
+            return nil
+        }
+
+        let argumentBindings: [String: Expression]
+        do {
+            argumentBindings = try MacroExpander.parseMacroArgumentBindings(
+                for: macro,
+                arguments: arguments
+            )
+        } catch {
+            guard macro.parameters.count == 1,
+                let parameter = macro.parameters.first,
+                arguments.count == 1,
+                arguments[0].label == nil
+            else {
+                return nil
+            }
+            argumentBindings = [parameter.localName: arguments[0].value]
+        }
+
+        var macroLocals = locals
+        for (key, value) in argumentBindings {
+            macroLocals[key] = value
+        }
+
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: targetBinding,
+            targetValue: targetValue,
+            graphBinding: graphBinding,
+            selfValue: selfValue,
+            localBindings: macroLocals,
+            macroDeclarationsByName: macroDeclarationsByName,
+            callableDeclarationsByName: callableDeclarationsByName,
+            knownObjectTypeNames: knownObjectTypeNames,
+            context: context,
+            llvmContext: llvmContext
+        )
+        guard case .string(let effect)? = evaluator.evaluateStatements(macro.body, locals: &macroLocals)
+        else {
+            return nil
+        }
+        return controlEffect(effect)
     }
 
-    private func macroLocalAssignment(
-        arguments: [CallArgument],
-        locals: [String: Expression]
-    ) -> (name: String, expression: Expression)? {
-        guard let targetArgument = arguments.first(where: { $0.label == "target" }),
-            let valueArgument = arguments.first(where: { $0.label == "value" }),
-            case .string(let name) = evaluate(targetArgument.value, locals: locals),
-            !name.isEmpty
-        else {
+    private func controlEffect(_ effect: String) -> (kind: String, condition: String)? {
+        let prefix = "effect|kind="
+        guard effect.hasPrefix(prefix) else {
             return nil
         }
+        let remainder = effect.dropFirst(prefix.count)
+        guard let conditionSeparator = remainder.range(of: "|condition=") else {
+            return nil
+        }
+        let kind = String(remainder[..<conditionSeparator.lowerBound])
+        guard !kind.isEmpty else {
+            return nil
+        }
+        let conditionStart = conditionSeparator.upperBound
+        return (kind, String(remainder[conditionStart...]))
+    }
 
-        return (name, macroLocalValueExpression(valueArgument.value, locals: locals))
+    func controlConditionExpression(_ source: String, locals: [String: Expression]) -> Expression? {
+        macroLocalValueExpression(.string(source), locals: [:])
+    }
+
+    private func evaluateStatementMacroEffect(
+        name: String,
+        arguments: [CallArgument],
+        locals: inout [String: Expression]
+    ) -> Bool {
+        guard let macro = macroDeclarationsByName[name],
+            let context
+        else {
+            return false
+        }
+
+        let argumentBindings: [String: Expression]
+        do {
+            argumentBindings = try MacroExpander.parseMacroArgumentBindings(
+                for: macro,
+                arguments: arguments
+            )
+        } catch {
+            return false
+        }
+
+        var macroLocals = locals
+        for (key, value) in argumentBindings {
+            macroLocals[key] = value
+        }
+
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: targetBinding,
+            targetValue: targetValue,
+            graphBinding: graphBinding,
+            selfValue: selfValue,
+            localBindings: macroLocals,
+            macroDeclarationsByName: macroDeclarationsByName,
+            callableDeclarationsByName: callableDeclarationsByName,
+            knownObjectTypeNames: knownObjectTypeNames,
+            context: context,
+            llvmContext: llvmContext
+        )
+        guard case .string(let effect)? = evaluator.evaluateStatements(macro.body, locals: &macroLocals),
+            let environmentSet = environmentSetEffect(effect)
+        else {
+            return false
+        }
+
+        locals[environmentSet.name] = macroLocalValueExpression(
+            .string(environmentSet.value),
+            locals: locals
+        )
+        return true
+    }
+
+    private func environmentSetEffect(_ effect: String) -> (name: String, value: String)? {
+        let prefix = "effect|kind=environment-set|name="
+        guard effect.hasPrefix(prefix) else {
+            return nil
+        }
+        let remainder = effect.dropFirst(prefix.count)
+        guard let valueSeparator = remainder.range(of: "|value=") else {
+            return nil
+        }
+        let name = String(remainder[..<valueSeparator.lowerBound])
+        guard !name.isEmpty else {
+            return nil
+        }
+        let valueStart = valueSeparator.upperBound
+        return (name, String(remainder[valueStart...]))
     }
 
     private func macroLocalValueExpression(
@@ -125,6 +270,11 @@ struct CompileTimeValueEvaluator {
         if case .string(let source) = expression,
             let parsed = try? parseMacroLocalValueSource(source)
         {
+            if case .identifier = parsed,
+                evaluate(parsed, locals: locals) == nil
+            {
+                return .string(source)
+            }
             return boundExpression(parsed, locals: locals)
         }
         return boundExpression(expression, locals: locals)
@@ -148,21 +298,6 @@ struct CompileTimeValueEvaluator {
         let expression = try parser.parseExpression()
         try parser.consume(.eof)
         return expression
-    }
-
-    func macroConditionExpression(argumentClause: String?) -> Expression? {
-        guard let argumentClause = argumentClause?.trimmingCharacters(in: .whitespacesAndNewlines),
-            !argumentClause.isEmpty,
-            let arguments = try? MacroExpander.parsedMacroArguments(argumentClause: argumentClause)
-        else {
-            return .boolean(true)
-        }
-
-        if let condition = arguments.first(where: { $0.label == "condition" }) {
-            return macroLocalValueExpression(condition.value, locals: [:])
-        }
-
-        return arguments.first.map { macroLocalValueExpression($0.value, locals: [:]) }
     }
 
     // Resolves an expression to a bound expression: if it evaluates to a concrete
@@ -194,6 +329,26 @@ struct CompileTimeValueEvaluator {
         case .nilLiteral:
             return .nilValue
         case .macroInvocation(let name, let arguments):
+            if name == "string",
+                let value = stringMacroValue(arguments: arguments, locals: locals)
+            {
+                return .string(value)
+            }
+            if name == "llvmField",
+                let value = llvmFieldMacroValue(arguments: arguments, locals: locals)
+            {
+                return .string(value)
+            }
+            if name == "temporary",
+                let value = temporaryMacroValue(arguments: arguments, locals: locals)
+            {
+                return .string(value)
+            }
+            if name == "llvmBinding",
+                let value = llvmBindingMacroValue(arguments: arguments, locals: locals)
+            {
+                return .string(value)
+            }
             guard let macro = macroDeclarationsByName[name],
                 macro.target == nil,
                 let context,
@@ -204,6 +359,7 @@ struct CompileTimeValueEvaluator {
                     callerTargetBinding: targetBinding,
                     callerTargetValue: targetValue,
                     callerSelfValue: selfValue,
+                    callerLLVMContext: llvmContext,
                     context: context
                 )
             else {
@@ -358,6 +514,91 @@ struct CompileTimeValueEvaluator {
         default:
             return nil
         }
+    }
+
+    private func stringMacroValue(
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> String? {
+        let valueExpression = arguments.first(where: { $0.label == "value" })?.value
+            ?? arguments.first?.value
+        guard let valueExpression else {
+            return ""
+        }
+        guard case .string(let value) = evaluate(valueExpression, locals: locals) else {
+            return nil
+        }
+        return value
+    }
+
+    private func llvmFieldMacroValue(
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> String? {
+        let valueExpression = arguments.first(where: { $0.label == "value" })?.value
+            ?? arguments.first?.value
+        let nameExpression = arguments.first(where: { $0.label == "name" })?.value
+        guard let valueExpression,
+            let nameExpression,
+            case .string(let value) = evaluate(valueExpression, locals: locals),
+            case .string(let name) = evaluate(nameExpression, locals: locals)
+        else {
+            return nil
+        }
+        guard let field = llvmPayloadField(value, name: name) else {
+            return ""
+        }
+        if name == "prelude", !field.isEmpty {
+            return field + "\n"
+        }
+        return field
+    }
+
+    private func temporaryMacroValue(
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> String? {
+        let prefixExpression = arguments.first(where: { $0.label == "prefix" })?.value
+            ?? arguments.first?.value
+        guard let llvmContext,
+            let prefixExpression,
+            case .string(let prefix) = evaluate(prefixExpression, locals: locals),
+            !prefix.isEmpty
+        else {
+            return nil
+        }
+        return "%\(llvmContext.nextTemporary(prefix: prefix))"
+    }
+
+    private func llvmBindingMacroValue(
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> String? {
+        let nameExpression = arguments.first(where: { $0.label == "name" })?.value
+            ?? arguments.first?.value
+        guard let llvmContext,
+            let nameExpression,
+            case .string(let name) = evaluate(nameExpression, locals: locals),
+            let type = llvmContext.bindings[name]
+        else {
+            return nil
+        }
+        return "llvm-binding|type=\(type)|pointer=%\(name)"
+    }
+
+    private func llvmPayloadField(_ payload: String, name: String) -> String? {
+        let parts = payload.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+        guard parts.first == "llvm-value" || parts.first == "llvm-binding" else {
+            return nil
+        }
+        for part in parts.dropFirst() {
+            let pair = part.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard pair.count == 2, String(pair[0]) == name else {
+                continue
+            }
+            return String(pair[1])
+        }
+        return nil
     }
 
     private func evaluateUserFunctionCall(

@@ -214,10 +214,27 @@ extension Parser {
         in bindings: [String: Expression],
         declarationName: String
     ) throws -> String {
-        guard case .string(let value)? = bindings[name] else {
-            throw ParseError("\(declarationName) requires \(name): String.")
+        guard let expression = bindings[name],
+            let value = stringValue(from: expression)
+        else {
+            throw ParseError("\(declarationName) requires \(name): String value.")
         }
         return value
+    }
+
+    private func stringValue(from expression: Expression) -> String? {
+        switch expression {
+        case .string(let value):
+            return value
+        case .macroInvocation(let name, let arguments) where name == "string":
+            let valueArgument = arguments.first(where: { $0.label == "value" }) ?? arguments.first
+            guard let valueArgument else {
+                return ""
+            }
+            return stringValue(from: valueArgument.value)
+        default:
+            return nil
+        }
     }
 
     private enum MacroDeclarationFieldRole {
@@ -237,7 +254,10 @@ extension Parser {
 
         let value: String
         switch expression {
-        case .string(let string):
+        case let expression where stringValue(from: expression) != nil:
+            guard let string = stringValue(from: expression) else {
+                return nil
+            }
             value = string
         case .macroInvocation(let macroName, _) where role == .result:
             value = typeName(forValueMacroName: macroName)
@@ -340,9 +360,9 @@ extension Parser {
         }
 
         guard let nameArgument = genericArguments.first(where: { $0.label == "name" }),
-            case .string(let genericName) = nameArgument.value
+            let genericName = stringValue(from: nameArgument.value)
         else {
-            throw ParseError("@generic macro members must declare name: String.")
+            throw ParseError("@generic macro members must declare name: String value.")
         }
 
         let valueFields = try macroMemberValueFields(
@@ -378,9 +398,9 @@ extension Parser {
         }
 
         guard let nameArgument = parameterArguments.first(where: { $0.label == "name" }),
-            case .string(let parameterName) = nameArgument.value
+            let parameterName = stringValue(from: nameArgument.value)
         else {
-            throw ParseError("@parameter macro members must declare name: String.")
+            throw ParseError("@parameter macro members must declare name: String value.")
         }
 
         let valueFields = try macroMemberValueFields(
@@ -502,10 +522,10 @@ extension Parser {
             return nil
         }
         guard let nameArgument = arguments.first(where: { $0.label == "name" }),
-            case .string(let name) = nameArgument.value,
+            let name = stringValue(from: nameArgument.value),
             !name.isEmpty
         else {
-            throw ParseError("@generic macro members must declare name: String.")
+            throw ParseError("@generic macro members must declare name: String value.")
         }
         return name
     }

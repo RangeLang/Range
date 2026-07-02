@@ -1,0 +1,25 @@
+@macro(name: @string("addition"), result: @string){
+    @parameter(name: @string("lhs"), value: @int())
+    @parameter(name: @string("rhs"), value: @int())
+    @parameter(name: @string("temporaryPrefix"), value: @string(value: "add"))
+    @state(name: @string("type"), value: "@llvmField(value: lhs, name: @string(\"type\"))")
+    @state(name: @string("operand"), value: "@temporary(prefix: temporaryPrefix)")
+
+    @return(value: @string("llvm-value|type="
+        + type
+        + "|operand="
+        + operand
+        + "|storage=temporary"
+        + "|needsTrunc=true"
+        + "|prelude="
+        + @llvmField(value: lhs, name: @string("prelude"))
+        + @llvmField(value: rhs, name: @string("prelude"))
+        + "  "
+        + operand
+        + " = add "
+        + type
+        + " "
+        + @llvmField(value: lhs, name: @string("operand"))
+        + ", "
+        + @llvmField(value: rhs, name: @string("operand"))))
+}

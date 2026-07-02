@@ -1,28 +1,17 @@
-@macro(name: "return", result: @string, target: @statement){
-    @parameter(name: "value", value: @string(value: ""))
-    @state(name: "llvm", value: "\"ret \" + value")
+@macro(name: @string("return"), result: @string, target: @statement){
+    @parameter(name: @string("value"), value: @string(value: ""))
 
-    @if("value.isEmpty") {
-        @assignment(target: "llvm", value: "ret void")
+    @state(name: @string("valueType"), value: "@llvmField(value: value, name: @string(\"type\"))")
+    @state(name: @string("llvm"), value: "\"llvm-effect|kind=llvm-terminator|body=\"")
+
+    @if("!valueType.isEmpty") {
+        @assignment(target: @string("llvm"), value: "\"llvm-effect|kind=llvm-terminator|body=\" + @llvmField(value: value, name: @string(\"prelude\")) + \"  ret i32 \" + @llvmField(value: value, name: @string(\"operand\"))")
     }
 
-    @if("value.contains(value: \"Int(\")") {
-        @state(name: "suffix", value: "value.segment(index: 1, delimiter: \"Int(\")")
-        @assignment(target: "llvm", value: "\"ret i64 \" + suffix.segment(index: Int(0), delimiter: \")\")")
+    @if("@llvmField(value: value, name: @string(\"needsTrunc\")) == \"true\"") {
+        @state(name: @string("returnOperand"), value: "@temporary(prefix: @string(\"return\"))")
+        @assignment(target: @string("llvm"), value: "\"llvm-effect|kind=llvm-terminator|body=\" + @llvmField(value: value, name: @string(\"prelude\")) + \"  \" + returnOperand + \" = trunc \" + valueType + \" \" + @llvmField(value: value, name: @string(\"operand\")) + \" to i32\\n  ret i32 \" + returnOperand")
     }
 
-    @if("value.contains(value: \"Bool(true)\")") {
-        @assignment(target: "llvm", value: "ret i1 1")
-    }
-
-    @if("value.contains(value: \"Bool(false)\")") {
-        @assignment(target: "llvm", value: "ret i1 0")
-    }
-
-    @return(value: "statement|kind=return|value="
-        + value
-        + "|projection="
-        + "target.declaration"
-        + "|llvm="
-        + llvm)
+    @return(value: llvm)
 }

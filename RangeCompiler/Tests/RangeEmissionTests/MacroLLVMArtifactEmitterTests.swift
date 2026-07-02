@@ -46,6 +46,147 @@ struct MacroLLVMArtifactEmitterTests {
         }
     }
 
+    @Test("emits minimal main body with let and return")
+    func emitsMinimalMainBodyWithLetAndReturn() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/Main.range",
+                source: """
+                    @main {
+                        @let(name: @string("count"), value: @int(value: @string("5")))
+                        @return(value: @int(value: @string("0")))
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let module = try MacroLLVMArtifactEmitter().emitModule(compiledProgram: program)
+
+        #expect(
+            module.ir
+                == """
+                define i32 @main() {
+                entry:
+                  %count = alloca i64
+                  store i64 5, ptr %count
+                  ret i32 0
+                }
+                """
+        )
+    }
+
+    @Test("emits int value type from Range-authored payload")
+    func emitsIntValueTypeFromRangeAuthoredPayload() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/Main.range",
+                source: """
+                    @main {
+                        @let(
+                            name: @string("count"),
+                            value: @int(value: @string("7"), bits: @string("32"))
+                        )
+                        @return(value: @int(value: @string("0")))
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let module = try MacroLLVMArtifactEmitter().emitModule(compiledProgram: program)
+
+        #expect(
+            module.ir
+                == """
+                define i32 @main() {
+                entry:
+                  %count = alloca i32
+                  store i32 7, ptr %count
+                  ret i32 0
+                }
+                """
+        )
+    }
+
+    @Test("emits minimal main return from reference")
+    func emitsMinimalMainReturnFromReference() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/Main.range",
+                source: """
+                    @main {
+                        @let(name: @string("count"), value: @int(value: @string("5")))
+                        @return(value: @reference(name: @string("count")))
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let module = try MacroLLVMArtifactEmitter().emitModule(compiledProgram: program)
+
+        #expect(
+            module.ir
+                == """
+                define i32 @main() {
+                entry:
+                  %count = alloca i64
+                  store i64 5, ptr %count
+                  %count.value.0 = load i64, ptr %count
+                  %return.1 = trunc i64 %count.value.0 to i32
+                  ret i32 %return.1
+                }
+                """
+        )
+    }
+
+    @Test("emits minimal main return from addition")
+    func emitsMinimalMainReturnFromAddition() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/Main.range",
+                source: """
+                    @main {
+                        @let(name: @string("count"), value: @int(value: @string("5")))
+                        @return(
+                            value: @addition(
+                                lhs: @reference(name: @string("count")),
+                                rhs: @int(value: @string("3"))
+                            )
+                        )
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let module = try MacroLLVMArtifactEmitter().emitModule(compiledProgram: program)
+
+        #expect(
+            module.ir
+                == """
+                define i32 @main() {
+                entry:
+                  %count = alloca i64
+                  store i64 5, ptr %count
+                  %count.value.0 = load i64, ptr %count
+                  %add.1 = add i64 %count.value.0, 3
+                  %return.2 = trunc i64 %add.1 to i32
+                  ret i32 %return.2
+                }
+                """
+        )
+    }
+
     @Test("writes macro-produced LLVM module file")
     func writesMacroProducedLLVMModuleFile() throws {
         var inputs = try rangeCoreInputs()

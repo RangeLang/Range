@@ -63,17 +63,29 @@ extension MacroExpander {
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
     ) throws -> BlockMacroNode {
-        let expandedBody = try expand(
-            statements: blockMacro.body,
-            expectedReturnType: nil,
-            macros: macros,
-            context: context
-        )
-        let memberText = evaluatedStringMacroStatements(
-            in: blockMacro.body,
-            macros: macros,
-            context: context
-        ).joined(separator: "\n")
+        let isLLVMArtifactBlock = hasLLVMBlockMarker(blockMacro.macros, macros: macros)
+            && canLowerLLVMArtifactBlock(
+                blockMacro.body,
+                macros: macros,
+                context: context
+            )
+        let expandedBody =
+            isLLVMArtifactBlock
+            ? blockMacro.body
+            : try expand(
+                statements: blockMacro.body,
+                expectedReturnType: nil,
+                macros: macros,
+                context: context
+            )
+        let memberText =
+            isLLVMArtifactBlock
+            ? ""
+            : evaluatedStringMacroStatements(
+                in: blockMacro.body,
+                macros: macros,
+                context: context
+            ).joined(separator: "\n")
         let rawBody = memberText.isEmpty ? blockMacro.rawBody : memberText
         let preEvaluatedApplications = blockMacro.macros.map {
             guard $0.name != "construct" else {
@@ -82,6 +94,7 @@ extension MacroExpander {
             return attachingEvaluatedStringValue(
                 to: $0,
                 rawBody: rawBody,
+                bodyStatements: isLLVMArtifactBlock ? blockMacro.body : nil,
                 macros: macros,
                 context: context
             )
@@ -100,49 +113,12 @@ extension MacroExpander {
             attachingEvaluatedStringValue(
                 to: $0,
                 rawBody: $0.name == "construct" ? constructRawBody : rawBody,
+                bodyStatements: isLLVMArtifactBlock ? blockMacro.body : nil,
                 macros: macros,
                 context: context
             )
         }
         return BlockMacroNode(macros: applications, body: expandedBody, rawBody: rawBody)
-    }
-
-    static func expandMainBlockBody(
-        _ mainBlock: BlockMacroNode,
-        expectedReturnType: TypeReference?,
-        macros: [String: MacroDeclaration],
-        context: MacroExpansionContext
-    ) throws -> [Statement] {
-        let expandedBody = try expand(
-            statements: mainBlock.body,
-            expectedReturnType: expectedReturnType,
-            macros: macros,
-            context: context
-        )
-
-        try emitMainBlockMacroDiagnostics(
-            mainBlock,
-            macros: macros,
-            context: context,
-            targetValue: blockMacroTargetValue(expandedBody)
-        )
-
-        return expandedBody
-    }
-
-    static func emitMainBlockMacroDiagnostics(
-        _ mainBlock: BlockMacroNode,
-        macros: [String: MacroDeclaration],
-        context: MacroExpansionContext,
-        targetValue: CompileTimeValue? = nil
-    ) throws {
-        try emitBlockMacroDiagnostics(
-            applications: mainBlock.macros,
-            declarationName: "@main",
-            macros: macros,
-            context: context,
-            targetValue: targetValue ?? blockMacroTargetValue(mainBlock.body)
-        )
     }
 
     static func emitBlockMacroDiagnostics(
@@ -435,6 +411,7 @@ extension MacroExpander {
     static func attachingEvaluatedStringValue(
         to application: MacroApplication,
         rawBody: String,
+        bodyStatements: [Statement]? = nil,
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
     ) -> MacroApplication {
@@ -446,6 +423,18 @@ extension MacroExpander {
             rawBody: rawBody,
             evaluatedStringValue: application.evaluatedStringValue
         )
+        if let bodyStatements,
+            let artifact = evaluatedBlockLLVMArtifact(
+                application: applicationWithBody,
+                statements: bodyStatements,
+                macros: macros,
+                context: context
+            )
+        {
+            var updated = applicationWithBody
+            updated.evaluatedStringValue = artifact
+            return updated
+        }
         guard let macro = macros[application.name] else { return applicationWithBody }
         let targetValue = blockMacroTargetValue(rawBody: rawBody, application: applicationWithBody)
         guard
@@ -485,6 +474,473 @@ extension MacroExpander {
         var updated = applicationWithBody
         updated.evaluatedStringValue = processed
         return updated
+    }
+
+    private static func evaluatedBlockLLVMArtifact(
+        application: MacroApplication,
+        statements: [Statement],
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) -> String? {
+        guard !statements.isEmpty,
+            let macro = macros[application.name]
+        else {
+            return nil
+        }
+
+        var bodyLines: [String] = []
+        var sawReturn = false
+        let llvmContext = CompileTimeLLVMContext()
+
+        for statement in statements {
+            switch statement {
+            case .macroApplication:
+                guard
+                    let effect = evaluatedLLVMBlockStatementEffect(
+                        statement,
+                        llvmContext: llvmContext,
+                        macros: macros,
+                        context: context
+                    )
+                else {
+                    return nil
+                }
+                if let binding = effect.binding, let type = effect.type {
+                    llvmContext.bindings[binding] = type
+                }
+                bodyLines.append(contentsOf: effect.lines)
+                if effect.kind == "llvm-terminator" {
+                    sawReturn = true
+                }
+            default:
+                return nil
+            }
+        }
+
+        guard sawReturn else {
+            return nil
+        }
+
+        return evaluatedBlockArtifactMacro(
+            macro: macro,
+            application: application,
+            body: bodyLines.joined(separator: "\n"),
+            context: context
+        )
+    }
+
+    private static func hasLLVMBlockMarker(
+        _ applications: [MacroApplication],
+        macros: [String: MacroDeclaration]
+    ) -> Bool {
+        applications.contains { application in
+            hasLLVMBlockMarker(application)
+                || macros[application.name].map { hasLLVMBlockMarker($0.macros) } == true
+        }
+    }
+
+    private static func hasLLVMBlockMarker(_ applications: [MacroApplication]) -> Bool {
+        applications.contains(where: hasLLVMBlockMarker)
+    }
+
+    private static func hasLLVMBlockMarker(_ application: MacroApplication) -> Bool {
+            guard application.name == "block",
+                let argumentClause = application.argumentClause,
+                let arguments = try? parsedMacroArguments(argumentClause: argumentClause)
+            else {
+                return false
+            }
+            let kindExpression = argument(named: "kind", in: arguments) ?? arguments.first?.value
+            return minimalStringValue(kindExpression) == "llvm"
+    }
+
+    private static func canLowerLLVMArtifactBlock(
+        _ statements: [Statement],
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) -> Bool {
+        guard !statements.isEmpty else {
+            return false
+        }
+        var sawReturn = false
+        let llvmContext = CompileTimeLLVMContext()
+        for statement in statements {
+            guard case .macroApplication = statement,
+                let effect = evaluatedLLVMBlockStatementEffect(
+                    statement,
+                    llvmContext: llvmContext,
+                    macros: macros,
+                    context: context
+                )
+            else {
+                return false
+            }
+            if let binding = effect.binding, let type = effect.type {
+                llvmContext.bindings[binding] = type
+            }
+            if effect.kind == "llvm-terminator" {
+                sawReturn = true
+            }
+        }
+        return sawReturn
+    }
+
+    private struct LLVMBlockStatementEffect {
+        var kind: String
+        var lines: [String]
+        var binding: String?
+        var type: String?
+    }
+
+    private static func evaluatedLLVMBlockStatementEffect(
+        _ statement: Statement,
+        llvmContext: CompileTimeLLVMContext,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) -> LLVMBlockStatementEffect? {
+        guard case .macroApplication(let name, let arguments) = statement,
+            let macro = macros[name],
+            let localBindings = preparedLLVMBlockStatementBindings(
+                macro: macro,
+                arguments: arguments,
+                llvmContext: llvmContext,
+                macros: macros,
+                context: context
+            )
+        else {
+            return nil
+        }
+
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: "target",
+            targetValue: .object(typeName: "LLVMStatementTarget", fields: [:]),
+            graphBinding: "graph",
+            selfValue: MacroTargetValueBuilder(
+                macroDeclarationsByName: context.macroDeclarationsByName,
+                macroMetadataByName: context.macroMetadataByName,
+                constructsByName: context.graphContext.constructsByName,
+                knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+            ).value(for: macro),
+            localBindings: localBindings,
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            callableDeclarationsByName: context.callableDeclarationsByName,
+            knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
+            context: context,
+            llvmContext: llvmContext
+        )
+        var locals = localBindings
+        guard case .string(let effect)? = evaluator.evaluateStatements(macro.body, locals: &locals) else {
+            return nil
+        }
+        return llvmBlockStatementEffect(effect)
+    }
+
+    private static func preparedLLVMBlockStatementBindings(
+        macro: MacroDeclaration,
+        arguments: [CallArgument],
+        llvmContext: CompileTimeLLVMContext,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) -> [String: Expression]? {
+        let argumentBindings = (try? parseMacroArgumentBindings(for: macro, arguments: arguments)) ?? [:]
+        let (localBindings, preparedValues) = preparedLLVMArgumentBindings(
+            argumentBindings,
+            llvmContext: llvmContext,
+            macros: macros,
+            context: context
+        )
+
+        let requiredValueNames = requiredLLVMValueParameterNames(for: macro)
+        guard requiredValueNames.allSatisfy({ preparedValues[$0] != nil }) else {
+            return nil
+        }
+
+        return localBindings
+    }
+
+    private static func requiredLLVMValueParameterNames(for macro: MacroDeclaration) -> Set<String> {
+        Set(macro.parameters.compactMap { parameter in
+            parameter.localName == "value" ? parameter.localName : nil
+        })
+    }
+
+    private static func preparedLLVMValue(
+        _ expression: Expression?,
+        llvmContext: CompileTimeLLVMContext,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) -> MinimalLLVMValue? {
+        minimalLLVMValue(
+            expression,
+            llvmContext: llvmContext,
+            macros: macros,
+            context: context
+        )
+    }
+
+    private static func preparedLLVMArgumentBindings(
+        _ argumentBindings: [String: Expression],
+        llvmContext: CompileTimeLLVMContext,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) -> ([String: Expression], [String: MinimalLLVMValue]) {
+        var localBindings = argumentBindings
+        var values: [String: MinimalLLVMValue] = [:]
+        for (name, expression) in argumentBindings {
+            guard let value = preparedLLVMValue(
+                expression,
+                llvmContext: llvmContext,
+                macros: macros,
+                context: context
+            ) else {
+                continue
+            }
+            values[name] = value
+            localBindings[name] = .string(value.payload)
+        }
+        return (localBindings, values)
+    }
+
+    private static func llvmBlockStatementEffect(_ effect: String) -> LLVMBlockStatementEffect? {
+        let prefix: String
+        if effect.hasPrefix("llvm-effect|kind=") {
+            prefix = "llvm-effect|kind="
+        } else if effect.hasPrefix("effect|kind=") {
+            prefix = "effect|kind="
+        } else {
+            return nil
+        }
+        let remainder = effect.dropFirst(prefix.count)
+        guard let bodySeparator = remainder.range(of: "|body=") else {
+            return nil
+        }
+        let metadata = String(remainder[..<bodySeparator.lowerBound])
+        let body = String(remainder[bodySeparator.upperBound...])
+        let parts = metadata.split(separator: "|", omittingEmptySubsequences: false)
+        guard let kind = parts.first.map(String.init),
+            kind.hasPrefix("llvm-")
+        else {
+            return nil
+        }
+
+        var fields: [String: String] = [:]
+        var binding: String?
+        var type: String?
+        for part in parts.dropFirst() {
+            let pair = part.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard pair.count == 2 else {
+                continue
+            }
+            fields[String(pair[0])] = String(pair[1])
+        }
+        binding = fields["binding"] ?? fields["name"]
+        type = fields["type"]
+
+        return LLVMBlockStatementEffect(
+            kind: kind,
+            lines: body.isEmpty ? [] : body.components(separatedBy: "\n"),
+            binding: binding,
+            type: type
+        )
+    }
+
+    private static func evaluatedBlockArtifactMacro(
+        macro: MacroDeclaration,
+        application: MacroApplication,
+        body: String,
+        context: MacroExpansionContext
+    ) -> String? {
+        let argumentBindings =
+            ((try? parseMacroArgumentBindings(
+                for: macro,
+                argumentClause: application.argumentClause
+            )) ?? singlePositionalMacroArgumentBindings(
+                for: macro,
+                argumentClause: application.argumentClause
+            )) ?? [:]
+        var localBindings = argumentBindings
+        localBindings["body"] = .string(body)
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: "target",
+            targetValue: .object(typeName: "LLVMArtifactTarget", fields: [:]),
+            graphBinding: "graph",
+            selfValue: MacroTargetValueBuilder(
+                macroDeclarationsByName: context.macroDeclarationsByName,
+                macroMetadataByName: context.macroMetadataByName,
+                constructsByName: context.graphContext.constructsByName,
+                knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+            ).value(for: macro),
+            localBindings: localBindings,
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            callableDeclarationsByName: context.callableDeclarationsByName,
+            knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
+            context: context
+        )
+        var locals = localBindings
+        guard case .string(let llvm)? = evaluator.evaluateStatements(macro.body, locals: &locals) else {
+            return nil
+        }
+        return llvm
+    }
+
+    private struct MinimalLLVMValue {
+        var lines: [String]
+        var type: String
+        var operand: String
+        var isImmediate: Bool
+        var payload: String
+    }
+
+    private static func minimalLLVMValue(
+        _ expression: Expression?,
+        llvmContext: CompileTimeLLVMContext,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) -> MinimalLLVMValue? {
+        evaluatedLLVMValue(
+            expression,
+            llvmContext: llvmContext,
+            macros: macros,
+            context: context
+        )
+    }
+
+    private static func evaluatedLLVMValue(
+        _ expression: Expression?,
+        llvmContext: CompileTimeLLVMContext,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) -> MinimalLLVMValue? {
+        guard
+            case .macroInvocation(let name, let arguments)? = expression,
+            let macro = macros[name]
+        else {
+            return nil
+        }
+
+        let argumentBindings: [String: Expression]
+        do {
+            argumentBindings = try parseMacroArgumentBindings(for: macro, arguments: arguments)
+        } catch {
+            return nil
+        }
+
+        let (localBindings, _) = preparedLLVMArgumentBindings(
+            argumentBindings,
+            llvmContext: llvmContext,
+            macros: macros,
+            context: context
+        )
+
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: "target",
+            targetValue: .object(typeName: "LLVMValueTarget", fields: [:]),
+            graphBinding: "graph",
+            selfValue: MacroTargetValueBuilder(
+                macroDeclarationsByName: context.macroDeclarationsByName,
+                macroMetadataByName: context.macroMetadataByName,
+                constructsByName: context.graphContext.constructsByName,
+                knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+            ).value(for: macro),
+            localBindings: localBindings,
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            callableDeclarationsByName: context.callableDeclarationsByName,
+            knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
+            context: context,
+            llvmContext: llvmContext
+        )
+        var locals = localBindings
+        guard case .string(let payload)? = evaluator.evaluateStatements(macro.body, locals: &locals) else {
+            return nil
+        }
+        return minimalLLVMValuePayload(payload)
+    }
+
+    private static func minimalLLVMValuePayload(_ payload: String) -> MinimalLLVMValue? {
+        let parts = payload.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+        guard parts.first == "llvm-value" else {
+            return nil
+        }
+
+        var fields: [String: String] = [:]
+        for part in parts.dropFirst() {
+            let pair = part.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard pair.count == 2 else {
+                continue
+            }
+            fields[String(pair[0])] = String(pair[1])
+        }
+
+        guard
+            let type = fields["type"],
+            isValidLLVMType(type),
+            let operand = fields["operand"],
+            isValidImmediateOperand(operand)
+        else {
+            return nil
+        }
+
+        let instructions = fields["instructions"] ?? fields["prelude"] ?? ""
+        let lines = instructions.isEmpty ? [] : instructions.components(separatedBy: "\n")
+        return MinimalLLVMValue(
+            lines: lines,
+            type: type,
+            operand: operand,
+            isImmediate: lines.isEmpty && !operand.hasPrefix("%"),
+            payload: payload
+        )
+    }
+
+    private static func argument(named name: String, in arguments: [CallArgument]) -> Expression? {
+        arguments.first(where: { $0.label == name })?.value
+    }
+
+    private static func minimalStringValue(_ expression: Expression?) -> String? {
+        guard let expression else {
+            return nil
+        }
+        switch expression {
+        case .string(let value):
+            return value
+        case .macroInvocation(let name, let arguments) where name == "string":
+            let valueExpression = argument(named: "value", in: arguments) ?? arguments.first?.value
+            guard let valueExpression else {
+                return ""
+            }
+            return minimalStringValue(valueExpression)
+        default:
+            return nil
+        }
+    }
+
+    private static func isValidLLVMIdentifier(_ name: String) -> Bool {
+        guard let first = name.first,
+            first.isLetter || first == "_"
+        else {
+            return false
+        }
+        return name.allSatisfy { character in
+            character.isLetter || character.isNumber || character == "_"
+        }
+    }
+
+    private static func isValidLLVMType(_ type: String) -> Bool {
+        guard type.first == "i" else {
+            return false
+        }
+        return type.dropFirst().allSatisfy(\.isNumber)
+    }
+
+    private static func isValidImmediateOperand(_ operand: String) -> Bool {
+        guard !operand.isEmpty else {
+            return false
+        }
+        if operand.first == "%" {
+            return operand.dropFirst().allSatisfy { character in
+                character.isLetter || character.isNumber || character == "_" || character == "."
+            }
+        }
+        return operand.allSatisfy { $0.isNumber || $0 == "-" }
     }
 
     static func evaluatedStringMacroStatements(
@@ -1631,8 +2087,7 @@ extension MacroExpander {
 
         for statement in statements {
             switch statement {
-            case .macroApplication(let name, _) where name == "state" || name == "let"
-                || name == "assignment":
+            case .macroApplication:
                 let evaluator = CompileTimeValueEvaluator(
                     targetBinding: targetBinding,
                     targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
@@ -1643,7 +2098,7 @@ extension MacroExpander {
                     context: context
                 )
                 _ = evaluator.evaluateStatements([statement], locals: &locals)
-            case .macroInvocation(let name, let argumentClause, let body) where name == "if":
+            case .macroInvocation(let name, let argumentClause, let body):
                 let evaluator = CompileTimeValueEvaluator(
                     targetBinding: targetBinding,
                     targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
@@ -1653,47 +2108,25 @@ extension MacroExpander {
                     macroDeclarationsByName: context.macroDeclarationsByName,
                     context: context
                 )
-                guard let condition = evaluator.macroConditionExpression(argumentClause: argumentClause),
-                    case .boolean(true) = evaluator.evaluate(condition, with: locals)
-                else {
+                guard let control = evaluator.evaluateControlMacroEffect(
+                    name: name,
+                    argumentClause: argumentClause,
+                    locals: locals
+                ) else {
                     continue
                 }
-                let branchResult = try macroDiagnosticsAndLocals(
-                    in: body,
-                    diagnosticOwnerName: diagnosticOwnerName,
-                    diagnosticsBinding: diagnosticsBinding,
-                    targetBinding: targetBinding,
-                    targetValue: targetValue,
-                    graphBinding: graphBinding,
-                    context: context,
-                    localBindings: locals
-                )
-                diagnostics.append(contentsOf: branchResult.diagnostics)
-                locals = branchResult.locals
-            case .macroInvocation(let name, let argumentClause, let body) where name == "while":
-                var iterationCount = 0
-                while true {
-                    let evaluator = CompileTimeValueEvaluator(
-                        targetBinding: targetBinding,
-                        targetValue: targetValue
-                            ?? .object(typeName: "MacroDiagnostics", fields: [:]),
-                        graphBinding: graphBinding,
-                        selfValue: macroSelfValue(named: diagnosticOwnerName),
-                        localBindings: locals,
-                        macroDeclarationsByName: context.macroDeclarationsByName,
-                        context: context
-                    )
-                    guard let condition = evaluator.macroConditionExpression(argumentClause: argumentClause),
+
+                switch control.kind {
+                case "branch":
+                    guard let condition = evaluator.controlConditionExpression(
+                        control.condition,
+                        locals: locals
+                    ),
                         case .boolean(true) = evaluator.evaluate(condition, with: locals)
                     else {
-                        break
+                        continue
                     }
-                    guard iterationCount < 10_000 else {
-                        throw ParseError(
-                            "Macro @\(diagnosticOwnerName) diagnostic loop exceeded 10000 iterations."
-                        )
-                    }
-                    let bodyResult = try macroDiagnosticsAndLocals(
+                    let branchResult = try macroDiagnosticsAndLocals(
                         in: body,
                         diagnosticOwnerName: diagnosticOwnerName,
                         diagnosticsBinding: diagnosticsBinding,
@@ -1703,9 +2136,38 @@ extension MacroExpander {
                         context: context,
                         localBindings: locals
                     )
-                    diagnostics.append(contentsOf: bodyResult.diagnostics)
-                    locals = bodyResult.locals
-                    iterationCount += 1
+                    diagnostics.append(contentsOf: branchResult.diagnostics)
+                    locals = branchResult.locals
+                case "loop":
+                    guard let condition = evaluator.controlConditionExpression(
+                        control.condition,
+                        locals: locals
+                    ) else {
+                        continue
+                    }
+                    var iterationCount = 0
+                    while case .boolean(true) = evaluator.evaluate(condition, with: locals) {
+                        guard iterationCount < 10_000 else {
+                            throw ParseError(
+                                "Macro @\(diagnosticOwnerName) diagnostic loop exceeded 10000 iterations."
+                            )
+                        }
+                        let bodyResult = try macroDiagnosticsAndLocals(
+                            in: body,
+                            diagnosticOwnerName: diagnosticOwnerName,
+                            diagnosticsBinding: diagnosticsBinding,
+                            targetBinding: targetBinding,
+                            targetValue: targetValue,
+                            graphBinding: graphBinding,
+                            context: context,
+                            localBindings: locals
+                        )
+                        diagnostics.append(contentsOf: bodyResult.diagnostics)
+                        locals = bodyResult.locals
+                        iterationCount += 1
+                    }
+                default:
+                    continue
                 }
             default:
                 continue
@@ -1738,6 +2200,7 @@ extension MacroExpander {
             fields: [:]
         ),
         callerSelfValue: CompileTimeValue? = nil,
+        callerLLVMContext: CompileTimeLLVMContext? = nil,
         context: MacroExpansionContext
     ) throws -> CompileTimeValue? {
         guard macro.target == nil, macro.expansionType != nil else {
@@ -1763,6 +2226,7 @@ extension MacroExpander {
             callerTargetBinding: callerTargetBinding,
             callerTargetValue: callerTargetValue,
             callerSelfValue: callerSelfValue,
+            callerLLVMContext: callerLLVMContext,
             context: context
         )
     }
@@ -1773,6 +2237,7 @@ extension MacroExpander {
         callerTargetBinding: String,
         callerTargetValue: CompileTimeValue,
         callerSelfValue: CompileTimeValue?,
+        callerLLVMContext: CompileTimeLLVMContext? = nil,
         context: MacroExpansionContext
     ) throws -> CompileTimeValue? {
         let targetValue = callerTargetValue
@@ -1788,7 +2253,8 @@ extension MacroExpander {
             selfValue: selfValue,
             localBindings: localBindings,
             macroDeclarationsByName: context.macroDeclarationsByName,
-            context: context
+            context: context,
+            llvmContext: callerLLVMContext
         )
         var locals = localBindings
         return evaluator.evaluateStatements(macro.body, locals: &locals)

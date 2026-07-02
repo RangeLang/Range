@@ -1,4 +1,4 @@
-@int(bits: "64", signedness: "signed")
+@int(bits: @string("64"), signedness: @string("signed"))
 @construct(name: "Int") {
 }
 
