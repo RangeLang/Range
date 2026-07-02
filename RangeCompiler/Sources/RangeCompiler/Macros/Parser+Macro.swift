@@ -62,8 +62,9 @@ extension Parser {
         if signatureOnly {
             if peek() == .leftBrace {
                 try consume(.leftBrace)
-                genericParameters = try parseMacroMemberGenerics()
-                parameters = try parseMacroMemberParameters()
+                let members = try parseMacroMembers()
+                genericParameters = members.genericParameters
+                parameters = members.parameters
                 try skipUnknownBlockBody()
                 try consume(.rightBrace)
             } else {
@@ -146,8 +147,9 @@ extension Parser {
         if signatureOnly {
             if peek() == .leftBrace {
                 try consume(.leftBrace)
-                genericParameters = try parseMacroMemberGenerics()
-                parameters = try parseMacroMemberParameters()
+                let members = try parseMacroMembers()
+                genericParameters = members.genericParameters
+                parameters = members.parameters
                 try skipUnknownBlockBody()
                 try consume(.rightBrace)
             } else {
@@ -180,12 +182,11 @@ extension Parser {
         )
     {
         try consume(.leftBrace)
-        let genericParameters = try parseMacroMemberGenerics()
-        let parameters = try parseMacroMemberParameters()
+        let members = try parseMacroMembers()
 
         if macroBodyStartsWithMacroStatement() {
             let body = try parseFreestandingMacroValueBody()
-            return (body, parameters, genericParameters)
+            return (body, members.parameters, members.genericParameters)
         }
 
         throw ParseError("Macro bodies must use explicit Range macro statements.")
@@ -202,8 +203,9 @@ extension Parser {
         )
     {
         try consume(.leftBrace)
-        let genericParameters = declaredGenericParameters + (try parseMacroMemberGenerics())
-        let parameters = declaredParameters + (try parseMacroMemberParameters())
+        let members = try parseMacroMembers()
+        let genericParameters = declaredGenericParameters + members.genericParameters
+        let parameters = declaredParameters + members.parameters
         let body = try parseFreestandingMacroValueBody()
 
         return (body, parameters, genericParameters)
@@ -215,7 +217,7 @@ extension Parser {
         declarationName: String
     ) throws -> String {
         guard let expression = bindings[name],
-            let value = stringValue(from: expression)
+            let value = name == "name" ? nameValue(from: expression) : stringValue(from: expression)
         else {
             throw ParseError("\(declarationName) requires \(name): String value.")
         }
@@ -234,6 +236,15 @@ extension Parser {
             return stringValue(from: valueArgument.value)
         default:
             return nil
+        }
+    }
+
+    private func nameValue(from expression: Expression) -> String? {
+        switch expression {
+        case .identifier(let value):
+            return value
+        default:
+            return stringValue(from: expression)
         }
     }
 
@@ -345,6 +356,24 @@ extension Parser {
         return parameters
     }
 
+    mutating func parseMacroMembers() throws
+        -> (genericParameters: [GenericParameter], parameters: [RangeFunctionParameter])
+    {
+        var genericParameters: [GenericParameter] = []
+        var parameters: [RangeFunctionParameter] = []
+        while case .macroAttribute(let name, _) = peek(), name == "generic" || name == "parameter" {
+            let statement = try parseStatement()
+            if let parameter = try macroMemberParameter(from: statement) {
+                parameters.append(parameter)
+                continue
+            }
+            if let genericParameter = try macroMemberGeneric(from: statement) {
+                genericParameters.append(genericParameter)
+            }
+        }
+        return (genericParameters, parameters)
+    }
+
     private func macroMemberGeneric(from statement: Statement) throws -> GenericParameter? {
         let genericArguments: [CallArgument]
         let body: [Statement]
@@ -360,7 +389,7 @@ extension Parser {
         }
 
         guard let nameArgument = genericArguments.first(where: { $0.label == "name" }),
-            let genericName = stringValue(from: nameArgument.value)
+            let genericName = nameValue(from: nameArgument.value)
         else {
             throw ParseError("@generic macro members must declare name: String value.")
         }
@@ -386,24 +415,53 @@ extension Parser {
     private func macroMemberParameter(from statement: Statement) throws -> RangeFunctionParameter? {
         let parameterArguments: [CallArgument]
         let body: [Statement]
+        let isGenericParameter: Bool
         switch statement {
         case .macroApplication(let name, let arguments) where name == "parameter":
             parameterArguments = arguments
             body = []
+            isGenericParameter = false
         case .macroInvocation(let name, let clause, let invocationBody) where name == "parameter":
             parameterArguments = try clause.map(MacroExpander.parsedMacroArguments) ?? []
             body = invocationBody
+            isGenericParameter = false
+        case .macroApplication(let name, let arguments)
+            where name == "generic" && arguments.contains(where: { $0.label == "value" }):
+            parameterArguments = arguments
+            body = []
+            isGenericParameter = true
+        case .macroInvocation(let name, let clause, let invocationBody) where name == "generic":
+            let arguments = try clause.map(MacroExpander.parsedMacroArguments) ?? []
+            guard arguments.contains(where: { $0.label == "value" }) else {
+                return nil
+            }
+            parameterArguments = arguments
+            body = invocationBody
+            isGenericParameter = true
         default:
             return nil
         }
 
         guard let nameArgument = parameterArguments.first(where: { $0.label == "name" }),
-            let parameterName = stringValue(from: nameArgument.value)
+            let parameterName = nameValue(from: nameArgument.value)
         else {
             throw ParseError("@parameter macro members must declare name: String value.")
         }
 
-        if let literalDefault = macroMemberLiteralCapability(
+        if isGenericParameter,
+            let valueArgument = parameterArguments.first(where: { $0.label == "value" })
+        {
+            return RangeFunctionParameter(
+                macros: [],
+                name: parameterName,
+                typeReference: nil,
+                defaultValue: valueArgument.value,
+                valueCapability: .generic,
+                slotName: nil
+            )
+        }
+
+        if let capability = macroMemberParameterCapability(
             in: body,
             parameterArguments: parameterArguments
         ) {
@@ -411,7 +469,7 @@ extension Parser {
                 macros: [],
                 name: parameterName,
                 typeReference: nil,
-                defaultValue: literalDefault,
+                valueCapability: capability,
                 slotName: nil
             )
         }
@@ -437,29 +495,44 @@ extension Parser {
         )
     }
 
-    private func macroMemberLiteralCapability(
+    private func macroMemberParameterCapability(
         in body: [Statement],
         parameterArguments: [CallArgument]
-    ) -> Expression? {
+    ) -> ParameterValueCapability? {
         if let valueArgument = parameterArguments.first(where: { $0.label == "value" }),
             case .macroInvocation(let name, _) = valueArgument.value,
-            name == "literal"
+            name == "literal" || name == "name" || name == "generic"
         {
-            return valueArgument.value
+            return parameterValueCapability(named: name)
         }
 
         for statement in body {
             switch statement {
-            case .macroApplication(let name, let arguments) where name == "literal":
-                return .macroInvocation(name: name, arguments: arguments)
-            case .macroInvocation(let name, let clause, _) where name == "literal":
-                let arguments = (try? clause.map(MacroExpander.parsedMacroArguments)) ?? []
-                return .macroInvocation(name: name, arguments: arguments)
+            case .macroApplication(let name, _)
+                where name == "literal" || name == "name" || name == "generic":
+                return parameterValueCapability(named: name)
+            case .macroInvocation(let name, let clause, _)
+                where name == "literal" || name == "name" || name == "generic":
+                _ = (try? clause.map(MacroExpander.parsedMacroArguments)) ?? []
+                return parameterValueCapability(named: name)
             default:
                 continue
             }
         }
         return nil
+    }
+
+    private func parameterValueCapability(named name: String) -> ParameterValueCapability? {
+        switch name {
+        case "literal":
+            return .literal
+        case "name":
+            return .name
+        case "generic":
+            return .generic
+        default:
+            return nil
+        }
     }
 
     private func macroMemberValueFields(
@@ -560,7 +633,7 @@ extension Parser {
             return nil
         }
         guard let nameArgument = arguments.first(where: { $0.label == "name" }),
-            let name = stringValue(from: nameArgument.value),
+            let name = nameValue(from: nameArgument.value),
             !name.isEmpty
         else {
             throw ParseError("@generic macro members must declare name: String value.")

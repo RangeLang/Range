@@ -21,6 +21,7 @@ extension MacroDeclaration {
                     macros: [],
                     name: "name",
                     typeReference: .named("String"),
+                    valueCapability: .name,
                     slotName: nil
                 ),
                 RangeFunctionParameter(

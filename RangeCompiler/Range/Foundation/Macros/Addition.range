@@ -1,10 +1,10 @@
-@macro(name: @string("addition"), result: @string){
-    @parameter(name: @string("lhs"), value: @int())
-    @parameter(name: @string("rhs"), value: @int())
-    @parameter(name: @string("temporaryPrefix"), value: @string(value: "add"))
-    @state(name: @string("type"), value: "@llvmField(value: lhs, name: @string(\"type\"))")
-    @state(name: @string("construct"), value: "@llvmField(value: lhs, name: @string(\"construct\"))")
-    @state(name: @string("operand"), value: "@temporary(prefix: temporaryPrefix)")
+@macro(name: addition, result: @string){
+    @parameter(name: lhs, value: @int())
+    @parameter(name: rhs, value: @int())
+    @parameter(name: temporaryPrefix, value: @string(value: "add"))
+    @state(name: type, value: "@llvmField(value: lhs, name: @string(\"type\"))")
+    @state(name: construct, value: "@llvmField(value: lhs, name: @string(\"construct\"))")
+    @state(name: operand, value: "@temporary(prefix: temporaryPrefix)")
 
     @return(value: @string("value|construct="
         + construct

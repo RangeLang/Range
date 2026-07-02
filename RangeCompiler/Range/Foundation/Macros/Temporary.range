@@ -1,5 +1,5 @@
-@macro(name: @string("temporary"), result: @string){
-    @parameter(name: @string("prefix"), value: @string(value: "tmp"))
+@macro(name: temporary, result: @string){
+    @parameter(name: prefix, value: @string(value: "tmp"))
 
     @return(value: @string(""))
 }

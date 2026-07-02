@@ -1,6 +1,6 @@
-@macro(name: @string("state"), result: @string, target: @statement) {
-    @parameter(name: @string("name"), value: @string(value: ""))
-    @parameter(name: @string("value"), value: @string(value: ""))
+@macro(name: state, result: @string, target: @statement) {
+    @parameter(name: name, value: @name)
+    @parameter(name: value, value: @string(value: ""))
 
     @return(value: @string("effect|kind=environment-set|name="
         + name

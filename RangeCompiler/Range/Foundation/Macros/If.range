@@ -1,5 +1,5 @@
-@macro(name: @string("if"), result: @string, target: @statement) {
-    @parameter(name: @string("condition"), value: @string(value: "true"))
+@macro(name: if, result: @string, target: @statement) {
+    @parameter(name: condition, value: @string(value: "true"))
 
     @return(value: @string("effect|kind=branch|condition="
         + condition))

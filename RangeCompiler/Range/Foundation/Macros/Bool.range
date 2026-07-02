@@ -1,7 +1,7 @@
 @type
-@macro(name: @string("bool"), result: @string, target: @construct){
-    @parameter(name: @string("value"), value: @literal)
-    @state(name: @string("operand"), value: "value == \"true\" ? \"1\" : \"0\"")
+@macro(name: bool, result: @string, target: @construct){
+    @parameter(name: value, value: @literal)
+    @state(name: operand, value: "value == \"true\" ? \"1\" : \"0\"")
 
     @return(value: @string("value|construct=Bool|llvm.type=i1"
         + "|llvm.operand="

@@ -1,9 +1,9 @@
-@macro(name: @string("reference"), result: @string){
-    @parameter(name: @string("name"), value: @string(value: ""))
-    @state(name: @string("binding"), value: "@llvmBinding(name: name)")
-    @state(name: @string("operand"), value: "@temporary(prefix: name + @string(\".value\"))")
-    @state(name: @string("returnCast"), value: "@llvmField(value: binding, name: @string(\"returnCast\"))")
-    @state(name: @string("needsTrunc"), value: "returnCast.isEmpty ? \"true\" : \"false\"")
+@macro(name: reference, result: @string){
+    @parameter(name: name, value: @name)
+    @state(name: binding, value: "@llvmBinding(name: name)")
+    @state(name: operand, value: "@temporary(prefix: name + @string(\".value\"))")
+    @state(name: returnCast, value: "@llvmField(value: binding, name: @string(\"returnCast\"))")
+    @state(name: needsTrunc, value: "returnCast.isEmpty ? \"true\" : \"false\"")
 
     @return(value: @string("value|construct="
         + @llvmField(value: binding, name: @string("construct"))

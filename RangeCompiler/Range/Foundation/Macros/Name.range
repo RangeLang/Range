@@ -1,0 +1,3 @@
+@macro(name: name, result: @string){
+    @return(value: @string("parameter-capability|kind=name"))
+}

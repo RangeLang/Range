@@ -27,8 +27,10 @@ struct MacroCarrierCompilerTests {
         #expect(program.declarationGraph.macrosByName["addition"] != nil)
         #expect(program.declarationGraph.macrosByName["assignment"] != nil)
         #expect(program.declarationGraph.macrosByName["float"] != nil)
+        #expect(program.declarationGraph.macrosByName["generic"] != nil)
         #expect(program.declarationGraph.macrosByName["if"] != nil)
         #expect(program.declarationGraph.macrosByName["main"] != nil)
+        #expect(program.declarationGraph.macrosByName["name"] != nil)
         #expect(program.declarationGraph.macrosByName["int"] != nil)
         #expect(program.declarationGraph.macrosByName["let"] != nil)
         #expect(program.declarationGraph.macrosByName["llvmField"] != nil)
@@ -41,6 +43,18 @@ struct MacroCarrierCompilerTests {
         #expect(program.declarationGraph.macrosByName["function"] == nil)
     }
 
+    @Test("let macro name parameter accepts names")
+    func letMacroNameParameterAcceptsNames() throws {
+        let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
+        let letMacro = try #require(program.declarationGraph.macrosByName["let"])
+        let nameParameter = try #require(
+            letMacro.parameters.first(where: { $0.localName == "name" })
+        )
+
+        #expect(nameParameter.valueCapability == .name)
+        #expect(nameParameter.defaultValue == nil)
+    }
+
     @Test("string macro value parameter accepts literals")
     func stringMacroValueParameterAcceptsLiterals() throws {
         let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
@@ -49,12 +63,45 @@ struct MacroCarrierCompilerTests {
             stringMacro.parameters.first(where: { $0.localName == "value" })
         )
 
-        guard case .macroInvocation(let name, _) = valueParameter.defaultValue else {
-            Issue.record("Expected @string value parameter to carry @literal default marker.")
-            return
-        }
+        #expect(valueParameter.valueCapability == .literal)
+        #expect(valueParameter.defaultValue == nil)
+    }
 
-        #expect(name == "literal")
+    @Test("int macro configuration parameters accept generics")
+    func intMacroConfigurationParametersAcceptGenerics() throws {
+        let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
+        let intMacro = try #require(program.declarationGraph.macrosByName["int"])
+        let bitsParameter = try #require(
+            intMacro.parameters.first(where: { $0.localName == "bits" })
+        )
+        let signednessParameter = try #require(
+            intMacro.parameters.first(where: { $0.localName == "signedness" })
+        )
+
+        #expect(bitsParameter.valueCapability == .generic)
+        #expect(signednessParameter.valueCapability == .generic)
+        #expect(bitsParameter.defaultValue != nil)
+        #expect(signednessParameter.defaultValue != nil)
+    }
+
+    @Test("macro declaration name accepts names")
+    func macroDeclarationNameAcceptsNames() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/MacroCarrierBareName.range",
+                source: """
+                    @macro(name: sample, result: @string) {
+                        @return(value: @string(""))
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+
+        #expect(program.declarationGraph.macrosByName["sample"] != nil)
     }
 
     @Test("top-level main macro blocks survive quarantine")

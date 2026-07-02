@@ -54,7 +54,7 @@ struct MacroLLVMArtifactEmitterTests {
                 path: "/tmp/Main.range",
                 source: """
                     @main {
-                        @let(name: @string("count"), value: @int(value: 5))
+                        @let(name: count, value: @int(value: 5))
                         @return(value: @int(value: 0))
                     }
                     """,
@@ -87,8 +87,8 @@ struct MacroLLVMArtifactEmitterTests {
                 source: """
                     @main {
                         @let(
-                            name: @string("count"),
-                            value: @int(value: 7, bits: @string("32"))
+                            name: count,
+                            value: @int(value: 7, bits: 32, signedness: signed)
                         )
                         @return(value: @int(value: 0))
                     }
@@ -121,8 +121,8 @@ struct MacroLLVMArtifactEmitterTests {
                 path: "/tmp/Main.range",
                 source: """
                     @main {
-                        @let(name: @string("count"), value: @int(value: 5))
-                        @return(value: @reference(name: @string("count")))
+                        @let(name: count, value: @int(value: 5))
+                        @return(value: @reference(name: count))
                     }
                     """,
                 role: .project
@@ -155,10 +155,10 @@ struct MacroLLVMArtifactEmitterTests {
                 path: "/tmp/Main.range",
                 source: """
                     @main {
-                        @let(name: @string("count"), value: @int(value: 5))
+                        @let(name: count, value: @int(value: 5))
                         @return(
                             value: @addition(
-                                lhs: @reference(name: @string("count")),
+                                lhs: @reference(name: count),
                                 rhs: @int(value: 3)
                             )
                         )
@@ -195,8 +195,8 @@ struct MacroLLVMArtifactEmitterTests {
                 path: "/tmp/Main.range",
                 source: """
                     @main {
-                        @let(name: @string("flag"), value: @bool(value: true))
-                        @return(value: @reference(name: @string("flag")))
+                        @let(name: flag, value: @bool(value: true))
+                        @return(value: @reference(name: flag))
                     }
                     """,
                 role: .project
@@ -229,8 +229,8 @@ struct MacroLLVMArtifactEmitterTests {
                 path: "/tmp/Main.range",
                 source: """
                     @main {
-                        @let(name: @string("ratio"), value: @float(value: 1.5))
-                        @return(value: @reference(name: @string("ratio")))
+                        @let(name: ratio, value: @float(value: 1.5))
+                        @return(value: @reference(name: ratio))
                     }
                     """,
                 role: .project

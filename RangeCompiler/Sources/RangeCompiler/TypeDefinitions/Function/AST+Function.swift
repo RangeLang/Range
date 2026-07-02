@@ -1,10 +1,17 @@
 import Foundation
 
+public enum ParameterValueCapability: Equatable {
+    case literal
+    case name
+    case generic
+}
+
 public struct RangeFunctionParameter {
     public let macros: [MacroApplication]
     public let name: String
     public let typeReference: TypeReference?
     public let defaultValue: Expression?
+    public let valueCapability: ParameterValueCapability?
     public let slotName: String?
     public let isBinding: Bool
     public let capturesSyntax: Bool
@@ -15,6 +22,7 @@ public struct RangeFunctionParameter {
         name: String,
         typeReference: TypeReference?,
         defaultValue: Expression? = nil,
+        valueCapability: ParameterValueCapability? = nil,
         slotName: String?,
         isBinding: Bool = false,
         capturesSyntax: Bool = false,
@@ -24,6 +32,7 @@ public struct RangeFunctionParameter {
         self.name = name
         self.typeReference = typeReference
         self.defaultValue = defaultValue
+        self.valueCapability = valueCapability
         self.slotName = slotName
         self.isBinding = isBinding
         self.capturesSyntax = capturesSyntax

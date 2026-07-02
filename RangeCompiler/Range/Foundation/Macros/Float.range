@@ -1,8 +1,8 @@
 @type
-@macro(name: @string("float"), result: @string, target: @construct){
-    @parameter(name: @string("value"), value: @literal)
-    @parameter(name: @string("precision"), value: @string(value: "64"))
-    @state(name: @string("llvmType"), value: "precision == \"32\" ? \"float\" : \"double\"")
+@macro(name: float, result: @string, target: @construct){
+    @parameter(name: value, value: @literal)
+    @parameter(name: precision, value: @string(value: "64"))
+    @state(name: llvmType, value: "precision == \"32\" ? \"float\" : \"double\"")
 
     @return(value: @string("value|construct=Float|llvm.type="
         + llvmType

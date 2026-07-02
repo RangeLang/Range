@@ -1,6 +1,6 @@
 @type
-@macro(name: @string("string"), result: @string, target: @construct){
-    @parameter(name: @string("value"), value: @literal)
+@macro(name: string, result: @string, target: @construct){
+    @parameter(name: value, value: @literal)
 
     @return(value: @string("value|construct=String|literal="
         + value))

@@ -351,6 +351,11 @@ struct CompileTimeValueEvaluator {
             {
                 return .string(value)
             }
+            if name == "generic",
+                let value = genericMacroValue(arguments: arguments, locals: locals)
+            {
+                return .string(value)
+            }
             guard let macro = macroDeclarationsByName[name],
                 macro.target == nil,
                 let context,
@@ -588,6 +593,44 @@ struct CompileTimeValueEvaluator {
         let construct = llvmContext.bindingConstructs[name] ?? ""
         let returnCast = llvmContext.bindingReturnCasts[name] ?? ""
         return "llvm-binding|construct=\(construct)|type=\(type)|returnCast=\(returnCast)|pointer=%\(name)"
+    }
+
+    private func genericMacroValue(
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> String? {
+        let valueExpression = arguments.first(where: { $0.label == "value" })?.value
+            ?? arguments.first?.value
+        guard let valueExpression else {
+            return ""
+        }
+        if case .macroInvocation(_, let arguments) = valueExpression,
+            let nestedValueExpression = arguments.first(where: { $0.label == "value" })?.value
+                ?? arguments.first?.value
+        {
+            return genericMacroValue(
+                arguments: [CallArgument(label: "value", value: nestedValueExpression)],
+                locals: locals
+            )
+        }
+        if case .identifier(let name) = valueExpression {
+            return name
+        }
+        guard let value = evaluate(valueExpression, locals: locals) else {
+            return nil
+        }
+        switch value {
+        case .string(let value):
+            return value
+        case .integer(let value):
+            return String(value)
+        case .double(let value):
+            return String(value)
+        case .boolean(let value):
+            return value ? "true" : "false"
+        default:
+            return nil
+        }
     }
 
     private func llvmPayloadField(_ payload: String, name: String) -> String? {

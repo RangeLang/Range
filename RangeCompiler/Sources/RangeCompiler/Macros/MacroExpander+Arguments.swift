@@ -265,7 +265,11 @@ extension MacroExpander {
 
             guard let argumentIndex else {
                 if let defaultValue = parameter.defaultValue {
-                    bindings[parameter.localName] = defaultValue
+                    bindings[parameter.localName] = normalizedArgumentValue(
+                        defaultValue,
+                        for: parameter,
+                        kind: kind
+                    )
                     continue
                 }
                 if parameter.typeReference?.isOptionalReference == true {
@@ -432,8 +436,14 @@ extension MacroExpander {
         for parameter: RangeFunctionParameter,
         kind: String
     ) -> Expression {
-        if isLiteralCapability(parameter.defaultValue) {
+        if parameter.valueCapability == .literal {
             return normalizedLiteralArgumentValue(value) ?? value
+        }
+        if parameter.valueCapability == .name {
+            return normalizedNameArgumentValue(value) ?? value
+        }
+        if parameter.valueCapability == .generic {
+            return normalizedGenericArgumentValue(value) ?? value
         }
         guard kind == "MacroMetadata" else {
             return value
@@ -448,13 +458,6 @@ extension MacroExpander {
             name: "Identifier",
             arguments: [CallArgument(label: "name", value: .string(name))]
         )
-    }
-
-    private static func isLiteralCapability(_ expression: Expression?) -> Bool {
-        guard case .macroInvocation(let name, _) = expression else {
-            return false
-        }
-        return name == "literal"
     }
 
     private static func normalizedLiteralArgumentValue(
@@ -473,6 +476,41 @@ extension MacroExpander {
             return .string("true")
         case .identifier("false"):
             return .string("false")
+        default:
+            return nil
+        }
+    }
+
+    private static func normalizedNameArgumentValue(_ value: Expression) -> Expression? {
+        switch value {
+        case .identifier(let name):
+            return .string(name)
+        case .string(let name):
+            return .string(name)
+        default:
+            return nil
+        }
+    }
+
+    private static func normalizedGenericArgumentValue(_ value: Expression) -> Expression? {
+        switch value {
+        case .integer(let value):
+            return .string(String(value))
+        case .double(let value):
+            return .string(String(value))
+        case .string(let value):
+            return .string(value)
+        case .boolean(let value):
+            return .string(value ? "true" : "false")
+        case .identifier(let name):
+            return .string(name)
+        case .macroInvocation(_, let arguments):
+            guard let value = arguments.first(where: { $0.label == "value" })?.value
+                ?? arguments.first?.value
+            else {
+                return nil
+            }
+            return normalizedGenericArgumentValue(value)
         default:
             return nil
         }

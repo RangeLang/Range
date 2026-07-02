@@ -1653,6 +1653,7 @@ extension MacroExpander {
                 name: parameter.localName,
                 typeReference: typeReference,
                 defaultValue: parameter.defaultValue,
+                valueCapability: parameter.valueCapability,
                 slotName: parameter.slotName,
                 isBinding: parameter.isBinding,
                 capturesSyntax: parameter.capturesSyntax,
