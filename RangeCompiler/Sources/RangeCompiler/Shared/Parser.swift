@@ -34,7 +34,9 @@ public struct Parser {
         self.declarationMemberResolver = declarationMemberResolver
         self.declarationOperatorResolver = declarationOperatorResolver
         self.declarationMacroExpansionResolver = declarationMacroExpansionResolver
-        self.macroDeclarationsByName = macroDeclarationsByName
+        self.macroDeclarationsByName = macroDeclarationsByName.merging(
+            ["macro": MacroDeclaration.bootstrapMacroSeed()]
+        ) { current, _ in current }
         self.macroMetadataByName = macroMetadataByName
         self.macroExpansionTypes = macroExpansionTypes
     }

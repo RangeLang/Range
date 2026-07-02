@@ -1,7 +1,5 @@
-@macro(name: "generic", result: "String", target: "@member"){
-    @parameter(name: "name") {
-        @value(type: "String")
-    }
+@macro(name: "generic", result: @string, target: @member){
+    @parameter(name: "name", value: @string(value: ""))
 
     @return(value: "member|kind=generic|name="
         + name

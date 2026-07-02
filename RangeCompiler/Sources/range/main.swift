@@ -175,11 +175,6 @@ struct RangeCompilerHost {
     }
 
     private func sourceFilePrecedence(_ lhs: URL, _ rhs: URL) -> Bool {
-        let lhsPriority = lhs.path.hasSuffix("/Range/Foundation/Macros/Macro.range") ? 0 : 1
-        let rhsPriority = rhs.path.hasSuffix("/Range/Foundation/Macros/Macro.range") ? 0 : 1
-        if lhsPriority != rhsPriority {
-            return lhsPriority < rhsPriority
-        }
         return lhs.path < rhs.path
     }
 

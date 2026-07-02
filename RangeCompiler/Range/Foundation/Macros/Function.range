@@ -1,13 +1,7 @@
-@macro(name: "function", result: "String"){
-    @parameter(name: "name") {
-        @value(type: "String")
-    }
-    @parameter(name: "result") {
-        @value(type: "String")
-    }
-    @parameter(name: "body") {
-        @value(type: "String", current: "String()")
-    }
+@macro(name: "function", result: @string){
+    @parameter(name: "name", value: @string(value: ""))
+    @parameter(name: "result", value: @string(value: ""))
+    @parameter(name: "body", value: @string(value: ""))
     @state(name: "llvm", value: "String(\"\")")
     @state(name: "records", value: "String(\"\")")
     @state(name: "members", value: "String(\"\")")

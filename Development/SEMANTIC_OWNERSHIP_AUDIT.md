@@ -18,6 +18,8 @@ scripts/range
 
 - File discovery and source loading in `RangeCompiler/Sources/range/main.swift`.
 - Minimal parsing and macro expansion plumbing in `RangeCompiler/Sources/RangeCompiler`.
+- The bootstrap `@macro` seed declaration, injected by the parser so hosted
+  macro declarations can be parsed before macro self-hosting exists.
 - Compile-time value execution needed to run Range-authored macro bodies.
 - Current context boxes for declarations, applications, and graph views.
 - Artifact file writing in `RangeCompiler/Sources/RangeEmission/MacroLLVMArtifactEmitter.swift`.
@@ -25,8 +27,8 @@ scripts/range
 ## Range-Owned Semantics
 
 - `@main` executable meaning in `RangeCompiler/Range/Foundation/Macros/Main.range`.
-- Macro declaration surface in `RangeCompiler/Range/Foundation/Macros/Macro.range`.
-- Primitive marker surfaces such as `@integer`, `@bool`, `@string`, and `@void`.
+- Normal macro declarations authored with `@macro(name: ...)` after the Swift-hosted seed exists.
+- Primitive marker surfaces such as `@int`, `@bool`, `@string`, and `@void`.
 - Core syntax and library declarations under `RangeCompiler/Range/Core`.
 
 ## Removed Swift Semantic Paths

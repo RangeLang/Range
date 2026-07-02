@@ -1,3 +1,4 @@
-@macro(name: "void", result: "String", target: "@construct"){
+@type
+@macro(name: "void", result: @string, target: @construct){
     @return(value: "void")
 }

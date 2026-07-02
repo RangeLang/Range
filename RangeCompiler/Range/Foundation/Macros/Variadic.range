@@ -1,6 +1,4 @@
-@macro(name: "variadic", target: "@parameter"){
-    @generic(name: "delimiter") {
-        @value(type: "String", current: "comma")
-    }
+@macro(name: "variadic", target: @parameter){
+    @generic(name: "delimiter", value: @string(value: "comma"))
     @return(value: "")
 }

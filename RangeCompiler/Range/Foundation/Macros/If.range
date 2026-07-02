@@ -1,7 +1,5 @@
-@macro(name: "if", result: "String", target: "@statement"){
-    @parameter(name: "condition") {
-        @value(type: "String", current: "true")
-    }
+@macro(name: "if", result: @string, target: @statement){
+    @parameter(name: "condition", value: @string(value: "true"))
     @state(name: "bodyText", value: "target.declaration.bodyText")
     @state(name: "children", value: "String(\"\")")
 

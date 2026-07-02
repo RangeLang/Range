@@ -10,6 +10,45 @@ public struct MacroDeclaration {
     public let body: [Statement]
 }
 
+extension MacroDeclaration {
+    static func bootstrapMacroSeed() -> MacroDeclaration {
+        MacroDeclaration(
+            macros: [],
+            name: "macro",
+            genericParameters: [],
+            parameters: [
+                RangeFunctionParameter(
+                    macros: [],
+                    name: "name",
+                    typeReference: .named("String"),
+                    slotName: nil
+                ),
+                RangeFunctionParameter(
+                    macros: [],
+                    name: "result",
+                    typeReference: .named("String"),
+                    slotName: nil
+                ),
+                RangeFunctionParameter(
+                    macros: [],
+                    name: "target",
+                    typeReference: .named("String"),
+                    slotName: nil
+                ),
+                RangeFunctionParameter(
+                    macros: [],
+                    name: "body",
+                    typeReference: .named("String"),
+                    slotName: nil
+                ),
+            ],
+            target: .macroSurface("macro"),
+            expansionType: .named("String"),
+            body: []
+        )
+    }
+}
+
 public struct MacroMetadataDeclaration {
     public let name: String
     public let genericParameters: [GenericParameter]

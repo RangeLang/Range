@@ -37,10 +37,10 @@ function collectScalarApplications(files: Array<ProgramSourceFile>): Array<Scala
     for file in files {
         let targetName: String(constructName(path: file.path))
 
-        if file.text.contains(value: "@integer") {
+        if file.text.contains(value: "@int") {
             applications.append(
                 element: ScalarApplication(
-                    macroName: "integer",
+                    macroName: "int",
                     targetName: targetName,
                     path: file.path,
                     source: file.text
@@ -98,8 +98,8 @@ function resolveScalarDeclarations(applications: Array<ScalarApplication>): Arra
 }
 
 function scalarApplicationTargetsConstruct(application: ScalarApplication): Bool {
-    if application.macroName == "integer" {
-        return application.source.contains(value: "@integer\nconstruct")
+    if application.macroName == "int" {
+        return application.source.contains(value: "@int\nconstruct")
     }
 
     if application.macroName == "bool" {
@@ -127,7 +127,7 @@ function scalarDeclaration(application: ScalarApplication): ScalarDeclaration {
 }
 
 function scalarLLVMType(application: ScalarApplication): String {
-    if application.macroName == "integer" {
+    if application.macroName == "int" {
         return String("i" + scalarGenericValue(source: application.source, name: "bits", defaultValue: "64"))
     }
 

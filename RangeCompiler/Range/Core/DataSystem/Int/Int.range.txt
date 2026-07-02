@@ -1,4 +1,4 @@
-@integer
+@int
 construct Int<bits: String("64"), signedness: Signedness.signed> {
     @let storage: Memory<self.identifier>
 

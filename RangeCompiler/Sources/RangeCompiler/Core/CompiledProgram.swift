@@ -89,15 +89,6 @@ public struct CompilerPipeline {
         }
     }
 
-    private func inputPriority(_ input: SourceInput) -> Int {
-        guard input.role.isCore,
-            input.path.hasSuffix("/Range/Foundation/Macros/Macro.range")
-        else {
-            return 1
-        }
-        return 0
-    }
-
     public func build(
         inputs: [SourceInput],
         diagnosticEngine: RangeDiagnosticEngine? = nil
@@ -107,11 +98,6 @@ public struct CompilerPipeline {
             let rhsRolePriority = inputRolePriority(rhs.role)
             if lhsRolePriority != rhsRolePriority {
                 return lhsRolePriority < rhsRolePriority
-            }
-            let lhsPriority = inputPriority(lhs)
-            let rhsPriority = inputPriority(rhs)
-            if lhsPriority != rhsPriority {
-                return lhsPriority < rhsPriority
             }
             return lhs.path < rhs.path
         }

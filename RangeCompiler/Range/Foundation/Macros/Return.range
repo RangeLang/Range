@@ -1,7 +1,5 @@
-@macro(name: "return", result: "String", target: "@statement"){
-    @parameter(name: "value") {
-        @value(type: "String", current: "String()")
-    }
+@macro(name: "return", result: @string, target: @statement){
+    @parameter(name: "value", value: @string(value: ""))
     @state(name: "llvm", value: "\"ret \" + value")
 
     @if("value.isEmpty") {

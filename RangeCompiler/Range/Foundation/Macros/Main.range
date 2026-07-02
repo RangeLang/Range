@@ -1,4 +1,4 @@
 @block
-@macro(name: "main", result: "String"){
+@macro(name: "main", result: @string){
     @return(value: "define i32 @main() {\nentry:\n  ret i32 0\n}")
 }

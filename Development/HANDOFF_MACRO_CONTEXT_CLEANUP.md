@@ -90,7 +90,7 @@ Representative legacy hotspots:
 - Range graph macros (Range): `RangeCompiler/Range/Foundation/Macros/Graph.range`
 - Range syntax/rewrite macros (Range): `RangeCompiler/Range/Foundation/Macros/Syntax.range`
 - Range expansion macros (Range): `RangeCompiler/Range/Foundation/Macros/Expand.range`
-- Range scalar and collection macros (Range): `Integer.range`, `Float.range`, `Bool.range`, `String.range`, `Array.range`
+- Range scalar and collection macros (Range): `Int.range`, `Float.range`, `Bool.range`, `String.range`, `Array.range`
 - Range project/main/compiler macros (Range): `Project.range`, `Main.range`, `Compiler.range`
 
 ## Cleanup Strategy

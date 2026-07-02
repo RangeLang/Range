@@ -1,7 +1,5 @@
-@macro(name: "state", result: "String", target: "@statement,@member"){
-    @parameter(name: "name") {
-        @value(type: "String")
-    }
+@macro(name: "state", result: @string, target: "@statement,@member"){
+    @parameter(name: "name", value: @string(value: ""))
     @state(name: "members", value: "String(\"\")")
     @state(name: "index", value: "Int(0)")
     @state(name: "memberBodyText", value: "target.declaration.bodyText")

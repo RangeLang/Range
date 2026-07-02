@@ -1,0 +1,10 @@
+@type
+@macro(name: "int", result: @string, target: @construct){
+    @parameter(name: "bits", value: @string(value: "64"))
+    @parameter(name: "signedness", value: @string(value: "signed"))
+
+    @return(value: "int|bits="
+        + bits
+        + "|signedness="
+        + signedness)
+}

@@ -120,15 +120,17 @@ extension Parser {
             in: argumentBindings,
             declarationName: "@macro"
         )
-        let resultName = try optionalStringMacroDeclarationField(
+        let resultName = try optionalMacroDeclarationField(
             "result",
             in: argumentBindings,
-            declarationName: "@macro"
+            declarationName: "@macro",
+            role: .result
         )
-        let targetName = try optionalStringMacroDeclarationField(
+        let targetName = try optionalMacroDeclarationField(
             "target",
             in: argumentBindings,
-            declarationName: "@macro"
+            declarationName: "@macro",
+            role: .target
         )
         let target = try macroDeclarationTarget(explicitTargetName: targetName)
         let expansionType: TypeReference?
@@ -218,18 +220,48 @@ extension Parser {
         return value
     }
 
-    private func optionalStringMacroDeclarationField(
+    private enum MacroDeclarationFieldRole {
+        case result
+        case target
+    }
+
+    private func optionalMacroDeclarationField(
         _ name: String,
         in bindings: [String: Expression],
-        declarationName: String
+        declarationName: String,
+        role: MacroDeclarationFieldRole
     ) throws -> String? {
         guard let expression = bindings[name] else {
             return nil
         }
-        guard case .string(let value) = expression else {
-            throw ParseError("\(declarationName) field \(name) must be String.")
+
+        let value: String
+        switch expression {
+        case .string(let string):
+            value = string
+        case .macroInvocation(let macroName, _) where role == .result:
+            value = typeName(forValueMacroName: macroName)
+        case .macroInvocation(let macroName, _) where role == .target:
+            value = "@\(macroName)"
+        default:
+            throw ParseError("\(declarationName) field \(name) must be String or macro value.")
         }
         return value.isEmpty ? nil : value
+    }
+
+    private func typeName(forValueMacroName name: String) -> String {
+        switch name {
+        case "int":
+            return "Int"
+        case "string":
+            return "String"
+        case "bool":
+            return "Bool"
+        case "void":
+            return "Void"
+        default:
+            return name.prefix(1).uppercased() + name.dropFirst()
+        }
     }
 
     private func macroDeclarationTarget(explicitTargetName: String?) throws -> MacroTarget? {
@@ -313,7 +345,10 @@ extension Parser {
             throw ParseError("@generic macro members must declare name: String.")
         }
 
-        let valueFields = try macroMemberValueFields(in: body)
+        let valueFields = try macroMemberValueFields(
+            in: body,
+            parameterArguments: genericArguments
+        )
         guard let type = valueFields.type else {
             return .type(name: genericName, constraint: nil, defaultArgument: nil)
         }
@@ -348,7 +383,10 @@ extension Parser {
             throw ParseError("@parameter macro members must declare name: String.")
         }
 
-        let valueFields = try macroMemberValueFields(in: body)
+        let valueFields = try macroMemberValueFields(
+            in: body,
+            parameterArguments: parameterArguments
+        )
         let typeReference = try valueFields.type.map {
             try parseMacroMemberTypeReference($0, generics: valueFields.generics)
         }
@@ -366,9 +404,16 @@ extension Parser {
         )
     }
 
-    private func macroMemberValueFields(in body: [Statement]) throws
+    private func macroMemberValueFields(
+        in body: [Statement],
+        parameterArguments: [CallArgument] = []
+    ) throws
         -> (type: String?, generics: [String], current: String?)
     {
+        if let valueArgument = parameterArguments.first(where: { $0.label == "value" }) {
+            return try macroMemberValueFields(from: valueArgument.value)
+        }
+
         for statement in body {
             let arguments: [CallArgument]
             let valueBody: [Statement]
@@ -402,6 +447,28 @@ extension Parser {
             return (type, generics, current)
         }
         return (nil, [], nil)
+    }
+
+    private func macroMemberValueFields(from expression: Expression) throws
+        -> (type: String?, generics: [String], current: String?)
+    {
+        guard case .macroInvocation(let name, let arguments) = expression else {
+            return (nil, [], nil)
+        }
+
+        let current = arguments.first(where: { $0.label == "value" }).map { argument in
+            macroMemberCurrentValue(from: argument.value)
+        }
+        return (typeName(forValueMacroName: name), [], current)
+    }
+
+    private func macroMemberCurrentValue(from expression: Expression) -> String {
+        switch expression {
+        case .string(let value):
+            return value
+        default:
+            return MacroExpander.renderExpressionForStringify(expression)
+        }
     }
 
     private func parseMacroMemberTypeReference(

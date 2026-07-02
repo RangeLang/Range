@@ -1,7 +1,5 @@
-@macro(name: "extension", result: "String", target: "@syntax"){
-    @parameter(name: "name") {
-        @value(type: "String")
-    }
+@macro(name: "extension", result: @string, target: @syntax){
+    @parameter(name: "name", value: @string(value: ""))
     @state(name: "members", value: "String(\"\")")
     @state(name: "index", value: "Int(0)")
     @state(name: "source", value: "target.application.rawBodyText")

@@ -1,3 +1,6 @@
-@macro(name: "bool", result: "String", target: "@construct"){
-    @return(value: "bool")
+@type
+@macro(name: "bool", result: @string, target: @construct){
+    @parameter(name: "value", value: @bool(value: false))
+
+    @return(value: "bool|value=" + String(value))
 }

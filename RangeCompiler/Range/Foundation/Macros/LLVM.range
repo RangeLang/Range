@@ -1,7 +1,5 @@
-@macro(name: "llvm", result: "String"){
-    @parameter(name: "body") {
-        @value(type: "String")
-    }
+@macro(name: "llvm", result: @string){
+    @parameter(name: "body", value: @string(value: ""))
 
     @return(value: "body")
 }

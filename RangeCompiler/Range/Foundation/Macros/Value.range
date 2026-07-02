@@ -1,13 +1,7 @@
-@macro(name: "value", result: "String", target: "@member"){
-    @parameter(name: "type") {
-        @value(type: "String")
-    }
-    @parameter(name: "current") {
-        @value(type: "String", current: "String()")
-    }
-    @parameter(name: "body") {
-        @value(type: "String", current: "String()")
-    }
+@macro(name: "value", result: @string, target: @member){
+    @parameter(name: "type", value: @string(value: ""))
+    @parameter(name: "current", value: @string(value: ""))
+    @parameter(name: "body", value: @string(value: ""))
     @return(value: "member|kind=value|type="
         + type
         + "|current="

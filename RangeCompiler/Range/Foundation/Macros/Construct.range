@@ -1,7 +1,5 @@
-@macro(name: "construct", result: "String", target: "@syntax"){
-    @parameter(name: "name") {
-        @value(type: "String")
-    }
+@macro(name: "construct", result: @string, target: @syntax){
+    @parameter(name: "name", value: @string(value: ""))
     @state(name: "fields", value: "String(\"\")")
     @state(name: "members", value: "String(\"\")")
     @state(name: "index", value: "Int(0)")
@@ -44,7 +42,7 @@
         @state(name: "lineLLVM", value: "String(\"\")")
         @state(name: "wasPendingState", value: "pendingState")
 
-        @if("line.contains(value: \"integer|bits=\")") {
+        @if("line.contains(value: \"int|bits=\")") {
             @assignment(target: "lineLLVM", value: "String(\"i64\")")
         }
 
