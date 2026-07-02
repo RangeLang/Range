@@ -432,6 +432,9 @@ extension MacroExpander {
         for parameter: RangeFunctionParameter,
         kind: String
     ) -> Expression {
+        if isLiteralCapability(parameter.defaultValue) {
+            return normalizedLiteralArgumentValue(value) ?? value
+        }
         guard kind == "MacroMetadata" else {
             return value
         }
@@ -445,6 +448,34 @@ extension MacroExpander {
             name: "Identifier",
             arguments: [CallArgument(label: "name", value: .string(name))]
         )
+    }
+
+    private static func isLiteralCapability(_ expression: Expression?) -> Bool {
+        guard case .macroInvocation(let name, _) = expression else {
+            return false
+        }
+        return name == "literal"
+    }
+
+    private static func normalizedLiteralArgumentValue(
+        _ value: Expression
+    ) -> Expression? {
+        switch value {
+        case .integer(let value):
+            return .string(String(value))
+        case .double(let value):
+            return .string(String(value))
+        case .string(let value):
+            return .string(value)
+        case .boolean(let value):
+            return .string(value ? "true" : "false")
+        case .identifier("true"):
+            return .string("true")
+        case .identifier("false"):
+            return .string("false")
+        default:
+            return nil
+        }
     }
 
     static func macroArgumentLabel(for parameter: RangeFunctionParameter) -> String? {

@@ -54,8 +54,8 @@ struct MacroLLVMArtifactEmitterTests {
                 path: "/tmp/Main.range",
                 source: """
                     @main {
-                        @let(name: @string("count"), value: @int(value: @string("5")))
-                        @return(value: @int(value: @string("0")))
+                        @let(name: @string("count"), value: @int(value: 5))
+                        @return(value: @int(value: 0))
                     }
                     """,
                 role: .project
@@ -88,9 +88,9 @@ struct MacroLLVMArtifactEmitterTests {
                     @main {
                         @let(
                             name: @string("count"),
-                            value: @int(value: @string("7"), bits: @string("32"))
+                            value: @int(value: 7, bits: @string("32"))
                         )
-                        @return(value: @int(value: @string("0")))
+                        @return(value: @int(value: 0))
                     }
                     """,
                 role: .project
@@ -121,7 +121,7 @@ struct MacroLLVMArtifactEmitterTests {
                 path: "/tmp/Main.range",
                 source: """
                     @main {
-                        @let(name: @string("count"), value: @int(value: @string("5")))
+                        @let(name: @string("count"), value: @int(value: 5))
                         @return(value: @reference(name: @string("count")))
                     }
                     """,
@@ -155,11 +155,11 @@ struct MacroLLVMArtifactEmitterTests {
                 path: "/tmp/Main.range",
                 source: """
                     @main {
-                        @let(name: @string("count"), value: @int(value: @string("5")))
+                        @let(name: @string("count"), value: @int(value: 5))
                         @return(
                             value: @addition(
                                 lhs: @reference(name: @string("count")),
-                                rhs: @int(value: @string("3"))
+                                rhs: @int(value: 3)
                             )
                         )
                     }
@@ -182,6 +182,74 @@ struct MacroLLVMArtifactEmitterTests {
                   %add.1 = add i64 %count.value.0, 3
                   %return.2 = trunc i64 %add.1 to i32
                   ret i32 %return.2
+                }
+                """
+        )
+    }
+
+    @Test("emits minimal main return from bool reference")
+    func emitsMinimalMainReturnFromBoolReference() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/Main.range",
+                source: """
+                    @main {
+                        @let(name: @string("flag"), value: @bool(value: true))
+                        @return(value: @reference(name: @string("flag")))
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let module = try MacroLLVMArtifactEmitter().emitModule(compiledProgram: program)
+
+        #expect(
+            module.ir
+                == """
+                define i32 @main() {
+                entry:
+                  %flag = alloca i1
+                  store i1 1, ptr %flag
+                  %flag.value.0 = load i1, ptr %flag
+                  %return.1 = zext i1 %flag.value.0 to i32
+                  ret i32 %return.1
+                }
+                """
+        )
+    }
+
+    @Test("emits minimal main return from float reference")
+    func emitsMinimalMainReturnFromFloatReference() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/Main.range",
+                source: """
+                    @main {
+                        @let(name: @string("ratio"), value: @float(value: 1.5))
+                        @return(value: @reference(name: @string("ratio")))
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let module = try MacroLLVMArtifactEmitter().emitModule(compiledProgram: program)
+
+        #expect(
+            module.ir
+                == """
+                define i32 @main() {
+                entry:
+                  %ratio = alloca double
+                  store double 1.5, ptr %ratio
+                  %ratio.value.0 = load double, ptr %ratio
+                  %return.1 = fptosi double %ratio.value.0 to i32
+                  ret i32 %return.1
                 }
                 """
         )

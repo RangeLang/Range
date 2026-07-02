@@ -507,6 +507,8 @@ extension MacroExpander {
                 }
                 if let binding = effect.binding, let type = effect.type {
                     llvmContext.bindings[binding] = type
+                    llvmContext.bindingConstructs[binding] = effect.construct ?? ""
+                    llvmContext.bindingReturnCasts[binding] = effect.returnCast ?? ""
                 }
                 bodyLines.append(contentsOf: effect.lines)
                 if effect.kind == "llvm-terminator" {
@@ -577,6 +579,8 @@ extension MacroExpander {
             }
             if let binding = effect.binding, let type = effect.type {
                 llvmContext.bindings[binding] = type
+                llvmContext.bindingConstructs[binding] = effect.construct ?? ""
+                llvmContext.bindingReturnCasts[binding] = effect.returnCast ?? ""
             }
             if effect.kind == "llvm-terminator" {
                 sawReturn = true
@@ -590,6 +594,8 @@ extension MacroExpander {
         var lines: [String]
         var binding: String?
         var type: String?
+        var construct: String?
+        var returnCast: String?
     }
 
     private static func evaluatedLLVMBlockStatementEffect(
@@ -735,12 +741,16 @@ extension MacroExpander {
         }
         binding = fields["binding"] ?? fields["name"]
         type = fields["type"]
+        let construct = fields["construct"]
+        let returnCast = fields["returnCast"]
 
         return LLVMBlockStatementEffect(
             kind: kind,
             lines: body.isEmpty ? [] : body.components(separatedBy: "\n"),
             binding: binding,
-            type: type
+            type: type,
+            construct: construct,
+            returnCast: returnCast
         )
     }
 
@@ -858,7 +868,7 @@ extension MacroExpander {
 
     private static func minimalLLVMValuePayload(_ payload: String) -> MinimalLLVMValue? {
         let parts = payload.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
-        guard parts.first == "llvm-value" else {
+        guard parts.first == "value" || parts.first == "llvm-value" else {
             return nil
         }
 
@@ -872,15 +882,19 @@ extension MacroExpander {
         }
 
         guard
-            let type = fields["type"],
+            let type = fields["llvm.type"] ?? fields["type"],
             isValidLLVMType(type),
-            let operand = fields["operand"],
+            let operand = fields["llvm.operand"] ?? fields["operand"],
             isValidImmediateOperand(operand)
         else {
             return nil
         }
 
-        let instructions = fields["instructions"] ?? fields["prelude"] ?? ""
+        let instructions = fields["llvm.instructions"]
+            ?? fields["instructions"]
+            ?? fields["llvm.prelude"]
+            ?? fields["prelude"]
+            ?? ""
         let lines = instructions.isEmpty ? [] : instructions.components(separatedBy: "\n")
         return MinimalLLVMValue(
             lines: lines,
@@ -925,6 +939,9 @@ extension MacroExpander {
     }
 
     private static func isValidLLVMType(_ type: String) -> Bool {
+        if type == "float" || type == "double" {
+            return true
+        }
         guard type.first == "i" else {
             return false
         }
@@ -940,7 +957,7 @@ extension MacroExpander {
                 character.isLetter || character.isNumber || character == "_" || character == "."
             }
         }
-        return operand.allSatisfy { $0.isNumber || $0 == "-" }
+        return operand.allSatisfy { $0.isNumber || $0 == "-" || $0 == "." }
     }
 
     static func evaluatedStringMacroStatements(

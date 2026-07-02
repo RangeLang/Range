@@ -403,6 +403,19 @@ extension Parser {
             throw ParseError("@parameter macro members must declare name: String value.")
         }
 
+        if let literalDefault = macroMemberLiteralCapability(
+            in: body,
+            parameterArguments: parameterArguments
+        ) {
+            return RangeFunctionParameter(
+                macros: [],
+                name: parameterName,
+                typeReference: nil,
+                defaultValue: literalDefault,
+                slotName: nil
+            )
+        }
+
         let valueFields = try macroMemberValueFields(
             in: body,
             parameterArguments: parameterArguments
@@ -422,6 +435,31 @@ extension Parser {
             defaultValue: defaultValue,
             slotName: nil
         )
+    }
+
+    private func macroMemberLiteralCapability(
+        in body: [Statement],
+        parameterArguments: [CallArgument]
+    ) -> Expression? {
+        if let valueArgument = parameterArguments.first(where: { $0.label == "value" }),
+            case .macroInvocation(let name, _) = valueArgument.value,
+            name == "literal"
+        {
+            return valueArgument.value
+        }
+
+        for statement in body {
+            switch statement {
+            case .macroApplication(let name, let arguments) where name == "literal":
+                return .macroInvocation(name: name, arguments: arguments)
+            case .macroInvocation(let name, let clause, _) where name == "literal":
+                let arguments = (try? clause.map(MacroExpander.parsedMacroArguments)) ?? []
+                return .macroInvocation(name: name, arguments: arguments)
+            default:
+                continue
+            }
+        }
+        return nil
     }
 
     private func macroMemberValueFields(

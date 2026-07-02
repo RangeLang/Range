@@ -2,6 +2,7 @@
     @parameter(name: @string("value"), value: @string(value: ""))
 
     @state(name: @string("valueType"), value: "@llvmField(value: value, name: @string(\"type\"))")
+    @state(name: @string("returnCast"), value: "@llvmField(value: value, name: @string(\"returnCast\"))")
     @state(name: @string("llvm"), value: "\"llvm-effect|kind=llvm-terminator|body=\"")
 
     @if("!valueType.isEmpty") {
@@ -11,6 +12,16 @@
     @if("@llvmField(value: value, name: @string(\"needsTrunc\")) == \"true\"") {
         @state(name: @string("returnOperand"), value: "@temporary(prefix: @string(\"return\"))")
         @assignment(target: @string("llvm"), value: "\"llvm-effect|kind=llvm-terminator|body=\" + @llvmField(value: value, name: @string(\"prelude\")) + \"  \" + returnOperand + \" = trunc \" + valueType + \" \" + @llvmField(value: value, name: @string(\"operand\")) + \" to i32\\n  ret i32 \" + returnOperand")
+    }
+
+    @if("returnCast == \"zext\"") {
+        @state(name: @string("returnOperand"), value: "@temporary(prefix: @string(\"return\"))")
+        @assignment(target: @string("llvm"), value: "\"llvm-effect|kind=llvm-terminator|body=\" + @llvmField(value: value, name: @string(\"prelude\")) + \"  \" + returnOperand + \" = zext \" + valueType + \" \" + @llvmField(value: value, name: @string(\"operand\")) + \" to i32\\n  ret i32 \" + returnOperand")
+    }
+
+    @if("returnCast == \"fptosi\"") {
+        @state(name: @string("returnOperand"), value: "@temporary(prefix: @string(\"return\"))")
+        @assignment(target: @string("llvm"), value: "\"llvm-effect|kind=llvm-terminator|body=\" + @llvmField(value: value, name: @string(\"prelude\")) + \"  \" + returnOperand + \" = fptosi \" + valueType + \" \" + @llvmField(value: value, name: @string(\"operand\")) + \" to i32\\n  ret i32 \" + returnOperand")
     }
 
     @return(value: llvm)

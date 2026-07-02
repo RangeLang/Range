@@ -3,15 +3,18 @@
     @parameter(name: @string("rhs"), value: @int())
     @parameter(name: @string("temporaryPrefix"), value: @string(value: "add"))
     @state(name: @string("type"), value: "@llvmField(value: lhs, name: @string(\"type\"))")
+    @state(name: @string("construct"), value: "@llvmField(value: lhs, name: @string(\"construct\"))")
     @state(name: @string("operand"), value: "@temporary(prefix: temporaryPrefix)")
 
-    @return(value: @string("llvm-value|type="
+    @return(value: @string("value|construct="
+        + construct
+        + "|llvm.type="
         + type
-        + "|operand="
+        + "|llvm.operand="
         + operand
-        + "|storage=temporary"
-        + "|needsTrunc=true"
-        + "|prelude="
+        + "|llvm.storage=temporary"
+        + "|llvm.needsTrunc=true"
+        + "|llvm.prelude="
         + @llvmField(value: lhs, name: @string("prelude"))
         + @llvmField(value: rhs, name: @string("prelude"))
         + "  "

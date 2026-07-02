@@ -2,6 +2,8 @@ import Foundation
 
 final class CompileTimeLLVMContext {
     var bindings: [String: String] = [:]
+    var bindingConstructs: [String: String] = [:]
+    var bindingReturnCasts: [String: String] = [:]
     private var temporaryIndex = 0
 
     func nextTemporary(prefix: String) -> String {
@@ -583,20 +585,31 @@ struct CompileTimeValueEvaluator {
         else {
             return nil
         }
-        return "llvm-binding|type=\(type)|pointer=%\(name)"
+        let construct = llvmContext.bindingConstructs[name] ?? ""
+        let returnCast = llvmContext.bindingReturnCasts[name] ?? ""
+        return "llvm-binding|construct=\(construct)|type=\(type)|returnCast=\(returnCast)|pointer=%\(name)"
     }
 
     private func llvmPayloadField(_ payload: String, name: String) -> String? {
         let parts = payload.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
-        guard parts.first == "llvm-value" || parts.first == "llvm-binding" else {
+        guard parts.first == "value" || parts.first == "llvm-value" || parts.first == "llvm-binding" else {
             return nil
         }
+        var fields: [String: String] = [:]
         for part in parts.dropFirst() {
             let pair = part.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
-            guard pair.count == 2, String(pair[0]) == name else {
+            guard pair.count == 2 else {
                 continue
             }
-            return String(pair[1])
+            fields[String(pair[0])] = String(pair[1])
+        }
+        if let field = fields[name] {
+            return field
+        }
+        if parts.first == "value",
+            let field = fields["llvm.\(name)"]
+        {
+            return field
         }
         return nil
     }

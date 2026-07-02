@@ -26,6 +26,7 @@ struct MacroCarrierCompilerTests {
 
         #expect(program.declarationGraph.macrosByName["addition"] != nil)
         #expect(program.declarationGraph.macrosByName["assignment"] != nil)
+        #expect(program.declarationGraph.macrosByName["float"] != nil)
         #expect(program.declarationGraph.macrosByName["if"] != nil)
         #expect(program.declarationGraph.macrosByName["main"] != nil)
         #expect(program.declarationGraph.macrosByName["int"] != nil)
@@ -34,9 +35,26 @@ struct MacroCarrierCompilerTests {
         #expect(program.declarationGraph.macrosByName["reference"] != nil)
         #expect(program.declarationGraph.macrosByName["return"] != nil)
         #expect(program.declarationGraph.macrosByName["state"] != nil)
+        #expect(program.declarationGraph.macrosByName["string"] != nil)
         #expect(program.declarationGraph.macrosByName["while"] != nil)
         #expect(program.declarationGraph.macrosByName["construct"] == nil)
         #expect(program.declarationGraph.macrosByName["function"] == nil)
+    }
+
+    @Test("string macro value parameter accepts literals")
+    func stringMacroValueParameterAcceptsLiterals() throws {
+        let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
+        let stringMacro = try #require(program.declarationGraph.macrosByName["string"])
+        let valueParameter = try #require(
+            stringMacro.parameters.first(where: { $0.localName == "value" })
+        )
+
+        guard case .macroInvocation(let name, _) = valueParameter.defaultValue else {
+            Issue.record("Expected @string value parameter to carry @literal default marker.")
+            return
+        }
+
+        #expect(name == "literal")
     }
 
     @Test("top-level main macro blocks survive quarantine")

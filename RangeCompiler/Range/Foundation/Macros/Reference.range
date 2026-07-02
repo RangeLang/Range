@@ -2,14 +2,21 @@
     @parameter(name: @string("name"), value: @string(value: ""))
     @state(name: @string("binding"), value: "@llvmBinding(name: name)")
     @state(name: @string("operand"), value: "@temporary(prefix: name + @string(\".value\"))")
+    @state(name: @string("returnCast"), value: "@llvmField(value: binding, name: @string(\"returnCast\"))")
+    @state(name: @string("needsTrunc"), value: "returnCast.isEmpty ? \"true\" : \"false\"")
 
-    @return(value: @string("llvm-value|type="
+    @return(value: @string("value|construct="
+        + @llvmField(value: binding, name: @string("construct"))
+        + "|llvm.type="
         + @llvmField(value: binding, name: @string("type"))
-        + "|operand="
+        + "|llvm.operand="
         + operand
-        + "|storage=temporary"
-        + "|needsTrunc=true"
-        + "|prelude=  "
+        + "|llvm.storage=temporary"
+        + "|llvm.needsTrunc="
+        + needsTrunc
+        + "|llvm.returnCast="
+        + returnCast
+        + "|llvm.prelude=  "
         + operand
         + " = load "
         + @llvmField(value: binding, name: @string("type"))
