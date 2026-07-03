@@ -327,15 +327,15 @@ extension MacroExpander {
                 knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
                 context: context
             ),
-            case .string(let processed) = value
+            case .string = value
         {
             var updated = application
-            updated.evaluatedStringValue = processed
+            updated.evaluatedValue = value
             return updated
         }
 
         guard let macro = context.macroDeclarationsByName[application.name],
-            macro.expansionType == .named("String"),
+            macro.expansionType != nil,
             let argumentBindings = try? parseMacroArgumentBindings(
                 for: macro,
                 argumentClause: application.argumentClause
@@ -355,12 +355,12 @@ extension MacroExpander {
             context: context
         )
         var locals = argumentBindings
-        guard case .string(let processed)? = evaluator.evaluateStatements(macro.body, locals: &locals)
+        guard let value = evaluator.evaluateStatements(macro.body, locals: &locals)
         else {
             return application
         }
         var updated = application
-        updated.evaluatedStringValue = processed
+        updated.evaluatedValue = value
         return updated
     }
 
@@ -372,7 +372,7 @@ extension MacroExpander {
     ) -> [MacroApplication] {
         applications.map { application in
             guard let macro = macros[application.name],
-                macro.expansionType == .named("String")
+                macro.expansionType != nil
             else {
                 return application
             }
@@ -394,7 +394,7 @@ extension MacroExpander {
             )
 
             var localBindings: [String: Expression] = [:]
-            guard case .string(let processed)? = evaluator.evaluateStatements(
+            guard let value = evaluator.evaluateStatements(
                 macro.body,
                 locals: &localBindings
             ) else {
@@ -402,7 +402,7 @@ extension MacroExpander {
             }
 
             var updated = application
-            updated.evaluatedStringValue = processed
+            updated.evaluatedValue = value
             return updated
         }
 
@@ -421,6 +421,7 @@ extension MacroExpander {
             argumentClause: application.argumentClause,
             rawBodyLanguage: application.rawBodyLanguage,
             rawBody: rawBody,
+            evaluatedValue: application.evaluatedValue,
             evaluatedStringValue: application.evaluatedStringValue
         )
         if let bodyStatements,
@@ -466,13 +467,13 @@ extension MacroExpander {
         )
 
         var locals = argumentBindings
-        guard case .string(let processed)? = evaluator.evaluateStatements(macro.body, locals: &locals)
+        guard let value = evaluator.evaluateStatements(macro.body, locals: &locals)
         else {
             return applicationWithBody
         }
 
         var updated = applicationWithBody
-        updated.evaluatedStringValue = processed
+        updated.evaluatedValue = value
         return updated
     }
 

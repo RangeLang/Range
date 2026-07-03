@@ -1,0 +1,6 @@
+@macro(name: field, result: @object){
+    @parameter(name: name, value: @name)
+    @parameter(name: value, value: @literal)
+
+    @return(value: @object(type: Field, fields: []))
+}

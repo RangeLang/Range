@@ -83,11 +83,22 @@ public struct MacroApplication {
     public let argumentClause: String?
     public let rawBodyLanguage: String?
     public let rawBody: String?
-    // The macro's evaluated string return value, when it produces one. This is
-    // the Range-authored processed result (e.g. an @llvm template after splice
-    // substitution), carried so emission can consume the macro's output rather
-    // than re-deriving it from the raw argument.
-    public var evaluatedStringValue: String?
+    // The macro's evaluated return value, when it produces one. String
+    // compatibility remains available through `evaluatedStringValue` while
+    // consumers migrate to structured values.
+    public var evaluatedValue: CompileTimeValue?
+
+    public var evaluatedStringValue: String? {
+        get {
+            guard case .string(let value) = evaluatedValue else {
+                return nil
+            }
+            return value
+        }
+        set {
+            evaluatedValue = newValue.map(CompileTimeValue.string)
+        }
+    }
 
     public init(
         name: String,
@@ -95,6 +106,7 @@ public struct MacroApplication {
         argumentClause: String?,
         rawBodyLanguage: String? = nil,
         rawBody: String? = nil,
+        evaluatedValue: CompileTimeValue? = nil,
         evaluatedStringValue: String? = nil
     ) {
         self.name = name
@@ -102,7 +114,7 @@ public struct MacroApplication {
         self.argumentClause = argumentClause
         self.rawBodyLanguage = rawBodyLanguage
         self.rawBody = rawBody
-        self.evaluatedStringValue = evaluatedStringValue
+        self.evaluatedValue = evaluatedValue ?? evaluatedStringValue.map(CompileTimeValue.string)
     }
 }
 

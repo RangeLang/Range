@@ -356,6 +356,16 @@ struct CompileTimeValueEvaluator {
             {
                 return .string(value)
             }
+            if name == "field",
+                let value = fieldMacroValue(arguments: arguments, locals: locals)
+            {
+                return value
+            }
+            if name == "object",
+                let value = objectMacroValue(arguments: arguments, locals: locals)
+            {
+                return value
+            }
             guard let macro = macroDeclarationsByName[name],
                 macro.target == nil,
                 let context,
@@ -636,6 +646,86 @@ struct CompileTimeValueEvaluator {
             return value ? "true" : "false"
         default:
             return nil
+        }
+    }
+
+    private func fieldMacroValue(
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> CompileTimeValue? {
+        let nameExpression = arguments.first(where: { $0.label == "name" })?.value
+            ?? arguments.first?.value
+        let valueExpression = arguments.first(where: { $0.label == "value" })?.value
+        guard let nameExpression,
+            let name = objectTypeName(nameExpression, locals: locals)
+        else {
+            return nil
+        }
+
+        let value = valueExpression.flatMap { evaluate($0, locals: locals) } ?? .nilValue
+        return .object(
+            typeName: "Field",
+            fields: [
+                "name": .string(name),
+                "value": value,
+            ]
+        )
+    }
+
+    private func objectMacroValue(
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> CompileTimeValue? {
+        let typeExpression = arguments.first(where: { $0.label == "type" })?.value
+            ?? arguments.first?.value
+        let fieldsExpression = arguments.first(where: { $0.label == "fields" })?.value
+        guard let typeExpression,
+            let typeName = objectTypeName(typeExpression, locals: locals)
+        else {
+            return nil
+        }
+
+        let fieldValues: [CompileTimeValue]
+        if let fieldsExpression {
+            guard case .array(let values) = evaluate(fieldsExpression, locals: locals) else {
+                return nil
+            }
+            fieldValues = values
+        } else {
+            fieldValues = []
+        }
+
+        var fields: [String: CompileTimeValue] = [:]
+        for fieldValue in fieldValues {
+            guard case .object("Field", let fieldFields) = fieldValue,
+                case .string(let name)? = fieldFields["name"],
+                let value = fieldFields["value"]
+            else {
+                return nil
+            }
+            fields[name] = value
+        }
+
+        return .object(typeName: typeName, fields: fields)
+    }
+
+    private func objectTypeName(_ expression: Expression, locals: [String: Expression]) -> String? {
+        switch expression {
+        case .identifier(let name), .string(let name):
+            return name
+        case .macroInvocation(let name, let arguments):
+            if let value = genericMacroValue(
+                arguments: [CallArgument(label: "value", value: .macroInvocation(name: name, arguments: arguments))],
+                locals: locals
+            ) {
+                return value
+            }
+            return "@\(name)"
+        default:
+            guard case .string(let name) = evaluate(expression, locals: locals) else {
+                return nil
+            }
+            return name
         }
     }
 

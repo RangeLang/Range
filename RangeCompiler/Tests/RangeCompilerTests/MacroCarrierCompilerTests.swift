@@ -29,6 +29,7 @@ struct MacroCarrierCompilerTests {
         #expect(program.declarationGraph.macrosByName["assignment"] != nil)
         #expect(program.declarationGraph.macrosByName["case"] != nil)
         #expect(program.declarationGraph.macrosByName["enum"] != nil)
+        #expect(program.declarationGraph.macrosByName["field"] != nil)
         #expect(program.declarationGraph.macrosByName["float"] != nil)
         #expect(program.declarationGraph.macrosByName["generic"] != nil)
         #expect(program.declarationGraph.macrosByName["if"] != nil)
@@ -37,6 +38,7 @@ struct MacroCarrierCompilerTests {
         #expect(program.declarationGraph.macrosByName["int"] != nil)
         #expect(program.declarationGraph.macrosByName["let"] != nil)
         #expect(program.declarationGraph.macrosByName["llvmField"] != nil)
+        #expect(program.declarationGraph.macrosByName["object"] != nil)
         #expect(program.declarationGraph.macrosByName["reference"] != nil)
         #expect(program.declarationGraph.macrosByName["return"] != nil)
         #expect(program.declarationGraph.macrosByName["state"] != nil)
@@ -186,6 +188,43 @@ struct MacroCarrierCompilerTests {
             }
             return value
         } == [5, 2, 1, 6])
+    }
+
+    @Test("macro applications carry structured evaluated values")
+    func macroApplicationsCarryStructuredEvaluatedValues() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/StructuredMacroValue.range",
+                source: """
+                    @macro(name: sampleObject, result: @object) {
+                        @return(value: @object(type: LLVMValue, fields: [
+                            @field(name: type, value: "i64"),
+                            @field(name: operand, value: 5)
+                        ]))
+                    }
+
+                    @main
+                    @sampleObject {
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let sampleApplication = try #require(
+            program.declarationGraph.mainBlockMacros.first(where: { $0.name == "sampleObject" })
+        )
+
+        guard case .object("LLVMValue", let fields)? = sampleApplication.evaluatedValue else {
+            Issue.record("Expected structured LLVMValue object.")
+            return
+        }
+
+        #expect(fields["type"] == .string("i64"))
+        #expect(fields["operand"] == .integer(5))
+        #expect(sampleApplication.evaluatedStringValue == nil)
     }
 
     @Test("macro declaration name accepts names")

@@ -492,6 +492,7 @@ struct MacroTargetValueBuilder {
             "rawBody": writtenSyntax(rawBody),
             "rawBodyText": .string(rawBody),
             "arguments": .array(argumentValues(for: application)),
+            "evaluatedValue": application.evaluatedValue ?? .nilValue,
             "evaluatedStringValue": .string(application.evaluatedStringValue ?? ""),
         ]
 

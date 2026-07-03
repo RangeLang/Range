@@ -1,6 +1,6 @@
 import Foundation
 
-indirect enum CompileTimeValue {
+public indirect enum CompileTimeValue: Equatable {
     case string(String)
     case integer(Int)
     case double(Double)
@@ -9,7 +9,7 @@ indirect enum CompileTimeValue {
     case array([CompileTimeValue])
     case object(typeName: String, fields: [String: CompileTimeValue])
 
-    func field(_ name: String) -> CompileTimeValue? {
+    public func field(_ name: String) -> CompileTimeValue? {
         guard case .object(_, let fields) = self else {
             return nil
         }
@@ -19,7 +19,7 @@ indirect enum CompileTimeValue {
         return fields[name]
     }
 
-    var expression: Expression? {
+    public var expression: Expression? {
         switch self {
         case .string(let value):
             return .string(value)
