@@ -1121,10 +1121,6 @@ struct CompileTimeValueEvaluator {
             return nil
         }
 
-        if name == "String" {
-            return evaluateStringConstructionArgument(arguments[0].value, locals: locals)
-        }
-
         guard let value = evaluate(arguments[0].value, locals: locals) else {
             return nil
         }
@@ -1132,34 +1128,6 @@ struct CompileTimeValueEvaluator {
         switch (name, value) {
         case ("Int", .integer), ("Bool", .boolean), ("Float", .double):
             return value
-        default:
-            return nil
-        }
-    }
-
-    private func evaluateStringConstructionArgument(
-        _ expression: Expression,
-        locals: [String: Expression]
-    ) -> CompileTimeValue? {
-        if case .binary(let lhs, .addition, let rhs) = expression,
-            case .string(let left)? = evaluateStringConstructionArgument(lhs, locals: locals),
-            case .string(let right)? = evaluateStringConstructionArgument(rhs, locals: locals)
-        {
-            return .string(left + right)
-        }
-
-        guard let value = evaluate(expression, locals: locals) else {
-            return nil
-        }
-        switch value {
-        case .string(let string):
-            return .string(string)
-        case .integer(let integer):
-            return .string(String(integer))
-        case .double(let double):
-            return .string(String(double))
-        case .boolean(let boolean):
-            return .string(boolean ? "true" : "false")
         default:
             return nil
         }

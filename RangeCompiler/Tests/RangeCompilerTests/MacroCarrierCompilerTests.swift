@@ -25,6 +25,7 @@ struct MacroCarrierCompilerTests {
         let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
 
         #expect(program.declarationGraph.macrosByName["addition"] != nil)
+        #expect(program.declarationGraph.macrosByName["array"] != nil)
         #expect(program.declarationGraph.macrosByName["assignment"] != nil)
         #expect(program.declarationGraph.macrosByName["case"] != nil)
         #expect(program.declarationGraph.macrosByName["enum"] != nil)
@@ -143,6 +144,48 @@ struct MacroCarrierCompilerTests {
 
         #expect(precisionParameter.valueCapability == .generic)
         #expect(precisionParameter.defaultValue != nil)
+    }
+
+    @Test("array macro accepts generic element type and literal elements")
+    func arrayMacroAcceptsGenericElementTypeAndLiteralElements() throws {
+        let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
+        let arrayMacro = try #require(program.declarationGraph.macrosByName["array"])
+        let typeParameter = try #require(
+            arrayMacro.parameters.first(where: { $0.localName == "type" })
+        )
+        let elementsParameter = try #require(
+            arrayMacro.parameters.first(where: { $0.localName == "elements" })
+        )
+
+        #expect(typeParameter.valueCapability == .generic)
+        #expect(typeParameter.defaultValue != nil)
+        #expect(elementsParameter.valueCapability == .literal)
+        #expect(elementsParameter.defaultValue == nil)
+    }
+
+    @Test("array literal arguments parse as array expressions")
+    func arrayLiteralArgumentsParseAsArrayExpressions() throws {
+        var parser = try Parser(source: "@array(type: @int, elements: [5, 2, 1, 6])")
+        let expression = try parser.parseExpression()
+        try parser.consume(.eof)
+
+        guard case .macroInvocation("array", let arguments) = expression else {
+            Issue.record("Expected @array invocation.")
+            return
+        }
+        let elementsArgument = try #require(arguments.first(where: { $0.label == "elements" }))
+        guard case .array(let elements) = elementsArgument.value else {
+            Issue.record("Expected elements argument to parse as an array expression.")
+            return
+        }
+
+        #expect(elements.count == 4)
+        #expect(elements.map { element -> Int? in
+            guard case .integer(let value) = element else {
+                return nil
+            }
+            return value
+        } == [5, 2, 1, 6])
     }
 
     @Test("macro declaration name accepts names")

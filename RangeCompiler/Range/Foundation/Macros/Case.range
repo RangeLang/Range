@@ -6,13 +6,9 @@
 
     @return(value: @string("member|kind=case|name="
         + name
-        + "|ordinal="
-        + String(target.ordinal)
         + "\n"
         + "member|kind=parameter|name="
         + label
         + "|type="
-        + value
-        + "|ordinal="
-        + String(target.ordinal)))
+        + value))
 }

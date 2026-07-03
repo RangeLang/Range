@@ -165,11 +165,29 @@ extension Parser {
             let expression = try parseExpression()
             try consume(.rightParen)
             return expression
+        case .leftBracket:
+            return try parseArrayExpression()
         case .leftBrace:
             return .block(try parseStatementBlock())
         default:
             throw ParseError("Expected expression.")
         }
+    }
+
+    mutating func parseArrayExpression() throws -> Expression {
+        try consume(.leftBracket)
+        var elements: [Expression] = []
+
+        if peek() != .rightBracket {
+            while true {
+                elements.append(try parseExpression(terminatingAt: [.comma, .rightBracket]))
+                guard peek() == .comma else { break }
+                advance()
+            }
+        }
+
+        try consume(.rightBracket)
+        return .array(elements)
     }
 
     mutating func parseCalledOrReferencedExpression(named fullName: String) throws -> Expression {

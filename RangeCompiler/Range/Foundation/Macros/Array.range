@@ -1,0 +1,9 @@
+@type
+@macro(name: array, result: @string, target: @construct){
+    @generic(name: type, value: @void)
+    @parameter(name: elements, value: @literal)
+
+    @return(value: @string("value|construct=Array|element.type="
+        + type
+        + "|storage=literal"))
+}

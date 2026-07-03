@@ -6,7 +6,5 @@
     @return(value: "member|kind=parameter|name="
         + name
         + "|type="
-        + value
-        + "|ordinal="
-        + String(target.ordinal))
+        + value)
 }

@@ -476,6 +476,11 @@ extension MacroExpander {
             return .string("true")
         case .identifier("false"):
             return .string("false")
+        case .array(let elements):
+            let normalizedElements = elements.map {
+                normalizedLiteralArgumentValue($0) ?? $0
+            }
+            return .array(normalizedElements)
         default:
             return nil
         }
@@ -514,6 +519,11 @@ extension MacroExpander {
                 return .string("")
             }
             return .string("@\(name)")
+        case .array(let elements):
+            let normalizedElements = elements.map {
+                normalizedGenericArgumentValue($0) ?? $0
+            }
+            return .array(normalizedElements)
         default:
             return nil
         }
