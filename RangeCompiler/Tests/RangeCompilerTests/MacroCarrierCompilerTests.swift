@@ -26,6 +26,8 @@ struct MacroCarrierCompilerTests {
 
         #expect(program.declarationGraph.macrosByName["addition"] != nil)
         #expect(program.declarationGraph.macrosByName["assignment"] != nil)
+        #expect(program.declarationGraph.macrosByName["case"] != nil)
+        #expect(program.declarationGraph.macrosByName["enum"] != nil)
         #expect(program.declarationGraph.macrosByName["float"] != nil)
         #expect(program.declarationGraph.macrosByName["generic"] != nil)
         #expect(program.declarationGraph.macrosByName["if"] != nil)
@@ -38,9 +40,56 @@ struct MacroCarrierCompilerTests {
         #expect(program.declarationGraph.macrosByName["return"] != nil)
         #expect(program.declarationGraph.macrosByName["state"] != nil)
         #expect(program.declarationGraph.macrosByName["string"] != nil)
+        #expect(program.declarationGraph.macrosByName["void"] != nil)
         #expect(program.declarationGraph.macrosByName["while"] != nil)
         #expect(program.declarationGraph.macrosByName["construct"] == nil)
         #expect(program.declarationGraph.macrosByName["function"] == nil)
+    }
+
+    @Test("signedness enum is Range-authored")
+    func signednessEnumIsRangeAuthored() throws {
+        let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
+        let signedness = try #require(program.declarationGraph.enumsByName["Signedness"])
+
+        #expect(signedness.cases.map(\.name) == ["signed", "unsigned"])
+        #expect(signedness.cases.allSatisfy { $0.associatedValues.isEmpty })
+    }
+
+    @Test("enum macro records support value-bearing cases")
+    func enumMacroRecordsSupportValueBearingCases() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/Result.range",
+                source: """
+                    @enum(name: Result) {
+                        @case(name: success, value: @int)
+                        @case(name: failure, label: cause, value: @string)
+                        @case(name: loading)
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let result = try #require(program.declarationGraph.enumsByName["Result"])
+
+        #expect(result.cases.map(\.name) == ["success", "failure", "loading"])
+        #expect(result.cases.count == 3)
+        let success = try #require(result.cases.first(where: { $0.name == "success" }))
+        let failure = try #require(result.cases.first(where: { $0.name == "failure" }))
+        let loading = try #require(result.cases.first(where: { $0.name == "loading" }))
+        let successValue = try #require(success.associatedValues.first)
+        let failureValue = try #require(failure.associatedValues.first)
+
+        #expect(success.associatedValues.count == 1)
+        #expect(successValue.label == nil)
+        #expect(successValue.typeReference == .named("@int"))
+        #expect(failure.associatedValues.count == 1)
+        #expect(failureValue.label == "cause")
+        #expect(failureValue.typeReference == .named("@string"))
+        #expect(loading.associatedValues.isEmpty)
     }
 
     @Test("let macro name parameter accepts names")
@@ -82,6 +131,18 @@ struct MacroCarrierCompilerTests {
         #expect(signednessParameter.valueCapability == .generic)
         #expect(bitsParameter.defaultValue != nil)
         #expect(signednessParameter.defaultValue != nil)
+    }
+
+    @Test("float macro configuration parameters accept generics")
+    func floatMacroConfigurationParametersAcceptGenerics() throws {
+        let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
+        let floatMacro = try #require(program.declarationGraph.macrosByName["float"])
+        let precisionParameter = try #require(
+            floatMacro.parameters.first(where: { $0.localName == "precision" })
+        )
+
+        #expect(precisionParameter.valueCapability == .generic)
+        #expect(precisionParameter.defaultValue != nil)
     }
 
     @Test("macro declaration name accepts names")

@@ -1,0 +1,18 @@
+@member
+@macro(name: case, result: @string){
+    @parameter(name: name, value: @name)
+    @parameter(name: label, value: @name(value: ""))
+    @parameter(name: value, value: @generic(value: @void))
+
+    @return(value: @string("member|kind=case|name="
+        + name
+        + "|ordinal="
+        + String(target.ordinal)
+        + "\n"
+        + "member|kind=parameter|name="
+        + label
+        + "|type="
+        + value
+        + "|ordinal="
+        + String(target.ordinal)))
+}

@@ -1,0 +1,4 @@
+@enum(name: Signedness) {
+    @case(name: signed)
+    @case(name: unsigned)
+}

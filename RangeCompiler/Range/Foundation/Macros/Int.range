@@ -2,7 +2,7 @@
 @macro(name: int, result: @string, target: @construct){
     @parameter(name: value, value: @literal)
     @generic(name: bits, value: @int(value: 64))
-    @generic(name: signedness, value: signed)
+    @generic(name: signedness, value: Signedness.signed)
 
     @return(value: @string("value|construct=Int|llvm.type=i"
         + bits

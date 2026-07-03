@@ -1,3 +1,2 @@
 @main {
-    Logger.info("Range playground ready.")
 }

@@ -88,7 +88,7 @@ struct MacroLLVMArtifactEmitterTests {
                     @main {
                         @let(
                             name: count,
-                            value: @int(value: 7, bits: 32, signedness: signed)
+                            value: @int(value: 7, bits: 32, signedness: Signedness.unsigned)
                         )
                         @return(value: @int(value: 0))
                     }
@@ -250,6 +250,38 @@ struct MacroLLVMArtifactEmitterTests {
                   %ratio.value.0 = load double, ptr %ratio
                   %return.1 = fptosi double %ratio.value.0 to i32
                   ret i32 %return.1
+                }
+                """
+        )
+    }
+
+    @Test("emits float value type from Range-authored precision")
+    func emitsFloatValueTypeFromRangeAuthoredPrecision() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/Main.range",
+                source: """
+                    @main {
+                        @let(name: ratio, value: @float(value: 1.5, precision: 32))
+                        @return(value: @int(value: 0))
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let module = try MacroLLVMArtifactEmitter().emitModule(compiledProgram: program)
+
+        #expect(
+            module.ir
+                == """
+                define i32 @main() {
+                entry:
+                  %ratio = alloca float
+                  store float 1.5, ptr %ratio
+                  ret i32 0
                 }
                 """
         )

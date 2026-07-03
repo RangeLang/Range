@@ -504,13 +504,16 @@ extension MacroExpander {
             return .string(value ? "true" : "false")
         case .identifier(let name):
             return .string(name)
-        case .macroInvocation(_, let arguments):
-            guard let value = arguments.first(where: { $0.label == "value" })?.value
+        case .macroInvocation(let name, let arguments):
+            if let value = arguments.first(where: { $0.label == "value" })?.value
                 ?? arguments.first?.value
-            else {
-                return nil
+            {
+                return normalizedGenericArgumentValue(value)
             }
-            return normalizedGenericArgumentValue(value)
+            if name == "void" {
+                return .string("")
+            }
+            return .string("@\(name)")
         default:
             return nil
         }

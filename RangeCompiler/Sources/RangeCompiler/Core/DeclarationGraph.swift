@@ -917,8 +917,43 @@ public struct DeclarationGraph {
             name: name,
             genericParameters: [],
             conformances: [],
-            cases: lines.dropFirst().compactMap(emittedEnumCase)
+            cases: emittedEnumCases(from: Array(lines.dropFirst()))
         )
+    }
+
+    private static func emittedEnumCases(from lines: [String]) -> [EnumCaseDeclaration] {
+        var cases: [EnumCaseDeclaration] = []
+        var index = 0
+        while index < lines.count {
+            let fields = emittedRecordFields(in: lines[index])
+            guard fields["kind"] == "case",
+                let name = fields["name"],
+                !name.isEmpty
+            else {
+                index += 1
+                continue
+            }
+
+            var associatedValues: [AssociatedValueDeclaration] = []
+            index += 1
+            while index < lines.count {
+                let childFields = emittedRecordFields(in: lines[index])
+                guard childFields["kind"] == "parameter" else {
+                    break
+                }
+                if let associatedValue = emittedEnumAssociatedValue(from: childFields) {
+                    associatedValues.append(associatedValue)
+                }
+                index += 1
+            }
+            cases.append(
+                EnumCaseDeclaration(
+                    name: name,
+                    associatedValues: associatedValues
+                )
+            )
+        }
+        return cases
     }
 
     private static func emittedEnumCase(from line: String) -> EnumCaseDeclaration? {
@@ -930,6 +965,21 @@ public struct DeclarationGraph {
             return nil
         }
         return EnumCaseDeclaration(name: name, associatedValues: [])
+    }
+
+    private static func emittedEnumAssociatedValue(
+        from fields: [String: String]
+    ) -> AssociatedValueDeclaration? {
+        let label = fields["name"].flatMap { $0.isEmpty ? nil : $0 }
+        let type = fields["type"].flatMap { $0.isEmpty ? nil : $0 }
+            ?? fields["value"].flatMap { $0.isEmpty ? nil : $0 }
+        guard let type else {
+            return nil
+        }
+        return AssociatedValueDeclaration(
+            label: label,
+            typeReference: emittedTypeReference(typeName: type)
+        )
     }
 
     static func collectMacros(from files: [ParsedSourceFile]) -> [String: MacroDeclaration] {

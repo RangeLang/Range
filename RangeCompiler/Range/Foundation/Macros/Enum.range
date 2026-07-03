@@ -1,0 +1,8 @@
+@macro(name: enum, result: @string){
+    @parameter(name: name, value: @name)
+
+    @return(value: @string("enum|name="
+        + name
+        + "\n"
+        + target.rawBody))
+}

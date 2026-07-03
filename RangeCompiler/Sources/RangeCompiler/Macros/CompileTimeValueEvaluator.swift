@@ -604,14 +604,20 @@ struct CompileTimeValueEvaluator {
         guard let valueExpression else {
             return ""
         }
-        if case .macroInvocation(_, let arguments) = valueExpression,
-            let nestedValueExpression = arguments.first(where: { $0.label == "value" })?.value
-                ?? arguments.first?.value
+        if case .macroInvocation(let name, let arguments) = valueExpression
         {
-            return genericMacroValue(
-                arguments: [CallArgument(label: "value", value: nestedValueExpression)],
-                locals: locals
-            )
+            if let nestedValueExpression = arguments.first(where: { $0.label == "value" })?.value
+                ?? arguments.first?.value
+            {
+                return genericMacroValue(
+                    arguments: [CallArgument(label: "value", value: nestedValueExpression)],
+                    locals: locals
+                )
+            }
+            if name == "void" {
+                return ""
+            }
+            return "@\(name)"
         }
         if case .identifier(let name) = valueExpression {
             return name

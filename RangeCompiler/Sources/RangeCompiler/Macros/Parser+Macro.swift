@@ -461,7 +461,7 @@ extension Parser {
             )
         }
 
-        if let capability = macroMemberParameterCapability(
+        if let parameterCapability = macroMemberParameterCapability(
             in: body,
             parameterArguments: parameterArguments
         ) {
@@ -469,7 +469,8 @@ extension Parser {
                 macros: [],
                 name: parameterName,
                 typeReference: nil,
-                valueCapability: capability,
+                defaultValue: parameterCapability.defaultValue,
+                valueCapability: parameterCapability.capability,
                 slotName: nil
             )
         }
@@ -498,23 +499,28 @@ extension Parser {
     private func macroMemberParameterCapability(
         in body: [Statement],
         parameterArguments: [CallArgument]
-    ) -> ParameterValueCapability? {
+    ) -> (capability: ParameterValueCapability, defaultValue: Expression?)? {
         if let valueArgument = parameterArguments.first(where: { $0.label == "value" }),
-            case .macroInvocation(let name, _) = valueArgument.value,
+            case .macroInvocation(let name, let arguments) = valueArgument.value,
             name == "literal" || name == "name" || name == "generic"
         {
-            return parameterValueCapability(named: name)
+            guard let capability = parameterValueCapability(named: name) else {
+                return nil
+            }
+            let defaultValue = arguments.first(where: { $0.label == "value" })?.value
+                ?? arguments.first?.value
+            return (capability, defaultValue)
         }
 
         for statement in body {
             switch statement {
             case .macroApplication(let name, _)
                 where name == "literal" || name == "name" || name == "generic":
-                return parameterValueCapability(named: name)
+                return parameterValueCapability(named: name).map { ($0, nil) }
             case .macroInvocation(let name, let clause, _)
                 where name == "literal" || name == "name" || name == "generic":
                 _ = (try? clause.map(MacroExpander.parsedMacroArguments)) ?? []
-                return parameterValueCapability(named: name)
+                return parameterValueCapability(named: name).map { ($0, nil) }
             default:
                 continue
             }

@@ -1,0 +1,3 @@
+@macro(name: void, result: @string){
+    @return(value: @string("parameter-capability|kind=void"))
+}
