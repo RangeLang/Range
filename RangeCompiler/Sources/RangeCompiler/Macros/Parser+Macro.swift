@@ -59,12 +59,16 @@ extension Parser {
         let body: [Statement]
         let parameters: [RangeFunctionParameter]
         let genericParameters: [GenericParameter]
+        let targetBindings: [MacroTargetBinding]
+        let memberBindings: [MacroMemberBinding]
         if signatureOnly {
             if peek() == .leftBrace {
                 try consume(.leftBrace)
                 let members = try parseMacroMembers()
                 genericParameters = members.genericParameters
                 parameters = members.parameters
+                targetBindings = members.targetBindings
+                memberBindings = members.memberBindings
                 try skipUnknownBlockBody()
                 try consume(.rightBrace)
             } else {
@@ -76,6 +80,8 @@ extension Parser {
             body = parsedBody.body
             parameters = parsedBody.parameters
             genericParameters = parsedBody.genericParameters
+            targetBindings = parsedBody.targetBindings
+            memberBindings = parsedBody.memberBindings
         }
 
         return MacroDeclaration(
@@ -83,6 +89,8 @@ extension Parser {
             name: "macro",
             genericParameters: genericParameters,
             parameters: parameters,
+            targetBindings: targetBindings,
+            memberBindings: memberBindings,
             target: .macroSurface("macro"),
             expansionType: expansionType,
             body: body
@@ -143,6 +151,8 @@ extension Parser {
         let body: [Statement]
         let parameters: [RangeFunctionParameter]
         let genericParameters: [GenericParameter]
+        let targetBindings: [MacroTargetBinding]
+        let memberBindings: [MacroMemberBinding]
 
         if signatureOnly {
             if peek() == .leftBrace {
@@ -150,6 +160,8 @@ extension Parser {
                 let members = try parseMacroMembers()
                 genericParameters = members.genericParameters
                 parameters = members.parameters
+                targetBindings = members.targetBindings
+                memberBindings = members.memberBindings
                 try skipUnknownBlockBody()
                 try consume(.rightBrace)
             } else {
@@ -161,6 +173,8 @@ extension Parser {
             body = parsedBody.body
             parameters = parsedBody.parameters
             genericParameters = parsedBody.genericParameters
+            targetBindings = parsedBody.targetBindings
+            memberBindings = parsedBody.memberBindings
         }
 
         return MacroDeclaration(
@@ -168,6 +182,8 @@ extension Parser {
             name: macroName,
             genericParameters: genericParameters,
             parameters: parameters,
+            targetBindings: targetBindings,
+            memberBindings: memberBindings,
             target: target,
             expansionType: expansionType,
             body: body
@@ -178,7 +194,9 @@ extension Parser {
         -> (
             body: [Statement],
             parameters: [RangeFunctionParameter],
-            genericParameters: [GenericParameter]
+            genericParameters: [GenericParameter],
+            targetBindings: [MacroTargetBinding],
+            memberBindings: [MacroMemberBinding]
         )
     {
         try consume(.leftBrace)
@@ -186,7 +204,13 @@ extension Parser {
 
         if macroBodyStartsWithMacroStatement() {
             let body = try parseFreestandingMacroValueBody()
-            return (body, members.parameters, members.genericParameters)
+            return (
+                body,
+                members.parameters,
+                members.genericParameters,
+                members.targetBindings,
+                members.memberBindings
+            )
         }
 
         throw ParseError("Macro bodies must use explicit Range macro statements.")
@@ -199,16 +223,20 @@ extension Parser {
         -> (
             body: [Statement],
             parameters: [RangeFunctionParameter],
-            genericParameters: [GenericParameter]
+            genericParameters: [GenericParameter],
+            targetBindings: [MacroTargetBinding],
+            memberBindings: [MacroMemberBinding]
         )
     {
         try consume(.leftBrace)
         let members = try parseMacroMembers()
         let genericParameters = declaredGenericParameters + members.genericParameters
         let parameters = declaredParameters + members.parameters
+        let targetBindings = members.targetBindings
+        let memberBindings = members.memberBindings
         let body = try parseFreestandingMacroValueBody()
 
-        return (body, parameters, genericParameters)
+        return (body, parameters, genericParameters, targetBindings, memberBindings)
     }
 
     private func stringMacroDeclarationField(
@@ -357,11 +385,20 @@ extension Parser {
     }
 
     mutating func parseMacroMembers() throws
-        -> (genericParameters: [GenericParameter], parameters: [RangeFunctionParameter])
+        -> (
+            genericParameters: [GenericParameter],
+            parameters: [RangeFunctionParameter],
+            targetBindings: [MacroTargetBinding],
+            memberBindings: [MacroMemberBinding]
+        )
     {
         var genericParameters: [GenericParameter] = []
         var parameters: [RangeFunctionParameter] = []
-        while case .macroAttribute(let name, _) = peek(), name == "generic" || name == "parameter" {
+        var targetBindings: [MacroTargetBinding] = []
+        var memberBindings: [MacroMemberBinding] = []
+        while case .macroAttribute(let name, _) = peek(),
+            name == "generic" || name == "parameter" || name == "target" || name == "members"
+        {
             let statement = try parseStatement()
             if let parameter = try macroMemberParameter(from: statement) {
                 parameters.append(parameter)
@@ -369,9 +406,106 @@ extension Parser {
             }
             if let genericParameter = try macroMemberGeneric(from: statement) {
                 genericParameters.append(genericParameter)
+                continue
+            }
+            if let targetBinding = try macroMemberTargetBinding(from: statement) {
+                targetBindings.append(targetBinding)
+                continue
+            }
+            if let memberBinding = try macroMemberBinding(from: statement) {
+                memberBindings.append(memberBinding)
             }
         }
-        return (genericParameters, parameters)
+        return (genericParameters, parameters, targetBindings, memberBindings)
+    }
+
+    private func macroMemberBinding(from statement: Statement) throws -> MacroMemberBinding? {
+        let arguments: [CallArgument]
+        switch statement {
+        case .macroApplication(let name, let macroArguments) where name == "members":
+            arguments = macroArguments
+        case .macroInvocation(let name, let clause, _) where name == "members":
+            arguments = try clause.map(MacroExpander.parsedMacroArguments) ?? []
+        default:
+            return nil
+        }
+
+        guard let nameArgument = arguments.first(where: { $0.label == "name" }),
+            let bindingName = nameValue(from: nameArgument.value),
+            !bindingName.isEmpty
+        else {
+            throw ParseError("@members macro members must declare name.")
+        }
+
+        guard let value = arguments.first(where: { $0.label == "value" })?.value else {
+            throw ParseError("@members macro members must declare value.")
+        }
+
+        return MacroMemberBinding(
+            name: bindingName,
+            value: value,
+            acceptedMacroName: macroMemberAcceptedMacroName(from: value)
+        )
+    }
+
+    private func macroMemberAcceptedMacroName(from expression: Expression) -> String? {
+        guard case .macroInvocation(let name, let arguments) = expression,
+            name == "array",
+            let typeArgument = arguments.first(where: { $0.label == "type" })
+        else {
+            return nil
+        }
+
+        switch typeArgument.value {
+        case .macroInvocation(let name, _):
+            return name
+        case .identifier(let name):
+            return name.hasPrefix("@") ? String(name.dropFirst()) : name
+        case .string(let name):
+            return name.hasPrefix("@") ? String(name.dropFirst()) : name
+        default:
+            return nil
+        }
+    }
+
+    private func macroMemberTargetBinding(from statement: Statement) throws -> MacroTargetBinding? {
+        let arguments: [CallArgument]
+        switch statement {
+        case .macroApplication(let name, let macroArguments) where name == "target":
+            arguments = macroArguments
+        case .macroInvocation(let name, let clause, _) where name == "target":
+            arguments = try clause.map(MacroExpander.parsedMacroArguments) ?? []
+        default:
+            return nil
+        }
+
+        guard let nameArgument = arguments.first(where: { $0.label == "name" }),
+            let bindingName = nameValue(from: nameArgument.value),
+            !bindingName.isEmpty
+        else {
+            throw ParseError("@target macro members must declare name.")
+        }
+
+        guard let typeArgument = arguments.first(where: { $0.label == "type" }) else {
+            throw ParseError("@target macro members must declare type.")
+        }
+
+        let targetName: String
+        switch typeArgument.value {
+        case .macroInvocation(let name, _):
+            targetName = "@\(name)"
+        case .string(let value):
+            targetName = value
+        case .identifier(let value):
+            targetName = value.hasPrefix("@") ? value : "@\(value)"
+        default:
+            throw ParseError("@target type must name a macro surface.")
+        }
+
+        return MacroTargetBinding(
+            name: bindingName,
+            target: try macroDeclarationTarget(from: targetName)
+        )
     }
 
     private func macroMemberGeneric(from statement: Statement) throws -> GenericParameter? {

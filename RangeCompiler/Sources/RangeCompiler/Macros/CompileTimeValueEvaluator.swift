@@ -16,9 +16,11 @@ final class CompileTimeLLVMContext {
 struct CompileTimeValueEvaluator {
     let targetBinding: String
     let targetValue: CompileTimeValue
+    let targetAliases: [String: CompileTimeValue]
     let graphBinding: String?
     let selfValue: CompileTimeValue?
     let localBindings: [String: Expression]
+    let valueBindings: [String: CompileTimeValue]
     let macroDeclarationsByName: [String: MacroDeclaration]
     let callableDeclarationsByName: [String: [CallableDeclaration]]
     let knownObjectTypeNames: Set<String>
@@ -28,9 +30,11 @@ struct CompileTimeValueEvaluator {
     init(
         targetBinding: String,
         targetValue: CompileTimeValue,
+        targetAliases: [String: CompileTimeValue] = [:],
         graphBinding: String? = nil,
         selfValue: CompileTimeValue? = nil,
         localBindings: [String: Expression],
+        valueBindings: [String: CompileTimeValue] = [:],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
         callableDeclarationsByName: [String: [CallableDeclaration]] = [:],
         knownObjectTypeNames: Set<String> = [],
@@ -39,9 +43,11 @@ struct CompileTimeValueEvaluator {
     ) {
         self.targetBinding = targetBinding
         self.targetValue = targetValue
+        self.targetAliases = targetAliases
         self.graphBinding = graphBinding
         self.selfValue = selfValue
         self.localBindings = localBindings
+        self.valueBindings = valueBindings
         self.macroDeclarationsByName = macroDeclarationsByName
         self.callableDeclarationsByName = callableDeclarationsByName
         self.knownObjectTypeNames = knownObjectTypeNames
@@ -160,9 +166,11 @@ struct CompileTimeValueEvaluator {
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: targetBinding,
             targetValue: targetValue,
+            targetAliases: targetAliases,
             graphBinding: graphBinding,
             selfValue: selfValue,
             localBindings: macroLocals,
+            valueBindings: valueBindings,
             macroDeclarationsByName: macroDeclarationsByName,
             callableDeclarationsByName: callableDeclarationsByName,
             knownObjectTypeNames: knownObjectTypeNames,
@@ -211,9 +219,11 @@ struct CompileTimeValueEvaluator {
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: targetBinding,
             targetValue: targetValue,
+            targetAliases: targetAliases,
             graphBinding: graphBinding,
             selfValue: selfValue,
             localBindings: macroLocals,
+            valueBindings: valueBindings,
             macroDeclarationsByName: macroDeclarationsByName,
             callableDeclarationsByName: callableDeclarationsByName,
             knownObjectTypeNames: knownObjectTypeNames,
@@ -725,9 +735,11 @@ struct CompileTimeValueEvaluator {
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: targetBinding,
             targetValue: targetValue,
+            targetAliases: targetAliases,
             graphBinding: graphBinding,
             selfValue: selfValue,
             localBindings: nestedLocals,
+            valueBindings: valueBindings,
             macroDeclarationsByName: macroDeclarationsByName,
             callableDeclarationsByName: callableDeclarationsByName,
             knownObjectTypeNames: knownObjectTypeNames,
@@ -834,8 +846,12 @@ struct CompileTimeValueEvaluator {
         let value: CompileTimeValue?
         if root == targetBinding {
             value = targetValue
+        } else if let alias = targetAliases[root] {
+            value = alias
         } else if let contextValue = targetValue.field(root) {
             value = contextValue
+        } else if let boundValue = valueBindings[root] {
+            value = boundValue
         } else if root == "context" {
             value = macroContextValue()
         } else if root == graphBinding || (graphBinding == nil && root == "graph") {

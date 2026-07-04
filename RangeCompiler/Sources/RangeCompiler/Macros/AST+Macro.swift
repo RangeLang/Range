@@ -5,9 +5,22 @@ public struct MacroDeclaration {
     public let name: String
     public let genericParameters: [GenericParameter]
     public let parameters: [RangeFunctionParameter]
+    public let targetBindings: [MacroTargetBinding]
+    public let memberBindings: [MacroMemberBinding]
     public let target: MacroTarget?
     public let expansionType: TypeReference?
     public let body: [Statement]
+}
+
+public struct MacroTargetBinding {
+    public let name: String
+    public let target: MacroTarget
+}
+
+public struct MacroMemberBinding {
+    public let name: String
+    public let value: Expression
+    public let acceptedMacroName: String?
 }
 
 extension MacroDeclaration {
@@ -43,6 +56,8 @@ extension MacroDeclaration {
                     slotName: nil
                 ),
             ],
+            targetBindings: [],
+            memberBindings: [],
             target: .macroSurface("macro"),
             expansionType: .named("String"),
             body: []

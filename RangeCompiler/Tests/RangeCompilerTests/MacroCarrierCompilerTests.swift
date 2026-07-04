@@ -43,6 +43,8 @@ struct MacroCarrierCompilerTests {
         #expect(program.declarationGraph.macrosByName["return"] != nil)
         #expect(program.declarationGraph.macrosByName["state"] != nil)
         #expect(program.declarationGraph.macrosByName["string"] != nil)
+        #expect(program.declarationGraph.macrosByName["members"] != nil)
+        #expect(program.declarationGraph.macrosByName["target"] != nil)
         #expect(program.declarationGraph.macrosByName["void"] != nil)
         #expect(program.declarationGraph.macrosByName["while"] != nil)
         #expect(program.declarationGraph.macrosByName["construct"] == nil)
@@ -93,6 +95,16 @@ struct MacroCarrierCompilerTests {
         #expect(failureValue.label == "cause")
         #expect(failureValue.typeReference == .named("@string"))
         #expect(loading.associatedValues.isEmpty)
+    }
+
+    @Test("enum macro declares cases member binding")
+    func enumMacroDeclaresCasesMemberBinding() throws {
+        let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
+        let enumMacro = try #require(program.declarationGraph.macrosByName["enum"])
+        let memberBinding = try #require(enumMacro.memberBindings.first)
+
+        #expect(memberBinding.name == "cases")
+        #expect(memberBinding.acceptedMacroName == "case")
     }
 
     @Test("let macro name parameter accepts names")

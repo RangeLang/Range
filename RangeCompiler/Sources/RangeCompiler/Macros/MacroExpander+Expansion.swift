@@ -338,6 +338,7 @@ extension MacroExpander {
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: "target",
             targetValue: targetValue,
+            targetAliases: targetAliases(for: macro, targetValue: targetValue),
             graphBinding: "graph",
             selfValue: targetValueBuilder.value(for: macro),
             localBindings: argumentBindings,
@@ -373,6 +374,7 @@ extension MacroExpander {
             let evaluator = CompileTimeValueEvaluator(
                 targetBinding: "target",
                 targetValue: targetValue,
+                targetAliases: targetAliases(for: macro, targetValue: targetValue),
                 graphBinding: "graph",
                 selfValue: MacroTargetValueBuilder(
                     macroDeclarationsByName: context.macroDeclarationsByName,
@@ -403,7 +405,7 @@ extension MacroExpander {
     static func attachingEvaluatedValue(
         to application: MacroApplication,
         rawBody: String,
-        members: [CompileTimeValue] = [],
+        members: [EvaluatedMacroMember] = [],
         bodyStatements: [Statement]? = nil,
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
@@ -432,8 +434,11 @@ extension MacroExpander {
         let targetValue = blockMacroTargetValue(
             rawBody: rawBody,
             application: applicationWithBody,
-            members: members
+            members: members.map(\.value)
         )
+        guard let valueBindings = memberValueBindings(for: macro, members: members) else {
+            return applicationWithBody
+        }
         guard
             let argumentBindings = (try? parseMacroArgumentBindings(
                 for: macro,
@@ -448,6 +453,7 @@ extension MacroExpander {
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: "target",
             targetValue: targetValue,
+            targetAliases: targetAliases(for: macro, targetValue: targetValue),
             graphBinding: "graph",
             selfValue: MacroTargetValueBuilder(
                 macroDeclarationsByName: context.macroDeclarationsByName,
@@ -456,6 +462,7 @@ extension MacroExpander {
                 knownObjectTypeNames: context.graphContext.knownObjectTypeNames
             ).value(for: macro),
             localBindings: argumentBindings,
+            valueBindings: valueBindings,
             macroDeclarationsByName: context.macroDeclarationsByName,
             callableDeclarationsByName: context.callableDeclarationsByName,
             knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
@@ -617,6 +624,10 @@ extension MacroExpander {
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: "target",
             targetValue: .object(typeName: "LLVMStatementTarget", fields: [:]),
+            targetAliases: targetAliases(
+                for: macro,
+                targetValue: .object(typeName: "LLVMStatementTarget", fields: [:])
+            ),
             graphBinding: "graph",
             selfValue: MacroTargetValueBuilder(
                 macroDeclarationsByName: context.macroDeclarationsByName,
@@ -766,6 +777,10 @@ extension MacroExpander {
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: "target",
             targetValue: .object(typeName: "LLVMArtifactTarget", fields: [:]),
+            targetAliases: targetAliases(
+                for: macro,
+                targetValue: .object(typeName: "LLVMArtifactTarget", fields: [:])
+            ),
             graphBinding: "graph",
             selfValue: MacroTargetValueBuilder(
                 macroDeclarationsByName: context.macroDeclarationsByName,
@@ -835,6 +850,10 @@ extension MacroExpander {
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: "target",
             targetValue: .object(typeName: "LLVMValueTarget", fields: [:]),
+            targetAliases: targetAliases(
+                for: macro,
+                targetValue: .object(typeName: "LLVMValueTarget", fields: [:])
+            ),
             graphBinding: "graph",
             selfValue: MacroTargetValueBuilder(
                 macroDeclarationsByName: context.macroDeclarationsByName,
@@ -937,18 +956,25 @@ extension MacroExpander {
         return operand.allSatisfy { $0.isNumber || $0 == "-" || $0 == "." }
     }
 
+    struct EvaluatedMacroMember {
+        let name: String
+        let value: CompileTimeValue
+    }
+
     static func evaluatedMacroMemberValues(
         in statements: [Statement],
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
-    ) -> [CompileTimeValue] {
-        statements.enumerated().compactMap { offset, statement -> CompileTimeValue? in
+    ) -> [EvaluatedMacroMember] {
+        statements.enumerated().compactMap { offset, statement -> EvaluatedMacroMember? in
             let name: String
             let argumentBindings: [String: Expression]?
             let targetValue: CompileTimeValue
+            let childMembers: [EvaluatedMacroMember]
             switch statement {
             case .macroApplication(let macroName, let arguments):
                 name = macroName
+                childMembers = []
                 if let macro = macros[name] {
                     argumentBindings = try? parseMacroArgumentBindings(
                         for: macro,
@@ -960,6 +986,11 @@ extension MacroExpander {
                 targetValue = memberMacroTargetValue(ordinal: offset)
             case .macroInvocation(let macroName, let argumentClause, let body):
                 name = macroName
+                childMembers = evaluatedMacroMemberValues(
+                    in: body,
+                    macros: macros,
+                    context: context
+                )
                 if let macro = macros[name] {
                     argumentBindings = (try? parseMacroArgumentBindings(
                         for: macro,
@@ -973,11 +1004,7 @@ extension MacroExpander {
                 }
                 targetValue = memberMacroTargetValue(
                     ordinal: offset,
-                    members: evaluatedMacroMemberValues(
-                        in: body,
-                        macros: macros,
-                        context: context
-                    )
+                    members: childMembers.map(\.value)
                 )
             default:
                 return nil
@@ -988,9 +1015,13 @@ extension MacroExpander {
             guard let argumentBindings else {
                 return nil
             }
+            guard let valueBindings = memberValueBindings(for: macro, members: childMembers) else {
+                return nil
+            }
             let evaluator = CompileTimeValueEvaluator(
                 targetBinding: "target",
                 targetValue: targetValue,
+                targetAliases: targetAliases(for: macro, targetValue: targetValue),
                 graphBinding: "graph",
                 selfValue: MacroTargetValueBuilder(
                     macroDeclarationsByName: context.macroDeclarationsByName,
@@ -999,6 +1030,7 @@ extension MacroExpander {
                     knownObjectTypeNames: context.graphContext.knownObjectTypeNames
                 ).value(for: macro),
                 localBindings: argumentBindings,
+                valueBindings: valueBindings,
                 macroDeclarationsByName: context.macroDeclarationsByName,
                 knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
                 context: context
@@ -1010,7 +1042,7 @@ extension MacroExpander {
             ) else {
                 return nil
             }
-            return value
+            return EvaluatedMacroMember(name: name, value: value)
         }
     }
 
@@ -1036,6 +1068,42 @@ extension MacroExpander {
                 "text": .string(bodyText),
             ]
         )
+    }
+
+    private static func targetAliases(
+        for macro: MacroDeclaration,
+        targetValue: CompileTimeValue
+    ) -> [String: CompileTimeValue] {
+        Dictionary(uniqueKeysWithValues: macro.targetBindings.map { binding in
+            (binding.name, targetValue)
+        })
+    }
+
+    private static func memberValueBindings(
+        for macro: MacroDeclaration,
+        members: [EvaluatedMacroMember]
+    ) -> [String: CompileTimeValue]? {
+        guard !macro.memberBindings.isEmpty else {
+            return [:]
+        }
+
+        var consumed = Set<Int>()
+        var bindings: [String: CompileTimeValue] = [:]
+        for binding in macro.memberBindings {
+            let matching = members.enumerated().compactMap { index, member -> CompileTimeValue? in
+                guard binding.acceptedMacroName == nil || binding.acceptedMacroName == member.name else {
+                    return nil
+                }
+                consumed.insert(index)
+                return member.value
+            }
+            bindings[binding.name] = .array(matching)
+        }
+
+        guard consumed.count == members.count else {
+            return nil
+        }
+        return bindings
     }
 
     static func statementMacroTargetValue(
@@ -2093,6 +2161,7 @@ extension MacroExpander {
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: callerTargetBinding,
             targetValue: targetValue,
+            targetAliases: targetAliases(for: macro, targetValue: targetValue),
             graphBinding: "graph",
             selfValue: selfValue,
             localBindings: localBindings,

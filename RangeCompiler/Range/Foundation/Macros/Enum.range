@@ -1,8 +1,9 @@
 @macro(name: enum, result: @object){
     @parameter(name: name, value: @name)
+    @members(name: cases, value: @array(type: @case, elements: []))
 
     @return(value: @object(type: Enum, fields: [
         @field(name: name, value: name),
-        @field(name: cases, value: target.members)
+        @field(name: cases, value: cases)
     ]))
 }

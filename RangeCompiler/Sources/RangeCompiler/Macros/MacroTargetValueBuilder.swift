@@ -536,6 +536,8 @@ struct MacroTargetValueBuilder {
                 "identifier": identifier(declaration.name),
                 "macros": .array(includeAttachedMacros ? declaration.macros.map(value(for:)) : []),
                 "target": declaration.target.map(value(for:)) ?? .nilValue,
+                "targets": .array(declaration.targetBindings.map(value(for:))),
+                "members": .array(declaration.memberBindings.map(value(for:))),
                 "expansionType": declaration.expansionType.map(typeReferenceValue) ?? .string(""),
                 "expansionTypeName": .string(declaration.expansionType?.displayName ?? ""),
                 "generics": .array(declaration.genericParameters.map { value(for: $0) }),
@@ -620,6 +622,27 @@ struct MacroTargetValueBuilder {
                 ]
             )
         }
+    }
+
+    private func value(for targetBinding: MacroTargetBinding) -> CompileTimeValue {
+        .object(
+            typeName: "Macro.TargetBinding",
+            fields: [
+                "name": .string(targetBinding.name),
+                "target": value(for: targetBinding.target),
+            ]
+        )
+    }
+
+    private func value(for memberBinding: MacroMemberBinding) -> CompileTimeValue {
+        .object(
+            typeName: "Macro.MemberBinding",
+            fields: [
+                "name": .string(memberBinding.name),
+                "acceptedMacroName": memberBinding.acceptedMacroName.map(CompileTimeValue.string) ?? .nilValue,
+                "value": value(for: memberBinding.value) ?? .nilValue,
+            ]
+        )
     }
 
     func writtenSyntax(_ text: String) -> CompileTimeValue {

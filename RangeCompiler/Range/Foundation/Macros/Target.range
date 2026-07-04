@@ -1,0 +1,9 @@
+@macro(name: target, result: @object){
+    @parameter(name: name, value: @name)
+    @parameter(name: type, value: @name)
+
+    @return(value: @object(type: TargetBinding, fields: [
+        @field(name: name, value: name),
+        @field(name: type, value: type)
+    ]))
+}
