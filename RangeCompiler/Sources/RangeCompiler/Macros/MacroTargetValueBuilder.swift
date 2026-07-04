@@ -493,7 +493,6 @@ struct MacroTargetValueBuilder {
             "rawBodyText": .string(rawBody),
             "arguments": .array(argumentValues(for: application)),
             "evaluatedValue": application.evaluatedValue ?? .nilValue,
-            "evaluatedStringValue": .string(application.evaluatedStringValue ?? ""),
         ]
 
         if let declaration = macroDeclarationsByName[application.name] {
@@ -929,10 +928,24 @@ struct MacroTargetValueBuilder {
             "llvm": .string(""),
         ]
         let declarationName = name.split(separator: "<", maxSplits: 1).first.map(String.init) ?? name
-        if let llvm = constructsByName[declarationName]?.macros.compactMap(\.evaluatedStringValue).first {
+        if let llvm = constructLLVMType(declarationName) {
             fields["llvm"] = .string(llvm)
         }
         return .object(typeName: "NamedTypeReference", fields: fields)
+    }
+
+    private func constructLLVMType(_ declarationName: String) -> String? {
+        guard let macros = constructsByName[declarationName]?.macros else {
+            return nil
+        }
+        return macros.compactMap { application -> String? in
+            guard let value = application.evaluatedValue,
+                let type = value.field("type")
+            else {
+                return nil
+            }
+            return stringValue(for: type)
+        }.first
     }
 
     private func identifier(_ name: String) -> CompileTimeValue {

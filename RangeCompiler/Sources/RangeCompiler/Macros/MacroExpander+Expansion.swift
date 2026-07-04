@@ -103,7 +103,7 @@ extension MacroExpander {
             guard application.name != "construct" else {
                 return nil
             }
-            return application.evaluatedStringValue
+            return evaluatedStringAttachment(application.evaluatedValue)
         }.filter { !$0.isEmpty }.joined(separator: "\n")
         let constructRawBody =
             attachmentRecords.isEmpty
@@ -421,8 +421,7 @@ extension MacroExpander {
             argumentClause: application.argumentClause,
             rawBodyLanguage: application.rawBodyLanguage,
             rawBody: rawBody,
-            evaluatedValue: application.evaluatedValue,
-            evaluatedStringValue: application.evaluatedStringValue
+            evaluatedValue: application.evaluatedValue
         )
         if let bodyStatements,
             let artifact = evaluatedBlockLLVMArtifact(
@@ -1149,6 +1148,13 @@ extension MacroExpander {
         default:
             return nil
         }
+    }
+
+    private static func evaluatedStringAttachment(_ value: CompileTimeValue?) -> String? {
+        guard case .string(let attachment)? = value else {
+            return nil
+        }
+        return attachment
     }
 
     private static func macroTargetsStatementSurface(_ macro: MacroDeclaration) -> Bool {

@@ -83,22 +83,8 @@ public struct MacroApplication {
     public let argumentClause: String?
     public let rawBodyLanguage: String?
     public let rawBody: String?
-    // The macro's evaluated return value, when it produces one. String
-    // compatibility remains available through `evaluatedStringValue` while
-    // consumers migrate to structured values.
+    // The macro's evaluated return value, when it produces one.
     public var evaluatedValue: CompileTimeValue?
-
-    public var evaluatedStringValue: String? {
-        get {
-            guard case .string(let value) = evaluatedValue else {
-                return nil
-            }
-            return value
-        }
-        set {
-            evaluatedValue = newValue.map(CompileTimeValue.string)
-        }
-    }
 
     public init(
         name: String,
@@ -106,15 +92,14 @@ public struct MacroApplication {
         argumentClause: String?,
         rawBodyLanguage: String? = nil,
         rawBody: String? = nil,
-        evaluatedValue: CompileTimeValue? = nil,
-        evaluatedStringValue: String? = nil
+        evaluatedValue: CompileTimeValue? = nil
     ) {
         self.name = name
         self.genericArguments = genericArguments
         self.argumentClause = argumentClause
         self.rawBodyLanguage = rawBodyLanguage
         self.rawBody = rawBody
-        self.evaluatedValue = evaluatedValue ?? evaluatedStringValue.map(CompileTimeValue.string)
+        self.evaluatedValue = evaluatedValue
     }
 }
 

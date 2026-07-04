@@ -27,7 +27,6 @@ struct MacroLLVMArtifactEmitterTests {
             return
         }
         #expect(fields["kind"] == .string("llvm-module"))
-        #expect(mainApplication.evaluatedStringValue == nil)
 
         let module = try MacroLLVMArtifactEmitter().emitModule(compiledProgram: program)
 

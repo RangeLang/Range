@@ -226,7 +226,6 @@ struct MacroCarrierCompilerTests {
 
         #expect(fields["type"] == .string("i64"))
         #expect(fields["operand"] == .integer(5))
-        #expect(sampleApplication.evaluatedStringValue == nil)
     }
 
     @Test("macro declaration name accepts names")
