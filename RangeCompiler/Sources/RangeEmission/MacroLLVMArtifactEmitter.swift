@@ -53,18 +53,20 @@ public struct MacroLLVMArtifactEmitter {
             file.sourceFile.blockMacros
                 .compactMap { block -> String? in
                     block.macros.compactMap { application in
-                        llvmModuleArtifactBody(application.evaluatedStringValue)
+                        llvmModuleArtifactBody(application.evaluatedValue)
                     }.first
                 }
                 .first
         }.first
     }
 
-    private func llvmModuleArtifactBody(_ value: String?) -> String? {
-        let prefix = "artifact|kind=llvm-module|body="
-        guard let value, value.hasPrefix(prefix) else {
+    private func llvmModuleArtifactBody(_ value: CompileTimeValue?) -> String? {
+        guard let value,
+            case .string("llvm-module") = value.field("kind"),
+            case .string(let body) = value.field("body")
+        else {
             return nil
         }
-        return String(value.dropFirst(prefix.count))
+        return body
     }
 }

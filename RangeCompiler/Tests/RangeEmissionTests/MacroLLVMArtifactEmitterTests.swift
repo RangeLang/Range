@@ -21,6 +21,14 @@ struct MacroLLVMArtifactEmitterTests {
         )
 
         let program = try CompilerPipeline().build(inputs: inputs)
+        let mainApplication = try #require(program.declarationGraph.mainBlockMacros.first)
+        guard case .object("LLVMModule", let fields)? = mainApplication.evaluatedValue else {
+            Issue.record("Expected @main to produce a structured LLVMModule object.")
+            return
+        }
+        #expect(fields["kind"] == .string("llvm-module"))
+        #expect(mainApplication.evaluatedStringValue == nil)
+
         let module = try MacroLLVMArtifactEmitter().emitModule(compiledProgram: program)
 
         #expect(

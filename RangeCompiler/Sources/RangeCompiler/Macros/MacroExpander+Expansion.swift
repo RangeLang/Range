@@ -433,7 +433,7 @@ extension MacroExpander {
             )
         {
             var updated = applicationWithBody
-            updated.evaluatedStringValue = artifact
+            updated.evaluatedValue = artifact
             return updated
         }
         guard let macro = macros[application.name] else { return applicationWithBody }
@@ -482,7 +482,7 @@ extension MacroExpander {
         statements: [Statement],
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
-    ) -> String? {
+    ) -> CompileTimeValue? {
         guard !statements.isEmpty,
             let macro = macros[application.name]
         else {
@@ -760,7 +760,7 @@ extension MacroExpander {
         application: MacroApplication,
         body: String,
         context: MacroExpansionContext
-    ) -> String? {
+    ) -> CompileTimeValue? {
         let argumentBindings =
             ((try? parseMacroArgumentBindings(
                 for: macro,
@@ -788,10 +788,7 @@ extension MacroExpander {
             context: context
         )
         var locals = localBindings
-        guard case .string(let llvm)? = evaluator.evaluateStatements(macro.body, locals: &locals) else {
-            return nil
-        }
-        return llvm
+        return evaluator.evaluateStatements(macro.body, locals: &locals)
     }
 
     private struct MinimalLLVMValue {

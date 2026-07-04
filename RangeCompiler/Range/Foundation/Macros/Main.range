@@ -1,8 +1,11 @@
 @block(kind: @string("llvm"))
-@macro(name: main, result: @string){
+@macro(name: main, result: @object){
     @parameter(name: body, value: @string(value: "  ret i32 0"))
 
-    @return(value: @string("artifact|kind=llvm-module|body=define i32 @main() {\nentry:\n"
-        + body
-        + "\n}"))
+    @return(value: @object(type: LLVMModule, fields: [
+        @field(name: kind, value: "llvm-module"),
+        @field(name: body, value: "define i32 @main() {\nentry:\n"
+            + body
+            + "\n}")
+    ]))
 }
