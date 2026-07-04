@@ -636,7 +636,7 @@ extension MacroExpander {
             llvmContext: llvmContext
         )
         var locals = localBindings
-        guard case .string(let effect)? = evaluator.evaluateStatements(macro.body, locals: &locals) else {
+        guard let effect = evaluator.evaluateStatements(macro.body, locals: &locals) else {
             return nil
         }
         return llvmBlockStatementEffect(effect)
@@ -708,7 +708,54 @@ extension MacroExpander {
         return (localBindings, values)
     }
 
-    private static func llvmBlockStatementEffect(_ effect: String) -> LLVMBlockStatementEffect? {
+    private static func llvmBlockStatementEffect(_ effect: CompileTimeValue) -> LLVMBlockStatementEffect? {
+        if let structured = structuredLLVMBlockStatementEffect(effect) {
+            return structured
+        }
+        guard case .string(let effect) = effect else {
+            return nil
+        }
+        return stringLLVMBlockStatementEffect(effect)
+    }
+
+    private static func structuredLLVMBlockStatementEffect(
+        _ effect: CompileTimeValue
+    ) -> LLVMBlockStatementEffect? {
+        guard case .object("LLVMEffect", _) = effect,
+            let kind = stringField("kind", in: effect),
+            kind.hasPrefix("llvm-"),
+            let body = stringField("body", in: effect)
+        else {
+            return nil
+        }
+
+        return LLVMBlockStatementEffect(
+            kind: kind,
+            lines: body.isEmpty ? [] : body.components(separatedBy: "\n"),
+            binding: optionalStringField("binding", in: effect) ?? optionalStringField("name", in: effect),
+            type: optionalStringField("type", in: effect),
+            construct: optionalStringField("construct", in: effect),
+            returnCast: optionalStringField("returnCast", in: effect)
+        )
+    }
+
+    private static func stringField(_ name: String, in value: CompileTimeValue) -> String? {
+        guard case .string(let string)? = value.field(name) else {
+            return nil
+        }
+        return string
+    }
+
+    private static func optionalStringField(_ name: String, in value: CompileTimeValue) -> String? {
+        guard let string = stringField(name, in: value),
+            !string.isEmpty
+        else {
+            return nil
+        }
+        return string
+    }
+
+    private static func stringLLVMBlockStatementEffect(_ effect: String) -> LLVMBlockStatementEffect? {
         let prefix: String
         if effect.hasPrefix("llvm-effect|kind=") {
             prefix = "llvm-effect|kind="
@@ -858,13 +905,20 @@ extension MacroExpander {
             llvmContext: llvmContext
         )
         var locals = localBindings
-        guard case .string(let payload)? = evaluator.evaluateStatements(macro.body, locals: &locals) else {
+        guard let value = evaluator.evaluateStatements(macro.body, locals: &locals) else {
             return nil
         }
-        return minimalLLVMValuePayload(payload)
+        return minimalLLVMValuePayload(value)
     }
 
-    private static func minimalLLVMValuePayload(_ payload: String) -> MinimalLLVMValue? {
+    private static func minimalLLVMValuePayload(_ payload: CompileTimeValue) -> MinimalLLVMValue? {
+        if case .object("LLVMValue", _) = payload {
+            return minimalLLVMValueObject(payload)
+        }
+
+        guard case .string(let payload) = payload else {
+            return nil
+        }
         let parts = payload.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
         guard parts.first == "value" || parts.first == "llvm-value" else {
             return nil
@@ -901,6 +955,45 @@ extension MacroExpander {
             isImmediate: lines.isEmpty && !operand.hasPrefix("%"),
             payload: payload
         )
+    }
+
+    private static func minimalLLVMValueObject(_ payload: CompileTimeValue) -> MinimalLLVMValue? {
+        guard
+            let type = stringField("type", in: payload),
+            isValidLLVMType(type),
+            let operand = stringField("operand", in: payload),
+            isValidImmediateOperand(operand)
+        else {
+            return nil
+        }
+
+        let instructions = optionalStringField("instructions", in: payload)
+            ?? optionalStringField("prelude", in: payload)
+            ?? ""
+        let lines = instructions.isEmpty ? [] : instructions.components(separatedBy: "\n")
+        return MinimalLLVMValue(
+            lines: lines,
+            type: type,
+            operand: operand,
+            isImmediate: lines.isEmpty && !operand.hasPrefix("%"),
+            payload: legacyLLVMValuePayload(payload)
+        )
+    }
+
+    private static func legacyLLVMValuePayload(_ payload: CompileTimeValue) -> String {
+        let fields = [
+            ("construct", stringField("construct", in: payload)),
+            ("llvm.type", stringField("type", in: payload)),
+            ("llvm.operand", stringField("operand", in: payload)),
+            ("llvm.storage", stringField("storage", in: payload)),
+            ("llvm.needsTrunc", stringField("needsTrunc", in: payload)),
+            ("llvm.returnCast", stringField("returnCast", in: payload)),
+            ("llvm.prelude", stringField("prelude", in: payload)),
+        ]
+        return "value"
+            + fields.compactMap { name, value in
+                value.map { "|\(name)=\($0)" }
+            }.joined()
     }
 
     private static func argument(named name: String, in arguments: [CallArgument]) -> Expression? {

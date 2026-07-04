@@ -1,16 +1,17 @@
 @type
-@macro(name: int, result: @string, target: @construct){
+@macro(name: int, result: @object, target: @construct){
     @parameter(name: value, value: @literal)
     @generic(name: bits, value: @int(value: 64))
     @generic(name: signedness, value: Signedness.signed)
 
-    @return(value: @string("value|construct=Int|llvm.type=i"
-        + bits
-        + "|llvm.operand="
-        + value
-        + "|llvm.signedness="
-        + signedness
-        + "|llvm.storage=immediate"
-        + "|llvm.needsTrunc=false"
-        + "|llvm.prelude="))
+    @return(value: @object(type: LLVMValue, fields: [
+        @field(name: construct, value: "Int"),
+        @field(name: type, value: "i" + bits),
+        @field(name: operand, value: value),
+        @field(name: signedness, value: signedness),
+        @field(name: storage, value: "immediate"),
+        @field(name: needsTrunc, value: "false"),
+        @field(name: returnCast, value: ""),
+        @field(name: prelude, value: "")
+    ]))
 }

@@ -1,13 +1,15 @@
 @type
-@macro(name: bool, result: @string, target: @construct){
+@macro(name: bool, result: @object, target: @construct){
     @parameter(name: value, value: @literal)
     @state(name: operand, value: "value == \"true\" ? \"1\" : \"0\"")
 
-    @return(value: @string("value|construct=Bool|llvm.type=i1"
-        + "|llvm.operand="
-        + operand
-        + "|llvm.storage=immediate"
-        + "|llvm.needsTrunc=false"
-        + "|llvm.returnCast=zext"
-        + "|llvm.prelude="))
+    @return(value: @object(type: LLVMValue, fields: [
+        @field(name: construct, value: "Bool"),
+        @field(name: type, value: "i1"),
+        @field(name: operand, value: operand),
+        @field(name: storage, value: "immediate"),
+        @field(name: needsTrunc, value: "false"),
+        @field(name: returnCast, value: "zext"),
+        @field(name: prelude, value: "")
+    ]))
 }

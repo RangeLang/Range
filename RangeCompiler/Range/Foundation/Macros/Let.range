@@ -4,11 +4,21 @@
 
     @state(name: valueType, value: "@llvmField(value: value, name: @string(\"type\"))")
     @state(name: valueConstruct, value: "@llvmField(value: value, name: @string(\"construct\"))")
-    @state(name: llvm, value: "\"effect|kind=environment-set|name=\" + name + \"|value=\" + value")
 
     @if("!valueType.isEmpty") {
-        @assignment(target: llvm, value: "\"llvm-effect|kind=llvm-binding|name=\" + name + \"|construct=\" + valueConstruct + \"|type=\" + valueType + \"|returnCast=\" + @llvmField(value: value, name: @string(\"returnCast\")) + \"|pointer=%\" + name + \"|body=\" + @llvmField(value: value, name: @string(\"prelude\")) + \"  %\" + name + \" = alloca \" + valueType + \"\\n  store \" + valueType + \" \" + @llvmField(value: value, name: @string(\"operand\")) + \", ptr %\" + name")
+        @state(name: body, value: "@llvmField(value: value, name: @string(\"prelude\")) + \"  %\" + name + \" = alloca \" + valueType + \"\\n  store \" + valueType + \" \" + @llvmField(value: value, name: @string(\"operand\")) + \", ptr %\" + name")
+        @return(value: @object(type: LLVMEffect, fields: [
+            @field(name: kind, value: "llvm-binding"),
+            @field(name: binding, value: name),
+            @field(name: type, value: valueType),
+            @field(name: construct, value: valueConstruct),
+            @field(name: returnCast, value: @llvmField(value: value, name: @string("returnCast"))),
+            @field(name: body, value: body)
+        ]))
     }
 
-    @return(value: llvm)
+    @return(value: @string("effect|kind=environment-set|name="
+        + name
+        + "|value="
+        + value))
 }

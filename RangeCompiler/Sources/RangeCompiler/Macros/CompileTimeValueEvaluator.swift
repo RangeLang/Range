@@ -557,7 +557,7 @@ struct CompileTimeValueEvaluator {
         let nameExpression = arguments.first(where: { $0.label == "name" })?.value
         guard let valueExpression,
             let nameExpression,
-            case .string(let value) = evaluate(valueExpression, locals: locals),
+            let value = evaluate(valueExpression, locals: locals),
             case .string(let name) = evaluate(nameExpression, locals: locals)
         else {
             return nil
@@ -729,7 +729,29 @@ struct CompileTimeValueEvaluator {
         }
     }
 
-    private func llvmPayloadField(_ payload: String, name: String) -> String? {
+    private func llvmPayloadField(_ payload: CompileTimeValue, name: String) -> String? {
+        if case .object("LLVMValue", _) = payload {
+            let normalizedName = name.hasPrefix("llvm.")
+                ? String(name.dropFirst("llvm.".count))
+                : name
+            if case .string(let value)? = payload.field(normalizedName) {
+                return value
+            }
+            if case .integer(let value)? = payload.field(normalizedName) {
+                return String(value)
+            }
+            if case .double(let value)? = payload.field(normalizedName) {
+                return String(value)
+            }
+            if case .boolean(let value)? = payload.field(normalizedName) {
+                return value ? "true" : "false"
+            }
+            return nil
+        }
+
+        guard case .string(let payload) = payload else {
+            return nil
+        }
         let parts = payload.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
         guard parts.first == "value" || parts.first == "llvm-value" || parts.first == "llvm-binding" else {
             return nil
