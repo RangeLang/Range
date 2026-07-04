@@ -1038,136 +1038,6 @@ extension MacroExpander {
         )
     }
 
-    static func evaluatedStringStatementMacro(
-        name: String,
-        argumentClause: String?,
-        body: [Statement],
-        macros: [String: MacroDeclaration],
-        context: MacroExpansionContext
-    ) throws -> String {
-        guard let macro = macros[name] else {
-            return renderStatementMacroInvocation(
-                name: name,
-                argumentClause: argumentClause,
-                body: renderStatementsForRawBody(body)
-            )
-        }
-        let application = MacroApplication(
-            name: name,
-            genericArguments: [],
-            argumentClause: argumentClause
-        )
-        guard
-            let argumentBindings = (try? parseMacroArgumentBindings(
-                for: macro,
-                argumentClause: argumentClause
-            )) ?? singlePositionalMacroArgumentBindings(
-                for: macro,
-                argumentClause: argumentClause
-            )
-        else {
-            throw ParseError("Could not bind arguments for statement macro @\(name).")
-        }
-
-        let evaluator = CompileTimeValueEvaluator(
-            targetBinding: "target",
-            targetValue: statementMacroTargetValue(body: body, application: application),
-            graphBinding: "graph",
-            selfValue: MacroTargetValueBuilder(
-                macroDeclarationsByName: context.macroDeclarationsByName,
-                macroMetadataByName: context.macroMetadataByName,
-                constructsByName: context.graphContext.constructsByName,
-                knownObjectTypeNames: context.graphContext.knownObjectTypeNames
-            ).value(for: macro),
-            localBindings: argumentBindings,
-            macroDeclarationsByName: context.macroDeclarationsByName,
-            callableDeclarationsByName: context.callableDeclarationsByName,
-            knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
-            context: context
-        )
-        var locals = argumentBindings
-        guard let value = evaluator.evaluateStatements(macro.body, locals: &locals),
-            let processed = renderedStatementMacroValue(value)
-        else {
-            throw ParseError("Could not evaluate statement macro @\(name) to String.")
-        }
-        return processed
-    }
-
-    static func evaluatedStringStatementMacro(
-        name: String,
-        arguments: [CallArgument],
-        macros: [String: MacroDeclaration],
-        context: MacroExpansionContext
-    ) throws -> String {
-        let statement = Statement.macroApplication(name: name, arguments: arguments)
-        guard let macro = macros[name],
-            let argumentBindings = try? parseMacroArgumentBindings(
-                for: macro,
-                arguments: arguments
-            )
-        else {
-            return renderStatementForBlockValue(statement)
-        }
-
-        let application = MacroApplication(
-            name: name,
-            genericArguments: [],
-            argumentClause: renderArgumentsForStringify(arguments)
-        )
-        let evaluator = CompileTimeValueEvaluator(
-            targetBinding: "target",
-            targetValue: statementMacroTargetValue(body: [], application: application),
-            graphBinding: "graph",
-            selfValue: MacroTargetValueBuilder(
-                macroDeclarationsByName: context.macroDeclarationsByName,
-                macroMetadataByName: context.macroMetadataByName,
-                constructsByName: context.graphContext.constructsByName,
-                knownObjectTypeNames: context.graphContext.knownObjectTypeNames
-            ).value(for: macro),
-            localBindings: argumentBindings,
-            macroDeclarationsByName: context.macroDeclarationsByName,
-            callableDeclarationsByName: context.callableDeclarationsByName,
-            knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
-            context: context
-        )
-        var locals = argumentBindings
-        guard let value = evaluator.evaluateStatements(macro.body, locals: &locals),
-            let processed = renderedStatementMacroValue(value)
-        else {
-            throw ParseError("Could not evaluate statement macro @\(name) to String.")
-        }
-        return processed
-    }
-
-    private static func renderedStatementMacroValue(_ value: CompileTimeValue) -> String? {
-        switch value {
-        case .object("MacroEffect", _), .object("LLVMEffect", _),
-            .object("EnumCase", _), .object("ParameterValue", _):
-            return ""
-        default:
-            return nil
-        }
-    }
-
-    private static func macroTargetsStatementSurface(_ macro: MacroDeclaration) -> Bool {
-        if macro.macros.contains(where: { $0.name == "statement" }) {
-            return true
-        }
-        return macro.target.map(macroTargetIncludesStatementSurface) ?? false
-    }
-
-    private static func macroTargetIncludesStatementSurface(_ target: MacroTarget) -> Bool {
-        switch target {
-        case .macroSurface(let name):
-            return name == "statement"
-        case .anyOf(let targets), .allOf(let targets):
-            return targets.contains(where: macroTargetIncludesStatementSurface)
-        case .syntax:
-            return false
-        }
-    }
-
     static func statementMacroTargetValue(
         body: [Statement],
         application: MacroApplication
@@ -1380,8 +1250,7 @@ extension MacroExpander {
     static func expand(
         callable: CallableDeclaration,
         macros: [String: MacroDeclaration],
-        context: MacroExpansionContext,
-        preserveStatementMacroApplications: Bool = false
+        context: MacroExpansionContext
     ) throws -> CallableDeclaration {
         CallableDeclaration(
             macros: callable.macros,
@@ -1399,8 +1268,7 @@ extension MacroExpander {
                     statements: $0,
                     expectedReturnType: callable.returnType,
                     macros: macros,
-                    context: context,
-                    preserveStatementMacroApplications: preserveStatementMacroApplications
+                    context: context
                 )
             }
         )
@@ -1545,8 +1413,7 @@ extension MacroExpander {
         statements: [Statement],
         expectedReturnType: TypeReference? = nil,
         macros: [String: MacroDeclaration],
-        context: MacroExpansionContext,
-        preserveStatementMacroApplications: Bool = false
+        context: MacroExpansionContext
     ) throws -> [Statement] {
         var expanded: [Statement] = []
         for statement in statements {
@@ -1555,8 +1422,7 @@ extension MacroExpander {
                     statement: statement,
                     expectedReturnType: expectedReturnType,
                     macros: macros,
-                    context: context,
-                    preserveStatementMacroApplications: preserveStatementMacroApplications
+                    context: context
                 ))
         }
         return expanded
@@ -1566,52 +1432,18 @@ extension MacroExpander {
         statement: Statement,
         expectedReturnType: TypeReference? = nil,
         macros: [String: MacroDeclaration],
-        context: MacroExpansionContext,
-        preserveStatementMacroApplications: Bool = false
+        context: MacroExpansionContext
     ) throws -> [Statement] {
         switch statement {
         case .macroInvocation(let name, let argumentClause, let body):
-            if preserveStatementMacroApplications,
-                macros[name].map(macroTargetsStatementSurface) == true
-            {
-                return [statement]
-            }
             let expandedBody = try expand(
                 statements: body,
                 expectedReturnType: nil,
                 macros: macros,
-                context: context,
-                preserveStatementMacroApplications: preserveStatementMacroApplications
+                context: context
             )
-            return [
-                .emitted(
-                    try evaluatedStringStatementMacro(
-                        name: name,
-                        argumentClause: argumentClause,
-                        body: expandedBody,
-                        macros: macros,
-                        context: context
-                    )
-                )
-            ]
-        case .macroApplication(let name, let arguments):
-            if preserveStatementMacroApplications,
-                macros[name].map(macroTargetsStatementSurface) == true
-            {
-                return [statement]
-            }
-            if macros[name].map(macroTargetsStatementSurface) == true {
-                return [
-                    .emitted(
-                        try evaluatedStringStatementMacro(
-                            name: name,
-                            arguments: arguments,
-                            macros: macros,
-                            context: context
-                        )
-                    )
-                ]
-            }
+            return [.macroInvocation(name: name, argumentClause: argumentClause, body: expandedBody)]
+        case .macroApplication:
             return [statement]
         default:
             return [statement]
