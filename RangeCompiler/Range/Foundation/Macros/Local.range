@@ -1,0 +1,5 @@
+@macro(name: local, result: @object){
+    @parameter(name: name, value: @name)
+
+    @return(value: @string(""))
+}

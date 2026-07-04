@@ -2,9 +2,11 @@
     @parameter(name: lhs, value: @int())
     @parameter(name: rhs, value: @int())
     @parameter(name: temporaryPrefix, value: @string(value: "add"))
-    @state(name: type, value: "@llvmField(value: lhs, name: @string(\"type\"))")
-    @state(name: construct, value: "@llvmField(value: lhs, name: @string(\"construct\"))")
+    @state(name: type, value: "lhs.type")
+    @state(name: construct, value: "lhs.construct")
     @state(name: operand, value: "@temporary(prefix: temporaryPrefix)")
+    @state(name: lhsPrelude, value: "lhs.prelude.isEmpty ? \"\" : lhs.prelude + \"\\n\"")
+    @state(name: rhsPrelude, value: "rhs.prelude.isEmpty ? \"\" : rhs.prelude + \"\\n\"")
 
     @return(value: @object(type: LLVMValue, fields: [
         @field(name: construct, value: construct),
@@ -13,15 +15,15 @@
         @field(name: storage, value: "temporary"),
         @field(name: needsTrunc, value: "true"),
         @field(name: returnCast, value: ""),
-        @field(name: prelude, value: @llvmField(value: lhs, name: @string("prelude"))
-            + @llvmField(value: rhs, name: @string("prelude"))
+        @field(name: prelude, value: lhsPrelude
+            + rhsPrelude
             + "  "
             + operand
             + " = add "
             + type
             + " "
-            + @llvmField(value: lhs, name: @string("operand"))
+            + lhs.operand
             + ", "
-            + @llvmField(value: rhs, name: @string("operand")))
+            + rhs.operand)
     ]))
 }

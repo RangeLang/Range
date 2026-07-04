@@ -2,17 +2,19 @@
     @parameter(name: name, value: @name)
     @parameter(name: value, value: @string(value: ""))
 
-    @state(name: valueType, value: "@llvmField(value: value, name: @string(\"type\"))")
-    @state(name: valueConstruct, value: "@llvmField(value: value, name: @string(\"construct\"))")
+    @state(name: valueType, value: "value.type")
+    @state(name: valueConstruct, value: "value.construct")
+    @state(name: rawValuePrelude, value: "value.prelude")
+    @state(name: valuePrelude, value: "rawValuePrelude.isEmpty ? \"\" : rawValuePrelude + \"\\n\"")
 
     @if("!valueType.isEmpty") {
-        @state(name: body, value: "@llvmField(value: value, name: @string(\"prelude\")) + \"  %\" + name + \" = alloca \" + valueType + \"\\n  store \" + valueType + \" \" + @llvmField(value: value, name: @string(\"operand\")) + \", ptr %\" + name")
+        @state(name: body, value: "valuePrelude + \"  %\" + name + \" = alloca \" + valueType + \"\\n  store \" + valueType + \" \" + value.operand + \", ptr %\" + name")
         @return(value: @object(type: LLVMEffect, fields: [
             @field(name: kind, value: "llvm-binding"),
             @field(name: binding, value: name),
             @field(name: type, value: valueType),
             @field(name: construct, value: valueConstruct),
-            @field(name: returnCast, value: @llvmField(value: value, name: @string("returnCast"))),
+            @field(name: returnCast, value: value.returnCast),
             @field(name: body, value: body)
         ]))
     }

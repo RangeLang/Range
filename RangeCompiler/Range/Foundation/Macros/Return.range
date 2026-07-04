@@ -1,27 +1,30 @@
 @macro(name: return, result: @object, target: @statement){
     @parameter(name: value, value: @string(value: ""))
 
-    @state(name: valueType, value: "@llvmField(value: value, name: @string(\"type\"))")
-    @state(name: returnCast, value: "@llvmField(value: value, name: @string(\"returnCast\"))")
+    @state(name: valueType, value: "value.type")
+    @state(name: returnCast, value: "value.returnCast")
+    @state(name: rawValuePrelude, value: "value.prelude")
+    @state(name: valuePrelude, value: "rawValuePrelude.isEmpty ? \"\" : rawValuePrelude + \"\\n\"")
+    @state(name: valueOperand, value: "value.operand")
     @state(name: body, value: "\"\"")
 
     @if("!valueType.isEmpty") {
-        @assignment(target: body, value: "@llvmField(value: value, name: @string(\"prelude\")) + \"  ret i32 \" + @llvmField(value: value, name: @string(\"operand\"))")
+        @assignment(target: body, value: "valuePrelude + \"  ret i32 \" + valueOperand")
     }
 
-    @if("@llvmField(value: value, name: @string(\"needsTrunc\")) == \"true\"") {
+    @if("value.needsTrunc == \"true\"") {
         @state(name: returnOperand, value: "@temporary(prefix: @string(\"return\"))")
-        @assignment(target: body, value: "@llvmField(value: value, name: @string(\"prelude\")) + \"  \" + returnOperand + \" = trunc \" + valueType + \" \" + @llvmField(value: value, name: @string(\"operand\")) + \" to i32\\n  ret i32 \" + returnOperand")
+        @assignment(target: body, value: "valuePrelude + \"  \" + returnOperand + \" = trunc \" + valueType + \" \" + valueOperand + \" to i32\\n  ret i32 \" + returnOperand")
     }
 
     @if("returnCast == \"zext\"") {
         @state(name: returnOperand, value: "@temporary(prefix: @string(\"return\"))")
-        @assignment(target: body, value: "@llvmField(value: value, name: @string(\"prelude\")) + \"  \" + returnOperand + \" = zext \" + valueType + \" \" + @llvmField(value: value, name: @string(\"operand\")) + \" to i32\\n  ret i32 \" + returnOperand")
+        @assignment(target: body, value: "valuePrelude + \"  \" + returnOperand + \" = zext \" + valueType + \" \" + valueOperand + \" to i32\\n  ret i32 \" + returnOperand")
     }
 
     @if("returnCast == \"fptosi\"") {
         @state(name: returnOperand, value: "@temporary(prefix: @string(\"return\"))")
-        @assignment(target: body, value: "@llvmField(value: value, name: @string(\"prelude\")) + \"  \" + returnOperand + \" = fptosi \" + valueType + \" \" + @llvmField(value: value, name: @string(\"operand\")) + \" to i32\\n  ret i32 \" + returnOperand")
+        @assignment(target: body, value: "valuePrelude + \"  \" + returnOperand + \" = fptosi \" + valueType + \" \" + valueOperand + \" to i32\\n  ret i32 \" + returnOperand")
     }
 
     @return(value: @object(type: LLVMEffect, fields: [

@@ -1,6 +1,0 @@
-@macro(name: llvmField, result: @string){
-    @parameter(name: value, value: @string(value: ""))
-    @parameter(name: name, value: @string(value: ""))
-
-    @return(value: @string(""))
-}

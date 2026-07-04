@@ -1,13 +1,13 @@
 @macro(name: reference, result: @object){
     @parameter(name: name, value: @name)
-    @state(name: binding, value: "@llvmBinding(name: name)")
+    @state(name: local, value: "@local(name: name)")
     @state(name: operand, value: "@temporary(prefix: name + @string(\".value\"))")
-    @state(name: returnCast, value: "@llvmField(value: binding, name: @string(\"returnCast\"))")
+    @state(name: returnCast, value: "local.returnCast")
     @state(name: needsTrunc, value: "returnCast.isEmpty ? \"true\" : \"false\"")
-    @state(name: type, value: "@llvmField(value: binding, name: @string(\"type\"))")
+    @state(name: type, value: "local.type")
 
     @return(value: @object(type: LLVMValue, fields: [
-        @field(name: construct, value: @llvmField(value: binding, name: @string("construct"))),
+        @field(name: construct, value: local.construct),
         @field(name: type, value: type),
         @field(name: operand, value: operand),
         @field(name: storage, value: "temporary"),
@@ -18,6 +18,6 @@
             + " = load "
             + type
             + ", ptr "
-            + @llvmField(value: binding, name: @string("pointer")))
+            + local.pointer)
     ]))
 }

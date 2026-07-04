@@ -336,20 +336,15 @@ struct CompileTimeValueEvaluator {
             {
                 return .string(value)
             }
-            if name == "llvmField",
-                let value = llvmFieldMacroValue(arguments: arguments, locals: locals)
-            {
-                return .string(value)
-            }
             if name == "temporary",
                 let value = temporaryMacroValue(arguments: arguments, locals: locals)
             {
                 return .string(value)
             }
-            if name == "llvmBinding",
-                let value = llvmBindingMacroValue(arguments: arguments, locals: locals)
+            if name == "local",
+                let value = localMacroValue(arguments: arguments, locals: locals)
             {
-                return .string(value)
+                return value
             }
             if name == "generic",
                 let value = genericMacroValue(arguments: arguments, locals: locals)
@@ -548,29 +543,6 @@ struct CompileTimeValueEvaluator {
         return value
     }
 
-    private func llvmFieldMacroValue(
-        arguments: [CallArgument],
-        locals: [String: Expression]
-    ) -> String? {
-        let valueExpression = arguments.first(where: { $0.label == "value" })?.value
-            ?? arguments.first?.value
-        let nameExpression = arguments.first(where: { $0.label == "name" })?.value
-        guard let valueExpression,
-            let nameExpression,
-            let value = evaluate(valueExpression, locals: locals),
-            case .string(let name) = evaluate(nameExpression, locals: locals)
-        else {
-            return nil
-        }
-        guard let field = llvmPayloadField(value, name: name) else {
-            return ""
-        }
-        if name == "prelude", !field.isEmpty {
-            return field + "\n"
-        }
-        return field
-    }
-
     private func temporaryMacroValue(
         arguments: [CallArgument],
         locals: [String: Expression]
@@ -587,10 +559,10 @@ struct CompileTimeValueEvaluator {
         return "%\(llvmContext.nextTemporary(prefix: prefix))"
     }
 
-    private func llvmBindingMacroValue(
+    private func localMacroValue(
         arguments: [CallArgument],
         locals: [String: Expression]
-    ) -> String? {
+    ) -> CompileTimeValue? {
         let nameExpression = arguments.first(where: { $0.label == "name" })?.value
             ?? arguments.first?.value
         guard let llvmContext,
@@ -602,7 +574,15 @@ struct CompileTimeValueEvaluator {
         }
         let construct = llvmContext.bindingConstructs[name] ?? ""
         let returnCast = llvmContext.bindingReturnCasts[name] ?? ""
-        return "llvm-binding|construct=\(construct)|type=\(type)|returnCast=\(returnCast)|pointer=%\(name)"
+        return .object(
+            typeName: "Local",
+            fields: [
+                "construct": .string(construct),
+                "type": .string(type),
+                "returnCast": .string(returnCast),
+                "pointer": .string("%\(name)"),
+            ]
+        )
     }
 
     private func genericMacroValue(
@@ -727,47 +707,6 @@ struct CompileTimeValueEvaluator {
             }
             return name
         }
-    }
-
-    private func llvmPayloadField(_ payload: CompileTimeValue, name: String) -> String? {
-        if case .object("LLVMValue", _) = payload {
-            let normalizedName = name.hasPrefix("llvm.")
-                ? String(name.dropFirst("llvm.".count))
-                : name
-            if case .string(let value)? = payload.field(normalizedName) {
-                return value
-            }
-            if case .integer(let value)? = payload.field(normalizedName) {
-                return String(value)
-            }
-            if case .double(let value)? = payload.field(normalizedName) {
-                return String(value)
-            }
-            if case .boolean(let value)? = payload.field(normalizedName) {
-                return value ? "true" : "false"
-            }
-            return nil
-        }
-
-        guard case .string(let payload) = payload else {
-            return nil
-        }
-        let parts = payload.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
-        guard parts.first == "llvm-binding" else {
-            return nil
-        }
-        var fields: [String: String] = [:]
-        for part in parts.dropFirst() {
-            let pair = part.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
-            guard pair.count == 2 else {
-                continue
-            }
-            fields[String(pair[0])] = String(pair[1])
-        }
-        if let field = fields[name] {
-            return field
-        }
-        return nil
     }
 
     private func evaluateUserFunctionCall(
@@ -970,10 +909,20 @@ struct CompileTimeValueEvaluator {
                 }
             }
 
-            guard let next = current.field(component) else {
-                return nil
+            if case .nilValue = current {
+                switch component {
+                case "isEmpty":
+                    current = .boolean(true)
+                    continue
+                case "count":
+                    current = .integer(0)
+                    continue
+                default:
+                    return .nilValue
+                }
             }
-            current = next
+
+            current = current.field(component) ?? .nilValue
         }
 
         return current
@@ -1201,7 +1150,7 @@ struct CompileTimeValueEvaluator {
         "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
         "Macro.Application", "Macro.Declaration", "Macro.Target", "CodingBehavior",
         "ValueGeneric", "Parameter.Declaration",
-        "Void", "Identity", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "LocalBinding",
+        "Void", "Identity", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "Local", "LocalBinding",
         "Return", "Break", "Assignment",
         "ProgramSourceFile", "ProgramArtifact", "ProgramResult", "RangeProgram", "RangeGraph", "RangeProject",
         "WrittenExpression",

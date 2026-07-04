@@ -37,7 +37,7 @@ struct MacroCarrierCompilerTests {
         #expect(program.declarationGraph.macrosByName["name"] != nil)
         #expect(program.declarationGraph.macrosByName["int"] != nil)
         #expect(program.declarationGraph.macrosByName["let"] != nil)
-        #expect(program.declarationGraph.macrosByName["llvmField"] != nil)
+        #expect(program.declarationGraph.macrosByName["local"] != nil)
         #expect(program.declarationGraph.macrosByName["object"] != nil)
         #expect(program.declarationGraph.macrosByName["reference"] != nil)
         #expect(program.declarationGraph.macrosByName["return"] != nil)
