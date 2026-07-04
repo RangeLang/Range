@@ -1155,7 +1155,7 @@ struct CompileTimeValueEvaluator {
         "ProgramSourceFile", "ProgramArtifact", "ProgramResult", "RangeProgram", "RangeGraph", "RangeProject",
         "WrittenExpression",
         "ArrayExpression", "EnumCaseExpression",
-        "LLVMValue",
+        "StringValue", "ArrayValue", "LLVMValue",
     ]
 
     private func evaluatePrimitiveConstruction(

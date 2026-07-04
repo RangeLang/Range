@@ -117,6 +117,7 @@ struct MacroCarrierCompilerTests {
 
         #expect(valueParameter.valueCapability == .literal)
         #expect(valueParameter.defaultValue == nil)
+        #expect(stringMacro.expansionType == .named("Object"))
     }
 
     @Test("int macro configuration parameters accept generics")
@@ -163,6 +164,7 @@ struct MacroCarrierCompilerTests {
         #expect(typeParameter.defaultValue != nil)
         #expect(elementsParameter.valueCapability == .literal)
         #expect(elementsParameter.defaultValue == nil)
+        #expect(arrayMacro.expansionType == .named("Object"))
     }
 
     @Test("array literal arguments parse as array expressions")

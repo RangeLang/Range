@@ -1,7 +1,9 @@
 @type
-@macro(name: string, result: @string, target: @construct){
+@macro(name: string, result: @object, target: @construct){
     @parameter(name: value, value: @literal)
 
-    @return(value: @string("value|construct=String|literal="
-        + value))
+    @return(value: @object(type: StringValue, fields: [
+        @field(name: construct, value: "String"),
+        @field(name: literal, value: value)
+    ]))
 }

@@ -1,9 +1,12 @@
 @type
-@macro(name: array, result: @string, target: @construct){
+@macro(name: array, result: @object, target: @construct){
     @generic(name: type, value: @void)
     @parameter(name: elements, value: @literal)
 
-    @return(value: @string("value|construct=Array|element.type="
-        + type
-        + "|storage=literal"))
+    @return(value: @object(type: ArrayValue, fields: [
+        @field(name: construct, value: "Array"),
+        @field(name: elementType, value: type),
+        @field(name: elements, value: elements),
+        @field(name: storage, value: "literal")
+    ]))
 }
