@@ -1,3 +1,5 @@
-@macro(name: generic, result: @string){
-    @return(value: @string("parameter-capability|kind=generic"))
+@macro(name: generic, result: @object){
+    @return(value: @object(type: ParameterCapability, fields: [
+        @field(name: kind, value: "generic")
+    ]))
 }

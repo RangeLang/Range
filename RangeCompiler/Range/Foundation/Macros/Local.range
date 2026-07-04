@@ -1,5 +1,7 @@
 @macro(name: local, result: @object){
     @parameter(name: name, value: @name)
 
-    @return(value: @string(""))
+    @return(value: @object(type: LocalBinding, fields: [
+        @field(name: name, value: name)
+    ]))
 }

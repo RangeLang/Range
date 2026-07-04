@@ -78,41 +78,33 @@ extension MacroExpander {
                 macros: macros,
                 context: context
             )
-        let memberText =
+        let memberValues =
             isLLVMArtifactBlock
-            ? ""
-            : evaluatedStringMacroStatements(
+            ? []
+            : evaluatedMacroMemberValues(
                 in: blockMacro.body,
                 macros: macros,
                 context: context
-            ).joined(separator: "\n")
-        let rawBody = memberText.isEmpty ? blockMacro.rawBody : memberText
+            )
+        let rawBody = blockMacro.rawBody
         let preEvaluatedApplications = blockMacro.macros.map {
             guard $0.name != "construct" else {
                 return $0
             }
-            return attachingEvaluatedStringValue(
+            return attachingEvaluatedValue(
                 to: $0,
                 rawBody: rawBody,
+                members: memberValues,
                 bodyStatements: isLLVMArtifactBlock ? blockMacro.body : nil,
                 macros: macros,
                 context: context
             )
         }
-        let attachmentRecords = preEvaluatedApplications.compactMap { application in
-            guard application.name != "construct" else {
-                return nil
-            }
-            return evaluatedStringAttachment(application.evaluatedValue)
-        }.filter { !$0.isEmpty }.joined(separator: "\n")
-        let constructRawBody =
-            attachmentRecords.isEmpty
-            ? rawBody
-            : rawBody.isEmpty ? attachmentRecords : attachmentRecords + "\n" + rawBody
         let applications = preEvaluatedApplications.map {
-            attachingEvaluatedStringValue(
+            attachingEvaluatedValue(
                 to: $0,
-                rawBody: $0.name == "construct" ? constructRawBody : rawBody,
+                rawBody: rawBody,
+                members: memberValues,
                 bodyStatements: isLLVMArtifactBlock ? blockMacro.body : nil,
                 macros: macros,
                 context: context
@@ -188,7 +180,8 @@ extension MacroExpander {
 
     static func blockMacroTargetValue(
         rawBody: String,
-        application: MacroApplication
+        application: MacroApplication,
+        members: [CompileTimeValue] = []
     ) -> CompileTimeValue {
         .object(
             typeName: "Block",
@@ -197,12 +190,14 @@ extension MacroExpander {
                 "declaration": .object(
                     typeName: "Block.Declaration",
                     fields: [
-                        "body": .array([]),
-                        "statements": .array([]),
+                        "body": .array(members),
+                        "statements": .array(members),
+                        "members": .array(members),
                     ]
                 ),
-                "body": .array([]),
-                "statements": .array([]),
+                "body": .array(members),
+                "statements": .array(members),
+                "members": .array(members),
                 "rawBody": .string(rawBody),
                 "rawBodyText": .string(rawBody),
             ]
@@ -300,10 +295,7 @@ extension MacroExpander {
         return extensionDeclaration
     }
 
-    // Evaluates a construct-attached macro and, when it returns a string,
-    // carries that processed result on the application so Range-authored
-    // construct macros can consume sibling attachment records.
-    static func attachingEvaluatedStringValue(
+    static func attachingEvaluatedValue(
         to application: MacroApplication,
         construct: ConstructDeclaration,
         context: MacroExpansionContext
@@ -364,7 +356,7 @@ extension MacroExpander {
         return updated
     }
 
-    static func attachingEvaluatedStringValues(
+    static func attachingEvaluatedValues(
         to applications: [MacroApplication],
         body: [Statement],
         macros: [String: MacroDeclaration],
@@ -408,9 +400,10 @@ extension MacroExpander {
 
     }
 
-    static func attachingEvaluatedStringValue(
+    static func attachingEvaluatedValue(
         to application: MacroApplication,
         rawBody: String,
+        members: [CompileTimeValue] = [],
         bodyStatements: [Statement]? = nil,
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
@@ -429,14 +422,18 @@ extension MacroExpander {
                 statements: bodyStatements,
                 macros: macros,
                 context: context
-            )
+        )
         {
             var updated = applicationWithBody
             updated.evaluatedValue = artifact
             return updated
         }
         guard let macro = macros[application.name] else { return applicationWithBody }
-        let targetValue = blockMacroTargetValue(rawBody: rawBody, application: applicationWithBody)
+        let targetValue = blockMacroTargetValue(
+            rawBody: rawBody,
+            application: applicationWithBody,
+            members: members
+        )
         guard
             let argumentBindings = (try? parseMacroArgumentBindings(
                 for: macro,
@@ -940,12 +937,12 @@ extension MacroExpander {
         return operand.allSatisfy { $0.isNumber || $0 == "-" || $0 == "." }
     }
 
-    static func evaluatedStringMacroStatements(
+    static func evaluatedMacroMemberValues(
         in statements: [Statement],
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
-    ) -> [String] {
-        statements.enumerated().compactMap { offset, statement -> String? in
+    ) -> [CompileTimeValue] {
+        statements.enumerated().compactMap { offset, statement -> CompileTimeValue? in
             let name: String
             let argumentBindings: [String: Expression]?
             let targetValue: CompileTimeValue
@@ -976,11 +973,11 @@ extension MacroExpander {
                 }
                 targetValue = memberMacroTargetValue(
                     ordinal: offset,
-                    bodyText: evaluatedStringMacroStatements(
+                    members: evaluatedMacroMemberValues(
                         in: body,
                         macros: macros,
                         context: context
-                    ).joined(separator: "\n")
+                    )
                 )
             default:
                 return nil
@@ -1007,17 +1004,21 @@ extension MacroExpander {
                 context: context
             )
             var locals = argumentBindings
-            guard case .string(let processed)? = evaluator.evaluateStatements(
+            guard let value = evaluator.evaluateStatements(
                 macro.body,
                 locals: &locals
             ) else {
                 return nil
             }
-            return processed
+            return value
         }
     }
 
-    static func memberMacroTargetValue(ordinal: Int, bodyText: String = "") -> CompileTimeValue {
+    static func memberMacroTargetValue(
+        ordinal: Int,
+        bodyText: String = "",
+        members: [CompileTimeValue] = []
+    ) -> CompileTimeValue {
         .object(
             typeName: "MemberMacro.Target",
             fields: [
@@ -1030,6 +1031,7 @@ extension MacroExpander {
                         "text": .string(bodyText),
                     ]
                 ),
+                "members": .array(members),
                 "bodyText": .string(bodyText),
                 "text": .string(bodyText),
             ]
@@ -1140,21 +1142,12 @@ extension MacroExpander {
 
     private static func renderedStatementMacroValue(_ value: CompileTimeValue) -> String? {
         switch value {
-        case .string(let processed):
-            return processed
         case .object("MacroEffect", _), .object("LLVMEffect", _),
             .object("EnumCase", _), .object("ParameterValue", _):
             return ""
         default:
             return nil
         }
-    }
-
-    private static func evaluatedStringAttachment(_ value: CompileTimeValue?) -> String? {
-        guard case .string(let attachment)? = value else {
-            return nil
-        }
-        return attachment
     }
 
     private static func macroTargetsStatementSurface(_ macro: MacroDeclaration) -> Bool {
@@ -1295,7 +1288,7 @@ extension MacroExpander {
             guard application.name != "construct" else {
                 return application
             }
-            return attachingEvaluatedStringValue(
+            return attachingEvaluatedValue(
                 to: application,
                 construct: construct,
                 context: context
@@ -1317,7 +1310,7 @@ extension MacroExpander {
             constructs: construct.constructs
         )
         let macrosWithValues = preEvaluatedMacros.map { application in
-            attachingEvaluatedStringValue(
+            attachingEvaluatedValue(
                 to: application,
                 construct: application.name == "construct"
                     ? constructForConstructMacroEvaluation

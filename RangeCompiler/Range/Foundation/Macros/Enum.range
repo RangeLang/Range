@@ -3,6 +3,6 @@
 
     @return(value: @object(type: Enum, fields: [
         @field(name: name, value: name),
-        @field(name: rawBody, value: target.rawBodyText)
+        @field(name: cases, value: target.members)
     ]))
 }

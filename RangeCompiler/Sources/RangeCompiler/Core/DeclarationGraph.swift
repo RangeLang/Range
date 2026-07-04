@@ -537,8 +537,6 @@ public struct DeclarationGraph {
         else {
             return nil
         }
-        let rawBody = stringField("rawBody", in: value) ?? ""
-
         let macro = MacroApplication(
             name: application.name,
             genericArguments: application.genericArguments,
@@ -555,34 +553,33 @@ public struct DeclarationGraph {
             name: name,
             genericParameters: [],
             conformances: [],
-            cases: emittedEnumCases(from: rawBody)
+            cases: emittedEnumCases(from: value)
         )
     }
 
-    private static func emittedEnumCases(from rawBody: String) -> [EnumCaseDeclaration] {
-        return rawBodyStatements(rawBody).compactMap { statement -> EnumCaseDeclaration? in
-            guard case .macroApplication("case", let arguments) = statement else {
-                return nil
-            }
-            return emittedEnumCase(from: arguments)
+    private static func emittedEnumCases(from value: CompileTimeValue) -> [EnumCaseDeclaration] {
+        guard case .array(let cases)? = value.field("cases") else {
+            return []
         }
+        return cases.compactMap(emittedEnumCase)
     }
 
-    private static func emittedEnumCase(from arguments: [CallArgument]) -> EnumCaseDeclaration? {
-        guard let name = nameArgument("name", in: arguments),
+    private static func emittedEnumCase(from value: CompileTimeValue) -> EnumCaseDeclaration? {
+        guard case .object("EnumCase", let fields) = value,
+            let name = stringField("name", in: value),
             !name.isEmpty
         else {
             return nil
         }
-        let associatedValues = emittedEnumAssociatedValue(from: arguments).map { [$0] } ?? []
+        let associatedValues = emittedEnumAssociatedValue(from: fields).map { [$0] } ?? []
         return EnumCaseDeclaration(name: name, associatedValues: associatedValues)
     }
 
-    private static func emittedEnumAssociatedValue(from arguments: [CallArgument]) -> AssociatedValueDeclaration? {
-        let label = nameArgument("label", in: arguments).flatMap { $0.isEmpty ? nil : $0 }
-        let type = arguments.first(where: { $0.label == "value" }).map {
-            emittedTypeName(from: $0.value)
-        }.flatMap { $0.isEmpty ? nil : $0 }
+    private static func emittedEnumAssociatedValue(
+        from fields: [String: CompileTimeValue]
+    ) -> AssociatedValueDeclaration? {
+        let label = fields["label"].flatMap(stringValue).flatMap { $0.isEmpty ? nil : $0 }
+        let type = fields["value"].flatMap(emittedTypeName).flatMap { $0.isEmpty ? nil : $0 }
         guard let type else {
             return nil
         }
@@ -590,18 +587,6 @@ public struct DeclarationGraph {
             label: label,
             typeReference: emittedTypeReference(typeName: type)
         )
-    }
-
-    private static func rawBodyStatements(_ rawBody: String) -> [Statement] {
-        guard !rawBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return []
-        }
-        do {
-            var parser = try Parser(source: "{\(rawBody)}")
-            return try parser.parseStatementBlock()
-        } catch {
-            return []
-        }
     }
 
     private static func macroNameArgument(in application: MacroApplication) -> String? {
@@ -625,13 +610,26 @@ public struct DeclarationGraph {
         }
     }
 
-    private static func emittedTypeName(from expression: Expression) -> String {
-        switch expression {
-        case .macroInvocation(let name, let arguments) where arguments.isEmpty:
-            return "@\(name)"
+    private static func emittedTypeName(from value: CompileTimeValue) -> String? {
+        switch value {
+        case .object("Void", _):
+            return nil
+        case .string(let value):
+            return value
+        case .object("NamedTypeReference", _):
+            return stringField("name", in: value)
+        case .object(let typeName, _):
+            return typeName
         default:
-            return MacroExpander.stringyArgumentValue(expression)
+            return nil
         }
+    }
+
+    private static func stringValue(_ value: CompileTimeValue) -> String? {
+        guard case .string(let string) = value else {
+            return nil
+        }
+        return string
     }
 
     private static func stringField(_ name: String, in value: CompileTimeValue) -> String? {

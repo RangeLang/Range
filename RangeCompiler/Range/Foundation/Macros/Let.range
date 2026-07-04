@@ -1,4 +1,4 @@
-@macro(name: let, result: @string, target: @statement) {
+@macro(name: let, result: @object, target: @statement) {
     @parameter(name: name, value: @name)
     @parameter(name: value, value: @string(value: ""))
 
