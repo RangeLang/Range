@@ -1,6 +1,8 @@
-@macro(name: if, result: @string, target: @statement) {
+@macro(name: if, result: @object, target: @statement) {
     @parameter(name: condition, value: @string(value: "true"))
 
-    @return(value: @string("effect|kind=branch|condition="
-        + condition))
+    @return(value: @object(type: MacroEffect, fields: [
+        @field(name: kind, value: "branch"),
+        @field(name: condition, value: condition)
+    ]))
 }

@@ -711,13 +711,7 @@ extension MacroExpander {
     }
 
     private static func llvmBlockStatementEffect(_ effect: CompileTimeValue) -> LLVMBlockStatementEffect? {
-        if let structured = structuredLLVMBlockStatementEffect(effect) {
-            return structured
-        }
-        guard case .string(let effect) = effect else {
-            return nil
-        }
-        return stringLLVMBlockStatementEffect(effect)
+        structuredLLVMBlockStatementEffect(effect)
     }
 
     private static func structuredLLVMBlockStatementEffect(
@@ -755,53 +749,6 @@ extension MacroExpander {
             return nil
         }
         return string
-    }
-
-    private static func stringLLVMBlockStatementEffect(_ effect: String) -> LLVMBlockStatementEffect? {
-        let prefix: String
-        if effect.hasPrefix("llvm-effect|kind=") {
-            prefix = "llvm-effect|kind="
-        } else if effect.hasPrefix("effect|kind=") {
-            prefix = "effect|kind="
-        } else {
-            return nil
-        }
-        let remainder = effect.dropFirst(prefix.count)
-        guard let bodySeparator = remainder.range(of: "|body=") else {
-            return nil
-        }
-        let metadata = String(remainder[..<bodySeparator.lowerBound])
-        let body = String(remainder[bodySeparator.upperBound...])
-        let parts = metadata.split(separator: "|", omittingEmptySubsequences: false)
-        guard let kind = parts.first.map(String.init),
-            kind.hasPrefix("llvm-")
-        else {
-            return nil
-        }
-
-        var fields: [String: String] = [:]
-        var binding: String?
-        var type: String?
-        for part in parts.dropFirst() {
-            let pair = part.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
-            guard pair.count == 2 else {
-                continue
-            }
-            fields[String(pair[0])] = String(pair[1])
-        }
-        binding = fields["binding"] ?? fields["name"]
-        type = fields["type"]
-        let construct = fields["construct"]
-        let returnCast = fields["returnCast"]
-
-        return LLVMBlockStatementEffect(
-            kind: kind,
-            lines: body.isEmpty ? [] : body.components(separatedBy: "\n"),
-            binding: binding,
-            type: type,
-            construct: construct,
-            returnCast: returnCast
-        )
     }
 
     private static func evaluatedBlockArtifactMacro(
@@ -1138,7 +1085,8 @@ extension MacroExpander {
             context: context
         )
         var locals = argumentBindings
-        guard case .string(let processed)? = evaluator.evaluateStatements(macro.body, locals: &locals)
+        guard let value = evaluator.evaluateStatements(macro.body, locals: &locals),
+            let processed = renderedStatementMacroValue(value)
         else {
             throw ParseError("Could not evaluate statement macro @\(name) to String.")
         }
@@ -1183,11 +1131,24 @@ extension MacroExpander {
             context: context
         )
         var locals = argumentBindings
-        guard case .string(let processed)? = evaluator.evaluateStatements(macro.body, locals: &locals)
+        guard let value = evaluator.evaluateStatements(macro.body, locals: &locals),
+            let processed = renderedStatementMacroValue(value)
         else {
             throw ParseError("Could not evaluate statement macro @\(name) to String.")
         }
         return processed
+    }
+
+    private static func renderedStatementMacroValue(_ value: CompileTimeValue) -> String? {
+        switch value {
+        case .string(let processed):
+            return processed
+        case .object("MacroEffect", _), .object("LLVMEffect", _),
+            .object("EnumCase", _), .object("ParameterValue", _):
+            return ""
+        default:
+            return nil
+        }
     }
 
     private static func macroTargetsStatementSurface(_ macro: MacroDeclaration) -> Bool {

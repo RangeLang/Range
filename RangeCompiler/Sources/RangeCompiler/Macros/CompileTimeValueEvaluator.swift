@@ -169,28 +169,13 @@ struct CompileTimeValueEvaluator {
             context: context,
             llvmContext: llvmContext
         )
-        guard case .string(let effect)? = evaluator.evaluateStatements(macro.body, locals: &macroLocals)
+        guard let effect = evaluator.evaluateStatements(macro.body, locals: &macroLocals),
+            let kind = stringField("kind", in: effect),
+            let condition = stringField("condition", in: effect)
         else {
             return nil
         }
-        return controlEffect(effect)
-    }
-
-    private func controlEffect(_ effect: String) -> (kind: String, condition: String)? {
-        let prefix = "effect|kind="
-        guard effect.hasPrefix(prefix) else {
-            return nil
-        }
-        let remainder = effect.dropFirst(prefix.count)
-        guard let conditionSeparator = remainder.range(of: "|condition=") else {
-            return nil
-        }
-        let kind = String(remainder[..<conditionSeparator.lowerBound])
-        guard !kind.isEmpty else {
-            return nil
-        }
-        let conditionStart = conditionSeparator.upperBound
-        return (kind, String(remainder[conditionStart...]))
+        return (kind, condition)
     }
 
     func controlConditionExpression(_ source: String, locals: [String: Expression]) -> Expression? {
@@ -235,7 +220,7 @@ struct CompileTimeValueEvaluator {
             context: context,
             llvmContext: llvmContext
         )
-        guard case .string(let effect)? = evaluator.evaluateStatements(macro.body, locals: &macroLocals),
+        guard let effect = evaluator.evaluateStatements(macro.body, locals: &macroLocals),
             let environmentSet = environmentSetEffect(effect)
         else {
             return false
@@ -248,21 +233,22 @@ struct CompileTimeValueEvaluator {
         return true
     }
 
-    private func environmentSetEffect(_ effect: String) -> (name: String, value: String)? {
-        let prefix = "effect|kind=environment-set|name="
-        guard effect.hasPrefix(prefix) else {
+    private func environmentSetEffect(_ effect: CompileTimeValue) -> (name: String, value: String)? {
+        guard stringField("kind", in: effect) == "environment-set",
+            let name = stringField("name", in: effect),
+            !name.isEmpty,
+            let value = stringField("value", in: effect)
+        else {
             return nil
         }
-        let remainder = effect.dropFirst(prefix.count)
-        guard let valueSeparator = remainder.range(of: "|value=") else {
+        return (name, value)
+    }
+
+    private func stringField(_ name: String, in value: CompileTimeValue) -> String? {
+        guard case .string(let string)? = value.field(name) else {
             return nil
         }
-        let name = String(remainder[..<valueSeparator.lowerBound])
-        guard !name.isEmpty else {
-            return nil
-        }
-        let valueStart = valueSeparator.upperBound
-        return (name, String(remainder[valueStart...]))
+        return string
     }
 
     private func macroLocalValueExpression(
@@ -1151,11 +1137,12 @@ struct CompileTimeValueEvaluator {
         "Macro.Application", "Macro.Declaration", "Macro.Target", "CodingBehavior",
         "ValueGeneric", "Parameter.Declaration",
         "Void", "Identity", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "Local", "LocalBinding",
+        "MacroEffect",
         "Return", "Break", "Assignment",
         "ProgramSourceFile", "ProgramArtifact", "ProgramResult", "RangeProgram", "RangeGraph", "RangeProject",
         "WrittenExpression",
         "ArrayExpression", "EnumCaseExpression",
-        "StringValue", "ArrayValue", "LLVMValue",
+        "StringValue", "ArrayValue", "EnumCase", "ParameterValue", "LLVMValue",
     ]
 
     private func evaluatePrimitiveConstruction(

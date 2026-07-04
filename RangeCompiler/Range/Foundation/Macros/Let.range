@@ -19,8 +19,9 @@
         ]))
     }
 
-    @return(value: @string("effect|kind=environment-set|name="
-        + name
-        + "|value="
-        + value))
+    @return(value: @object(type: MacroEffect, fields: [
+        @field(name: kind, value: "environment-set"),
+        @field(name: name, value: name),
+        @field(name: value, value: value)
+    ]))
 }

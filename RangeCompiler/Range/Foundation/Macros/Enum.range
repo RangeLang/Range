@@ -1,8 +1,8 @@
-@macro(name: enum, result: @string){
+@macro(name: enum, result: @object){
     @parameter(name: name, value: @name)
 
-    @return(value: @string("enum|name="
-        + name
-        + "\n"
-        + target.rawBody))
+    @return(value: @object(type: Enum, fields: [
+        @field(name: name, value: name),
+        @field(name: rawBody, value: target.rawBodyText)
+    ]))
 }

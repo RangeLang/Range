@@ -1,14 +1,12 @@
 @member
-@macro(name: case, result: @string){
+@macro(name: case, result: @object){
     @parameter(name: name, value: @name)
     @parameter(name: label, value: @name(value: ""))
     @parameter(name: value, value: @generic(value: @void))
 
-    @return(value: @string("member|kind=case|name="
-        + name
-        + "\n"
-        + "member|kind=parameter|name="
-        + label
-        + "|type="
-        + value))
+    @return(value: @object(type: EnumCase, fields: [
+        @field(name: name, value: name),
+        @field(name: label, value: label),
+        @field(name: value, value: value)
+    ]))
 }

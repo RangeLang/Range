@@ -1,9 +1,10 @@
-@macro(name: assignment, result: @string, target: @statement) {
+@macro(name: assignment, result: @object, target: @statement) {
     @parameter(name: target, value: @name)
     @parameter(name: value, value: @string(value: ""))
 
-    @return(value: @string("effect|kind=environment-set|name="
-        + target
-        + "|value="
-        + value))
+    @return(value: @object(type: MacroEffect, fields: [
+        @field(name: kind, value: "environment-set"),
+        @field(name: name, value: target),
+        @field(name: value, value: value)
+    ]))
 }

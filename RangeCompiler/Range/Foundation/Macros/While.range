@@ -1,6 +1,8 @@
-@macro(name: while, result: @string, target: @statement) {
+@macro(name: while, result: @object, target: @statement) {
     @parameter(name: condition, value: @string(value: "true"))
 
-    @return(value: @string("effect|kind=loop|condition="
-        + condition))
+    @return(value: @object(type: MacroEffect, fields: [
+        @field(name: kind, value: "loop"),
+        @field(name: condition, value: condition)
+    ]))
 }
