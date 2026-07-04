@@ -753,7 +753,7 @@ struct CompileTimeValueEvaluator {
             return nil
         }
         let parts = payload.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
-        guard parts.first == "value" || parts.first == "llvm-value" || parts.first == "llvm-binding" else {
+        guard parts.first == "llvm-binding" else {
             return nil
         }
         var fields: [String: String] = [:]
@@ -765,11 +765,6 @@ struct CompileTimeValueEvaluator {
             fields[String(pair[0])] = String(pair[1])
         }
         if let field = fields[name] {
-            return field
-        }
-        if parts.first == "value",
-            let field = fields["llvm.\(name)"]
-        {
             return field
         }
         return nil
@@ -1211,6 +1206,7 @@ struct CompileTimeValueEvaluator {
         "ProgramSourceFile", "ProgramArtifact", "ProgramResult", "RangeProgram", "RangeGraph", "RangeProject",
         "WrittenExpression",
         "ArrayExpression", "EnumCaseExpression",
+        "LLVMValue",
     ]
 
     private func evaluatePrimitiveConstruction(

@@ -1,25 +1,23 @@
-@macro(name: reference, result: @string){
+@macro(name: reference, result: @object){
     @parameter(name: name, value: @name)
     @state(name: binding, value: "@llvmBinding(name: name)")
     @state(name: operand, value: "@temporary(prefix: name + @string(\".value\"))")
     @state(name: returnCast, value: "@llvmField(value: binding, name: @string(\"returnCast\"))")
     @state(name: needsTrunc, value: "returnCast.isEmpty ? \"true\" : \"false\"")
+    @state(name: type, value: "@llvmField(value: binding, name: @string(\"type\"))")
 
-    @return(value: @string("value|construct="
-        + @llvmField(value: binding, name: @string("construct"))
-        + "|llvm.type="
-        + @llvmField(value: binding, name: @string("type"))
-        + "|llvm.operand="
-        + operand
-        + "|llvm.storage=temporary"
-        + "|llvm.needsTrunc="
-        + needsTrunc
-        + "|llvm.returnCast="
-        + returnCast
-        + "|llvm.prelude=  "
-        + operand
-        + " = load "
-        + @llvmField(value: binding, name: @string("type"))
-        + ", ptr "
-        + @llvmField(value: binding, name: @string("pointer"))))
+    @return(value: @object(type: LLVMValue, fields: [
+        @field(name: construct, value: @llvmField(value: binding, name: @string("construct"))),
+        @field(name: type, value: type),
+        @field(name: operand, value: operand),
+        @field(name: storage, value: "temporary"),
+        @field(name: needsTrunc, value: needsTrunc),
+        @field(name: returnCast, value: returnCast),
+        @field(name: prelude, value: "  "
+            + operand
+            + " = load "
+            + type
+            + ", ptr "
+            + @llvmField(value: binding, name: @string("pointer")))
+    ]))
 }

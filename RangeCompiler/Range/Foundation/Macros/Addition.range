@@ -1,4 +1,4 @@
-@macro(name: addition, result: @string){
+@macro(name: addition, result: @object){
     @parameter(name: lhs, value: @int())
     @parameter(name: rhs, value: @int())
     @parameter(name: temporaryPrefix, value: @string(value: "add"))
@@ -6,23 +6,22 @@
     @state(name: construct, value: "@llvmField(value: lhs, name: @string(\"construct\"))")
     @state(name: operand, value: "@temporary(prefix: temporaryPrefix)")
 
-    @return(value: @string("value|construct="
-        + construct
-        + "|llvm.type="
-        + type
-        + "|llvm.operand="
-        + operand
-        + "|llvm.storage=temporary"
-        + "|llvm.needsTrunc=true"
-        + "|llvm.prelude="
-        + @llvmField(value: lhs, name: @string("prelude"))
-        + @llvmField(value: rhs, name: @string("prelude"))
-        + "  "
-        + operand
-        + " = add "
-        + type
-        + " "
-        + @llvmField(value: lhs, name: @string("operand"))
-        + ", "
-        + @llvmField(value: rhs, name: @string("operand"))))
+    @return(value: @object(type: LLVMValue, fields: [
+        @field(name: construct, value: construct),
+        @field(name: type, value: type),
+        @field(name: operand, value: operand),
+        @field(name: storage, value: "temporary"),
+        @field(name: needsTrunc, value: "true"),
+        @field(name: returnCast, value: ""),
+        @field(name: prelude, value: @llvmField(value: lhs, name: @string("prelude"))
+            + @llvmField(value: rhs, name: @string("prelude"))
+            + "  "
+            + operand
+            + " = add "
+            + type
+            + " "
+            + @llvmField(value: lhs, name: @string("operand"))
+            + ", "
+            + @llvmField(value: rhs, name: @string("operand")))
+    ]))
 }

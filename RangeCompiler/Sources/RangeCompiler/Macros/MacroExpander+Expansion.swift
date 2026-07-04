@@ -703,7 +703,9 @@ extension MacroExpander {
                 continue
             }
             values[name] = value
-            localBindings[name] = .string(value.payload)
+            if let expression = value.expression {
+                localBindings[name] = expression
+            }
         }
         return (localBindings, values)
     }
@@ -843,7 +845,7 @@ extension MacroExpander {
         var type: String
         var operand: String
         var isImmediate: Bool
-        var payload: String
+        var expression: Expression?
     }
 
     private static func minimalLLVMValue(
@@ -908,56 +910,13 @@ extension MacroExpander {
         guard let value = evaluator.evaluateStatements(macro.body, locals: &locals) else {
             return nil
         }
-        return minimalLLVMValuePayload(value)
-    }
-
-    private static func minimalLLVMValuePayload(_ payload: CompileTimeValue) -> MinimalLLVMValue? {
-        if case .object("LLVMValue", _) = payload {
-            return minimalLLVMValueObject(payload)
-        }
-
-        guard case .string(let payload) = payload else {
-            return nil
-        }
-        let parts = payload.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
-        guard parts.first == "value" || parts.first == "llvm-value" else {
-            return nil
-        }
-
-        var fields: [String: String] = [:]
-        for part in parts.dropFirst() {
-            let pair = part.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
-            guard pair.count == 2 else {
-                continue
-            }
-            fields[String(pair[0])] = String(pair[1])
-        }
-
-        guard
-            let type = fields["llvm.type"] ?? fields["type"],
-            isValidLLVMType(type),
-            let operand = fields["llvm.operand"] ?? fields["operand"],
-            isValidImmediateOperand(operand)
-        else {
-            return nil
-        }
-
-        let instructions = fields["llvm.instructions"]
-            ?? fields["instructions"]
-            ?? fields["llvm.prelude"]
-            ?? fields["prelude"]
-            ?? ""
-        let lines = instructions.isEmpty ? [] : instructions.components(separatedBy: "\n")
-        return MinimalLLVMValue(
-            lines: lines,
-            type: type,
-            operand: operand,
-            isImmediate: lines.isEmpty && !operand.hasPrefix("%"),
-            payload: payload
-        )
+        return minimalLLVMValueObject(value)
     }
 
     private static func minimalLLVMValueObject(_ payload: CompileTimeValue) -> MinimalLLVMValue? {
+        guard case .object("LLVMValue", _) = payload else {
+            return nil
+        }
         guard
             let type = stringField("type", in: payload),
             isValidLLVMType(type),
@@ -976,24 +935,8 @@ extension MacroExpander {
             type: type,
             operand: operand,
             isImmediate: lines.isEmpty && !operand.hasPrefix("%"),
-            payload: legacyLLVMValuePayload(payload)
+            expression: payload.expression
         )
-    }
-
-    private static func legacyLLVMValuePayload(_ payload: CompileTimeValue) -> String {
-        let fields = [
-            ("construct", stringField("construct", in: payload)),
-            ("llvm.type", stringField("type", in: payload)),
-            ("llvm.operand", stringField("operand", in: payload)),
-            ("llvm.storage", stringField("storage", in: payload)),
-            ("llvm.needsTrunc", stringField("needsTrunc", in: payload)),
-            ("llvm.returnCast", stringField("returnCast", in: payload)),
-            ("llvm.prelude", stringField("prelude", in: payload)),
-        ]
-        return "value"
-            + fields.compactMap { name, value in
-                value.map { "|\(name)=\($0)" }
-            }.joined()
     }
 
     private static func argument(named name: String, in arguments: [CallArgument]) -> Expression? {
