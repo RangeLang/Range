@@ -1,0 +1,6 @@
+@main {
+    while Bool(true) {
+        break
+    }
+    return 4
+}

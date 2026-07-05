@@ -43,6 +43,47 @@ struct LLVMModuleEmitterTests {
         #expect(module == expectedMain(returning: 9))
     }
 
+    @Test("Bool constructor return extends boolean to integer return")
+    func boolConstructorReturnExtendsBooleanToIntegerReturn() throws {
+        let module = try emit(
+            """
+            @main {
+                return Bool(true)
+            }
+            """
+        )
+
+        #expect(
+            module == expectedMain(
+                """
+                  %0 = zext i1 1 to i32
+                  ret i32 %0
+                """
+            )
+        )
+    }
+
+    @Test("Integer comparison return emits icmp")
+    func integerComparisonReturnEmitsICmp() throws {
+        let module = try emit(
+            """
+            @main {
+                return 5 < 10
+            }
+            """
+        )
+
+        #expect(
+            module == expectedMain(
+                """
+                  %0 = icmp slt i32 5, 10
+                  %1 = zext i1 %0 to i32
+                  ret i32 %1
+                """
+            )
+        )
+    }
+
     @Test("Integer local return emits bound integer return")
     func integerLocalReturnEmitsBoundIntegerReturn() throws {
         let module = try emit(
@@ -116,7 +157,7 @@ struct LLVMModuleEmitterTests {
     }
 
     @Test("Mutable integer state assignment emits updated return")
-    func mutableIntegerStateCompoundAssignmentEmitsUpdatedReturn() throws {
+    func mutableIntegerStateAssignmentEmitsUpdatedReturn() throws {
         let module = try emit(
             """
             @main {
@@ -137,6 +178,177 @@ struct LLVMModuleEmitterTests {
                   store i32 %1, ptr %count
                   %2 = load i32, ptr %count
                   ret i32 %2
+                """
+            )
+        )
+    }
+
+    @Test("If statement emits conditional branch")
+    func ifStatementEmitsConditionalBranch() throws {
+        let module = try emit(
+            """
+            @main {
+                state count: Int(5)
+                if count < 10 {
+                    count: count + 1
+                }
+                return count
+            }
+            """
+        )
+
+        #expect(
+            module == expectedMain(
+                """
+                  %count = alloca i32
+                  store i32 5, ptr %count
+                  %0 = load i32, ptr %count
+                  %1 = icmp slt i32 %0, 10
+                  br i1 %1, label %if.then.1, label %if.end.0
+                if.then.1:
+                  %2 = load i32, ptr %count
+                  %3 = add i32 %2, 1
+                  store i32 %3, ptr %count
+                  br label %if.end.0
+                if.end.0:
+                  %4 = load i32, ptr %count
+                  ret i32 %4
+                """
+            )
+        )
+    }
+
+    @Test("If else returns emit terminating branches")
+    func ifElseReturnsEmitTerminatingBranches() throws {
+        let module = try emit(
+            """
+            @main {
+                let count: Int(5)
+                if count < 10 {
+                    return 1
+                } else {
+                    return 0
+                }
+            }
+            """
+        )
+
+        #expect(
+            module == expectedMain(
+                """
+                  %count = alloca i32
+                  store i32 5, ptr %count
+                  %0 = load i32, ptr %count
+                  %1 = icmp slt i32 %0, 10
+                  br i1 %1, label %if.then.1, label %if.then.2
+                if.then.1:
+                  ret i32 1
+                if.then.2:
+                  ret i32 0
+                """
+            )
+        )
+    }
+
+    @Test("While loop emits backedge")
+    func whileLoopEmitsBackedge() throws {
+        let module = try emit(
+            """
+            @main {
+                state count: Int(0)
+                while count < 3 {
+                    count: count + 1
+                }
+                return count
+            }
+            """
+        )
+
+        #expect(
+            module == expectedMain(
+                """
+                  %count = alloca i32
+                  store i32 0, ptr %count
+                  br label %while.condition.0
+                while.condition.0:
+                  %0 = load i32, ptr %count
+                  %1 = icmp slt i32 %0, 3
+                  br i1 %1, label %while.body.1, label %while.end.2
+                while.body.1:
+                  %2 = load i32, ptr %count
+                  %3 = add i32 %2, 1
+                  store i32 %3, ptr %count
+                  br label %while.condition.0
+                while.end.2:
+                  %4 = load i32, ptr %count
+                  ret i32 %4
+                """
+            )
+        )
+    }
+
+    @Test("Break emits branch to loop end")
+    func breakEmitsBranchToLoopEnd() throws {
+        let module = try emit(
+            """
+            @main {
+                while Bool(true) {
+                    break
+                }
+                return 4
+            }
+            """
+        )
+
+        #expect(
+            module == expectedMain(
+                """
+                  br label %while.condition.0
+                while.condition.0:
+                  br i1 1, label %while.body.1, label %while.end.2
+                while.body.1:
+                  br label %while.end.2
+                while.end.2:
+                  ret i32 4
+                """
+            )
+        )
+    }
+
+    @Test("Continue emits branch to loop condition")
+    func continueEmitsBranchToLoopCondition() throws {
+        let module = try emit(
+            """
+            @main {
+                state count: Int(0)
+                while count < 3 {
+                    count: count + 1
+                    continue
+                    count: count + 10
+                }
+                return count
+            }
+            """
+        )
+
+        #expect(
+            module == expectedMain(
+                """
+                  %count = alloca i32
+                  store i32 0, ptr %count
+                  br label %while.condition.0
+                while.condition.0:
+                  %0 = load i32, ptr %count
+                  %1 = icmp slt i32 %0, 3
+                  br i1 %1, label %while.body.1, label %while.end.2
+                while.body.1:
+                  %2 = load i32, ptr %count
+                  %3 = add i32 %2, 1
+                  store i32 %3, ptr %count
+                  br label %while.condition.0
+                while.end.2:
+                  %4 = load i32, ptr %count
+                  ret i32 %4
                 """
             )
         )
