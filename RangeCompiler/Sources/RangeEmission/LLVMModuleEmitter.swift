@@ -18,15 +18,8 @@ public struct LLVMModuleEmitter {
 
     public func emit(program: CompiledProgram) throws -> String {
         let mainBlock = try projectMainBlock(in: program)
-        let returnCode = try mainReturnCode(from: mainBlock)
-
-        return """
-        define i32 @main() {
-        entry:
-          ret i32 \(returnCode)
-        }
-
-        """
+        var emitter = MainFunctionEmitter()
+        return try emitter.emit(mainBlock: mainBlock)
     }
 
     private func projectMainBlock(in program: CompiledProgram) throws -> MainBlockNode {
@@ -56,26 +49,55 @@ public struct LLVMModuleEmitter {
         }
     }
 
-    private func mainReturnCode(from mainBlock: MainBlockNode) throws -> Int {
-        var locals: [String: Int] = [:]
+    private struct MainFunctionEmitter {
+        private var instructions: [String] = []
+        private var locals: [String: String] = [:]
+        private var temporaryIndex = 0
+        private var returned = false
 
-        for statement in mainBlock.body {
+        mutating func emit(mainBlock: MainBlockNode) throws -> String {
+            for statement in mainBlock.body {
+                try emit(statement: statement)
+            }
+
+            if !returned {
+                instructions.append("ret i32 0")
+            }
+
+            let body = instructions.map { "  \($0)" }.joined(separator: "\n")
+            return """
+            define i32 @main() {
+            entry:
+            \(body)
+            }
+
+            """
+        }
+
+        private mutating func emit(statement: Statement) throws {
             switch statement {
             case .localBinding(let declaration):
-                locals[declaration.name] = try integerValue(from: declaration.expression, locals: locals)
+                let value = try emitIntegerValue(from: declaration.expression)
+                let pointer = try declareLocal(named: declaration.name)
+                instructions.append("store i32 \(value), ptr \(pointer)")
 
             case .assignment(let target, let expression):
                 let name = try integerLocalName(from: target)
-                guard locals[name] != nil else {
+                guard let pointer = locals[name] else {
                     throw LLVMEmissionError("Unknown LLVM integer local '\(name)'.")
                 }
-                locals[name] = try integerValue(from: expression, locals: locals)
+                let value = try emitIntegerValue(from: expression)
+                instructions.append("store i32 \(value), ptr \(pointer)")
 
             case .return(let expression):
                 guard let expression else {
-                    return 0
+                    instructions.append("ret i32 0")
+                    returned = true
+                    return
                 }
-                return try integerValue(from: expression, locals: locals)
+                let value = try emitIntegerValue(from: expression)
+                instructions.append("ret i32 \(value)")
+                returned = true
 
             default:
                 throw LLVMEmissionError(
@@ -84,72 +106,97 @@ public struct LLVMModuleEmitter {
             }
         }
 
-        return 0
-    }
-
-    private func integerValue(
-        from expression: RangeCompiler.Expression,
-        locals: [String: Int]
-    ) throws -> Int {
-        switch expression {
-        case .integer(let value):
-            return value
-        case .identifier(let name):
-            guard let value = locals[name] else {
-                throw LLVMEmissionError("Unknown LLVM integer local '\(name)'.")
+        private mutating func declareLocal(named name: String) throws -> String {
+            if locals[name] != nil {
+                throw LLVMEmissionError("Duplicate LLVM integer local '\(name)'.")
             }
-            return value
-        case .call(let name, let arguments)
-            where name == "Int" && arguments.count == 1 && arguments[0].label == nil:
-            return try integerValue(from: arguments[0].value, locals: locals)
-        case .binary(let lhs, let operatorSymbol, let rhs):
-            let left = try integerValue(from: lhs, locals: locals)
-            let right = try integerValue(from: rhs, locals: locals)
-            return try evaluateIntegerBinary(
-                lhs: left,
-                operatorSymbol: operatorSymbol,
-                rhs: right
-            )
-        default:
-            throw LLVMEmissionError("LLVM emission currently supports integer values only.")
+            let pointer = "%\(try llvmIdentifier(name))"
+            locals[name] = pointer
+            instructions.append("\(pointer) = alloca i32")
+            return pointer
         }
-    }
 
-    private func evaluateIntegerBinary(
-        lhs: Int,
-        operatorSymbol: BinaryOperator,
-        rhs: Int
-    ) throws -> Int {
-        switch operatorSymbol {
-        case .addition:
-            return lhs + rhs
-        case .subtraction:
-            return lhs - rhs
-        case .multiplication:
-            return lhs * rhs
-        case .division:
-            guard rhs != 0 else {
-                throw LLVMEmissionError("LLVM integer division by zero.")
+        private func integerLocalName(from target: AssignmentTarget) throws -> String {
+            switch target {
+            case .local(let name), .state(let name):
+                return name
+            case .binding(let name):
+                throw LLVMEmissionError("LLVM emission cannot assign to binding '\(name)' yet.")
+            case .member:
+                throw LLVMEmissionError("LLVM emission cannot assign to member targets yet.")
             }
-            return lhs / rhs
-        case .remainder:
-            guard rhs != 0 else {
-                throw LLVMEmissionError("LLVM integer remainder by zero.")
-            }
-            return lhs % rhs
-        default:
-            throw LLVMEmissionError("LLVM emission currently supports integer arithmetic only.")
         }
-    }
 
-    private func integerLocalName(from target: AssignmentTarget) throws -> String {
-        switch target {
-        case .local(let name), .state(let name):
+        private mutating func emitIntegerValue(from expression: RangeCompiler.Expression) throws
+            -> String
+        {
+            switch expression {
+            case .integer(let value):
+                return "\(value)"
+
+            case .identifier(let name):
+                guard let pointer = locals[name] else {
+                    throw LLVMEmissionError("Unknown LLVM integer local '\(name)'.")
+                }
+                let result = nextTemporary()
+                instructions.append("\(result) = load i32, ptr \(pointer)")
+                return result
+
+            case .call(let name, let arguments)
+                where name == "Int" && arguments.count == 1 && arguments[0].label == nil:
+                return try emitIntegerValue(from: arguments[0].value)
+
+            case .binary(let lhs, let operatorSymbol, let rhs):
+                let left = try emitIntegerValue(from: lhs)
+                let right = try emitIntegerValue(from: rhs)
+                let result = nextTemporary()
+                instructions.append(
+                    "\(result) = \(try llvmIntegerInstruction(for: operatorSymbol)) i32 \(left), \(right)"
+                )
+                return result
+
+            default:
+                throw LLVMEmissionError("LLVM emission currently supports integer values only.")
+            }
+        }
+
+        private func llvmIntegerInstruction(for operatorSymbol: BinaryOperator) throws -> String {
+            switch operatorSymbol {
+            case .addition:
+                return "add"
+            case .subtraction:
+                return "sub"
+            case .multiplication:
+                return "mul"
+            case .division:
+                return "sdiv"
+            case .remainder:
+                return "srem"
+            default:
+                throw LLVMEmissionError("LLVM emission currently supports integer arithmetic only.")
+            }
+        }
+
+        private mutating func nextTemporary() -> String {
+            defer { temporaryIndex += 1 }
+            return "%\(temporaryIndex)"
+        }
+
+        private func llvmIdentifier(_ name: String) throws -> String {
+            guard !name.isEmpty else {
+                throw LLVMEmissionError("LLVM local names cannot be empty.")
+            }
+            let scalars = name.unicodeScalars
+            let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_$.-"))
+            guard scalars.allSatisfy({ allowed.contains($0) }) else {
+                throw LLVMEmissionError("Unsupported LLVM local name '\(name)'.")
+            }
+            guard let first = scalars.first,
+                !CharacterSet.decimalDigits.contains(first)
+            else {
+                throw LLVMEmissionError("LLVM local names cannot start with a digit.")
+            }
             return name
-        case .binding(let name):
-            throw LLVMEmissionError("LLVM emission cannot assign to binding '\(name)' yet.")
-        case .member:
-            throw LLVMEmissionError("LLVM emission cannot assign to member targets yet.")
         }
     }
 }

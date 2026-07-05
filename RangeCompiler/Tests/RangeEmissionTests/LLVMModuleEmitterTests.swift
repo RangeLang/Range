@@ -54,11 +54,20 @@ struct LLVMModuleEmitterTests {
             """
         )
 
-        #expect(module == expectedMain(returning: 5))
+        #expect(
+            module == expectedMain(
+                """
+                  %count = alloca i32
+                  store i32 5, ptr %count
+                  %0 = load i32, ptr %count
+                  ret i32 %0
+                """
+            )
+        )
     }
 
-    @Test("Integer arithmetic return emits folded integer return")
-    func integerArithmeticReturnEmitsFoldedIntegerReturn() throws {
+    @Test("Integer arithmetic return emits LLVM instructions")
+    func integerArithmeticReturnEmitsLLVMInstructions() throws {
         let module = try emit(
             """
             @main {
@@ -67,11 +76,19 @@ struct LLVMModuleEmitterTests {
             """
         )
 
-        #expect(module == expectedMain(returning: 11))
+        #expect(
+            module == expectedMain(
+                """
+                  %0 = mul i32 2, 3
+                  %1 = add i32 5, %0
+                  ret i32 %1
+                """
+            )
+        )
     }
 
-    @Test("Integer arithmetic local return emits folded integer return")
-    func integerArithmeticLocalReturnEmitsFoldedIntegerReturn() throws {
+    @Test("Integer arithmetic local return emits LLVM instructions")
+    func integerArithmeticLocalReturnEmitsLLVMInstructions() throws {
         let module = try emit(
             """
             @main {
@@ -82,7 +99,20 @@ struct LLVMModuleEmitterTests {
             """
         )
 
-        #expect(module == expectedMain(returning: 7))
+        #expect(
+            module == expectedMain(
+                """
+                  %count = alloca i32
+                  store i32 5, ptr %count
+                  %0 = load i32, ptr %count
+                  %1 = add i32 %0, 2
+                  %total = alloca i32
+                  store i32 %1, ptr %total
+                  %2 = load i32, ptr %total
+                  ret i32 %2
+                """
+            )
+        )
     }
 
     @Test("Mutable integer state assignment emits updated return")
@@ -97,7 +127,19 @@ struct LLVMModuleEmitterTests {
             """
         )
 
-        #expect(module == expectedMain(returning: 7))
+        #expect(
+            module == expectedMain(
+                """
+                  %count = alloca i32
+                  store i32 5, ptr %count
+                  %0 = load i32, ptr %count
+                  %1 = add i32 %0, 2
+                  store i32 %1, ptr %count
+                  %2 = load i32, ptr %count
+                  ret i32 %2
+                """
+            )
+        )
     }
 
     private func emit(_ source: String) throws -> String {
@@ -115,10 +157,14 @@ struct LLVMModuleEmitterTests {
     }
 
     private func expectedMain(returning value: Int) -> String {
+        expectedMain("  ret i32 \(value)")
+    }
+
+    private func expectedMain(_ body: String) -> String {
         """
         define i32 @main() {
         entry:
-          ret i32 \(value)
+        \(body)
         }
 
         """
