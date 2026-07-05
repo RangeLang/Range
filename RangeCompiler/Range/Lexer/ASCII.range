@@ -185,12 +185,6 @@ construct GreaterEqual {
 construct Plus {
 }
 
-@Token("+=")
-@lexer<.emit>
-@syntax
-construct PlusEqual {
-}
-
 @Token("&")
 @lexer<.emit>
 @syntax

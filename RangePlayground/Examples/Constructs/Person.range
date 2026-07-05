@@ -3,6 +3,6 @@ construct Person {
     state age: Int
 
     function birthday() {
-        age += 1
+        age: age + 1
     }
 }

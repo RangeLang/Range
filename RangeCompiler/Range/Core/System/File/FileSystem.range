@@ -65,9 +65,9 @@ construct FileTree {
                 state childIndex: 0
                 while childIndex < childFiles.count {
                     files.append(element: childFiles.element(index: childIndex))
-                    childIndex += 1
+                    childIndex: childIndex + 1
                 }
-                index += 1
+                index: index + 1
             }
         }
 
@@ -84,7 +84,7 @@ construct FileTree {
                 let entry: FileSystemEntry(entries.element(index: index))
 
                 if !entry.name.isEmpty && entry.name.character(index: 0) == "." {
-                    index += 1
+                    index: index + 1
                     continue
                 }
 
@@ -107,7 +107,7 @@ construct FileTree {
                     )
                 }
 
-                index += 1
+                index: index + 1
             }
 
             return .success(

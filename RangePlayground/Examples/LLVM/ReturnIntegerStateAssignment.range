@@ -1,0 +1,5 @@
+@main {
+    state count: Int(5)
+    count: count + 2
+    return count
+}

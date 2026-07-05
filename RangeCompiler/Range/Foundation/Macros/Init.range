@@ -88,7 +88,7 @@ macro init<
                 diagnostics.error("@init field type must match the literal value type.")
             }
 
-            letIndex += 1
+            letIndex: letIndex + 1
         }
 
         state stateIndex: Int(0)
@@ -109,7 +109,7 @@ macro init<
                 diagnostics.error("@init field type must match the literal value type.")
             }
 
-            stateIndex += 1
+            stateIndex: stateIndex + 1
         }
     }
 }

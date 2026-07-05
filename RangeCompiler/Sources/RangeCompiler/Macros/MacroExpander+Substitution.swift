@@ -90,12 +90,6 @@ extension MacroExpander {
                 target: target,
                 expression: substituteMacroBindings(in: expression, bindings: bindings)
             )
-        case .compoundAssignment(let target, let operatorSymbol, let expression):
-            return .compoundAssignment(
-                target: target,
-                operatorSymbol: operatorSymbol,
-                expression: substituteMacroBindings(in: expression, bindings: bindings)
-            )
         case .expression(let expression):
             return .expression(substituteMacroBindings(in: expression, bindings: bindings))
         case .forEach(let name, let sequence, let body):
@@ -439,18 +433,6 @@ extension MacroExpander {
             return [
                 .assignment(
                     target: target,
-                    expression: substituteMacroTargetCalls(
-                        in: expression,
-                        targetBinding: targetBinding,
-                        targetBlock: targetBlock
-                    )
-                )
-            ]
-        case .compoundAssignment(let target, let operatorSymbol, let expression):
-            return [
-                .compoundAssignment(
-                    target: target,
-                    operatorSymbol: operatorSymbol,
                     expression: substituteMacroTargetCalls(
                         in: expression,
                         targetBinding: targetBinding,

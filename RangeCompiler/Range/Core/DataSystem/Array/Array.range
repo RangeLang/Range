@@ -81,7 +81,7 @@ extension Array {
         while index < count {
             switch container.encode(element(index: index)) {
             case .success:
-                index += 1
+                index: index + 1
             case .failure(let error):
                 return .failure(cause: error)
             }

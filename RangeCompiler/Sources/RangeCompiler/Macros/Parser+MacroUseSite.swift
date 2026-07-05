@@ -248,8 +248,6 @@ extension Parser {
             return ">="
         case .plus:
             return "+"
-        case .plusEqual:
-            return "+="
         case .slash:
             return "/"
         case .ampersand:

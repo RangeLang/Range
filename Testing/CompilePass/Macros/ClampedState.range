@@ -4,6 +4,6 @@ construct Person {
 
     function update(value: Int) {
         set age   value
-        age += value
+        age: age + value
     }
 }

@@ -137,7 +137,7 @@ construct LexerCursor {
                 advancePattern(rule.pattern)
                 return emitRuleToken(token: rule.token, start: start)
             }
-            ruleIndex += 1
+            ruleIndex: ruleIndex + 1
         }
         return false
     }
@@ -168,7 +168,6 @@ construct LexerCursor {
             || token == "greater"
             || token == "greaterEqual"
             || token == "plus"
-            || token == "plusEqual"
             || token == "slash"
             || token == "ampersand"
             || token == "andAnd"
@@ -224,8 +223,6 @@ construct LexerCursor {
             emit(kind: .greaterEqual, start: start)
         } else if token == "plus" {
             emit(kind: .plus, start: start)
-        } else if token == "plusEqual" {
-            emit(kind: .plusEqual, start: start)
         } else if token == "slash" {
             emit(kind: .slash, start: start)
         } else if token == "ampersand" {
@@ -288,12 +285,12 @@ construct LexerCursor {
 
     function advance(): String {
         let value: currentCharacter()
-        index += 1
+        index: index + 1
         if value == "\n" {
-            line += 1
+            line: line + 1
             set column   0
         } else {
-            column += 1
+            column: column + 1
         }
         return value
     }
@@ -443,7 +440,7 @@ construct LexerCursor {
                 let escaped: advance()
                 set result   result + "\\" + escaped
                 if escaped == "(" {
-                    interpolationDepth += 1
+                    interpolationDepth: interpolationDepth + 1
                 }
                 continue
             }
@@ -460,7 +457,7 @@ construct LexerCursor {
                 }
 
                 if character == "(" {
-                    interpolationDepth += 1
+                    interpolationDepth: interpolationDepth + 1
                 } else if character == ")" {
                     set interpolationDepth   interpolationDepth - 1
                 }
@@ -548,7 +545,7 @@ construct LexerCursor {
         state end: text.count
 
         while start < end && isNewlineAt(text: text, index: start) {
-            start += 1
+            start: start + 1
         }
 
         while end > start && isNewlineAt(text: text, index: end - 1) {
@@ -565,7 +562,7 @@ construct LexerCursor {
             if body.directive == directive {
                 return body.language
             }
-            bodyIndex += 1
+            bodyIndex: bodyIndex + 1
         }
         return ""
     }

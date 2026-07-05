@@ -486,7 +486,7 @@ extension Parser {
                     return true
                 }
             case .eof, .leftBrace, .rightBrace, .rightParen, .rightBracket, .equal, .equalEqual,
-                .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash, .ampersand, .andAnd, .pipe, .orOr,
+                .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .slash, .ampersand, .andAnd, .pipe, .orOr,
                 .questionQuestion, .colon, .arrow:
                 return false
             case .hash, .foreignBody, .macroAttribute, .dollar, .percent, .bang:

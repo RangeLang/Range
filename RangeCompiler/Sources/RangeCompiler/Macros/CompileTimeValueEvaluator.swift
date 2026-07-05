@@ -171,12 +171,19 @@ struct CompileTimeValueEvaluator {
             }
             return .boolean(!value)
         case .binary(let lhs, .addition, let rhs):
-            guard case .string(let left) = evaluate(lhs, locals: locals),
-                case .string(let right) = evaluate(rhs, locals: locals)
+            guard let left = evaluate(lhs, locals: locals),
+                let right = evaluate(rhs, locals: locals)
             else {
                 return nil
             }
-            return .string(left + right)
+            switch (left, right) {
+            case (.string(let left), .string(let right)):
+                return .string(left + right)
+            case (.integer(let left), .integer(let right)):
+                return .integer(left + right)
+            default:
+                return nil
+            }
         case .binary(let lhs, .subtraction, let rhs):
             guard case .integer(let left) = evaluate(lhs, locals: locals),
                 case .integer(let right) = evaluate(rhs, locals: locals)

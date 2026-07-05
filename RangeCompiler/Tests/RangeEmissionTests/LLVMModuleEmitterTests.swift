@@ -43,6 +43,63 @@ struct LLVMModuleEmitterTests {
         #expect(module == expectedMain(returning: 9))
     }
 
+    @Test("Integer local return emits bound integer return")
+    func integerLocalReturnEmitsBoundIntegerReturn() throws {
+        let module = try emit(
+            """
+            @main {
+                let count: Int(5)
+                return count
+            }
+            """
+        )
+
+        #expect(module == expectedMain(returning: 5))
+    }
+
+    @Test("Integer arithmetic return emits folded integer return")
+    func integerArithmeticReturnEmitsFoldedIntegerReturn() throws {
+        let module = try emit(
+            """
+            @main {
+                return 5 + 2 * 3
+            }
+            """
+        )
+
+        #expect(module == expectedMain(returning: 11))
+    }
+
+    @Test("Integer arithmetic local return emits folded integer return")
+    func integerArithmeticLocalReturnEmitsFoldedIntegerReturn() throws {
+        let module = try emit(
+            """
+            @main {
+                let count: Int(5)
+                let total: Int(count + 2)
+                return total
+            }
+            """
+        )
+
+        #expect(module == expectedMain(returning: 7))
+    }
+
+    @Test("Mutable integer state assignment emits updated return")
+    func mutableIntegerStateCompoundAssignmentEmitsUpdatedReturn() throws {
+        let module = try emit(
+            """
+            @main {
+                state count: Int(5)
+                count: count + 2
+                return count
+            }
+            """
+        )
+
+        #expect(module == expectedMain(returning: 7))
+    }
+
     private func emit(_ source: String) throws -> String {
         var inputs = try rangeCoreInputs()
         inputs.append(

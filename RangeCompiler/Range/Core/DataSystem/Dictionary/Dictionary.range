@@ -55,7 +55,7 @@ extension Dictionary<String, Value> {
 
             switch container.encode(entry.value, forKey: entry.key) {
             case .success:
-                index += 1
+                index: index + 1
             case .failure(let error):
                 return .failure(cause: error)
             }

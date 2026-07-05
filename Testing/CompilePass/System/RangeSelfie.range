@@ -58,8 +58,6 @@ function tokenKindName(kind: TokenKind): String {
         return "greaterEqual"
     case .plus:
         return "plus"
-    case .plusEqual:
-        return "plusEqual"
     case .slash:
         return "slash"
     case .ampersand:
@@ -91,8 +89,8 @@ function renderTokens(tokens: [LexicalToken]): String {
 
     while index < tokens.count {
         let token: LexicalToken(tokens.element(index: index))
-        output += "\(index): \(tokenKindName(kind: token.kind)) \"\(token.source)\" @ \(token.range.start.line):\(token.range.start.character)-\(token.range.end.line):\(token.range.end.character)\n"
-        index += 1
+        output: output + "\(index): \(tokenKindName(kind: token.kind)) \"\(token.source)\" @ \(token.range.start.line):\(token.range.start.character)-\(token.range.end.line):\(token.range.end.character)\n"
+        index: index + 1
     }
 
     return output

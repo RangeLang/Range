@@ -21,7 +21,6 @@ function rangeLexer(): Lexer {
             LexerRule(name: "less", pattern: "<", token: "less", priority: 20),
             LexerRule(name: "greaterEqual", pattern: ">=", token: "greaterEqual", priority: 30),
             LexerRule(name: "greater", pattern: ">", token: "greater", priority: 20),
-            LexerRule(name: "plusEqual", pattern: "+=", token: "plusEqual", priority: 30),
             LexerRule(name: "plus", pattern: "+", token: "plus", priority: 20),
             LexerRule(name: "questionQuestion", pattern: "??", token: "questionQuestion", priority: 30),
             LexerRule(name: "question", pattern: "?", token: "question", priority: 20),

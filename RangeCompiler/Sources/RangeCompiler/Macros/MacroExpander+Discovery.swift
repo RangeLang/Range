@@ -137,7 +137,7 @@ extension MacroExpander {
         case .switchStatement(_, let cases, let defaultBody):
             return cases.contains { $0.body.contains(where: containsMacroRewrite) }
                 || (defaultBody?.contains(where: containsMacroRewrite) ?? false)
-        case .localBinding, .assignment, .compoundAssignment, .return, .break, .continue:
+        case .localBinding, .assignment, .return, .break, .continue:
             return false
         }
     }

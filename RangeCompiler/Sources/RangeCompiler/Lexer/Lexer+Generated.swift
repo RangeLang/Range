@@ -34,7 +34,6 @@ enum RangeAuthoredTokenKind {
     case greater
     case greaterEqual
     case plus
-    case plusEqual
     case slash
     case ampersand
     case andAnd
@@ -116,8 +115,6 @@ extension Lexer {
             parserToken = .greaterEqual
         case .plus:
             parserToken = .plus
-        case .plusEqual:
-            parserToken = .plusEqual
         case .slash:
             parserToken = .slash
         case .ampersand:
@@ -166,7 +163,6 @@ extension RangeAuthoredLexer {
         RangeAuthoredLexerRule(name: "less", pattern: "<", token: "less", priority: 20),
         RangeAuthoredLexerRule(name: "greaterEqual", pattern: ">=", token: "greaterEqual", priority: 30),
         RangeAuthoredLexerRule(name: "greater", pattern: ">", token: "greater", priority: 20),
-        RangeAuthoredLexerRule(name: "plusEqual", pattern: "+=", token: "plusEqual", priority: 30),
         RangeAuthoredLexerRule(name: "plus", pattern: "+", token: "plus", priority: 20),
         RangeAuthoredLexerRule(name: "questionQuestion", pattern: "??", token: "questionQuestion", priority: 30),
         RangeAuthoredLexerRule(name: "question", pattern: "?", token: "question", priority: 20),

@@ -1958,19 +1958,19 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
         #expect(assignmentName == "Math.clamp")
 
-        let compoundAssignment = try #require(update.body?[1])
+        let secondAssignment = try #require(update.body?[1])
 
-        guard case .assignment(_, let compoundAssignmentExpression) = compoundAssignment else {
-            Issue.record("Expected compound assignment to lower into a rewritten assignment.")
+        guard case .assignment(_, let secondAssignmentExpression) = secondAssignment else {
+            Issue.record("Expected second assignment to lower into a rewritten assignment.")
             return
         }
 
-        guard case .call(let compoundAssignmentName, _) = compoundAssignmentExpression else {
-            Issue.record("Expected lowered compound assignment to become a call.")
+        guard case .call(let secondAssignmentName, _) = secondAssignmentExpression else {
+            Issue.record("Expected lowered second assignment to become a call.")
             return
         }
 
-        #expect(compoundAssignmentName == "Math.clamp")
+        #expect(secondAssignmentName == "Math.clamp")
     }
 
     @Test("State getter macro rewrites reads in expressions")
@@ -2117,16 +2117,16 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(directName == "value")
         #expect(directAmount == 1)
 
-        let compoundAssignment = try #require(update.body?[1])
-        guard case .assignment(_, let compoundExpression) = compoundAssignment,
-            case .binary(_, .addition, let outerRHS) = compoundExpression,
-            case .integer(let compoundAmount) = outerRHS
+        let secondAssignment = try #require(update.body?[1])
+        guard case .assignment(_, let secondExpression) = secondAssignment,
+            case .binary(_, .addition, let outerRHS) = secondExpression,
+            case .integer(let secondAmount) = outerRHS
         else {
-            Issue.record("Expected binding setter to rewrite compound assignments.")
+            Issue.record("Expected binding setter to rewrite colon assignments.")
             return
         }
 
-        #expect(compoundAmount == 1)
+        #expect(secondAmount == 1)
     }
 
     @Test("Construct macro expand emits extension declarations")

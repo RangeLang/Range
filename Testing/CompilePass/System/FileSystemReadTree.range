@@ -12,8 +12,8 @@ function renderTree(node: FileTreeNode, indent: String): String {
     state index: 0
 
     while index < node.children.count {
-        output += renderTree(node: node.children.element(index: index), indent: "\(indent)  ")
-        index += 1
+        output: output + renderTree(node: node.children.element(index: index), indent: "\(indent)  ")
+        index: index + 1
     }
 
     return output

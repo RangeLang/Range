@@ -196,7 +196,7 @@ extension ApplicationGraphValidator {
                         fileName: fileName
                     )
                 }
-            case .assignment, .compoundAssignment, .expression, .return,
+            case .assignment, .expression, .return,
                 .break, .continue:
                 continue
             }

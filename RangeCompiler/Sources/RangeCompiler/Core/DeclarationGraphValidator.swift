@@ -796,7 +796,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return expressionMacroUsages(in: expression, declarationName: declarationName)
         case .localBinding(let declaration):
             return expressionMacroUsages(in: declaration.expression, declarationName: declaration.name)
-        case .assignment(_, let expression), .compoundAssignment(_, _, let expression):
+        case .assignment(_, let expression):
             return expressionMacroUsages(in: expression, declarationName: declarationName)
         case .forEach(_, let sequence, let body):
             return expressionMacroUsages(in: sequence, declarationName: declarationName)

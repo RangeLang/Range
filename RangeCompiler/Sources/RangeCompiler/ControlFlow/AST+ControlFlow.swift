@@ -9,11 +9,6 @@ public indirect enum Statement {
     case localCallable(LocalCallableDeclaration)
     case derived(name: String, typeName: String, body: [Statement])
     case assignment(target: AssignmentTarget, expression: Expression)
-    case compoundAssignment(
-        target: AssignmentTarget,
-        operatorSymbol: CompoundOperator,
-        expression: Expression
-    )
     case expression(Expression)
     case forEach(name: String, sequence: Expression, body: [Statement])
     case whileLoop(condition: Expression, body: [Statement])
@@ -150,8 +145,4 @@ public indirect enum AssignmentTarget {
     case binding(String)
     case local(String)
     case member(base: AssignmentTarget, name: String)
-}
-
-public enum CompoundOperator: String {
-    case plusEquals = "+="
 }

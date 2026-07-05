@@ -161,9 +161,6 @@ extension Parser {
         case .percent:
             advance()
             return "%"
-        case .plusEqual:
-            advance()
-            return "+="
         case .bang:
             advance()
             return "!"

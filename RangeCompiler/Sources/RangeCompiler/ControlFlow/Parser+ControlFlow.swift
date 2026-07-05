@@ -91,15 +91,11 @@ extension Parser {
         let target = try parseAssignmentTarget(localBindings: localBindings)
 
         switch peek() {
-        case .plusEqual:
+        case .colon:
             advance()
-            return .compoundAssignment(
-                target: target,
-                operatorSymbol: .plusEquals,
-                expression: try parseExpression()
-            )
+            return .assignment(target: target, expression: try parseExpression())
         default:
-            throw ParseError("Expected assignment operator (`+=`) or `set` statement in action block.")
+            throw ParseError("Expected assignment operator (`:`) or `set` statement in action block.")
         }
     }
 
@@ -259,7 +255,7 @@ extension Parser {
             offset += 2
         }
         let next = peek(offset: offset)
-        return next == .plusEqual
+        return next == .colon
     }
 
     func isExpressionStatementStart() -> Bool {

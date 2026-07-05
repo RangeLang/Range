@@ -1,7 +1,7 @@
 @main {
   state person: Person(name: "George", age: 26)
 
-  person.age += 1
+  person.age: person.age + 1
 
   derived personString: String {
     "Person: \(person.name), Age: \(person.age)"
@@ -21,6 +21,6 @@ construct User {
   binding person: Person
 
   function incrementAge() {
-    person.age += 1
+    person.age: person.age + 1
   }
 }

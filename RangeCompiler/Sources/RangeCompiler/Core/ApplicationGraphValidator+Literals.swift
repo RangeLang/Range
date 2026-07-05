@@ -317,7 +317,7 @@ extension ApplicationGraphValidator {
                         fileName: fileName
                     )
                 }
-            case .localBinding, .assignment, .compoundAssignment,
+            case .localBinding, .assignment,
                 .expression, .return, .break, .continue:
                 continue
             }

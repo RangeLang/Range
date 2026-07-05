@@ -204,7 +204,7 @@ struct RangeAuthoredLexerCursor {
         case "leftBrace", "rightBrace", "leftParen", "rightParen", "leftBracket", "rightBracket",
             "asterisk", "dot", "ellipsis", "colon", "arrow", "bang", "equal", "equalEqual",
             "bangEqual", "minus", "less", "lessEqual", "greater", "greaterEqual", "plus",
-            "plusEqual", "slash", "ampersand", "andAnd", "pipe", "orOr", "question",
+            "slash", "ampersand", "andAnd", "pipe", "orOr", "question",
             "questionQuestion", "dollar", "percent", "comma":
             return true
         default:
@@ -256,8 +256,6 @@ struct RangeAuthoredLexerCursor {
             emit(kind: .greaterEqual, start: start)
         case "plus":
             emit(kind: .plus, start: start)
-        case "plusEqual":
-            emit(kind: .plusEqual, start: start)
         case "slash":
             emit(kind: .slash, start: start)
         case "ampersand":

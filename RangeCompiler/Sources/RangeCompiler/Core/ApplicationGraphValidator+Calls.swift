@@ -209,8 +209,7 @@ extension ApplicationGraphValidator {
                     context: context,
                     fileName: fileName
                 )
-            case .assignment(_, let expression), .compoundAssignment(_, _, let expression),
-                .expression(let expression):
+            case .assignment(_, let expression), .expression(let expression):
                 try validateCallArgumentLabels(
                     in: expression,
                     environment: environment,

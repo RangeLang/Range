@@ -701,7 +701,7 @@ extension MacroExpander {
                 if let defaultBody {
                     expressions.append(contentsOf: macroOperationExpressions(in: defaultBody))
                 }
-            case .localBinding, .assignment, .compoundAssignment, .return, .macroInvocation,
+            case .localBinding, .assignment, .return, .macroInvocation,
                 .break, .continue:
                 continue
             }

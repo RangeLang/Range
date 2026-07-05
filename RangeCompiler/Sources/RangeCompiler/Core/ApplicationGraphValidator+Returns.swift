@@ -349,7 +349,7 @@ extension ApplicationGraphValidator {
                         fileName: fileName
                     )
                 }
-            case .localBinding, .assignment, .compoundAssignment,
+            case .localBinding, .assignment,
                 .expression, .return, .break, .continue:
                 continue
             }
@@ -388,7 +388,7 @@ extension ApplicationGraphValidator {
                 expressions.append(contentsOf: collectReturnExpressions(in: deferred.body))
             case .localCallable:
                 continue
-            case .localBinding, .derived, .assignment, .compoundAssignment,
+            case .localBinding, .derived, .assignment,
                 .expression, .break, .continue:
                 continue
             }

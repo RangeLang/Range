@@ -30,7 +30,6 @@ enum Token: Equatable {
     case greater
     case greaterEqual
     case plus
-    case plusEqual
     case slash
     case ampersand
     case andAnd

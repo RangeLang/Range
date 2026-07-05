@@ -1075,35 +1075,6 @@ extension MacroExpander {
         return applyPropertyTransforms(effects.getterTransforms, to: expression)
     }
 
-    static func rewrittenCompoundStateAssignment(
-        target: AssignmentTarget,
-        operatorSymbol: CompoundOperator,
-        expression: Expression,
-        stateEffects: [String: PropertyMacroEffects]
-    ) -> Statement? {
-        guard let name = propertyName(for: target),
-            let effects = stateEffects[name],
-            !effects.setterTransforms.isEmpty
-        else {
-            return nil
-        }
-
-        let combinedExpression: Expression
-        switch operatorSymbol {
-        case .plusEquals:
-            combinedExpression = .binary(
-                lhs: .identifier(name),
-                operatorSymbol: .addition,
-                rhs: expression
-            )
-        }
-
-        return .assignment(
-            target: target,
-            expression: applyPropertyTransforms(effects.setterTransforms, to: combinedExpression)
-        )
-    }
-
     static func propertyName(for target: AssignmentTarget) -> String? {
         switch target {
         case .state(let name), .binding(let name):
@@ -1357,40 +1328,6 @@ extension MacroExpander {
                     expression: try expand(
                         expression: rewrittenExpression,
                         expectedType: expectedType(for: target, stateEffects: stateEffects),
-                        macros: macros,
-                        parameterMacroSignatures: parameterMacroSignatures,
-                        literalBridges: literalBridges,
-                        context: context,
-                        stateEffects: stateEffects
-                    )
-                )
-            ]
-        case .compoundAssignment(let target, let operatorSymbol, let expression):
-            if let rewrittenAssignment = rewrittenCompoundStateAssignment(
-                target: target,
-                operatorSymbol: operatorSymbol,
-                expression: expression,
-                stateEffects: stateEffects
-            ) {
-                return try expand(
-                    statement: rewrittenAssignment,
-                    expectedReturnType: expectedReturnType,
-                    macros: macros,
-                    protocols: protocols,
-                    parameterMacroSignatures: parameterMacroSignatures,
-                    literalBridges: literalBridges,
-                    context: context,
-                    stateEffects: stateEffects
-                )
-            }
-
-            return [
-                .compoundAssignment(
-                    target: target,
-                    operatorSymbol: operatorSymbol,
-                    expression: try expand(
-                        expression: expression,
-                        expectedType: nil,
                         macros: macros,
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
@@ -1996,7 +1933,7 @@ extension MacroExpander {
                 if let defaultBody {
                     blocks.append(contentsOf: emittedCodeBlocks(in: defaultBody))
                 }
-            case .macroInvocation, .assignment, .compoundAssignment, .expression,
+            case .macroInvocation, .assignment, .expression,
                 .return, .break, .continue:
                 continue
             }
@@ -2286,32 +2223,6 @@ extension MacroExpander {
                     context: context
                 )
                 locals[name] = evaluator.evaluate(expression, with: locals)?.expression ?? expression
-            case .compoundAssignment(let target, .plusEquals, let expression):
-                guard let name = diagnosticMutableBindingName(target),
-                    let currentExpression = locals[name]
-                else {
-                    continue
-                }
-                let evaluator = CompileTimeValueEvaluator(
-                    targetBinding: targetBinding,
-                    targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
-                    graphBinding: graphBinding,
-                    selfValue: macroSelfValue(named: diagnosticOwnerName),
-                    localBindings: locals,
-                    macroDeclarationsByName: context.macroDeclarationsByName,
-                    context: context
-                )
-                switch (
-                    evaluator.evaluate(currentExpression, with: locals),
-                    evaluator.evaluate(expression, with: locals)
-                ) {
-                case (.integer(let current)?, .integer(let increment)?):
-                    locals[name] = .integer(current + increment)
-                case (.string(let current)?, .string(let suffix)?):
-                    locals[name] = .string(current + suffix)
-                default:
-                    continue
-                }
             case .expand, .macroInvocation, .return, .break, .continue:
                 continue
             }
@@ -2906,8 +2817,6 @@ extension MacroExpander {
             return ">="
         case .plus:
             return "+"
-        case .plusEqual:
-            return "+="
         case .slash:
             return "/"
         case .ampersand:
@@ -3050,8 +2959,7 @@ extension MacroExpander {
                     localIdentifiers: localIdentifiers
                 )
             }
-        case .assignment(_, let expression), .compoundAssignment(_, _, let expression),
-            .expression(let expression):
+        case .assignment(_, let expression), .expression(let expression):
             try validateSyntaxMacroExpression(
                 expression,
                 macroName: macroName,

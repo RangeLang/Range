@@ -184,7 +184,7 @@ extension ApplicationGraphValidator {
                         "'continue' in \(fileName) can only be used inside a loop."
                     )
                 }
-            case .localBinding, .assignment, .compoundAssignment,
+            case .localBinding, .assignment,
                 .expression:
                 continue
             }

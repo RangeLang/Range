@@ -119,8 +119,6 @@ public struct CompilationArtifactsEmitter {
             return "greaterEqual"
         case .plus:
             return "plus"
-        case .plusEqual:
-            return "plusEqual"
         case .slash:
             return "slash"
         case .ampersand:

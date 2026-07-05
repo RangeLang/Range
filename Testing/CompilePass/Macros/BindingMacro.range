@@ -28,6 +28,6 @@ construct Box {
 
     function update(value: Int) {
         set score   value
-        score += value
+        score: score + value
     }
 }

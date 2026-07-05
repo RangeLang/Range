@@ -449,13 +449,6 @@ struct GraphCollector {
                         expression, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
                 }
 
-            case .compoundAssignment(let target, _, let expression):
-                let targetID = resolveAssignmentTarget(target, scope: scope)
-                addEdge(from: ownerID, to: targetID, kind: .mutates)
-                addEdge(from: ownerID, to: targetID, kind: .dependsOn)
-                analyzeExpression(
-                    expression, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
-
             case .expression(let expression):
                 analyzeExpression(
                     expression, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
