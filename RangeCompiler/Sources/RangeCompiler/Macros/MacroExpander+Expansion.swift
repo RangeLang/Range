@@ -81,17 +81,17 @@ extension MacroExpander {
         let memberValues =
             isLLVMArtifactBlock
             ? []
-            : evaluatedMacroMemberValues(
+            : try evaluatedMacroMemberValues(
                 in: blockMacro.body,
                 macros: macros,
                 context: context
             )
         let rawBody = blockMacro.rawBody
-        let preEvaluatedApplications = blockMacro.macros.map {
+        let preEvaluatedApplications = try blockMacro.macros.map {
             guard $0.name != "construct" else {
                 return $0
             }
-            return attachingEvaluatedValue(
+            return try attachingEvaluatedValue(
                 to: $0,
                 rawBody: rawBody,
                 members: memberValues,
@@ -100,8 +100,8 @@ extension MacroExpander {
                 context: context
             )
         }
-        let applications = preEvaluatedApplications.map {
-            attachingEvaluatedValue(
+        let applications = try preEvaluatedApplications.map {
+            try attachingEvaluatedValue(
                 to: $0,
                 rawBody: rawBody,
                 members: memberValues,
@@ -409,7 +409,7 @@ extension MacroExpander {
         bodyStatements: [Statement]? = nil,
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
-    ) -> MacroApplication {
+    ) throws -> MacroApplication {
         let applicationWithBody = MacroApplication(
             name: application.name,
             genericArguments: application.genericArguments,
@@ -436,9 +436,7 @@ extension MacroExpander {
             application: applicationWithBody,
             members: members.map(\.value)
         )
-        guard let valueBindings = memberValueBindings(for: macro, members: members) else {
-            return applicationWithBody
-        }
+        let valueBindings = try memberValueBindings(for: macro, members: members)
         guard
             let argumentBindings = (try? parseMacroArgumentBindings(
                 for: macro,
@@ -474,7 +472,6 @@ extension MacroExpander {
         else {
             return applicationWithBody
         }
-
         var updated = applicationWithBody
         updated.evaluatedValue = value
         return updated
@@ -965,8 +962,9 @@ extension MacroExpander {
         in statements: [Statement],
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
-    ) -> [EvaluatedMacroMember] {
-        statements.enumerated().compactMap { offset, statement -> EvaluatedMacroMember? in
+    ) throws -> [EvaluatedMacroMember] {
+        var evaluatedMembers: [EvaluatedMacroMember] = []
+        for (offset, statement) in statements.enumerated() {
             let name: String
             let argumentBindings: [String: Expression]?
             let targetValue: CompileTimeValue
@@ -981,12 +979,12 @@ extension MacroExpander {
                         arguments: arguments
                     )
                 } else {
-                    return nil
+                    continue
                 }
                 targetValue = memberMacroTargetValue(ordinal: offset)
             case .macroInvocation(let macroName, let argumentClause, let body):
                 name = macroName
-                childMembers = evaluatedMacroMemberValues(
+                childMembers = try evaluatedMacroMemberValues(
                     in: body,
                     macros: macros,
                     context: context
@@ -1000,24 +998,22 @@ extension MacroExpander {
                         argumentClause: argumentClause
                     )
                 } else {
-                    return nil
+                    continue
                 }
                 targetValue = memberMacroTargetValue(
                     ordinal: offset,
                     members: childMembers.map(\.value)
                 )
             default:
-                return nil
+                continue
             }
             guard let macro = macros[name] else {
-                return nil
+                continue
             }
             guard let argumentBindings else {
-                return nil
+                continue
             }
-            guard let valueBindings = memberValueBindings(for: macro, members: childMembers) else {
-                return nil
-            }
+            let valueBindings = try memberValueBindings(for: macro, members: childMembers)
             let evaluator = CompileTimeValueEvaluator(
                 targetBinding: "target",
                 targetValue: targetValue,
@@ -1040,10 +1036,11 @@ extension MacroExpander {
                 macro.body,
                 locals: &locals
             ) else {
-                return nil
+                continue
             }
-            return EvaluatedMacroMember(name: name, value: value)
+            evaluatedMembers.append(EvaluatedMacroMember(name: name, value: value))
         }
+        return evaluatedMembers
     }
 
     static func memberMacroTargetValue(
@@ -1082,7 +1079,7 @@ extension MacroExpander {
     private static func memberValueBindings(
         for macro: MacroDeclaration,
         members: [EvaluatedMacroMember]
-    ) -> [String: CompileTimeValue]? {
+    ) throws -> [String: CompileTimeValue] {
         guard !macro.memberBindings.isEmpty else {
             return [:]
         }
@@ -1099,9 +1096,20 @@ extension MacroExpander {
             }
             bindings[binding.name] = .array(matching)
         }
-
-        guard consumed.count == members.count else {
-            return nil
+        let unmatchedChildren = members.enumerated()
+            .filter { !consumed.contains($0.offset) }
+            .map { "@\($0.element.name)" }
+        if !unmatchedChildren.isEmpty {
+            let expectedNames = macro.memberBindings.compactMap(\.acceptedMacroName)
+            let expected =
+                expectedNames.isEmpty
+                ? "declared @members"
+                : expectedNames.map { "@\($0)" }.joined(separator: ", ")
+            throw ParseError(
+                "Macro @\(macro.name) does not accept child "
+                    + unmatchedChildren.joined(separator: ", ")
+                    + "; expected \(expected)."
+            )
         }
         return bindings
     }

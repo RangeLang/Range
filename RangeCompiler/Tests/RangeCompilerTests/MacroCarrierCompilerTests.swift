@@ -107,6 +107,33 @@ struct MacroCarrierCompilerTests {
         #expect(memberBinding.acceptedMacroName == "case")
     }
 
+    @Test("enum macro rejects non-case members")
+    func enumMacroRejectsNonCaseMembers() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/BadEnum.range",
+                source: """
+                    @enum(name: Broken) {
+                        @case(name: ok)
+                        @let(name: count, value: @int(value: 1))
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        do {
+            _ = try CompilerPipeline().build(inputs: inputs)
+            Issue.record("Expected @enum to reject non-@case members.")
+        } catch {
+            let message = String(describing: error)
+            #expect(message.contains("@enum"))
+            #expect(message.contains("@let"))
+            #expect(message.contains("@case"))
+        }
+    }
+
     @Test("let macro name parameter accepts names")
     func letMacroNameParameterAcceptsNames() throws {
         let program = try CompilerPipeline().build(inputs: try rangeCoreInputs())
