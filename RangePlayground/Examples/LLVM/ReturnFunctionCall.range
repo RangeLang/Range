@@ -1,0 +1,7 @@
+function add(lhs: Int, rhs: Int): Int {
+    return lhs + rhs
+}
+
+@main {
+    return add(lhs: 5, rhs: 2)
+}

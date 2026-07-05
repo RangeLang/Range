@@ -354,6 +354,122 @@ struct LLVMModuleEmitterTests {
         )
     }
 
+    @Test("Integer function call emits LLVM function")
+    func integerFunctionCallEmitsLLVMFunction() throws {
+        let module = try emit(
+            """
+            function add(lhs: Int, rhs: Int): Int {
+                return lhs + rhs
+            }
+
+            @main {
+                return add(lhs: 5, rhs: 2)
+            }
+            """
+        )
+
+        #expect(
+            module == """
+            define i32 @add(i32 %lhs.arg, i32 %rhs.arg) {
+            entry:
+              %lhs = alloca i32
+              store i32 %lhs.arg, ptr %lhs
+              %rhs = alloca i32
+              store i32 %rhs.arg, ptr %rhs
+              %0 = load i32, ptr %lhs
+              %1 = load i32, ptr %rhs
+              %2 = add i32 %0, %1
+              ret i32 %2
+            }
+
+            define i32 @main() {
+            entry:
+              %0 = call i32 @add(i32 5, i32 2)
+              ret i32 %0
+            }
+
+            """
+        )
+    }
+
+    @Test("Boolean function call extends return for main")
+    func booleanFunctionCallExtendsReturnForMain() throws {
+        let module = try emit(
+            """
+            function isSmall(value: Int): Bool {
+                return value < 10
+            }
+
+            @main {
+                return isSmall(value: 5)
+            }
+            """
+        )
+
+        #expect(
+            module == """
+            define i1 @isSmall(i32 %value.arg) {
+            entry:
+              %value = alloca i32
+              store i32 %value.arg, ptr %value
+              %0 = load i32, ptr %value
+              %1 = icmp slt i32 %0, 10
+              ret i1 %1
+            }
+
+            define i32 @main() {
+            entry:
+              %0 = call i1 @isSmall(i32 5)
+              %1 = zext i1 %0 to i32
+              ret i32 %1
+            }
+
+            """
+        )
+    }
+
+    @Test("Boolean parameter function call emits i1 parameter")
+    func booleanParameterFunctionCallEmitsI1Parameter() throws {
+        let module = try emit(
+            """
+            function choose(flag: Bool): Int {
+                if flag {
+                    return 9
+                } else {
+                    return 0
+                }
+            }
+
+            @main {
+                return choose(flag: Bool(true))
+            }
+            """
+        )
+
+        #expect(
+            module == """
+            define i32 @choose(i1 %flag.arg) {
+            entry:
+              %flag = alloca i1
+              store i1 %flag.arg, ptr %flag
+              %0 = load i1, ptr %flag
+              br i1 %0, label %if.then.1, label %if.then.2
+            if.then.1:
+              ret i32 9
+            if.then.2:
+              ret i32 0
+            }
+
+            define i32 @main() {
+            entry:
+              %0 = call i32 @choose(i1 1)
+              ret i32 %0
+            }
+
+            """
+        )
+    }
+
     private func emit(_ source: String) throws -> String {
         var inputs = try rangeCoreInputs()
         inputs.append(

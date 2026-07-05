@@ -18,8 +18,19 @@ public struct LLVMModuleEmitter {
 
     public func emit(program: CompiledProgram) throws -> String {
         let mainBlock = try projectMainBlock(in: program)
-        var emitter = MainFunctionEmitter()
-        return try emitter.emit(mainBlock: mainBlock)
+        let callables = try projectCallables(in: program)
+        let signatures = try functionSignatures(for: callables)
+        var modules: [String] = []
+
+        for callable in callables {
+            var emitter = FunctionEmitter(signatures: signatures)
+            modules.append(try emitter.emit(callable: callable))
+        }
+
+        var mainEmitter = FunctionEmitter(signatures: signatures)
+        modules.append(try mainEmitter.emitMain(mainBlock: mainBlock))
+
+        return modules.joined(separator: "\n")
     }
 
     private func projectMainBlock(in program: CompiledProgram) throws -> MainBlockNode {
@@ -49,21 +60,117 @@ public struct LLVMModuleEmitter {
         }
     }
 
-    private struct MainFunctionEmitter {
+    private func projectCallables(in program: CompiledProgram) throws -> [CallableDeclaration] {
+        program.projectExpandedFiles.flatMap { file in
+            callables(in: file.sourceFile)
+        }
+    }
+
+    private func callables(in sourceFile: SourceFileNode) -> [CallableDeclaration] {
+        switch sourceFile {
+        case .module(let module):
+            return module.callables
+        default:
+            return []
+        }
+    }
+
+    private func functionSignatures(for callables: [CallableDeclaration]) throws
+        -> [String: FunctionSignature]
+    {
+        var signatures: [String: FunctionSignature] = [:]
+
+        for callable in callables {
+            guard callable.targetType == nil else {
+                continue
+            }
+            guard callable.genericParameters.isEmpty else {
+                throw LLVMEmissionError("LLVM emission does not support generic function '\(callable.name)' yet.")
+            }
+            guard signatures[callable.name] == nil else {
+                throw LLVMEmissionError("LLVM emission requires unique function names. Duplicate: \(callable.name).")
+            }
+
+            let parameters = try callable.parameters.map { parameter in
+                FunctionParameterSignature(
+                    name: parameter.localName,
+                    externalLabel: parameter.externalLabel,
+                    type: try llvmType(for: parameter.typeReference, context: "parameter '\(parameter.localName)'")
+                )
+            }
+            let returnType = try llvmReturnType(for: callable.returnType)
+            signatures[callable.name] = FunctionSignature(
+                name: callable.name,
+                parameters: parameters,
+                returnType: returnType
+            )
+        }
+
+        return signatures
+    }
+
+    private func llvmReturnType(for typeReference: TypeReference?) throws -> String {
+        guard let typeReference else {
+            return "void"
+        }
+        return try llvmType(for: typeReference, context: "function return")
+    }
+
+    private func llvmType(for typeReference: TypeReference?, context: String) throws -> String {
+        guard let typeReference else {
+            throw LLVMEmissionError("LLVM emission requires an explicit type for \(context).")
+        }
+        switch typeReference.displayName {
+        case "Int":
+            return "i32"
+        case "Bool":
+            return "i1"
+        case "Void":
+            return "void"
+        default:
+            throw LLVMEmissionError("LLVM emission does not support \(context) type '\(typeReference.displayName)' yet.")
+        }
+    }
+
+    private struct FunctionSignature {
+        let name: String
+        let parameters: [FunctionParameterSignature]
+        let returnType: String
+    }
+
+    private struct FunctionParameterSignature {
+        let name: String
+        let externalLabel: String?
+        let type: String
+    }
+
+    private struct FunctionEmitter {
         private struct LLVMValue {
             let type: String
             let operand: String
         }
 
+        private struct LocalSlot {
+            let pointer: String
+            let type: String
+        }
+
+        private let signatures: [String: FunctionSignature]
         private var instructions: [String] = []
-        private var locals: [String: String] = [:]
+        private var locals: [String: LocalSlot] = [:]
         private var temporaryIndex = 0
         private var labelIndex = 0
         private var returned = false
         private var blockTerminated = false
         private var loopStack: [(breakLabel: String, continueLabel: String)] = []
+        private var currentReturnType = "i32"
 
-        mutating func emit(mainBlock: MainBlockNode) throws -> String {
+        init(signatures: [String: FunctionSignature]) {
+            self.signatures = signatures
+        }
+
+        mutating func emitMain(mainBlock: MainBlockNode) throws -> String {
+            currentReturnType = "i32"
             for statement in mainBlock.body {
                 try emit(statement: statement)
                 if returned || blockTerminated {
@@ -75,49 +182,84 @@ public struct LLVMModuleEmitter {
                 instructions.append("ret i32 0")
             }
 
-            let body = instructions.map { line in
-                line.hasSuffix(":") ? line : "  \(line)"
-            }.joined(separator: "\n")
-            return """
-            define i32 @main() {
-            entry:
-            \(body)
+            return renderFunction(name: "main", returnType: "i32", parameters: [])
+        }
+
+        mutating func emit(callable: CallableDeclaration) throws -> String {
+            guard let signature = signatures[callable.name] else {
+                throw LLVMEmissionError("Missing LLVM function signature for '\(callable.name)'.")
+            }
+            guard let body = callable.body else {
+                throw LLVMEmissionError("LLVM function '\(callable.name)' requires a body.")
+            }
+            currentReturnType = signature.returnType
+
+            var renderedParameters: [String] = []
+            for parameter in signature.parameters {
+                let pointer = try declareLocal(named: parameter.name, type: parameter.type)
+                let parameterName = try llvmIdentifier(parameter.name)
+                renderedParameters.append("\(parameter.type) %\(parameterName).arg")
+                instructions.append(
+                    "store \(parameter.type) %\(parameterName).arg, ptr \(pointer)"
+                )
             }
 
-            """
+            for statement in body {
+                try emit(statement: statement)
+                if returned || blockTerminated {
+                    break
+                }
+            }
+
+            if !returned {
+                switch signature.returnType {
+                case "void":
+                    instructions.append("ret void")
+                case "i1":
+                    instructions.append("ret i1 0")
+                default:
+                    instructions.append("ret \(signature.returnType) 0")
+                }
+            }
+
+            return renderFunction(
+                name: signature.name,
+                returnType: signature.returnType,
+                parameters: renderedParameters
+            )
         }
 
         private mutating func emit(statement: Statement) throws {
             switch statement {
             case .localBinding(let declaration):
                 let value = try emitValue(from: declaration.expression)
-                guard value.type == "i32" else {
-                    throw LLVMEmissionError("LLVM locals currently support i32 values only.")
-                }
-                let pointer = try declareLocal(named: declaration.name)
-                instructions.append("store i32 \(value.operand), ptr \(pointer)")
+                let pointer = try declareLocal(named: declaration.name, type: value.type)
+                instructions.append("store \(value.type) \(value.operand), ptr \(pointer)")
 
             case .assignment(let target, let expression):
                 let name = try integerLocalName(from: target)
-                guard let pointer = locals[name] else {
-                    throw LLVMEmissionError("Unknown LLVM integer local '\(name)'.")
+                guard let local = locals[name] else {
+                    throw LLVMEmissionError("Unknown LLVM local '\(name)'.")
                 }
                 let value = try emitValue(from: expression)
-                guard value.type == "i32" else {
-                    throw LLVMEmissionError("LLVM assignments currently support i32 values only.")
+                guard value.type == local.type else {
+                    throw LLVMEmissionError("LLVM assignment to '\(name)' expected \(local.type), got \(value.type).")
                 }
-                instructions.append("store i32 \(value.operand), ptr \(pointer)")
+                instructions.append("store \(value.type) \(value.operand), ptr \(local.pointer)")
 
             case .return(let expression):
                 guard let expression else {
-                    instructions.append("ret i32 0")
+                    guard currentReturnType == "void" else {
+                        throw LLVMEmissionError("LLVM return requires a value for \(currentReturnType) functions.")
+                    }
+                    instructions.append("ret void")
                     returned = true
                     blockTerminated = true
                     return
                 }
                 let value = try emitValue(from: expression)
-                let returnOperand = try emitI32ReturnOperand(from: value)
-                instructions.append("ret i32 \(returnOperand)")
+                let returnValue = try emitReturnValue(value)
+                instructions.append("ret \(returnValue.type) \(returnValue.operand)")
                 returned = true
                 blockTerminated = true
 
@@ -276,13 +418,13 @@ public struct LLVMModuleEmitter {
             blockTerminated = false
         }
 
-        private mutating func declareLocal(named name: String) throws -> String {
+        private mutating func declareLocal(named name: String, type: String) throws -> String {
             if locals[name] != nil {
-                throw LLVMEmissionError("Duplicate LLVM integer local '\(name)'.")
+                throw LLVMEmissionError("Duplicate LLVM local '\(name)'.")
             }
             let pointer = "%\(try llvmIdentifier(name))"
-            locals[name] = pointer
-            instructions.append("\(pointer) = alloca i32")
+            locals[name] = LocalSlot(pointer: pointer, type: type)
+            instructions.append("\(pointer) = alloca \(type)")
             return pointer
         }
 
@@ -306,12 +448,12 @@ public struct LLVMModuleEmitter {
                 return LLVMValue(type: "i1", operand: value ? "1" : "0")
 
             case .identifier(let name):
-                guard let pointer = locals[name] else {
-                    throw LLVMEmissionError("Unknown LLVM integer local '\(name)'.")
+                guard let local = locals[name] else {
+                    throw LLVMEmissionError("Unknown LLVM local '\(name)'.")
                 }
                 let result = nextTemporary()
-                instructions.append("\(result) = load i32, ptr \(pointer)")
-                return LLVMValue(type: "i32", operand: result)
+                instructions.append("\(result) = load \(local.type), ptr \(local.pointer)")
+                return LLVMValue(type: local.type, operand: result)
 
             case .call(let name, let arguments)
                 where name == "Int" && arguments.count == 1 && arguments[0].label == nil:
@@ -331,6 +473,9 @@ public struct LLVMModuleEmitter {
 
             case .binary(let lhs, let operatorSymbol, let rhs):
                 return try emitBinaryValue(lhs: lhs, operatorSymbol: operatorSymbol, rhs: rhs)
+
+            case .call(let name, let arguments):
+                return try emitFunctionCall(name: name, arguments: arguments)
 
             default:
                 throw LLVMEmissionError("LLVM emission currently supports integer and boolean values only.")
@@ -427,6 +572,58 @@ public struct LLVMModuleEmitter {
             }
         }
 
+        private mutating func emitFunctionCall(name: String, arguments: [CallArgument]) throws -> LLVMValue {
+            guard let signature = signatures[name] else {
+                throw LLVMEmissionError("Unknown LLVM function '\(name)'.")
+            }
+            guard arguments.count == signature.parameters.count else {
+                throw LLVMEmissionError("LLVM function '\(name)' expects \(signature.parameters.count) arguments, got \(arguments.count).")
+            }
+
+            var emittedArguments: [String] = []
+            for (index, argument) in arguments.enumerated() {
+                let parameter = signature.parameters[index]
+                if let label = argument.label,
+                    label != parameter.externalLabel,
+                    label != parameter.name
+                {
+                    throw LLVMEmissionError("LLVM function '\(name)' argument label '\(label)' does not match parameter '\(parameter.name)'.")
+                }
+                let value = try emitValue(from: argument.value)
+                guard value.type == parameter.type else {
+                    throw LLVMEmissionError("LLVM function '\(name)' argument '\(parameter.name)' expected \(parameter.type), got \(value.type).")
+                }
+                emittedArguments.append("\(value.type) \(value.operand)")
+            }
+
+            let argumentText = emittedArguments.joined(separator: ", ")
+            if signature.returnType == "void" {
+                instructions.append("call void @\(try llvmIdentifier(name))(\(argumentText))")
+                throw LLVMEmissionError("Void function calls are not values yet.")
+            }
+
+            let result = nextTemporary()
+            instructions.append(
+                "\(result) = call \(signature.returnType) @\(try llvmIdentifier(name))(\(argumentText))"
+            )
+            return LLVMValue(type: signature.returnType, operand: result)
+        }
+
+        private mutating func emitReturnValue(_ value: LLVMValue) throws -> LLVMValue {
+            switch (currentReturnType, value.type) {
+            case ("i32", "i32"), ("i1", "i1"):
+                return value
+            case ("i32", "i1"):
+                let result = nextTemporary()
+                instructions.append("\(result) = zext i1 \(value.operand) to i32")
+                return LLVMValue(type: "i32", operand: result)
+            case ("void", _):
+                throw LLVMEmissionError("LLVM void functions cannot return a value.")
+            default:
+                throw LLVMEmissionError("LLVM return expected \(currentReturnType), got \(value.type).")
+            }
+        }
+
         private mutating func emitCondition(from expression: RangeCompiler.Expression) throws -> String {
             let value = try emitValue(from: expression)
             switch value.type {
@@ -449,6 +646,23 @@ public struct LLVMModuleEmitter {
         private mutating func nextLabel(_ prefix: String) -> String {
             defer { labelIndex += 1 }
             return "\(prefix).\(labelIndex)"
+        }
+
+        private func renderFunction(
+            name: String,
+            returnType: String,
+            parameters: [String]
+        ) -> String {
+            let body = instructions.map { line in
+                line.hasSuffix(":") ? line : "  \(line)"
+            }.joined(separator: "\n")
+            return """
+            define \(returnType) @\(name)(\(parameters.joined(separator: ", "))) {
+            entry:
+            \(body)
+            }
+
+            """
         }
 
         private func llvmIdentifier(_ name: String) throws -> String {
