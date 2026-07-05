@@ -1,33 +1,25 @@
 # Range
 
-Range runs `.range` projects by generating a small Swift package and building it with Swift Embedded.
+Range currently runs `.range` projects through the Range script runner, which
+asks the Swift-hosted compiler to emit LLVM IR and then links that IR with
+`clang`.
 
 ## Download
 
-Install the `range` CLI from the latest GitHub release. macOS is the primary
-release target, with Windows and Linux builds published alongside it:
-
-https://github.com/georgetchelidze/Range/releases/latest
-
-Check that it is on your `PATH`:
+The active development command surface is the repository script:
 
 ```sh
-range version
+scripts/range run path/to/Main.range
 ```
 
 ## Start
 
-Create a project:
+Emit LLVM IR directly:
 
 ```sh
-range create MyProject
-cd MyProject
+scripts/range emit-llvm path/to/Main.range .range/Build/llvm/Main.ll
 ```
 
-Run it:
-
-```sh
-range run
-```
-
-`range run` reads `Package.range`, compiles the project to generated Swift, enables Swift Embedded for that package, and launches it through SwiftPM.
+`scripts/range run` writes `.range/Build/llvm/Main.ll`, links it with `clang`,
+and launches the executable. Swift remains the current compiler host; generated
+Swift package workspaces are no longer the active backend path.

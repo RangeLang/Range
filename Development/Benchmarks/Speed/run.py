@@ -584,7 +584,7 @@ def build_case(
     targets.append(BenchTarget("Python", ["python3", str(python_source), str(case.n)]))
 
     range_project = prepare_range_project(case)
-    range_binary = range_project / ".range" / "Build" / "swift" / ".build" / "debug" / "RangeGenerated"
+    range_binary = range_project / ".range" / "Build" / "llvm" / range_project.name
     if timed_setup(f"{case.name} Range emit/build", [str(range_cli), "run", str(range_project)]):
         if range_binary.is_file():
             targets.append(BenchTarget("Range", [str(range_binary)]))
@@ -637,19 +637,12 @@ def main() -> int:
     require_tool("swift")
 
     BUILD.mkdir(parents=True, exist_ok=True)
-    range_env = embedded_swift_env()
-    range_cli = ROOT / "CLI" / ".build" / "release" / "CLI"
+    range_env = os.environ.copy()
+    range_cli = ROOT / "scripts" / "range"
 
     print(f"base iterations: {ITERATIONS}")
     print(f"runs: {RUNS}")
     print()
-
-    if not timed_setup(
-        "CLI",
-        ["swift", "build", "-c", "release", "--package-path", "CLI", "--product", "CLI"],
-        env=range_env,
-    ):
-        raise SystemExit("CLI setup failed")
 
     results: dict[str, list[tuple[str, Measurement, float, float, float, str]]] = {}
 

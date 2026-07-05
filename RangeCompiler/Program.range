@@ -21,11 +21,11 @@ construct RangeCompilerProgram {
     }
 
     function compilerPipeline(): String {
-        return "RangeCompiler/Core\n" +
+        return "RangeCompiler/Range/Core\n" +
             "  -> normal compiler pipeline\n" +
-            "RangeCompiler/Foundation\n" +
+            "RangeCompiler/Range/Foundation\n" +
             "  -> bundled compiler-owned features\n" +
-            "RangeCompiler/Lexer\n" +
+            "RangeCompiler/Range/Lexer\n" +
             "  -> compiler support layer\n" +
             "Project sources\n"
     }

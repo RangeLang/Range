@@ -3,8 +3,8 @@ set shell := ["zsh", "-cu"]
 default:
   @just --list
 
-cli-build:
-  cd CLI && swift build
+compiler-build:
+  swift build --package-path RangeCompiler
 
-range-compiler: cli-build
-  CLI/.build/debug/CLI compile RangeCompiler
+range-run:
+  scripts/range run RangePlayground/Examples/LLVM/EmptyMain.range

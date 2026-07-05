@@ -83,14 +83,7 @@ def main() -> int:
     if shutil.which("cc") is None:
         raise SystemExit("missing cc")
 
-    local_range_cli = ROOT / "CLI" / ".build" / "release" / "CLI"
-    installed_range_cli = shutil.which("range")
-    range_cli = local_range_cli if local_range_cli.is_file() else None
-    if range_cli is None and installed_range_cli:
-        range_cli = Path(installed_range_cli)
-    if range_cli is None:
-        run(["swift", "build", "-c", "release", "--package-path", "CLI", "--product", "CLI"])
-        range_cli = local_range_cli
+    range_cli = ROOT / "scripts" / "range"
 
     if BUILD.exists():
         shutil.rmtree(BUILD)
@@ -99,9 +92,7 @@ def main() -> int:
     c_source = BUILD / "main.c"
     c_binary = BUILD / "nested-c"
     range_project = BUILD / "RangeNested"
-    generated_swift_package = range_project / ".range" / "Build" / "swift"
-    embedded_range_binary = generated_swift_package / ".build" / "debug" / "RangeGenerated"
-    nonembedded_range_binary = generated_swift_package / ".build" / "release" / "RangeGenerated"
+    range_binary = range_project / ".range" / "Build" / "llvm" / "Playground"
 
     write_text(
         c_source,
@@ -171,20 +162,9 @@ def main() -> int:
     )
 
     range_build = try_run([str(range_cli), "run", str(range_project / "Playground.range")])
-    if range_build is None and range_cli == local_range_cli and installed_range_cli:
-        range_cli = Path(installed_range_cli)
-        range_build = try_run([str(range_cli), "run", str(range_project / "Playground.range")])
-
-    range_binary = embedded_range_binary
-    range_label = "Range"
-    if range_build is None or not embedded_range_binary.is_file():
-        package_swift = generated_swift_package / "Package.swift"
-        if not package_swift.is_file():
-            raise SystemExit("Range build failed before generating Swift")
-        remove_embedded_swift_setting(package_swift)
-        run(["swift", "build", "-c", "release", "--package-path", str(generated_swift_package)])
-        range_binary = nonembedded_range_binary
-        range_label = "Range-generated Swift (non-Embedded fallback)"
+    range_label = "Range LLVM"
+    if range_build is None:
+        raise SystemExit("Range LLVM build failed")
 
     if not range_binary.is_file():
         raise SystemExit(f"Range binary not found: {range_binary}")

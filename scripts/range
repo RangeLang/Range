@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+RANGE_ROOT="${RANGE_ROOT:-$REPO_ROOT/RangeCompiler/Range}"
+RANGE_BIN="${RANGE_BIN:-}"
+
+usage() {
+    cat >&2 <<'USAGE'
+Usage:
+  scripts/range run INPUT [-- ARGS...]
+  scripts/range emit-llvm INPUT OUTPUT
+USAGE
+}
+
+range_compiler() {
+    if [[ -n "$RANGE_BIN" ]]; then
+        "$RANGE_BIN" "$@"
+    else
+        swift run --package-path "$REPO_ROOT/RangeCompiler" range "$@"
+    fi
+}
+
+command="${1:-}"
+if [[ -z "$command" ]]; then
+    usage
+    exit 1
+fi
+shift
+
+case "$command" in
+    emit-llvm)
+        if [[ $# -ne 2 ]]; then
+            usage
+            exit 1
+        fi
+        range_compiler emit-llvm --range-root "$RANGE_ROOT" "$1" "$2"
+        ;;
+    run)
+        if [[ $# -lt 1 ]]; then
+            usage
+            exit 1
+        fi
+        input="$1"
+        shift
+        if [[ "${1:-}" == "--" ]]; then
+            shift
+        fi
+
+        if [[ -d "$input" ]]; then
+            project_root="$input"
+            executable_name="$(basename "$input")"
+        else
+            project_root="$(cd "$(dirname "$input")" && pwd)"
+            executable_name="$(basename "$input" .range)"
+        fi
+
+        build_root="$project_root/.range/Build/llvm"
+        ir_file="$build_root/Main.ll"
+        executable="$build_root/$executable_name"
+
+        rm -rf "$build_root"
+        mkdir -p "$build_root"
+        range_compiler emit-llvm --range-root "$RANGE_ROOT" "$input" "$ir_file"
+        clang "$ir_file" -o "$executable"
+        "$executable" "$@"
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac

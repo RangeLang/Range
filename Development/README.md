@@ -68,10 +68,9 @@ implementation tracking surface.
 - [ ] `ApplicationGraphValidator` uses declaration queries for many existence
       checks, but it still carries substantial transient type-flow and
       accessible-type state as `BootstrapLiteralType` maps.
-- [ ] The Swift backend still emits and ships runtime/support code with
-      Foundation-heavy and host-oriented behavior.
-- [ ] The CLI is intentionally host-bound, but the compiler/backend boundary is
-      not yet clean enough for a serious Embedded Swift build lane.
+- [x] The old Swift backend package has been removed from the active layout.
+- [ ] The script runner is intentionally host-bound, but the compiler/emission
+      boundary is still early and only supports the current LLVM path.
 - [ ] Memory graph and reactivity graph remain design documents, not concrete
       compiler stages.
 
@@ -185,16 +184,14 @@ implementation tracking surface.
 - [ ] Continue moving foundational language-visible surfaces into `RangeCore`
       instead of Swift-only mirrors.
 
-### 9. Embedded Swift And Backend Boundary
+### 9. LLVM Emission And Host Boundary
 
-- [ ] Split pure backend lowering/emission from host file/project operations.
-- [ ] Isolate generated runtime support that depends on Foundation, classes,
-      locks, file/process APIs, or other host-only behavior.
-- [ ] Audit `RangeSyntax` Foundation usage and replace easy cases where the
+- [ ] Split pure LLVM lowering/emission from host file/project operations.
+- [ ] Isolate runtime support that depends on Foundation, classes, locks,
+      file/process APIs, or other host-only behavior.
+- [ ] Audit `RangeCompiler` Foundation usage and replace easy cases where the
       standard library is enough.
-- [ ] Add an Embedded Swift feasibility build lane when the local toolchain and
-      SDK setup can support it.
-- [ ] Keep CLI host adapters outside the compiler core boundary.
+- [ ] Keep script/host adapters outside the compiler core boundary.
 
 ### 10. Tooling And Editor Parity
 
@@ -252,12 +249,11 @@ implementation tracking surface.
 
 ## Verification Snapshot
 
-Last reviewed on 2026-05-19.
+Last reviewed on 2026-07-05.
 
-- `RangeSyntax`: `swift test` passed with 43 tests.
-- `CLI`: `swift test` passed with 36 tests.
-- `RangeBackendSwift`: `swift test` builds, but exits with `no tests found`
-  because the package has no test target.
+- `RangeCompiler`: `swift build --package-path RangeCompiler` passes.
+- `scripts/range run RangePlayground/Examples/LLVM/EmptyMain.range` emits LLVM,
+  links with `clang`, and exits 0.
 - Fixture inventory at review time:
   - `CompilePass`: 94 fixtures.
   - `CompileFail`: 46 fixtures.
