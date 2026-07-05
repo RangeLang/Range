@@ -346,7 +346,13 @@ extension ApplicationGraphValidator {
                     )
                 }
 
-                guard candidates.contains(where: { callArguments(arguments, match: $0.parameters) }) else {
+                guard candidates.contains(where: { callArguments(arguments, match: $0.parameters) })
+                    || literalConstructCall(
+                        name: name,
+                        arguments: arguments,
+                        environment: environment
+                    )
+                else {
                     throw SemanticValidationError(
                         "Call \(name)(\(renderCallArguments(arguments))) in \(fileName) does not match any available parameter labels. Expected one of: \(renderExpectedCallShapes(for: candidates))."
                     )
@@ -356,7 +362,13 @@ extension ApplicationGraphValidator {
                 environment: environment,
                 context: context
             ), !candidates.isEmpty {
-                guard candidates.contains(where: { callArguments(arguments, match: $0.parameters) }) else {
+                guard candidates.contains(where: { callArguments(arguments, match: $0.parameters) })
+                    || literalConstructCall(
+                        name: name,
+                        arguments: arguments,
+                        environment: environment
+                    )
+                else {
                     throw SemanticValidationError(
                         "Call \(name)(\(renderCallArguments(arguments))) in \(fileName) does not match any available parameter labels. Expected one of: \(renderExpectedCallShapes(for: candidates))."
                     )
@@ -657,6 +669,43 @@ extension ApplicationGraphValidator {
                 return "\(callable.name)(\(labels))"
             }
             .joined(separator: " or ")
+    }
+
+    func literalConstructCall(
+        name: String,
+        arguments: [CallArgument],
+        environment: CallLabelValidationEnvironment
+    ) -> Bool {
+        let constructName = stripGenericArgumentClause(from: name)
+        guard environment.declarationGraph.hasConstruct(named: constructName),
+            arguments.count == 1,
+            arguments[0].label == nil,
+            let carrierTypeName = literalCarrierTypeName(for: arguments[0].value)
+        else {
+            return false
+        }
+
+        return environment.declarationGraph.literalBridgeResolver.isCompatible(
+            expected: .named(constructName),
+            carrierTypeName: carrierTypeName
+        )
+    }
+
+    func literalCarrierTypeName(for expression: Expression) -> String? {
+        switch expression {
+        case .integer:
+            return "IntLiteral"
+        case .double:
+            return "FloatLiteral"
+        case .string, .interpolatedString:
+            return "StringLiteral"
+        case .boolean:
+            return "BoolLiteral"
+        case .nilLiteral:
+            return "NilLiteral"
+        default:
+            return nil
+        }
     }
 
     func contextForSwitchCasePattern(

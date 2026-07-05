@@ -35,5 +35,10 @@ let package = Package(
             dependencies: ["RangeCompiler"],
             path: "Tests/RangeCompilerTests"
         ),
+        .testTarget(
+            name: "RangeEmissionTests",
+            dependencies: ["RangeCompiler", "RangeEmission"],
+            path: "Tests/RangeEmissionTests"
+        ),
     ]
 )
