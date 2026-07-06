@@ -50,3 +50,8 @@ no longer the active backend path.
 `SwiftBootstrap` is the stage-0 compiler target: it exists to compile Range
 source through the current Swift-hosted pipeline until the Range-authored
 compiler can compile itself.
+
+The first self-hosting lane lives at `RangeCompiler/Range/Programs/Compiler`.
+It is intentionally tiny right now: `scripts/range check-bootstrap-compiler`
+compiles that Range-authored compiler program through `SwiftBootstrap`, links it
+with `clang`, and runs the native `Compiler` binary.

@@ -107,6 +107,17 @@ struct RangeScriptTests {
         #expect(result.stderr.isEmpty)
     }
 
+    @Test("Bootstrap compiler check builds and runs Range compiler program")
+    func bootstrapCompilerCheckBuildsAndRunsRangeCompilerProgram() throws {
+        let result = try runRangeScript(arguments: ["check-bootstrap-compiler"], timeout: 30)
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stdout.contains("Bootstrap compiler check succeeded:"))
+        #expect(result.stdout.contains("/Programs/Compiler/.range/Build/llvm/Compiler"))
+        #expect(result.stderr.isEmpty)
+    }
+
     @Test("Emit example check rejects missing directories")
     func emitExampleCheckRejectsMissingDirectories() throws {
         let missing = try repositoryRoot()

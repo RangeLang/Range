@@ -38,6 +38,9 @@ execution is no longer the desired or active program execution path.
 - Updated `Testing/README.md` to describe the current runnable LLVM example
   surface and manifest gate instead of treating runnable coverage as only a
   future fixture category.
+- Added the first self-hosting lane checkpoint:
+  `RangeCompiler/Range/Programs/Compiler/Main.range` builds and runs as a
+  native `Compiler` binary through `SwiftBootstrap`.
 
 ## Active Validation
 
@@ -46,6 +49,8 @@ The following checks pass after the latest cleanup:
 ```sh
 swift build --package-path RangeCompiler --product range
 swift test --package-path RangeCompiler --filter RangeScriptTests
+swift test --package-path RangeCompiler --filter SwiftBootstrapTests
+scripts/range check-bootstrap-compiler
 scripts/range check
 ```
 

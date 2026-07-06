@@ -88,6 +88,17 @@ struct SwiftBootstrapTests {
 
         #expect(exitCode == 7)
     }
+
+    @Test("checkBootstrapCompiler builds and runs Range compiler program")
+    func checkBootstrapCompilerBuildsAndRunsRangeCompilerProgram() throws {
+        let executable = try SwiftBootstrapCompiler().checkBootstrapCompiler(
+            rangeRoot: try rangeRoot(),
+            compilerDirectory: try compilerProgramDirectory()
+        )
+
+        #expect(FileManager.default.isExecutableFile(atPath: executable.path))
+        #expect(executable.lastPathComponent == "Compiler")
+    }
 }
 
 private func temporaryDirectory() throws -> URL {
@@ -113,6 +124,11 @@ private func llvmExample(_ name: String) throws -> URL {
 private func rangeRoot() throws -> URL {
     try repositoryRoot()
         .appendingPathComponent("RangeCompiler/Range", isDirectory: true)
+}
+
+private func compilerProgramDirectory() throws -> URL {
+    try rangeRoot()
+        .appendingPathComponent("Programs/Compiler", isDirectory: true)
 }
 
 private func repositoryRoot() throws -> URL {

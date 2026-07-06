@@ -14,6 +14,7 @@ private func usage() -> String {
     Usage:
       range check-llvm-examples --range-root ROOT DIR
       range check-llvm-runs --range-root ROOT MANIFEST [--require-full-coverage]
+      range check-bootstrap-compiler --range-root ROOT DIR
       range compile-executable --range-root ROOT INPUT
       range emit-llvm --range-root ROOT INPUT OUTPUT
       range run --range-root ROOT INPUT [-- ARGS...]
@@ -71,6 +72,20 @@ private func run(arguments: [String]) throws -> Int32 {
     )
 }
 
+private func checkBootstrapCompiler(arguments: [String]) throws {
+    guard arguments.count == 3, arguments[0] == "--range-root" else {
+        throw DriverError(message: usage())
+    }
+
+    let rangeRoot = URL(fileURLWithPath: arguments[1])
+    let compilerDirectory = URL(fileURLWithPath: arguments[2])
+
+    try SwiftBootstrapCompiler().checkBootstrapCompiler(
+        rangeRoot: rangeRoot,
+        compilerDirectory: compilerDirectory
+    )
+}
+
 private func checkLLVMRuns(arguments: [String]) throws {
     guard arguments.count >= 3, arguments[0] == "--range-root" else {
         throw DriverError(message: usage())
@@ -112,6 +127,8 @@ do {
     }
 
     switch command {
+    case "check-bootstrap-compiler":
+        try checkBootstrapCompiler(arguments: Array(arguments.dropFirst()))
     case "check-llvm-examples":
         try checkLLVMExamples(arguments: Array(arguments.dropFirst()))
     case "check-llvm-runs":

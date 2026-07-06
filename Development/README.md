@@ -83,6 +83,9 @@ implementation tracking surface.
       expected stdout.
 - [x] `SwiftBootstrap` owns emit-only LLVM example corpus checks; Bash no
       longer walks the example directory or manages temporary IR outputs.
+- [x] `RangeCompiler/Range/Programs/Compiler` has a minimal Range-authored
+      compiler entrypoint that builds and runs as a native `Compiler` binary
+      through `SwiftBootstrap`.
 - [ ] The compiler/emission boundary still needs to shrink: Swift remains the
       compiler host and owns substantial parser/type/lowering machinery.
 - [ ] Memory graph and reactivity graph remain design documents, not concrete
@@ -95,6 +98,8 @@ implementation tracking surface.
 - [ ] Keep this checklist updated whenever a planned item is implemented.
 - [ ] Add focused tests for any existing graph behavior that is only covered
       indirectly by broad compile fixtures.
+- [x] Add a stage-0 self-hosting lane check:
+      `scripts/range check-bootstrap-compiler`.
 - [x] Add a small declaration graph snapshot test for current registry/query
       coverage: enums, macros, extensions, states, values,
       initializers, parameters, namespace attributes, and package spaces.

@@ -45,6 +45,25 @@ public struct SwiftBootstrapCompiler {
     }
 
     @discardableResult
+    public func checkBootstrapCompiler(rangeRoot: URL, compilerDirectory: URL) throws -> URL {
+        let executable = try compileExecutable(rangeRoot: rangeRoot, input: compilerDirectory)
+        let result = try runExecutable(executable: executable, arguments: [], stdin: nil)
+        guard result.exitCode == 0 else {
+            throw SwiftBootstrapError(
+                """
+                Bootstrap compiler exited \(result.exitCode): \(compilerDirectory.path)
+                --- stdout ---
+                \(prefixLines(result.stdout))
+                --- stderr ---
+                \(prefixLines(result.stderr))
+                """
+            )
+        }
+        print("Bootstrap compiler check succeeded: \(executable.path)")
+        return executable
+    }
+
+    @discardableResult
     public func checkLLVMRuns(
         rangeRoot: URL,
         manifest: URL,
