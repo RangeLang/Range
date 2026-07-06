@@ -1,6 +1,6 @@
 import Foundation
 
-extension ApplicationGraphValidator {
+extension SourceSemanticsValidator {
     func validateControlFlow(in parsedFiles: [ParsedSourceFile]) throws {
         for parsedFile in parsedFiles {
             let fileName = lastPathComponent(of: parsedFile.path)

@@ -1,6 +1,6 @@
 import Foundation
 
-extension ApplicationGraphValidator {
+extension SourceSemanticsValidator {
     func validateLiteralBridgeCompatibility(
         in parsedFiles: [ParsedSourceFile],
         declarationGraph: DeclarationGraph,

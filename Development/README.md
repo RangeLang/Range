@@ -17,8 +17,7 @@ implementation tracking surface.
 - [x] `ProgramGraph` is the canonical graph storage root.
 - [x] `DeclarationGraph` is built from expanded files and exposes `programGraph`.
 - [x] Validation is staged through `ProgramGraphValidator`,
-      `DeclarationGraphValidator`, and the source/declaration validation pass
-      currently named `ApplicationGraphValidator`.
+      `DeclarationGraphValidator`, and `SourceSemanticsValidator`.
 - [x] `DeclarationGraph` has first-class registries or query views for
       constructs, protocols, enums, macros, extensions, namespaces,
       package spaces, top-level callables, operators, top-level states,
@@ -65,7 +64,7 @@ implementation tracking surface.
       expression/type meaning through parser and validator code.
 - [ ] Operators are declared in `RangeCore`, but precedence defaults and some
       operator typing behavior still live in Swift-side compiler logic.
-- [ ] `ApplicationGraphValidator` no longer depends on a materialized
+- [ ] `SourceSemanticsValidator` no longer depends on a materialized
       `ApplicationGraph`, but it still carries substantial transient type-flow
       and accessible-type state as `BootstrapLiteralType` maps.
 - [x] The old Swift backend package has been removed from the active layout.

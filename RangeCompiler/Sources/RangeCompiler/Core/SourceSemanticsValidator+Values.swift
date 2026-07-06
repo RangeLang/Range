@@ -1,6 +1,6 @@
 import Foundation
 
-extension ApplicationGraphValidator {
+extension SourceSemanticsValidator {
     func validateValueBindings(
         in parsedFiles: [ParsedSourceFile],
         declarationGraph: DeclarationGraph

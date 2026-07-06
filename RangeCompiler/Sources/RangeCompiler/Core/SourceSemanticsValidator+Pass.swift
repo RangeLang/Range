@@ -1,6 +1,6 @@
 import Foundation
 
-extension ApplicationGraphValidator: CompiledProgramValidationPass {
+extension SourceSemanticsValidator: CompiledProgramValidationPass {
     public func validate(_ program: CompiledProgram) throws {
         let graphViews = program.declarationViews
         try validateControlFlow(in: program.expandedFiles)

@@ -1,6 +1,6 @@
 import Foundation
 
-extension ApplicationGraphValidator {
+extension SourceSemanticsValidator {
     func validateCallArgumentLabels(
         in parsedFiles: [ParsedSourceFile],
         declarationGraph: DeclarationGraph

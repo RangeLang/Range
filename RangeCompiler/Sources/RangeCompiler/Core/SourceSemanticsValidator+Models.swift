@@ -1,6 +1,6 @@
 import Foundation
 
-extension ApplicationGraphValidator {
+extension SourceSemanticsValidator {
     struct ControlFlowContext {
         let insideAnonymousBackground: Bool
         let loopDepth: Int
