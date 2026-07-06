@@ -1,8 +1,0 @@
-@main {
-    switch FileManager.readFile(path: "../../../.range/Artifacts/03-graph.txt") {
-    case .success(let graph):
-        Logger.info(graph)
-    case .failure:
-        Logger.error("failed to read self portrait graph")
-    }
-}

@@ -34,6 +34,19 @@ Current top-level layout:
 The default rule is simple: if it is compiler input worth keeping around, it
 belongs in `Testing`.
 
+## Runnable LLVM Examples
+
+Runnable Range programs live under `RangePlayground/Examples/LLVM` and are
+checked through `scripts/range check`. The manifest
+`RangePlayground/Examples/LLVM/run-manifest.tsv` records the expected process
+exit code, optional stdin, optional arguments, and optional stdout for each
+example.
+
+`RangeScriptTests` verifies that the default run manifest covers every LLVM
+example and that malformed manifests fail before execution. The full executable
+gate is still the script path: Range source is emitted to LLVM IR by the
+Swift-hosted compiler path, linked with `clang`, and run as a native executable.
+
 ## Roadmap
 
 The current fixture surface is intentionally small. Add categories only when
@@ -41,10 +54,8 @@ they protect real compiler behavior.
 
 - `CompileFail` diagnostics: require specific error text or diagnostic codes,
   not just "any failure".
-- `RunPass`: compile and run the generated program, then check stdout, stderr,
-  and exit status.
-- `EmitLLVM`: compile through Range LLVM emitter output and compare important
-  emitted LLVM IR shapes.
+- `EmitLLVM`: compare important emitted LLVM IR shapes when the script run
+  manifest does not give enough structural coverage.
 - `Artifacts`: verify compiler artifacts such as declaration graphs, dependency
   graphs, and lowered IR once those formats stabilize.
 - `ParsePass` / `ParseFail`: add parser-only fixtures if syntax work starts
