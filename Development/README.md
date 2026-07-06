@@ -85,9 +85,10 @@ implementation tracking surface.
       longer walks the example directory or manages temporary IR outputs.
 - [x] `RangeCompiler/Range/Programs/Compiler` has a minimal Range-authored
       compiler entrypoint that builds and runs as a native `Compiler` binary
-      through `SwiftBootstrap` and calls its Range-authored scanner library for a
-      Range input. The scanner streams structured token records before rendering
-      output.
+      through `SwiftBootstrap` and calls its Range-authored lexer library for a
+      Range input. The lexer is a small direct port of the Swift bootstrap lexer
+      path, with a focused test comparing native output against the Swift
+      bootstrap lexer stream.
 - [ ] The compiler/emission boundary still needs to shrink: Swift remains the
       compiler host and owns substantial parser/type/lowering machinery.
 - [ ] Memory graph and reactivity graph remain design documents, not concrete

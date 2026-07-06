@@ -55,6 +55,7 @@ The first self-hosting lane lives at `RangeCompiler/Range/Programs/Compiler`.
 It is intentionally tiny right now: `scripts/range check-bootstrap-compiler`
 compiles that Range-authored compiler program through `SwiftBootstrap`, links it
 with `clang`, and runs the native `Compiler` binary against a Range source file
-so the binary calls its Range-authored scanner library and prints a deterministic
-token stream. The scanner now builds structured token records internally before
-rendering them.
+so the binary calls its Range-authored lexer library and prints a deterministic
+token stream. The lexer is a small direct port of the Swift bootstrap lexer path.
+The test suite compares the native lexer stream against the Swift bootstrap
+lexer for the compiler entrypoint.

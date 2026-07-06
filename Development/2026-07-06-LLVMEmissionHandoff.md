@@ -41,9 +41,10 @@ execution is no longer the desired or active program execution path.
 - Added the first self-hosting lane checkpoint:
   `RangeCompiler/Range/Programs/Compiler/Main.range` builds and runs as a
   native `Compiler` binary through `SwiftBootstrap`, then calls its
-  Range-authored scanner library for a Range source file and prints a
-  deterministic token stream. The scanner streams `ScannedRangeToken` records
-  internally before rendering output.
+  Range-authored lexer library for a Range source file and prints a deterministic
+  token stream. The lexer is a small direct port of the Swift bootstrap lexer
+  path, with a focused test comparing native output against the Swift bootstrap
+  lexer stream.
 
 ## Active Validation
 

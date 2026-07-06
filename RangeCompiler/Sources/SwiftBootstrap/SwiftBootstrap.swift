@@ -60,8 +60,9 @@ public struct SwiftBootstrapCompiler {
                 """
             )
         }
-        guard mainResult.stdout.contains("@main"),
-            mainResult.stdout.contains("commandLineArgumentCount")
+        guard mainResult.stdout.contains("macroAttribute\\t@main"),
+            mainResult.stdout.contains("identifier\\tcommandLineArgumentCount"),
+            mainResult.stdout.contains("keyword\\treturn")
         else {
             throw SwiftBootstrapError(
                 """
@@ -74,29 +75,31 @@ public struct SwiftBootstrapCompiler {
             )
         }
 
-        let scannerInput = compilerDirectory.appendingPathComponent("Scanner.range")
-        let scannerResult = try runExecutable(executable: executable, arguments: [scannerInput.path], stdin: nil)
-        guard scannerResult.exitCode == 0 else {
+        let lexerInput = compilerDirectory.appendingPathComponent("Lexer.range")
+        let lexerResult = try runExecutable(executable: executable, arguments: [lexerInput.path], stdin: nil)
+        guard lexerResult.exitCode == 0 else {
             throw SwiftBootstrapError(
                 """
-                Bootstrap compiler exited \(scannerResult.exitCode): \(scannerInput.path)
+                Bootstrap compiler exited \(lexerResult.exitCode): \(lexerInput.path)
                 --- stdout ---
-                \(prefixLines(scannerResult.stdout))
+                \(prefixLines(lexerResult.stdout))
                 --- stderr ---
-                \(prefixLines(scannerResult.stderr))
+                \(prefixLines(lexerResult.stderr))
                 """
             )
         }
-        guard scannerResult.stdout.contains("ScannedRangeToken"),
-            scannerResult.stdout.contains("scanNextRangeToken")
+        guard lexerResult.stdout.contains("keyword\\tconstruct"),
+            lexerResult.stdout.contains("identifier\\tRangeLexedToken"),
+            lexerResult.stdout.contains("identifier\\tlexNextRangeToken"),
+            lexerResult.stdout.contains("stringLiteral\\t\"ellipsis\"")
         else {
             throw SwiftBootstrapError(
                 """
-                Bootstrap compiler did not scan expected scanner tokens: \(scannerInput.path)
+                Bootstrap compiler did not scan expected lexer tokens: \(lexerInput.path)
                 --- stdout ---
-                \(prefixLines(scannerResult.stdout))
+                \(prefixLines(lexerResult.stdout))
                 --- stderr ---
-                \(prefixLines(scannerResult.stderr))
+                \(prefixLines(lexerResult.stderr))
                 """
             )
         }

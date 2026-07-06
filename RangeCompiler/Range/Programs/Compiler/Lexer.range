@@ -1,0 +1,312 @@
+construct RangeLexedToken {
+    let kind: String
+    let start: Int
+    let end: Int
+    let text: String
+}
+
+function lexRangeSource(source: String): String {
+    state output: ""
+    state tokenIndex: Int(0)
+    state sourceIndex: Int(0)
+
+    while true {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(
+            source: source,
+            start: sourceIndex
+        ))
+
+        if maybeToken == nil {
+            return output
+        }
+
+        let fallback: RangeLexedToken(RangeLexedToken(kind: String("eof"), start: sourceIndex, end: sourceIndex, text: String("")))
+        let token: RangeLexedToken(maybeToken ?? fallback)
+        output: "\(output)\(tokenIndex)\t\(token.kind)\t\(token.text)\n"
+        sourceIndex: token.end
+        tokenIndex: tokenIndex + 1
+    }
+
+    return output
+}
+
+function lexNextRangeToken(source: String, start: Int): Optional<RangeLexedToken> {
+    state sourceIndex: Int(start)
+    let sourceLength: Int(stringLength(value: source))
+
+    while sourceIndex < sourceLength && isRangeLexerWhitespace(character: source.character(index: sourceIndex)) {
+        sourceIndex: sourceIndex + 1
+    }
+
+    if sourceIndex >= sourceLength {
+        return nil
+    }
+
+    if hasRangePrefix(source: source, start: sourceIndex, prefix: String("...")) {
+        return rangeToken(kind: String("ellipsis"), source: source, start: sourceIndex, end: sourceIndex + 3)
+    }
+    if hasRangePrefix(source: source, start: sourceIndex, prefix: String("->")) {
+        return rangeToken(kind: String("arrow"), source: source, start: sourceIndex, end: sourceIndex + 2)
+    }
+    if hasRangePrefix(source: source, start: sourceIndex, prefix: String("!=")) {
+        return rangeToken(kind: String("bangEqual"), source: source, start: sourceIndex, end: sourceIndex + 2)
+    }
+    if hasRangePrefix(source: source, start: sourceIndex, prefix: String("==")) {
+        return rangeToken(kind: String("equalEqual"), source: source, start: sourceIndex, end: sourceIndex + 2)
+    }
+    if hasRangePrefix(source: source, start: sourceIndex, prefix: String("<=")) {
+        return rangeToken(kind: String("lessEqual"), source: source, start: sourceIndex, end: sourceIndex + 2)
+    }
+    if hasRangePrefix(source: source, start: sourceIndex, prefix: String(">=")) {
+        return rangeToken(kind: String("greaterEqual"), source: source, start: sourceIndex, end: sourceIndex + 2)
+    }
+    if hasRangePrefix(source: source, start: sourceIndex, prefix: String("??")) {
+        return rangeToken(kind: String("questionQuestion"), source: source, start: sourceIndex, end: sourceIndex + 2)
+    }
+    if hasRangePrefix(source: source, start: sourceIndex, prefix: String("&&")) {
+        return rangeToken(kind: String("andAnd"), source: source, start: sourceIndex, end: sourceIndex + 2)
+    }
+    if hasRangePrefix(source: source, start: sourceIndex, prefix: String("||")) {
+        return rangeToken(kind: String("orOr"), source: source, start: sourceIndex, end: sourceIndex + 2)
+    }
+    if hasRangePrefix(source: source, start: sourceIndex, prefix: String("#(")) {
+        return rangeToken(kind: String("hash"), source: source, start: sourceIndex, end: sourceIndex + 2)
+    }
+
+    let character: String(source.character(index: sourceIndex))
+
+    if isRangeQuote(character: character) {
+        return rangeToken(kind: String("stringLiteral"), source: source, start: sourceIndex, end: readRangeStringEnd(source: source, start: sourceIndex))
+    }
+    if character == String("@") {
+        return readRangeSigilIdentifier(source: source, start: sourceIndex)
+    }
+    if character == String("`") {
+        return readRangeEscapedIdentifier(source: source, start: sourceIndex)
+    }
+    if isRangeDigit(character: character) {
+        return readRangeNumber(source: source, start: sourceIndex)
+    }
+    if isRangeIdentifierStart(character: character) {
+        return readRangeIdentifier(source: source, start: sourceIndex)
+    }
+
+    return readRangeLiteralToken(source: source, start: sourceIndex)
+}
+
+function rangeToken(kind: String, source: String, start: Int, end: Int): RangeLexedToken {
+    return RangeLexedToken(kind: kind, start: start, end: end, text: source.substring(start: start, end: end))
+}
+
+function readRangeLiteralToken(source: String, start: Int): Optional<RangeLexedToken> {
+    let character: String(source.character(index: start))
+
+    if character == String("{") {
+        return rangeToken(kind: String("leftBrace"), source: source, start: start, end: start + 1)
+    } else if character == String("}") {
+        return rangeToken(kind: String("rightBrace"), source: source, start: start, end: start + 1)
+    } else if character == String("(") {
+        return rangeToken(kind: String("leftParen"), source: source, start: start, end: start + 1)
+    } else if character == String(")") {
+        return rangeToken(kind: String("rightParen"), source: source, start: start, end: start + 1)
+    } else if character == String("[") {
+        return rangeToken(kind: String("leftBracket"), source: source, start: start, end: start + 1)
+    } else if character == String("]") {
+        return rangeToken(kind: String("rightBracket"), source: source, start: start, end: start + 1)
+    } else if character == String("*") {
+        return rangeToken(kind: String("asterisk"), source: source, start: start, end: start + 1)
+    } else if character == String(".") {
+        return rangeToken(kind: String("dot"), source: source, start: start, end: start + 1)
+    } else if character == String(":") {
+        return rangeToken(kind: String("colon"), source: source, start: start, end: start + 1)
+    } else if character == String("!") {
+        return rangeToken(kind: String("bang"), source: source, start: start, end: start + 1)
+    } else if character == String("=") {
+        return rangeToken(kind: String("equal"), source: source, start: start, end: start + 1)
+    } else if character == String("-") {
+        return rangeToken(kind: String("minus"), source: source, start: start, end: start + 1)
+    } else if character == String("<") {
+        return rangeToken(kind: String("less"), source: source, start: start, end: start + 1)
+    } else if character == String(">") {
+        return rangeToken(kind: String("greater"), source: source, start: start, end: start + 1)
+    } else if character == String("+") {
+        return rangeToken(kind: String("plus"), source: source, start: start, end: start + 1)
+    } else if character == String("/") {
+        return rangeToken(kind: String("slash"), source: source, start: start, end: start + 1)
+    } else if character == String("&") {
+        return rangeToken(kind: String("ampersand"), source: source, start: start, end: start + 1)
+    } else if character == String("|") {
+        return rangeToken(kind: String("pipe"), source: source, start: start, end: start + 1)
+    } else if character == String("?") {
+        return rangeToken(kind: String("question"), source: source, start: start, end: start + 1)
+    } else if character == String("$") {
+        return rangeToken(kind: String("dollar"), source: source, start: start, end: start + 1)
+    } else if character == String("%") {
+        return rangeToken(kind: String("percent"), source: source, start: start, end: start + 1)
+    } else if character == String(",") {
+        return rangeToken(kind: String("comma"), source: source, start: start, end: start + 1)
+    }
+
+    return rangeToken(kind: String("unknown"), source: source, start: start, end: start + 1)
+}
+
+function readRangeStringEnd(source: String, start: Int): Int {
+    state sourceIndex: Int(start + 1)
+    let sourceLength: Int(stringLength(value: source))
+
+    while sourceIndex < sourceLength && !isRangeQuote(character: source.character(index: sourceIndex)) {
+        sourceIndex: sourceIndex + 1
+    }
+
+    if sourceIndex < sourceLength {
+        return sourceIndex + 1
+    }
+
+    return sourceIndex
+}
+
+function readRangeSigilIdentifier(source: String, start: Int): Optional<RangeLexedToken> {
+    state sourceIndex: Int(start + 1)
+    let sourceLength: Int(stringLength(value: source))
+
+    if sourceIndex >= sourceLength || !isRangeIdentifierStart(character: source.character(index: sourceIndex)) {
+        return rangeToken(kind: String("unknown"), source: source, start: start, end: start + 1)
+    }
+
+    while sourceIndex < sourceLength && isRangeIdentifierPart(character: source.character(index: sourceIndex)) {
+        sourceIndex: sourceIndex + 1
+    }
+
+    return rangeToken(kind: String("macroAttribute"), source: source, start: start, end: sourceIndex)
+}
+
+function readRangeEscapedIdentifier(source: String, start: Int): Optional<RangeLexedToken> {
+    state sourceIndex: Int(start + 1)
+    let sourceLength: Int(stringLength(value: source))
+
+    while sourceIndex < sourceLength && source.character(index: sourceIndex) != String("`") {
+        sourceIndex: sourceIndex + 1
+    }
+
+    if sourceIndex < sourceLength {
+        return rangeToken(kind: String("identifier"), source: source, start: start, end: sourceIndex + 1)
+    }
+
+    return rangeToken(kind: String("unknown"), source: source, start: start, end: sourceIndex)
+}
+
+function readRangeNumber(source: String, start: Int): Optional<RangeLexedToken> {
+    state sourceIndex: Int(start)
+    let sourceLength: Int(stringLength(value: source))
+
+    while sourceIndex < sourceLength && isRangeDigit(character: source.character(index: sourceIndex)) {
+        sourceIndex: sourceIndex + 1
+    }
+
+    if sourceIndex < sourceLength
+        && source.character(index: sourceIndex) == String(".")
+        && sourceIndex + 1 < sourceLength
+        && isRangeDigit(character: source.character(index: sourceIndex + 1))
+    {
+        sourceIndex: sourceIndex + 1
+        while sourceIndex < sourceLength && isRangeDigit(character: source.character(index: sourceIndex)) {
+            sourceIndex: sourceIndex + 1
+        }
+        return rangeToken(kind: String("double"), source: source, start: start, end: sourceIndex)
+    }
+
+    return rangeToken(kind: String("integer"), source: source, start: start, end: sourceIndex)
+}
+
+function readRangeIdentifier(source: String, start: Int): Optional<RangeLexedToken> {
+    state sourceIndex: Int(start)
+    let sourceLength: Int(stringLength(value: source))
+
+    while sourceIndex < sourceLength && isRangeIdentifierPart(character: source.character(index: sourceIndex)) {
+        sourceIndex: sourceIndex + 1
+    }
+
+    let text: String(source.substring(start: start, end: sourceIndex))
+    if isRangeKeyword(value: text) {
+        return rangeToken(kind: String("keyword"), source: source, start: start, end: sourceIndex)
+    }
+
+    return rangeToken(kind: String("identifier"), source: source, start: start, end: sourceIndex)
+}
+
+function hasRangePrefix(source: String, start: Int, prefix: String): Bool {
+    let sourceLength: Int(stringLength(value: source))
+    let prefixLength: Int(stringLength(value: prefix))
+
+    if start + prefixLength > sourceLength {
+        return false
+    }
+
+    state index: Int(0)
+    while index < prefixLength {
+        if source.character(index: start + index) != prefix.character(index: index) {
+            return false
+        }
+        index: index + 1
+    }
+
+    return true
+}
+
+function isRangeLexerWhitespace(character: String): Bool {
+    return character == String(" ") || character < String(" ")
+}
+
+function isRangeQuote(character: String): Bool {
+    return character > String("!") && character < String("#")
+}
+
+function isRangeIdentifierStart(character: String): Bool {
+    return isRangeLetter(character: character) || character == String("_")
+}
+
+function isRangeIdentifierPart(character: String): Bool {
+    return isRangeIdentifierStart(character: character) || isRangeDigit(character: character)
+}
+
+function isRangeLetter(character: String): Bool {
+    return (character >= String("a") && character <= String("z")) || (character >= String("A") && character <= String("Z"))
+}
+
+function isRangeDigit(character: String): Bool {
+    return character >= String("0") && character <= String("9")
+}
+
+function isRangeKeyword(value: String): Bool {
+    return value == String("let")
+        || value == String("state")
+        || value == String("binding")
+        || value == String("derived")
+        || value == String("extension")
+        || value == String("for")
+        || value == String("in")
+        || value == String("break")
+        || value == String("case")
+        || value == String("if")
+        || value == String("else")
+        || value == String("while")
+        || value == String("return")
+        || value == String("continue")
+        || value == String("switch")
+        || value == String("default")
+        || value == String("enum")
+        || value == String("protocol")
+        || value == String("construct")
+        || value == String("macro")
+        || value == String("open")
+        || value == String("closed")
+        || value == String("function")
+        || value == String("init")
+        || value == String("get")
+        || value == String("set")
+        || value == String("precedencegroup")
+        || value == String("infix")
+        || value == String("prefix")
+        || value == String("postfix")
+        || value == String("operator")
+}

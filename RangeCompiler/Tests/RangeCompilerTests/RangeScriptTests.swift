@@ -1,4 +1,5 @@
 import Foundation
+@testable import RangeCompiler
 import Testing
 
 @Suite("Range script", .serialized)
@@ -118,6 +119,26 @@ struct RangeScriptTests {
         #expect(result.stderr.isEmpty)
     }
 
+    @Test("Native compiler lexer matches Swift bootstrap lexer")
+    func nativeCompilerLexerMatchesSwiftBootstrapLexer() throws {
+        let source = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Main.range")
+        let compiler = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
+        let result = try runRangeScript(
+            arguments: ["run", compiler.path, "--", source.path],
+            timeout: 30
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+
+        let nativeTokens = nativeLexerTokens(from: result.stdout)
+        let swiftTokens = try swiftBootstrapLexerTokens(for: source)
+        #expect(nativeTokens == swiftTokens)
+    }
+
     @Test("Emit example check rejects missing directories")
     func emitExampleCheckRejectsMissingDirectories() throws {
         let missing = try repositoryRoot()
@@ -233,6 +254,122 @@ private func runManifestNames(in manifest: URL) throws -> [String] {
         .sorted()
 }
 
+private func nativeLexerTokens(from stdout: String) -> [LexerTokenSnapshot] {
+    stdout
+        .replacingOccurrences(of: "\\n", with: "\n")
+        .replacingOccurrences(of: "\\t", with: "\t")
+        .split(separator: "\n")
+        .compactMap { line -> LexerTokenSnapshot? in
+            let columns = line.split(separator: "\t", omittingEmptySubsequences: false)
+            guard columns.count >= 3, Int(columns[0]) != nil else {
+                return nil
+            }
+            return LexerTokenSnapshot(kind: String(columns[1]), source: String(columns[2]))
+        }
+}
+
+private func swiftBootstrapLexerTokens(for source: URL) throws -> [LexerTokenSnapshot] {
+    let text = try String(contentsOf: source, encoding: .utf8)
+    let result = RangeAuthoredLexer().tokenize(source: text, foreignBodies: [])
+    switch result {
+    case .success(let tokens):
+        return tokens.compactMap { token -> LexerTokenSnapshot? in
+            let kind = swiftBootstrapLexerKindName(token.kind)
+            guard kind != "eof" else {
+                return nil
+            }
+            return LexerTokenSnapshot(kind: kind, source: token.source)
+        }
+    case .failure(let error):
+        throw RangeScriptTestError.swiftLexerFailed(error.message)
+    }
+}
+
+private func swiftBootstrapLexerKindName(_ kind: RangeAuthoredTokenKind) -> String {
+    switch kind {
+    case .hash:
+        return "hash"
+    case .identifier:
+        return "identifier"
+    case .foreignBody:
+        return "foreignBody"
+    case .stringLiteral:
+        return "stringLiteral"
+    case .integer:
+        return "integer"
+    case .double:
+        return "double"
+    case .keyword:
+        return "keyword"
+    case .macroAttribute:
+        return "macroAttribute"
+    case .leftBrace:
+        return "leftBrace"
+    case .rightBrace:
+        return "rightBrace"
+    case .leftParen:
+        return "leftParen"
+    case .rightParen:
+        return "rightParen"
+    case .leftBracket:
+        return "leftBracket"
+    case .rightBracket:
+        return "rightBracket"
+    case .asterisk:
+        return "asterisk"
+    case .dot:
+        return "dot"
+    case .ellipsis:
+        return "ellipsis"
+    case .colon:
+        return "colon"
+    case .arrow:
+        return "arrow"
+    case .bang:
+        return "bang"
+    case .equal:
+        return "equal"
+    case .equalEqual:
+        return "equalEqual"
+    case .bangEqual:
+        return "bangEqual"
+    case .minus:
+        return "minus"
+    case .less:
+        return "less"
+    case .lessEqual:
+        return "lessEqual"
+    case .greater:
+        return "greater"
+    case .greaterEqual:
+        return "greaterEqual"
+    case .plus:
+        return "plus"
+    case .slash:
+        return "slash"
+    case .ampersand:
+        return "ampersand"
+    case .andAnd:
+        return "andAnd"
+    case .pipe:
+        return "pipe"
+    case .orOr:
+        return "orOr"
+    case .question:
+        return "question"
+    case .questionQuestion:
+        return "questionQuestion"
+    case .dollar:
+        return "dollar"
+    case .percent:
+        return "percent"
+    case .comma:
+        return "comma"
+    case .eof:
+        return "eof"
+    }
+}
+
 private func repositoryRoot() throws -> URL {
     var current = URL(fileURLWithPath: #filePath)
     while current.path != "/" {
@@ -259,7 +396,13 @@ private struct ScriptResult {
     var timedOut: Bool
 }
 
+private struct LexerTokenSnapshot: Equatable {
+    var kind: String
+    var source: String
+}
+
 private enum RangeScriptTestError: Error {
     case missingDirectory(String)
     case repositoryRootNotFound
+    case swiftLexerFailed(String)
 }
