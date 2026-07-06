@@ -281,8 +281,7 @@ case "$command" in
             shift
         fi
 
-        executable="$(build_executable "$input")"
-        "$executable" "$@"
+        range_compiler run --range-root "$RANGE_ROOT" "$input" -- "$@"
         ;;
     *)
         usage

@@ -14,6 +14,7 @@ private func usage() -> String {
     Usage:
       range compile-executable --range-root ROOT INPUT
       range emit-llvm --range-root ROOT INPUT OUTPUT
+      range run --range-root ROOT INPUT [-- ARGS...]
     """
 }
 
@@ -49,6 +50,25 @@ private func compileExecutable(arguments: [String]) throws {
     print(executable.path)
 }
 
+private func run(arguments: [String]) throws -> Int32 {
+    guard arguments.count >= 3, arguments[0] == "--range-root" else {
+        throw DriverError(message: usage())
+    }
+
+    let rangeRoot = URL(fileURLWithPath: arguments[1])
+    let input = URL(fileURLWithPath: arguments[2])
+    var executableArguments = Array(arguments.dropFirst(3))
+    if executableArguments.first == "--" {
+        executableArguments.removeFirst()
+    }
+
+    return try SwiftBootstrapCompiler().run(
+        rangeRoot: rangeRoot,
+        input: input,
+        arguments: executableArguments
+    )
+}
+
 let arguments = Array(CommandLine.arguments.dropFirst())
 
 do {
@@ -61,6 +81,11 @@ do {
         try compileExecutable(arguments: Array(arguments.dropFirst()))
     case "emit-llvm":
         try emitLLVM(arguments: Array(arguments.dropFirst()))
+    case "run":
+        let exitCode = try run(arguments: Array(arguments.dropFirst()))
+        if exitCode != 0 {
+            exit(exitCode)
+        }
     default:
         throw DriverError(message: usage())
     }

@@ -32,6 +32,18 @@ public struct SwiftBootstrapCompiler {
         return layout.executable
     }
 
+    @discardableResult
+    public func run(rangeRoot: URL, input: URL, arguments: [String]) throws -> Int32 {
+        let executable = try compileExecutable(rangeRoot: rangeRoot, input: input)
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
+
+        try process.run()
+        process.waitUntilExit()
+        return process.terminationStatus
+    }
+
     public func emitLLVM(rangeRoot: URL, input: URL, output: URL) throws {
         let inputs = try coreInputs(rangeRoot: rangeRoot) + projectInputs(input: input)
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
