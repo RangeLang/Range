@@ -89,7 +89,7 @@ struct SwiftBootstrapTests {
         #expect(exitCode == 7)
     }
 
-    @Test("checkBootstrapCompiler builds and runs Range compiler program")
+    @Test("checkBootstrapCompiler tokenizes Range compiler input")
     func checkBootstrapCompilerBuildsAndRunsRangeCompilerProgram() throws {
         let executable = try SwiftBootstrapCompiler().checkBootstrapCompiler(
             rangeRoot: try rangeRoot(),

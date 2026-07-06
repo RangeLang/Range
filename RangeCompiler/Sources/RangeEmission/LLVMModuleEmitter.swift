@@ -3958,7 +3958,9 @@ public struct LLVMModuleEmitter {
                     return LLVMValue(type: "double", operand: result, array: nil)
                 }
                 guard left.type == "i32", right.type == "i32" else {
-                    throw LLVMEmissionError("LLVM integer arithmetic requires i32 operands.")
+                    throw LLVMEmissionError(
+                        "LLVM integer arithmetic requires i32 operands, got \(left.type) and \(right.type)."
+                    )
                 }
                 let result = nextTemporary()
                 instructions.append(

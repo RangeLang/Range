@@ -107,7 +107,7 @@ struct RangeScriptTests {
         #expect(result.stderr.isEmpty)
     }
 
-    @Test("Bootstrap compiler check builds and runs Range compiler program")
+    @Test("Bootstrap compiler check tokenizes Range compiler input")
     func bootstrapCompilerCheckBuildsAndRunsRangeCompilerProgram() throws {
         let result = try runRangeScript(arguments: ["check-bootstrap-compiler"], timeout: 30)
 

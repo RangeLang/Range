@@ -1,6 +1,6 @@
 import Foundation
 
-public struct SemanticValidationError: Error, CustomStringConvertible {
+public struct SemanticValidationError: Error, CustomStringConvertible, LocalizedError {
     public let message: String
 
     public init(_ message: String) {
@@ -8,4 +8,6 @@ public struct SemanticValidationError: Error, CustomStringConvertible {
     }
 
     public var description: String { message }
+
+    public var errorDescription: String? { message }
 }

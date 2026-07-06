@@ -1,4 +1,57 @@
 @main {
-    print(value: String("Range compiler bootstrap"))
+    if commandLineArgumentCount() != 1 {
+        print(value: String("usage: Compiler <input.range>"))
+        return 64
+    }
+
+    let argument: Optional<String>(commandLineArgument(index: 0))
+    let path: String(argument ?? String(""))
+    let source: String(readFile(path: path))
+
+    state output: ""
+    state tokenIndex: Int(0)
+    state sourceIndex: Int(0)
+    let sourceLength: Int(stringLength(value: source))
+
+    while sourceIndex < sourceLength {
+        let character: String(source.character(index: sourceIndex))
+
+        if character == String(" ") || character == String("\n") || character == String("\t") {
+            sourceIndex: sourceIndex + 1
+            continue
+        }
+
+        let tokenStart: Int(sourceIndex)
+
+        if character == String("\"") {
+            sourceIndex: sourceIndex + 1
+            while sourceIndex < sourceLength && source.character(index: sourceIndex) != String("\"") {
+                sourceIndex: sourceIndex + 1
+            }
+            if sourceIndex < sourceLength {
+                sourceIndex: sourceIndex + 1
+            }
+        } else if character == String("{") || character == String("}") || character == String("(") || character == String(")")
+            || character == String("[") || character == String("]") || character == String(":") || character == String(",")
+        {
+            sourceIndex: sourceIndex + 1
+        } else {
+            while sourceIndex < sourceLength {
+                let current: String(source.character(index: sourceIndex))
+                if current == String(" ") || current == String("\n") || current == String("\t")
+                    || current == String("{") || current == String("}") || current == String("(") || current == String(")")
+                    || current == String("[") || current == String("]") || current == String(":") || current == String(",")
+                {
+                    break
+                }
+                sourceIndex: sourceIndex + 1
+            }
+        }
+
+        output: "\(output)\(tokenIndex)\t\(source.substring(start: tokenStart, end: sourceIndex))\n"
+        tokenIndex: tokenIndex + 1
+    }
+
+    print(value: output)
     return 0
 }

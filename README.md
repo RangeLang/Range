@@ -54,4 +54,5 @@ compiler can compile itself.
 The first self-hosting lane lives at `RangeCompiler/Range/Programs/Compiler`.
 It is intentionally tiny right now: `scripts/range check-bootstrap-compiler`
 compiles that Range-authored compiler program through `SwiftBootstrap`, links it
-with `clang`, and runs the native `Compiler` binary.
+with `clang`, and runs the native `Compiler` binary against a Range source file
+so the binary prints a deterministic scanner token stream.

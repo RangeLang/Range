@@ -47,11 +47,25 @@ public struct SwiftBootstrapCompiler {
     @discardableResult
     public func checkBootstrapCompiler(rangeRoot: URL, compilerDirectory: URL) throws -> URL {
         let executable = try compileExecutable(rangeRoot: rangeRoot, input: compilerDirectory)
-        let result = try runExecutable(executable: executable, arguments: [], stdin: nil)
+        let input = compilerDirectory.appendingPathComponent("Main.range")
+        let result = try runExecutable(executable: executable, arguments: [input.path], stdin: nil)
         guard result.exitCode == 0 else {
             throw SwiftBootstrapError(
                 """
                 Bootstrap compiler exited \(result.exitCode): \(compilerDirectory.path)
+                --- stdout ---
+                \(prefixLines(result.stdout))
+                --- stderr ---
+                \(prefixLines(result.stderr))
+                """
+            )
+        }
+        guard result.stdout.contains("@main"),
+            result.stdout.contains("commandLineArgumentCount")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Bootstrap compiler did not print expected token stream: \(compilerDirectory.path)
                 --- stdout ---
                 \(prefixLines(result.stdout))
                 --- stderr ---
