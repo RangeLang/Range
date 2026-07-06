@@ -56,10 +56,6 @@ public struct CompiledProgram {
         ApplicationGraphBuilder().build(program: self)
     }
 
-    public var graphProjections: [CompiledProgramGraphProjection] {
-        CompiledProgramGraphFlow().deriveGraphs(from: self)
-    }
-
     public var projectParsedFiles: [ParsedSourceFile] {
         parsedFiles.filter { inputRoleByPath[$0.path] == .project }
     }
