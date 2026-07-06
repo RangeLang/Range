@@ -58,4 +58,5 @@ with `clang`, and runs the native `Compiler` binary against a Range source file
 so the binary calls its Range-authored lexer library and prints a deterministic
 token stream. The lexer is a small direct port of the Swift bootstrap lexer path.
 The test suite compares the native lexer stream against the Swift bootstrap
-lexer for the compiler entrypoint.
+lexer for the compiler entrypoint. The binary also parses the first tiny AST
+checkpoint: an `@main` block summary with body bounds.

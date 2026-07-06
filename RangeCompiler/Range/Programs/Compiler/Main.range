@@ -7,6 +7,6 @@
     let argument: Optional<String>(commandLineArgument(index: 0))
     let path: String(argument ?? String(""))
     let source: String(readFile(path: path))
-    print(value: lexRangeSource(source: source))
+    print(value: "\(lexRangeSource(source: source))\(parseRangeSource(source: source))")
     return 0
 }

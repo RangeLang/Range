@@ -1,0 +1,65 @@
+construct ParsedMainBlock {
+    let attributeStart: Int
+    let bodyStart: Int
+    let bodyEnd: Int
+}
+
+function parseRangeSource(source: String): String {
+    let mainBlock: Optional<ParsedMainBlock>(parseRangeMainBlock(source: source))
+
+    if mainBlock == nil {
+        return String("parse\tnoMainBlock\n")
+    }
+
+    let fallback: ParsedMainBlock(ParsedMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
+    let parsed: ParsedMainBlock(mainBlock ?? fallback)
+    return "parse\tmainBlock\tattributeStart=\(parsed.attributeStart)\tbodyStart=\(parsed.bodyStart)\tbodyEnd=\(parsed.bodyEnd)\n"
+}
+
+function parseRangeMainBlock(source: String): Optional<ParsedMainBlock> {
+    state sourceIndex: Int(0)
+    state sawMainAttribute: Bool(false)
+    state mainAttributeStart: Int(0)
+    state bodyStart: Int(0)
+    state bodyDepth: Int(0)
+
+    while true {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: sourceIndex))
+
+        if maybeToken == nil {
+            return nil
+        }
+
+        let fallback: RangeLexedToken(RangeLexedToken(kind: String("eof"), start: sourceIndex, end: sourceIndex, text: String("")))
+        let token: RangeLexedToken(maybeToken ?? fallback)
+
+        if !sawMainAttribute {
+            if token.kind == String("macroAttribute") && token.text == String("@main") {
+                sawMainAttribute: true
+                mainAttributeStart: token.start
+            }
+        } else if bodyDepth == 0 {
+            if token.kind == String("leftBrace") {
+                bodyStart: token.end
+                bodyDepth: 1
+            }
+        } else {
+            if token.kind == String("leftBrace") {
+                bodyDepth: bodyDepth + 1
+            } else if token.kind == String("rightBrace") {
+                bodyDepth: bodyDepth - 1
+                if bodyDepth == 0 {
+                    return ParsedMainBlock(
+                        attributeStart: mainAttributeStart,
+                        bodyStart: bodyStart,
+                        bodyEnd: token.start
+                    )
+                }
+            }
+        }
+
+        sourceIndex: token.end
+    }
+
+    return nil
+}

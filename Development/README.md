@@ -89,6 +89,8 @@ implementation tracking surface.
       Range input. The lexer is a small direct port of the Swift bootstrap lexer
       path, with a focused test comparing native output against the Swift
       bootstrap lexer stream.
+- [x] `RangeCompiler/Range/Programs/Compiler` parses the first tiny AST
+      checkpoint: an `@main` block summary with body bounds.
 - [ ] The compiler/emission boundary still needs to shrink: Swift remains the
       compiler host and owns substantial parser/type/lowering machinery.
 - [ ] Memory graph and reactivity graph remain design documents, not concrete

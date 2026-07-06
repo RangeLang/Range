@@ -44,7 +44,8 @@ execution is no longer the desired or active program execution path.
   Range-authored lexer library for a Range source file and prints a deterministic
   token stream. The lexer is a small direct port of the Swift bootstrap lexer
   path, with a focused test comparing native output against the Swift bootstrap
-  lexer stream.
+  lexer stream. The compiler also parses the first tiny AST checkpoint: an
+  `@main` block summary with body bounds.
 
 ## Active Validation
 

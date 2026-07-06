@@ -62,7 +62,8 @@ public struct SwiftBootstrapCompiler {
         }
         guard mainResult.stdout.contains("macroAttribute\\t@main"),
             mainResult.stdout.contains("identifier\\tcommandLineArgumentCount"),
-            mainResult.stdout.contains("keyword\\treturn")
+            mainResult.stdout.contains("keyword\\treturn"),
+            mainResult.stdout.contains("parse\\tmainBlock")
         else {
             throw SwiftBootstrapError(
                 """
@@ -91,7 +92,8 @@ public struct SwiftBootstrapCompiler {
         guard lexerResult.stdout.contains("keyword\\tconstruct"),
             lexerResult.stdout.contains("identifier\\tRangeLexedToken"),
             lexerResult.stdout.contains("identifier\\tlexNextRangeToken"),
-            lexerResult.stdout.contains("stringLiteral\\t\"ellipsis\"")
+            lexerResult.stdout.contains("stringLiteral\\t\"ellipsis\""),
+            lexerResult.stdout.contains("parse\\tnoMainBlock")
         else {
             throw SwiftBootstrapError(
                 """

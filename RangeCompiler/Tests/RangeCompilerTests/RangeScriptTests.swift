@@ -139,6 +139,26 @@ struct RangeScriptTests {
         #expect(nativeTokens == swiftTokens)
     }
 
+    @Test("Native compiler parses main block")
+    func nativeCompilerParsesMainBlock() throws {
+        let source = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Main.range")
+        let compiler = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
+        let result = try runRangeScript(
+            arguments: ["run", compiler.path, "--", source.path],
+            timeout: 30
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("parse\\tmainBlock"))
+        #expect(result.stdout.contains("attributeStart=0"))
+        #expect(result.stdout.contains("bodyStart="))
+        #expect(result.stdout.contains("bodyEnd="))
+    }
+
     @Test("Emit example check rejects missing directories")
     func emitExampleCheckRejectsMissingDirectories() throws {
         let missing = try repositoryRoot()
