@@ -1,0 +1,69 @@
+function scanRangeSource(source: String): String {
+    state output: ""
+    state tokenIndex: Int(0)
+    state sourceIndex: Int(0)
+    let sourceLength: Int(stringLength(value: source))
+
+    while sourceIndex < sourceLength {
+        let character: String(source.character(index: sourceIndex))
+
+        if isRangeScannerWhitespace(character: character) {
+            sourceIndex: sourceIndex + 1
+            continue
+        }
+
+        let tokenStart: Int(sourceIndex)
+
+        if character == String("\"") {
+            sourceIndex: scanRangeScannerString(source: source, start: sourceIndex)
+        } else if isRangeScannerDelimiter(character: character) {
+            sourceIndex: sourceIndex + 1
+        } else {
+            sourceIndex: scanRangeScannerWord(source: source, start: sourceIndex)
+        }
+
+        output: "\(output)\(tokenIndex)\t\(source.substring(start: tokenStart, end: sourceIndex))\n"
+        tokenIndex: tokenIndex + 1
+    }
+
+    return output
+}
+
+function isRangeScannerWhitespace(character: String): Bool {
+    return character == String(" ") || character == String("\n") || character == String("\t")
+}
+
+function isRangeScannerDelimiter(character: String): Bool {
+    return character == String("{") || character == String("}") || character == String("(") || character == String(")")
+        || character == String("[") || character == String("]") || character == String(":") || character == String(",")
+}
+
+function scanRangeScannerString(source: String, start: Int): Int {
+    state sourceIndex: Int(start + 1)
+    let sourceLength: Int(stringLength(value: source))
+
+    while sourceIndex < sourceLength && source.character(index: sourceIndex) != String("\"") {
+        sourceIndex: sourceIndex + 1
+    }
+
+    if sourceIndex < sourceLength {
+        return sourceIndex + 1
+    }
+
+    return sourceIndex
+}
+
+function scanRangeScannerWord(source: String, start: Int): Int {
+    state sourceIndex: Int(start)
+    let sourceLength: Int(stringLength(value: source))
+
+    while sourceIndex < sourceLength {
+        let current: String(source.character(index: sourceIndex))
+        if isRangeScannerWhitespace(character: current) || isRangeScannerDelimiter(character: current) {
+            return sourceIndex
+        }
+        sourceIndex: sourceIndex + 1
+    }
+
+    return sourceIndex
+}

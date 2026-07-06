@@ -85,7 +85,8 @@ implementation tracking surface.
       longer walks the example directory or manages temporary IR outputs.
 - [x] `RangeCompiler/Range/Programs/Compiler` has a minimal Range-authored
       compiler entrypoint that builds and runs as a native `Compiler` binary
-      through `SwiftBootstrap` and prints a scanner token stream for a Range input.
+      through `SwiftBootstrap` and calls its Range-authored scanner library for a
+      Range input.
 - [ ] The compiler/emission boundary still needs to shrink: Swift remains the
       compiler host and owns substantial parser/type/lowering machinery.
 - [ ] Memory graph and reactivity graph remain design documents, not concrete

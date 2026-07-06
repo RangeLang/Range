@@ -40,8 +40,9 @@ execution is no longer the desired or active program execution path.
   future fixture category.
 - Added the first self-hosting lane checkpoint:
   `RangeCompiler/Range/Programs/Compiler/Main.range` builds and runs as a
-  native `Compiler` binary through `SwiftBootstrap`, then scans a Range source
-  file and prints a deterministic token stream.
+  native `Compiler` binary through `SwiftBootstrap`, then calls its
+  Range-authored scanner library for a Range source file and prints a
+  deterministic token stream.
 
 ## Active Validation
 
