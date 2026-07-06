@@ -7,7 +7,7 @@ The active execution path is:
 ```text
 Range source
 -> Range script runner (Bash)
--> range compiler host (Swift)
+-> SwiftBootstrap compiler host (Swift)
 -> Range compiler pipeline (Swift)
 -> Range LLVM emitter (Swift)
 -> LLVM IR
@@ -15,9 +15,9 @@ Range source
 -> native executable
 ```
 
-The goal is still active. Swift remains the current compiler host, but generated
-Swift package workspace execution is no longer the desired or active program
-execution path.
+The goal is still active. `SwiftBootstrap` is the stage-0 compiler target:
+Swift remains the current compiler host, but generated Swift package workspace
+execution is no longer the desired or active program execution path.
 
 ## Latest Work Completed
 
@@ -63,15 +63,15 @@ the artifact deletion, including rewrite-site descriptor and synthesized
 extension/conformance expectations.
 
 The active gate for runnable Range programs is the Range script runner (Bash)
-plus Range LLVM emitter (Swift) path validated by `scripts/range check`.
+plus `SwiftBootstrap`/Range LLVM emitter path validated by `scripts/range check`.
 
-## Current Dirty Files From This Handoff
+## Stage-0 Boundary
 
-- `Development/2026-07-06-LLVMEmissionHandoff.md`
-- `Testing/README.md`
-- deleted stale artifact snapshot files under `RangePlayground/.range/Artifacts`
-- deleted `RangeCompiler/Sources/RangeCompiler/Core/CompilationArtifacts.swift`
-- deleted `Testing/CompilePass/System/RangeSelfPortrait.range`
+`SwiftBootstrap` should be treated as temporary trusted compiler code. Keep code
+there when it is required to turn Range source into LLVM today. Delete old
+generated-Swift execution, SwiftPM workspace, and stale artifact plumbing when
+it is no longer part of that stage-0 path. As the Range-authored compiler gains
+coverage, equivalent `SwiftBootstrap` behavior can become dead code.
 
 ## Next Best Targets
 
@@ -87,4 +87,3 @@ plus Range LLVM emitter (Swift) path validated by `scripts/range check`.
    for the active path.
 4. Avoid reintroducing generated Swift package workspace execution unless it is
    explicitly requested for archaeology.
-

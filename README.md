@@ -1,8 +1,8 @@
 # Range
 
 Range currently runs `.range` projects through the Range script runner, which
-asks the Swift-hosted compiler to emit LLVM IR and then links that IR with
-`clang`.
+asks the `SwiftBootstrap` compiler host to emit LLVM IR and then links that IR
+with `clang`.
 
 ## Download
 
@@ -43,3 +43,7 @@ scripts/range check-llvm-runs
 `.range/Build/llvm/Main.ll`, links it with `clang`, and launches the executable.
 Swift remains the current compiler host; generated Swift package workspaces are
 no longer the active backend path.
+
+`SwiftBootstrap` is the stage-0 compiler target: it exists to compile Range
+source through the current Swift-hosted pipeline until the Range-authored
+compiler can compile itself.

@@ -10,6 +10,7 @@ let package = Package(
     products: [
         .library(name: "RangeCompiler", targets: ["RangeCompiler"]),
         .library(name: "RangeEmission", targets: ["RangeEmission"]),
+        .library(name: "SwiftBootstrap", targets: ["SwiftBootstrap"]),
         .executable(name: "range", targets: ["range"]),
     ],
     targets: [
@@ -24,9 +25,15 @@ let package = Package(
             path: "Sources/RangeEmission",
             swiftSettings: [.treatWarning("EmbeddedRestrictions", as: .error)]
         ),
+        .target(
+            name: "SwiftBootstrap",
+            dependencies: ["RangeCompiler", "RangeEmission"],
+            path: "Sources/SwiftBootstrap",
+            swiftSettings: [.treatWarning("EmbeddedRestrictions", as: .error)]
+        ),
         .executableTarget(
             name: "range",
-            dependencies: ["RangeCompiler", "RangeEmission"],
+            dependencies: ["SwiftBootstrap"],
             path: "Sources/range",
             swiftSettings: [.treatWarning("EmbeddedRestrictions", as: .error)]
         ),
