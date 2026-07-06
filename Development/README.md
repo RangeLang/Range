@@ -82,6 +82,8 @@ implementation tracking surface.
 - [x] `SwiftBootstrap` owns LLVM run-manifest validation and execution checks;
       Bash no longer parses manifest rows, expected exits, stdin, args, or
       expected stdout.
+- [x] `SwiftBootstrap` owns emit-only LLVM example corpus checks; Bash no
+      longer walks the example directory or manages temporary IR outputs.
 - [ ] The compiler/emission boundary still needs to shrink: Swift remains the
       compiler host and owns substantial parser/type/lowering machinery.
 - [ ] Memory graph and reactivity graph remain design documents, not concrete
@@ -210,6 +212,8 @@ implementation tracking surface.
       `SwiftBootstrap`.
 - [x] Move `check-llvm-runs` manifest validation and execution assertions out of
       the Bash script and into `SwiftBootstrap`.
+- [x] Move `check-llvm-examples` corpus emission out of the Bash script and into
+      `SwiftBootstrap`.
 - [ ] Split pure LLVM lowering/emission from remaining host file/project
       operations.
 - [ ] Isolate runtime support that depends on Foundation, classes, locks,
@@ -278,8 +282,8 @@ Last reviewed on 2026-07-06.
 
 - `RangeCompiler`: `swift build --package-path RangeCompiler` passes.
 - `SwiftBootstrap`: the `range` executable routes `emit-llvm`, native
-  executable construction/execution, and run-manifest checks through the stage-0
-  compiler target.
+  executable construction/execution, run-manifest checks, and emit-only corpus
+  checks through the stage-0 compiler target.
 - `scripts/range check` emits LLVM, links with `clang`, and runs all 148
   `RangePlayground/Examples/LLVM/*.range` examples with expected exit/stdout
   checks.

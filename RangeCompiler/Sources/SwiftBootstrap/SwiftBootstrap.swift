@@ -103,6 +103,41 @@ public struct SwiftBootstrapCompiler {
         return count
     }
 
+    @discardableResult
+    public func checkLLVMExamples(rangeRoot: URL, examplesDirectory: URL) throws -> Int {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(
+            atPath: examplesDirectory.path,
+            isDirectory: &isDirectory
+        ), isDirectory.boolValue else {
+            throw SwiftBootstrapError("Missing LLVM examples directory: \(examplesDirectory.path)")
+        }
+
+        let examples = try topLevelRangeFiles(in: examplesDirectory)
+        if examples.isEmpty {
+            throw SwiftBootstrapError("No LLVM examples found in: \(examplesDirectory.path)")
+        }
+
+        let buildRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("range-llvm-examples-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: buildRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: buildRoot)
+        }
+
+        for (index, input) in examples.enumerated() {
+            let count = index + 1
+            let output = buildRoot
+                .appendingPathComponent(input.deletingPathExtension().lastPathComponent)
+                .appendingPathExtension("ll")
+            print("[\(count)] emit \(input.lastPathComponent)")
+            try emitLLVM(rangeRoot: rangeRoot, input: input, output: output)
+        }
+
+        print("LLVM emission succeeded for \(examples.count) example(s).")
+        return examples.count
+    }
+
     public func emitLLVM(rangeRoot: URL, input: URL, output: URL) throws {
         let inputs = try coreInputs(rangeRoot: rangeRoot) + projectInputs(input: input)
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
@@ -147,6 +182,25 @@ public struct SwiftBootstrapCompiler {
         }
 
         return files.sorted { $0.path < $1.path }
+    }
+
+    private func topLevelRangeFiles(in directory: URL) throws -> [URL] {
+        guard
+            let urls = try? FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            )
+        else {
+            throw SwiftBootstrapError("Missing directory: \(directory.path)")
+        }
+
+        return try urls.filter { url in
+            let isRegularFile =
+                try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile ?? false
+            return isRegularFile && url.pathExtension.lowercased() == "range"
+        }
+        .sorted { $0.path < $1.path }
     }
 
     private func sourceInput(for file: URL, role: SourceInputRole) throws -> SourceInput {

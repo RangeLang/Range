@@ -12,6 +12,7 @@ private struct DriverError: LocalizedError {
 private func usage() -> String {
     """
     Usage:
+      range check-llvm-examples --range-root ROOT DIR
       range check-llvm-runs --range-root ROOT MANIFEST [--require-full-coverage]
       range compile-executable --range-root ROOT INPUT
       range emit-llvm --range-root ROOT INPUT OUTPUT
@@ -89,6 +90,20 @@ private func checkLLVMRuns(arguments: [String]) throws {
     )
 }
 
+private func checkLLVMExamples(arguments: [String]) throws {
+    guard arguments.count == 3, arguments[0] == "--range-root" else {
+        throw DriverError(message: usage())
+    }
+
+    let rangeRoot = URL(fileURLWithPath: arguments[1])
+    let examplesDirectory = URL(fileURLWithPath: arguments[2])
+
+    try SwiftBootstrapCompiler().checkLLVMExamples(
+        rangeRoot: rangeRoot,
+        examplesDirectory: examplesDirectory
+    )
+}
+
 let arguments = Array(CommandLine.arguments.dropFirst())
 
 do {
@@ -97,6 +112,8 @@ do {
     }
 
     switch command {
+    case "check-llvm-examples":
+        try checkLLVMExamples(arguments: Array(arguments.dropFirst()))
     case "check-llvm-runs":
         try checkLLVMRuns(arguments: Array(arguments.dropFirst()))
     case "compile-executable":

@@ -40,9 +40,10 @@ scripts/range check-llvm-runs
 
 `scripts/range check` delegates the run manifest to `SwiftBootstrap`, which
 validates manifest coverage, emits LLVM, links with `clang`, launches each
-executable, and checks exit/stdout expectations. `scripts/range run` delegates
-to `range run`, which writes `.range/Build/llvm/Main.ll` through
-`SwiftBootstrap`, links it, and launches the executable.
+executable, and checks exit/stdout expectations. The emit-only example corpus
+check also runs through `SwiftBootstrap`. `scripts/range run` delegates to
+`range run`, which writes `.range/Build/llvm/Main.ll` through `SwiftBootstrap`,
+links it, and launches the executable.
 Swift remains the current compiler host; generated Swift package workspaces are
 no longer the active backend path.
 

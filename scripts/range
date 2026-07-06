@@ -63,29 +63,7 @@ case "$command" in
         fi
 
         examples_dir="${1:-$REPO_ROOT/RangePlayground/Examples/LLVM}"
-        if [[ ! -d "$examples_dir" ]]; then
-            echo "Missing LLVM examples directory: $examples_dir" >&2
-            exit 1
-        fi
-        example_count="$(find "$examples_dir" -maxdepth 1 -type f -name '*.range' -print | wc -l | tr -d '[:space:]')"
-        if [[ "$example_count" == "0" ]]; then
-            echo "No LLVM examples found in: $examples_dir" >&2
-            exit 1
-        fi
-
-        prepare_range_bin
-        build_root="$(mktemp -d "${TMPDIR:-/tmp}/range-llvm-examples.XXXXXX")"
-        trap 'rm -rf "$build_root"' EXIT
-
-        count=0
-        while IFS= read -r input; do
-            count=$((count + 1))
-            output="$build_root/$(basename "$input" .range).ll"
-            echo "[$count] emit $(basename "$input")"
-            range_compiler emit-llvm --range-root "$RANGE_ROOT" "$input" "$output"
-        done < <(find "$examples_dir" -maxdepth 1 -type f -name '*.range' -print | sort)
-
-        echo "LLVM emission succeeded for $count example(s)."
+        range_compiler check-llvm-examples --range-root "$RANGE_ROOT" "$examples_dir"
         ;;
     check-llvm-runs)
         if [[ $# -gt 1 ]]; then
