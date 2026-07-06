@@ -45,7 +45,10 @@ execution is no longer the desired or active program execution path.
   token stream. The lexer is a small direct port of the Swift bootstrap lexer
   path, with a focused test comparing native output against the Swift bootstrap
   lexer stream. The compiler also parses the first tiny AST checkpoint: an
-  `@main` block summary with body bounds.
+  `@main` block summary plus top-level function declaration summaries with body
+  bounds. The parsed `@main` block now lowers to a stage-2 synthetic `main`
+  function summary, and direct `return <integer>` in that body emits the first
+  Range-authored LLVM text checkpoint.
 
 ## Active Validation
 

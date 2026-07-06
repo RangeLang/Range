@@ -1,0 +1,68 @@
+construct MainReturnInteger {
+    let value: String
+}
+
+function emitRangeLLVM(source: String): String {
+    let maybeReturn: Optional<MainReturnInteger>(parseMainReturnInteger(source: source))
+
+    if maybeReturn == nil {
+        return String("llvm\tnoMainReturnInteger\n")
+    }
+
+    let fallback: MainReturnInteger(MainReturnInteger(value: String("0")))
+    let mainReturn: MainReturnInteger(maybeReturn ?? fallback)
+    return "llvm\tmain\treturn=\(mainReturn.value)\nllvmText\tdefine i32 @main() {\\nentry:\\n  ret i32 \(mainReturn.value)\\n}\\n\n"
+}
+
+function parseMainReturnInteger(source: String): Optional<MainReturnInteger> {
+    let maybeMain: Optional<ParsedMainBlock>(parseRangeMainBlock(source: source))
+
+    if maybeMain == nil {
+        return nil
+    }
+
+    let fallbackMain: ParsedMainBlock(ParsedMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
+    let mainBlock: ParsedMainBlock(maybeMain ?? fallbackMain)
+    state sourceIndex: Int(0)
+    sourceIndex: mainBlock.bodyStart
+    state bodyDepth: Int(0)
+
+    while sourceIndex < mainBlock.bodyEnd {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: sourceIndex))
+
+        if maybeToken == nil {
+            return nil
+        }
+
+        let fallbackToken: RangeLexedToken(RangeLexedToken(kind: String("eof"), start: sourceIndex, end: sourceIndex, text: String("")))
+        let token: RangeLexedToken(maybeToken ?? fallbackToken)
+
+        if token.start >= mainBlock.bodyEnd {
+            return nil
+        }
+
+        if token.kind == String("leftBrace") {
+            bodyDepth: bodyDepth + 1
+        } else if token.kind == String("rightBrace") {
+            if bodyDepth > 0 {
+                bodyDepth: bodyDepth - 1
+            }
+        } else if bodyDepth == 0 && token.kind == String("keyword") && token.text == String("return") {
+            let maybeValue: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: token.end))
+            if maybeValue == nil {
+                return nil
+            }
+
+            let valueToken: RangeLexedToken(maybeValue ?? fallbackToken)
+            if valueToken.kind == String("integer") {
+                return MainReturnInteger(value: valueToken.text)
+            }
+
+            return nil
+        }
+
+        sourceIndex: token.end
+    }
+
+    return nil
+}

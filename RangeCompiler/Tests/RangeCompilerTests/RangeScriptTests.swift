@@ -119,24 +119,35 @@ struct RangeScriptTests {
         #expect(result.stderr.isEmpty)
     }
 
-    @Test("Native compiler lexer matches Swift bootstrap lexer")
-    func nativeCompilerLexerMatchesSwiftBootstrapLexer() throws {
-        let source = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Main.range")
-        let compiler = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
-        let result = try runRangeScript(
-            arguments: ["run", compiler.path, "--", source.path],
-            timeout: 30
-        )
+    @Test("Native compiler lexer matches Swift bootstrap lexer corpus")
+    func nativeCompilerLexerMatchesSwiftBootstrapLexerCorpus() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
 
-        #expect(result.timedOut == false)
-        #expect(result.exitCode == 0)
-        #expect(result.stderr.isEmpty)
+        let synthetic = directory.appendingPathComponent("LexerParity.range")
+        try """
+        @main {
+            let escaped: `if`(1)
+            let numbers: Pair(1, 2.5)
+            let operators: Bool(a == b != c <= d >= e && f || g ?? h)
+            let punctuation: Bag([a, b], #(value), value.path...)
+            return 0
+        }
+        """.write(to: synthetic, atomically: true, encoding: .utf8)
 
-        let nativeTokens = nativeLexerTokens(from: result.stdout)
-        let swiftTokens = try swiftBootstrapLexerTokens(for: source)
-        #expect(nativeTokens == swiftTokens)
+        let root = try repositoryRoot()
+        let sources = [
+            root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Main.range"),
+            synthetic,
+        ]
+
+        for source in sources {
+            let nativeTokens = try nativeCompilerLexerTokens(for: source)
+            let swiftTokens = try swiftBootstrapLexerTokens(for: source)
+            #expect(nativeTokens == swiftTokens, "Lexer mismatch for \(source.lastPathComponent)")
+        }
     }
 
     @Test("Native compiler parses main block")
@@ -154,9 +165,79 @@ struct RangeScriptTests {
         #expect(result.exitCode == 0)
         #expect(result.stderr.isEmpty)
         #expect(result.stdout.contains("parse\\tmainBlock"))
+        #expect(result.stdout.contains("stage2\\tmainFunction\\tname=main"))
         #expect(result.stdout.contains("attributeStart=0"))
         #expect(result.stdout.contains("bodyStart="))
         #expect(result.stdout.contains("bodyEnd="))
+    }
+
+    @Test("Native compiler lowers main block to stage2 main function")
+    func nativeCompilerLowersMainBlockToStage2MainFunction() throws {
+        let source = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Main.range")
+        let compiler = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
+        let result = try runRangeScript(
+            arguments: ["run", compiler.path, "--", source.path],
+            timeout: 30
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("stage2\\tmainFunction\\tname=main"))
+        #expect(result.stdout.contains("bodyStart="))
+        #expect(result.stdout.contains("bodyEnd="))
+    }
+
+    @Test("Native compiler emits LLVM for integer main return")
+    func nativeCompilerEmitsLLVMForIntegerMainReturn() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let source = directory.appendingPathComponent("ReturnSeven.range")
+        try """
+        @main {
+            return 7
+        }
+        """.write(to: source, atomically: true, encoding: .utf8)
+
+        let compiler = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
+        let result = try runRangeScript(
+            arguments: ["run", compiler.path, "--", source.path],
+            timeout: 30
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("llvm\\tmain\\treturn=7"))
+        #expect(result.stdout.contains("llvmText\\tdefine i32 @main()"))
+        #expect(result.stdout.contains("ret i32 7"))
+    }
+
+    @Test("Native compiler parses function declarations")
+    func nativeCompilerParsesFunctionDeclarations() throws {
+        let source = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Parser.range")
+        let compiler = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
+        let result = try runRangeScript(
+            arguments: ["run", compiler.path, "--", source.path],
+            timeout: 30
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("parse\\tnoMainBlock"))
+        #expect(result.stdout.contains("parse\\tfunction\\tname=parseRangeSource"))
+        #expect(result.stdout.contains("parse\\tfunction\\tname=parseRangeMainBlock"))
+        #expect(result.stdout.contains("parse\\tfunction\\tname=parseRangeFunctionDeclarations"))
+        #expect(result.stdout.contains("parse\\tfunction\\tname=parseRangeFunctionDeclaration"))
     }
 
     @Test("Emit example check rejects missing directories")
@@ -286,6 +367,21 @@ private func nativeLexerTokens(from stdout: String) -> [LexerTokenSnapshot] {
             }
             return LexerTokenSnapshot(kind: String(columns[1]), source: String(columns[2]))
         }
+}
+
+private func nativeCompilerLexerTokens(for source: URL) throws -> [LexerTokenSnapshot] {
+    let compiler = try repositoryRoot()
+        .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
+    let result = try runRangeScript(
+        arguments: ["run", compiler.path, "--", source.path],
+        timeout: 30
+    )
+
+    if result.timedOut || result.exitCode != 0 || !result.stderr.isEmpty {
+        throw RangeScriptTestError.nativeLexerFailed(source.path, result.stderr)
+    }
+
+    return nativeLexerTokens(from: result.stdout)
 }
 
 private func swiftBootstrapLexerTokens(for source: URL) throws -> [LexerTokenSnapshot] {
@@ -424,5 +520,6 @@ private struct LexerTokenSnapshot: Equatable {
 private enum RangeScriptTestError: Error {
     case missingDirectory(String)
     case repositoryRootNotFound
+    case nativeLexerFailed(String, String)
     case swiftLexerFailed(String)
 }

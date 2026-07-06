@@ -63,7 +63,10 @@ public struct SwiftBootstrapCompiler {
         guard mainResult.stdout.contains("macroAttribute\\t@main"),
             mainResult.stdout.contains("identifier\\tcommandLineArgumentCount"),
             mainResult.stdout.contains("keyword\\treturn"),
-            mainResult.stdout.contains("parse\\tmainBlock")
+            mainResult.stdout.contains("parse\\tmainBlock"),
+            mainResult.stdout.contains("stage2\\tmainFunction\\tname=main"),
+            mainResult.stdout.contains("llvm\\tmain\\treturn=0"),
+            mainResult.stdout.contains("llvmText\\tdefine i32 @main()")
         else {
             throw SwiftBootstrapError(
                 """
@@ -93,7 +96,8 @@ public struct SwiftBootstrapCompiler {
             lexerResult.stdout.contains("identifier\\tRangeLexedToken"),
             lexerResult.stdout.contains("identifier\\tlexNextRangeToken"),
             lexerResult.stdout.contains("stringLiteral\\t\"ellipsis\""),
-            lexerResult.stdout.contains("parse\\tnoMainBlock")
+            lexerResult.stdout.contains("parse\\tnoMainBlock"),
+            lexerResult.stdout.contains("llvm\\tnoMainReturnInteger")
         else {
             throw SwiftBootstrapError(
                 """
@@ -102,6 +106,34 @@ public struct SwiftBootstrapCompiler {
                 \(prefixLines(lexerResult.stdout))
                 --- stderr ---
                 \(prefixLines(lexerResult.stderr))
+                """
+            )
+        }
+
+        let parserInput = compilerDirectory.appendingPathComponent("Parser.range")
+        let parserResult = try runExecutable(executable: executable, arguments: [parserInput.path], stdin: nil)
+        guard parserResult.exitCode == 0 else {
+            throw SwiftBootstrapError(
+                """
+                Bootstrap compiler exited \(parserResult.exitCode): \(parserInput.path)
+                --- stdout ---
+                \(prefixLines(parserResult.stdout))
+                --- stderr ---
+                \(prefixLines(parserResult.stderr))
+                """
+            )
+        }
+        guard parserResult.stdout.contains("parse\\tnoMainBlock"),
+            parserResult.stdout.contains("parse\\tfunction\\tname=parseRangeSource"),
+            parserResult.stdout.contains("parse\\tfunction\\tname=parseRangeFunctionDeclaration")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Bootstrap compiler did not parse expected function declarations: \(parserInput.path)
+                --- stdout ---
+                \(prefixLines(parserResult.stdout))
+                --- stderr ---
+                \(prefixLines(parserResult.stderr))
                 """
             )
         }

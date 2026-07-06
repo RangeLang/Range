@@ -91,6 +91,12 @@ implementation tracking surface.
       bootstrap lexer stream.
 - [x] `RangeCompiler/Range/Programs/Compiler` parses the first tiny AST
       checkpoint: an `@main` block summary with body bounds.
+- [x] `RangeCompiler/Range/Programs/Compiler` parses top-level function
+      declaration summaries with body bounds.
+- [x] `RangeCompiler/Range/Programs/Compiler` lowers the parsed `@main` block to
+      a stage-2 synthetic `main` function summary.
+- [x] `RangeCompiler/Range/Programs/Compiler` emits the first Range-authored LLVM
+      text checkpoint for `@main { return <integer> }`.
 - [ ] The compiler/emission boundary still needs to shrink: Swift remains the
       compiler host and owns substantial parser/type/lowering machinery.
 - [ ] Memory graph and reactivity graph remain design documents, not concrete

@@ -70,7 +70,7 @@ function lexNextRangeToken(source: String, start: Int): Optional<RangeLexedToken
         return rangeToken(kind: String("orOr"), source: source, start: sourceIndex, end: sourceIndex + 2)
     }
     if hasRangePrefix(source: source, start: sourceIndex, prefix: String("#(")) {
-        return rangeToken(kind: String("hash"), source: source, start: sourceIndex, end: sourceIndex + 2)
+        return rangeToken(kind: String("hash"), source: source, start: sourceIndex, end: sourceIndex + 1)
     }
 
     let character: String(source.character(index: sourceIndex))
