@@ -75,6 +75,8 @@ implementation tracking surface.
 - [x] `SwiftBootstrap` is the explicit stage-0 compiler target. It owns the
       temporary Swift-hosted `Range source -> LLVM IR` path until a
       Range-authored compiler binary can replace it.
+- [x] `SwiftBootstrap` owns stage-0 executable construction: build directory
+      cleanup, LLVM IR materialization, and `clang` linking.
 - [ ] The compiler/emission boundary still needs to shrink: Swift remains the
       compiler host and owns substantial parser/type/lowering machinery.
 - [ ] Memory graph and reactivity graph remain design documents, not concrete
@@ -197,7 +199,10 @@ implementation tracking surface.
       emission, `clang`, process exit, and declared stdout.
 - [x] Introduce `SwiftBootstrap` as the stage-0 compiler boundary used by the
       `range` executable.
-- [ ] Split pure LLVM lowering/emission from host file/project operations.
+- [x] Move native executable construction out of the Bash script and into
+      `SwiftBootstrap`.
+- [ ] Split pure LLVM lowering/emission from remaining host file/project
+      operations.
 - [ ] Isolate runtime support that depends on Foundation, classes, locks,
       file/process APIs, or other host-only behavior.
 - [ ] Audit `RangeCompiler` Foundation usage and replace easy cases where the
@@ -263,8 +268,8 @@ implementation tracking surface.
 Last reviewed on 2026-07-06.
 
 - `RangeCompiler`: `swift build --package-path RangeCompiler` passes.
-- `SwiftBootstrap`: the `range` executable routes `emit-llvm` through the
-  stage-0 compiler target.
+- `SwiftBootstrap`: the `range` executable routes `emit-llvm` and native
+  executable construction through the stage-0 compiler target.
 - `scripts/range check` emits LLVM, links with `clang`, and runs all 148
   `RangePlayground/Examples/LLVM/*.range` examples with expected exit/stdout
   checks.

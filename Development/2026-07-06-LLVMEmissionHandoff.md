@@ -11,7 +11,7 @@ Range source
 -> Range compiler pipeline (Swift)
 -> Range LLVM emitter (Swift)
 -> LLVM IR
--> clang
+-> SwiftBootstrap clang link
 -> native executable
 ```
 
@@ -68,10 +68,11 @@ plus `SwiftBootstrap`/Range LLVM emitter path validated by `scripts/range check`
 ## Stage-0 Boundary
 
 `SwiftBootstrap` should be treated as temporary trusted compiler code. Keep code
-there when it is required to turn Range source into LLVM today. Delete old
-generated-Swift execution, SwiftPM workspace, and stale artifact plumbing when
-it is no longer part of that stage-0 path. As the Range-authored compiler gains
-coverage, equivalent `SwiftBootstrap` behavior can become dead code.
+there when it is required to turn Range source into LLVM or a native executable
+today. Delete old generated-Swift execution, SwiftPM workspace, and stale
+artifact plumbing when it is no longer part of that stage-0 path. As the
+Range-authored compiler gains coverage, equivalent `SwiftBootstrap` behavior can
+become dead code.
 
 ## Next Best Targets
 

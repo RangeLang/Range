@@ -12,6 +12,7 @@ private struct DriverError: LocalizedError {
 private func usage() -> String {
     """
     Usage:
+      range compile-executable --range-root ROOT INPUT
       range emit-llvm --range-root ROOT INPUT OUTPUT
     """
 }
@@ -33,6 +34,21 @@ private func emitLLVM(arguments: [String]) throws {
     try SwiftBootstrapCompiler().emitLLVM(rangeRoot: rangeRoot, input: input, output: output)
 }
 
+private func compileExecutable(arguments: [String]) throws {
+    guard arguments.count == 3, arguments[0] == "--range-root" else {
+        throw DriverError(message: usage())
+    }
+
+    let rangeRoot = URL(fileURLWithPath: arguments[1])
+    let input = URL(fileURLWithPath: arguments[2])
+
+    let executable = try SwiftBootstrapCompiler().compileExecutable(
+        rangeRoot: rangeRoot,
+        input: input
+    )
+    print(executable.path)
+}
+
 let arguments = Array(CommandLine.arguments.dropFirst())
 
 do {
@@ -41,6 +57,8 @@ do {
     }
 
     switch command {
+    case "compile-executable":
+        try compileExecutable(arguments: Array(arguments.dropFirst()))
     case "emit-llvm":
         try emitLLVM(arguments: Array(arguments.dropFirst()))
     default:

@@ -37,23 +37,7 @@ prepare_range_bin() {
 build_executable() {
     input="$1"
 
-    if [[ -d "$input" ]]; then
-        project_root="$input"
-        executable_name="$(basename "$input")"
-    else
-        project_root="$(cd "$(dirname "$input")" && pwd)"
-        executable_name="$(basename "$input" .range)"
-    fi
-
-    build_root="$project_root/.range/Build/llvm"
-    ir_file="$build_root/Main.ll"
-    executable="$build_root/$executable_name"
-
-    rm -rf "$build_root"
-    mkdir -p "$build_root"
-    range_compiler emit-llvm --range-root "$RANGE_ROOT" "$input" "$ir_file"
-    clang -Wno-override-module "$ir_file" -o "$executable"
-    printf '%s\n' "$executable"
+    range_compiler compile-executable --range-root "$RANGE_ROOT" "$input"
 }
 
 validate_run_manifest() {
