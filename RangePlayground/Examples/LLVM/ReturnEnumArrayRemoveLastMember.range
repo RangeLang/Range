@@ -1,0 +1,17 @@
+enum NumberToken {
+    case value(value: Int)
+    case eof
+}
+
+@main {
+    let tokens: [NumberToken]([.value(value: 4), .value(value: 6)])
+    let removed: Optional<NumberToken>(tokens.removeLast())
+    let fallback: NumberToken(.eof)
+    let chosen: NumberToken(removed ?? fallback)
+    switch chosen {
+    case .value(let number):
+        return number == 6 && tokens.count == 1 ? 0 : 1
+    case .eof:
+        return 1
+    }
+}

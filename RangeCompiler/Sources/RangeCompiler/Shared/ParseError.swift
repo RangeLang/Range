@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ParseError: Error, CustomStringConvertible {
+public struct ParseError: Error, CustomStringConvertible, LocalizedError {
     public let message: String
     public let range: RangeSourceRange?
 
@@ -10,4 +10,6 @@ public struct ParseError: Error, CustomStringConvertible {
     }
 
     public var description: String { message }
+
+    public var errorDescription: String? { message }
 }

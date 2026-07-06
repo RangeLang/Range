@@ -1,0 +1,9 @@
+construct Box {
+    let maybe: Optional<[Int]>
+}
+
+@main {
+    state box: Box(maybe: [1])
+    box.maybe: nil
+    return box.maybe == nil ? 0 : 1
+}

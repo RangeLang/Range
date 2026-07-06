@@ -1,0 +1,7 @@
+@main {
+    let values: [1, 2, 3]
+    let removed: Optional<Int>(values.removeLast())
+    return (removed ?? 0) == 3
+        && values.count == 2
+        && values.element(index: 1) == 2 ? 0 : 1
+}

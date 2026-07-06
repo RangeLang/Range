@@ -1,0 +1,8 @@
+function compute(): Int {
+    return 4
+}
+
+@main {
+    compute()
+    return 7
+}

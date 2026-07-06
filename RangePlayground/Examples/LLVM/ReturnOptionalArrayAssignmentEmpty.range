@@ -1,0 +1,5 @@
+@main {
+    state maybe: Optional<[Int]>(nil)
+    maybe: []
+    return maybe == nil ? 1 : 0
+}

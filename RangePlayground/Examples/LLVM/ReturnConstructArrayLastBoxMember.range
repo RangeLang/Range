@@ -1,0 +1,11 @@
+construct Box {
+    let value: Int
+}
+
+@main {
+    let boxes: [Box]([Box(value: 4), Box(value: 6)])
+    let last: Optional<Box>(boxes.last())
+    let fallback: Box(value: 0)
+    let chosen: Box(last ?? fallback)
+    return chosen.value == 6 && boxes.count == 2 ? 0 : 1
+}

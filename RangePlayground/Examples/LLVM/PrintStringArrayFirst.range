@@ -1,0 +1,8 @@
+function first(values: [String]): String {
+    return values[0]
+}
+
+@main {
+    print(value: first(values: [String("Hello from Range array")]))
+    return 0
+}

@@ -1,0 +1,7 @@
+@main {
+    let text: String(readFile(path: String("RangePlayground/Examples/LLVM/ReadFileInput.txt")))
+    if text != String("not same") {
+        return 1
+    }
+    return 0
+}

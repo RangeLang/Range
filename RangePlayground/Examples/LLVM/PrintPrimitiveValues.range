@@ -1,0 +1,6 @@
+@main {
+    print(value: 7)
+    print(value: Float(2.5))
+    print(value: true)
+    return 0
+}

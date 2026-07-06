@@ -833,6 +833,11 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return arguments.flatMap { expressionMacroUsages(in: $0.value, declarationName: declarationName) }
         case .array(let elements):
             return elements.flatMap { expressionMacroUsages(in: $0, declarationName: declarationName) }
+        case .indexed(let base, let index):
+            return expressionMacroUsages(in: base, declarationName: declarationName)
+                + expressionMacroUsages(in: index, declarationName: declarationName)
+        case .member(let base, _):
+            return expressionMacroUsages(in: base, declarationName: declarationName)
         case .dictionary(let elements):
             return elements.flatMap {
                 expressionMacroUsages(in: $0.key, declarationName: declarationName)

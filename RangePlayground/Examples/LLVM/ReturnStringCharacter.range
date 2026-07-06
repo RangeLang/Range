@@ -1,0 +1,4 @@
+@main {
+    let text: String("hello")
+    return text.character(index: 1) == String("e") ? 0 : 1
+}

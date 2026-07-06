@@ -1,0 +1,16 @@
+enum NumberToken {
+    case value(value: Int)
+    case eof
+}
+
+@main {
+    let maybe: Optional<NumberToken>(nil)
+    let fallback: NumberToken(.value(value: 5))
+    let token: NumberToken(maybe ?? fallback)
+    switch token {
+    case .value(let number):
+        return number
+    case .eof:
+        return 0
+    }
+}

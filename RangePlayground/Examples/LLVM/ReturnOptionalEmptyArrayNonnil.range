@@ -1,0 +1,7 @@
+@main {
+    let maybe: Optional<[Int]>([])
+    if maybe {
+        return 1
+    }
+    return 0
+}

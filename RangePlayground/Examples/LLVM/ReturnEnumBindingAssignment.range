@@ -1,0 +1,15 @@
+enum NumberToken {
+    case value(value: Int)
+    case eof
+}
+
+@main {
+    let token: NumberToken(.value(value: 7))
+    switch token {
+    case .value(state number):
+        number: number + 5
+        return number
+    case .eof:
+        return 0
+    }
+}

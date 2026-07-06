@@ -1,0 +1,3 @@
+@main {
+    return Float(5.5) % Float(2.0) == Float(1.5)
+}

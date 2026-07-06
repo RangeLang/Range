@@ -1,0 +1,4 @@
+@main {
+    let maybe: Optional<Int>(nil)
+    return maybe == nil
+}

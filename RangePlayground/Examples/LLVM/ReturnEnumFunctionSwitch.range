@@ -1,0 +1,20 @@
+enum TrafficLight {
+    case red
+    case yellow
+    case green
+}
+
+function signal(): TrafficLight {
+    return .yellow
+}
+
+@main {
+    switch signal() {
+    case .red:
+        return 1
+    case .yellow:
+        return 2
+    case .green:
+        return 3
+    }
+}

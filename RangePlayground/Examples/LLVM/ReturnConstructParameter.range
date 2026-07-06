@@ -1,0 +1,12 @@
+construct Point {
+    let x: Int
+    let y: Int
+}
+
+function getY(point: Point): Int {
+    return point.y
+}
+
+@main {
+    return getY(point: Point(x: 2, y: 5))
+}

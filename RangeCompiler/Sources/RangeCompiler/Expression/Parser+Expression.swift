@@ -151,15 +151,16 @@ extension Parser {
                 return .nilLiteral
             }
             var fullName = name
-            try appendPostfixAccesses(to: &fullName)
+            try appendPostfixMemberAccesses(to: &fullName)
             fullName += try parseGenericArgumentClauseIfPresent()
-            return try parseCalledOrReferencedExpression(named: fullName)
+            let expression = try parseCalledOrReferencedExpression(named: fullName)
+            return try parseIndexedPostfixes(on: expression)
         case .dollar:
             try consume(.dollar)
             let name = try consumeIdentifier()
             var fullName = name
-            try appendPostfixAccesses(to: &fullName)
-            return .bindingReference(fullName)
+            try appendPostfixMemberAccesses(to: &fullName)
+            return try parseIndexedPostfixes(on: .bindingReference(fullName))
         case .dot:
             advance()
             let name = try consumeCallableName()
@@ -167,12 +168,13 @@ extension Parser {
             fullName += try parseGenericArgumentClauseIfPresent()
             return try parseCalledOrReferencedExpression(named: fullName)
         case .leftBracket:
-            return try parseCollectionLiteral()
+            let expression = try parseCollectionLiteral()
+            return try parsePostfixes(on: expression)
         case .leftParen:
             try consume(.leftParen)
             let expression = try parseExpression()
             try consume(.rightParen)
-            return expression
+            return try parsePostfixes(on: expression)
         case .leftBrace:
             return .block(try parseStatementBlock(baseLocalBindings: [:]))
         default:
@@ -321,7 +323,7 @@ extension Parser {
         )
     }
 
-    mutating func appendPostfixAccesses(to fullName: inout String) throws {
+    mutating func appendPostfixMemberAccesses(to fullName: inout String) throws {
         while true {
             if peek() == .dot {
                 switch peek(offset: 1) {
@@ -335,11 +337,12 @@ extension Parser {
                 }
             }
 
-            if peek() == .leftBracket {
+            if peek() == .leftBracket,
+                case .integer(let index) = peek(offset: 1),
+                peek(offset: 2) == .rightBracket,
+                peek(offset: 3) == .dot
+            {
                 try consume(.leftBracket)
-                guard case .integer(let index) = peek() else {
-                    throw ParseError("Expected integer index.")
-                }
                 advance()
                 try consume(.rightBracket)
                 fullName += "[\(index)]"
@@ -347,6 +350,44 @@ extension Parser {
             }
 
             return
+        }
+    }
+
+    mutating func parseIndexedPostfixes(on expression: Expression) throws -> Expression {
+        var expression = expression
+        while peek() == .leftBracket {
+            try consume(.leftBracket)
+            let index = try parseExpression(terminatingAt: [.rightBracket])
+            try consume(.rightBracket)
+            expression = .indexed(base: expression, index: index)
+        }
+        return expression
+    }
+
+    mutating func parsePostfixes(on expression: Expression) throws -> Expression {
+        var expression = expression
+        while true {
+            if peek() == .leftBracket {
+                try consume(.leftBracket)
+                let index = try parseExpression(terminatingAt: [.rightBracket])
+                try consume(.rightBracket)
+                expression = .indexed(base: expression, index: index)
+                continue
+            }
+
+            if peek() == .dot {
+                switch peek(offset: 1) {
+                case .identifier(let name), .keyword(let name):
+                    advance()
+                    advance()
+                    expression = .member(base: expression, name: name)
+                    continue
+                default:
+                    return expression
+                }
+            }
+
+            return expression
         }
     }
 

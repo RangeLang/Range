@@ -1,0 +1,10 @@
+construct Bag {
+    let items: [String]
+}
+
+@main {
+    let bag: Bag(items: [String("alpha"), String("beta")])
+    let last: Optional<String>(bag.items.last())
+    return (last ?? String("")) == String("beta")
+        && bag.items.count == 2 ? 0 : 1
+}

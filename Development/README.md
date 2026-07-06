@@ -69,8 +69,11 @@ implementation tracking surface.
       checks, but it still carries substantial transient type-flow and
       accessible-type state as `BootstrapLiteralType` maps.
 - [x] The old Swift backend package has been removed from the active layout.
-- [ ] The script runner is intentionally host-bound, but the compiler/emission
-      boundary is still early and only supports the current LLVM path.
+- [x] The script runner is intentionally host-bound and the active execution
+      path is the current LLVM path: Range source goes through the range
+      compiler host, LLVM emission, `clang`, and the linked executable.
+- [ ] The compiler/emission boundary still needs to shrink: Swift remains the
+      compiler host and owns substantial parser/type/lowering machinery.
 - [ ] Memory graph and reactivity graph remain design documents, not concrete
       compiler stages.
 
@@ -186,6 +189,9 @@ implementation tracking surface.
 
 ### 9. LLVM Emission And Host Boundary
 
+- [x] Make the script-driven LLVM executable path the active checked baseline.
+      `scripts/range check` validates the full LLVM example corpus through
+      emission, `clang`, process exit, and declared stdout.
 - [ ] Split pure LLVM lowering/emission from host file/project operations.
 - [ ] Isolate runtime support that depends on Foundation, classes, locks,
       file/process APIs, or other host-only behavior.
@@ -249,11 +255,14 @@ implementation tracking surface.
 
 ## Verification Snapshot
 
-Last reviewed on 2026-07-05.
+Last reviewed on 2026-07-06.
 
 - `RangeCompiler`: `swift build --package-path RangeCompiler` passes.
-- `scripts/range run RangePlayground/Examples/LLVM/EmptyMain.range` emits LLVM,
-  links with `clang`, and exits 0.
+- `scripts/range check` emits LLVM, links with `clang`, and runs all 148
+  `RangePlayground/Examples/LLVM/*.range` examples with expected exit/stdout
+  checks.
+- `swift test --package-path RangeCompiler --filter RangeScriptTests` passes
+  and guards the script manifest/coverage contract.
 - Fixture inventory at review time:
   - `CompilePass`: 94 fixtures.
   - `CompileFail`: 46 fixtures.

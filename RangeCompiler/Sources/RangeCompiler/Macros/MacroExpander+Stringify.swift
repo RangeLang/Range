@@ -39,8 +39,12 @@ extension MacroExpander {
             return "\(name)(\(renderArgumentsForStringify(arguments)))"
         case .bindingReference(let name):
             return "$\(name)"
+        case .member(let base, let name):
+            return "\(renderExpressionForStringify(base)).\(name)"
         case .array(let elements):
             return "[\(elements.map(renderExpressionForStringify).joined(separator: ", "))]"
+        case .indexed(let base, let index):
+            return "\(renderExpressionForStringify(base))[\(renderExpressionForStringify(index))]"
         case .dictionary(let elements):
             let rendered = elements.map {
                 "\(renderExpressionForStringify($0.key)): \(renderExpressionForStringify($0.value))"

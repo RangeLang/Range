@@ -1,0 +1,11 @@
+construct Box<Value> {
+    let value: Value
+}
+
+function unwrap<T>(box: Box<T>): T {
+    return box.value
+}
+
+@main {
+    return unwrap<Int>(box: Box<Int>(value: 16))
+}

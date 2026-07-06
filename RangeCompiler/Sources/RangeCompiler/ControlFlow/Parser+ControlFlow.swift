@@ -248,11 +248,33 @@ extension Parser {
     func isAssignmentStatementStart() -> Bool {
         guard case .identifier = peek() else { return false }
         var offset = 1
-        while peek(offset: offset) == .dot {
-            guard case .identifier = peek(offset: offset + 1) else {
-                return false
+        while true {
+            if peek(offset: offset) == .leftBracket {
+                var depth = 1
+                offset += 1
+                while depth > 0 {
+                    switch peek(offset: offset) {
+                    case .leftBracket:
+                        depth += 1
+                    case .rightBracket:
+                        depth -= 1
+                    case .eof:
+                        return false
+                    default:
+                        break
+                    }
+                    offset += 1
+                }
+                continue
             }
-            offset += 2
+            if peek(offset: offset) == .dot {
+                guard case .identifier = peek(offset: offset + 1) else {
+                    return false
+                }
+                offset += 2
+                continue
+            }
+            break
         }
         let next = peek(offset: offset)
         return next == .colon
@@ -286,19 +308,9 @@ extension Parser {
         let typedInitializer: Expression?
         if peek() == .colon {
             try consume(.colon)
-            if shouldParseTypedConstructionAfterColon() {
-                let annotation = try parseTypedConstructionAnnotation()
-                explicitType = annotation.type
-                typedInitializer = annotation.initializer
-                if canStartInlineExpression() {
-                    throw ParseError(
-                        "\(kind == .constant ? "let" : "state") '\(name)' expects one initializer after ':'. Use typed construction, for example `\(kind == .constant ? "let" : "state") \(name): \(annotation.type.displayName)(value)`."
-                    )
-                }
-            } else {
-                explicitType = nil
-                typedInitializer = try parseExpression()
-            }
+            let parsed = try parseColonTypedConstructionOrExpression()
+            explicitType = parsed.type
+            typedInitializer = parsed.initializer
         } else {
             explicitType = nil
             typedInitializer = nil
@@ -424,10 +436,21 @@ extension Parser {
         } else {
             target = try resolveAssignmentTarget(name: name, localBindings: localBindings)
         }
-        while peek() == .dot {
-            try consume(.dot)
-            let memberName = try consumeIdentifier()
-            target = .member(base: target, name: memberName)
+        while true {
+            if peek() == .leftBracket {
+                try consume(.leftBracket)
+                let index = try parseExpression(terminatingAt: [.rightBracket])
+                try consume(.rightBracket)
+                target = .indexed(base: target, index: index)
+                continue
+            }
+            if peek() == .dot {
+                try consume(.dot)
+                let memberName = try consumeIdentifier()
+                target = .member(base: target, name: memberName)
+                continue
+            }
+            break
         }
         return target
     }

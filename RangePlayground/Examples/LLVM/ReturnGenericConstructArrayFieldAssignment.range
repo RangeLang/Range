@@ -1,0 +1,9 @@
+construct Box<Value> {
+    let value: Value
+}
+
+@main {
+    state boxes: [Box<Int>]([Box<Int>(value: 17), Box<Int>(value: 18)])
+    boxes[1].value: 19
+    return boxes[1].value
+}

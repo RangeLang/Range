@@ -1,0 +1,5 @@
+@main {
+    let maybe: Optional<[Int]>(nil)
+    let chosen: [Int](maybe ?? [])
+    return chosen.count
+}

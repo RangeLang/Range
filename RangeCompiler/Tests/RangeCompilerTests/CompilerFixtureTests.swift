@@ -2443,87 +2443,12 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         }
     }
 
-    @Test("Range runtime hook executes range lexer declaration")
-    func rangeRuntimeHookExecutesRangeLexerDeclaration() throws {
-        let program = try CompilerPipeline().build(
-            inputs: try rangeCoreInputs(),
-            runtimeHooks: [RangeFunctionRuntimeHook(functionName: "rangeLexer")]
-        )
-
-        let result = try #require(
-            program.runtimeHookResults.first { $0.hookName == "range.function.rangeLexer" }
-        )
-        let artifact = try #require(result.artifacts["rangeLexer"])
-
-        #expect(artifact.contains("Lexer("))
-        #expect(artifact.contains("LexerRule("))
-        #expect(artifact.contains("whitespace"))
-        #expect(!artifact.contains("hashAttribute"))
-    }
-
     @Test("FileManager readFile surface validates")
     func fileSystemReadTextSurfaceValidates() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "System/FileManagerReadFile.range")
         _ = try compile(fixture: fixture, expectedRole: .pass)
     }
 
-    @Test("Compiler pipeline runtime hooks run beside Swift pipeline")
-    func compilerPipelineRuntimeHooksRunBesideSwiftPipeline() throws {
-        let hook = RecordingRuntimeHook()
-        let diagnostics = RangeDiagnosticEngine()
-        let program = try CompilerPipeline().build(
-            inputs: try rangeCoreInputs(),
-            diagnosticEngine: diagnostics,
-            runtimeHooks: [hook]
-        )
-
-        #expect(hook.stages == [
-            .coreDeclarationsDiscovered,
-            .coreParsed,
-            .projectDeclarationsDiscovered,
-            .projectParsed,
-            .macrosExpanded,
-            .declarationGraphBuilt,
-        ])
-        #expect(program.runtimeHookResults.count == 6)
-        #expect(program.runtimeHookResults.last?.artifacts["constructs"] != nil)
-        #expect(
-            diagnostics.diagnostics.contains {
-                $0.source == "range-runtime-hook"
-                    && $0.code == "runtime.side-by-side"
-            }
-        )
-    }
-
-}
-
-private final class RecordingRuntimeHook: CompilerPipelineRuntimeHook {
-    let name = "recording"
-    var stages: [CompilerPipelineRuntimeStage] = []
-
-    func run(context: CompilerPipelineRuntimeContext) throws -> CompilerPipelineRuntimeResult? {
-        stages.append(context.stage)
-
-        guard context.stage == .declarationGraphBuilt else {
-            return CompilerPipelineRuntimeResult(hookName: name, stage: context.stage)
-        }
-
-        return CompilerPipelineRuntimeResult(
-            hookName: name,
-            stage: context.stage,
-            diagnostics: [
-                RangeDiagnostic(
-                    severity: .information,
-                    message: "runtime hook observed declaration graph",
-                    source: "range-runtime-hook",
-                    code: "runtime.side-by-side"
-                )
-            ],
-            artifacts: [
-                "constructs": String(context.declarationGraph?.constructsByName.count ?? 0)
-            ]
-        )
-    }
 }
 
 private enum FixtureRole {

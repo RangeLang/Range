@@ -969,6 +969,8 @@ extension MacroExpander {
         switch target {
         case .state(let name), .binding(let name):
             return stateEffects[name]?.type
+        case .indexed(let base, _):
+            return expectedType(for: base, stateEffects: stateEffects)
         case .member(let base, _):
             return expectedType(for: base, stateEffects: stateEffects)
         case .local:
@@ -1079,7 +1081,7 @@ extension MacroExpander {
         switch target {
         case .state(let name), .binding(let name):
             return name
-        case .local, .member:
+        case .local, .indexed, .member:
             return nil
         }
     }
@@ -1630,6 +1632,40 @@ extension MacroExpander {
                         stateEffects: stateEffects
                     )
                 }
+            )
+        case .indexed(let base, let index):
+            return .indexed(
+                base: try expand(
+                    expression: base,
+                    expectedType: nil,
+                    macros: macros,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: stateEffects
+                ),
+                index: try expand(
+                    expression: index,
+                    expectedType: .named("Int"),
+                    macros: macros,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: stateEffects
+                )
+            )
+        case .member(let base, let name):
+            return .member(
+                base: try expand(
+                    expression: base,
+                    expectedType: nil,
+                    macros: macros,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: stateEffects
+                ),
+                name: name
             )
         case .dictionary(let elements):
             return .dictionary(
@@ -2234,7 +2270,7 @@ extension MacroExpander {
         switch target {
         case .local(let name), .state(let name):
             return name
-        case .binding, .member:
+        case .binding, .indexed, .member:
             return nil
         }
     }
@@ -3344,6 +3380,8 @@ extension MacroExpander {
         switch target {
         case .state(let name), .binding(let name), .local(let name):
             return name
+        case .indexed(let base, let index):
+            return "\(renderAssignmentTarget(base))[\(renderExpressionForStringify(index))]"
         case .member(let base, let name):
             return "\(renderAssignmentTarget(base)).\(name)"
         }

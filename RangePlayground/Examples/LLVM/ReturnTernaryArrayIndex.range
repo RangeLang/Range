@@ -1,0 +1,10 @@
+function choose(flag: Bool, first: [Int], second: [Int]): [Int] {
+    return flag ? first : second
+}
+
+@main {
+    let first: [1, 2, 3]
+    let second: [4, 5, 6]
+    let values: choose(flag: Bool(false), first: first, second: second)
+    return values[1]
+}

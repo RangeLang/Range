@@ -1,0 +1,7 @@
+function second(numbers: [Int]): Int {
+    return numbers[1]
+}
+
+@main {
+    return second(numbers: [1, 2, 3])
+}

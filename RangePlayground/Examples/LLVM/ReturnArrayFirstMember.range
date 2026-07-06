@@ -1,0 +1,5 @@
+@main {
+    let values: [4, 5, 6]
+    let first: Optional<Int>(values.first())
+    return (first ?? 0) == 4 && values.count == 3 ? 0 : 1
+}

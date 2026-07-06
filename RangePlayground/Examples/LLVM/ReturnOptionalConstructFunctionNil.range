@@ -1,0 +1,11 @@
+construct Box {
+    let value: Int
+}
+
+function maybe(): Optional<Box> {
+    return nil
+}
+
+@main {
+    return maybe() == nil
+}

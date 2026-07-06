@@ -1,0 +1,21 @@
+enum NumberToken {
+    case value(value: Int)
+    case eof
+}
+
+construct TokenBag {
+    let tokens: [NumberToken]
+}
+
+@main {
+    let bag: TokenBag(tokens: [.value(value: 4), .value(value: 6)])
+    let removed: Optional<NumberToken>(bag.tokens.removeLast())
+    let fallback: NumberToken(.eof)
+    let chosen: NumberToken(removed ?? fallback)
+    switch chosen {
+    case .value(let number):
+        return number == 6 && bag.tokens.count == 1 ? 0 : 1
+    case .eof:
+        return 1
+    }
+}

@@ -1,0 +1,6 @@
+@main {
+    let values: [String]([String("alpha"), String("beta")])
+    let removed: String(values.remove(index: 0))
+    return removed == String("alpha")
+        && values.element(index: 0) == String("beta") ? 0 : 1
+}

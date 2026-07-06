@@ -1,0 +1,8 @@
+construct Bag {
+    let items: [Int]([])
+}
+
+@main {
+    let bag: Bag()
+    return bag.items.count
+}

@@ -1,0 +1,5 @@
+@main {
+    state maybe: Optional<Int>(7)
+    maybe: nil
+    return maybe == nil
+}

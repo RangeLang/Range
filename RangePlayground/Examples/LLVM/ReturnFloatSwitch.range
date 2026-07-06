@@ -1,0 +1,11 @@
+@main {
+    let value: Float(1.5)
+    switch value {
+    case Float(0.5):
+        return 5
+    case Float(1.5):
+        return 15
+    default:
+        return 0
+    }
+}

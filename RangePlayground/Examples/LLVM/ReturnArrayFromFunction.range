@@ -1,0 +1,8 @@
+function numbers(): [Int] {
+    return [1, 2, 3]
+}
+
+@main {
+    let values: numbers()
+    return values[2]
+}

@@ -1,0 +1,9 @@
+construct Bag {
+    let items: [Int]
+}
+
+@main {
+    let bag: Bag(items: [4, 5, 6])
+    let last: Optional<Int>(bag.items.last())
+    return (last ?? 0) == 6 && bag.items.count == 3 ? 0 : 1
+}

@@ -1,0 +1,4 @@
+@main {
+    let missing: Optional<String>(commandLineArgument(index: 2))
+    return missing == nil ? 0 : 1
+}

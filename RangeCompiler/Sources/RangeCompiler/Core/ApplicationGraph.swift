@@ -561,6 +561,8 @@ struct GraphCollector {
             if let resolved = resolveSimpleName(name, scope: scope) {
                 addEdge(from: ownerID, to: resolved, kind: .dependsOn)
             }
+        case .member(let base, _):
+            analyzeExpression(base, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
         case .macroInvocation(_, let arguments):
             for argument in arguments {
                 analyzeExpression(
@@ -586,6 +588,9 @@ struct GraphCollector {
                 analyzeExpression(
                     element, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
             }
+        case .indexed(let base, let index):
+            analyzeExpression(base, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
+            analyzeExpression(index, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
         case .dictionary(let elements):
             for element in elements {
                 analyzeExpression(
@@ -751,9 +756,24 @@ struct GraphCollector {
         switch target {
         case .state(let name), .binding(let name), .local(let name):
             return resolveSimpleName(name, scope: scope) ?? ensureFallbackNode(name: name)
+        case .indexed(let base, let index):
+            let baseID = resolveAssignmentTarget(base, scope: scope)
+            let indexName = renderedAssignmentIndex(index)
+            return ensureMemberNode(baseID: baseID, name: "[\(indexName)]", kind: .member)
         case .member(let base, let name):
             let baseID = resolveAssignmentTarget(base, scope: scope)
             return ensureMemberNode(baseID: baseID, name: name, kind: .member)
+        }
+    }
+
+    private func renderedAssignmentIndex(_ expression: Expression) -> String {
+        switch expression {
+        case .integer(let value):
+            return String(value)
+        case .identifier(let name):
+            return name
+        default:
+            return "index"
         }
     }
 

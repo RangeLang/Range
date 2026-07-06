@@ -1,0 +1,5 @@
+@main {
+    let values: [Int]([])
+    values.append(element: 7)
+    return values.count == 1 && values.element(index: 0) == 7 ? 0 : 1
+}

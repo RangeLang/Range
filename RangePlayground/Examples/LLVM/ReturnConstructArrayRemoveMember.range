@@ -1,0 +1,11 @@
+construct Bag {
+    let items: [Int]
+}
+
+@main {
+    let bag: Bag(items: [1, 2, 3])
+    let removed: Int(bag.items.remove(index: 1))
+    return removed == 2
+        && bag.items.count == 2
+        && bag.items.element(index: 1) == 3 ? 0 : 1
+}

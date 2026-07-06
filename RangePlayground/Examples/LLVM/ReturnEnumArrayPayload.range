@@ -1,0 +1,14 @@
+enum NumberToken {
+    case value(value: Int)
+    case eof
+}
+
+@main {
+    let tokens: [NumberToken]([.value(value: 4), .value(value: 6)])
+    switch tokens[1] {
+    case .value(let number):
+        return number
+    case .eof:
+        return 0
+    }
+}

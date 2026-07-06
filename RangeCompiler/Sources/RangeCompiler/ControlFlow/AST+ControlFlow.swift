@@ -144,5 +144,6 @@ public indirect enum AssignmentTarget {
     case state(String)
     case binding(String)
     case local(String)
+    case indexed(base: AssignmentTarget, index: Expression)
     case member(base: AssignmentTarget, name: String)
 }

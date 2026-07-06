@@ -1,0 +1,4 @@
+@main {
+    let count: Int(5)
+    return stringLength(value: String("count \(count)"))
+}

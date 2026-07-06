@@ -14,18 +14,9 @@ extension Parser {
         var typedInitializer: Expression?
         if peek() == .colon {
             try consume(.colon)
-            if shouldParseTypedConstructionAfterColon() {
-                let annotation = try parseTypedConstructionAnnotation()
-                explicitType = annotation.type
-                typedInitializer = annotation.initializer
-                if canStartInlineExpression() {
-                    throw ParseError(
-                        "state '\(name)' expects one initializer after ':'. Use typed construction, for example `state \(name): \(annotation.type.displayName)(value)`."
-                    )
-                }
-            } else {
-                typedInitializer = try parseExpression()
-            }
+            let parsed = try parseColonTypedConstructionOrExpression()
+            explicitType = parsed.type
+            typedInitializer = parsed.initializer
         }
         let storage: StateStorage
         let inferredType: TypeReference
@@ -242,6 +233,9 @@ extension Parser {
     }
 
     func isExplicitBracketCollectionType(_ typeReference: TypeReference) -> Bool {
+        if case .optional(let wrapped) = typeReference {
+            return isExplicitBracketCollectionType(wrapped)
+        }
         if case .array = typeReference {
             return true
         }

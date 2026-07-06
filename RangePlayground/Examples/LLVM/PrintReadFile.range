@@ -1,0 +1,5 @@
+@main {
+    let text: String(readFile(path: String("RangePlayground/Examples/LLVM/ReadFileInput.txt")))
+    print(value: text)
+    return 0
+}

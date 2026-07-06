@@ -1,0 +1,13 @@
+construct Point {
+    let x: Int
+    let y: Int
+}
+
+function makePoint(): Point {
+    return Point(x: 2, y: 5)
+}
+
+@main {
+    let point: makePoint()
+    return point.y
+}

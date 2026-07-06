@@ -1,0 +1,5 @@
+@main {
+    let values: [Int]([])
+    let removed: Optional<Int>(values.removeLast())
+    return removed == nil && values.count == 0 ? 0 : 1
+}

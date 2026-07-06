@@ -1,0 +1,17 @@
+enum TrafficLight {
+    case red
+    case yellow
+    case green
+}
+
+@main {
+    let light: TrafficLight(.green)
+    switch light {
+    case .red:
+        return 1
+    case .yellow:
+        return 2
+    case .green:
+        return 3
+    }
+}

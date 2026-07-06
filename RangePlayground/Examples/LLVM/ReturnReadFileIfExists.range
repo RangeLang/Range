@@ -1,0 +1,4 @@
+@main {
+    let text: Optional<String>(readFileIfExists(path: String("RangePlayground/Examples/LLVM/ReadFileInput.txt")))
+    return (text ?? String("")).count == 17 ? 0 : 1
+}

@@ -1,0 +1,13 @@
+construct Pair<First, Second> {
+    let first: First
+    let second: Second
+}
+
+construct Box<Value> {
+    let value: Value
+}
+
+@main {
+    let box: Box<Pair<Int, Int>>(value: Pair<Int, Int>(first: 20, second: 21))
+    return box.value.second
+}

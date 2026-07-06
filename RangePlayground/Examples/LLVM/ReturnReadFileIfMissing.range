@@ -1,0 +1,4 @@
+@main {
+    let text: Optional<String>(readFileIfExists(path: String("RangePlayground/Examples/LLVM/DefinitelyMissingInput.txt")))
+    return text == nil ? 0 : 1
+}

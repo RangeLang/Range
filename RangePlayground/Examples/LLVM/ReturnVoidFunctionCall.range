@@ -1,0 +1,12 @@
+function step(): Void {
+    return
+}
+
+function run(): Int {
+    step()
+    return 6
+}
+
+@main {
+    return run()
+}

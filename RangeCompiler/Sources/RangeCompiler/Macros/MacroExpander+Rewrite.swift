@@ -380,8 +380,8 @@ extension MacroExpander {
             return .boolLiteral
         case .nilLiteral:
             return .nilLiteral
-        case .block, .macroInvocation, .identifier, .call, .bindingReference, .array,
-            .dictionary, .ternary, .unary, .binary:
+        case .block, .macroInvocation, .identifier, .call, .bindingReference, .array, .member,
+            .indexed, .dictionary, .ternary, .unary, .binary:
             return nil
         }
     }

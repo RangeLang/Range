@@ -6,21 +6,14 @@ extension Parser {
         try consumeKeyword(.let)
         let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "let")
         try consume(.colon)
-        let annotation: (type: TypeReference, initializer: Expression?)?
         let value: Expression?
         let type: TypeReference
-        if shouldParseTypedConstructionAfterColon() {
-            annotation = try parseTypedConstructionAnnotation()
-            type = annotation!.type
-            value = annotation!.initializer
-            if canStartInlineExpression() {
-                throw ParseError(
-                    "let '\(localName)' expects one initializer after ':'. Use typed construction, for example `let \(localName): \(type.displayName)(value)`."
-                )
-            }
+        let parsed = try parseColonTypedConstructionOrExpression()
+        if let explicitType = parsed.type {
+            type = explicitType
+            value = parsed.initializer
         } else {
-            annotation = nil
-            value = try parseExpression()
+            value = parsed.initializer
             type = try inferInitializedBindingType(
                 name: localName,
                 explicitType: nil,

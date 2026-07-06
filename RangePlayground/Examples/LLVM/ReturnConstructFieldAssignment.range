@@ -1,0 +1,10 @@
+construct Point {
+    let x: Int
+    let y: Int
+}
+
+@main {
+    state point: Point(x: 2, y: 5)
+    point.x: 7
+    return point.x
+}

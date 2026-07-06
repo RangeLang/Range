@@ -1,0 +1,5 @@
+@main {
+    let values: [String]([String("alpha"), String("beta")])
+    let first: Optional<String>(values.first())
+    return (first ?? String("")) == String("alpha") ? 0 : 1
+}

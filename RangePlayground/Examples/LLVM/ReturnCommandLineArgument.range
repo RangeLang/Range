@@ -1,0 +1,4 @@
+@main {
+    let first: Optional<String>(commandLineArgument(index: 0))
+    return (first ?? String("")) == String("alpha") ? 0 : 1
+}

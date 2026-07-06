@@ -1,0 +1,31 @@
+name: Range
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Active LLVM path
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
+
+      - name: Validate script syntax
+        run: bash -n scripts/range
+
+      - name: Build range compiler host
+        run: swift build --package-path RangeCompiler --product range
+
+      - name: Test Range script contract
+        run: swift test --package-path RangeCompiler --filter RangeScriptTests
+
+      - name: Check active LLVM executable path
+        run: scripts/range check

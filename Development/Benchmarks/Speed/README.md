@@ -15,13 +15,17 @@ included in the medians. Runtime, CPU time, and memory are also printed relative
 to C per benchmark case.
 
 JSON encoding and real `@background` concurrency are intentionally not included
-yet because those generated paths are not Embedded Swift-compatible today.
+yet because those runtime paths are not part of the current LLVM benchmark
+surface.
 
-If the current Range Swift backend emits a workspace that does not build on the
-local toolchain, the task still reports CLI build and emit time, then skips
-the Range runtime row. On macOS, the script looks for an installed Swift
-toolchain with `usr/lib/swift/embedded` and uses it for the Range Embedded build.
-Set `RANGE_SWIFT_TOOLCHAINS` to override the detected toolchain identifier.
+The Range row uses `scripts/range run`, which asks the range compiler host
+(Swift) to emit LLVM IR, links it with `clang`, and then benchmarks the linked
+executable. If the Range LLVM build does not produce an executable, the task
+reports the setup output and skips the Range runtime row.
+
+Correctness for the active LLVM execution path is checked outside the benchmark
+with `scripts/range check`, which runs the full LLVM example corpus through
+emission, `clang`, process exit, and declared stdout checks.
 
 Use `VERBOSE=1` to show full setup command output on failures.
 

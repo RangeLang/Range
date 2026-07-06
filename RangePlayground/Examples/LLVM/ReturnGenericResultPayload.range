@@ -1,0 +1,21 @@
+enum Result<Success, Failure> {
+    case success(result: Success)
+    case failure(cause: Failure)
+}
+
+enum ParseError {
+    case invalid
+}
+
+function parse(): Result<Int, ParseError> {
+    return .success(result: 9)
+}
+
+@main {
+    switch parse() {
+    case .success(let value):
+        return value
+    case .failure(let error):
+        return 0
+    }
+}

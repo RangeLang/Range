@@ -1,0 +1,7 @@
+function pick(value: Optional<Int>): Int {
+    return value ?? 3
+}
+
+@main {
+    return pick(value: nil)
+}

@@ -1,0 +1,21 @@
+enum ParseError {
+    case failed
+}
+
+enum Result<Success, Failure> {
+    case success(value: Success)
+    case failure(error: Failure)
+}
+
+function unwrap<T>(result: Result<T, ParseError>, fallback: T): T {
+    switch result {
+    case .success(let value):
+        return value
+    case .failure:
+        return fallback
+    }
+}
+
+@main {
+    return unwrap<Int>(result: .success(value: 14), fallback: 0)
+}

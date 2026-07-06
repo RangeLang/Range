@@ -1,0 +1,5 @@
+@main {
+    let values: [1, 2, 3]
+    values.clear()
+    return values.isEmpty && values.count == 0 ? 0 : 1
+}

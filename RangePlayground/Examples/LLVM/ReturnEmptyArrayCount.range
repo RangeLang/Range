@@ -1,0 +1,11 @@
+function empty(): [Int] {
+    return []
+}
+
+function count(values: [Int]): Int {
+    return values.count
+}
+
+@main {
+    return count(values: empty())
+}

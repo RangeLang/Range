@@ -1,0 +1,7 @@
+function add(base: Int, amount: Int = 5): Int {
+    return base + amount
+}
+
+@main {
+    return add(base: 7)
+}

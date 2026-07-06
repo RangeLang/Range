@@ -171,6 +171,35 @@ extension Parser {
         return (result, initializer)
     }
 
+    mutating func parseColonTypedConstructionOrExpression() throws
+        -> (type: TypeReference?, initializer: Expression?)
+    {
+        guard shouldParseTypedConstructionAfterColon() else {
+            return (nil, try parseExpression())
+        }
+
+        let typedConstructionStart = index
+        let annotation = try parseTypedConstructionAnnotation()
+        if canStartInlineExpression() || canContinueInlineExpression() {
+            index = typedConstructionStart
+            return (nil, try parseExpression())
+        }
+        return (annotation.type, annotation.initializer)
+    }
+
+    func canContinueInlineExpression() -> Bool {
+        guard index > 0, index < tokens.count else {
+            return false
+        }
+        guard tokens[index - 1].range.end.line == tokens[index].range.start.line else {
+            return false
+        }
+        guard let symbol = operatorSymbol(for: peek()) else {
+            return false
+        }
+        return operatorEnvironment.infixOperators[symbol] != nil
+    }
+
     func shouldParseTypedConstructionAfterColon() -> Bool {
         switch peek() {
         case .identifier(let value), .keyword(let value):

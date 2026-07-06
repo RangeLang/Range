@@ -51,19 +51,6 @@ def try_run(command: list[str], cwd: Path = ROOT) -> subprocess.CompletedProcess
         return None
 
 
-def remove_embedded_swift_setting(package_swift: Path) -> None:
-    source = package_swift.read_text(encoding="utf-8")
-    source = source.replace(".macOS(.v14)", ".macOS(.v26)")
-    source = source.replace(
-        """,
-            swiftSettings: [
-                .enableExperimentalFeature("Embedded")
-            ]""",
-        "",
-    )
-    package_swift.write_text(source, encoding="utf-8")
-
-
 def measure(command: list[str]) -> Measurement:
     samples: list[float] = []
     output = ""
@@ -120,43 +107,25 @@ def main() -> int:
     )
     run(["cc", "-O3", str(c_source), "-o", str(c_binary)])
 
-    project_manifest = """
-        @Project
-        construct Project {
-            let name: Title("RangeNestedBillion")
-            let version: Version(0.1.0)
-            let author: "George"
-        }
-        """
-    package_manifest = """
-        @package
-        construct RangeNestedBillion {
-            let name: Title("RangeNestedBillion")
-            let version: Version(0.1.0)
-            let author: "George"
-        }
-        """
-    write_text(range_project / "Project.range", project_manifest)
-    write_text(range_project / "Package.range", package_manifest)
     write_text(
         range_project / "Playground.range",
         f"""
         @main {{
-            let outer: Int   {OUTER}
-            let inner: Int   {INNER}
-            state i: Int   0
-            state acc: Int   1
+            let outer: Int({OUTER})
+            let inner: Int({INNER})
+            state i: Int(0)
+            state acc: Int(1)
 
             while i < outer {{
-                state j: Int   0
+                state j: Int(0)
                 while j < inner {{
-                    set acc   ((acc * 1664525) + i + j) % 2147483647
-                    j += 1
+                    acc: ((acc * 1664525) + i + j) % 2147483647
+                    j: j + 1
                 }}
-                i += 1
+                i: i + 1
             }}
 
-            Logger.log("\\(acc)")
+            print(value: acc)
         }}
         """,
     )
@@ -183,7 +152,7 @@ def main() -> int:
     print(f"Range/C wall time: {relative:.2f}x")
 
     if c.output != range_measurement.output:
-        print("warning: outputs differ; Range Int overflow semantics differ from C uint64 wraparound here")
+        print("warning: outputs differ; Range Int currently lowers to i32 while C uses int64_t here")
 
     return 0
 

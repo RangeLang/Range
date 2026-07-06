@@ -169,6 +169,16 @@ extension MacroExpander {
             )
         case .array(let elements):
             return .array(elements.map { substituteMacroBindings(in: $0, bindings: bindings) })
+        case .indexed(let base, let index):
+            return .indexed(
+                base: substituteMacroBindings(in: base, bindings: bindings),
+                index: substituteMacroBindings(in: index, bindings: bindings)
+            )
+        case .member(let base, let name):
+            return .member(
+                base: substituteMacroBindings(in: base, bindings: bindings),
+                name: name
+            )
         case .dictionary(let elements):
             return .dictionary(
                 elements.map { element in
@@ -671,6 +681,28 @@ extension MacroExpander {
                         targetBlock: targetBlock
                     )
                 }
+            )
+        case .indexed(let base, let index):
+            return .indexed(
+                base: substituteMacroTargetCalls(
+                    in: base,
+                    targetBinding: targetBinding,
+                    targetBlock: targetBlock
+                ),
+                index: substituteMacroTargetCalls(
+                    in: index,
+                    targetBinding: targetBinding,
+                    targetBlock: targetBlock
+                )
+            )
+        case .member(let base, let name):
+            return .member(
+                base: substituteMacroTargetCalls(
+                    in: base,
+                    targetBinding: targetBinding,
+                    targetBlock: targetBlock
+                ),
+                name: name
             )
         case .dictionary(let elements):
             return .dictionary(

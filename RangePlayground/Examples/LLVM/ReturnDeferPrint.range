@@ -1,0 +1,6 @@
+@main {
+    @defer {
+        print(value: String("done"))
+    }
+    return 0
+}

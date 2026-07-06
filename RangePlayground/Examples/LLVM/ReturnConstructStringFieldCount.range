@@ -1,0 +1,8 @@
+construct Box {
+    let text: String
+}
+
+@main {
+    let box: Box(text: String("hello"))
+    return box.text.count
+}

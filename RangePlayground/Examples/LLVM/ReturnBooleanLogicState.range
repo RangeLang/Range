@@ -1,0 +1,4 @@
+@main {
+    state value: true && false
+    return value ? 1 : 0
+}

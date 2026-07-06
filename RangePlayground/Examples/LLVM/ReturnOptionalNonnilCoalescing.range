@@ -1,0 +1,4 @@
+@main {
+    let maybe: Optional<Int>(7)
+    return maybe ?? 9
+}

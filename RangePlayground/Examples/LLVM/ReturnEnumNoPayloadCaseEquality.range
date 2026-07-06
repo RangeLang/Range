@@ -1,0 +1,12 @@
+enum Token {
+    case value(value: Int)
+    case eof
+}
+
+@main {
+    let token: Token(.eof)
+    if token == .eof {
+        return 1
+    }
+    return 0
+}

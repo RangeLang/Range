@@ -1,0 +1,8 @@
+construct Box<Value> {
+    let value: Value
+}
+
+@main {
+    let box: Box<Int>(value: 15)
+    return box.value
+}

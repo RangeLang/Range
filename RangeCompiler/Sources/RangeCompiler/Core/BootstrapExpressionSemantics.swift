@@ -67,6 +67,19 @@ public enum ExpressionTypeSemantics {
             if let returnType = callableReturnTypes[name] {
                 return .typed(returnType)
             }
+            if let primitiveConstructorType = try inferPrimitiveConstructorCallType(
+                name: name,
+                arguments: arguments,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver,
+                macroExpansionResolver: macroExpansionResolver
+            ) {
+                return .typed(primitiveConstructorType)
+            }
             if let memberType = inferKnownMemberCallType(
                 name: name,
                 arguments: arguments,
@@ -124,6 +137,26 @@ public enum ExpressionTypeSemantics {
                 return .typed(memberType)
             }
             throw ParseError("Binding reference '$\(name)' is not valid in a state initializer.")
+        case .member(let base, let name):
+            let baseType = try inferType(
+                of: base,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            )
+            guard case .typed(let baseReference) = baseType,
+                let memberType = inferKnownMemberIdentifierType(
+                    baseType: baseReference,
+                    memberName: name,
+                    memberResolver: memberResolver
+                )
+            else {
+                throw ParseError("Unknown member '\(name)' on \(baseType.displayName).")
+            }
+            return .typed(memberType)
         case .array(let elements):
             return try inferArrayType(
                 elements: elements,
@@ -134,6 +167,32 @@ public enum ExpressionTypeSemantics {
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
             )
+        case .indexed(let base, let index):
+            let baseType = try inferType(
+                of: base,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            )
+            let indexType = try inferType(
+                of: index,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            )
+            guard isCompatible(actual: indexType, expected: .named("Int"), resolver: resolver) else {
+                throw ParseError("Array index must be Int, got \(indexType.displayName).")
+            }
+            guard case .typed(.array(let elementType)) = baseType else {
+                throw ParseError("Indexed expression requires an array, got \(baseType.displayName).")
+            }
+            return .typed(elementType)
         case .dictionary(let elements):
             return try inferDictionaryType(
                 elements: elements,
@@ -190,8 +249,15 @@ public enum ExpressionTypeSemantics {
         case .unary(let operatorSymbol, _):
             switch operatorSymbol {
             case .not:
-                throw ParseError(
-                    "Unary operator typing is not supported by bootstrap inference yet.")
+                return try inferBooleanNotType(
+                    expression,
+                    accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
+                    macroExpansionTypes: macroExpansionTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver
+                )
             }
         case .binary(_, let operatorSymbol, _):
             switch operatorSymbol {
@@ -236,8 +302,15 @@ public enum ExpressionTypeSemantics {
                     operatorResolver: operatorResolver
                 )
             case .and, .or:
-                throw ParseError(
-                    "Binary operator typing is not supported by bootstrap inference yet.")
+                return try inferBooleanLogicType(
+                    expression,
+                    accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
+                    macroExpansionTypes: macroExpansionTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver
+                )
             }
         }
     }
@@ -282,7 +355,12 @@ public enum ExpressionTypeSemantics {
         typeCompatibilityResolver: DeclarationTypeCompatibilityResolver = .empty
     ) -> Bool {
         switch actual {
-        case .intLiteral, .floatLiteral, .stringLiteral, .boolLiteral, .nilLiteral:
+        case .nilLiteral:
+            if case .optional = expected {
+                return true
+            }
+            return false
+        case .intLiteral, .floatLiteral, .stringLiteral, .boolLiteral:
             if case .optional(let wrapped) = expected {
                 return isCompatible(
                     actual: actual,
@@ -549,8 +627,8 @@ public enum ExpressionTypeSemantics {
         case .integer, .double, .string, .interpolatedString, .boolean, .nilLiteral, .array,
             .dictionary:
             return true
-        case .block, .macroInvocation, .identifier, .call, .bindingReference, .ternary, .unary,
-            .binary:
+        case .block, .macroInvocation, .identifier, .call, .bindingReference, .indexed, .member,
+            .ternary, .unary, .binary:
             return false
         }
     }
@@ -786,6 +864,29 @@ public enum ExpressionTypeSemantics {
             return nil
         }
 
+        if let memberType = inferKnownMemberIdentifierType(
+            baseType: baseReference,
+            memberName: memberName,
+            memberResolver: memberResolver
+        ) {
+            return memberType
+        }
+
+        if baseName == "self",
+            let type = accessibleTypes[memberName],
+            case .typed(let reference) = type
+        {
+            return reference
+        }
+
+        return nil
+    }
+
+    private static func inferKnownMemberIdentifierType(
+        baseType baseReference: TypeReference,
+        memberName: String,
+        memberResolver: DeclarationMemberResolver
+    ) -> TypeReference? {
         if baseReference.displayName == "Expression", memberName == "written" {
             return .named("WrittenSyntax")
         }
@@ -827,13 +928,6 @@ public enum ExpressionTypeSemantics {
             memberName: memberName
         ) {
             return collectionMemberType
-        }
-
-        if baseName == "self",
-            let type = accessibleTypes[memberName],
-            case .typed(let reference) = type
-        {
-            return reference
         }
 
         return nil
@@ -902,6 +996,42 @@ public enum ExpressionTypeSemantics {
             baseType: baseReference,
             memberName: memberName
         )
+    }
+
+    private static func inferPrimitiveConstructorCallType(
+        name: String,
+        arguments: [CallArgument],
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
+        macroExpansionResolver: DeclarationMacroExpansionResolver
+    ) throws -> TypeReference? {
+        guard ["Int", "Bool", "Float", "String"].contains(name) else {
+            return nil
+        }
+        guard arguments.count == 1, arguments[0].label == nil else {
+            return nil
+        }
+        let expected: TypeReference = .named(name)
+        let actual = try inferType(
+            of: arguments[0].value,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
+            resolver: resolver,
+            memberResolver: memberResolver,
+            operatorResolver: operatorResolver,
+            macroExpansionResolver: macroExpansionResolver
+        )
+        guard isCompatible(actual: actual, expected: expected, resolver: resolver) else {
+            throw ParseError(
+                "\(name)(...) expects \(name), got \(actual.displayName)."
+            )
+        }
+        return expected
     }
 
     private static func resolveMemberBaseType(
@@ -1331,6 +1461,20 @@ public enum ExpressionTypeSemantics {
             memberResolver: memberResolver,
             operatorResolver: operatorResolver
         )
+        if let wrappedType = optionalWrappedType(for: lhsType),
+            try isExpressionCompatible(
+                rhs,
+                expected: wrappedType,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            )
+        {
+            return .typed(wrappedType)
+        }
         let rhsType = try inferType(
             of: rhs,
             accessibleTypes: accessibleTypes,
@@ -1500,6 +1644,91 @@ public enum ExpressionTypeSemantics {
         throw ParseError(
             "Operator '\(operatorSymbol.rawValue)' has no matching core signature for \(lhsType.displayName) and \(rhsType.displayName)."
         )
+    }
+
+    private static func inferBooleanNotType(
+        _ expression: Expression,
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver
+    ) throws -> BootstrapLiteralType {
+        guard case .unary(let operatorSymbol, let nested) = expression,
+            operatorSymbol == .not
+        else {
+            throw ParseError("Expected boolean not expression.")
+        }
+
+        let nestedType = try inferType(
+            of: nested,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
+            resolver: resolver,
+            memberResolver: memberResolver,
+            operatorResolver: operatorResolver
+        )
+        guard isCompatible(actual: nestedType, expected: .named("Bool"), resolver: resolver) else {
+            throw ParseError(
+                "Operator '!' expects a Bool operand, got \(nestedType.displayName)."
+            )
+        }
+        return .typed(.named("Bool"))
+    }
+
+    private static func inferBooleanLogicType(
+        _ expression: Expression,
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver
+    ) throws -> BootstrapLiteralType {
+        guard case .binary(let lhs, let operatorSymbol, let rhs) = expression,
+            operatorSymbol == .and || operatorSymbol == .or
+        else {
+            throw ParseError("Expected boolean logic expression.")
+        }
+
+        let lhsType = try inferType(
+            of: lhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
+            resolver: resolver,
+            memberResolver: memberResolver,
+            operatorResolver: operatorResolver
+        )
+        let rhsType = try inferType(
+            of: rhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
+            resolver: resolver,
+            memberResolver: memberResolver,
+            operatorResolver: operatorResolver
+        )
+
+        if let returnType = operatorResolver.binaryOperatorReturnType(
+            symbol: operatorSymbol.rawValue,
+            lhs: lhsType,
+            rhs: rhsType,
+            literalBridgeResolver: resolver
+        ) {
+            return .typed(returnType)
+        }
+
+        guard isCompatible(actual: lhsType, expected: .named("Bool"), resolver: resolver),
+            isCompatible(actual: rhsType, expected: .named("Bool"), resolver: resolver)
+        else {
+            throw ParseError(
+                "Operator '\(operatorSymbol.rawValue)' expects Bool operands, got \(lhsType.displayName) and \(rhsType.displayName)."
+            )
+        }
+        return .typed(.named("Bool"))
     }
 
     private static func isStringCompatible(

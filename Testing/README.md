@@ -43,8 +43,8 @@ they protect real compiler behavior.
   not just "any failure".
 - `RunPass`: compile and run the generated program, then check stdout, stderr,
   and exit status.
-- `EmitSwift`: compile through the Swift backend and compare important emitted
-  Swift shapes.
+- `EmitLLVM`: compile through Range LLVM emitter output and compare important
+  emitted LLVM IR shapes.
 - `Artifacts`: verify compiler artifacts such as declaration graphs, dependency
   graphs, and lowered IR once those formats stabilize.
 - `ParsePass` / `ParseFail`: add parser-only fixtures if syntax work starts

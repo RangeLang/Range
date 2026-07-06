@@ -400,6 +400,26 @@ extension ApplicationGraphValidator {
                     fileName: fileName
                 )
             }
+        case .indexed(let base, let index):
+            try validateCallArgumentLabels(
+                in: base,
+                environment: environment,
+                context: context,
+                fileName: fileName
+            )
+            try validateCallArgumentLabels(
+                in: index,
+                environment: environment,
+                context: context,
+                fileName: fileName
+            )
+        case .member(let base, _):
+            try validateCallArgumentLabels(
+                in: base,
+                environment: environment,
+                context: context,
+                fileName: fileName
+            )
         case .dictionary(let elements):
             for element in elements {
                 try validateCallArgumentLabels(

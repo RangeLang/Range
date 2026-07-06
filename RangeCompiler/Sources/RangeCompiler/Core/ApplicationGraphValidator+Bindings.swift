@@ -383,6 +383,26 @@ extension ApplicationGraphValidator {
                     fileName: fileName
                 )
             }
+        case .indexed(let base, let index):
+            try validateBindingReferences(
+                in: base,
+                declarationGraph: declarationGraph,
+                context: context,
+                fileName: fileName
+            )
+            try validateBindingReferences(
+                in: index,
+                declarationGraph: declarationGraph,
+                context: context,
+                fileName: fileName
+            )
+        case .member(let base, _):
+            try validateBindingReferences(
+                in: base,
+                declarationGraph: declarationGraph,
+                context: context,
+                fileName: fileName
+            )
         case .dictionary(let elements):
             for element in elements {
                 try validateBindingReferences(

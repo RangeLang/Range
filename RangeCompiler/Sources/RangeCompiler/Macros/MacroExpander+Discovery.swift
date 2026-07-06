@@ -160,6 +160,10 @@ extension MacroExpander {
             }
         case .array(let values):
             return values.contains(where: expressionContainsMacroRewrite)
+        case .indexed(let base, let index):
+            return expressionContainsMacroRewrite(base) || expressionContainsMacroRewrite(index)
+        case .member(let base, _):
+            return expressionContainsMacroRewrite(base)
         case .dictionary(let elements):
             return elements.contains {
                 expressionContainsMacroRewrite($0.key) || expressionContainsMacroRewrite($0.value)
