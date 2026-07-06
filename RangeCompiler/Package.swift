@@ -47,5 +47,10 @@ let package = Package(
             dependencies: ["RangeCompiler", "RangeEmission"],
             path: "Tests/RangeEmissionTests"
         ),
+        .testTarget(
+            name: "SwiftBootstrapTests",
+            dependencies: ["SwiftBootstrap"],
+            path: "Tests/SwiftBootstrapTests"
+        ),
     ]
 )
