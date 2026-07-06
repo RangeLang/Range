@@ -16,9 +16,9 @@ implementation tracking surface.
 - [x] `CompiledProgram` is the compiler pipeline artifact, not the graph root.
 - [x] `ProgramGraph` is the canonical graph storage root.
 - [x] `DeclarationGraph` is built from expanded files and exposes `programGraph`.
-- [x] `ApplicationGraph` is derived downstream from `DeclarationGraph`.
 - [x] Validation is staged through `ProgramGraphValidator`,
-      `DeclarationGraphValidator`, and `ApplicationGraphValidator`.
+      `DeclarationGraphValidator`, and the source/declaration validation pass
+      currently named `ApplicationGraphValidator`.
 - [x] `DeclarationGraph` has first-class registries or query views for
       constructs, protocols, enums, macros, extensions, namespaces,
       package spaces, top-level callables, operators, top-level states,
@@ -58,16 +58,16 @@ implementation tracking surface.
       `satisfiesRequirement` is not yet an explicit graph relation.
 - [ ] Carried macro behavior exists, but `carriesMacro` is not yet an explicit
       graph relation.
-- [ ] Declaration/application facets are documented and partially surfaced, but
-      `facetOf` is not yet an explicit graph relation.
+- [ ] Declaration/application facets are documented and partially surfaced in
+      declaration queries, but `facetOf` is not yet an explicit graph relation.
 - [ ] Literal compatibility uses declaration-backed literal bridge facts in
       important places, but `BootstrapLiteralType` still carries too much
       expression/type meaning through parser and validator code.
 - [ ] Operators are declared in `RangeCore`, but precedence defaults and some
       operator typing behavior still live in Swift-side compiler logic.
-- [ ] `ApplicationGraphValidator` uses declaration queries for many existence
-      checks, but it still carries substantial transient type-flow and
-      accessible-type state as `BootstrapLiteralType` maps.
+- [ ] `ApplicationGraphValidator` no longer depends on a materialized
+      `ApplicationGraph`, but it still carries substantial transient type-flow
+      and accessible-type state as `BootstrapLiteralType` maps.
 - [x] The old Swift backend package has been removed from the active layout.
 - [x] The script runner is intentionally host-bound and the active execution
       path is the current LLVM path: Range source goes through the range
@@ -99,8 +99,8 @@ implementation tracking surface.
 - [x] Add a small declaration graph snapshot test for current registry/query
       coverage: enums, macros, extensions, states, values,
       initializers, parameters, namespace attributes, and package spaces.
-- [ ] Add an application graph snapshot test that proves declaration projection
-      plus application edges stay downstream from the declaration graph.
+- [x] Remove the disconnected materialized `ApplicationGraph` projection; keep
+      validation on the active declaration/source pipeline.
 
 ### 2. Make Declaration Metadata Uniform
 
@@ -157,11 +157,11 @@ implementation tracking surface.
 ### 6. Define The First Memory Graph Slice
 
 - [ ] Define the minimal first `MemoryGraph` node and relation vocabulary from
-      current declaration and application graph facts.
+      current declaration facts plus active source-flow validation.
 - [ ] Start with storage identity and mutation facts for `state`, `binding`,
       `derived`, `let`, and local mutation.
-- [ ] Keep `MemoryGraph` derived from declaration plus application meaning, not
-      raw parser structures.
+- [ ] Keep `MemoryGraph` derived from declaration plus validated application
+      meaning, not raw parser structures.
 - [ ] Add one compiler pass that produces a memory projection without changing
       diagnostics yet.
 - [ ] Add proof/snapshot fixtures before using memory facts for rejection rules.

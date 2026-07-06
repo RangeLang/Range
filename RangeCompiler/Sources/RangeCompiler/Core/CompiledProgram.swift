@@ -52,10 +52,6 @@ public struct CompiledProgram {
         declarationViews.literalBridgeResolver
     }
 
-    public var applicationGraph: ApplicationGraph {
-        ApplicationGraphBuilder().build(program: self)
-    }
-
     public var projectParsedFiles: [ParsedSourceFile] {
         parsedFiles.filter { inputRoleByPath[$0.path] == .project }
     }

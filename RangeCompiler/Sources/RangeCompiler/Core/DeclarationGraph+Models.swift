@@ -75,13 +75,13 @@ public struct RealizedInitMacroTarget {
 public struct DeclaredMemberSurface {
     public let ownerConstructName: String
     public let name: String
-    public let kind: ApplicationGraphNodeKind
+    public let kind: SemanticGraphEntityKind
     public let declaredTypeName: String?
 
     public init(
         ownerConstructName: String,
         name: String,
-        kind: ApplicationGraphNodeKind,
+        kind: SemanticGraphEntityKind,
         declaredTypeName: String?
     ) {
         self.ownerConstructName = ownerConstructName

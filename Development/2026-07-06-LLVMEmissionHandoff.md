@@ -31,6 +31,8 @@ execution is no longer the desired or active program execution path.
   - `RangePlayground/.range/Artifacts/Playground/02-ast.txt`
 - Removed `CompilationArtifactsEmitter` (Swift), which was not part of the
   active script-driven LLVM executable path.
+- Removed the disconnected materialized `ApplicationGraph` projection and graph
+  renderer. Validation now stays on the active declaration/source pipeline.
 - Removed `Testing/CompilePass/System/RangeSelfPortrait.range`, which read a
   hardcoded `.range/Artifacts/03-graph.txt` artifact.
 - Updated `Testing/README.md` to describe the current runnable LLVM example

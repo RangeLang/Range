@@ -268,8 +268,8 @@ public struct DeclarationGraph {
 
     public func memberKinds(
         forConstruct named: String
-    ) -> [String: ApplicationGraphNodeKind] {
-        var result: [String: ApplicationGraphNodeKind] = [:]
+    ) -> [String: SemanticGraphEntityKind] {
+        var result: [String: SemanticGraphEntityKind] = [:]
         for state in states(onConstruct: named) { result[state.name] = .state }
         for binding in bindings(onConstruct: named) { result[binding.name] = .binding }
         for derived in deriveds(onConstruct: named) { result[derived.name] = .derived }
