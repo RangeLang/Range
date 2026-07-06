@@ -1,5 +1,6 @@
 .DS_Store
 .env
+__pycache__/
 /.build
 /Packages
 xcuserdata/
