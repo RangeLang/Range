@@ -42,7 +42,8 @@ execution is no longer the desired or active program execution path.
   `RangeCompiler/Range/Programs/Compiler/Main.range` builds and runs as a
   native `Compiler` binary through `SwiftBootstrap`, then calls its
   Range-authored scanner library for a Range source file and prints a
-  deterministic token stream.
+  deterministic token stream. The scanner streams `ScannedRangeToken` records
+  internally before rendering output.
 
 ## Active Validation
 

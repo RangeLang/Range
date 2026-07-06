@@ -1,7 +1,38 @@
+construct ScannedRangeToken {
+    let index: Int
+    let start: Int
+    let end: Int
+    let text: String
+}
+
 function scanRangeSource(source: String): String {
     state output: ""
     state tokenIndex: Int(0)
     state sourceIndex: Int(0)
+
+    while true {
+        let maybeToken: Optional<ScannedRangeToken>(scanNextRangeToken(
+            source: source,
+            start: sourceIndex,
+            index: tokenIndex
+        ))
+
+        if maybeToken == nil {
+            return output
+        }
+
+        let fallback: ScannedRangeToken(ScannedRangeToken(index: 0, start: 0, end: 0, text: String("")))
+        let token: ScannedRangeToken(maybeToken ?? fallback)
+        output: "\(output)\(renderScannedRangeToken(token: token))"
+        sourceIndex: token.end
+        tokenIndex: tokenIndex + 1
+    }
+
+    return output
+}
+
+function scanNextRangeToken(source: String, start: Int, index: Int): Optional<ScannedRangeToken> {
+    state sourceIndex: Int(start)
     let sourceLength: Int(stringLength(value: source))
 
     while sourceIndex < sourceLength {
@@ -22,11 +53,19 @@ function scanRangeSource(source: String): String {
             sourceIndex: scanRangeScannerWord(source: source, start: sourceIndex)
         }
 
-        output: "\(output)\(tokenIndex)\t\(source.substring(start: tokenStart, end: sourceIndex))\n"
-        tokenIndex: tokenIndex + 1
+        return ScannedRangeToken(
+            index: index,
+            start: tokenStart,
+            end: sourceIndex,
+            text: source.substring(start: tokenStart, end: sourceIndex)
+        )
     }
 
-    return output
+    return nil
+}
+
+function renderScannedRangeToken(token: ScannedRangeToken): String {
+    return "\(token.index)\t\(token.text)\n"
 }
 
 function isRangeScannerWhitespace(character: String): Bool {

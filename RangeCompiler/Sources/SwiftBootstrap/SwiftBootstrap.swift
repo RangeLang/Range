@@ -47,29 +47,56 @@ public struct SwiftBootstrapCompiler {
     @discardableResult
     public func checkBootstrapCompiler(rangeRoot: URL, compilerDirectory: URL) throws -> URL {
         let executable = try compileExecutable(rangeRoot: rangeRoot, input: compilerDirectory)
-        let input = compilerDirectory.appendingPathComponent("Main.range")
-        let result = try runExecutable(executable: executable, arguments: [input.path], stdin: nil)
-        guard result.exitCode == 0 else {
+        let mainInput = compilerDirectory.appendingPathComponent("Main.range")
+        let mainResult = try runExecutable(executable: executable, arguments: [mainInput.path], stdin: nil)
+        guard mainResult.exitCode == 0 else {
             throw SwiftBootstrapError(
                 """
-                Bootstrap compiler exited \(result.exitCode): \(compilerDirectory.path)
+                Bootstrap compiler exited \(mainResult.exitCode): \(mainInput.path)
                 --- stdout ---
-                \(prefixLines(result.stdout))
+                \(prefixLines(mainResult.stdout))
                 --- stderr ---
-                \(prefixLines(result.stderr))
+                \(prefixLines(mainResult.stderr))
                 """
             )
         }
-        guard result.stdout.contains("@main"),
-            result.stdout.contains("commandLineArgumentCount")
+        guard mainResult.stdout.contains("@main"),
+            mainResult.stdout.contains("commandLineArgumentCount")
         else {
             throw SwiftBootstrapError(
                 """
-                Bootstrap compiler did not print expected token stream: \(compilerDirectory.path)
+                Bootstrap compiler did not scan expected entrypoint tokens: \(mainInput.path)
                 --- stdout ---
-                \(prefixLines(result.stdout))
+                \(prefixLines(mainResult.stdout))
                 --- stderr ---
-                \(prefixLines(result.stderr))
+                \(prefixLines(mainResult.stderr))
+                """
+            )
+        }
+
+        let scannerInput = compilerDirectory.appendingPathComponent("Scanner.range")
+        let scannerResult = try runExecutable(executable: executable, arguments: [scannerInput.path], stdin: nil)
+        guard scannerResult.exitCode == 0 else {
+            throw SwiftBootstrapError(
+                """
+                Bootstrap compiler exited \(scannerResult.exitCode): \(scannerInput.path)
+                --- stdout ---
+                \(prefixLines(scannerResult.stdout))
+                --- stderr ---
+                \(prefixLines(scannerResult.stderr))
+                """
+            )
+        }
+        guard scannerResult.stdout.contains("ScannedRangeToken"),
+            scannerResult.stdout.contains("scanNextRangeToken")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Bootstrap compiler did not scan expected scanner tokens: \(scannerInput.path)
+                --- stdout ---
+                \(prefixLines(scannerResult.stdout))
+                --- stderr ---
+                \(prefixLines(scannerResult.stderr))
                 """
             )
         }

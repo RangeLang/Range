@@ -56,4 +56,5 @@ It is intentionally tiny right now: `scripts/range check-bootstrap-compiler`
 compiles that Range-authored compiler program through `SwiftBootstrap`, links it
 with `clang`, and runs the native `Compiler` binary against a Range source file
 so the binary calls its Range-authored scanner library and prints a deterministic
-token stream.
+token stream. The scanner now builds structured token records internally before
+rendering them.
