@@ -64,15 +64,17 @@ extension/conformance expectations.
 
 The active gate for runnable Range programs is the Range script runner (Bash)
 plus `SwiftBootstrap`/Range LLVM emitter path validated by `scripts/range check`.
+`SwiftBootstrap` now owns the run manifest checks behind that script entrypoint.
 
 ## Stage-0 Boundary
 
 `SwiftBootstrap` should be treated as temporary trusted compiler code. Keep code
 there when it is required to turn Range source into LLVM, a native executable, or
-a directly launched stage-0 process today. Delete old generated-Swift execution,
-SwiftPM workspace, and stale artifact plumbing when it is no longer part of that
-stage-0 path. As the Range-authored compiler gains coverage, equivalent
-`SwiftBootstrap` behavior can become dead code.
+a directly launched stage-0 process today. The run manifest is part of that
+stage-0 boundary because it is the active executable truth. Delete old
+generated-Swift execution, SwiftPM workspace, and stale artifact plumbing when it
+is no longer part of that stage-0 path. As the Range-authored compiler gains
+coverage, equivalent `SwiftBootstrap` behavior can become dead code.
 
 ## Next Best Targets
 

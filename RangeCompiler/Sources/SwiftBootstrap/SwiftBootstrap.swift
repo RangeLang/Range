@@ -44,6 +44,65 @@ public struct SwiftBootstrapCompiler {
         return process.terminationStatus
     }
 
+    @discardableResult
+    public func checkLLVMRuns(
+        rangeRoot: URL,
+        manifest: URL,
+        requireFullCoverage: Bool
+    ) throws -> Int {
+        let manifestEntries = try parseRunManifest(manifest)
+        if manifestEntries.isEmpty {
+            throw SwiftBootstrapError("LLVM run manifest has no runnable entries: \(manifest.path)")
+        }
+
+        try validateManifestCoverage(
+            entries: manifestEntries,
+            manifest: manifest,
+            requireFullCoverage: requireFullCoverage
+        )
+
+        var count = 0
+        for entry in manifestEntries {
+            count += 1
+            print("[\(count)] run \(entry.source.lastPathComponent)")
+            let executable = try compileExecutable(rangeRoot: rangeRoot, input: entry.source)
+            let result = try runExecutable(
+                executable: executable,
+                arguments: entry.arguments,
+                stdin: entry.stdin
+            )
+
+            if result.exitCode != entry.expectedExit {
+                throw SwiftBootstrapError(
+                    """
+                    Expected exit \(entry.expectedExit), got \(result.exitCode) for \(entry.source.path)
+                    --- stdout ---
+                    \(prefixLines(result.stdout))
+                    --- stderr ---
+                    \(prefixLines(result.stderr))
+                    """
+                )
+            }
+
+            if let expectedStdout = entry.expectedStdout, result.stdout != expectedStdout {
+                throw SwiftBootstrapError(
+                    """
+                    Stdout mismatch for \(entry.source.path)
+                    --- expected stdout ---
+                    \(prefixLines(expectedStdout))
+                    --- actual stdout ---
+                    \(prefixLines(result.stdout))
+                    --- stderr ---
+                    \(prefixLines(result.stderr))
+                    """
+                )
+            }
+        }
+
+        print("LLVM run checks succeeded for \(count) example(s).")
+        return count
+    }
+
     public func emitLLVM(rangeRoot: URL, input: URL, output: URL) throws {
         let inputs = try coreInputs(rangeRoot: rangeRoot) + projectInputs(input: input)
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
@@ -189,10 +248,221 @@ public struct SwiftBootstrapCompiler {
             throw SwiftBootstrapError(details)
         }
     }
+
+    private func parseRunManifest(_ manifest: URL) throws -> [RunManifestEntry] {
+        guard FileManager.default.fileExists(atPath: manifest.path) else {
+            throw SwiftBootstrapError("Missing LLVM run manifest: \(manifest.path)")
+        }
+
+        let manifestDirectory = manifest.deletingLastPathComponent()
+        let text = try String(contentsOf: manifest, encoding: .utf8)
+        var entries: [RunManifestEntry] = []
+
+        for (index, rawLine) in text.split(separator: "\n", omittingEmptySubsequences: false)
+            .enumerated()
+        {
+            let lineNumber = index + 1
+            let line = String(rawLine)
+            if line.isEmpty || line.hasPrefix("#") {
+                continue
+            }
+
+            let columns = line.split(separator: "\t", omittingEmptySubsequences: false)
+                .map(String.init)
+            guard columns.count >= 4 else {
+                throw SwiftBootstrapError(
+                    "Invalid manifest row \(lineNumber) in \(manifest.path): expected at least file, exit, stdin, and args columns."
+                )
+            }
+
+            guard let expectedExit = Int32(columns[1]), expectedExit >= 0, expectedExit <= 255 else {
+                throw SwiftBootstrapError(
+                    "Invalid expected exit '\(columns[1])' on manifest row \(lineNumber) in \(manifest.path)."
+                )
+            }
+
+            let source = sourceURL(for: columns[0], relativeTo: manifestDirectory)
+            guard FileManager.default.fileExists(atPath: source.path) else {
+                throw SwiftBootstrapError(
+                    "Manifest row \(lineNumber) references missing source: \(source.path)"
+                )
+            }
+
+            entries.append(
+                RunManifestEntry(
+                    source: source,
+                    expectedExit: expectedExit,
+                    stdin: columns[2] == "-" ? nil : decodeManifestEscapes(columns[2]),
+                    arguments: columns[3] == "-" ? [] : shellLikeArguments(columns[3]),
+                    expectedStdout: columns.count > 4 && columns[4] != "-"
+                        ? decodeManifestEscapes(columns[4])
+                        : nil
+                )
+            )
+        }
+
+        return entries
+    }
+
+    private func validateManifestCoverage(
+        entries: [RunManifestEntry],
+        manifest: URL,
+        requireFullCoverage: Bool
+    ) throws {
+        let manifestNames = entries.map { $0.source.lastPathComponent }
+        let duplicateNames = Dictionary(grouping: manifestNames, by: { $0 })
+            .filter { $0.value.count > 1 }
+            .map(\.key)
+            .sorted()
+        if !duplicateNames.isEmpty {
+            throw SwiftBootstrapError(
+                "Duplicate LLVM run manifest entries:\n\(duplicateNames.prefix(80).joined(separator: "\n"))"
+            )
+        }
+
+        guard requireFullCoverage else {
+            return
+        }
+
+        let manifestDirectory = manifest.deletingLastPathComponent()
+        let corpusNames = try rangeFiles(in: manifestDirectory)
+            .filter { $0.deletingLastPathComponent() == manifestDirectory }
+            .map(\.lastPathComponent)
+            .sorted()
+        let manifestNameSet = Set(manifestNames)
+        let corpusNameSet = Set(corpusNames)
+        let missingNames = corpusNames.filter { !manifestNameSet.contains($0) }
+        if !missingNames.isEmpty {
+            throw SwiftBootstrapError(
+                "LLVM run manifest is missing example(s):\n\(missingNames.prefix(120).joined(separator: "\n"))"
+            )
+        }
+
+        let extraNames = manifestNames.sorted().filter { !corpusNameSet.contains($0) }
+        if !extraNames.isEmpty {
+            throw SwiftBootstrapError(
+                "LLVM run manifest references non-corpus example(s):\n\(extraNames.prefix(120).joined(separator: "\n"))"
+            )
+        }
+    }
+
+    private func sourceURL(for path: String, relativeTo directory: URL) -> URL {
+        if path.hasPrefix("/") {
+            return URL(fileURLWithPath: path)
+        }
+        return directory.appendingPathComponent(path)
+    }
+
+    private func runExecutable(
+        executable: URL,
+        arguments: [String],
+        stdin: String?
+    ) throws -> ExecutionResult {
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
+
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.standardOutput = stdout
+        process.standardError = stderr
+
+        let stdinPipe: Pipe?
+        if stdin != nil {
+            let pipe = Pipe()
+            process.standardInput = pipe
+            stdinPipe = pipe
+        } else {
+            stdinPipe = nil
+        }
+
+        try process.run()
+
+        if let stdinPipe, let stdin {
+            stdinPipe.fileHandleForWriting.write(Data(stdin.utf8))
+            try? stdinPipe.fileHandleForWriting.close()
+        }
+
+        process.waitUntilExit()
+        let stdoutText = String(
+            data: stdout.fileHandleForReading.readDataToEndOfFile(),
+            encoding: .utf8
+        ) ?? ""
+        let stderrText = String(
+            data: stderr.fileHandleForReading.readDataToEndOfFile(),
+            encoding: .utf8
+        ) ?? ""
+
+        return ExecutionResult(
+            exitCode: process.terminationStatus,
+            stdout: stdoutText,
+            stderr: stderrText
+        )
+    }
 }
 
 private struct ExecutableLayout {
     var buildRoot: URL
     var llvmIR: URL
     var executable: URL
+}
+
+private struct RunManifestEntry {
+    var source: URL
+    var expectedExit: Int32
+    var stdin: String?
+    var arguments: [String]
+    var expectedStdout: String?
+}
+
+private struct ExecutionResult {
+    var exitCode: Int32
+    var stdout: String
+    var stderr: String
+}
+
+private func shellLikeArguments(_ text: String) -> [String] {
+    text.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+}
+
+private func decodeManifestEscapes(_ text: String) -> String {
+    var result = ""
+    var index = text.startIndex
+    while index < text.endIndex {
+        let character = text[index]
+        guard character == "\\" else {
+            result.append(character)
+            index = text.index(after: index)
+            continue
+        }
+
+        let nextIndex = text.index(after: index)
+        guard nextIndex < text.endIndex else {
+            result.append(character)
+            index = nextIndex
+            continue
+        }
+
+        switch text[nextIndex] {
+        case "n":
+            result.append("\n")
+        case "r":
+            result.append("\r")
+        case "t":
+            result.append("\t")
+        case "\\":
+            result.append("\\")
+        default:
+            result.append(text[nextIndex])
+        }
+        index = text.index(after: nextIndex)
+    }
+    return result
+}
+
+private func prefixLines(_ text: String, limit: Int = 80) -> String {
+    let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        .prefix(limit)
+        .map(String.init)
+    return lines.joined(separator: "\n")
 }

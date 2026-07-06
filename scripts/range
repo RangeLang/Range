@@ -34,95 +34,6 @@ prepare_range_bin() {
     RANGE_BIN="$REPO_ROOT/RangeCompiler/.build/debug/range"
 }
 
-build_executable() {
-    input="$1"
-
-    range_compiler compile-executable --range-root "$RANGE_ROOT" "$input"
-}
-
-validate_run_manifest() {
-    manifest="$1"
-    require_full_coverage="$2"
-    manifest_dir="$(cd "$(dirname "$manifest")" && pwd)"
-    manifest_names_file="$(mktemp "${TMPDIR:-/tmp}/range-run-manifest-names.XXXXXX")"
-    sorted_manifest_names_file="$(mktemp "${TMPDIR:-/tmp}/range-run-manifest-names-sorted.XXXXXX")"
-    corpus_names_file="$(mktemp "${TMPDIR:-/tmp}/range-run-corpus-names.XXXXXX")"
-    missing_names_file="$(mktemp "${TMPDIR:-/tmp}/range-run-missing-names.XXXXXX")"
-    extra_names_file="$(mktemp "${TMPDIR:-/tmp}/range-run-extra-names.XXXXXX")"
-    duplicate_names_file="$(mktemp "${TMPDIR:-/tmp}/range-run-duplicate-names.XXXXXX")"
-
-    line_number=0
-    manifest_entry_count=0
-    while IFS=$'\t' read -r input expected_exit stdin_text args_text expected_stdout || [[ -n "${input:-}" ]]; do
-        line_number=$((line_number + 1))
-        if [[ -z "${input:-}" || "${input:0:1}" == "#" ]]; then
-            continue
-        fi
-        manifest_entry_count=$((manifest_entry_count + 1))
-
-        if [[ -z "${expected_exit:-}" || -z "${stdin_text:-}" || -z "${args_text:-}" ]]; then
-            echo "Invalid manifest row $line_number in $manifest: expected at least file, exit, stdin, and args columns." >&2
-            rm -f "$manifest_names_file" "$sorted_manifest_names_file" "$corpus_names_file" "$missing_names_file" "$extra_names_file" "$duplicate_names_file"
-            exit 1
-        fi
-
-        if ! [[ "$expected_exit" =~ ^[0-9]+$ ]] || (( expected_exit > 255 )); then
-            echo "Invalid expected exit '$expected_exit' on manifest row $line_number in $manifest." >&2
-            rm -f "$manifest_names_file" "$sorted_manifest_names_file" "$corpus_names_file" "$missing_names_file" "$extra_names_file" "$duplicate_names_file"
-            exit 1
-        fi
-
-        if [[ "$input" = /* ]]; then
-            source_path="$input"
-        else
-            source_path="$manifest_dir/$input"
-        fi
-        if [[ ! -f "$source_path" ]]; then
-            echo "Manifest row $line_number references missing source: $source_path" >&2
-            rm -f "$manifest_names_file" "$sorted_manifest_names_file" "$corpus_names_file" "$missing_names_file" "$extra_names_file" "$duplicate_names_file"
-            exit 1
-        fi
-
-        basename "$source_path" >> "$manifest_names_file"
-    done < "$manifest"
-
-    if (( manifest_entry_count == 0 )); then
-        echo "LLVM run manifest has no runnable entries: $manifest" >&2
-        rm -f "$manifest_names_file" "$sorted_manifest_names_file" "$corpus_names_file" "$missing_names_file" "$extra_names_file" "$duplicate_names_file"
-        exit 1
-    fi
-
-    sort "$manifest_names_file" | uniq -d > "$duplicate_names_file"
-    if [[ -s "$duplicate_names_file" ]]; then
-        echo "Duplicate LLVM run manifest entries:" >&2
-        sed -n '1,80p' "$duplicate_names_file" >&2
-        rm -f "$manifest_names_file" "$sorted_manifest_names_file" "$corpus_names_file" "$missing_names_file" "$extra_names_file" "$duplicate_names_file"
-        exit 1
-    fi
-
-    if [[ "$require_full_coverage" == "true" ]]; then
-        find "$manifest_dir" -maxdepth 1 -type f -name '*.range' -exec basename {} \; | sort > "$corpus_names_file"
-        sort "$manifest_names_file" > "$sorted_manifest_names_file"
-        comm -23 "$corpus_names_file" "$sorted_manifest_names_file" > "$missing_names_file"
-        comm -13 "$corpus_names_file" "$sorted_manifest_names_file" > "$extra_names_file"
-
-        if [[ -s "$missing_names_file" ]]; then
-            echo "LLVM run manifest is missing example(s):" >&2
-            sed -n '1,120p' "$missing_names_file" >&2
-            rm -f "$manifest_names_file" "$sorted_manifest_names_file" "$corpus_names_file" "$missing_names_file" "$extra_names_file" "$duplicate_names_file"
-            exit 1
-        fi
-        if [[ -s "$extra_names_file" ]]; then
-            echo "LLVM run manifest references non-corpus example(s):" >&2
-            sed -n '1,120p' "$extra_names_file" >&2
-            rm -f "$manifest_names_file" "$sorted_manifest_names_file" "$corpus_names_file" "$missing_names_file" "$extra_names_file" "$duplicate_names_file"
-            exit 1
-        fi
-    fi
-
-    rm -f "$manifest_names_file" "$sorted_manifest_names_file" "$corpus_names_file" "$missing_names_file" "$extra_names_file" "$duplicate_names_file"
-}
-
 command="${1:-}"
 if [[ -z "$command" ]]; then
     usage
@@ -194,81 +105,11 @@ case "$command" in
             exit 1
         fi
 
-        validate_run_manifest "$manifest" "$require_full_coverage"
-        prepare_range_bin
-        manifest_dir="$(cd "$(dirname "$manifest")" && pwd)"
-        count=0
-        while IFS=$'\t' read -r input expected_exit stdin_text args_text expected_stdout || [[ -n "${input:-}" ]]; do
-            if [[ -z "${input:-}" || "${input:0:1}" == "#" ]]; then
-                continue
-            fi
-            if [[ -z "${expected_exit:-}" || -z "${stdin_text:-}" ]]; then
-                echo "Invalid manifest row: $input" >&2
-                exit 1
-            fi
-
-            if [[ "$input" = /* ]]; then
-                source_path="$input"
-            else
-                source_path="$manifest_dir/$input"
-            fi
-
-            count=$((count + 1))
-            echo "[$count] run $(basename "$source_path")"
-            executable="$(build_executable "$source_path")"
-            stdout_file="$(mktemp "${TMPDIR:-/tmp}/range-run-stdout.XXXXXX")"
-            stderr_file="$(mktemp "${TMPDIR:-/tmp}/range-run-stderr.XXXXXX")"
-            expected_stdout_file="$(mktemp "${TMPDIR:-/tmp}/range-run-expected-stdout.XXXXXX")"
-            run_args=()
-            if [[ -n "${args_text:-}" && "$args_text" != "-" ]]; then
-                read -r -a run_args <<< "$args_text"
-            fi
-
-            set +e
-            if [[ "$stdin_text" == "-" ]]; then
-                if [[ ${#run_args[@]} -eq 0 ]]; then
-                    "$executable" >"$stdout_file" 2>"$stderr_file"
-                else
-                    "$executable" "${run_args[@]}" >"$stdout_file" 2>"$stderr_file"
-                fi
-            else
-                if [[ ${#run_args[@]} -eq 0 ]]; then
-                    printf '%b' "$stdin_text" | "$executable" >"$stdout_file" 2>"$stderr_file"
-                else
-                    printf '%b' "$stdin_text" | "$executable" "${run_args[@]}" >"$stdout_file" 2>"$stderr_file"
-                fi
-            fi
-            actual_exit=$?
-            set -e
-
-            if [[ "$actual_exit" != "$expected_exit" ]]; then
-                echo "Expected exit $expected_exit, got $actual_exit for $source_path" >&2
-                echo "--- stdout ---" >&2
-                sed -n '1,80p' "$stdout_file" >&2
-                echo "--- stderr ---" >&2
-                sed -n '1,80p' "$stderr_file" >&2
-                rm -f "$stdout_file" "$stderr_file" "$expected_stdout_file"
-                exit 1
-            fi
-
-            if [[ -n "${expected_stdout:-}" && "$expected_stdout" != "-" ]]; then
-                printf '%b' "$expected_stdout" >"$expected_stdout_file"
-                if ! cmp -s "$expected_stdout_file" "$stdout_file"; then
-                    echo "Stdout mismatch for $source_path" >&2
-                    echo "--- expected stdout ---" >&2
-                    sed -n '1,80p' "$expected_stdout_file" >&2
-                    echo "--- actual stdout ---" >&2
-                    sed -n '1,80p' "$stdout_file" >&2
-                    echo "--- stderr ---" >&2
-                    sed -n '1,80p' "$stderr_file" >&2
-                    rm -f "$stdout_file" "$stderr_file" "$expected_stdout_file"
-                    exit 1
-                fi
-            fi
-            rm -f "$stdout_file" "$stderr_file" "$expected_stdout_file"
-        done < "$manifest"
-
-        echo "LLVM run checks succeeded for $count example(s)."
+        if [[ "$require_full_coverage" == "true" ]]; then
+            range_compiler check-llvm-runs --range-root "$RANGE_ROOT" "$manifest" --require-full-coverage
+        else
+            range_compiler check-llvm-runs --range-root "$RANGE_ROOT" "$manifest"
+        fi
         ;;
     run)
         if [[ $# -lt 1 ]]; then
