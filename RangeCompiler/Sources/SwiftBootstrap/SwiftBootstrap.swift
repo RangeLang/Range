@@ -496,7 +496,9 @@ public struct SwiftBootstrapCompiler {
             stage2BodyNamesText.contains("compilerCoreLLVMLowerDirectIfStatementRecordWithAfter;"),
             stage2BodyNamesText.contains("compilerCoreLLVMLowerLinearStatementRecord;"),
             stage2BodyNamesText.contains("compilerCoreRenderedDirectReturnBlock;"),
-            stage2BodyNamesText.contains("compilerCoreNativeMainSourceLLVMText;"),
+            stage2BodyNamesText.contains("compilerSourceSetBodyFunctionNamesNativeProgram;"),
+            stage2BodyNamesText.contains("compilerCoreLLVMEntryTextForProgram;"),
+            stage2BodyNamesText.contains("compilerCoreLLVMEntryReachableFunctions;"),
             stage2BodyNamesText.contains("compilerSourceInventoryFileRecords;"),
             stage2BodyNamesText.contains("isRangeLexerWhitespace;")
         else {
@@ -849,8 +851,16 @@ public struct SwiftBootstrapCompiler {
         let smokeExecutable = stage2SmokeExecutablePath(compilerDirectory: compilerDirectory)
 
         try """
-        @main {
+        function nativeSmokeLeaf(): Int {
             return 0
+        }
+
+        function nativeSmokeValue(): Int {
+            return nativeSmokeLeaf()
+        }
+
+        @main {
+            return nativeSmokeValue()
         }
         """.write(to: smokeSource, atomically: true, encoding: .utf8)
 
@@ -869,6 +879,10 @@ public struct SwiftBootstrapCompiler {
 
         guard compileResult.stderr.isEmpty,
             compileResult.stdout.contains("define i32 @main() {\nentry:"),
+            compileResult.stdout.contains("define i32 @nativeSmokeLeaf()"),
+            compileResult.stdout.contains("define i32 @nativeSmokeValue()"),
+            compileResult.stdout.contains("call i32 @nativeSmokeLeaf()"),
+            compileResult.stdout.contains("call i32 @nativeSmokeValue()"),
             compileResult.stdout.contains("ret i32 0"),
             !compileResult.stdout.contains("\\n")
         else {

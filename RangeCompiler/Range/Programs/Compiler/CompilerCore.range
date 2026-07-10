@@ -608,7 +608,7 @@ function compilerNativeProgramForLLVMFileSource(fileSource: String): CompilerPro
 }
 
 function compilerSourceSetBodyFunctionNames(): String {
-    return "\(compilerSourceSetBodyFunctionNamesInventory())\(compilerSourceSetBodyFunctionNamesNativeMain())\(compilerSourceSetBodyFunctionNamesSourceSetPrep())\(compilerSourceSetBodyFunctionNamesSourceSetLLVM())\(compilerSourceSetBodyFunctionNamesSourceSetParser())\(compilerSourceSetBodyFunctionNamesMainASTLowering())\(compilerSourceSetBodyFunctionNamesLexer())\(compilerSourceSetBodyFunctionNamesScanning())"
+    return "\(compilerSourceSetBodyFunctionNamesInventory())\(compilerSourceSetBodyFunctionNamesNativeMain())\(compilerSourceSetBodyFunctionNamesNativeProgram())\(compilerSourceSetBodyFunctionNamesSourceSetPrep())\(compilerSourceSetBodyFunctionNamesSourceSetLLVM())\(compilerSourceSetBodyFunctionNamesSourceSetParser())\(compilerSourceSetBodyFunctionNamesMainASTLowering())\(compilerSourceSetBodyFunctionNamesLexer())\(compilerSourceSetBodyFunctionNamesScanning())"
 }
 
 function compilerSourceSetBodyFunctionNamesInventory(): String {
@@ -616,7 +616,7 @@ function compilerSourceSetBodyFunctionNamesInventory(): String {
 }
 
 function compilerSourceSetBodyFunctionNamesInventoryCore(): String {
-    return "compileRangeNativeSource;compileRangeNativeSourceDirectiveOutput;compileRangeNativeProgramOutput;compilerSourceRequestsSourceSetBodyFunctionNames;compilerSourceRequestsNativeSourceSetLLVMText;compilerSourceRequestsNativeSourceSetParseStats;compilerSourceRequestsNativeSourceSetReachableStats;compilerSourceRequestsNativeSourceSetSelectedStats;compilerSourceRequestsNativeSourceSetSelectedScanStats;compilerSourceRequestsSourceSetLLVMText;compilerSourceSetBodyFunctionNames;compilerSourceSetBodyFunctionNamesInventory;compilerSourceSetBodyFunctionNamesInventoryCore;compilerSourceSetBodyFunctionNamesInventoryChunks;compilerSourceSetBodyFunctionNamesInventorySourceSetChunks;compilerSourceSetBodyFunctionNamesInventoryMainASTChunks;compilerSourceSetBodyFunctionNamesNativeMain;compilerSourceSetBodyFunctionNamesSourceSetPrep;"
+    return "compileRangeNativeSource;compileRangeNativeSourceDirectiveOutput;compileRangeNativeProgramOutput;compilerSourceRequestsSourceSetBodyFunctionNames;compilerSourceRequestsNativeSourceSetLLVMText;compilerSourceRequestsNativeSourceSetParseStats;compilerSourceRequestsNativeSourceSetReachableStats;compilerSourceRequestsNativeSourceSetSelectedStats;compilerSourceRequestsNativeSourceSetSelectedScanStats;compilerSourceRequestsSourceSetLLVMText;compilerSourceSetBodyFunctionNames;compilerSourceSetBodyFunctionNamesInventory;compilerSourceSetBodyFunctionNamesInventoryCore;compilerSourceSetBodyFunctionNamesInventoryChunks;compilerSourceSetBodyFunctionNamesInventorySourceSetChunks;compilerSourceSetBodyFunctionNamesInventoryMainASTChunks;compilerSourceSetBodyFunctionNamesNativeMain;compilerSourceSetBodyFunctionNamesNativeProgram;compilerSourceSetBodyFunctionNamesSourceSetPrep;"
 }
 
 function compilerSourceSetBodyFunctionNamesInventoryChunks(): String {
@@ -632,11 +632,15 @@ function compilerSourceSetBodyFunctionNamesInventoryMainASTChunks(): String {
 }
 
 function compilerSourceSetBodyFunctionNamesNativeMain(): String {
-    return "compilerNativeMainSource;compilerCoreNativeMainSourceLLVMText;compilerCoreNativeMainSourceLLVMTextFromAttribute;compilerCoreNativeMainSourceLLVMTextFromBodyStart;compilerCoreNativeMainSourceLLVMTextFromBodyEnd;compilerCoreNativeMainSourceLLVMTextFromReturnStart;compilerCoreNativeMainSourceLLVMTextFromExpression;compilerCoreNativeMainIntegerReturnLLVMText;"
+    return "compilerNativeMainSource;"
+}
+
+function compilerSourceSetBodyFunctionNamesNativeProgram(): String {
+    return "parseCompilerProgramWithFunctionBodies;parseCompilerProgramWithFunctionBodyMode;parseCompilerTopLevelDeclarationsWithFunctionBodyMode;compilerCoreParseTopLevelDeclarationStep;compilerCoreParseConstructDeclarationStep;compilerCoreParseFunctionDeclarationStep;compilerCoreParseFunctionDeclarationStepFromDeclaration;compilerCoreAppendConstructDeclaration;compilerCoreAppendFunctionDeclaration;compilerCoreTopLevelDeclarationSummary;compilerCoreLLVMEntryTextForProgram;compilerCoreLLVMEntryTextForParsedBlock;compilerCoreLLVMEntryReachableFunctions;"
 }
 
 function compilerSourceSetBodyFunctionNamesSourceSetPrep(): String {
-    return "compilerCoreNativeMainBodyStart;compilerCoreNativeMainBodyEnd;compilerCoreNativeMainBodyEndFromDepth;compilerCoreNativeMainBodyEndClosing;compilerCoreNativeMainReturnValue;compilerCoreNativeMainReturnEnd;compilerSourceRequestsSourceInventory;compilerSourceInventorySummary;"
+    return "compilerSourceRequestsSourceInventory;compilerSourceInventorySummary;"
 }
 
 function compilerSourceSetBodyFunctionNamesSourceSetLLVM(): String {
@@ -786,139 +790,6 @@ function compilerSourceSetProgramAppendingFileExisting(program: CompilerProgram,
 
 function compilerSourceSetProgramAppendingFileMain(fileProgram: CompilerProgram, declarationRecords: String): CompilerProgram {
     return CompilerProgram(source: fileProgram.source, hasMainBlock: true, mainAttributeStart: fileProgram.mainAttributeStart, mainBlock: fileProgram.mainBlock, mainStatementRecords: fileProgram.mainStatementRecords, mainStatementSummary: fileProgram.mainStatementSummary, declarationRecords: declarationRecords, declarationSummary: String(""), functionSummary: String(""))
-}
-
-function compilerCoreNativeMainSourceLLVMText(source: String): String {
-    let attributeStart: Int(compilerCoreFindMainAttributeStart(source: source))
-    return compilerCoreNativeMainSourceLLVMTextFromAttribute(source: source, attributeStart: attributeStart)
-}
-
-function compilerCoreNativeMainSourceLLVMTextFromAttribute(source: String, attributeStart: Int): String {
-    if attributeStart < 0 {
-        return String("")
-    }
-
-    let bodyStart: Int(compilerCoreNativeMainBodyStart(source: source, start: attributeStart + 5))
-    return compilerCoreNativeMainSourceLLVMTextFromBodyStart(source: source, attributeStart: attributeStart, bodyStart: bodyStart)
-}
-
-function compilerCoreNativeMainSourceLLVMTextFromBodyStart(source: String, attributeStart: Int, bodyStart: Int): String {
-    if bodyStart < 0 {
-        return String("")
-    }
-
-    let bodyEnd: Int(compilerCoreNativeMainBodyEnd(source: source, start: bodyStart))
-    return compilerCoreNativeMainSourceLLVMTextFromBodyEnd(source: source, attributeStart: attributeStart, bodyStart: bodyStart, bodyEnd: bodyEnd)
-}
-
-function compilerCoreNativeMainSourceLLVMTextFromBodyEnd(source: String, attributeStart: Int, bodyStart: Int, bodyEnd: Int): String {
-    if bodyEnd <= bodyStart {
-        return String("")
-    }
-
-    let returnStart: Int(stringIndexOf(source: source, needle: String("return"), start: bodyStart))
-    return compilerCoreNativeMainSourceLLVMTextFromReturnStart(source: source, returnStart: returnStart, bodyEnd: bodyEnd)
-}
-
-function compilerCoreNativeMainSourceLLVMTextFromReturnStart(source: String, returnStart: Int, bodyEnd: Int): String {
-    if returnStart >= bodyEnd {
-        return String("")
-    }
-
-    let expressionStart: Int(compilerCoreFirstNonWhitespaceIndex(source: source, start: returnStart + 6, end: bodyEnd))
-    let expressionEnd: Int(compilerCoreNativeMainReturnEnd(source: source, start: expressionStart, end: bodyEnd))
-    return compilerCoreNativeMainSourceLLVMTextFromExpression(source: source, expressionStart: expressionStart, expressionEnd: expressionEnd)
-}
-
-function compilerCoreNativeMainSourceLLVMTextFromExpression(source: String, expressionStart: Int, expressionEnd: Int): String {
-    let expressionValue: String(compilerCoreNativeMainReturnValue(source: source, start: expressionStart, end: expressionEnd))
-    if expressionValue == String("") {
-        return String("")
-    }
-
-    let lineBreak: String(source.character(index: expressionEnd))
-    return compilerCoreNativeMainIntegerReturnLLVMText(value: expressionValue, lineBreak: lineBreak)
-}
-
-function compilerCoreNativeMainIntegerReturnLLVMText(value: String, lineBreak: String): String {
-    let atSign: String("@")
-    return "define i32 \(atSign)main() {\(lineBreak)entry:\(lineBreak)  ret i32 \(value)\(lineBreak)}\(lineBreak)"
-}
-
-function compilerCoreNativeMainBodyStart(source: String, start: Int): Int {
-    let sourceLength: Int(stringLength(value: source))
-    let leftBrace: Int(stringIndexOf(source: source, needle: String("{"), start: start))
-    if leftBrace >= sourceLength {
-        return 0 - 1
-    }
-
-    return leftBrace + 1
-}
-
-function compilerCoreNativeMainBodyEnd(source: String, start: Int): Int {
-    return compilerCoreNativeMainBodyEndFromDepth(source: source, searchStart: start, depth: 1)
-}
-
-function compilerCoreNativeMainBodyEndFromDepth(source: String, searchStart: Int, depth: Int): Int {
-    let sourceLength: Int(stringLength(value: source))
-    let nextLeft: Int(stringIndexOf(source: source, needle: String("{"), start: searchStart))
-    let nextRight: Int(stringIndexOf(source: source, needle: String("}"), start: searchStart))
-    if nextRight >= sourceLength {
-        return 0 - 1
-    }
-
-    if nextLeft < nextRight {
-        return compilerCoreNativeMainBodyEndFromDepth(source: source, searchStart: nextLeft + 1, depth: depth + 1)
-    }
-
-    return compilerCoreNativeMainBodyEndClosing(source: source, closingBrace: nextRight, depth: depth)
-}
-
-function compilerCoreNativeMainBodyEndClosing(source: String, closingBrace: Int, depth: Int): Int {
-    if depth == 1 {
-        return closingBrace
-    }
-
-    return compilerCoreNativeMainBodyEndFromDepth(source: source, searchStart: closingBrace + 1, depth: depth - 1)
-}
-
-function compilerCoreNativeMainReturnStatementRecord(source: String, mainBlock: CompilerMainBlock): String {
-    let returnStart: Int(stringIndexOf(source: source, needle: String("return"), start: mainBlock.bodyStart))
-    if returnStart >= mainBlock.bodyEnd {
-        return String("")
-    }
-
-    let expressionStart: Int(compilerCoreFirstNonWhitespaceIndex(source: source, start: returnStart + 6, end: mainBlock.bodyEnd))
-    let expressionEnd: Int(compilerCoreNativeMainReturnEnd(source: source, start: expressionStart, end: mainBlock.bodyEnd))
-    let expressionValue: String(compilerCoreNativeMainReturnValue(source: source, start: expressionStart, end: expressionEnd))
-    if expressionValue == String("") {
-        return String("")
-    }
-
-    let expressionRecord: String(compilerCoreExpressionRecord(kind: String("integerLiteral"), value: expressionValue, left: String(""), right: String(""), arguments: String(""), start: expressionStart, end: expressionEnd))
-    let statement: CompilerStatement(CompilerStatement(kind: String("return"), name: String(""), typeName: String(""), targetSummary: String(""), targetRecord: String(""), expressionKind: String("integerLiteral"), expressionValue: expressionValue, expressionSummary: "integerLiteral(\(expressionValue))", expressionRecord: expressionRecord, bodyStart: 0, bodyEnd: 0, elseBodyStart: 0, elseBodyEnd: 0, bodyStatementRecords: String(""), elseStatementRecords: String(""), summary: "kind=return\texpression=integerLiteral(\(expressionValue))", start: returnStart, end: expressionEnd))
-    return compilerCoreStatementRecord(statement: statement)
-}
-
-function compilerCoreNativeMainReturnValue(source: String, start: Int, end: Int): String {
-    if end <= start {
-        return String("")
-    }
-
-    return source.substring(start: start, end: end)
-}
-
-function compilerCoreNativeMainReturnEnd(source: String, start: Int, end: Int): Int {
-    if start >= end {
-        return end
-    }
-
-    let character: String(source.character(index: start))
-    if isRangeLexerWhitespace(character: character) {
-        return start
-    }
-
-    return compilerCoreNativeMainReturnEnd(source: source, start: start + 1, end: end)
 }
 
 function compilerSourceSetProgramSource(source: String): String {
@@ -2832,9 +2703,14 @@ function compilerCoreNativeMainLLVMText(): String {
 }
 
 function compilerCoreLLVMEntryTextForParsedBlock(program: CompilerProgram, parsedBlock: CompilerParsedBlock): String {
-    let loweredBlock: CompilerLLVMLoweredBlock(compilerCoreLLVMLowerBlock(program: program, parsedBlock: parsedBlock))
     let reachableFunctions: String(compilerCoreLLVMEntryReachableFunctions(program: program, parsedBlock: parsedBlock))
-    return compilerCoreLLVMEntryTextForLoweredBlock(program: program, loweredBlock: loweredBlock, reachableFunctions: reachableFunctions)
+    let audit: CompilerLLVMHelperAudit(compilerCoreLLVMSelectedHelperAudit(program: program, names: reachableFunctions))
+    if audit.excludedCount > 0 {
+        return compilerCoreLLVMHelperAuditFailure(audit: audit)
+    }
+    let loweredBlock: CompilerLLVMLoweredBlock(compilerCoreLLVMLowerBlock(program: program, parsedBlock: parsedBlock))
+    let text: String(compilerCoreLLVMEntryTextForLoweredBlock(program: program, loweredBlock: loweredBlock, reachableFunctions: reachableFunctions))
+    return compilerCoreMaterializeLLVMText(text: text)
 }
 
 function compilerCoreLLVMEntryReachableFunctions(program: CompilerProgram, parsedBlock: CompilerParsedBlock): String {
@@ -6596,7 +6472,7 @@ function compilerCoreStatementRecordsCalledFunctionNames(records: String): Strin
 function compilerCoreReachableFunctionNames(program: CompilerProgram, roots: String): String {
     let recordsLength: Int(stringLength(value: program.declarationRecords))
     let rootedNames: String(compilerCoreReachableFunctionRootNames(program: program, roots: roots, sourceIndex: 0, recordsLength: recordsLength, reachableNames: roots))
-    return compilerCoreReachableFunctionNamesExpanding(program: program, reachableNames: rootedNames, recordsLength: recordsLength)
+    return compilerCoreReachableFunctionNamesExpanding(program: program, reachableNames: rootedNames, previouslyExpandedNames: roots, recordsLength: recordsLength)
 }
 
 function compilerCoreReachableFunctionRootNames(program: CompilerProgram, roots: String, sourceIndex: Int, recordsLength: Int, reachableNames: String): String {
@@ -6626,16 +6502,16 @@ function compilerCoreReachableFunctionRootNamesAppendingRecord(program: Compiler
     return reachableNames
 }
 
-function compilerCoreReachableFunctionNamesExpanding(program: CompilerProgram, reachableNames: String, recordsLength: Int): String {
-    let expandedNames: String(compilerCoreReachableFunctionNamesExpansionPass(program: program, reachableNames: reachableNames, sourceIndex: 0, recordsLength: recordsLength))
+function compilerCoreReachableFunctionNamesExpanding(program: CompilerProgram, reachableNames: String, previouslyExpandedNames: String, recordsLength: Int): String {
+    let expandedNames: String(compilerCoreReachableFunctionNamesExpansionPass(program: program, reachableNames: reachableNames, previouslyExpandedNames: previouslyExpandedNames, sourceIndex: 0, recordsLength: recordsLength))
     if stringLength(value: expandedNames) > stringLength(value: reachableNames) {
-        return compilerCoreReachableFunctionNamesExpanding(program: program, reachableNames: expandedNames, recordsLength: recordsLength)
+        return compilerCoreReachableFunctionNamesExpanding(program: program, reachableNames: expandedNames, previouslyExpandedNames: reachableNames, recordsLength: recordsLength)
     }
 
     return expandedNames
 }
 
-function compilerCoreReachableFunctionNamesExpansionPass(program: CompilerProgram, reachableNames: String, sourceIndex: Int, recordsLength: Int): String {
+function compilerCoreReachableFunctionNamesExpansionPass(program: CompilerProgram, reachableNames: String, previouslyExpandedNames: String, sourceIndex: Int, recordsLength: Int): String {
     if sourceIndex >= recordsLength {
         return reachableNames
     }
@@ -6645,15 +6521,15 @@ function compilerCoreReachableFunctionNamesExpansionPass(program: CompilerProgra
         return reachableNames
     }
 
-    let nextReachableNames: String(compilerCoreReachableFunctionNamesAppendingRecord(program: program, reachableNames: reachableNames, record: record))
+    let nextReachableNames: String(compilerCoreReachableFunctionNamesAppendingRecord(program: program, reachableNames: reachableNames, previouslyExpandedNames: previouslyExpandedNames, record: record))
     let nextSourceIndex: Int(compilerCoreTopLevelDeclarationRecordNextIndex(records: program.declarationRecords, start: sourceIndex))
-    return compilerCoreReachableFunctionNamesExpansionPass(program: program, reachableNames: nextReachableNames, sourceIndex: nextSourceIndex, recordsLength: recordsLength)
+    return compilerCoreReachableFunctionNamesExpansionPass(program: program, reachableNames: nextReachableNames, previouslyExpandedNames: previouslyExpandedNames, sourceIndex: nextSourceIndex, recordsLength: recordsLength)
 }
 
-function compilerCoreReachableFunctionNamesAppendingRecord(program: CompilerProgram, reachableNames: String, record: String): String {
+function compilerCoreReachableFunctionNamesAppendingRecord(program: CompilerProgram, reachableNames: String, previouslyExpandedNames: String, record: String): String {
     let declarationKind: String(compilerCoreRecordField(record: record, prefix: String("kind=")))
     let declarationName: String(compilerCoreRecordField(record: record, prefix: String("name=")))
-    if declarationKind == String("function") && compilerCoreNameListContains(names: reachableNames, name: declarationName) {
+    if declarationKind == String("function") && compilerCoreNameListContains(names: reachableNames, name: declarationName) && !compilerCoreNameListContains(names: previouslyExpandedNames, name: declarationName) {
         let declaration: CompilerTopLevelDeclaration(compilerCoreTopLevelDeclarationFromRecord(record: record))
         if compilerCoreShouldExpandReachableFunction(declaration: declaration) {
             let bodyCalledNames: String(compilerCoreFunctionDeclarationCalledFunctionNames(program: program, declaration: declaration))

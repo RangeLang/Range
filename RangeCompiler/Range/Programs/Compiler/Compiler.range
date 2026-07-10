@@ -65,7 +65,8 @@ function compileRangeNativeSourceDirectiveOutput(source: String): String {
 }
 
 function compileRangeNativeProgramOutput(source: String): String {
-    return compilerCoreNativeMainSourceLLVMText(source: source)
+    let program: CompilerProgram(parseCompilerProgramWithFunctionBodies(source: source))
+    return compilerCoreLLVMEntryTextForProgram(program: program)
 }
 
 function compileRangeSourceSetDirectiveOutput(source: String): String {
