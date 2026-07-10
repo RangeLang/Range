@@ -193,6 +193,7 @@ construct CompilerSemanticGraph {
     let resolutions: CompilerIntTable
     let nodeTypes: CompilerIntTable
     let parameterEffects: CompilerIntTable
+    let accessEffects: CompilerIntTable
     let failures: IntBuffer
 }
 
@@ -229,6 +230,7 @@ construct CompilerFunctionDeclarationParts {
 construct CompilerStoredMemberParseStep {
     let found: Bool
     let keepScanning: Bool
+    let kindTag: Int
     let nameToken: RangeLexedToken
     let typeReference: CompilerTypeReference
     let nextIndex: Int
@@ -584,7 +586,7 @@ function compilerSyntaxDeclarationColumnCount(): Int {
 }
 
 function compilerSyntaxMemberColumnCount(): Int {
-    return 12
+    return 13
 }
 
 function compilerSyntaxFunctionColumnCount(): Int {
@@ -629,6 +631,14 @@ function compilerSyntaxKindIntegerLiteral(): Int { return 11 }
 function compilerSyntaxKindAddition(): Int { return 12 }
 function compilerSyntaxKindArgument(): Int { return 13 }
 function compilerSyntaxKindMainAnnotation(): Int { return 14 }
+function compilerSyntaxKindAssignment(): Int { return 15 }
+function compilerSyntaxKindBindingReference(): Int { return 16 }
+
+function compilerSyntaxLocalKindLet(): Int { return 1 }
+function compilerSyntaxLocalKindState(): Int { return 2 }
+function compilerSyntaxMemberKindLet(): Int { return 1 }
+function compilerSyntaxMemberKindState(): Int { return 2 }
+function compilerSyntaxMemberKindBinding(): Int { return 3 }
 
 function compilerSyntaxRoleStatement(): Int { return 1 }
 function compilerSyntaxRoleInitializer(): Int { return 2 }
@@ -640,6 +650,8 @@ function compilerSyntaxRoleReceiver(): Int { return 7 }
 function compilerSyntaxRoleLeftOperand(): Int { return 8 }
 function compilerSyntaxRoleRightOperand(): Int { return 9 }
 function compilerSyntaxRoleAppliesTo(): Int { return 12 }
+function compilerSyntaxRoleAssignmentTarget(): Int { return 13 }
+function compilerSyntaxRoleAssignedValue(): Int { return 14 }
 
 function compilerSyntaxTablesCreate(source: String): CompilerSyntaxTables {
     return CompilerSyntaxTables(
@@ -815,7 +827,7 @@ function compilerSyntaxAllocate(tables: CompilerSyntaxTables, kindTag: Int, face
         expectedFacetRow: compilerIntTableRowCount(table: tables.members)
     } else if kindTag == compilerSyntaxKindParameter() {
         expectedFacetRow: compilerIntTableRowCount(table: tables.parameters)
-    } else if kindTag >= compilerSyntaxKindEntry() && kindTag <= compilerSyntaxKindMainAnnotation() {
+    } else if kindTag >= compilerSyntaxKindEntry() && kindTag <= compilerSyntaxKindBindingReference() {
         expectedFacetRow: compilerIntTableRowCount(table: tables.bodyNodes)
     }
     if facetRow < 0 || facetRow != expectedFacetRow {
@@ -873,7 +885,7 @@ function compilerBodySyntaxAppendNode(sink: CompilerBodySyntaxSink, kindTag: Int
     if !sink.enabled {
         return 0 - 1
     }
-    if kindTag < compilerSyntaxKindEntry() || kindTag > compilerSyntaxKindMainAnnotation()
+    if kindTag < compilerSyntaxKindEntry() || kindTag > compilerSyntaxKindBindingReference()
         || !compilerSyntaxGlobalRangeIsValid(tables: sink.tables, fileID: sink.fileID, start: start, end: end)
         || (firstStart >= 0 && !compilerSyntaxGlobalRangeIsValid(tables: sink.tables, fileID: sink.fileID, start: firstStart, end: firstEnd))
         || (secondStart >= 0 && !compilerSyntaxGlobalRangeIsValid(tables: sink.tables, fileID: sink.fileID, start: secondStart, end: secondEnd)) {
@@ -901,7 +913,7 @@ function compilerBodySyntaxAppendEdge(sink: CompilerBodySyntaxSink, ownerSyntaxI
     if !sink.enabled {
         return 0
     }
-    if ownerSyntaxID < 0 || childSyntaxID < 0 || roleTag < compilerSyntaxRoleStatement() || roleTag > compilerSyntaxRoleAppliesTo() {
+    if ownerSyntaxID < 0 || childSyntaxID < 0 || roleTag < compilerSyntaxRoleStatement() || roleTag > compilerSyntaxRoleAssignedValue() {
         compilerSyntaxTablesPoison(tables: sink.tables)
         return 0 - 1
     }
@@ -932,7 +944,7 @@ function compilerSyntaxAppendDeclaration(tables: CompilerSyntaxTables, syntaxID:
     return compilerSyntaxTableAppend(tables: tables, table: tables.declarations, value: fingerprint.second)
 }
 
-function compilerSyntaxAppendMember(tables: CompilerSyntaxTables, syntaxID: Int, fileID: Int, parentSyntaxID: Int, ordinal: Int, memberStart: Int, memberEnd: Int, nameStart: Int, nameEnd: Int, typeStart: Int, typeEnd: Int, fingerprint: CompilerFingerprint): Int {
+function compilerSyntaxAppendMember(tables: CompilerSyntaxTables, syntaxID: Int, fileID: Int, parentSyntaxID: Int, ordinal: Int, memberStart: Int, memberEnd: Int, nameStart: Int, nameEnd: Int, typeStart: Int, typeEnd: Int, fingerprint: CompilerFingerprint, memberKind: Int): Int {
     if !compilerSyntaxMemberRangesAreValid(tables: tables, fileID: fileID, memberStart: memberStart, memberEnd: memberEnd, nameStart: nameStart, nameEnd: nameEnd, typeStart: typeStart, typeEnd: typeEnd) {
         compilerSyntaxTablesPoison(tables: tables)
         return 0 - 1
@@ -948,7 +960,8 @@ function compilerSyntaxAppendMember(tables: CompilerSyntaxTables, syntaxID: Int,
     if compilerSyntaxTableAppend(tables: tables, table: tables.members, value: compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: typeStart)) != 0 { return 0 - 1 }
     if compilerSyntaxTableAppend(tables: tables, table: tables.members, value: compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: typeEnd)) != 0 { return 0 - 1 }
     if compilerSyntaxTableAppend(tables: tables, table: tables.members, value: fingerprint.first) != 0 { return 0 - 1 }
-    return compilerSyntaxTableAppend(tables: tables, table: tables.members, value: fingerprint.second)
+    if compilerSyntaxTableAppend(tables: tables, table: tables.members, value: fingerprint.second) != 0 { return 0 - 1 }
+    return compilerSyntaxTableAppend(tables: tables, table: tables.members, value: memberKind)
 }
 
 function compilerSyntaxAppendFunction(tables: CompilerSyntaxTables, syntaxID: Int, fileID: Int, firstParameterRow: Int, parameterCount: Int, parameterStart: Int, parameterEnd: Int, returnTypeStart: Int, returnTypeEnd: Int, bodyStart: Int, bodyEnd: Int, signature: CompilerFingerprint): Int {
@@ -1067,9 +1080,8 @@ function compilerTypedSyntaxCaptureMain(source: String, tables: CompilerSyntaxTa
     let mainRootSink: CompilerBodySyntaxSink(compilerBodySyntaxSinkEnabled(tables: tables, fileID: fileID, ownerSyntaxID: 0 - 1, statementOrdinal: 0))
     let mainAnnotationSyntaxID: Int(compilerBodySyntaxAppendNode(sink: mainRootSink, kindTag: compilerSyntaxKindMainAnnotation(), ordinal: 0, start: mainBlock.attributeStart, end: mainBlock.bodyStart, firstStart: mainBlock.attributeStart, firstEnd: mainBlock.bodyStart, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
     let entrySyntaxID: Int(compilerBodySyntaxAppendNode(sink: mainRootSink, kindTag: compilerSyntaxKindEntry(), ordinal: 0, start: mainBlock.bodyStart, end: mainBlock.bodyEnd, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
-    compilerBodySyntaxAppendEdge(sink: mainRootSink, ownerSyntaxID: mainAnnotationSyntaxID, childSyntaxID: entrySyntaxID, roleTag: compilerSyntaxRoleAppliesTo(), ordinal: 0)
-    if mainAnnotationSyntaxID < 0 { return 0 - 1 }
-    if entrySyntaxID < 0 { return 0 - 1 }
+    if mainAnnotationSyntaxID < 0 || entrySyntaxID < 0
+        || compilerBodySyntaxAppendEdge(sink: mainRootSink, ownerSyntaxID: mainAnnotationSyntaxID, childSyntaxID: entrySyntaxID, roleTag: compilerSyntaxRoleAppliesTo(), ordinal: 0) != 0 { return 0 - 1 }
     return compilerTypedSyntaxCaptureBody(source: source, tables: tables, fileID: fileID, ownerSyntaxID: entrySyntaxID, start: mainBlock.bodyStart, end: mainBlock.bodyEnd)
 }
 
@@ -1109,7 +1121,7 @@ function compilerTypedSyntaxCaptureConstruct(source: String, tables: CompilerSyn
     state fingerprint: CompilerFingerprint(compilerSyntaxDeclarationBaseFingerprint(tables: tables, fileID: fileID, kindTag: compilerSyntaxKindConstruct(), name: parts.nameToken.text))
     let memberCapture: CompilerTypedMemberCapture(compilerTypedSyntaxCaptureMembers(source: source, tables: tables, fileID: fileID, parentSyntaxID: syntaxID, start: parts.bodyRange.start, end: parts.bodyRange.end, baseFingerprint: fingerprint))
     fingerprint: compilerFingerprintAppendInt(fingerprint: memberCapture.fingerprint, value: memberCapture.count)
-    compilerSyntaxAppendDeclaration(tables: tables, syntaxID: syntaxID, fileID: fileID, kindTag: compilerSyntaxKindConstruct(), ordinal: declarationOrdinal, declarationStart: keyword.start, declarationEnd: parts.bodyRange.next, nameStart: parts.nameToken.start, nameEnd: parts.nameToken.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, fingerprint: fingerprint)
+    if compilerSyntaxAppendDeclaration(tables: tables, syntaxID: syntaxID, fileID: fileID, kindTag: compilerSyntaxKindConstruct(), ordinal: declarationOrdinal, declarationStart: keyword.start, declarationEnd: parts.bodyRange.next, nameStart: parts.nameToken.start, nameEnd: parts.nameToken.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, fingerprint: fingerprint) != 0 { compilerSyntaxTablesPoison(tables: tables) }
     return CompilerTypedDeclarationCaptureStep(captured: true, nextIndex: parts.bodyRange.next)
 }
 
@@ -1138,11 +1150,15 @@ function compilerTypedSyntaxCaptureMembers(source: String, tables: CompilerSynta
             return CompilerTypedMemberCapture(count: memberOrdinal, fingerprint: declarationFingerprint)
         }
 
-        let memberFingerprint: CompilerFingerprint(compilerTypedFingerprintAppendNamedType(fingerprint: baseFingerprint, tag: 10, ordinal: memberOrdinal, name: step.nameToken.text, typeName: step.typeReference.text))
-        declarationFingerprint: compilerTypedFingerprintAppendNamedType(fingerprint: declarationFingerprint, tag: 10, ordinal: memberOrdinal, name: step.nameToken.text, typeName: step.typeReference.text)
+        let memberFingerprintBase: CompilerFingerprint(compilerTypedFingerprintAppendNamedType(fingerprint: baseFingerprint, tag: 10, ordinal: memberOrdinal, name: step.nameToken.text, typeName: step.typeReference.text))
+        let memberFingerprint: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: memberFingerprintBase, value: step.kindTag))
+        declarationFingerprint: compilerFingerprintAppendInt(fingerprint: compilerTypedFingerprintAppendNamedType(fingerprint: declarationFingerprint, tag: 10, ordinal: memberOrdinal, name: step.nameToken.text, typeName: step.typeReference.text), value: step.kindTag)
         let memberRow: Int(compilerIntTableRowCount(table: tables.members))
         let memberSyntaxID: Int(compilerSyntaxAllocate(tables: tables, kindTag: compilerSyntaxKindMember(), facetRow: memberRow))
-        compilerSyntaxAppendMember(tables: tables, syntaxID: memberSyntaxID, fileID: fileID, parentSyntaxID: parentSyntaxID, ordinal: memberOrdinal, memberStart: token.start, memberEnd: step.typeReference.end, nameStart: step.nameToken.start, nameEnd: step.nameToken.end, typeStart: step.typeReference.start, typeEnd: step.typeReference.end, fingerprint: memberFingerprint)
+        if compilerSyntaxAppendMember(tables: tables, syntaxID: memberSyntaxID, fileID: fileID, parentSyntaxID: parentSyntaxID, ordinal: memberOrdinal, memberStart: token.start, memberEnd: step.typeReference.end, nameStart: step.nameToken.start, nameEnd: step.nameToken.end, typeStart: step.typeReference.start, typeEnd: step.typeReference.end, fingerprint: memberFingerprint, memberKind: step.kindTag) != 0 {
+            compilerSyntaxTablesPoison(tables: tables)
+            return CompilerTypedMemberCapture(count: memberOrdinal, fingerprint: declarationFingerprint)
+        }
         memberOrdinal: memberOrdinal + 1
         cursor: CompilerTokenCursor(source: source, index: step.nextIndex)
     }
@@ -1179,10 +1195,15 @@ function compilerTypedSyntaxCaptureFunctionWithPolicy(source: String, tables: Co
     let parameterCapture: CompilerTypedParameterCapture(compilerTypedSyntaxCaptureParameters(source: source, tables: tables, fileID: fileID, functionID: functionRow, start: parts.parameterRange.start, end: parts.parameterRange.end, baseFingerprint: signature))
     signature: compilerFingerprintAppendInt(fingerprint: parameterCapture.fingerprint, value: parameterCapture.count)
     signature: compilerFingerprintAppendText(fingerprint: signature, tag: 30, text: parts.returnType.text)
-    compilerSyntaxAppendFunction(tables: tables, syntaxID: syntaxID, fileID: fileID, firstParameterRow: firstParameterRow, parameterCount: parameterCapture.count, parameterStart: parts.parameterRange.start, parameterEnd: parts.parameterRange.end, returnTypeStart: parts.returnType.start, returnTypeEnd: parts.returnType.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, signature: signature)
-    compilerSyntaxAppendDeclaration(tables: tables, syntaxID: syntaxID, fileID: fileID, kindTag: compilerSyntaxKindFunction(), ordinal: declarationOrdinal, declarationStart: keyword.start, declarationEnd: parts.bodyRange.next, nameStart: parts.nameToken.start, nameEnd: parts.nameToken.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, fingerprint: signature)
+    if compilerSyntaxAppendFunction(tables: tables, syntaxID: syntaxID, fileID: fileID, firstParameterRow: firstParameterRow, parameterCount: parameterCapture.count, parameterStart: parts.parameterRange.start, parameterEnd: parts.parameterRange.end, returnTypeStart: parts.returnType.start, returnTypeEnd: parts.returnType.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, signature: signature) != 0
+        || compilerSyntaxAppendDeclaration(tables: tables, syntaxID: syntaxID, fileID: fileID, kindTag: compilerSyntaxKindFunction(), ordinal: declarationOrdinal, declarationStart: keyword.start, declarationEnd: parts.bodyRange.next, nameStart: parts.nameToken.start, nameEnd: parts.nameToken.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, fingerprint: signature) != 0 {
+        compilerSyntaxTablesPoison(tables: tables)
+        return CompilerTypedDeclarationCaptureStep(captured: true, nextIndex: parts.bodyRange.next)
+    }
     if captureBody {
-        compilerTypedSyntaxCaptureBody(source: source, tables: tables, fileID: fileID, ownerSyntaxID: syntaxID, start: parts.bodyRange.start, end: parts.bodyRange.end)
+        if compilerTypedSyntaxCaptureBody(source: source, tables: tables, fileID: fileID, ownerSyntaxID: syntaxID, start: parts.bodyRange.start, end: parts.bodyRange.end) != 0 {
+            compilerSyntaxTablesPoison(tables: tables)
+        }
     }
     return CompilerTypedDeclarationCaptureStep(captured: true, nextIndex: parts.bodyRange.next)
 }
@@ -1222,7 +1243,10 @@ function compilerTypedSyntaxCaptureParameters(source: String, tables: CompilerSy
             signature: compilerTypedFingerprintAppendNamedType(fingerprint: signature, tag: 20, ordinal: parameterOrdinal, name: step.nameToken.text, typeName: step.typeReference.text)
             let parameterRow: Int(compilerIntTableRowCount(table: tables.parameters))
             let parameterSyntaxID: Int(compilerSyntaxAllocate(tables: tables, kindTag: compilerSyntaxKindParameter(), facetRow: parameterRow))
-            compilerSyntaxAppendParameter(tables: tables, syntaxID: parameterSyntaxID, fileID: fileID, functionID: functionID, ordinal: parameterOrdinal, parameterStart: token.start, parameterEnd: step.typeReference.end, nameStart: step.nameToken.start, nameEnd: step.nameToken.end, typeStart: step.typeReference.start, typeEnd: step.typeReference.end, fingerprint: parameterFingerprint)
+            if compilerSyntaxAppendParameter(tables: tables, syntaxID: parameterSyntaxID, fileID: fileID, functionID: functionID, ordinal: parameterOrdinal, parameterStart: token.start, parameterEnd: step.typeReference.end, nameStart: step.nameToken.start, nameEnd: step.nameToken.end, typeStart: step.typeReference.start, typeEnd: step.typeReference.end, fingerprint: parameterFingerprint) != 0 {
+                compilerSyntaxTablesPoison(tables: tables)
+                return CompilerTypedParameterCapture(count: parameterOrdinal, fingerprint: signature)
+            }
             parameterOrdinal: parameterOrdinal + 1
             cursor: CompilerTokenCursor(source: source, index: step.nextIndex)
         }
@@ -1277,7 +1301,7 @@ function compilerSyntaxFacetIsValid(tables: CompilerSyntaxTables, syntaxID: Int)
         return facetRow < compilerIntTableRowCount(table: tables.parameters)
             && compilerIntTableValue(table: tables.parameters, row: facetRow, column: 0) == syntaxID
     }
-    if kindTag >= compilerSyntaxKindEntry() && kindTag <= compilerSyntaxKindMainAnnotation() {
+    if kindTag >= compilerSyntaxKindEntry() && kindTag <= compilerSyntaxKindBindingReference() {
         return facetRow < compilerIntTableRowCount(table: tables.bodyNodes)
             && compilerIntTableValue(table: tables.bodyNodes, row: facetRow, column: 0) == syntaxID
     }
@@ -1349,7 +1373,9 @@ function compilerSyntaxMembersAreValid(tables: CompilerSyntaxTables): Bool {
         let fileID: Int(compilerIntTableValue(table: tables.members, row: row, column: 1))
         let parentSyntaxID: Int(compilerIntTableValue(table: tables.members, row: row, column: 2))
         let ordinal: Int(compilerIntTableValue(table: tables.members, row: row, column: 3))
-        if syntaxID < 0 || syntaxID >= syntaxCount || fileID < 0 || fileID >= fileCount || parentSyntaxID < 0 || parentSyntaxID >= syntaxCount {
+        let memberKind: Int(compilerIntTableValue(table: tables.members, row: row, column: 12))
+        if syntaxID < 0 || syntaxID >= syntaxCount || fileID < 0 || fileID >= fileCount || parentSyntaxID < 0 || parentSyntaxID >= syntaxCount
+            || (memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState() && memberKind != compilerSyntaxMemberKindBinding()) {
             return false
         }
         if compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 0) != compilerSyntaxKindMember()
@@ -1488,6 +1514,14 @@ function compilerSyntaxBodyNodeShapeIsValid(tables: CompilerSyntaxTables, syntax
         return compilerSyntaxBodyEdgeCount(tables: tables, syntaxID: syntaxID, roleTag: compilerSyntaxRoleReturnValue(), asOwner: true) == 1
             && compilerSyntaxBodyEdgeCount(tables: tables, syntaxID: syntaxID, roleTag: 0 - 1, asOwner: true) == 1
     }
+    if kindTag == compilerSyntaxKindAssignment() {
+        return compilerSyntaxBodyEdgeCount(tables: tables, syntaxID: syntaxID, roleTag: compilerSyntaxRoleAssignmentTarget(), asOwner: true) == 1
+            && compilerSyntaxBodyEdgeCount(tables: tables, syntaxID: syntaxID, roleTag: compilerSyntaxRoleAssignedValue(), asOwner: true) == 1
+            && compilerSyntaxBodyEdgeCount(tables: tables, syntaxID: syntaxID, roleTag: 0 - 1, asOwner: true) == 2
+    }
+    if kindTag == compilerSyntaxKindBindingReference() {
+        return compilerSyntaxBodyEdgeCount(tables: tables, syntaxID: syntaxID, roleTag: 0 - 1, asOwner: true) == 0
+    }
     if kindTag == compilerSyntaxKindApplication() {
         return compilerSyntaxBodyEdgeCount(tables: tables, syntaxID: syntaxID, roleTag: compilerSyntaxRoleCallee(), asOwner: true) == 1
             && compilerSyntaxBodyEdgeCount(tables: tables, syntaxID: syntaxID, roleTag: 0 - 1, asOwner: true) == 1 + compilerSyntaxBodyEdgeCount(tables: tables, syntaxID: syntaxID, roleTag: compilerSyntaxRoleArgument(), asOwner: true)
@@ -1515,6 +1549,7 @@ function compilerSyntaxKindIsBodyExpression(kindTag: Int): Bool {
         || kindTag == compilerSyntaxKindMemberRead()
         || kindTag == compilerSyntaxKindIntegerLiteral()
         || kindTag == compilerSyntaxKindAddition()
+        || kindTag == compilerSyntaxKindBindingReference()
 }
 
 function compilerSyntaxPriorBodyRoleCount(tables: CompilerSyntaxTables, edgeRow: Int, ownerSyntaxID: Int, roleTag: Int): Int {
@@ -1535,7 +1570,7 @@ function compilerSyntaxBodyEdgeKindsAreValid(tables: CompilerSyntaxTables, edgeR
     let childKindTag: Int(compilerIntTableValue(table: tables.syntaxIndex, row: childSyntaxID, column: 0))
     if roleTag == compilerSyntaxRoleStatement() {
         if ownerKindTag != compilerSyntaxKindFunction() && ownerKindTag != compilerSyntaxKindEntry() { return false }
-        if childKindTag != compilerSyntaxKindLocalBinding() && childKindTag != compilerSyntaxKindReturn() { return false }
+        if childKindTag != compilerSyntaxKindLocalBinding() && childKindTag != compilerSyntaxKindReturn() && childKindTag != compilerSyntaxKindAssignment() { return false }
         let statementFacetRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: childSyntaxID, column: 1))
         return compilerIntTableValue(table: tables.bodyNodes, row: statementFacetRow, column: 2) == ownerSyntaxID
             && compilerIntTableValue(table: tables.bodyNodes, row: statementFacetRow, column: 3) == ordinal
@@ -1544,7 +1579,7 @@ function compilerSyntaxBodyEdgeKindsAreValid(tables: CompilerSyntaxTables, edgeR
     if roleTag == compilerSyntaxRoleAppliesTo() {
         return ownerKindTag == compilerSyntaxKindMainAnnotation() && childKindTag == compilerSyntaxKindEntry() && ordinal == 0
     }
-    if ownerKindTag < compilerSyntaxKindEntry() || ownerKindTag > compilerSyntaxKindMainAnnotation() { return false }
+    if ownerKindTag < compilerSyntaxKindEntry() || ownerKindTag > compilerSyntaxKindBindingReference() { return false }
     let edgeOwnerFacetRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: ownerSyntaxID, column: 1))
     let edgeChildFacetRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: childSyntaxID, column: 1))
     if compilerIntTableValue(table: tables.bodyNodes, row: edgeOwnerFacetRow, column: 2)
@@ -1554,6 +1589,12 @@ function compilerSyntaxBodyEdgeKindsAreValid(tables: CompilerSyntaxTables, edgeR
     }
     if roleTag == compilerSyntaxRoleReturnValue() {
         return ownerKindTag == compilerSyntaxKindReturn() && compilerSyntaxKindIsBodyExpression(kindTag: childKindTag) && ordinal == 0
+    }
+    if roleTag == compilerSyntaxRoleAssignmentTarget() {
+        return ownerKindTag == compilerSyntaxKindAssignment() && childKindTag == compilerSyntaxKindIdentifier() && ordinal == 0
+    }
+    if roleTag == compilerSyntaxRoleAssignedValue() {
+        return ownerKindTag == compilerSyntaxKindAssignment() && compilerSyntaxKindIsBodyExpression(kindTag: childKindTag) && ordinal == 0
     }
     if roleTag == compilerSyntaxRoleCallee() {
         return ownerKindTag == compilerSyntaxKindApplication()
@@ -1592,7 +1633,7 @@ function compilerSyntaxBodyNodesAreValid(tables: CompilerSyntaxTables): Bool {
             return false
         }
         let bodyKindTag: Int(compilerIntTableValue(table: tables.syntaxIndex, row: bodySyntaxID, column: 0))
-        if bodyKindTag < compilerSyntaxKindEntry() || bodyKindTag > compilerSyntaxKindMainAnnotation()
+    if bodyKindTag < compilerSyntaxKindEntry() || bodyKindTag > compilerSyntaxKindBindingReference()
             || compilerIntTableValue(table: tables.syntaxIndex, row: bodySyntaxID, column: 1) != bodyNodeRow {
             return false
         }
@@ -1624,11 +1665,11 @@ function compilerSyntaxBodyEdgesAreValid(tables: CompilerSyntaxTables): Bool {
         let bodyEdgeRole: Int(compilerIntTableValue(table: tables.bodyEdges, row: bodyValidationEdgeRow, column: 2))
         let bodyEdgeOrdinal: Int(compilerIntTableValue(table: tables.bodyEdges, row: bodyValidationEdgeRow, column: 3))
         if bodyEdgeOwner < 0 || bodyEdgeOwner >= bodyEdgeSyntaxCount || bodyEdgeChild < 0 || bodyEdgeChild >= bodyEdgeSyntaxCount
-            || bodyEdgeRole < compilerSyntaxRoleStatement() || bodyEdgeRole > compilerSyntaxRoleAppliesTo() || bodyEdgeOrdinal < 0 {
+            || bodyEdgeRole < compilerSyntaxRoleStatement() || bodyEdgeRole > compilerSyntaxRoleAssignedValue() || bodyEdgeOrdinal < 0 {
             return false
         }
         let bodyEdgeChildKind: Int(compilerIntTableValue(table: tables.syntaxIndex, row: bodyEdgeChild, column: 0))
-        if bodyEdgeChildKind < compilerSyntaxKindEntry() || bodyEdgeChildKind > compilerSyntaxKindMainAnnotation() { return false }
+        if bodyEdgeChildKind < compilerSyntaxKindEntry() || bodyEdgeChildKind > compilerSyntaxKindBindingReference() { return false }
         if !compilerSyntaxBodyEdgeKindsAreValid(tables: tables, edgeRow: bodyValidationEdgeRow, ownerSyntaxID: bodyEdgeOwner, childSyntaxID: bodyEdgeChild, roleTag: bodyEdgeRole, ordinal: bodyEdgeOrdinal) { return false }
         bodyValidationEdgeRow: bodyValidationEdgeRow + 1
     }
@@ -1691,6 +1732,8 @@ function compilerSyntaxKindName(kindTag: Int): String {
     if kindTag == compilerSyntaxKindAddition() { return String("addition") }
     if kindTag == compilerSyntaxKindArgument() { return String("argument") }
     if kindTag == compilerSyntaxKindMainAnnotation() { return String("mainAnnotation") }
+    if kindTag == compilerSyntaxKindAssignment() { return String("assignment") }
+    if kindTag == compilerSyntaxKindBindingReference() { return String("bindingReference") }
     return String("unknown")
 }
 
@@ -1776,7 +1819,7 @@ function compilerPlotterFacetKind(kindTag: Int): Int {
     if kindTag == compilerSyntaxKindParameter() { return compilerGraphFacetParameter() }
     if kindTag == compilerSyntaxKindEntry() { return compilerGraphFacetEntry() }
     if kindTag == compilerSyntaxKindMainAnnotation() { return compilerGraphFacetMainAnnotation() }
-    if kindTag == compilerSyntaxKindLocalBinding() || kindTag == compilerSyntaxKindReturn() { return compilerGraphFacetStatement() }
+    if kindTag == compilerSyntaxKindLocalBinding() || kindTag == compilerSyntaxKindReturn() || kindTag == compilerSyntaxKindAssignment() { return compilerGraphFacetStatement() }
     if kindTag == compilerSyntaxKindArgument() { return compilerGraphFacetArgument() }
     if kindTag == compilerSyntaxKindApplication() { return compilerGraphFacetApplication() }
     return compilerGraphFacetExpression()
@@ -1888,7 +1931,7 @@ function compilerPlotterBuild(tables: CompilerSyntaxTables, delta: CompilerGraph
     state plotSubjectSyntaxID: Int(0)
     while plotSubjectSyntaxID < plotSyntaxCount {
         state plotRoleTag: Int(compilerSyntaxRoleStatement())
-        while plotRoleTag <= compilerSyntaxRoleAppliesTo() {
+        while plotRoleTag <= compilerSyntaxRoleAssignedValue() {
             if plotRoleTag == compilerGraphRoleMember() {
                 if compilerPlotterAppendMemberFacts(tables: tables, delta: delta, subjectSyntaxID: plotSubjectSyntaxID) != 0 { return 0 - 1 }
             } else if plotRoleTag == compilerGraphRoleParameter() {
@@ -1994,6 +2037,9 @@ function compilerPlotterSummary(source: String): String {
 function compilerSemanticResolutionColumnCount(): Int { return 3 }
 function compilerSemanticNodeTypeColumnCount(): Int { return 3 }
 function compilerSemanticParameterEffectColumnCount(): Int { return 5 }
+function compilerSemanticAccessEffectColumnCount(): Int { return 5 }
+function compilerSemanticAccessWrite(): Int { return 1 }
+function compilerSemanticAccessUnique(): Int { return 1 }
 function compilerSemanticResolutionConstruct(): Int { return 1 }
 function compilerSemanticResolutionFunction(): Int { return 2 }
 function compilerSemanticResolutionLocal(): Int { return 3 }
@@ -2010,6 +2056,7 @@ function compilerSemanticGraphCreate(): CompilerSemanticGraph {
         resolutions: compilerIntTableCreate(columnCount: compilerSemanticResolutionColumnCount(), estimatedRowCount: 128),
         nodeTypes: compilerIntTableCreate(columnCount: compilerSemanticNodeTypeColumnCount(), estimatedRowCount: 256),
         parameterEffects: compilerIntTableCreate(columnCount: compilerSemanticParameterEffectColumnCount(), estimatedRowCount: 64),
+        accessEffects: compilerIntTableCreate(columnCount: compilerSemanticAccessEffectColumnCount(), estimatedRowCount: 64),
         failures: intBufferCreate(capacity: 1)
     )
 }
@@ -2019,6 +2066,7 @@ function compilerSemanticGraphDestroy(semantics: CompilerSemanticGraph): Int {
     if compilerIntTableDestroy(table: semantics.resolutions) != 0 { semanticDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: semantics.nodeTypes) != 0 { semanticDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: semantics.parameterEffects) != 0 { semanticDestroyStatus: 0 - 1 }
+    if compilerIntTableDestroy(table: semantics.accessEffects) != 0 { semanticDestroyStatus: 0 - 1 }
     if intBufferDestroy(buffer: semantics.failures) != 0 { semanticDestroyStatus: 0 - 1 }
     return semanticDestroyStatus
 }
@@ -2377,7 +2425,7 @@ function compilerSemanticTypeForNode(tables: CompilerSyntaxTables, delta: Compil
     if semanticNodeKind == compilerSyntaxKindIntegerLiteral() || semanticNodeKind == compilerSyntaxKindAddition() {
         return CompilerSemanticType(kindTag: compilerSemanticTypeInt(), declarationNodeID: 0 - 1)
     }
-    if semanticNodeKind == compilerSyntaxKindIdentifier() {
+    if semanticNodeKind == compilerSyntaxKindIdentifier() || semanticNodeKind == compilerSyntaxKindBindingReference() {
         let semanticIdentifierResolutionKind: Int(compilerSemanticResolutionKind(semantics: semantics, useNodeID: nodeID))
         if semanticIdentifierResolutionKind == compilerSemanticResolutionLocal() || semanticIdentifierResolutionKind == compilerSemanticResolutionParameter() {
             return compilerSemanticDeclaredNodeType(tables: tables, nodeID: compilerSemanticResolutionTarget(semantics: semantics, useNodeID: nodeID))
@@ -2404,6 +2452,10 @@ function compilerSemanticTypeForNode(tables: CompilerSyntaxTables, delta: Compil
     if semanticNodeKind == compilerSyntaxKindReturn() {
         let semanticReturnValueNodeID: Int(compilerSemanticGraphChild(delta: delta, subjectNodeID: nodeID, roleTag: compilerSyntaxRoleReturnValue(), ordinal: 0))
         return compilerSemanticStoredNodeType(semantics: semantics, nodeID: semanticReturnValueNodeID)
+    }
+    if semanticNodeKind == compilerSyntaxKindAssignment() {
+        let semanticAssignedValueNodeID: Int(compilerSemanticGraphChild(delta: delta, subjectNodeID: nodeID, roleTag: compilerSyntaxRoleAssignedValue(), ordinal: 0))
+        return compilerSemanticStoredNodeType(semantics: semantics, nodeID: semanticAssignedValueNodeID)
     }
     return CompilerSemanticType(kindTag: compilerSemanticTypeNone(), declarationNodeID: 0 - 1)
 }
@@ -2465,6 +2517,36 @@ function compilerSemanticAppendParameterEffects(tables: CompilerSyntaxTables, de
     return 0
 }
 
+function compilerSemanticAppendAccessEffects(delta: CompilerGraphDelta, semantics: CompilerSemanticGraph): Int {
+    state semanticAccessNodeID: Int(0)
+    let semanticAccessNodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
+    while semanticAccessNodeID < semanticAccessNodeCount {
+        if compilerIntTableValue(table: delta.nodes, row: semanticAccessNodeID, column: 1) == compilerSyntaxKindAssignment() {
+            let semanticAccessTargetNodeID: Int(compilerSemanticGraphChild(delta: delta, subjectNodeID: semanticAccessNodeID, roleTag: compilerSyntaxRoleAssignmentTarget(), ordinal: 0))
+            let semanticAccessLocalNodeID: Int(compilerSemanticResolutionTarget(semantics: semantics, useNodeID: semanticAccessTargetNodeID))
+            if semanticAccessTargetNodeID < 0 || semanticAccessLocalNodeID < 0
+                || compilerSemanticResolutionKind(semantics: semantics, useNodeID: semanticAccessTargetNodeID) != compilerSemanticResolutionLocal() { return 0 - 1 }
+            if compilerSemanticAppend(semantics: semantics, table: semantics.accessEffects, value: semanticAccessNodeID) != 0 { return 0 - 1 }
+            if compilerSemanticAppend(semantics: semantics, table: semantics.accessEffects, value: semanticAccessTargetNodeID) != 0 { return 0 - 1 }
+            if compilerSemanticAppend(semantics: semantics, table: semantics.accessEffects, value: semanticAccessLocalNodeID) != 0 { return 0 - 1 }
+            if compilerSemanticAppend(semantics: semantics, table: semantics.accessEffects, value: compilerSemanticAccessWrite()) != 0 { return 0 - 1 }
+            if compilerSemanticAppend(semantics: semantics, table: semantics.accessEffects, value: compilerSemanticAccessUnique()) != 0 { return 0 - 1 }
+        }
+        semanticAccessNodeID: semanticAccessNodeID + 1
+    }
+    return 0
+}
+
+function compilerSemanticAccessEffectRowForAssignment(semantics: CompilerSemanticGraph, assignmentNodeID: Int): Int {
+    state semanticAccessLookupRow: Int(0)
+    let semanticAccessLookupCount: Int(compilerIntTableRowCount(table: semantics.accessEffects))
+    while semanticAccessLookupRow < semanticAccessLookupCount {
+        if compilerIntTableValue(table: semantics.accessEffects, row: semanticAccessLookupRow, column: 0) == assignmentNodeID { return semanticAccessLookupRow }
+        semanticAccessLookupRow: semanticAccessLookupRow + 1
+    }
+    return 0 - 1
+}
+
 function compilerSemanticBuild(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, semantics: CompilerSemanticGraph): Int {
     if !compilerGraphDeltaIsValid(tables: tables, delta: delta) {
         compilerSemanticGraphPoison(semantics: semantics)
@@ -2475,7 +2557,7 @@ function compilerSemanticBuild(tables: CompilerSyntaxTables, delta: CompilerGrap
     while semanticBuildNodeID < semanticBuildNodeCount {
         let semanticBuildKindTag: Int(compilerIntTableValue(table: delta.nodes, row: semanticBuildNodeID, column: 1))
         state semanticResolutionStatus: Int(0)
-        if semanticBuildKindTag == compilerSyntaxKindIdentifier() {
+        if semanticBuildKindTag == compilerSyntaxKindIdentifier() || semanticBuildKindTag == compilerSyntaxKindBindingReference() {
             semanticResolutionStatus: compilerSemanticResolveIdentifier(tables: tables, delta: delta, semantics: semantics, identifierNodeID: semanticBuildNodeID)
         } else if semanticBuildKindTag == compilerSyntaxKindApplication() {
             semanticResolutionStatus: compilerSemanticResolveApplication(tables: tables, delta: delta, semantics: semantics, applicationNodeID: semanticBuildNodeID)
@@ -2493,20 +2575,22 @@ function compilerSemanticBuild(tables: CompilerSyntaxTables, delta: CompilerGrap
         if compilerSemanticAppendNodeType(semantics: semantics, nodeID: semanticBuildNodeID, type: semanticBuiltType) != 0 { return 0 - 1 }
         semanticBuildNodeID: semanticBuildNodeID + 1
     }
-    return compilerSemanticAppendParameterEffects(tables: tables, delta: delta, semantics: semantics)
+    if compilerSemanticAppendParameterEffects(tables: tables, delta: delta, semantics: semantics) != 0 { return 0 - 1 }
+    return compilerSemanticAppendAccessEffects(delta: delta, semantics: semantics)
 }
 
 function compilerSemanticGraphIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, semantics: CompilerSemanticGraph): Bool {
     if intBufferCount(buffer: semantics.failures) != 0
         || !compilerIntTableIsComplete(table: semantics.resolutions)
         || !compilerIntTableIsComplete(table: semantics.nodeTypes)
-        || !compilerIntTableIsComplete(table: semantics.parameterEffects) { return false }
+        || !compilerIntTableIsComplete(table: semantics.parameterEffects)
+        || !compilerIntTableIsComplete(table: semantics.accessEffects) { return false }
     let semanticValidationNodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
     state semanticExpectedResolutionCount: Int(0)
     state semanticValidationNodeID: Int(0)
     while semanticValidationNodeID < semanticValidationNodeCount {
         let semanticValidationKind: Int(compilerIntTableValue(table: delta.nodes, row: semanticValidationNodeID, column: 1))
-        if semanticValidationKind == compilerSyntaxKindIdentifier() || semanticValidationKind == compilerSyntaxKindApplication()
+        if semanticValidationKind == compilerSyntaxKindIdentifier() || semanticValidationKind == compilerSyntaxKindBindingReference() || semanticValidationKind == compilerSyntaxKindApplication()
             || semanticValidationKind == compilerSyntaxKindMemberRead() || semanticValidationKind == compilerSyntaxKindArgument() {
             semanticExpectedResolutionCount: semanticExpectedResolutionCount + 1
         }
@@ -2551,7 +2635,9 @@ function compilerSemanticGraphIsValid(tables: CompilerSyntaxTables, delta: Compi
             || semanticTypedNodeKind == compilerSyntaxKindLocalBinding() || semanticTypedNodeKind == compilerSyntaxKindApplication()
             || semanticTypedNodeKind == compilerSyntaxKindMemberRead() || semanticTypedNodeKind == compilerSyntaxKindIntegerLiteral()
             || semanticTypedNodeKind == compilerSyntaxKindAddition() || semanticTypedNodeKind == compilerSyntaxKindArgument()
-            || semanticTypedNodeKind == compilerSyntaxKindReturn() || semanticTypedNodeKind == compilerSyntaxKindFunction())
+            || semanticTypedNodeKind == compilerSyntaxKindReturn() || semanticTypedNodeKind == compilerSyntaxKindFunction()
+            || semanticTypedNodeKind == compilerSyntaxKindBindingReference()
+            || semanticTypedNodeKind == compilerSyntaxKindAssignment())
             && semanticNodeTypeKind == compilerSemanticTypeNone() { return false }
         semanticValidationNodeID: semanticValidationNodeID + 1
     }
@@ -2564,6 +2650,25 @@ function compilerSemanticGraphIsValid(tables: CompilerSyntaxTables, delta: Compi
             || compilerIntTableValue(table: delta.nodes, row: semanticEffectParameterNode, column: 1) != compilerSyntaxKindParameter() { return false }
         semanticEffectRow: semanticEffectRow + 1
     }
+    state semanticAccessEffectRow: Int(0)
+    state semanticExpectedAccessEffects: Int(0)
+    semanticValidationNodeID: 0
+    while semanticValidationNodeID < semanticValidationNodeCount {
+        if compilerIntTableValue(table: delta.nodes, row: semanticValidationNodeID, column: 1) == compilerSyntaxKindAssignment() { semanticExpectedAccessEffects: semanticExpectedAccessEffects + 1 }
+        semanticValidationNodeID: semanticValidationNodeID + 1
+    }
+    if compilerIntTableRowCount(table: semantics.accessEffects) != semanticExpectedAccessEffects { return false }
+    while semanticAccessEffectRow < compilerIntTableRowCount(table: semantics.accessEffects) {
+        let semanticAccessAssignmentNodeID: Int(compilerIntTableValue(table: semantics.accessEffects, row: semanticAccessEffectRow, column: 0))
+        let semanticAccessTargetNodeID: Int(compilerIntTableValue(table: semantics.accessEffects, row: semanticAccessEffectRow, column: 1))
+        let semanticAccessLocalNodeID: Int(compilerIntTableValue(table: semantics.accessEffects, row: semanticAccessEffectRow, column: 2))
+        if compilerIntTableValue(table: delta.nodes, row: semanticAccessAssignmentNodeID, column: 1) != compilerSyntaxKindAssignment()
+            || compilerSemanticGraphChild(delta: delta, subjectNodeID: semanticAccessAssignmentNodeID, roleTag: compilerSyntaxRoleAssignmentTarget(), ordinal: 0) != semanticAccessTargetNodeID
+            || compilerSemanticResolutionTarget(semantics: semantics, useNodeID: semanticAccessTargetNodeID) != semanticAccessLocalNodeID
+            || compilerIntTableValue(table: semantics.accessEffects, row: semanticAccessEffectRow, column: 3) != compilerSemanticAccessWrite()
+            || compilerIntTableValue(table: semantics.accessEffects, row: semanticAccessEffectRow, column: 4) != compilerSemanticAccessUnique() { return false }
+        semanticAccessEffectRow: semanticAccessEffectRow + 1
+    }
     return true
 }
 
@@ -2573,7 +2678,8 @@ function compilerSemanticRenderSnapshot(semantics: CompilerSemanticGraph): Strin
     let semanticResolutionSnapshot: String(compilerTypedSyntaxRenderRawTable(name: String("semanticResolution"), table: semantics.resolutions))
     let semanticTypeSnapshot: String(compilerTypedSyntaxRenderRawTable(name: String("semanticType"), table: semantics.nodeTypes))
     let semanticEffectSnapshot: String(compilerTypedSyntaxRenderRawTable(name: String("semanticEffect"), table: semantics.parameterEffects))
-    return "semanticGraph\(semanticTab)valid=true\(semanticTab)resolutionCount=\(compilerIntTableRowCount(table: semantics.resolutions))\(semanticTab)typeCount=\(compilerIntTableRowCount(table: semantics.nodeTypes))\(semanticTab)effectCount=\(compilerIntTableRowCount(table: semantics.parameterEffects))\(semanticNewline)\(semanticResolutionSnapshot)\(semanticTypeSnapshot)\(semanticEffectSnapshot)"
+    let semanticAccessEffectSnapshot: String(compilerTypedSyntaxRenderRawTable(name: String("semanticAccessEffect"), table: semantics.accessEffects))
+    return "semanticGraph\(semanticTab)valid=true\(semanticTab)resolutionCount=\(compilerIntTableRowCount(table: semantics.resolutions))\(semanticTab)typeCount=\(compilerIntTableRowCount(table: semantics.nodeTypes))\(semanticTab)effectCount=\(compilerIntTableRowCount(table: semantics.parameterEffects))\(semanticTab)accessEffectCount=\(compilerIntTableRowCount(table: semantics.accessEffects))\(semanticNewline)\(semanticResolutionSnapshot)\(semanticTypeSnapshot)\(semanticEffectSnapshot)\(semanticAccessEffectSnapshot)"
 }
 
 function compilerSemanticSummary(source: String): String {
@@ -2612,12 +2718,15 @@ function compilerMemoryDecisionTransfer(): Int { return 8 }
 function compilerMemoryDecisionReturnMode(): Int { return 9 }
 function compilerMemoryDecisionAccess(): Int { return 10 }
 function compilerMemoryDecisionStoragePolicy(): Int { return 11 }
+function compilerMemoryDecisionAlias(): Int { return 12 }
 function compilerMemoryPlacementLocal(): Int { return 1 }
 function compilerMemoryBorrowShared(): Int { return 1 }
 function compilerMemoryPassByValue(): Int { return 1 }
 function compilerMemoryTransferOwnership(): Int { return 1 }
 function compilerMemoryReturnAggregateValue(): Int { return 1 }
 function compilerMemoryAccessRead(): Int { return 1 }
+function compilerMemoryAccessWriteUnique(): Int { return 2 }
+function compilerMemoryAccessSharedAlias(): Int { return 3 }
 function compilerMemoryStorageImmutable(): Int { return 1 }
 function compilerMemoryStorageMutable(): Int { return 2 }
 
@@ -2676,7 +2785,7 @@ function compilerMemoryAppendStorage(memory: CompilerMemoryGraph, localNodeID: I
 }
 
 function compilerMemoryAppendDecision(memory: CompilerMemoryGraph, decisionKind: Int, nodeID: Int, storageID: Int, typeNodeID: Int, value: Int, originNodeID: Int): Int {
-    if decisionKind < compilerMemoryDecisionLayout() || decisionKind > compilerMemoryDecisionStoragePolicy() || nodeID < 0 || typeNodeID < 0 || originNodeID < 0 {
+    if decisionKind < compilerMemoryDecisionLayout() || decisionKind > compilerMemoryDecisionAlias() || nodeID < 0 || typeNodeID < 0 || originNodeID < 0 {
         compilerMemoryGraphPoison(memory: memory)
         return 0 - 1
     }
@@ -2715,8 +2824,8 @@ function compilerMemoryLocalStoragePolicy(tables: CompilerSyntaxTables, localNod
         || compilerIntTableValue(table: tables.syntaxIndex, row: localNodeID, column: 0) != compilerSyntaxKindLocalBinding() { return 0 - 1 }
     let memoryPolicyBodyRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: localNodeID, column: 1))
     let memoryPolicyAux: Int(compilerIntTableValue(table: tables.bodyNodes, row: memoryPolicyBodyRow, column: 10))
-    if memoryPolicyAux == 0 { return compilerMemoryStorageImmutable() }
-    if memoryPolicyAux == 1 { return compilerMemoryStorageMutable() }
+    if memoryPolicyAux == compilerSyntaxLocalKindLet() { return compilerMemoryStorageImmutable() }
+    if memoryPolicyAux == compilerSyntaxLocalKindState() { return compilerMemoryStorageMutable() }
     return 0 - 1
 }
 
@@ -2737,10 +2846,13 @@ function compilerMemoryConstructFieldCount(tables: CompilerSyntaxTables, semanti
     while memoryMemberRow < memoryMemberCount {
         if compilerIntTableValue(table: tables.members, row: memoryMemberRow, column: 2) == constructNodeID {
             let memoryMemberNodeID: Int(compilerIntTableValue(table: tables.members, row: memoryMemberRow, column: 0))
-            if compilerIntTableValue(table: semantics.nodeTypes, row: memoryMemberNodeID, column: 1) != compilerSemanticTypeInt() {
-                return 0 - 1
+            let memoryMemberKind: Int(compilerIntTableValue(table: tables.members, row: memoryMemberRow, column: 12))
+            if memoryMemberKind != compilerSyntaxMemberKindBinding() {
+                if compilerIntTableValue(table: semantics.nodeTypes, row: memoryMemberNodeID, column: 1) != compilerSemanticTypeInt() {
+                    return 0 - 1
+                }
+                memoryFieldCount: memoryFieldCount + 1
             }
-            memoryFieldCount: memoryFieldCount + 1
         }
         memoryMemberRow: memoryMemberRow + 1
     }
@@ -2766,7 +2878,7 @@ function compilerMemoryBuildLayouts(tables: CompilerSyntaxTables, delta: Compile
     return 0
 }
 
-function compilerMemoryLocalEscapes(delta: CompilerGraphDelta, semantics: CompilerSemanticGraph, localNodeID: Int): Bool {
+function compilerMemoryLocalEscapes(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, semantics: CompilerSemanticGraph, localNodeID: Int): Bool {
     state memoryLocalUseRow: Int(0)
     let memoryLocalUseCount: Int(compilerIntTableRowCount(table: semantics.resolutions))
     while memoryLocalUseRow < memoryLocalUseCount {
@@ -2777,8 +2889,17 @@ function compilerMemoryLocalEscapes(delta: CompilerGraphDelta, semantics: Compil
             let memoryLocalArgumentNodeID: Int(compilerSemanticGraphParent(delta: delta, objectNodeID: memoryLocalUseNodeID, roleTag: compilerSyntaxRoleArgumentValue()))
             if memoryLocalArgumentNodeID >= 0 {
                 let memoryLocalParameterNodeID: Int(compilerSemanticResolutionTarget(semantics: semantics, useNodeID: memoryLocalArgumentNodeID))
-                let memoryLocalEffectRow: Int(compilerMemoryEffectRowForParameter(semantics: semantics, parameterNodeID: memoryLocalParameterNodeID))
-                if memoryLocalEffectRow < 0 || compilerIntTableValue(table: semantics.parameterEffects, row: memoryLocalEffectRow, column: 4) != 0 { return true }
+                state memoryLocalBindingAliasUse: Bool(false)
+                if compilerIntTableValue(table: delta.nodes, row: memoryLocalParameterNodeID, column: 1) == compilerSyntaxKindMember() {
+                    let memoryLocalMemberFacetRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: memoryLocalParameterNodeID, column: 1))
+                    if compilerIntTableValue(table: tables.members, row: memoryLocalMemberFacetRow, column: 12) == compilerSyntaxMemberKindBinding() {
+                        memoryLocalBindingAliasUse: true
+                    }
+                }
+                if !memoryLocalBindingAliasUse {
+                    let memoryLocalEffectRow: Int(compilerMemoryEffectRowForParameter(semantics: semantics, parameterNodeID: memoryLocalParameterNodeID))
+                    if memoryLocalEffectRow < 0 || compilerIntTableValue(table: semantics.parameterEffects, row: memoryLocalEffectRow, column: 4) != 0 { return true }
+                }
             }
         }
         memoryLocalUseRow: memoryLocalUseRow + 1
@@ -2795,7 +2916,7 @@ function compilerMemoryBuildStorages(tables: CompilerSyntaxTables, delta: Compil
             let memoryLocalTypeNodeID: Int(compilerIntTableValue(table: semantics.nodeTypes, row: memoryLocalNodeID, column: 2))
             let memoryLocalFacetRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: memoryLocalNodeID, column: 1))
             let memoryLocalRegionNodeID: Int(compilerIntTableValue(table: tables.bodyNodes, row: memoryLocalFacetRow, column: 2))
-            if compilerMemoryLocalEscapes(delta: delta, semantics: semantics, localNodeID: memoryLocalNodeID)
+            if compilerMemoryLocalEscapes(tables: tables, delta: delta, semantics: semantics, localNodeID: memoryLocalNodeID)
                 || compilerMemoryLayoutRowForType(memory: memory, typeNodeID: memoryLocalTypeNodeID) < 0
                 || compilerMemoryAppendStorage(memory: memory, localNodeID: memoryLocalNodeID, typeNodeID: memoryLocalTypeNodeID, regionNodeID: memoryLocalRegionNodeID) < 0 {
                 compilerMemoryGraphPoison(memory: memory)
@@ -3009,26 +3130,6 @@ function compilerMemoryFunctionReturnNode(delta: CompilerGraphDelta, functionNod
     return memoryFunctionReturnNodeID
 }
 
-function compilerMemoryCallerStorageForFunction(delta: CompilerGraphDelta, semantics: CompilerSemanticGraph, memory: CompilerMemoryGraph, functionNodeID: Int): Int {
-    state memoryCallerStorageID: Int(0 - 1)
-    state memoryCallerNodeID: Int(0)
-    let memoryCallerNodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
-    while memoryCallerNodeID < memoryCallerNodeCount {
-        if compilerIntTableValue(table: delta.nodes, row: memoryCallerNodeID, column: 1) == compilerSyntaxKindApplication()
-            && compilerSemanticResolutionKind(semantics: semantics, useNodeID: memoryCallerNodeID) == compilerSemanticResolutionFunction()
-            && compilerSemanticResolutionTarget(semantics: semantics, useNodeID: memoryCallerNodeID) == functionNodeID {
-            let memoryCallerLocalNodeID: Int(compilerSemanticGraphParent(delta: delta, objectNodeID: memoryCallerNodeID, roleTag: compilerSyntaxRoleInitializer()))
-            let memoryCandidateStorageID: Int(compilerMemoryStorageForLocal(memory: memory, localNodeID: memoryCallerLocalNodeID))
-            if memoryCandidateStorageID >= 0 {
-                if memoryCallerStorageID >= 0 { return 0 - 1 }
-                memoryCallerStorageID: memoryCandidateStorageID
-            }
-        }
-        memoryCallerNodeID: memoryCallerNodeID + 1
-    }
-    return memoryCallerStorageID
-}
-
 function compilerMemoryBuildTransferDecisions(delta: CompilerGraphDelta, semantics: CompilerSemanticGraph, memory: CompilerMemoryGraph): Int {
     state memoryTransferCallNodeID: Int(0)
     let memoryTransferCallNodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
@@ -3068,11 +3169,12 @@ function compilerMemoryBuildReturnModeDecisions(delta: CompilerGraphDelta, seman
     return 0
 }
 
-function compilerMemoryBuildAccessDecisions(delta: CompilerGraphDelta, semantics: CompilerSemanticGraph, memory: CompilerMemoryGraph): Int {
+function compilerMemoryBuildAccessDecisions(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, semantics: CompilerSemanticGraph, memory: CompilerMemoryGraph): Int {
     state memoryAccessNodeID: Int(0)
     let memoryAccessNodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
     while memoryAccessNodeID < memoryAccessNodeCount {
-        if compilerIntTableValue(table: delta.nodes, row: memoryAccessNodeID, column: 1) == compilerSyntaxKindMemberRead() {
+        let memoryAccessNodeKind: Int(compilerIntTableValue(table: delta.nodes, row: memoryAccessNodeID, column: 1))
+        if memoryAccessNodeKind == compilerSyntaxKindMemberRead() {
             let memoryAccessReceiverNodeID: Int(compilerSemanticGraphChild(delta: delta, subjectNodeID: memoryAccessNodeID, roleTag: compilerSyntaxRoleReceiver(), ordinal: 0))
             if compilerSemanticResolutionKind(semantics: semantics, useNodeID: memoryAccessReceiverNodeID) == compilerSemanticResolutionLocal() {
                 let memoryAccessLocalNodeID: Int(compilerSemanticResolutionTarget(semantics: semantics, useNodeID: memoryAccessReceiverNodeID))
@@ -3081,10 +3183,72 @@ function compilerMemoryBuildAccessDecisions(delta: CompilerGraphDelta, semantics
                 let memoryAccessTypeNodeID: Int(compilerIntTableValue(table: memory.storages, row: memoryAccessStorageID, column: 2))
                 if compilerMemoryAppendDecision(memory: memory, decisionKind: compilerMemoryDecisionAccess(), nodeID: memoryAccessNodeID, storageID: memoryAccessStorageID, typeNodeID: memoryAccessTypeNodeID, value: compilerMemoryAccessRead(), originNodeID: memoryAccessReceiverNodeID) != 0 { return 0 - 1 }
             }
+        } else if memoryAccessNodeKind == compilerSyntaxKindAssignment() {
+            let memoryWriteTargetNodeID: Int(compilerSemanticGraphChild(delta: delta, subjectNodeID: memoryAccessNodeID, roleTag: compilerSyntaxRoleAssignmentTarget(), ordinal: 0))
+            let memoryWriteLocalNodeID: Int(compilerSemanticResolutionTarget(semantics: semantics, useNodeID: memoryWriteTargetNodeID))
+            let memoryWriteStorageID: Int(compilerMemoryStorageForLocal(memory: memory, localNodeID: memoryWriteLocalNodeID))
+            let memoryWriteEffectRow: Int(compilerSemanticAccessEffectRowForAssignment(semantics: semantics, assignmentNodeID: memoryAccessNodeID))
+            if memoryWriteTargetNodeID < 0 || memoryWriteLocalNodeID < 0 || memoryWriteStorageID < 0
+                || memoryWriteEffectRow < 0
+                || compilerIntTableValue(table: semantics.accessEffects, row: memoryWriteEffectRow, column: 2) != memoryWriteLocalNodeID
+                || compilerIntTableValue(table: semantics.accessEffects, row: memoryWriteEffectRow, column: 3) != compilerSemanticAccessWrite()
+                || compilerIntTableValue(table: semantics.accessEffects, row: memoryWriteEffectRow, column: 4) != compilerSemanticAccessUnique()
+                || compilerMemoryLocalStoragePolicy(tables: tables, localNodeID: memoryWriteLocalNodeID) != compilerMemoryStorageMutable() { return 0 - 1 }
+            let memoryWriteTypeNodeID: Int(compilerIntTableValue(table: memory.storages, row: memoryWriteStorageID, column: 2))
+            if compilerMemoryAppendDecision(memory: memory, decisionKind: compilerMemoryDecisionAccess(), nodeID: memoryAccessNodeID, storageID: memoryWriteStorageID, typeNodeID: memoryWriteTypeNodeID, value: compilerMemoryAccessWriteUnique(), originNodeID: memoryWriteTargetNodeID) != 0 { return 0 - 1 }
         }
         memoryAccessNodeID: memoryAccessNodeID + 1
     }
     return 0
+}
+
+function compilerMemoryBuildAliasDecisions(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, semantics: CompilerSemanticGraph, memory: CompilerMemoryGraph): Int {
+    state aliasNodeID: Int(0)
+    let aliasNodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
+    while aliasNodeID < aliasNodeCount {
+        if compilerIntTableValue(table: delta.nodes, row: aliasNodeID, column: 1) == compilerSyntaxKindBindingReference() {
+            let aliasArgumentNodeID: Int(compilerSemanticGraphParent(delta: delta, objectNodeID: aliasNodeID, roleTag: compilerSyntaxRoleArgumentValue()))
+            if aliasArgumentNodeID >= 0 {
+                let aliasMemberNodeID: Int(compilerSemanticResolutionTarget(semantics: semantics, useNodeID: aliasArgumentNodeID))
+                if aliasMemberNodeID >= 0 {
+                    let aliasMemberFacetRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: aliasMemberNodeID, column: 1))
+                    if compilerIntTableValue(table: tables.members, row: aliasMemberFacetRow, column: 12) == compilerSyntaxMemberKindBinding() {
+                    let aliasLocalNodeID: Int(compilerSemanticResolutionTarget(semantics: semantics, useNodeID: aliasNodeID))
+                    let aliasStorageID: Int(compilerMemoryStorageForLocal(memory: memory, localNodeID: aliasLocalNodeID))
+                    let aliasTypeNodeID: Int(compilerIntTableValue(table: memory.storages, row: aliasStorageID, column: 2))
+                    if aliasLocalNodeID < 0 || aliasStorageID < 0
+                        || compilerIntTableValue(table: semantics.nodeTypes, row: aliasNodeID, column: 1) != compilerSemanticTypeConstruct()
+                        || compilerMemoryAppendDecision(memory: memory, decisionKind: compilerMemoryDecisionAlias(), nodeID: aliasNodeID, storageID: aliasStorageID, typeNodeID: aliasTypeNodeID, value: compilerMemoryAccessSharedAlias(), originNodeID: aliasMemberNodeID) != 0 { return 0 - 1 }
+                    }
+                }
+            }
+        }
+        aliasNodeID: aliasNodeID + 1
+    }
+    if compilerMemoryAliasAccessesConflict(memory: memory) {
+        compilerMemoryGraphPoison(memory: memory)
+        return 0 - 1
+    }
+    return 0
+}
+
+function compilerMemoryAliasAccessesConflict(memory: CompilerMemoryGraph): Bool {
+    state aliasDecisionRow: Int(0)
+    let decisionCount: Int(compilerIntTableRowCount(table: memory.decisions))
+    while aliasDecisionRow < decisionCount {
+        if compilerIntTableValue(table: memory.decisions, row: aliasDecisionRow, column: 0) == compilerMemoryDecisionAlias() {
+            let aliasStorageID: Int(compilerIntTableValue(table: memory.decisions, row: aliasDecisionRow, column: 2))
+            state accessDecisionRow: Int(0)
+            while accessDecisionRow < decisionCount {
+                if compilerIntTableValue(table: memory.decisions, row: accessDecisionRow, column: 0) == compilerMemoryDecisionAccess()
+                    && compilerIntTableValue(table: memory.decisions, row: accessDecisionRow, column: 2) == aliasStorageID
+                    && compilerIntTableValue(table: memory.decisions, row: accessDecisionRow, column: 4) == compilerMemoryAccessWriteUnique() { return true }
+                accessDecisionRow: accessDecisionRow + 1
+            }
+        }
+        aliasDecisionRow: aliasDecisionRow + 1
+    }
+    return false
 }
 
 function compilerMemoryBuildStoragePolicyDecisions(tables: CompilerSyntaxTables, memory: CompilerMemoryGraph): Int {
@@ -3118,8 +3282,9 @@ function compilerMemoryBuild(tables: CompilerSyntaxTables, delta: CompilerGraphD
     if compilerMemoryBuildDestroyDecisions(tables: tables, delta: delta, semantics: semantics, memory: memory) != 0 { return 0 - 1 }
     if compilerMemoryBuildTransferDecisions(delta: delta, semantics: semantics, memory: memory) != 0 { return 0 - 1 }
     if compilerMemoryBuildReturnModeDecisions(delta: delta, semantics: semantics, memory: memory) != 0 { return 0 - 1 }
-    if compilerMemoryBuildAccessDecisions(delta: delta, semantics: semantics, memory: memory) != 0 { return 0 - 1 }
-    return compilerMemoryBuildStoragePolicyDecisions(tables: tables, memory: memory)
+    if compilerMemoryBuildAccessDecisions(tables: tables, delta: delta, semantics: semantics, memory: memory) != 0 { return 0 - 1 }
+    if compilerMemoryBuildStoragePolicyDecisions(tables: tables, memory: memory) != 0 { return 0 - 1 }
+    return compilerMemoryBuildAliasDecisions(tables: tables, delta: delta, semantics: semantics, memory: memory)
 }
 
 function compilerMemoryDecisionCount(memory: CompilerMemoryGraph, decisionKind: Int): Int {
@@ -3203,10 +3368,33 @@ function compilerMemoryLocalMemberAccessCount(delta: CompilerGraphDelta, semanti
             if compilerSemanticResolutionKind(semantics: semantics, useNodeID: memoryLocalAccessReceiverNodeID) == compilerSemanticResolutionLocal() {
                 memoryLocalAccessCount: memoryLocalAccessCount + 1
             }
+        } else if compilerIntTableValue(table: delta.nodes, row: memoryLocalAccessNodeID, column: 1) == compilerSyntaxKindAssignment() {
+            memoryLocalAccessCount: memoryLocalAccessCount + 1
         }
         memoryLocalAccessNodeID: memoryLocalAccessNodeID + 1
     }
     return memoryLocalAccessCount
+}
+
+function compilerMemoryBindingAliasCount(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, semantics: CompilerSemanticGraph): Int {
+    state aliasNodeID: Int(0)
+    state aliasCount: Int(0)
+    let nodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
+    while aliasNodeID < nodeCount {
+        if compilerIntTableValue(table: delta.nodes, row: aliasNodeID, column: 1) == compilerSyntaxKindBindingReference() {
+            let argumentValueNodeID: Int(aliasNodeID)
+            let argumentNodeID: Int(compilerSemanticGraphParent(delta: delta, objectNodeID: argumentValueNodeID, roleTag: compilerSyntaxRoleArgumentValue()))
+            if argumentNodeID >= 0 {
+                let memberNodeID: Int(compilerSemanticResolutionTarget(semantics: semantics, useNodeID: argumentNodeID))
+                if memberNodeID >= 0 {
+                    let memberFacetRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: memberNodeID, column: 1))
+                    if compilerIntTableValue(table: tables.members, row: memberFacetRow, column: 12) == compilerSyntaxMemberKindBinding() { aliasCount: aliasCount + 1 }
+                }
+            }
+        }
+        aliasNodeID: aliasNodeID + 1
+    }
+    return aliasCount
 }
 
 function compilerMemoryGraphIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, semantics: CompilerSemanticGraph, memory: CompilerMemoryGraph): Bool {
@@ -3221,6 +3409,7 @@ function compilerMemoryGraphIsValid(tables: CompilerSyntaxTables, delta: Compile
     let memoryReturnedFunctionCount: Int(compilerMemoryReturnedConstructFunctionCount(delta: delta, semantics: semantics))
     let memoryReturnedCallCount: Int(compilerMemoryReturnedConstructCallCount(delta: delta, semantics: semantics))
     let memoryExpectedAccessCount: Int(compilerMemoryLocalMemberAccessCount(delta: delta, semantics: semantics))
+    let memoryExpectedAliasCount: Int(compilerMemoryBindingAliasCount(tables: tables, delta: delta, semantics: semantics))
     if compilerMemoryDecisionCount(memory: memory, decisionKind: compilerMemoryDecisionLayout()) != memoryLayoutCount
         || compilerMemoryDecisionCount(memory: memory, decisionKind: compilerMemoryDecisionPlacement()) != memoryStorageCount
         || compilerMemoryDecisionCount(memory: memory, decisionKind: compilerMemoryDecisionInitialize()) != memoryStorageCount
@@ -3231,6 +3420,7 @@ function compilerMemoryGraphIsValid(tables: CompilerSyntaxTables, delta: Compile
         || compilerMemoryDecisionCount(memory: memory, decisionKind: compilerMemoryDecisionTransfer()) != memoryReturnedCallCount
         || compilerMemoryDecisionCount(memory: memory, decisionKind: compilerMemoryDecisionReturnMode()) != memoryReturnedFunctionCount
         || compilerMemoryDecisionCount(memory: memory, decisionKind: compilerMemoryDecisionAccess()) != memoryExpectedAccessCount
+        || compilerMemoryDecisionCount(memory: memory, decisionKind: compilerMemoryDecisionAlias()) != memoryExpectedAliasCount
         || compilerMemoryDecisionCount(memory: memory, decisionKind: compilerMemoryDecisionStoragePolicy()) != memoryStorageCount { return false }
 
     state memoryValidationLayoutRow: Int(0)
@@ -3298,7 +3488,11 @@ function compilerMemoryGraphIsValid(tables: CompilerSyntaxTables, delta: Compile
         if memoryValidationDecisionKind == compilerMemoryDecisionDestroy() && memoryValidationDecisionValue != 1 { return false }
         if memoryValidationDecisionKind == compilerMemoryDecisionTransfer() && memoryValidationDecisionValue != compilerMemoryTransferOwnership() { return false }
         if memoryValidationDecisionKind == compilerMemoryDecisionReturnMode() && memoryValidationDecisionValue != compilerMemoryReturnAggregateValue() { return false }
-        if memoryValidationDecisionKind == compilerMemoryDecisionAccess() && memoryValidationDecisionValue != compilerMemoryAccessRead() { return false }
+        if memoryValidationDecisionKind == compilerMemoryDecisionAccess()
+            && memoryValidationDecisionValue != compilerMemoryAccessRead()
+            && memoryValidationDecisionValue != compilerMemoryAccessWriteUnique() { return false }
+        if memoryValidationDecisionKind == compilerMemoryDecisionAlias()
+            && memoryValidationDecisionValue != compilerMemoryAccessSharedAlias() { return false }
         if memoryValidationDecisionKind == compilerMemoryDecisionStoragePolicy()
             && memoryValidationDecisionValue != compilerMemoryStorageImmutable()
             && memoryValidationDecisionValue != compilerMemoryStorageMutable() { return false }
@@ -3334,13 +3528,28 @@ function compilerMemoryGraphIsValid(tables: CompilerSyntaxTables, delta: Compile
                 && (compilerIntTableValue(table: delta.nodes, row: memoryValidationDecisionNodeID, column: 1) != compilerSyntaxKindApplication()
                     || compilerSemanticResolutionKind(semantics: semantics, useNodeID: memoryValidationDecisionNodeID) != compilerSemanticResolutionFunction()
                     || compilerSemanticGraphChild(delta: delta, subjectNodeID: compilerMemoryFunctionReturnNode(delta: delta, functionNodeID: compilerSemanticResolutionTarget(semantics: semantics, useNodeID: memoryValidationDecisionNodeID)), roleTag: compilerSyntaxRoleReturnValue(), ordinal: 0) != memoryValidationDecisionOriginNodeID) { return false }
-            if memoryValidationDecisionKind == compilerMemoryDecisionAccess()
-                && (compilerIntTableValue(table: delta.nodes, row: memoryValidationDecisionNodeID, column: 1) != compilerSyntaxKindMemberRead()
-                    || compilerSemanticResolutionTarget(semantics: semantics, useNodeID: memoryValidationDecisionOriginNodeID) != memoryValidationDecisionLocalNodeID) { return false }
+            if memoryValidationDecisionKind == compilerMemoryDecisionAccess() {
+                let memoryValidationAccessNodeKind: Int(compilerIntTableValue(table: delta.nodes, row: memoryValidationDecisionNodeID, column: 1))
+                if memoryValidationAccessNodeKind == compilerSyntaxKindMemberRead() {
+                    if memoryValidationDecisionValue != compilerMemoryAccessRead()
+                        || compilerSemanticResolutionTarget(semantics: semantics, useNodeID: memoryValidationDecisionOriginNodeID) != memoryValidationDecisionLocalNodeID { return false }
+                } else if memoryValidationAccessNodeKind == compilerSyntaxKindAssignment() {
+                    let memoryValidationWriteEffectRow: Int(compilerSemanticAccessEffectRowForAssignment(semantics: semantics, assignmentNodeID: memoryValidationDecisionNodeID))
+                    if memoryValidationDecisionValue != compilerMemoryAccessWriteUnique()
+                        || memoryValidationWriteEffectRow < 0
+                        || compilerIntTableValue(table: semantics.accessEffects, row: memoryValidationWriteEffectRow, column: 1) != memoryValidationDecisionOriginNodeID
+                        || compilerIntTableValue(table: semantics.accessEffects, row: memoryValidationWriteEffectRow, column: 2) != memoryValidationDecisionLocalNodeID
+                        || compilerMemoryLocalStoragePolicy(tables: tables, localNodeID: memoryValidationDecisionLocalNodeID) != compilerMemoryStorageMutable() { return false }
+                } else { return false }
+            }
             if memoryValidationDecisionKind == compilerMemoryDecisionStoragePolicy()
                 && (memoryValidationDecisionNodeID != memoryValidationDecisionLocalNodeID
                     || memoryValidationDecisionOriginNodeID != memoryValidationDecisionLocalNodeID
                     || memoryValidationDecisionValue != compilerMemoryLocalStoragePolicy(tables: tables, localNodeID: memoryValidationDecisionLocalNodeID)) { return false }
+            if memoryValidationDecisionKind == compilerMemoryDecisionAlias() {
+                if compilerIntTableValue(table: delta.nodes, row: memoryValidationDecisionNodeID, column: 1) != compilerSyntaxKindBindingReference()
+                    || compilerIntTableValue(table: delta.nodes, row: memoryValidationDecisionOriginNodeID, column: 1) != compilerSyntaxKindMember() { return false }
+            }
         }
         memoryPreviousDecisionKind: memoryValidationDecisionKind
         memoryPreviousDecisionNodeID: memoryValidationDecisionNodeID
@@ -3404,6 +3613,7 @@ function compilerTypedIROperationConstructValue(): Int { return 11 }
 function compilerTypedIROperationTransfer(): Int { return 12 }
 function compilerTypedIROperationCallReceive(): Int { return 13 }
 function compilerTypedIROperationStoragePolicy(): Int { return 14 }
+function compilerTypedIROperationStore(): Int { return 15 }
 
 function compilerTypedIRCreate(): CompilerTypedIR {
     return CompilerTypedIR(
@@ -3442,7 +3652,7 @@ function compilerTypedIRAppendFunction(ir: CompilerTypedIR, ownerNodeID: Int, id
 }
 
 function compilerTypedIRAppendOperation(ir: CompilerTypedIR, nodeID: Int, regionNodeID: Int, operationKind: Int, typeNodeID: Int, storageID: Int, first: Int, second: Int, memoryDecisionRow: Int): Int {
-    if nodeID < 0 || regionNodeID < 0 || operationKind < compilerTypedIROperationConstruct() || operationKind > compilerTypedIROperationStoragePolicy() {
+    if nodeID < 0 || regionNodeID < 0 || operationKind < compilerTypedIROperationConstruct() || operationKind > compilerTypedIROperationStore() {
         compilerTypedIRPoison(ir: ir)
         return 0 - 1
     }
@@ -3594,6 +3804,18 @@ function compilerTypedIRBuildNode(tables: CompilerSyntaxTables, delta: CompilerG
             let typedIRLayoutDecisionRow: Int(compilerTypedIRMemoryDecisionRow(memory: memory, decisionKind: compilerMemoryDecisionLayout(), nodeID: typedIRApplicationTypeNodeID, storageID: 0 - 1))
             if typedIRLayoutDecisionRow < 0 { return 0 - 1 }
             if typedIRApplicationStorageID < 0 {
+                let typedIRAssignmentNodeID: Int(compilerSemanticGraphParent(delta: delta, objectNodeID: nodeID, roleTag: compilerSyntaxRoleAssignedValue()))
+                if typedIRAssignmentNodeID >= 0 {
+                    let typedIRAssignmentTargetNodeID: Int(compilerSemanticGraphChild(delta: delta, subjectNodeID: typedIRAssignmentNodeID, roleTag: compilerSyntaxRoleAssignmentTarget(), ordinal: 0))
+                    let typedIRAssignmentLocalNodeID: Int(compilerSemanticResolutionTarget(semantics: semantics, useNodeID: typedIRAssignmentTargetNodeID))
+                    let typedIRAssignmentStorageID: Int(compilerMemoryStorageForLocal(memory: memory, localNodeID: typedIRAssignmentLocalNodeID))
+                    let typedIRAssignmentDecisionRow: Int(compilerTypedIRMemoryDecisionRow(memory: memory, decisionKind: compilerMemoryDecisionAccess(), nodeID: typedIRAssignmentNodeID, storageID: typedIRAssignmentStorageID))
+                    if typedIRAssignmentTargetNodeID < 0 || typedIRAssignmentLocalNodeID < 0 || typedIRAssignmentStorageID < 0 || typedIRAssignmentDecisionRow < 0
+                        || compilerIntTableValue(table: memory.decisions, row: typedIRAssignmentDecisionRow, column: 4) != compilerMemoryAccessWriteUnique() { return 0 - 1 }
+                    let typedIRAssignedFieldCount: Int(compilerTypedIRAppendConstructFields(tables: tables, delta: delta, semantics: semantics, memory: memory, ir: ir, applicationNodeID: nodeID, regionNodeID: typedIRRegionNodeID, typeNodeID: typedIRApplicationTypeNodeID, storageID: typedIRAssignmentStorageID, layoutDecisionRow: typedIRLayoutDecisionRow))
+                    if typedIRAssignedFieldCount <= 0 { return 0 - 1 }
+                    return compilerTypedIRAppendOperation(ir: ir, nodeID: typedIRAssignmentNodeID, regionNodeID: typedIRRegionNodeID, operationKind: compilerTypedIROperationStore(), typeNodeID: typedIRApplicationTypeNodeID, storageID: typedIRAssignmentStorageID, first: nodeID, second: typedIRAssignmentTargetNodeID, memoryDecisionRow: typedIRAssignmentDecisionRow)
+                }
                 let typedIRTransferReturnNodeID: Int(compilerSemanticGraphParent(delta: delta, objectNodeID: nodeID, roleTag: compilerSyntaxRoleReturnValue()))
                 if typedIRTransferReturnNodeID < 0 { return 0 - 1 }
                 let typedIRReturnedFieldCount: Int(compilerTypedIRAppendConstructFields(tables: tables, delta: delta, semantics: semantics, memory: memory, ir: ir, applicationNodeID: nodeID, regionNodeID: typedIRRegionNodeID, typeNodeID: typedIRApplicationTypeNodeID, storageID: 0 - 1, layoutDecisionRow: typedIRLayoutDecisionRow))
@@ -3670,6 +3892,7 @@ function compilerTypedIRDecisionKindForOperation(operationKind: Int): Int {
     if operationKind == compilerTypedIROperationTransfer() { return compilerMemoryDecisionTransfer() }
     if operationKind == compilerTypedIROperationCallReceive() { return compilerMemoryDecisionInitialize() }
     if operationKind == compilerTypedIROperationStoragePolicy() { return compilerMemoryDecisionStoragePolicy() }
+    if operationKind == compilerTypedIROperationStore() { return compilerMemoryDecisionAccess() }
     return 0 - 1
 }
 
@@ -3703,6 +3926,32 @@ function compilerTypedIRInsertFieldsAreValid(memory: CompilerMemoryGraph, ir: Co
             if compilerIntTableValue(table: ir.operations, row: typedIRConstructOperationRow, column: 5) != typedIRConstructExpectedFields { return false }
         }
         typedIRConstructOperationRow: typedIRConstructOperationRow + 1
+    }
+    state typedIRStoreOperationRow: Int(0)
+    while typedIRStoreOperationRow < typedIRConstructOperationCount {
+        if compilerIntTableValue(table: ir.operations, row: typedIRStoreOperationRow, column: 2) == compilerTypedIROperationStore() {
+            let typedIRStoreValueNodeID: Int(compilerIntTableValue(table: ir.operations, row: typedIRStoreOperationRow, column: 5))
+            let typedIRStoreTypeNodeID: Int(compilerIntTableValue(table: ir.operations, row: typedIRStoreOperationRow, column: 3))
+            let typedIRStoreStorageID: Int(compilerIntTableValue(table: ir.operations, row: typedIRStoreOperationRow, column: 4))
+            let typedIRStoreLayoutRow: Int(compilerMemoryLayoutRowForType(memory: memory, typeNodeID: typedIRStoreTypeNodeID))
+            if typedIRStoreLayoutRow < 0 { return false }
+            let typedIRStoreExpectedFields: Int(compilerIntTableValue(table: memory.layouts, row: typedIRStoreLayoutRow, column: 1))
+            state typedIRStoreFieldOrdinal: Int(0)
+            while typedIRStoreFieldOrdinal < typedIRStoreExpectedFields {
+                state typedIRStoreFieldMatches: Int(0)
+                state typedIRStoreCandidateRow: Int(0)
+                while typedIRStoreCandidateRow < typedIRConstructOperationCount {
+                    if compilerIntTableValue(table: ir.operations, row: typedIRStoreCandidateRow, column: 0) == typedIRStoreValueNodeID
+                        && compilerIntTableValue(table: ir.operations, row: typedIRStoreCandidateRow, column: 2) == compilerTypedIROperationInsertField()
+                        && compilerIntTableValue(table: ir.operations, row: typedIRStoreCandidateRow, column: 4) == typedIRStoreStorageID
+                        && compilerIntTableValue(table: ir.operations, row: typedIRStoreCandidateRow, column: 5) == typedIRStoreFieldOrdinal { typedIRStoreFieldMatches: typedIRStoreFieldMatches + 1 }
+                    typedIRStoreCandidateRow: typedIRStoreCandidateRow + 1
+                }
+                if typedIRStoreFieldMatches != 1 { return false }
+                typedIRStoreFieldOrdinal: typedIRStoreFieldOrdinal + 1
+            }
+        }
+        typedIRStoreOperationRow: typedIRStoreOperationRow + 1
     }
     return true
 }
@@ -3756,6 +4005,10 @@ function compilerTypedIRIsValid(tables: CompilerSyntaxTables, delta: CompilerGra
                 && compilerIntTableValue(table: memory.decisions, row: typedIRValidationOperationDecisionRow, column: 2) != typedIRValidationStorageID { return false }
             if typedIRValidationOperationKind == compilerTypedIROperationStoragePolicy()
                 && compilerIntTableValue(table: ir.operations, row: typedIRValidationOperationRow, column: 5) != compilerIntTableValue(table: memory.decisions, row: typedIRValidationOperationDecisionRow, column: 4) { return false }
+            if typedIRValidationOperationKind == compilerTypedIROperationStore()
+                && (compilerIntTableValue(table: memory.decisions, row: typedIRValidationOperationDecisionRow, column: 1) != typedIRValidationNodeID
+                    || compilerIntTableValue(table: memory.decisions, row: typedIRValidationOperationDecisionRow, column: 4) != compilerMemoryAccessWriteUnique()
+                    || compilerIntTableValue(table: memory.decisions, row: typedIRValidationOperationDecisionRow, column: 5) != compilerIntTableValue(table: ir.operations, row: typedIRValidationOperationRow, column: 6)) { return false }
         } else if typedIRValidationOperationDecisionRow != 0 - 1 { return false }
         if typedIRValidationOperationKind == compilerTypedIROperationReturn() { typedIRTerminatorCount: typedIRTerminatorCount + 1 }
         typedIRValidationOperationRow: typedIRValidationOperationRow + 1
@@ -3825,17 +4078,23 @@ function compilerTypedIRIdentityText(value: Int): String {
     return "p\(value)"
 }
 
+function compilerTypedIRLLVMAppend(buffer: TextBuffer, text: String): Bool {
+    return textBufferAppend(buffer: buffer, text: text) == 0
+}
+
 function compilerTypedIRLLVMFixedAggregateType(memory: CompilerMemoryGraph, layoutRow: Int): String {
     let typedIRTypeBuffer: TextBuffer(textBufferCreate(capacity: 128))
-    textBufferAppend(buffer: typedIRTypeBuffer, text: String("{ "))
+    if !compilerTypedIRLLVMAppend(buffer: typedIRTypeBuffer, text: String("{ ")) { return String("") }
     state typedIRTypeFieldOrdinal: Int(0)
     let typedIRTypeFieldCount: Int(compilerIntTableValue(table: memory.layouts, row: layoutRow, column: 1))
     while typedIRTypeFieldOrdinal < typedIRTypeFieldCount {
-        if typedIRTypeFieldOrdinal > 0 { textBufferAppend(buffer: typedIRTypeBuffer, text: String(", ")) }
-        textBufferAppend(buffer: typedIRTypeBuffer, text: String("i32"))
+        if typedIRTypeFieldOrdinal > 0 {
+            if !compilerTypedIRLLVMAppend(buffer: typedIRTypeBuffer, text: String(", ")) { return String("") }
+        }
+        if !compilerTypedIRLLVMAppend(buffer: typedIRTypeBuffer, text: String("i32")) { return String("") }
         typedIRTypeFieldOrdinal: typedIRTypeFieldOrdinal + 1
     }
-    textBufferAppend(buffer: typedIRTypeBuffer, text: String(" }"))
+    if !compilerTypedIRLLVMAppend(buffer: typedIRTypeBuffer, text: String(" }")) { return String("") }
     return compilerCoreTextBufferMaterializeAndDestroy(buffer: typedIRTypeBuffer)
 }
 
@@ -3860,7 +4119,7 @@ function compilerTypedIRFixedLLVMRenderReturned(tables: CompilerSyntaxTables, me
     let typedIRReturnedNewline: String(compilerCoreNewlineCharacter())
     let typedIRReturnedAlignment: Int(compilerIntTableValue(table: memory.layouts, row: layoutRow, column: 3))
     let typedIRReturnedBuffer: TextBuffer(textBufferCreate(capacity: 4096))
-    textBufferAppend(buffer: typedIRReturnedBuffer, text: "\(typeName) = type \(compilerTypedIRLLVMFixedAggregateType(memory: memory, layoutRow: layoutRow))\(typedIRReturnedNewline)")
+    if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "\(typeName) = type \(compilerTypedIRLLVMFixedAggregateType(memory: memory, layoutRow: layoutRow))\(typedIRReturnedNewline)") { return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure")) }
     state typedIRReturnedOperationRow: Int(0)
     let typedIRReturnedOperationCount: Int(compilerIntTableRowCount(table: ir.operations))
     state typedIRReturnedFunctionRow: Int(0)
@@ -3875,7 +4134,7 @@ function compilerTypedIRFixedLLVMRenderReturned(tables: CompilerSyntaxTables, me
                 textBufferDestroy(buffer: typedIRReturnedBuffer)
                 return compilerNativeDiagnostic(kind: String("invalidReturnedTypedIRLLVMFunction"))
             }
-            textBufferAppend(buffer: typedIRReturnedBuffer, text: "\(typedIRReturnedNewline)define \(typeName) \(compilerTypedIRFunctionName(ir: ir, functionRow: typedIRReturnedFunctionRow))() {\(typedIRReturnedNewline)entry:\(typedIRReturnedNewline)")
+            if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "\(typedIRReturnedNewline)define \(typeName) \(compilerTypedIRFunctionName(ir: ir, functionRow: typedIRReturnedFunctionRow))() {\(typedIRReturnedNewline)entry:\(typedIRReturnedNewline)") { return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure")) }
             state typedIRReturnedAggregateIndex: Int(0)
             state typedIRReturnedAggregateOperand: String("poison")
             typedIRReturnedOperationRow: 0
@@ -3883,7 +4142,7 @@ function compilerTypedIRFixedLLVMRenderReturned(tables: CompilerSyntaxTables, me
                 if compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 1) == typedIRReturnedHelperNodeID
                     && compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 2) == compilerTypedIROperationInsertField() {
                     let typedIRReturnedAggregateResult: String("%aggregate\(typedIRReturnedAggregateIndex)")
-                    textBufferAppend(buffer: typedIRReturnedBuffer, text: "  \(typedIRReturnedAggregateResult) = insertvalue \(typeName) \(typedIRReturnedAggregateOperand), i32 \(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 6)), \(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 5))\(typedIRReturnedNewline)")
+                    if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "  \(typedIRReturnedAggregateResult) = insertvalue \(typeName) \(typedIRReturnedAggregateOperand), i32 \(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 6)), \(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 5))\(typedIRReturnedNewline)") { return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure")) }
                     typedIRReturnedAggregateOperand: typedIRReturnedAggregateResult
                     typedIRReturnedAggregateIndex: typedIRReturnedAggregateIndex + 1
                 }
@@ -3893,14 +4152,14 @@ function compilerTypedIRFixedLLVMRenderReturned(tables: CompilerSyntaxTables, me
                 textBufferDestroy(buffer: typedIRReturnedBuffer)
                 return compilerNativeDiagnostic(kind: String("invalidReturnedTypedIRLLVMFields"))
             }
-            textBufferAppend(buffer: typedIRReturnedBuffer, text: "  ret \(typeName) \(typedIRReturnedAggregateOperand)\(typedIRReturnedNewline)}\(typedIRReturnedNewline)")
+            if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "  ret \(typeName) \(typedIRReturnedAggregateOperand)\(typedIRReturnedNewline)}\(typedIRReturnedNewline)") { return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure")) }
         }
         typedIRReturnedFunctionRow: typedIRReturnedFunctionRow + 1
     }
-    textBufferAppend(buffer: typedIRReturnedBuffer, text: "\(typedIRReturnedNewline)define i32 @main() {\(typedIRReturnedNewline)entry:\(typedIRReturnedNewline)")
+    if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "\(typedIRReturnedNewline)define i32 @main() {\(typedIRReturnedNewline)entry:\(typedIRReturnedNewline)") { return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure")) }
     state typedIRReturnedStorageRow: Int(0)
     while typedIRReturnedStorageRow < compilerIntTableRowCount(table: memory.storages) {
-        textBufferAppend(buffer: typedIRReturnedBuffer, text: "  %storage\(typedIRReturnedStorageRow) = alloca \(typeName), align \(typedIRReturnedAlignment)\(typedIRReturnedNewline)")
+        if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "  %storage\(typedIRReturnedStorageRow) = alloca \(typeName), align \(typedIRReturnedAlignment)\(typedIRReturnedNewline)") { return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure")) }
         typedIRReturnedStorageRow: typedIRReturnedStorageRow + 1
     }
     typedIRReturnedOperationRow: 0
@@ -3915,18 +4174,38 @@ function compilerTypedIRFixedLLVMRenderReturned(tables: CompilerSyntaxTables, me
                     textBufferDestroy(buffer: typedIRReturnedBuffer)
                     return compilerNativeDiagnostic(kind: String("invalidReturnedTypedIRLLVMCall"))
                 }
-                textBufferAppend(buffer: typedIRReturnedBuffer, text: "  %received\(typedIRReturnedNodeID) = call \(typeName) \(compilerTypedIRFunctionName(ir: ir, functionRow: typedIRReturnedCallFunctionRow))()\(typedIRReturnedNewline)  store \(typeName) %received\(typedIRReturnedNodeID), ptr %storage\(typedIRReturnedStorageID), align \(typedIRReturnedAlignment)\(typedIRReturnedNewline)")
+                if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "  %received\(typedIRReturnedNodeID) = call \(typeName) \(compilerTypedIRFunctionName(ir: ir, functionRow: typedIRReturnedCallFunctionRow))()\(typedIRReturnedNewline)  store \(typeName) %received\(typedIRReturnedNodeID), ptr %storage\(typedIRReturnedStorageID), align \(typedIRReturnedAlignment)\(typedIRReturnedNewline)") { return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure")) }
+            } else if typedIRReturnedOperationKind == compilerTypedIROperationStore() {
+                let typedIRStoreValueNodeID: Int(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 5))
+                state typedIRStoreAggregateIndex: Int(0)
+                state typedIRStoreAggregateOperand: String("poison")
+                state typedIRStoreFieldRow: Int(0)
+                while typedIRStoreFieldRow < typedIRReturnedOperationCount {
+                    if compilerIntTableValue(table: ir.operations, row: typedIRStoreFieldRow, column: 0) == typedIRStoreValueNodeID
+                        && compilerIntTableValue(table: ir.operations, row: typedIRStoreFieldRow, column: 2) == compilerTypedIROperationInsertField() {
+                        let typedIRStoreAggregateResult: String("%updated\(typedIRReturnedNodeID)_\(typedIRStoreAggregateIndex)")
+                        if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "  \(typedIRStoreAggregateResult) = insertvalue \(typeName) \(typedIRStoreAggregateOperand), i32 \(compilerIntTableValue(table: ir.operations, row: typedIRStoreFieldRow, column: 6)), \(compilerIntTableValue(table: ir.operations, row: typedIRStoreFieldRow, column: 5))\(typedIRReturnedNewline)") { return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure")) }
+                        typedIRStoreAggregateOperand: typedIRStoreAggregateResult
+                        typedIRStoreAggregateIndex: typedIRStoreAggregateIndex + 1
+                    }
+                    typedIRStoreFieldRow: typedIRStoreFieldRow + 1
+                }
+                if typedIRStoreAggregateIndex != compilerIntTableValue(table: memory.layouts, row: layoutRow, column: 1) {
+                    textBufferDestroy(buffer: typedIRReturnedBuffer)
+                    return compilerNativeDiagnostic(kind: String("invalidReturnedTypedIRLLVMStore"))
+                }
+                if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "  store \(typeName) \(typedIRStoreAggregateOperand), ptr %storage\(typedIRReturnedStorageID), align \(typedIRReturnedAlignment)\(typedIRReturnedNewline)") { return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure")) }
             } else if typedIRReturnedOperationKind == compilerTypedIROperationMemberRead() {
-                textBufferAppend(buffer: typedIRReturnedBuffer, text: "  %borrow\(typedIRReturnedNodeID) = load \(typeName), ptr %storage\(typedIRReturnedStorageID), align \(typedIRReturnedAlignment)\(typedIRReturnedNewline)  %value\(typedIRReturnedNodeID) = extractvalue \(typeName) %borrow\(typedIRReturnedNodeID), \(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 6))\(typedIRReturnedNewline)")
+                if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "  %borrow\(typedIRReturnedNodeID) = load \(typeName), ptr %storage\(typedIRReturnedStorageID), align \(typedIRReturnedAlignment)\(typedIRReturnedNewline)  %value\(typedIRReturnedNodeID) = extractvalue \(typeName) %borrow\(typedIRReturnedNodeID), \(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 6))\(typedIRReturnedNewline)") { return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure")) }
             } else if typedIRReturnedOperationKind == compilerTypedIROperationAddition() {
-                textBufferAppend(buffer: typedIRReturnedBuffer, text: "  %value\(typedIRReturnedNodeID) = add i32 %value\(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 5)), %value\(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 6))\(typedIRReturnedNewline)")
+                if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "  %value\(typedIRReturnedNodeID) = add i32 %value\(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 5)), %value\(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 6))\(typedIRReturnedNewline)") { return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure")) }
             } else if typedIRReturnedOperationKind == compilerTypedIROperationReturn() {
-                textBufferAppend(buffer: typedIRReturnedBuffer, text: "  ret i32 %value\(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 5))\(typedIRReturnedNewline)")
+                if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "  ret i32 %value\(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 5))\(typedIRReturnedNewline)") { return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure")) }
             }
         }
         typedIRReturnedOperationRow: typedIRReturnedOperationRow + 1
     }
-    textBufferAppend(buffer: typedIRReturnedBuffer, text: "}\(typedIRReturnedNewline)")
+    if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "}\(typedIRReturnedNewline)") { return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure")) }
     return compilerCoreTextBufferMaterializeAndDestroy(buffer: typedIRReturnedBuffer)
 }
 
@@ -4476,7 +4755,7 @@ function compilerNativeSourceSetProgramForLLVM(source: String): CompilerProgram 
 }
 
 function compilerSourceSetBodyFunctionNames(): String {
-    return "\(compilerSourceSetBodyFunctionNamesInventory())\(compilerSourceSetBodyFunctionNamesNativeMain())\(compilerSourceSetBodyFunctionNamesNativeProgram())\(compilerSourceSetBodyFunctionNamesSourceSetPrep())\(compilerSourceSetBodyFunctionNamesSourceIdentity())\(compilerSourceSetBodyFunctionNamesTypedSyntax())\(compilerSourceSetBodyFunctionNamesSemantics())\(compilerSourceSetBodyFunctionNamesMemoryGraph())\(compilerSourceSetBodyFunctionNamesTypedIR())\(compilerSourceSetBodyFunctionNamesSourceSetLLVM())\(compilerSourceSetBodyFunctionNamesSourceSetParser())\(compilerSourceSetBodyFunctionNamesMainASTLowering())\(compilerSourceSetBodyFunctionNamesLexer())\(compilerSourceSetBodyFunctionNamesScanning())"
+    return "\(compilerSourceSetBodyFunctionNamesInventory())\(compilerSourceSetBodyFunctionNamesNativeMain())\(compilerSourceSetBodyFunctionNamesNativeProgram())\(compilerSourceSetBodyFunctionNamesSourceSetPrep())\(compilerSourceSetBodyFunctionNamesSourceIdentity())\(compilerSourceSetBodyFunctionNamesTypedSyntax())\(compilerSourceSetBodyFunctionNamesSemantics())\(compilerSourceSetBodyFunctionNamesMemoryGraph())\(compilerSourceSetBodyFunctionNamesBinding())\(compilerSourceSetBodyFunctionNamesTypedIR())\(compilerSourceSetBodyFunctionNamesSourceSetLLVM())\(compilerSourceSetBodyFunctionNamesSourceSetParser())\(compilerSourceSetBodyFunctionNamesMainASTLowering())\(compilerSourceSetBodyFunctionNamesLexer())\(compilerSourceSetBodyFunctionNamesScanning())"
 }
 
 function compilerSourceSetBodyFunctionNamesInventory(): String {
@@ -4484,7 +4763,7 @@ function compilerSourceSetBodyFunctionNamesInventory(): String {
 }
 
 function compilerSourceSetBodyFunctionNamesInventoryCore(): String {
-    return "compileRangeNativeSource;compileRangeNativeSourceDirectiveOutput;compileRangeNativeProgramOutput;compilerSourceRequestsSourceSetBodyFunctionNames;compilerSourceRequestsNativeSourceSetLLVMText;compilerSourceRequestsNativeSourceSetParseStats;compilerSourceRequestsNativeSourceSetReachableStats;compilerSourceRequestsNativeSourceSetSelectedStats;compilerSourceRequestsNativeSourceSetSelectedScanStats;compilerSourceRequestsSourceSetLLVMText;compilerSourceRequestsPlotter;compilerSourceSetBodyFunctionNames;compilerSourceSetBodyFunctionNamesInventory;compilerSourceSetBodyFunctionNamesInventoryCore;compilerSourceSetBodyFunctionNamesInventoryChunks;compilerSourceSetBodyFunctionNamesInventorySourceSetChunks;compilerSourceSetBodyFunctionNamesInventoryMainASTChunks;compilerSourceSetBodyFunctionNamesNativeMain;compilerSourceSetBodyFunctionNamesNativeProgram;compilerSourceSetBodyFunctionNamesSourceSetPrep;compilerSourceSetBodyFunctionNamesSourceIdentity;compilerSourceSetBodyFunctionNamesTypedSyntax;"
+    return "compileRangeNativeSource;compileRangeNativeSourceDirectiveOutput;compileRangeNativeProgramOutput;compilerSourceRequestsSourceSetBodyFunctionNames;compilerSourceRequestsNativeSourceSetLLVMText;compilerSourceRequestsNativeSourceSetParseStats;compilerSourceRequestsNativeSourceSetReachableStats;compilerSourceRequestsNativeSourceSetSelectedStats;compilerSourceRequestsNativeSourceSetSelectedScanStats;compilerSourceRequestsSourceSetLLVMText;compilerSourceRequestsPlotter;compilerSourceSetBodyFunctionNames;compilerSourceSetBodyFunctionNamesInventory;compilerSourceSetBodyFunctionNamesInventoryCore;compilerSourceSetBodyFunctionNamesInventoryChunks;compilerSourceSetBodyFunctionNamesInventorySourceSetChunks;compilerSourceSetBodyFunctionNamesInventoryMainASTChunks;compilerSourceSetBodyFunctionNamesNativeMain;compilerSourceSetBodyFunctionNamesNativeProgram;compilerSourceSetBodyFunctionNamesSourceSetPrep;compilerSourceSetBodyFunctionNamesSourceIdentity;compilerSourceSetBodyFunctionNamesTypedSyntax;compilerSourceSetBodyFunctionNamesBinding;compilerTypedIRLLVMAppend;"
 }
 
 function compilerSourceSetBodyFunctionNamesInventoryChunks(): String {
@@ -4516,19 +4795,23 @@ function compilerSourceSetBodyFunctionNamesSourceIdentity(): String {
 }
 
 function compilerSourceSetBodyFunctionNamesTypedSyntax(): String {
-    return "compilerSourceRequestsTypedSyntax;compilerTypedSyntaxSummary;compilerTypedSyntaxCapture;compilerTypedSyntaxCaptureTopLevelToken;compilerTypedSyntaxCaptureConstruct;compilerTypedSyntaxCaptureMembers;compilerTypedSyntaxCaptureFunction;compilerTypedSyntaxCaptureParameters;compilerTypedSyntaxCaptureBody;compilerTypedSyntaxCaptureMain;compilerTypedFingerprintAppendNamedType;compilerTypedSyntaxRenderSnapshot;compilerTypedSyntaxRenderRawTable;compilerTypedSyntaxLocalText;compilerSyntaxKindName;compilerSyntaxIndexColumnCount;compilerSyntaxDeclarationColumnCount;compilerSyntaxMemberColumnCount;compilerSyntaxFunctionColumnCount;compilerSyntaxParameterColumnCount;compilerSyntaxBodyNodeColumnCount;compilerSyntaxBodyEdgeColumnCount;compilerSyntaxKindConstruct;compilerSyntaxKindFunction;compilerSyntaxKindMember;compilerSyntaxKindParameter;compilerSyntaxKindEntry;compilerSyntaxKindLocalBinding;compilerSyntaxKindReturn;compilerSyntaxKindIdentifier;compilerSyntaxKindApplication;compilerSyntaxKindMemberRead;compilerSyntaxKindIntegerLiteral;compilerSyntaxKindAddition;compilerSyntaxKindArgument;compilerSyntaxRoleStatement;compilerSyntaxRoleInitializer;compilerSyntaxRoleReturnValue;compilerSyntaxRoleCallee;compilerSyntaxRoleArgument;compilerSyntaxRoleArgumentValue;compilerSyntaxRoleReceiver;compilerSyntaxRoleLeftOperand;compilerSyntaxRoleRightOperand;compilerSyntaxTablesCreate;compilerSyntaxTablesDestroy;compilerSyntaxTablesPoison;compilerSyntaxTablesIsValid;compilerSyntaxTableAppend;compilerSyntaxGlobalRangeIsValid;compilerSyntaxDeclarationRangesAreValid;compilerSyntaxMemberRangesAreValid;compilerSyntaxFunctionRangesAreValid;compilerSyntaxParameterRangesAreValid;compilerFingerprintInitial;compilerFingerprintAppendInt;compilerFingerprintAppendRange;compilerFingerprintAppendText;compilerSyntaxDeclarationBaseFingerprint;compilerSyntaxAllocate;compilerSyntaxAppendDeclaration;compilerSyntaxAppendMember;compilerSyntaxAppendFunction;compilerSyntaxAppendParameter;compilerBodySyntaxSinkDisabled;compilerBodySyntaxSinkEnabled;compilerBodySyntaxSinkWithStatementOrdinal;compilerBodySyntaxLocalOffset;compilerBodySyntaxAppendNode;compilerBodySyntaxAppendEdge;compilerSyntaxDeclarationRowForSyntaxID;compilerSyntaxPriorChildCount;compilerSyntaxFacetIsValid;compilerSyntaxDeclarationsAreValid;compilerSyntaxMembersAreValid;compilerSyntaxFunctionsAreValid;compilerSyntaxParametersAreValid;compilerSyntaxBodyEdgeCount;compilerSyntaxBodyNodeShapeIsValid;compilerSyntaxKindIsBodyExpression;compilerSyntaxPriorBodyRoleCount;compilerSyntaxBodyEdgeKindsAreValid;compilerSyntaxBodyNodesAreValid;compilerSyntaxBodyEdgesAreValid;compilerSyntaxTablesAreStructurallyValid;compilerSourceStoreFileLocalOffsetForFileID;compilerSourceStoreGlobalOffset;parseCompilerStatementWithSink;parseCompilerReturnStatementWithSink;parseCompilerReturnStatementExpressionWithSink;parseCompilerLocalBindingStatementWithSink;compilerCoreCallArgumentsStartWithLabel;parseCompilerExpressionWithSink;parseCompilerExpressionAtPrecedenceWithSink;parseCompilerPrefixExpressionWithSink;parseCompilerPostfixExpressionWithSink;parseCompilerCallArgumentsWithSink;compilerCoreTokenExpressionWithSink;compilerCoreMissingParsedExpression;compilerPlotterSummary;compilerPlotterRenderSnapshot;compilerPlotterBuild;compilerPlotterAppendSyntaxNode;compilerPlotterAppendMemberFacts;compilerPlotterAppendParameterFacts;compilerPlotterAppendBodyFacts;compilerPlotterNodeIDForSyntaxID;compilerPlotterFunctionSyntaxID;compilerPlotterFacetKind;compilerGraphNodeColumnCount;compilerGraphFactColumnCount;compilerGraphFactOwns;compilerGraphRoleMember;compilerGraphRoleParameter;compilerGraphFacetDeclaration;compilerGraphFacetMember;compilerGraphFacetParameter;compilerGraphFacetEntry;compilerGraphFacetStatement;compilerGraphFacetExpression;compilerGraphFacetArgument;compilerGraphDeltaCreate;compilerGraphDeltaDestroy;compilerGraphDeltaPoison;compilerGraphDeltaAppend;compilerGraphDeltaAppendNode;compilerGraphDeltaAppendFact;compilerGraphDeltaIsValid;"
+    return "compilerSourceRequestsTypedSyntax;compilerTypedSyntaxSummary;compilerTypedSyntaxCapture;compilerTypedSyntaxCaptureTopLevelToken;compilerTypedSyntaxCaptureConstruct;compilerTypedSyntaxCaptureMembers;compilerTypedSyntaxCaptureFunction;compilerTypedSyntaxCaptureParameters;compilerTypedSyntaxCaptureBody;compilerTypedSyntaxCaptureMain;compilerTypedFingerprintAppendNamedType;compilerTypedSyntaxRenderSnapshot;compilerTypedSyntaxRenderRawTable;compilerTypedSyntaxLocalText;compilerSyntaxKindName;compilerSyntaxIndexColumnCount;compilerSyntaxDeclarationColumnCount;compilerSyntaxMemberColumnCount;compilerSyntaxFunctionColumnCount;compilerSyntaxParameterColumnCount;compilerSyntaxBodyNodeColumnCount;compilerSyntaxBodyEdgeColumnCount;compilerSyntaxKindConstruct;compilerSyntaxKindFunction;compilerSyntaxKindMember;compilerSyntaxKindParameter;compilerSyntaxKindEntry;compilerSyntaxKindLocalBinding;compilerSyntaxKindReturn;compilerSyntaxKindIdentifier;compilerSyntaxKindApplication;compilerSyntaxKindMemberRead;compilerSyntaxKindIntegerLiteral;compilerSyntaxKindAddition;compilerSyntaxKindArgument;compilerSyntaxKindMainAnnotation;compilerSyntaxKindAssignment;compilerSyntaxLocalKindLet;compilerSyntaxLocalKindState;compilerSyntaxRoleStatement;compilerSyntaxRoleInitializer;compilerSyntaxRoleReturnValue;compilerSyntaxRoleCallee;compilerSyntaxRoleArgument;compilerSyntaxRoleArgumentValue;compilerSyntaxRoleReceiver;compilerSyntaxRoleLeftOperand;compilerSyntaxRoleRightOperand;compilerSyntaxRoleAssignmentTarget;compilerSyntaxRoleAssignedValue;compilerSyntaxRoleAppliesTo;compilerSyntaxTablesCreate;compilerSyntaxTablesDestroy;compilerSyntaxTablesPoison;compilerSyntaxTablesIsValid;compilerSyntaxTableAppend;compilerSyntaxGlobalRangeIsValid;compilerSyntaxDeclarationRangesAreValid;compilerSyntaxMemberRangesAreValid;compilerSyntaxFunctionRangesAreValid;compilerSyntaxParameterRangesAreValid;compilerFingerprintInitial;compilerFingerprintAppendInt;compilerFingerprintAppendRange;compilerFingerprintAppendText;compilerSyntaxDeclarationBaseFingerprint;compilerSyntaxAllocate;compilerSyntaxAppendDeclaration;compilerSyntaxAppendMember;compilerSyntaxAppendFunction;compilerSyntaxAppendParameter;compilerBodySyntaxSinkDisabled;compilerBodySyntaxSinkEnabled;compilerBodySyntaxSinkWithStatementOrdinal;compilerBodySyntaxLocalOffset;compilerBodySyntaxAppendNode;compilerBodySyntaxAppendEdge;compilerSyntaxDeclarationRowForSyntaxID;compilerSyntaxPriorChildCount;compilerSyntaxFacetIsValid;compilerSyntaxDeclarationsAreValid;compilerSyntaxMembersAreValid;compilerSyntaxFunctionsAreValid;compilerSyntaxParametersAreValid;compilerSyntaxBodyEdgeCount;compilerSyntaxBodyNodeShapeIsValid;compilerSyntaxKindIsBodyExpression;compilerSyntaxPriorBodyRoleCount;compilerSyntaxBodyEdgeKindsAreValid;compilerSyntaxBodyNodesAreValid;compilerSyntaxBodyEdgesAreValid;compilerSyntaxTablesAreStructurallyValid;compilerSourceStoreFileLocalOffsetForFileID;compilerSourceStoreGlobalOffset;parseCompilerStatementWithSink;parseCompilerAssignmentStatementWithSink;parseCompilerReturnStatementWithSink;parseCompilerReturnStatementExpressionWithSink;parseCompilerLocalBindingStatementWithSink;compilerCoreCallArgumentsStartWithLabel;parseCompilerExpressionWithSink;parseCompilerExpressionAtPrecedenceWithSink;parseCompilerPrefixExpressionWithSink;parseCompilerPostfixExpressionWithSink;parseCompilerCallArgumentsWithSink;compilerCoreTokenExpressionWithSink;compilerCoreMissingParsedExpression;compilerPlotterSummary;compilerPlotterRenderSnapshot;compilerPlotterBuild;compilerPlotterAppendSyntaxNode;compilerPlotterAppendMemberFacts;compilerPlotterAppendParameterFacts;compilerPlotterAppendBodyFacts;compilerPlotterNodeIDForSyntaxID;compilerPlotterFunctionSyntaxID;compilerPlotterFacetKind;compilerGraphNodeColumnCount;compilerGraphFactColumnCount;compilerGraphFactOwns;compilerGraphRoleMember;compilerGraphRoleParameter;compilerGraphFacetDeclaration;compilerGraphFacetMember;compilerGraphFacetParameter;compilerGraphFacetEntry;compilerGraphFacetStatement;compilerGraphFacetExpression;compilerGraphFacetArgument;compilerGraphDeltaCreate;compilerGraphDeltaDestroy;compilerGraphDeltaPoison;compilerGraphDeltaAppend;compilerGraphDeltaAppendNode;compilerGraphDeltaAppendFact;compilerGraphDeltaIsValid;"
 }
 
 function compilerSourceSetBodyFunctionNamesSemantics(): String {
-    return "compilerSourceRequestsSemantics;compilerSemanticSummary;compilerSemanticRenderSnapshot;compilerSemanticBuild;compilerSemanticGraphIsValid;compilerSemanticResolutionColumnCount;compilerSemanticNodeTypeColumnCount;compilerSemanticParameterEffectColumnCount;compilerSemanticResolutionConstruct;compilerSemanticResolutionFunction;compilerSemanticResolutionLocal;compilerSemanticResolutionParameter;compilerSemanticResolutionMember;compilerSemanticResolutionArgumentMember;compilerSemanticResolutionArgumentParameter;compilerSemanticTypeNone;compilerSemanticTypeInt;compilerSemanticTypeConstruct;compilerSemanticGraphCreate;compilerSemanticGraphDestroy;compilerSemanticGraphPoison;compilerSemanticAppend;compilerSemanticAppendResolution;compilerSemanticResolutionTarget;compilerSemanticResolutionKind;compilerSemanticGraphChild;compilerSemanticGraphParent;compilerSemanticLocalRangesEqual;compilerSemanticLocalRangeEqualsText;compilerSemanticFunctionRowForSyntaxID;compilerSemanticNamedDeclaration;compilerSemanticResolveIdentifier;compilerSemanticTypeKind;compilerSemanticTypeDeclaration;compilerSemanticTypeFromSpan;compilerSemanticDeclaredNodeType;compilerSemanticResolveApplication;compilerSemanticResolveMember;compilerSemanticResolveArgument;compilerSemanticStoredNodeType;compilerSemanticTypeForNode;compilerSemanticAppendNodeType;compilerSemanticParameterIsRead;compilerSemanticParameterEscapes;compilerSemanticAppendParameterEffects;"
+    return "compilerSourceRequestsSemantics;compilerSemanticSummary;compilerSemanticRenderSnapshot;compilerSemanticBuild;compilerSemanticGraphIsValid;compilerSemanticResolutionColumnCount;compilerSemanticNodeTypeColumnCount;compilerSemanticParameterEffectColumnCount;compilerSemanticAccessEffectColumnCount;compilerSemanticAccessWrite;compilerSemanticAccessUnique;compilerSemanticResolutionConstruct;compilerSemanticResolutionFunction;compilerSemanticResolutionLocal;compilerSemanticResolutionParameter;compilerSemanticResolutionMember;compilerSemanticResolutionArgumentMember;compilerSemanticResolutionArgumentParameter;compilerSemanticTypeNone;compilerSemanticTypeInt;compilerSemanticTypeConstruct;compilerSemanticGraphCreate;compilerSemanticGraphDestroy;compilerSemanticGraphPoison;compilerSemanticAppend;compilerSemanticAppendResolution;compilerSemanticResolutionTarget;compilerSemanticResolutionKind;compilerSemanticGraphChild;compilerSemanticGraphParent;compilerSemanticLocalRangesEqual;compilerSemanticLocalRangeEqualsText;compilerSemanticFunctionRowForSyntaxID;compilerSemanticNamedDeclaration;compilerSemanticResolveIdentifier;compilerSemanticTypeKind;compilerSemanticTypeDeclaration;compilerSemanticTypeFromSpan;compilerSemanticDeclaredNodeType;compilerSemanticResolveApplication;compilerSemanticResolveMember;compilerSemanticResolveArgument;compilerSemanticStoredNodeType;compilerSemanticTypeForNode;compilerSemanticAppendNodeType;compilerSemanticParameterIsRead;compilerSemanticParameterEscapes;compilerSemanticAppendParameterEffects;compilerSemanticAppendAccessEffects;compilerSemanticAccessEffectRowForAssignment;"
 }
 
 function compilerSourceSetBodyFunctionNamesMemoryGraph(): String {
-    return "compilerSourceRequestsMemoryGraph;compilerMemorySummary;compilerMemoryRenderSnapshot;compilerMemoryBuild;compilerMemoryGraphIsValid;compilerMemoryLayoutColumnCount;compilerMemoryStorageColumnCount;compilerMemoryDecisionColumnCount;compilerMemoryDecisionLayout;compilerMemoryDecisionPlacement;compilerMemoryDecisionInitialize;compilerMemoryDecisionBorrow;compilerMemoryDecisionEscape;compilerMemoryDecisionPassMode;compilerMemoryDecisionDestroy;compilerMemoryDecisionTransfer;compilerMemoryDecisionReturnMode;compilerMemoryDecisionAccess;compilerMemoryDecisionStoragePolicy;compilerMemoryPlacementLocal;compilerMemoryBorrowShared;compilerMemoryPassByValue;compilerMemoryTransferOwnership;compilerMemoryReturnAggregateValue;compilerMemoryAccessRead;compilerMemoryStorageImmutable;compilerMemoryStorageMutable;compilerMemoryGraphCreate;compilerMemoryGraphDestroy;compilerMemoryGraphPoison;compilerMemoryAppend;compilerMemoryAppendLayout;compilerMemoryAppendStorage;compilerMemoryAppendDecision;compilerMemoryLayoutRowForType;compilerMemoryStorageForLocal;compilerMemoryLocalStoragePolicy;compilerMemoryEffectRowForParameter;compilerMemoryConstructFieldCount;compilerMemoryBuildLayouts;compilerMemoryLocalEscapes;compilerMemoryBuildStorages;compilerMemoryBuildLayoutDecisions;compilerMemoryBuildPlacementDecisions;compilerMemoryBuildInitializeDecisions;compilerMemoryBuildBorrowDecisions;compilerMemoryBuildEscapeDecisions;compilerMemoryBuildPassDecisions;compilerMemoryLastReturnInRegion;compilerMemoryNodeEnd;compilerMemoryDestroyFollowsUses;compilerMemoryBuildDestroyDecisions;compilerMemoryFunctionReturnNode;compilerMemoryCallerStorageForFunction;compilerMemoryBuildTransferDecisions;compilerMemoryBuildReturnModeDecisions;compilerMemoryBuildAccessDecisions;compilerMemoryBuildStoragePolicyDecisions;compilerMemoryDecisionCount;compilerMemoryConstructParameterCount;compilerMemoryBorrowCount;compilerMemoryReturnedConstructFunctionCount;compilerMemoryReturnedConstructCallCount;compilerMemoryLocalMemberAccessCount;"
+    return "compilerSourceRequestsMemoryGraph;compilerMemorySummary;compilerMemoryRenderSnapshot;compilerMemoryBuild;compilerMemoryGraphIsValid;compilerMemoryLayoutColumnCount;compilerMemoryStorageColumnCount;compilerMemoryDecisionColumnCount;compilerMemoryDecisionLayout;compilerMemoryDecisionPlacement;compilerMemoryDecisionInitialize;compilerMemoryDecisionBorrow;compilerMemoryDecisionEscape;compilerMemoryDecisionPassMode;compilerMemoryDecisionDestroy;compilerMemoryDecisionTransfer;compilerMemoryDecisionReturnMode;compilerMemoryDecisionAccess;compilerMemoryDecisionStoragePolicy;compilerMemoryPlacementLocal;compilerMemoryBorrowShared;compilerMemoryPassByValue;compilerMemoryTransferOwnership;compilerMemoryReturnAggregateValue;compilerMemoryAccessRead;compilerMemoryAccessWriteUnique;compilerMemoryStorageImmutable;compilerMemoryStorageMutable;compilerMemoryGraphCreate;compilerMemoryGraphDestroy;compilerMemoryGraphPoison;compilerMemoryAppend;compilerMemoryAppendLayout;compilerMemoryAppendStorage;compilerMemoryAppendDecision;compilerMemoryLayoutRowForType;compilerMemoryStorageForLocal;compilerMemoryLocalStoragePolicy;compilerMemoryEffectRowForParameter;compilerMemoryConstructFieldCount;compilerMemoryBuildLayouts;compilerMemoryLocalEscapes;compilerMemoryBuildStorages;compilerMemoryBuildLayoutDecisions;compilerMemoryBuildPlacementDecisions;compilerMemoryBuildInitializeDecisions;compilerMemoryBuildBorrowDecisions;compilerMemoryBuildEscapeDecisions;compilerMemoryBuildPassDecisions;compilerMemoryLastReturnInRegion;compilerMemoryNodeEnd;compilerMemoryDestroyFollowsUses;compilerMemoryBuildDestroyDecisions;compilerMemoryFunctionReturnNode;compilerMemoryBuildTransferDecisions;compilerMemoryBuildReturnModeDecisions;compilerMemoryBuildAccessDecisions;compilerMemoryBuildStoragePolicyDecisions;compilerMemoryDecisionCount;compilerMemoryConstructParameterCount;compilerMemoryBorrowCount;compilerMemoryReturnedConstructFunctionCount;compilerMemoryReturnedConstructCallCount;compilerMemoryLocalMemberAccessCount;"
+}
+
+function compilerSourceSetBodyFunctionNamesBinding(): String {
+    return "compilerSyntaxKindBindingReference;compilerSyntaxMemberKindLet;compilerSyntaxMemberKindState;compilerSyntaxMemberKindBinding;compilerMemoryDecisionAlias;compilerMemoryAccessSharedAlias;compilerMemoryBindingAliasCount;compilerMemoryBuildAliasDecisions;compilerMemoryAliasAccessesConflict;"
 }
 
 function compilerSourceSetBodyFunctionNamesTypedIR(): String {
-    return "compilerSourceRequestsTypedIR;compilerSourceRequestsMemoryLLVMText;compilerTypedIRSummary;compilerTypedIRRenderSnapshot;compilerTypedIRBuild;compilerTypedIRBuildFunctions;compilerTypedIRBuildNode;compilerTypedIRIsValid;compilerTypedIRDecisionKindForOperation;compilerTypedIRInsertFieldsAreValid;compilerTypedIRFunctionColumnCount;compilerTypedIROperationColumnCount;compilerTypedIROperationConstruct;compilerTypedIROperationMemberRead;compilerTypedIROperationAddition;compilerTypedIROperationCall;compilerTypedIROperationReturn;compilerTypedIROperationDestroy;compilerTypedIROperationLocal;compilerTypedIROperationInteger;compilerTypedIROperationInsertField;compilerTypedIROperationNoEscape;compilerTypedIROperationConstructValue;compilerTypedIROperationTransfer;compilerTypedIROperationCallReceive;compilerTypedIROperationStoragePolicy;compilerTypedIRCreate;compilerTypedIRDestroy;compilerTypedIRPoison;compilerTypedIRAppend;compilerTypedIRAppendFunction;compilerTypedIRAppendOperation;compilerTypedIRMemoryDecisionRow;compilerTypedIRNodeRegion;compilerTypedIRIntegerValue;compilerTypedIRArgumentIntegerForMember;compilerTypedIRAppendConstructFields;compilerTypedIROperationRow;compilerTypedIRIdentityText;compilerTypedIRLLVMFixedAggregateType;compilerTypedIRFunctionRowForOwner;compilerTypedIRFunctionName;compilerTypedIRFixedLLVMRenderReturned;compilerTypedIRFixedLLVMRender;compilerTypedIRProofCandidate;compilerTypedIRFixedLLVMTextWithPolicy;compilerTypedIRFixedLLVMText;compilerTypedIRFixedLLVMIfSupported;"
+    return "compilerSourceRequestsTypedIR;compilerSourceRequestsMemoryLLVMText;compilerTypedIRSummary;compilerTypedIRRenderSnapshot;compilerTypedIRBuild;compilerTypedIRBuildFunctions;compilerTypedIRBuildNode;compilerTypedIRIsValid;compilerTypedIRDecisionKindForOperation;compilerTypedIRInsertFieldsAreValid;compilerTypedIRFunctionColumnCount;compilerTypedIROperationColumnCount;compilerTypedIROperationConstruct;compilerTypedIROperationMemberRead;compilerTypedIROperationAddition;compilerTypedIROperationCall;compilerTypedIROperationReturn;compilerTypedIROperationDestroy;compilerTypedIROperationLocal;compilerTypedIROperationInteger;compilerTypedIROperationInsertField;compilerTypedIROperationNoEscape;compilerTypedIROperationConstructValue;compilerTypedIROperationTransfer;compilerTypedIROperationCallReceive;compilerTypedIROperationStoragePolicy;compilerTypedIROperationStore;compilerTypedIRCreate;compilerTypedIRDestroy;compilerTypedIRPoison;compilerTypedIRAppend;compilerTypedIRAppendFunction;compilerTypedIRAppendOperation;compilerTypedIRMemoryDecisionRow;compilerTypedIRNodeRegion;compilerTypedIRIntegerValue;compilerTypedIRArgumentIntegerForMember;compilerTypedIRAppendConstructFields;compilerTypedIROperationRow;compilerTypedIRIdentityText;compilerTypedIRLLVMFixedAggregateType;compilerTypedIRFunctionRowForOwner;compilerTypedIRFunctionName;compilerTypedIRFixedLLVMRenderReturned;compilerTypedIRFixedLLVMRender;compilerTypedIRProofCandidate;compilerTypedIRFixedLLVMTextWithPolicy;compilerTypedIRFixedLLVMText;compilerTypedIRFixedLLVMIfSupported;"
 }
 
 function compilerSourceSetBodyFunctionNamesSourceSetLLVM(): String {
@@ -5625,22 +5908,22 @@ function compilerCoreEmptyParsedStatements(start: Int, end: Int): CompilerParsed
 
 function compilerCoreTopLevelDeclarationRecord(declaration: CompilerTopLevelDeclaration): String {
     let outputBuffer: TextBuffer(textBufferCreate(capacity: 1024))
-    textBufferAppend(buffer: outputBuffer, text: "kind=\(declaration.kind)|name=\(declaration.name)|parameterStart=")
-    textBufferAppendInt(buffer: outputBuffer, value: declaration.parameterStart)
-    textBufferAppend(buffer: outputBuffer, text: String("|parameterEnd="))
-    textBufferAppendInt(buffer: outputBuffer, value: declaration.parameterEnd)
-    textBufferAppend(buffer: outputBuffer, text: "|parameters=\(declaration.parameterSummary)|returnType=\(declaration.returnType)|members=\(declaration.memberSummary)|statementRecords=")
-    textBufferAppend(buffer: outputBuffer, text: compilerCoreStatementRecordEncodeValue(value: declaration.statementRecords))
-    textBufferAppend(buffer: outputBuffer, text: String("|statementSummary=|bodyStart="))
-    textBufferAppendInt(buffer: outputBuffer, value: declaration.bodyStart)
-    textBufferAppend(buffer: outputBuffer, text: String("|bodyEnd="))
-    textBufferAppendInt(buffer: outputBuffer, value: declaration.bodyEnd)
-    textBufferAppend(buffer: outputBuffer, text: compilerCoreTopLevelDeclarationRecordTerminator())
+    if textBufferAppend(buffer: outputBuffer, text: "kind=\(declaration.kind)|name=\(declaration.name)|parameterStart=") != 0 { return String("") }
+    if textBufferAppendInt(buffer: outputBuffer, value: declaration.parameterStart) != 0 { return String("") }
+    if textBufferAppend(buffer: outputBuffer, text: String("|parameterEnd=")) != 0 { return String("") }
+    if textBufferAppendInt(buffer: outputBuffer, value: declaration.parameterEnd) != 0 { return String("") }
+    if textBufferAppend(buffer: outputBuffer, text: "|parameters=\(declaration.parameterSummary)|returnType=\(declaration.returnType)|members=\(declaration.memberSummary)|statementRecords=") != 0 { return String("") }
+    if textBufferAppend(buffer: outputBuffer, text: compilerCoreStatementRecordEncodeValue(value: declaration.statementRecords)) != 0 { return String("") }
+    if textBufferAppend(buffer: outputBuffer, text: String("|statementSummary=|bodyStart=")) != 0 { return String("") }
+    if textBufferAppendInt(buffer: outputBuffer, value: declaration.bodyStart) != 0 { return String("") }
+    if textBufferAppend(buffer: outputBuffer, text: String("|bodyEnd=")) != 0 { return String("") }
+    if textBufferAppendInt(buffer: outputBuffer, value: declaration.bodyEnd) != 0 { return String("") }
+    if textBufferAppend(buffer: outputBuffer, text: compilerCoreTopLevelDeclarationRecordTerminator()) != 0 { return String("") }
     return compilerCoreTextBufferMaterializeAndDestroy(buffer: outputBuffer)
 }
 
 function compilerCoreTopLevelDeclarationRecordTerminator(): String {
-    return compilerCoreStatementRecordDecodeValue(value: String("@TILDE@"))
+    return String("~")
 }
 
 function compilerCoreTopLevelDeclarationRecordAt(records: String, start: Int): String {
@@ -5998,8 +6281,11 @@ function parseCompilerCallArgumentsWithSink(source: String, start: Int, end: Int
             }
             records: "\(records)\(compilerCoreCallArgumentRecord(index: argumentIndex, label: label, expressionRecord: expression.record, expressionSummary: expression.summary))"
             let argumentSyntaxID: Int(compilerBodySyntaxAppendNode(sink: sink, kindTag: compilerSyntaxKindArgument(), ordinal: argumentIndex, start: token.start, end: expression.end, firstStart: labelStart, firstEnd: labelEnd, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
-            compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: callSyntaxID, childSyntaxID: argumentSyntaxID, roleTag: compilerSyntaxRoleArgument(), ordinal: argumentIndex)
-            compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: argumentSyntaxID, childSyntaxID: compilerParsedExpressionSyntaxID(parsed: parsedArgumentExpression), roleTag: compilerSyntaxRoleArgumentValue(), ordinal: 0)
+            if compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: callSyntaxID, childSyntaxID: argumentSyntaxID, roleTag: compilerSyntaxRoleArgument(), ordinal: argumentIndex) != 0
+                || compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: argumentSyntaxID, childSyntaxID: compilerParsedExpressionSyntaxID(parsed: parsedArgumentExpression), roleTag: compilerSyntaxRoleArgumentValue(), ordinal: 0) != 0 {
+                if sink.enabled { compilerSyntaxTablesPoison(tables: sink.tables) }
+                return CompilerCallArguments(summary: output, records: records, start: start, end: end)
+            }
             argumentIndex: argumentIndex + 1
             cursor: CompilerTokenCursor(source: source, index: expression.end)
         }
@@ -6134,14 +6420,14 @@ function parseCompilerConstructMembers(source: String, start: Int, end: Int): Co
 function compilerCoreMissingStoredMemberParseStep(source: String, index: Int, nextIndex: Int, keepScanning: Bool): CompilerStoredMemberParseStep {
     let missingToken: RangeLexedToken(RangeLexedToken(kind: String("eof"), start: index, end: index, text: String("")))
     let missingType: CompilerTypeReference(CompilerTypeReference(text: String(""), start: index, end: index))
-    return CompilerStoredMemberParseStep(found: false, keepScanning: keepScanning, nameToken: missingToken, typeReference: missingType, nextIndex: nextIndex)
+    return CompilerStoredMemberParseStep(found: false, keepScanning: keepScanning, kindTag: 0 - 1, nameToken: missingToken, typeReference: missingType, nextIndex: nextIndex)
 }
 
 function compilerCoreParseStoredMemberToken(source: String, end: Int, token: RangeLexedToken): CompilerStoredMemberParseStep {
     if token.start >= end {
         return compilerCoreMissingStoredMemberParseStep(source: source, index: token.start, nextIndex: token.end, keepScanning: false)
     }
-    if token.kind != String("keyword") || token.text != String("let") {
+    if token.kind != String("keyword") || (token.text != String("let") && token.text != String("state") && token.text != String("binding")) {
         return compilerCoreMissingStoredMemberParseStep(source: source, index: token.start, nextIndex: token.end, keepScanning: true)
     }
 
@@ -6178,7 +6464,10 @@ function compilerCoreParseStoredMemberToken(source: String, end: Int, token: Ran
 
     let typeFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: typeCursor.index, end: typeCursor.index))
     let typeReference: CompilerTypeReference(maybeType ?? typeFallback)
-    return CompilerStoredMemberParseStep(found: true, keepScanning: true, nameToken: nameToken, typeReference: typeReference, nextIndex: typeReference.end)
+    state memberKind: Int(compilerSyntaxMemberKindLet())
+    if token.text == String("state") { memberKind: compilerSyntaxMemberKindState() }
+    if token.text == String("binding") { memberKind: compilerSyntaxMemberKindBinding() }
+    return CompilerStoredMemberParseStep(found: true, keepScanning: true, kindTag: memberKind, nameToken: nameToken, typeReference: typeReference, nextIndex: typeReference.end)
 }
 
 function compilerCoreParseDeclarationNameAfterKeyword(source: String, keyword: RangeLexedToken): Optional<RangeLexedToken> {
@@ -7268,8 +7557,8 @@ function compilerCoreTextBufferMaterializeAndDestroy(buffer: TextBuffer): String
 
 function compilerCoreTextBufferConcat(left: String, right: String): String {
     let outputBuffer: TextBuffer(textBufferCreate(capacity: 1024))
-    textBufferAppend(buffer: outputBuffer, text: left)
-    textBufferAppend(buffer: outputBuffer, text: right)
+    if textBufferAppend(buffer: outputBuffer, text: left) != 0 { return String("") }
+    if textBufferAppend(buffer: outputBuffer, text: right) != 0 { return String("") }
     return compilerCoreTextBufferMaterializeAndDestroy(buffer: outputBuffer)
 }
 
@@ -10104,17 +10393,17 @@ function compilerCoreStatementRecordEncodeValue(value: String): String {
 
     while sourceIndex < valueLength {
         if stringHasPrefix(source: value, start: sourceIndex, prefix: String("@")) {
-            textBufferAppend(buffer: outputBuffer, text: String("@AT@"))
+            if textBufferAppend(buffer: outputBuffer, text: String("@AT@")) != 0 { return String("") }
         } else if stringHasPrefix(source: value, start: sourceIndex, prefix: String("|")) {
-            textBufferAppend(buffer: outputBuffer, text: String("@PIPE@"))
+            if textBufferAppend(buffer: outputBuffer, text: String("@PIPE@")) != 0 { return String("") }
         } else if stringHasPrefix(source: value, start: sourceIndex, prefix: String("~")) {
-            textBufferAppend(buffer: outputBuffer, text: String("@TILDE@"))
+            if textBufferAppend(buffer: outputBuffer, text: String("@TILDE@")) != 0 { return String("") }
         } else if stringHasPrefix(source: value, start: sourceIndex, prefix: compilerCoreNewlineCharacter()) {
-            textBufferAppend(buffer: outputBuffer, text: String("@NEWLINE@"))
+            if textBufferAppend(buffer: outputBuffer, text: String("@NEWLINE@")) != 0 { return String("") }
         } else if stringHasPrefix(source: value, start: sourceIndex, prefix: String(";")) {
-            textBufferAppend(buffer: outputBuffer, text: String("@SEMICOLON@"))
+            if textBufferAppend(buffer: outputBuffer, text: String("@SEMICOLON@")) != 0 { return String("") }
         } else {
-            textBufferAppendCharacter(buffer: outputBuffer, source: value, index: sourceIndex)
+            if textBufferAppendCharacter(buffer: outputBuffer, source: value, index: sourceIndex) != 0 { return String("") }
         }
         sourceIndex: sourceIndex + 1
     }
@@ -10129,22 +10418,22 @@ function compilerCoreStatementRecordDecodeValue(value: String): String {
 
     while sourceIndex < valueLength {
         if hasRangePrefix(source: value, start: sourceIndex, prefix: String("@PIPE@")) {
-            textBufferAppend(buffer: outputBuffer, text: String("|"))
+            if textBufferAppend(buffer: outputBuffer, text: String("|")) != 0 { return String("") }
             sourceIndex: sourceIndex + 6
         } else if hasRangePrefix(source: value, start: sourceIndex, prefix: String("@TILDE@")) {
-            textBufferAppend(buffer: outputBuffer, text: String("~"))
+            if textBufferAppend(buffer: outputBuffer, text: String("~")) != 0 { return String("") }
             sourceIndex: sourceIndex + 7
         } else if hasRangePrefix(source: value, start: sourceIndex, prefix: String("@NEWLINE@")) {
-            textBufferAppend(buffer: outputBuffer, text: compilerCoreNewlineCharacter())
+            if textBufferAppend(buffer: outputBuffer, text: compilerCoreNewlineCharacter()) != 0 { return String("") }
             sourceIndex: sourceIndex + 9
         } else if hasRangePrefix(source: value, start: sourceIndex, prefix: String("@SEMICOLON@")) {
-            textBufferAppend(buffer: outputBuffer, text: String(";"))
+            if textBufferAppend(buffer: outputBuffer, text: String(";")) != 0 { return String("") }
             sourceIndex: sourceIndex + 11
         } else if hasRangePrefix(source: value, start: sourceIndex, prefix: String("@AT@")) {
-            textBufferAppend(buffer: outputBuffer, text: String("@"))
+            if textBufferAppend(buffer: outputBuffer, text: String("@")) != 0 { return String("") }
             sourceIndex: sourceIndex + 4
         } else {
-            textBufferAppendCharacter(buffer: outputBuffer, source: value, index: sourceIndex)
+            if textBufferAppendCharacter(buffer: outputBuffer, source: value, index: sourceIndex) != 0 { return String("") }
             sourceIndex: sourceIndex + 1
         }
     }
@@ -11369,8 +11658,43 @@ function parseCompilerStatementWithSink(program: CompilerProgram, start: Int, bo
             return parseCompilerLocalBindingStatementWithSink(cursor: cursor, keyword: token, bodyEnd: bodyEnd, sink: sink)
         }
     }
+    if token.kind == String("identifier") {
+        if !sink.enabled {
+            return parseCompilerStatementFromToken(program: program, cursor: cursor, token: token, bodyEnd: bodyEnd)
+        }
+        return parseCompilerAssignmentStatementWithSink(cursor: cursor, token: token, bodyEnd: bodyEnd, sink: sink)
+    }
     if sink.enabled { compilerSyntaxTablesPoison(tables: sink.tables) }
     return parseCompilerStatementFromToken(program: program, cursor: cursor, token: token, bodyEnd: bodyEnd)
+}
+
+function parseCompilerAssignmentStatementWithSink(cursor: CompilerTokenCursor, token: RangeLexedToken, bodyEnd: Int, sink: CompilerBodySyntaxSink): Optional<CompilerStatement> {
+    let maybeTarget: Optional<CompilerParsedExpression>(parseCompilerExpressionWithSink(source: cursor.source, start: token.start, limit: bodyEnd, sink: sink))
+    if maybeTarget == nil { return nil }
+    let targetFallback: CompilerParsedExpression(compilerCoreMissingParsedExpression(start: token.start))
+    let parsedTarget: CompilerParsedExpression(maybeTarget ?? targetFallback)
+    let target: CompilerExpression(compilerParsedExpressionValue(parsed: parsedTarget))
+    if target.kind != String("identifier") { return nil }
+    let colonCursor: CompilerTokenCursor(CompilerTokenCursor(source: cursor.source, index: target.end))
+    let maybeColon: Optional<RangeLexedToken>(compilerCursorPeek(cursor: colonCursor))
+    if maybeColon == nil { return nil }
+    let colonFallback: RangeLexedToken(compilerFallbackToken(cursor: colonCursor))
+    let colonToken: RangeLexedToken(maybeColon ?? colonFallback)
+    if colonToken.kind != String("colon") { return nil }
+    let valueCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: colonCursor, token: colonToken))
+    let maybeValue: Optional<CompilerParsedExpression>(parseCompilerExpressionWithSink(source: cursor.source, start: valueCursor.index, limit: bodyEnd, sink: sink))
+    if maybeValue == nil { return nil }
+    let valueFallback: CompilerParsedExpression(compilerCoreMissingParsedExpression(start: valueCursor.index))
+    let parsedValue: CompilerParsedExpression(maybeValue ?? valueFallback)
+    let value: CompilerExpression(compilerParsedExpressionValue(parsed: parsedValue))
+    let assignmentSyntaxID: Int(compilerBodySyntaxAppendNode(sink: sink, kindTag: compilerSyntaxKindAssignment(), ordinal: sink.statementOrdinal, start: token.start, end: value.end, firstStart: token.start, firstEnd: token.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: assignmentSyntaxID, childSyntaxID: compilerParsedExpressionSyntaxID(parsed: parsedTarget), roleTag: compilerSyntaxRoleAssignmentTarget(), ordinal: 0) != 0
+        || compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: assignmentSyntaxID, childSyntaxID: compilerParsedExpressionSyntaxID(parsed: parsedValue), roleTag: compilerSyntaxRoleAssignedValue(), ordinal: 0) != 0
+        || compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: sink.ownerSyntaxID, childSyntaxID: assignmentSyntaxID, roleTag: compilerSyntaxRoleStatement(), ordinal: sink.statementOrdinal) != 0 {
+        if sink.enabled { compilerSyntaxTablesPoison(tables: sink.tables) }
+        return nil
+    }
+    return parseCompilerAssignmentStatement(token: token, target: target, value: value)
 }
 
 function parseCompilerStatementWithToken(program: CompilerProgram, cursor: CompilerTokenCursor, maybeToken: Optional<RangeLexedToken>, bodyEnd: Int): Optional<CompilerStatement> {
@@ -11500,8 +11824,11 @@ function parseCompilerReturnStatementExpressionWithSink(source: String, keyword:
     let expression: CompilerExpression(compilerParsedExpressionValue(parsed: parsedReturnExpression))
     let statement: CompilerStatement(compilerCoreReturnStatementFromExpression(keyword: keyword, expression: expression))
     let statementSyntaxID: Int(compilerBodySyntaxAppendNode(sink: sink, kindTag: compilerSyntaxKindReturn(), ordinal: sink.statementOrdinal, start: keyword.start, end: expression.end, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
-    compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: statementSyntaxID, childSyntaxID: compilerParsedExpressionSyntaxID(parsed: parsedReturnExpression), roleTag: compilerSyntaxRoleReturnValue(), ordinal: 0)
-    compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: sink.ownerSyntaxID, childSyntaxID: statementSyntaxID, roleTag: compilerSyntaxRoleStatement(), ordinal: sink.statementOrdinal)
+    if compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: statementSyntaxID, childSyntaxID: compilerParsedExpressionSyntaxID(parsed: parsedReturnExpression), roleTag: compilerSyntaxRoleReturnValue(), ordinal: 0) != 0
+        || compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: sink.ownerSyntaxID, childSyntaxID: statementSyntaxID, roleTag: compilerSyntaxRoleStatement(), ordinal: sink.statementOrdinal) != 0 {
+        if sink.enabled { compilerSyntaxTablesPoison(tables: sink.tables) }
+        return nil
+    }
     return statement
 }
 
@@ -12032,7 +12359,10 @@ function parseCompilerLocalBindingStatementWithSink(cursor: CompilerTokenCursor,
         let implicitCalleeRecord: String(compilerCoreExpressionRecord(kind: String("identifier"), value: typeReference.text, left: String(""), right: String(""), arguments: String(""), start: typeReference.start, end: typeReference.end))
         let implicitCalleeSyntaxID: Int(compilerBodySyntaxAppendNode(sink: sink, kindTag: compilerSyntaxKindIdentifier(), ordinal: 0, start: typeReference.start, end: typeReference.end, firstStart: typeReference.start, firstEnd: typeReference.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
         let implicitApplicationSyntaxID: Int(compilerBodySyntaxAppendNode(sink: sink, kindTag: compilerSyntaxKindApplication(), ordinal: 0, start: typeReference.start, end: initializerRange.next, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
-        compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: implicitApplicationSyntaxID, childSyntaxID: implicitCalleeSyntaxID, roleTag: compilerSyntaxRoleCallee(), ordinal: 0)
+        if compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: implicitApplicationSyntaxID, childSyntaxID: implicitCalleeSyntaxID, roleTag: compilerSyntaxRoleCallee(), ordinal: 0) != 0 {
+            if sink.enabled { compilerSyntaxTablesPoison(tables: sink.tables) }
+            return nil
+        }
         let implicitArguments: CompilerCallArguments(parseCompilerCallArgumentsWithSink(source: cursor.source, start: initializerRange.start, end: initializerRange.end, sink: sink, callSyntaxID: implicitApplicationSyntaxID))
         let implicitSummary: String("call(identifier(\(typeReference.text)),arguments=[\(implicitArguments.summary)])")
         let implicitRecord: String(compilerCoreExpressionRecord(kind: String("call"), value: typeReference.text, left: implicitCalleeRecord, right: String(""), arguments: implicitArguments.records, start: typeReference.start, end: initializerRange.next))
@@ -12058,11 +12388,14 @@ function parseCompilerLocalBindingStatementWithSink(cursor: CompilerTokenCursor,
         bindingEnd: bindingRightParenToken.end
     }
 
-    state bindingAux: Int(0)
-    if keyword.text == String("state") { bindingAux: 1 }
-    let statementSyntaxID: Int(compilerBodySyntaxAppendNode(sink: sink, kindTag: compilerSyntaxKindLocalBinding(), ordinal: sink.statementOrdinal, start: keyword.start, end: bindingEnd, firstStart: nameToken.start, firstEnd: nameToken.end, secondStart: typeReference.start, secondEnd: typeReference.end, aux: bindingAux))
-    compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: statementSyntaxID, childSyntaxID: bindingExpressionSyntaxID, roleTag: compilerSyntaxRoleInitializer(), ordinal: 0)
-    compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: sink.ownerSyntaxID, childSyntaxID: statementSyntaxID, roleTag: compilerSyntaxRoleStatement(), ordinal: sink.statementOrdinal)
+    state bindingKind: Int(compilerSyntaxLocalKindLet())
+    if keyword.text == String("state") { bindingKind: compilerSyntaxLocalKindState() }
+    let statementSyntaxID: Int(compilerBodySyntaxAppendNode(sink: sink, kindTag: compilerSyntaxKindLocalBinding(), ordinal: sink.statementOrdinal, start: keyword.start, end: bindingEnd, firstStart: nameToken.start, firstEnd: nameToken.end, secondStart: typeReference.start, secondEnd: typeReference.end, aux: bindingKind))
+    if compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: statementSyntaxID, childSyntaxID: bindingExpressionSyntaxID, roleTag: compilerSyntaxRoleInitializer(), ordinal: 0) != 0
+        || compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: sink.ownerSyntaxID, childSyntaxID: statementSyntaxID, roleTag: compilerSyntaxRoleStatement(), ordinal: sink.statementOrdinal) != 0 {
+        if sink.enabled { compilerSyntaxTablesPoison(tables: sink.tables) }
+        return nil
+    }
     return CompilerStatement(
         kind: keyword.text,
         name: nameToken.text,
@@ -12213,8 +12546,11 @@ function parseCompilerExpressionAtPrecedenceWithSink(source: String, start: Int,
         state binarySyntaxID: Int(0 - 1)
         if operatorToken.kind == String("plus") {
             binarySyntaxID: compilerBodySyntaxAppendNode(sink: sink, kindTag: compilerSyntaxKindAddition(), ordinal: 0, start: leftExpression.start, end: rightExpression.end, firstStart: operatorToken.start, firstEnd: operatorToken.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0)
-            compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: binarySyntaxID, childSyntaxID: leftExpressionSyntaxID, roleTag: compilerSyntaxRoleLeftOperand(), ordinal: 0)
-            compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: binarySyntaxID, childSyntaxID: compilerParsedExpressionSyntaxID(parsed: parsedRightExpression), roleTag: compilerSyntaxRoleRightOperand(), ordinal: 0)
+            if compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: binarySyntaxID, childSyntaxID: leftExpressionSyntaxID, roleTag: compilerSyntaxRoleLeftOperand(), ordinal: 0) != 0
+                || compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: binarySyntaxID, childSyntaxID: compilerParsedExpressionSyntaxID(parsed: parsedRightExpression), roleTag: compilerSyntaxRoleRightOperand(), ordinal: 0) != 0 {
+                if sink.enabled { compilerSyntaxTablesPoison(tables: sink.tables) }
+                return nil
+            }
         } else if sink.enabled {
             compilerSyntaxTablesPoison(tables: sink.tables)
         }
@@ -12321,6 +12657,21 @@ function parseCompilerPostfixExpressionWithSink(source: String, start: Int, limi
         return nil
     }
 
+    if token.kind == String("dollar") {
+        let nameCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: cursor, token: token))
+        let maybeName: Optional<RangeLexedToken>(compilerCursorPeek(cursor: nameCursor))
+        if maybeName == nil { return nil }
+        let nameFallback: RangeLexedToken(compilerFallbackToken(cursor: nameCursor))
+        let nameToken: RangeLexedToken(maybeName ?? nameFallback)
+        if nameToken.kind != String("identifier") { return nil }
+        let bindingSyntaxID: Int(compilerBodySyntaxAppendNode(sink: sink, kindTag: compilerSyntaxKindBindingReference(), ordinal: 0, start: token.start, end: nameToken.end, firstStart: nameToken.start, firstEnd: nameToken.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+        let bindingRecord: String(compilerCoreExpressionRecord(kind: String("bindingReference"), value: nameToken.text, left: String(""), right: String(""), arguments: String(""), start: token.start, end: nameToken.end))
+        return CompilerParsedExpression(
+            expression: CompilerExpression(kind: String("bindingReference"), value: nameToken.text, summary: "bindingReference((nameToken.text))", record: bindingRecord, start: token.start, end: nameToken.end),
+            syntaxID: bindingSyntaxID
+        )
+    }
+
     state summary: String("")
     state kind: String("")
     state value: String("")
@@ -12389,7 +12740,10 @@ function parseCompilerPostfixExpressionWithSink(source: String, start: Int, limi
             expressionEnd: memberToken.end
             record: compilerCoreExpressionRecord(kind: kind, value: value, left: baseRecord, right: String(""), arguments: String(""), start: token.start, end: expressionEnd)
             syntaxID: compilerBodySyntaxAppendNode(sink: sink, kindTag: compilerSyntaxKindMemberRead(), ordinal: 0, start: token.start, end: expressionEnd, firstStart: memberToken.start, firstEnd: memberToken.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0)
-            compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: syntaxID, childSyntaxID: baseSyntaxID, roleTag: compilerSyntaxRoleReceiver(), ordinal: 0)
+            if compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: syntaxID, childSyntaxID: baseSyntaxID, roleTag: compilerSyntaxRoleReceiver(), ordinal: 0) != 0 {
+                if sink.enabled { compilerSyntaxTablesPoison(tables: sink.tables) }
+                return nil
+            }
             suffixCursor: compilerCursorAdvance(cursor: memberCursor, token: memberToken)
         } else if suffixToken.kind == String("leftParen") {
             let maybeArguments: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: suffixCursor, leftKind: String("leftParen"), rightKind: String("rightParen")))
@@ -12401,7 +12755,10 @@ function parseCompilerPostfixExpressionWithSink(source: String, start: Int, limi
             let calleeRecord: String(record)
             let calleeSyntaxID: Int(syntaxID)
             let callSyntaxID: Int(compilerBodySyntaxAppendNode(sink: sink, kindTag: compilerSyntaxKindApplication(), ordinal: 0, start: token.start, end: argumentsRange.next, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
-            compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: callSyntaxID, childSyntaxID: calleeSyntaxID, roleTag: compilerSyntaxRoleCallee(), ordinal: 0)
+            if compilerBodySyntaxAppendEdge(sink: sink, ownerSyntaxID: callSyntaxID, childSyntaxID: calleeSyntaxID, roleTag: compilerSyntaxRoleCallee(), ordinal: 0) != 0 {
+                if sink.enabled { compilerSyntaxTablesPoison(tables: sink.tables) }
+                return nil
+            }
             let arguments: CompilerCallArguments(parseCompilerCallArgumentsWithSink(source: source, start: argumentsRange.start, end: argumentsRange.end, sink: sink, callSyntaxID: callSyntaxID))
             kind: String("call")
             summary: "call(\(summary),arguments=[\(arguments.summary)])"

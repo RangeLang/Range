@@ -876,6 +876,7 @@ public struct SwiftBootstrapCompiler {
         @main {
             let first: NativeSmokePair(nativeSmokeFirst())
             state second: NativeSmokePair(nativeSmokeSecond())
+            second: NativeSmokePair(first: 3, second: 6)
             return first.first + second.second
         }
         """.write(to: smokeSource, atomically: true, encoding: .utf8)
@@ -900,6 +901,7 @@ public struct SwiftBootstrapCompiler {
             compileResult.stdout.components(separatedBy: "call %Range.Fixed.").count == 3,
             compileResult.stdout.contains("%storage0 = alloca"),
             compileResult.stdout.contains("%storage1 = alloca"),
+            compileResult.stdout.contains("%updated"),
             compileResult.stdout.contains("extractvalue"),
             !compileResult.stdout.contains("rangeConstruct"),
             !compileResult.stdout.contains("malloc"),

@@ -1804,7 +1804,7 @@ struct RangeScriptTests {
         #expect(result.timedOut == false)
         #expect(result.exitCode == 0)
         #expect(result.stderr.isEmpty)
-        #expect(result.stdout.hasPrefix("semanticGraph\tvalid=true\tresolutionCount=12\ttypeCount=25\teffectCount=1\n"))
+        #expect(result.stdout.hasPrefix("semanticGraph\tvalid=true\tresolutionCount=12\ttypeCount=25\teffectCount=1\taccessEffectCount=0\n"))
         #expect(result.stdout.contains("semanticResolution\trow=10\tvalues=22,19,3"))
         #expect(result.stdout.contains("semanticResolution\trow=11\tvalues=23,4,7"))
         #expect(result.stdout.contains("semanticType\trow=19\tvalues=19,2,0"))
@@ -1998,6 +1998,120 @@ struct RangeScriptTests {
         #expect(!result.stdout.contains("values=7,10,"))
     }
 
+    @Test("MemoryGraph records binding as a shared alias without placement")
+    func nativeCompilerRecordsBindingAliasWithoutPlacement() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            compilerSourceFile\\tPair.range
+            construct Pair {
+                let left: Int
+                let right: Int
+            }
+            compilerSourceFile\\tUser.range
+            construct User {
+                let tag: Int
+                binding pair: Pair
+            }
+            compilerSourceFile\\tMain.range
+            @main {
+                let pair: Pair(left: 3, right: 4)
+                let user: User(tag: 1, pair: $pair)
+                return pair.left + pair.right
+            }
+
+            """,
+            name: "BindingAliasMemoryGraph.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("memoryGraph\tvalid=true"))
+        #expect(result.stdout.contains("memoryDecision\trow="))
+        #expect(result.stdout.contains("values=12,"))
+        #expect(!result.stdout.contains("memoryStorage\trow=2"))
+    }
+
+    @Test("MemoryGraph allows multiple shared bindings to one storage")
+    func memoryGraphAllowsSharedBindingAliases() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            construct Pair {
+                let left: Int
+                let right: Int
+            }
+            construct User {
+                let tag: Int
+                binding pair: Pair
+            }
+            @main {
+                let pair: Pair(left: 3, right: 4)
+                let first: User(tag: 1, pair: $pair)
+                let second: User(tag: 2, pair: $pair)
+                return pair.left + pair.right
+            }
+
+            """,
+            name: "SharedBindingAliases.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("memoryGraph\tvalid=true\tlayoutCount=2\tstorageCount=3\tdecisionCount=21\n"))
+        #expect(result.stdout.components(separatedBy: "values=12,").count == 3)
+    }
+
+    @Test("MemoryGraph rejects a unique write while shared binding is live")
+    func memoryGraphRejectsWriteConflictingWithSharedBinding() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            construct Pair {
+                let left: Int
+                let right: Int
+            }
+            construct User {
+                let tag: Int
+                binding pair: Pair
+            }
+            @main {
+                state pair: Pair(left: 3, right: 4)
+                let user: User(tag: 1, pair: $pair)
+                pair: Pair(left: 5, right: 6)
+                return pair.left + pair.right
+            }
+
+            """,
+            name: "SharedBindingWriteConflict.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
+    }
+
     @Test("Native compiler executes returned aggregate ownership transfer")
     func nativeCompilerExecutesReturnedAggregateOwnershipTransfer() throws {
         let directory = FileManager.default.temporaryDirectory
@@ -2095,6 +2209,93 @@ struct RangeScriptTests {
         #expect(result.stdout.hasPrefix("typedIR\tvalid=true\tfunctionCount=3\toperationCount=28\n"))
         #expect(result.stdout.contains("typedIROperation\trow=15\tvalues=23,20,14,0,0,1,0,15"))
         #expect(result.stdout.contains("typedIROperation\trow=20\tvalues=26,20,14,0,1,2,0,16"))
+    }
+
+    @Test("Native compiler executes unique state aggregate write")
+    func nativeCompilerExecutesUniqueStateAggregateWrite() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryLLVMText
+            construct Duo {
+                let first: Int
+                let second: Int
+            }
+            function makeDuo(): Duo {
+                return Duo(first: 1, second: 2)
+            }
+            @main {
+                state value: Duo(makeDuo())
+                value: Duo(second: 4, first: 3)
+                return value.first + value.second
+            }
+
+            """,
+            name: "StateAggregateWrite.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("%updated"))
+        #expect(result.stdout.components(separatedBy: "store %Range.Fixed.").count == 3)
+        #expect(result.stdout.contains("ptr %storage0"))
+        #expect(!result.stdout.contains("rangeConstruct"))
+        #expect(!result.stdout.contains("malloc"))
+        #expect(!result.stdout.contains("calloc"))
+
+        let llvm = directory.appendingPathComponent("StateAggregateWrite.ll")
+        let executable = directory.appendingPathComponent("StateAggregateWrite")
+        try result.stdout.write(to: llvm, atomically: true, encoding: .utf8)
+        let clangResult = try runCapturedProcess(
+            executable: "/usr/bin/env",
+            arguments: ["clang", "-Wno-override-module", "-x", "ir", llvm.path, "-o", executable.path]
+        )
+        #expect(clangResult.exitCode == 0)
+        #expect(clangResult.stderr.isEmpty)
+        let executableResult = try runCapturedProcess(executable: executable.path, arguments: [])
+        #expect(executableResult.exitCode == 7)
+        #expect(executableResult.stdout.isEmpty)
+        #expect(executableResult.stderr.isEmpty)
+    }
+
+    @Test("MemoryGraph rejects identical aggregate write through let")
+    func memoryGraphRejectsAggregateWriteThroughLet() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryLLVMText
+            construct Duo {
+                let first: Int
+                let second: Int
+            }
+            function makeDuo(): Duo {
+                return Duo(first: 1, second: 2)
+            }
+            @main {
+                let value: Duo(makeDuo())
+                value: Duo(second: 4, first: 3)
+                return value.first + value.second
+            }
+
+            """,
+            name: "LetAggregateWrite.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
     }
 
     @Test("Native compiler iterates returned functions and aggregate fields")

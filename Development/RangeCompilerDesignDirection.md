@@ -871,6 +871,41 @@ Stage 2 and Stage 3 and exits `7`. Peak RSS was `6.40 GB`; because accepted runs
 have ranged from `4.83 GB` to `7.10 GB`, this is deterministic-output evidence,
 not evidence that peak compiler memory has improved.
 
+State write enforcement now extends that same path without adding another
+ownership model. Authored locals carry explicit `let` or `state` kind through
+typed syntax. An assignment has typed target/value edges; SemanticGraph resolves
+the target and emits a unique write effect; MemoryGraph permits the write only
+for mutable storage and emits `Access(write, unique)`; and typed IR emits a
+`Store` that cites that exact access decision. The permanent ordinary smoke
+mutates a `state` aggregate and exits `7`; changing only that destination to
+`let` fails closed with `invalidMemoryGraph` and native exit `65`.
+
+The accepted state-write fixed point completes in `386.91 s` at `5.60 GB`
+maximum RSS and emits `2,278,780` bytes of compiler LLVM. Stage 2/3 compiler
+LLVM and binaries are byte-identical. During fixed-point hardening, the typed
+assignment parser was also constrained so its disabled syntax sink delegates
+identifier-led statements to the ordinary statement parser. This preserves
+source-set call statements and avoids making typed proof capture a second
+parser policy. The measurement proves deterministic output, not low-memory
+compilation; the next memory work must reduce transient source/record lifetime
+and then repeat the same measured gate.
+
+The binding checkpoint now preserves authored member policy and introduces a
+typed `$source` binding-reference node. A binding argument resolves to the
+source local's existing `StorageID`; MemoryGraph emits one shared `Alias`
+decision and deliberately emits no binding placement, initialization, escape,
+or destruction. Multiple shared aliases to the same storage are accepted. A
+unique state write while a shared alias is live fails closed with
+`invalidMemoryGraph` and native exit `65`.
+
+This checkpoint is byte-identical across Stage 2/3 at `390.97 s`, `6.40 GB`
+maximum RSS, and `2,306,211` bytes of compiler LLVM. It proves non-owning alias
+identity and shared/write conflict enforcement for constructor binding
+arguments. It does not yet prove write/write conflict through binding-member
+mutation: typed assignment currently targets locals, so member-target writes
+and unique binding access must be added before that final conflict row can be
+claimed.
+
 ## Stage 0 Boundary
 
 Treat Stage 0 as **frozen semantics, movable substrate**.
@@ -1178,13 +1213,15 @@ The next work is three vertical milestones:
    verified: fixed layout, local placement, caller-owned returned-value
    placement, per-call ownership transfer, aggregate return ABI, iterated
    returned functions and fields, immutable/mutable local storage policy,
-   initialization, shared borrow, non-escape, by-value pass mode, and final
-   destruction are explicit typed decisions. Next, carry those decisions
-   through typed per-function IR into aggregate by-value LLVM without the
-   linked construct runtime or heap allocation. The next work is deletion of
-   migrated dynamic construct consumers plus contrasting unique-mutation,
-   alias-conflict, shared-borrow multiplicity, and longer-lived escaping-owner
-   placement—not a second compiler or memory model.
+   initialization, unique state writes, shared borrow, non-escape, by-value
+   pass mode, and final destruction are explicit typed decisions. Typed IR
+   cites them through fixed aggregate LLVM without the linked construct runtime
+   or heap allocation. `binding` now references an existing `StorageID` with no
+   placement or destruction; shared/shared is accepted and shared/write is
+   rejected. Next, extend typed assignment through binding members and prove
+   unique binding plus write/write conflicts. `derived` dependency edges and
+   longer-lived escaping-owner placement follow—not a second compiler or
+   memory model.
 
 Every milestone records fixture behavior, graph/identity snapshots, elapsed
 time, peak RSS, and Stage 2/Stage 3 hashes. Current RSS measurements vary too

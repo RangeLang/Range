@@ -181,6 +181,70 @@ Accepted generalized returned-aggregate and storage-policy checkpoint
   but below the earlier `7.10 GB` measurement, so no memory-efficiency claim is
   made from the single sample.
 
+Accepted unique `state` write checkpoint (supersedes the compiler artifact
+hashes and measurements above):
+
+- local authored kind is explicit typed syntax: `let` selects immutable owned
+  storage and `state` selects mutable owned storage;
+- assignment syntax owns typed target and assigned-value edges. SemanticGraph
+  resolves the destination local and emits a unique write effect;
+- MemoryGraph derives `Access(write, unique)` only when the destination's
+  storage policy is mutable. The same authored assignment to `let` fails with
+  `compilerError kind=invalidMemoryGraph` and native exit `65`;
+- typed IR emits `Store` only while citing that access decision; aggregate LLVM
+  builds `%updated` field values and stores them into the existing entry-owned
+  storage, without new placement, transfer, destruction, or runtime ownership;
+- the permanent no-directive smoke mutates a returned aggregate in `state`,
+  links, and exits `7`. Its LLVM is 1,722 bytes at SHA-256
+  `9993168a3605c42615d2e41ab7de9bcaba917ecbd3aece8df8712fc09385a098`
+  and contains no `rangeConstruct*`, `malloc`, or `calloc`;
+- a fixed-point blocker exposed by this slice was a parser-boundary error, not
+  a memory-policy error: identifier-led statements were routed through typed
+  assignment capture even with its syntax sink disabled. Disabled capture now
+  delegates to the ordinary statement parser, preserving self-hosted call
+  statements while live typed capture remains fail-closed;
+- full Stage 2/Stage 3 fixed point: `386.91 s`;
+- measured maximum RSS: `5.60 GB` (`5,595,299,840` bytes);
+- compiler LLVM: `2,278,780` bytes;
+- Stage 2/3 LLVM SHA-256:
+  `a4348772927c880c9246be1e7b85d336b9ed8de8e5451033ab618e9759c1ce53`;
+- Stage 2/3 binary SHA-256:
+  `e1f01212cc7fd3b87d3fe6fb476cf05b328633fc991ce59caf01e3c34231c307`;
+- Stage 2 and Stage 3 LLVM and binaries are byte-identical. This proves
+  deterministic state-write compilation, not low-memory compilation. The next
+  semantic slice is `binding` as a non-owning reference to an existing
+  `StorageID`, followed by shared/shared acceptance and shared/write plus
+  write/write rejection. `derived` remains storage-free dependency structure.
+
+Accepted non-owning binding-alias checkpoint (supersedes the compiler artifact
+hashes and measurements above):
+
+- construct members preserve explicit `let`, `state`, or `binding` policy in
+  typed syntax, and `$source` is a typed binding-reference expression;
+- a binding constructor argument resolves to the source local's existing
+  `StorageID`. MemoryGraph emits `Alias(shared)` and creates no storage,
+  placement, initialization, escape, or destruction for the binding itself;
+- binding members are excluded from fixed physical layout. Stored `let` and
+  `state` members remain the only layout fields;
+- two shared aliases to storage `0` are accepted and produce two deterministic
+  alias decisions;
+- a unique write to storage `0` while a shared alias is live fails closed with
+  `compilerError kind=invalidMemoryGraph` and native exit `65`;
+- full Stage 2/Stage 3 fixed point: `390.97 s`;
+- measured maximum RSS: `6.40 GB` (`6,403,768,320` bytes);
+- compiler LLVM: `2,306,211` bytes;
+- Stage 2/3 LLVM SHA-256:
+  `2316797ee8cf145f5eb2f1c5270d898ac226f4ca744023c6085ddc98e8e6ec5c`;
+- Stage 2/3 binary SHA-256:
+  `e277911205f63e774134d5bd02746e9cd515a3c28d7b70e388f8d886a0d53362`;
+- output determinism is proven; low-memory compilation is not. This run is
+  above the prior `5.60 GB` state-write sample and remains within the older
+  observed range, so it does not establish a memory reduction;
+- write/write conflict through binding-member mutation remains unproven because
+  typed assignment targets are still local identifiers. The next slice is
+  member-target assignment, unique binding access, and the remaining conflict
+  row. `derived` remains afterward as storage-free dependency structure.
+
 Historical first returned-aggregate ownership-transfer checkpoint:
 
 - `function makeDuo(): Duo { return Duo(...) }` constructs a typed aggregate
@@ -447,9 +511,11 @@ eventual compiler service. Use three bounded implementation patches:
    equivalent two-`Int`-field construct. Typed operations cite exact
    MemoryGraph rows; aggregate LLVM contains no dynamic construct runtime or
    allocator dependency. Renamed/reordered-label, returned-local rejection,
-   executable, and Stage 2/3 snapshot gates pass. Unique mutation, alias
-   conflict, shared-borrow multiplicity, and escaping-owner placement remain
-   follow-on expansions of the same graph and IR, not alternate models.
+   executable, unique `state` mutation, immutable-write rejection, non-owning
+   shared `binding`, shared/shared acceptance, shared/write rejection, and
+   Stage 2/3 snapshot gates pass. Binding-member writes, unique binding
+   conflicts, shared-borrow lifetime precision, and escaping-owner placement
+   remain follow-on expansions of the same graph and IR, not alternate models.
 
 The accelerated track may defer full Foundation identity, editor line maps,
 in-compiler content-hash persistence, StringID interning, body caching without
