@@ -7,6 +7,10 @@
     let argument: Optional<String>(commandLineArgument(index: 0))
     let path: String(argument ?? String(""))
     let source: String(readFile(path: path))
-    print(value: compileRangeSource(source: source))
+    let output: String(compileRangeSource(source: source))
+    print(value: output)
+    if compilerNativeOutputIsError(output: output) {
+        return 65
+    }
     return 0
 }

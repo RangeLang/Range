@@ -24,6 +24,13 @@ public struct LLVMModuleEmitter {
         "textBufferMaterialize",
         "textBufferDestroy",
     ]
+    private static let intBufferRuntimeFunctionNames: Set<String> = [
+        "intBufferCreate",
+        "intBufferAppend",
+        "intBufferCount",
+        "intBufferElement",
+        "intBufferDestroy",
+    ]
     private static let stringRuntimeFunctionNames: Set<String> = [
         "stringHasPrefix",
         "stringFindFrom",
@@ -34,6 +41,7 @@ public struct LLVMModuleEmitter {
         "stringFindByteOf",
     ]
     private static let coreRuntimeFunctionNames = textBufferRuntimeFunctionNames
+        .union(intBufferRuntimeFunctionNames)
         .union(stringRuntimeFunctionNames)
 
     public func emit(program: CompiledProgram) throws -> String {
@@ -1620,6 +1628,8 @@ public struct LLVMModuleEmitter {
             return LLVMType(ir: "ptr", array: nil, nominalName: nil)
         case "TextBuffer":
             return LLVMType(ir: "ptr", array: nil, nominalName: "TextBuffer")
+        case "IntBuffer":
+            return LLVMType(ir: "ptr", array: nil, nominalName: "IntBuffer")
         case "Void":
             return LLVMType(ir: "void", array: nil, nominalName: nil)
         default:
@@ -1778,6 +1788,7 @@ public struct LLVMModuleEmitter {
         private(set) var usesCommandLineArguments = false
         private(set) var usesStrstr = false
         private(set) var usesTextBuffer = false
+        private(set) var usesIntBuffer = false
         private(set) var usesStringRuntime = false
 
         static func arrayTypeName(for elementType: String) -> String {
@@ -1858,6 +1869,10 @@ public struct LLVMModuleEmitter {
 
         func markUsesTextBuffer() {
             usesTextBuffer = true
+        }
+
+        func markUsesIntBuffer() {
+            usesIntBuffer = true
         }
 
         func markUsesStringRuntime() {
@@ -1954,6 +1969,13 @@ public struct LLVMModuleEmitter {
                 lines.append("declare i32 @textBufferAppendCharacter(ptr, ptr, i32)")
                 lines.append("declare ptr @textBufferMaterialize(ptr)")
                 lines.append("declare i32 @textBufferDestroy(ptr)")
+            }
+            if usesIntBuffer {
+                lines.append("declare ptr @intBufferCreate(i32)")
+                lines.append("declare i32 @intBufferAppend(ptr, i32)")
+                lines.append("declare i32 @intBufferCount(ptr)")
+                lines.append("declare i32 @intBufferElement(ptr, i32)")
+                lines.append("declare i32 @intBufferDestroy(ptr)")
             }
             if usesStringRuntime {
                 lines.append("declare i1 @stringHasPrefix(ptr, i32, ptr)")
@@ -3939,6 +3961,8 @@ public struct LLVMModuleEmitter {
                 return LLVMType(ir: "ptr", array: nil)
             case "TextBuffer":
                 return LLVMType(ir: "ptr", array: nil, nominalName: "TextBuffer")
+            case "IntBuffer":
+                return LLVMType(ir: "ptr", array: nil, nominalName: "IntBuffer")
             case "Void":
                 return LLVMType(ir: "void", array: nil)
             default:
@@ -5593,6 +5617,9 @@ public struct LLVMModuleEmitter {
             }
             if LLVMModuleEmitter.textBufferRuntimeFunctionNames.contains(resolvedName) {
                 runtime.markUsesTextBuffer()
+            }
+            if LLVMModuleEmitter.intBufferRuntimeFunctionNames.contains(resolvedName) {
+                runtime.markUsesIntBuffer()
             }
             if LLVMModuleEmitter.stringRuntimeFunctionNames.contains(resolvedName) {
                 runtime.markUsesStringRuntime()

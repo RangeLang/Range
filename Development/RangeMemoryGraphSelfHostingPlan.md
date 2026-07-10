@@ -1,0 +1,608 @@
+# Range Memory Graph Self-Hosting Plan
+
+Status: active execution plan  
+Date: 2026-07-10  
+Authority: `RangeCompilerDesignDirection.md` plus the live `development` branch
+
+## Objective
+
+Prove Range's memory model inside the self-hosted compiler by taking one closed,
+typed language subset through:
+
+```text
+authored source and stable identity
+-> typed AST subset
+-> Plotter structural facts
+-> settled declaration/application facts
+-> MemoryGraph v0
+-> typed per-function IR
+-> fixed-layout LLVM
+```
+
+The proof must demonstrate that compiler-derived memory facts—not ARC, garbage
+collection, implicit reference counting, or a universal heap-object runtime—are
+the sole policy source for storage, ownership, borrowing, aliasing, escape,
+region, lifetime, transfer, and destruction decisions.
+
+## Current Implementation Status
+
+- Milestone 1: implementation-complete and fixed-point verified for the first
+  typed-body checkpoint. File and declaration identity remain fixed-point
+  proven; the live typed owner now also captures the closed proof body.
+- First substrate slice: completed and fixed-point verified. It adds reusable
+  contiguous `IntBuffer` storage with geometric growth, bounds-checked indexed
+  reads, explicit destruction, and no compiler policy in C.
+- First Range-owned identity slice: completed and fixed-point verified. It adds
+  a five-column dense file table, ordered FileIDs for framed bundles, FileID 0
+  fallback for ordinary source, global-to-file-local offset mapping, explicit
+  destruction, and the read-only `compilerSourceIdentity` snapshot directive.
+- Second Range-owned identity slice: completed and fixed-point verified. It
+  adds opt-in, one-owner typed capture for construct declarations, stored
+  members, functions, and parameters; distinct dense `SyntaxID`/`FunctionID`
+  domains; authored file-local spans; body-independent structural
+  fingerprints; cross-table validation; and fail-closed duplicate detection.
+  Ordinary legacy parsing allocates no typed sidecars.
+- Third Range-owned slice: implemented and focused-fixture verified. The same
+  statement/Pratt parser now writes normalized body nodes and role edges for
+  entry blocks, local bindings, returns, unresolved applications, labeled
+  arguments, identifiers, member reads, integer literals, and addition. A
+  tagged disabled sink uses the existing null `IntBuffer` contract and performs
+  no heap allocation; the live sink borrows the one top-level table owner.
+  No statement/expression record is decoded into typed meaning.
+- The exact proof spelling `let pair: Pair(left: 3, right: 4)` is recognized
+  generically as an application of the declared type; there is no `Pair` name
+  or literal special case.
+- Dead `functionSummary` propagation has been removed from `CompilerProgram`
+  and lowered blocks while its explicit diagnostic producer remains.
+- The first deletion gate is real: top-level `compilerCoreSymbols` now renders
+  declarations, stored members, functions, and parameters from a
+  declaration-only typed capture policy. The old top-level symbol decoder and
+  its member/parameter summary scanners have been physically deleted. Legacy
+  body-symbol decoding remains only for the unsupported control-flow fixture.
+- Milestone 2: first live implementation is fixed-point verified. The
+  `compilerPlotter` boundary captures and validates typed tables, constructs a
+  bounded `CompilerGraphDelta` before those tables are destroyed, and then
+  releases graph and syntax ownership in reverse order. The exact Pair fixture
+  first checkpoint emits 24 NodeID rows and 21 canonically ordered `Owns`
+  facts. Node rows retain
+  SyntaxID, declaration identity, FileID, authored span, and facet kind;
+  member, parameter, annotation, and body relationships are stored once.
+- Milestone 3 semantic settlement and MemoryGraph v0 derivation are now live
+  for the closed proof subset. `compilerSemantics` resolves construct/function
+  applications, constructor labels, locals, parameters, member reads, node
+  types, and parameter read/write/escape effects directly from authored spans
+  and graph facts. `compilerMemoryGraph` then derives fixed layout, local
+  storage, initialization, shared borrowing, non-escape, by-value parameter
+  transport, and deterministic destruction. Neither layer decodes legacy
+  summaries or rendered snapshots. Minimal typed IR and decision-driven LLVM
+  lowering remain pending.
+
+Accepted direct Pair semantic/MemoryGraph proof:
+
+- semantic graph: 12 resolutions, 25 node types, and 1 parameter-effect row;
+- `sum(pair:)` effect: read, no write, no escape;
+- fixed `Pair` layout: 2 fields, 8 bytes, 4-byte alignment;
+- one local storage in the `@main` entry region;
+- seven ordered decisions: layout, local placement, initialization, shared
+  borrow, non-escape, by-value pass mode, and destruction at the final return;
+- two independent direct compiler runs produced identical MemoryGraph snapshot
+  SHA-256 `af6b091cc58b204cbed762f742b3a018ca455d5e280654dd5c9a24923770cb34`;
+- the semantic and memory focused Swift fixtures both pass (`68.32 s` and
+  `68.13 s` respectively);
+- the layer fails closed when semantic or memory evidence is incomplete.
+
+Accepted semantic/MemoryGraph/typed-IR/fixed-LLVM checkpoint:
+
+- full Stage 2/Stage 3 fixed point: `337.26 s`;
+- measured maximum RSS: `6.12 GB` (`6,116,540,416` bytes);
+- Stage 2/3 LLVM SHA-256:
+  `1ea0a7bd707bd960dabcce8a6a9154167897ed1359f1e10c61ef1eb3446b5791`;
+- Stage 2/3 binary SHA-256:
+  `2186898314f8ea699f739742bc357034c32f4a4949623aad983e9e3e55436a05`;
+- compiler LLVM: `2,117,938` bytes;
+- direct Stage 2/3 MemoryGraph snapshot SHA-256:
+  `af6b091cc58b204cbed762f742b3a018ca455d5e280654dd5c9a24923770cb34`;
+- direct Stage 2/3 typed-IR snapshot SHA-256:
+  `01176436e026fa84f105e8006ad8cf76357c0cbb2b562da424d6e81183ad89da`;
+- direct Stage 2/3 fixed-layout LLVM SHA-256:
+  `116f017051ed692e633b567325b63d29a630f673b0cf279ffbaf535fdecf081e`;
+- the renamed `Duo` fixture with reversed constructor-label order compiles
+  through the same generic path, clang accepts the emitted module, and the
+  executable exits `7`;
+- emitted proof LLVM uses a named `{ i32, i32 }` aggregate, `alloca`,
+  `insertvalue`, `store`, `load`, aggregate by-value call, and `extractvalue`;
+  it contains no `rangeConstruct*`, `malloc`, or `calloc` declaration or call;
+- returned local aggregate is rejected before placement with native compiler
+  exit `65`, proving non-escape is derived rather than asserted;
+- Stage 2 inventory, body-name coverage, normal compilation, Stage 3 linking,
+  and Stage 2 self-rebuild all pass;
+- time is 26.2% above the hardened Plotter checkpoint and compiler LLVM is
+  16.5% larger. This is recorded as the accepted first complete Range-owned
+  memory-model and fixed-layout-lowering capability cost. Measured RSS is
+  12.2% lower, but one run is evidence rather than causal attribution.
+
+Accepted ordinary-native-path cutover checkpoint (supersedes the compiler
+artifact hashes and measurements immediately above):
+
+- the migrated one-construct/one-local fixed-layout subset is attempted before
+  legacy native lowering; once it qualifies, semantic or memory failure is
+  fatal and cannot fall back to the dynamic construct runtime;
+- unrelated/unmigrated syntax still uses the transitional legacy path, so this
+  is one vertical compiler with an explicit ownership boundary rather than a
+  directive-only second model;
+- full Stage 2/Stage 3 fixed point: `339.90 s`;
+- measured maximum RSS: `7.10 GB` (`7,104,299,008` bytes);
+- Stage 2/3 LLVM SHA-256:
+  `3c4ecbd0280d759446257dbf1c623b912f1affce58fe285014c5f5729fae3ffd`;
+- Stage 2/3 binary SHA-256:
+  `6c58d32c1e1a22d8583637d72753eed3ae444835b16e6875e396534722a0d01c`;
+- compiler LLVM: `2,122,020` bytes;
+- ordinary renamed/reordered-label `Duo` LLVM is identical across Stage 2/3
+  at SHA-256
+  `21cd129b0f23fc3182eadfc06b4a8ebf668e0708f50850a85508f0d3aa87b74a`;
+- clang accepts that ordinary output and the executable exits `7`; it contains
+  fixed aggregate operations and no `rangeConstruct*`, `malloc`, or `calloc`;
+- time is 0.8% above the directive proof checkpoint. RSS is 2.0% above the
+  hardened Plotter checkpoint and remains within the accepted 10% capability
+  ceiling; no causal memory-improvement claim is made.
+
+Accepted first typed-body/Plotter fixed-point checkpoint:
+
+- 24 total SyntaxIDs: the prior 5 declaration-side IDs plus 19 body nodes;
+- 18 normalized role edges with one physical direction;
+- function and `@main` bodies cover construct application, member reads,
+  function call, labeled arguments, integer literals, addition, local binding,
+  and return;
+- body edits change the body snapshot while preserving the function's
+  body-independent declaration fingerprint;
+- the three-fixture body/signature test passes in `186.07 s`; the exact Pair
+  focused snapshot and stricter edge/cardinality validator also pass.
+- full fixed point: `264.41 s`;
+- measured maximum RSS: `6.28 GB`;
+- Stage 2/3 LLVM SHA-256:
+  `b088d90c5806d1594a8e1a752734e5e3f7a9aed103d27db26ec3d8fb7c48521e`;
+- Stage 2/3 binary SHA-256:
+  `0537e1cf8813ce11889f0257b7384db9f57d8c14cc971025c4defaa3ba559811`;
+- compiler LLVM: `1,771,309` bytes;
+- direct linked Stage 2/3 typed snapshot SHA-256:
+  `0722529f83209a776e6b9f18bc03e018c132abf5fdb06b00c07140c8afcb0e47`;
+- direct linked Stage 2/3 graph snapshot SHA-256:
+  `0daba32538c5c1245a93e0eec0a83075ae989f6b79e89b1f9f4e5a1d20ad2bfa`;
+- time is 14.1% above the declaration-only checkpoint and LLVM is 10.7%
+  larger. This is an explicit body/Plotter capability cost, not an efficiency
+  claim. The first top-level symbol consumer has therefore moved to a
+  declaration-only typed policy; its old decoder is no longer on that live
+  path.
+
+Post-checkpoint hardening restores the exact legacy `CompilerExpression`
+shape through a `{ expression, SyntaxID }` parser result, adds a disabled-sink
+guard, normalizes binary singleton ordinals, distinguishes application and
+annotation facets, adds a distinct authored `@main` annotation plus one
+`AppliesTo` fact (25 nodes, 22 graph facts), and strengthens graph
+correspondence/reachability checks.
+
+Accepted hardened typed-body/Plotter checkpoint:
+
+- full fixed point: `267.23 s`;
+- measured maximum RSS: `6.96 GB`;
+- Stage 2/3 LLVM SHA-256:
+  `9ed0e0cab2082da6f5bd77bbb7ac887969a7ad81a6c24ff4b32733f138ef0944`;
+- Stage 2/3 binary SHA-256:
+  `12a0e076f759001575396012f0cd3b29b2f73abe91d151d5dfb32f0fc758834e`;
+- compiler LLVM: `1,818,321` bytes;
+- direct linked Stage 2/3 typed snapshot SHA-256:
+  `e5df209a5dcdbf8adcc675b3c748b3f7b8ad349faa574363d109c88f40ce9391`;
+- direct linked Stage 2/3 graph snapshot SHA-256:
+  `10719e3fd0b60e4dec8566a33ffab2207548746c8152bb0dd8b1bf1b61cb4877`;
+- time is 1.1% above the first body/Plotter checkpoint. The hardened snapshot
+  has 25 nodes, 22 graph facts, distinct application/annotation facets, and a
+  real `AppliesTo` fact; its migrated top-level symbol decoder is deleted.
+
+Accepted IntBuffer checkpoint:
+
+- full fixed point: `202.49 s`;
+- reported maximum RSS: `7.57 GB` (recorded, but not attributed to IntBuffer
+  because compiler tables do not consume it yet);
+- Stage 2/3 LLVM SHA-256:
+  `f9556a71dcd67343f9ba30f6b24ac23324ca518779ade3122338ceda8e839739`;
+- Stage 2/3 binary SHA-256:
+  `a1f35b6cf93ab810cdc01e55c1c5c6951183c0367e18596a6954fe13f98f8e18`;
+- compiler LLVM: `1,318,366` bytes;
+- strict C build, Swift emitter ABI, linked runtime execution, native compiler
+  lowering, inventory/body checks, transitive smoke, and Stage 2/3 byte
+  equality all pass.
+
+Accepted source-identity checkpoint:
+
+- bundled two-file and ordinary-source identity fixtures pass;
+- direct Stage 2 snapshot reports deterministic FileIDs, path/content spans,
+  and local offset zero at each content start;
+- full fixed point: `205.73 s`;
+- reported maximum RSS: `6.38 GB` (recorded as run evidence, not attributed as
+  an optimization result);
+- Stage 2/3 LLVM SHA-256:
+  `77b6c4f44ca5af9d7b2ddf9a2421a679482328056df2b57bf8953340d54c6013`;
+- Stage 2/3 binary SHA-256:
+  `54594b75e37c74cfc19af341170d1878dc237490cb4993d0e0ad51dac719820f`;
+- compiler LLVM: `1,342,915` bytes;
+- inventory/body checks, transitive normal compile, self-rebuild, direct Stage
+  2 identity snapshot, and byte equality all pass.
+
+Verified typed-declaration checkpoint (bounded capability exception):
+
+- bundled Pair capture produces 5 dense syntax rows, 2 declarations, 2 stored
+  members, 1 function row, and 1 parameter row with correct FileID-local
+  authored spans;
+- at this declaration-only checkpoint, body-only edits preserved the full
+  snapshot and function fingerprint. With typed body rows now present, body
+  edits correctly change the full snapshot while preserving the declaration
+  fingerprint; signature edits change the function fingerprint; unrelated
+  declaration reorder changes dense rows without changing the target
+  fingerprint;
+- duplicate declaration fingerprints poison capture and return a structured
+  invalid-snapshot diagnostic;
+- direct linked Stage 2/3 typed snapshot SHA-256:
+  `baadb048d1053268dbdde6fc03f290548d261cdb3646d395e633fe2b593f3f8e`;
+- full fixed point: `231.72 s`;
+- measured maximum RSS: `10.55 GB`;
+- Stage 2/3 LLVM SHA-256:
+  `1fb6d3b9339630a5599e016baf27570113cefb0fa1018ffc5c5b478f2f0f1d49`;
+- Stage 2/3 binary SHA-256:
+  `ea8b898171e7d443997b627377294cbd80b39adc0afc7a211dc8f39a5e952f27`;
+- compiler LLVM: `1,599,738` bytes;
+- time is 12.6% above the source-identity checkpoint, exceeding the nominal
+  10% gate. This is recorded as a direct typed-identity capability cost, not
+  an efficiency win. The bridge must pay that cost down by moving a real
+  consumer to typed rows and deleting its string-record path before broad
+  feature expansion;
+- RSS is within 10% of the preserved `10.10 GB` source-lazy baseline. As with
+  earlier RSS readings, a single run is evidence, not causal attribution.
+
+## Preserved Baseline
+
+The starting implementation is development commit `3a309a8d`.
+
+Permanent baseline evidence:
+
+- Stage 2 and Stage 3 LLVM SHA-256:
+  `208a80777c24e0e285f85ce6959826f49a7cea3987bd485de2c0331f0cda80c1`;
+- Stage 2 and Stage 3 native binaries are byte-identical;
+- full fixed point: `200.01 s`, `10.10 GB` maximum RSS;
+- compiler LLVM: `1,309,617` bytes;
+- transitive `main -> helper -> leaf` smoke passes;
+- arithmetic and function call fixtures return `7`;
+- printing emits `Hello from Range`;
+- delimiter-heavy strings, unique LLVM globals, clang validation, linking, and
+  execution pass.
+
+Every milestone must preserve the previous milestone's fixtures and record:
+
+- elapsed time and maximum RSS;
+- Stage 2 and Stage 3 LLVM and binary hashes;
+- identity, Plotter, and MemoryGraph snapshot hashes when those layers exist;
+- fixture exit status/stdout/diagnostics;
+- placeholder, unresolved-helper, malformed-LLVM, and link failures.
+
+Do not run Stage 2 and Stage 3 gates concurrently.
+
+## Permanent Rules
+
+- Range-authored code owns compiler and memory policy.
+- Stage 0 may provide only reusable runtime, ABI, lowering, process, linking,
+  validation, and test substrate required by the vertical slice.
+- Authored source and AST are immutable.
+- Parser remains structural and does not resolve names, settle types, or make
+  memory decisions.
+- Plotter emits structural graph facts and provenance, not memory policy.
+- MemoryGraph is the only authority for emitted storage/lifetime decisions.
+- Typed IR carries settled decisions and cannot invent a heap, ARC, GC, or
+  refcount fallback.
+- Final text is produced only at serialization boundaries.
+- Unsupported or ambiguous cases fail closed with authored diagnostics.
+- No second Swift semantic compiler, parallel memory engine, or external chunk
+  protocol may be introduced.
+
+## The First Proof Fixture
+
+```range
+construct Pair {
+    let left: Int
+    let right: Int
+}
+
+function sum(pair: Pair): Int {
+    return pair.left + pair.right
+}
+
+@main {
+    let pair: Pair(left: 3, right: 4)
+    return sum(pair: pair)
+}
+```
+
+Required settled interpretation:
+
+- `Pair` has a deterministic two-field fixed layout;
+- `pair` has local storage in `main`;
+- construction initializes both owned fields;
+- `sum` observes/borrows the value without mutation;
+- the call does not transfer ownership;
+- the value does not escape `main`;
+- the selected representation is a fixed value/aggregate with local lifetime.
+
+The source parameter remains a semantic value input. A shared-address
+`sum(ptr)` ABI is permitted as copy-elision/read-only transport only after
+MemoryGraph proves that pass mode; it is not source-level `binding` aliasing.
+
+Required emitted proof:
+
+- executable returns `7`;
+- LLVM contains a fixed Pair layout/value representation;
+- LLVM contains no `rangeConstructCreate`, `rangeConstructSet*`, or
+  `rangeConstructGet*` call for Pair;
+- LLVM contains no `malloc` or `calloc` for the local Pair value;
+- Stage 2 and Stage 3 identity, graph, MemoryGraph, IR, and LLVM snapshots are
+  identical.
+
+## Accelerated Proof Track
+
+The core memory-model hypothesis must be proven before completing every
+eventual compiler service. Use three bounded implementation patches:
+
+1. **Dense identity substrate:** build `CompilerIntTable` over `IntBuffer`, map
+   the existing bundled source framing to minimal `FileID`/source spans, and
+   produce deterministic source/identity snapshots without changing target
+   program LLVM. Declaration/member/function/parameter capture is an opt-in
+   bridge in this patch: it shares token/type grammar with legacy parsing,
+   owns and destroys its tables exactly once, and may not become a permanent
+   parallel representation.
+2. **Typed proof graph:** parse only the Pair proof subset into typed tables;
+   Plotter emits structural facts; Application/Semantic v0 settles the closed
+   references/types/effects; MemoryGraph emits deterministic memory decisions.
+   This patch is implemented and focused-fixture verified; Stage 2/3 snapshot
+   equality is still required before accepting its fixed-point checkpoint.
+3. **Decision-driven lowering:** implemented and fixed-point verified for any
+   equivalent two-`Int`-field construct. Typed operations cite exact
+   MemoryGraph rows; aggregate LLVM contains no dynamic construct runtime or
+   allocator dependency. Renamed/reordered-label, returned-local rejection,
+   executable, and Stage 2/3 snapshot gates pass. Unique mutation, alias
+   conflict, shared-borrow multiplicity, and escaping-owner placement remain
+   follow-on expansions of the same graph and IR, not alternate models.
+
+The accelerated track may defer full Foundation identity, editor line maps,
+in-compiler content-hash persistence, StringID interning, body caching without
+duplicate-parse evidence, macros, arrays, generics, broad semantic settlement,
+the full parity sweep, and compiler dogfooding. It may not defer authored spans,
+snapshot-local dense row IDs, a body-independent structural fingerprint, typed
+proof identities, settled proof-subset meaning, deterministic snapshots, or
+fail-closed behavior.
+It must not special-case the name `Pair` or recover proof facts from rendered
+LLVM/string summaries.
+
+## Milestone 1: Stable Identity And Typed Authored Storage
+
+### Scope
+
+Introduce the minimum durable substrate needed by Plotter and MemoryGraph:
+
+- `SourceSnapshotID` and one immutable bundled backing source;
+- `FileID` and a file table containing path, role, bundle range, file-local
+  range conversion, content hash, and line-map ownership;
+- `DeclarationID` and `FunctionID` derived from stable declaration path and
+  declared signature shape, excluding body content;
+- typed records for the proof subset:
+  - construct declaration;
+  - stored member;
+  - function and parameter;
+  - local binding and return;
+  - construct application, member read, and function call;
+  - integer literal and addition;
+- a `SyntaxID` and authored source span on every typed node;
+- typed lookup APIs for declarations, members, parameters, syntax nodes, and
+  applications;
+- parse-count instrumentation for lazy bodies.
+
+Body caching is evidence-gated. Add a cache only if instrumentation proves an
+active path parses the same `(SourceSnapshotID, FunctionID, BodySyntaxHash,
+ParserSchemaVersion, ParserOptionsHash)` more than once. Do not make cache
+construction a prerequisite when no duplicate exists.
+
+### Physical requirements
+
+- IDs are typed integers, never record offsets exposed as durable identity.
+- File and typed AST tables are contiguous, ID-indexed stores.
+- Names and paths use interned `StringID` values once interning exists.
+- Tokens and AST nodes refer to source spans rather than copied source text.
+- Do not implement the new stores as delimiter-encoded semantic databases or
+  linked name-keyed construct fields.
+- Plotter, semantic settlement, and MemoryGraph may not recover meaning by
+  decoding `memberSummary`, `parameterSummary`, `statementRecords`,
+  `expressionRecord`, or `localValues` strings.
+- If current Stage 0 cannot realize the table ABI, add only a reusable generic
+  contiguous buffer/slot substrate with geometric capacity.
+
+### Gate
+
+- stable identity snapshots are identical across repeated runs and Stage 2/3;
+- body-only edits preserve declaration/function identity;
+- declared-signature edits change the appropriate identity/fingerprint;
+- every proof node maps back to the correct file and authored span;
+- emitted LLVM and fixture behavior remain unchanged;
+- fixed-point time/RSS do not regress by more than 10% without an explicitly
+  accepted architectural capability gain.
+
+### Deletion gate
+
+When the final consumer of a migrated declaration record uses the typed store,
+delete that string field, encoder, decoder, and lookup path. Do not leave dual
+semantic representations indefinitely.
+
+The opt-in `compilerTypedSyntax` path is a proof/serialization boundary, not a
+future semantic API. Plotter must consume live typed tables. Once the first
+declaration/body consumer moves, delete the equivalent summary/record decoder
+rather than teaching both representations new semantics.
+
+## Milestone 2: Structural Plotter Delta
+
+### Scope
+
+Plot the typed proof subset into deterministic graph identities and facts:
+
+- `Node(kind, SyntaxID, DeclarationID, FileID, span)`;
+- `Owns(owner, child, role, ordinal)`;
+- `Origin(node, SyntaxID, span)`;
+- `Facet(facet, syntax)` where declaration/application facets differ;
+- annotation `AppliesTo` for `@main` and later authored annotations;
+- declaration, member, function, parameter, local, application, and return
+  identities required by the fixture.
+
+Plotter must return a bounded `GraphDelta`. It does not mutate AST storage,
+resolve names opportunistically, infer types/effects, execute macros, or lower
+LLVM.
+
+Application syntax nodes are structural and unresolved at this phase.
+Canonical snapshot order is `FileID`, `NodeID`, role, then ordinal.
+
+### Gate
+
+- graph delta ordering is deterministic;
+- graph snapshots and public-shape hashes match across Stage 2/3;
+- every fact retains authored provenance;
+- no relationship is physically stored twice for forward/inverse access;
+- unresolved or ambiguous proof-subset references fail with authored
+  diagnostics;
+- current LLVM remains unchanged until Milestone 3 consumes the graph.
+
+## Milestone 3: MemoryGraph v0, Typed IR, Fixed LLVM Layout
+
+### Application/Semantic v0
+
+Before MemoryGraph runs, settle the proof subset through a narrow typed
+application/semantic layer that resolves:
+
+- `Pair` construction to its declaration;
+- constructor argument labels to stored members;
+- the `sum` call to its function declaration;
+- `pair.left`/`pair.right` to fixed members;
+- local and parameter references;
+- `Int` field, addition, and return types;
+- per-parameter read/write/escape effects.
+
+These are explicit typed enrichment facts after Plotter. Plotter does not
+resolve names or types, and MemoryGraph does not guess missing semantic facts.
+Unsupported or ambiguous cases fail closed before memory derivation.
+
+The native compiler process must propagate a Range-owned failure result as a
+nonzero exit status. Printing `compilerError` while the generated NativeMain
+returns `0` is not an acceptable negative proof. Stage 0 may transport the
+status but does not decide the diagnostic or policy.
+
+### Facts
+
+Derive typed, provenance-bearing facts for:
+
+- `Region`, `Storage`, and `Value` identity;
+- `Owns` and `Stores`;
+- `Access(read/write)` and `Borrow(shared/unique)`;
+- unique mutable access;
+- semantic and lowering `Alias` facts kept distinct;
+- `Escape` or non-escape;
+- `LifetimeConstraint`;
+- `LayoutDecision`, `PlacementDecision`, and `PassMode`;
+- transfer and `DestroyPoint`.
+
+MemoryGraph may run only after the proof subset's declaration, type, layout,
+call, mutation, and escape inputs are settled. Missing inputs produce a
+diagnostic; they never select an implicit heap/reference fallback.
+
+### Typed per-function IR
+
+Build the minimum typed IR required to carry the proof:
+
+- fixed-layout value construction;
+- local storage identity;
+- field initialization and read;
+- read-only borrow/call parameter;
+- integer addition;
+- return;
+- explicit storage/transfer/destruction operations selected by MemoryGraph.
+
+IR validates that every storage-affecting operation cites a MemoryGraph
+decision. Backend lowering only realizes those operations.
+
+### Contrasting fixtures
+
+After the non-escaping Pair fixture, add:
+
+1. returned Pair with explicit ownership transfer to the caller;
+2. unique mutation accepted and recorded;
+3. conflicting mutable aliases rejected precisely;
+4. multiple shared immutable borrows accepted;
+5. Pair stored into an escaping owner with a derived longer-lived region.
+
+### Gate
+
+- all proof and contrasting fixtures have deterministic graph/IR snapshots;
+- non-escaping Pair uses fixed layout without construct-runtime calls,
+  `malloc`, or `calloc`;
+- alias/mutation diagnostics point to authored spans and derivation facts;
+- negative fixtures return a nonzero native compiler status;
+- Stage 2/3 remain byte-identical;
+- no current parity fixture regresses;
+- keep the slice only if it preserves correctness and either improves the
+  measurements or establishes the accepted reusable memory-model capability
+  within the 10% regression ceiling.
+
+### Deletion gate
+
+For migrated constructs, delete linked field-name globals and dynamic
+`rangeConstructCreate/Set/Get` lowering. The generic runtime may remain only
+for unmigrated language cases until their own typed vertical slices land.
+
+### Follow-on dogfood gate
+
+Do not require a compiler-owned construct in the initial non-escaping Pair
+proof. Existing small compiler records are returned or embedded. After the
+returned/stored-value and escape-placement fixtures pass, migrate
+`CompilerBlock` through the same path and then measure fixed-point time/RSS.
+
+## Supporting Gate: Native Parity Matrix
+
+Before changing the default driver, run the already-built Stage 2 compiler over
+all entries in `RangePlayground/Examples/LLVM/run-manifest.tsv` and classify:
+
+- pass;
+- compiler diagnostic;
+- malformed LLVM;
+- unresolved link symbol;
+- executable crash;
+- wrong exit status;
+- wrong stdout/stderr.
+
+Compare observable behavior, not Swift/native LLVM text. Native compiler errors
+must produce nonzero status before clang is invoked.
+
+This matrix is a permanent regression gate but does not block the narrow
+MemoryGraph proof from beginning.
+
+## Work Order
+
+1. Check in the architecture and this plan.
+2. Implement Milestone 1 source/file identity and proof-subset typed records.
+3. Prove identity determinism and unchanged LLVM at the fixed point.
+4. Implement Milestone 2 Plotter facts for the proof subset.
+5. Prove deterministic graph snapshots and authored provenance.
+6. Implement Milestone 3 MemoryGraph v0 and typed function IR.
+7. Switch only the Pair proof fixture to fixed-layout lowering.
+8. Add contrasting ownership/alias/escape fixtures.
+9. Dogfood one compiler construct and measure.
+10. Expand vertically; never replace the working compiler in one rewrite.
+
+## Completion Definition
+
+This plan is complete when Range's self-hosted compiler can prove, snapshot,
+and reproduce the Pair fixture's storage/ownership/borrow/alias/escape/lifetime
+facts; carry them through typed per-function IR; emit a fixed non-heap layout;
+execute correctly; and reproduce identical MemoryGraph and LLVM output at
+Stage 2 and Stage 3 without ARC, GC, implicit refcounting, or Swift-owned
+memory policy.

@@ -37,6 +37,34 @@ function compileRangeNativeSourceDirectiveOutput(source: String): String {
         return compilerSourceInventorySummary(source: source)
     }
 
+    if compilerSourceRequestsSourceIdentity(source: source) {
+        return compilerSourceIdentitySummary(source: source)
+    }
+
+    if compilerSourceRequestsTypedSyntax(source: source) {
+        return compilerTypedSyntaxSummary(source: source)
+    }
+
+    if compilerSourceRequestsPlotter(source: source) {
+        return compilerPlotterSummary(source: source)
+    }
+
+    if compilerSourceRequestsSemantics(source: source) {
+        return compilerSemanticSummary(source: source)
+    }
+
+    if compilerSourceRequestsMemoryGraph(source: source) {
+        return compilerMemorySummary(source: source)
+    }
+
+    if compilerSourceRequestsTypedIR(source: source) {
+        return compilerTypedIRSummary(source: source)
+    }
+
+    if compilerSourceRequestsMemoryLLVMText(source: source) {
+        return compilerTypedIRFixedLLVMText(source: source)
+    }
+
     if compilerSourceRequestsNativeSourceSetParseStats(source: source) {
         return compilerNativeSourceSetParseStats(source: source)
     }
@@ -65,6 +93,10 @@ function compileRangeNativeSourceDirectiveOutput(source: String): String {
 }
 
 function compileRangeNativeProgramOutput(source: String): String {
+    let typedFixedOutput: String(compilerTypedIRFixedLLVMIfSupported(source: source))
+    if typedFixedOutput != String("") {
+        return typedFixedOutput
+    }
     let program: CompilerProgram(parseCompilerProgramForLLVM(source: source))
     return compilerCoreLLVMEntryTextForProgram(program: program)
 }
@@ -115,6 +147,34 @@ function compileRangeSourceSetDirectiveOutput(source: String): String {
         return compilerSourceInventorySummary(source: source)
     }
 
+    if compilerSourceRequestsSourceIdentity(source: source) {
+        return compilerSourceIdentitySummary(source: source)
+    }
+
+    if compilerSourceRequestsTypedSyntax(source: source) {
+        return compilerTypedSyntaxSummary(source: source)
+    }
+
+    if compilerSourceRequestsPlotter(source: source) {
+        return compilerPlotterSummary(source: source)
+    }
+
+    if compilerSourceRequestsSemantics(source: source) {
+        return compilerSemanticSummary(source: source)
+    }
+
+    if compilerSourceRequestsMemoryGraph(source: source) {
+        return compilerMemorySummary(source: source)
+    }
+
+    if compilerSourceRequestsTypedIR(source: source) {
+        return compilerTypedIRSummary(source: source)
+    }
+
+    if compilerSourceRequestsMemoryLLVMText(source: source) {
+        return compilerTypedIRFixedLLVMText(source: source)
+    }
+
     return String("")
 }
 
@@ -148,6 +208,55 @@ function compileRangeCoreDirectiveOutput(source: String, program: CompilerProgra
 
 function compilerSourceRequestsSourceInventory(source: String): Bool {
     if hasRangePrefix(source: source, start: 0, prefix: String("compilerSourceInventory")) {
+        return true
+    }
+    return false
+}
+
+function compilerSourceRequestsSourceIdentity(source: String): Bool {
+    if hasRangePrefix(source: source, start: 0, prefix: String("compilerSourceIdentity")) {
+        return true
+    }
+    return false
+}
+
+function compilerSourceRequestsTypedSyntax(source: String): Bool {
+    if hasRangePrefix(source: source, start: 0, prefix: String("compilerTypedSyntax")) {
+        return true
+    }
+    return false
+}
+
+function compilerSourceRequestsPlotter(source: String): Bool {
+    if hasRangePrefix(source: source, start: 0, prefix: String("compilerPlotter")) {
+        return true
+    }
+    return false
+}
+
+function compilerSourceRequestsSemantics(source: String): Bool {
+    if hasRangePrefix(source: source, start: 0, prefix: String("compilerSemantics")) {
+        return true
+    }
+    return false
+}
+
+function compilerSourceRequestsMemoryGraph(source: String): Bool {
+    if hasRangePrefix(source: source, start: 0, prefix: String("compilerMemoryGraph")) {
+        return true
+    }
+    return false
+}
+
+function compilerSourceRequestsTypedIR(source: String): Bool {
+    if hasRangePrefix(source: source, start: 0, prefix: String("compilerTypedIR")) {
+        return true
+    }
+    return false
+}
+
+function compilerSourceRequestsMemoryLLVMText(source: String): Bool {
+    if hasRangePrefix(source: source, start: 0, prefix: String("compilerMemoryLLVMText")) {
         return true
     }
     return false

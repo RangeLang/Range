@@ -1178,6 +1178,54 @@ struct RangeScriptTests {
         #expect(result.stdout.contains("call i32 @textBufferDestroy(ptr"))
     }
 
+    @Test("Native compiler lowers the shared IntBuffer ABI")
+    func nativeCompilerLowersSharedIntBufferABI() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let source = directory.appendingPathComponent("CompilerIntBufferLLVM.range")
+        try """
+        compilerLLVMText
+
+        function bufferedValue(): Int {
+            let buffer: IntBuffer(intBufferCreate(capacity: 1))
+            intBufferAppend(buffer: buffer, value: 7)
+            intBufferAppend(buffer: buffer, value: 11)
+            let count: Int(intBufferCount(buffer: buffer))
+            let value: Int(intBufferElement(buffer: buffer, index: 1))
+            intBufferDestroy(buffer: buffer)
+            return count + value
+        }
+
+        @main {
+            return bufferedValue()
+        }
+        """.write(to: source, atomically: true, encoding: .utf8)
+
+        let compiler = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
+        let result = try runRangeScript(
+            arguments: ["run", compiler.path, "--", source.path],
+            timeout: 120
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("declare ptr @intBufferCreate(i32)"))
+        #expect(result.stdout.contains("declare i32 @intBufferAppend(ptr, i32)"))
+        #expect(result.stdout.contains("declare i32 @intBufferCount(ptr)"))
+        #expect(result.stdout.contains("declare i32 @intBufferElement(ptr, i32)"))
+        #expect(result.stdout.contains("declare i32 @intBufferDestroy(ptr)"))
+        #expect(result.stdout.contains("call ptr @intBufferCreate(i32 1)"))
+        #expect(result.stdout.contains("call i32 @intBufferAppend(ptr"))
+        #expect(result.stdout.contains("call i32 @intBufferCount(ptr"))
+        #expect(result.stdout.contains("call i32 @intBufferElement(ptr"))
+        #expect(result.stdout.contains("call i32 @intBufferDestroy(ptr"))
+    }
+
     @Test("Native compiler lowers the shared String search ABI")
     func nativeCompilerLowersSharedStringSearchABI() throws {
         let directory = FileManager.default.temporaryDirectory
@@ -1377,6 +1425,563 @@ struct RangeScriptTests {
         #expect(result.stdout.contains("%r7 = phi ptr [getelementptr inbounds ([1 x i8], ptr @.str.1, i32 0, i32 0), %entry], [%r5, %if0]"))
         #expect(result.stdout.contains("%r8 = call ptr @stringConcat(ptr %r6, ptr %r7)"))
         #expect(result.stdout.contains("ret ptr %r8"))
+    }
+
+    @Test("Native compiler snapshots bundled source file identity and local offsets")
+    func nativeCompilerSnapshotsBundledSourceIdentity() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let source = directory.appendingPathComponent("CompilerSourceIdentity.range")
+        let sourceText = """
+        compilerSourceIdentity
+        compilerSourceFile\\tHelper.range
+        function choose(value: Int): Int {
+            return value + 1
+        }
+        compilerSourceFile\\tMain.range
+        @main {
+            return choose(2)
+        }
+
+        """
+        try sourceText.write(to: source, atomically: true, encoding: .utf8)
+
+        let helperPathRange = try #require(sourceText.range(of: "Helper.range"))
+        let mainPathRange = try #require(sourceText.range(of: "Main.range"))
+        let secondMarkerRange = try #require(
+            sourceText.range(of: "compilerSourceFile\\tMain.range")
+        )
+        let helperPathStart = sourceText[..<helperPathRange.lowerBound].utf8.count
+        let helperPathEnd = sourceText[..<helperPathRange.upperBound].utf8.count
+        let helperContentStart = helperPathEnd + 1
+        let helperContentEnd = sourceText[..<secondMarkerRange.lowerBound].utf8.count
+        let mainPathStart = sourceText[..<mainPathRange.lowerBound].utf8.count
+        let mainPathEnd = sourceText[..<mainPathRange.upperBound].utf8.count
+        let mainContentStart = mainPathEnd + 1
+        let mainContentEnd = sourceText.utf8.count
+
+        let compiler = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
+        let result = try runRangeScript(
+            arguments: ["run", compiler.path, "--", source.path],
+            timeout: 120
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("sourceIdentity\tfileCount=2\n"))
+        #expect(
+            result.stdout.contains(
+                "sourceFile\tid=0\trole=project\tpath=Helper.range\tpathStart=\(helperPathStart)\tpathEnd=\(helperPathEnd)\tcontentStart=\(helperContentStart)\tcontentEnd=\(helperContentEnd)\n"
+            )
+        )
+        #expect(
+            result.stdout.contains(
+                "sourceMap\tglobal=\(helperContentStart)\tfileID=0\tlocal=0\n"
+            )
+        )
+        #expect(
+            result.stdout.contains(
+                "sourceFile\tid=1\trole=project\tpath=Main.range\tpathStart=\(mainPathStart)\tpathEnd=\(mainPathEnd)\tcontentStart=\(mainContentStart)\tcontentEnd=\(mainContentEnd)\n"
+            )
+        )
+        #expect(
+            result.stdout.contains(
+                "sourceMap\tglobal=\(mainContentStart)\tfileID=1\tlocal=0\n"
+            )
+        )
+    }
+
+    @Test("Native compiler assigns FileID zero to an ordinary source")
+    func nativeCompilerSnapshotsOrdinarySourceIdentity() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let source = directory.appendingPathComponent("CompilerOrdinarySourceIdentity.range")
+        let sourceText = """
+        compilerSourceIdentity
+        function value(): Int {
+            return 7
+        }
+
+        """
+        try sourceText.write(to: source, atomically: true, encoding: .utf8)
+
+        let compiler = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
+        let result = try runRangeScript(
+            arguments: ["run", compiler.path, "--", source.path],
+            timeout: 120
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("sourceIdentity\tfileCount=1\n"))
+        #expect(
+            result.stdout.contains(
+                "sourceFile\tid=0\trole=project\tpath=\tpathStart=0\tpathEnd=0\tcontentStart=0\tcontentEnd=\(sourceText.utf8.count)\n"
+            )
+        )
+        #expect(result.stdout.contains("sourceMap\tglobal=0\tfileID=0\tlocal=0\n"))
+    }
+
+    @Test("Native compiler snapshots dense typed Pair syntax with structural fingerprints")
+    func nativeCompilerSnapshotsDenseTypedPairSyntax() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let baseSource = """
+        compilerTypedSyntax
+        compilerSourceFile\\tPair.range
+        construct Pair {
+            let left: Int
+            let right: Int
+        }
+
+        function sum(pair: Pair): Int {
+            return pair.left + pair.right
+        }
+        compilerSourceFile\\tMain.range
+        @main {
+            let pair: Pair(left: 3, right: 4)
+            return sum(pair: pair)
+        }
+
+        """
+        let bodyEditSource = baseSource.replacingOccurrences(
+            of: "return pair.left + pair.right",
+            with: "return pair.right + pair.left"
+        )
+        let signatureEditSource = baseSource.replacingOccurrences(
+            of: "function sum(pair: Pair): Int",
+            with: "function sum(pair: Int): Int"
+        )
+
+        let baseResult = try runTypedSyntaxFixture(
+            source: baseSource,
+            name: "TypedPairBase.range",
+            directory: directory
+        )
+        let bodyEditResult = try runTypedSyntaxFixture(
+            source: bodyEditSource,
+            name: "TypedPairBodyEdit.range",
+            directory: directory
+        )
+        let signatureEditResult = try runTypedSyntaxFixture(
+            source: signatureEditSource,
+            name: "TypedPairSignatureEdit.range",
+            directory: directory
+        )
+
+        #expect(baseResult.timedOut == false)
+        #expect(baseResult.exitCode == 0)
+        #expect(baseResult.stderr.isEmpty)
+        #expect(
+            baseResult.stdout.hasPrefix(
+                "typedSyntax\tvalid=true\tidentityScope=pathStable,pathlessSnapshotLocal\tfileCount=2\tsyntaxCount=25\tdeclarationCount=2\tmemberCount=2\tfunctionCount=1\tparameterCount=1\tbodyNodeCount=20\tbodyEdgeCount=19\n"
+            )
+        )
+        #expect(baseResult.stdout.contains("declaration\trow=0\tsyntaxID=0\tfileID=0\tkind=construct"))
+        #expect(baseResult.stdout.contains("declaration\trow=1\tsyntaxID=3\tfileID=0\tkind=function"))
+        #expect(baseResult.stdout.contains("member\trow=0\tsyntaxID=1\tfileID=0\tparentSyntaxID=0\tordinal=0"))
+        #expect(baseResult.stdout.contains("parameter\trow=0\tsyntaxID=4\tfileID=0\tfunctionID=0\tordinal=0"))
+        #expect(baseResult.stdout.contains("syntax\tid=9\tkind=addition\tfacetRow=4"))
+        #expect(baseResult.stdout.contains("syntax\tid=11\tkind=mainAnnotation\tfacetRow=6"))
+        #expect(baseResult.stdout.contains("syntax\tid=14\tkind=application\tfacetRow=9"))
+        #expect(baseResult.stdout.contains("syntax\tid=19\tkind=local\tfacetRow=14"))
+        #expect(baseResult.stdout.contains("typedTable\tname=bodyNode\tversion=1\tcolumns=11\trows=20"))
+        #expect(baseResult.stdout.contains("typedTable\tname=bodyEdge\tversion=1\tcolumns=4\trows=19"))
+
+        let baseFingerprint = try #require(
+            typedSyntaxDeclarationFingerprint(in: baseResult.stdout, name: "sum")
+        )
+        let bodyEditFingerprint = try #require(
+            typedSyntaxDeclarationFingerprint(in: bodyEditResult.stdout, name: "sum")
+        )
+        let signatureEditFingerprint = try #require(
+            typedSyntaxDeclarationFingerprint(in: signatureEditResult.stdout, name: "sum")
+        )
+        #expect(bodyEditResult.stdout != baseResult.stdout)
+        #expect(bodyEditFingerprint == baseFingerprint)
+        #expect(signatureEditFingerprint != baseFingerprint)
+    }
+
+    @Test("Typed declaration fingerprint survives unrelated declaration reorder")
+    func typedDeclarationFingerprintSurvivesUnrelatedDeclarationReorder() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let constructSource = """
+        construct Pair {
+            let left: Int
+            let right: Int
+        }
+
+        """
+        let helperSource = """
+        function helper(): Int {
+            return 1
+        }
+
+        """
+        let sumSource = """
+        function sum(pair: Pair): Int {
+            return pair.left + pair.right
+        }
+
+        """
+        let helperFirstSource = """
+        compilerTypedSyntax
+        compilerSourceFile\\tPair.range
+        \(constructSource)\(helperSource)\(sumSource)
+        """
+        let helperLastSource = """
+        compilerTypedSyntax
+        compilerSourceFile\\tPair.range
+        \(constructSource)\(sumSource)\(helperSource)
+        """
+
+        let helperFirstResult = try runTypedSyntaxFixture(
+            source: helperFirstSource,
+            name: "TypedPairHelperFirst.range",
+            directory: directory
+        )
+        let helperLastResult = try runTypedSyntaxFixture(
+            source: helperLastSource,
+            name: "TypedPairHelperLast.range",
+            directory: directory
+        )
+        #expect(helperFirstResult.exitCode == 0)
+        #expect(helperLastResult.exitCode == 0)
+        #expect(helperFirstResult.stderr.isEmpty)
+        #expect(helperLastResult.stderr.isEmpty)
+        #expect(helperFirstResult.stdout != helperLastResult.stdout)
+        #expect(
+            typedSyntaxDeclarationFingerprint(in: helperFirstResult.stdout, name: "sum")
+                == typedSyntaxDeclarationFingerprint(in: helperLastResult.stdout, name: "sum")
+        )
+    }
+
+    @Test("Typed syntax rejects duplicate declaration fingerprints")
+    func typedSyntaxRejectsDuplicateDeclarationFingerprints() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerTypedSyntax
+            compilerSourceFile\\tDuplicate.range
+            function value(): Int {
+                return 1
+            }
+
+            function value(): Int {
+                return 2
+            }
+
+            """,
+            name: "TypedDuplicateDeclarations.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidTypedSyntaxSnapshot\n\n")
+    }
+
+    @Test("Typed body subset fails closed without a legacy-record fallback")
+    func typedBodySubsetFailsClosedWithoutLegacyRecordFallback() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerTypedSyntax
+            compilerSourceFile\\tUnsupportedBody.range
+            function difference(left: Int, right: Int): Int {
+                return left - right
+            }
+
+            """,
+            name: "TypedUnsupportedBody.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidTypedSyntaxSnapshot\n\n")
+    }
+
+    @Test("Native compiler plots Pair graph delta from live typed tables")
+    func nativeCompilerPlotsPairGraphDeltaFromLiveTypedTables() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerPlotter
+            compilerSourceFile\\tPair.range
+            construct Pair {
+                let left: Int
+                let right: Int
+            }
+
+            function sum(pair: Pair): Int {
+                return pair.left + pair.right
+            }
+            compilerSourceFile\\tMain.range
+            @main {
+                let pair: Pair(left: 3, right: 4)
+                return sum(pair: pair)
+            }
+
+            """,
+            name: "PairGraphDelta.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("graphDelta\tvalid=true\tnodeCount=25\tfactCount=22\n"))
+        #expect(result.stdout.contains("typedTable\tname=graphNode\tversion=1\tcolumns=8\trows=25"))
+        #expect(result.stdout.contains("typedTable\tname=graphFact\tversion=1\tcolumns=5\trows=22"))
+        #expect(result.stdout.contains("graphFact\trow=0\tvalues=1,0,1,10,0"))
+        #expect(result.stdout.contains("graphFact\trow=3\tvalues=1,3,4,11,0"))
+        #expect(result.stdout.contains("graphFact\trow=9\tvalues=2,11,12,12,0"))
+        #expect(result.stdout.contains("graphFact\trow=21\tvalues=1,24,21,3,0"))
+    }
+
+    @Test("Native compiler resolves Pair semantics from the graph delta")
+    func nativeCompilerResolvesPairSemanticsFromGraphDelta() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerSemantics
+            compilerSourceFile\\tPair.range
+            construct Pair {
+                let left: Int
+                let right: Int
+            }
+
+            function sum(pair: Pair): Int {
+                return pair.left + pair.right
+            }
+            compilerSourceFile\\tMain.range
+            @main {
+                let pair: Pair(left: 3, right: 4)
+                return sum(pair: pair)
+            }
+
+            """,
+            name: "PairSemantics.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("semanticGraph\tvalid=true\tresolutionCount=12\ttypeCount=25\teffectCount=1\n"))
+        #expect(result.stdout.contains("semanticResolution\trow=10\tvalues=22,19,3"))
+        #expect(result.stdout.contains("semanticResolution\trow=11\tvalues=23,4,7"))
+        #expect(result.stdout.contains("semanticType\trow=19\tvalues=19,2,0"))
+        #expect(result.stdout.contains("semanticEffect\trow=0\tvalues=3,4,1,0,0"))
+    }
+
+    @Test("Native compiler proves fixed-layout Pair memory decisions")
+    func nativeCompilerProvesFixedLayoutPairMemoryDecisions() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            compilerSourceFile\\tPair.range
+            construct Pair {
+                let left: Int
+                let right: Int
+            }
+
+            function sum(pair: Pair): Int {
+                return pair.left + pair.right
+            }
+            compilerSourceFile\\tMain.range
+            @main {
+                let pair: Pair(left: 3, right: 4)
+                return sum(pair: pair)
+            }
+
+            """,
+            name: "PairMemoryGraph.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("memoryGraph\tvalid=true\tlayoutCount=1\tstorageCount=1\tdecisionCount=7\n"))
+        #expect(result.stdout.contains("memoryLayout\trow=0\tvalues=0,2,8,4"))
+        #expect(result.stdout.contains("memoryStorage\trow=0\tvalues=0,19,0,12,1,0"))
+        #expect(result.stdout.contains("memoryDecision\trow=2\tvalues=3,14,0,0,1,19"))
+        #expect(result.stdout.contains("memoryDecision\trow=3\tvalues=4,23,0,0,1,22"))
+        #expect(result.stdout.contains("memoryDecision\trow=5\tvalues=6,4,-1,0,1,3"))
+        #expect(result.stdout.contains("memoryDecision\trow=6\tvalues=7,24,0,0,1,19"))
+    }
+
+    @Test("Native compiler carries MemoryGraph decisions through typed IR")
+    func nativeCompilerCarriesMemoryGraphDecisionsThroughTypedIR() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerTypedIR
+            compilerSourceFile\\tPair.range
+            construct Pair {
+                let left: Int
+                let right: Int
+            }
+
+            function sum(pair: Pair): Int {
+                return pair.left + pair.right
+            }
+            compilerSourceFile\\tMain.range
+            @main {
+                let pair: Pair(left: 3, right: 4)
+                return sum(pair: pair)
+            }
+
+            """,
+            name: "PairTypedIR.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("typedIR\tvalid=true\tfunctionCount=2\toperationCount=14\n"))
+        #expect(result.stdout.contains("typedIROperation\trow=4\tvalues=14,12,9,0,0,0,3,0"))
+        #expect(result.stdout.contains("typedIROperation\trow=6\tvalues=14,12,1,0,0,3,4,2"))
+        #expect(result.stdout.contains("typedIROperation\trow=9\tvalues=19,12,7,0,0,14,0,1"))
+        #expect(result.stdout.contains("typedIROperation\trow=10\tvalues=19,12,10,0,0,19,0,4"))
+        #expect(result.stdout.contains("typedIROperation\trow=11\tvalues=21,12,4,0,0,3,19,3"))
+        #expect(result.stdout.contains("typedIROperation\trow=12\tvalues=24,12,6,0,0,19,0,6"))
+    }
+
+    @Test("Native compiler lowers renamed fixed aggregate without construct runtime")
+    func nativeCompilerLowersRenamedFixedAggregateWithoutConstructRuntime() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryLLVMText
+            compilerSourceFile\\tDuo.range
+            construct Duo {
+                let first: Int
+                let second: Int
+            }
+
+            function total(value: Duo): Int {
+                return value.first + value.second
+            }
+            compilerSourceFile\\tMain.range
+            @main {
+                let value: Duo(second: 4, first: 3)
+                return total(value: value)
+            }
+
+            """,
+            name: "DuoFixedLLVM.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("= type { i32, i32 }"))
+        #expect(result.stdout.contains("insertvalue"))
+        #expect(result.stdout.contains("extractvalue"))
+        #expect(result.stdout.contains("alloca"))
+        #expect(!result.stdout.contains("rangeConstruct"))
+        #expect(!result.stdout.contains("malloc"))
+        #expect(!result.stdout.contains("calloc"))
+
+        let llvm = directory.appendingPathComponent("DuoFixedLLVM.ll")
+        let executable = directory.appendingPathComponent("DuoFixedLLVM")
+        try result.stdout.write(to: llvm, atomically: true, encoding: .utf8)
+        let clangResult = try runCapturedProcess(
+            executable: "/usr/bin/env",
+            arguments: ["clang", "-Wno-override-module", "-x", "ir", llvm.path, "-o", executable.path]
+        )
+        #expect(clangResult.exitCode == 0)
+        #expect(clangResult.stderr.isEmpty)
+
+        let executableResult = try runCapturedProcess(executable: executable.path, arguments: [])
+        #expect(executableResult.exitCode == 7)
+        #expect(executableResult.stdout.isEmpty)
+        #expect(executableResult.stderr.isEmpty)
+    }
+
+    @Test("MemoryGraph rejects returned local aggregate before placement")
+    func memoryGraphRejectsReturnedLocalAggregateBeforePlacement() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            compilerSourceFile\\tDuo.range
+            construct Duo {
+                let first: Int
+                let second: Int
+            }
+            compilerSourceFile\\tMain.range
+            @main {
+                let value: Duo(first: 3, second: 4)
+                return value
+            }
+
+            """,
+            name: "ReturnedLocalDuo.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
     }
 
     @Test("Native compiler emits combined source-set LLVM report")
@@ -1791,6 +2396,38 @@ struct RangeScriptTests {
         #expect(result.exitCode != 0)
         #expect(result.stderr.contains("No LLVM examples found"))
     }
+}
+
+private func runTypedSyntaxFixture(
+    source: String,
+    name: String,
+    directory: URL
+) throws -> ScriptResult {
+    let sourceURL = directory.appendingPathComponent(name)
+    try source.write(to: sourceURL, atomically: true, encoding: .utf8)
+    let compiler = try repositoryRoot()
+        .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
+    return try runRangeScript(
+        arguments: ["run", compiler.path, "--", sourceURL.path],
+        timeout: 120
+    )
+}
+
+private func typedSyntaxDeclarationFingerprint(in output: String, name: String) -> String? {
+    let nameField = "name=\(name)"
+    for line in output.split(separator: "\n") {
+        let fields = line.split(separator: "\t")
+        guard fields.first == "declaration",
+            fields.contains(where: { $0 == Substring(nameField) })
+        else {
+            continue
+        }
+        guard let fingerprint = fields.first(where: { $0.hasPrefix("fingerprint=") }) else {
+            return nil
+        }
+        return String(fingerprint.dropFirst("fingerprint=".count))
+    }
+    return nil
 }
 
 private func runRangeScript(arguments: [String], timeout: TimeInterval = 10) throws -> ScriptResult {

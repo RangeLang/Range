@@ -497,6 +497,14 @@ public struct SwiftBootstrapCompiler {
             stage2BodyNamesText.contains("compilerCoreLLVMLowerLinearStatementRecord;"),
             stage2BodyNamesText.contains("compilerCoreRenderedDirectReturnBlock;"),
             stage2BodyNamesText.contains("compilerSourceSetBodyFunctionNamesNativeProgram;"),
+            stage2BodyNamesText.contains("compilerSourceSetBodyFunctionNamesSourceIdentity;"),
+            stage2BodyNamesText.contains("compilerSourceIdentitySummary;"),
+            stage2BodyNamesText.contains("compilerSourceStoreFileIDAtGlobalOffset;"),
+            stage2BodyNamesText.contains("compilerSourceSetBodyFunctionNamesTypedSyntax;"),
+            stage2BodyNamesText.contains("compilerTypedSyntaxSummary;"),
+            stage2BodyNamesText.contains("compilerTypedSyntaxCapture;"),
+            stage2BodyNamesText.contains("compilerCoreParseStoredMemberToken;"),
+            stage2BodyNamesText.contains("compilerCoreParseFunctionParameterToken;"),
             stage2BodyNamesText.contains("compilerCoreLLVMEntryTextForProgram;"),
             stage2BodyNamesText.contains("compilerCoreLLVMEntryReachableFunctions;"),
             stage2BodyNamesText.contains("compilerSourceInventoryFileRecords;"),
@@ -813,6 +821,7 @@ public struct SwiftBootstrapCompiler {
             .appendingPathComponent("Runtime", isDirectory: true)
         return [
             runtimeRoot.appendingPathComponent("RangeTextBuffer.c"),
+            runtimeRoot.appendingPathComponent("RangeIntBuffer.c"),
             runtimeRoot.appendingPathComponent("RangeString.c"),
         ]
     }

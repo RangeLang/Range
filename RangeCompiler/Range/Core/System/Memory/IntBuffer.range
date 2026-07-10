@@ -1,0 +1,17 @@
+@language
+construct IntBuffer {}
+
+@language
+function intBufferCreate(capacity: Int): IntBuffer
+
+@language
+function intBufferAppend(buffer: IntBuffer, value: Int): Int
+
+@language
+function intBufferCount(buffer: IntBuffer): Int
+
+@language
+function intBufferElement(buffer: IntBuffer, index: Int): Int
+
+@language
+function intBufferDestroy(buffer: IntBuffer): Int

@@ -126,6 +126,46 @@ struct SwiftBootstrapTests {
         #expect(exitCode == 0)
     }
 
+    @Test("run links the shared IntBuffer runtime")
+    func runLinksSharedIntBufferRuntime() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("IntBuffer.range")
+        try """
+        @main {
+            let buffer: IntBuffer(intBufferCreate(capacity: 1))
+            if intBufferAppend(buffer: buffer, value: 7) != 0 {
+                return 1
+            }
+            if intBufferAppend(buffer: buffer, value: 11) != 0 {
+                return 2
+            }
+            if intBufferAppend(buffer: buffer, value: 42) != 0 {
+                return 3
+            }
+            let count: Int(intBufferCount(buffer: buffer))
+            let first: Int(intBufferElement(buffer: buffer, index: 0))
+            let second: Int(intBufferElement(buffer: buffer, index: 1))
+            let third: Int(intBufferElement(buffer: buffer, index: 2))
+            if intBufferDestroy(buffer: buffer) != 0 {
+                return 4
+            }
+            if count == 3 && first == 7 && second == 11 && third == 42 {
+                return 0
+            }
+            return 5
+        }
+        """.write(to: source, atomically: true, encoding: .utf8)
+
+        let exitCode = try SwiftBootstrapCompiler().run(
+            rangeRoot: try rangeRoot(),
+            input: source,
+            arguments: []
+        )
+
+        #expect(exitCode == 0)
+    }
+
     @Test("run links the shared String runtime")
     func runLinksSharedStringRuntime() throws {
         let directory = try temporaryDirectory()

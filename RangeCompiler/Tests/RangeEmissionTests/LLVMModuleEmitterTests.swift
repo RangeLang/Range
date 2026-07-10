@@ -5661,6 +5661,36 @@ struct LLVMModuleEmitterTests {
         #expect(!module.contains("define i32 @textBufferAppend"))
     }
 
+    @Test("IntBuffer uses the shared external runtime ABI")
+    func intBufferUsesSharedExternalRuntimeABI() throws {
+        let module = try emit(
+            """
+            @main {
+                let buffer: IntBuffer(intBufferCreate(capacity: 1))
+                intBufferAppend(buffer: buffer, value: 7)
+                intBufferAppend(buffer: buffer, value: 11)
+                let count: Int(intBufferCount(buffer: buffer))
+                let value: Int(intBufferElement(buffer: buffer, index: 1))
+                intBufferDestroy(buffer: buffer)
+                return count + value
+            }
+            """
+        )
+
+        #expect(module.contains("declare ptr @intBufferCreate(i32)"))
+        #expect(module.contains("declare i32 @intBufferAppend(ptr, i32)"))
+        #expect(module.contains("declare i32 @intBufferCount(ptr)"))
+        #expect(module.contains("declare i32 @intBufferElement(ptr, i32)"))
+        #expect(module.contains("declare i32 @intBufferDestroy(ptr)"))
+        #expect(module.contains("call ptr @intBufferCreate(i32 1)"))
+        #expect(module.contains("call i32 @intBufferAppend(ptr"))
+        #expect(module.contains("call i32 @intBufferCount(ptr"))
+        #expect(module.contains("call i32 @intBufferElement(ptr"))
+        #expect(module.contains("call i32 @intBufferDestroy(ptr"))
+        #expect(!module.contains("define ptr @intBufferCreate"))
+        #expect(!module.contains("define i32 @intBufferAppend"))
+    }
+
     @Test("Literal string interpolation emits global string")
     func literalStringInterpolationEmitsGlobalString() throws {
         let module = try emit(
