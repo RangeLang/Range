@@ -9,8 +9,5 @@
     let source: String(readFile(path: path))
     let output: String(compileRangeSource(source: source))
     print(value: output)
-    if compilerNativeOutputIsError(output: output) {
-        return 65
-    }
-    return 0
+    return compilerNativeOutputExitCode(output: output)
 }

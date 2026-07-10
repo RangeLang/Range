@@ -146,6 +146,88 @@ artifact hashes and measurements immediately above):
   hardened Plotter checkpoint and remains within the accepted 10% capability
   ceiling; no causal memory-improvement claim is made.
 
+Accepted generalized returned-aggregate and storage-policy checkpoint
+(supersedes the compiler artifact hashes and measurements below):
+
+- ownership transfer is derived per aggregate-returning call application, not
+  once per callee; two calls to different returning functions therefore own
+  two independent caller destinations and two `Transfer` decisions;
+- typed IR iterates every returned function row and every layout field, and a
+  call operation carries the callee identity used by LLVM lowering;
+- focused executable proofs cover two distinct returned functions, two caller
+  storages, and three `Int` fields. Reordered labeled initializers still lower
+  by semantic field ordinal and the executable exits `7`;
+- `let` and `state` locals both own storage, but MemoryGraph now emits an
+  explicit policy decision (`1` immutable, `2` mutable) for each storage and
+  typed IR cites it with a storage-policy operation;
+- this is compile-time storage-policy proof only. Mutation/write-effect
+  validation, non-owning `binding` aliases, alias-conflict rejection, and
+  `derived` dependency edges are not yet implemented;
+- the permanent ordinary no-directive Stage 2/3 smoke uses two returning
+  functions, one `let` destination, one `state` destination, and two member
+  reads. Both stage compilers emit byte-identical LLVM and the linked program
+  exits `7` without `rangeConstruct*`, `malloc`, or `calloc`;
+- full Stage 2/Stage 3 fixed point: `374.94 s`;
+- measured maximum RSS: `6.40 GB` (`6,400,917,504` bytes);
+- compiler LLVM: `2,210,182` bytes;
+- Stage 2/3 LLVM SHA-256:
+  `bd1b2ac9477a2be281ac2004add54e0a80f81b0beeca0d359ebbb23e9a7be61f`;
+- Stage 2/3 binary SHA-256:
+  `85566c6fa5f8e41a838bb8583d2474a9d51234f9a3732f87f73595b35c79f882`;
+- ordinary no-directive proof LLVM SHA-256 from both stages:
+  `2ccec65db3b40e6d15c36056df5e1e18efd91f85d3e8f9e5290919502d2f6908`;
+- output determinism is proven for this checkpoint. Peak RSS is not yet
+  deterministic: this run is 32.6% above the preceding `4.83 GB` measurement
+  but below the earlier `7.10 GB` measurement, so no memory-efficiency claim is
+  made from the single sample.
+
+Historical first returned-aggregate ownership-transfer checkpoint:
+
+- `function makeDuo(): Duo { return Duo(...) }` constructs a typed aggregate
+  value without creating callee storage;
+- the caller local owns the sole storage row and receives the returned value;
+- MemoryGraph emits nine decisions: layout, caller placement, call
+  initialization, non-escape, caller destruction, ownership transfer,
+  aggregate return mode, and two caller read accesses;
+- the original checkpoint attached `Transfer` to the callee return and no
+  `Destroy` decision;
+  destruction occurs exactly once at the caller's final return;
+- typed IR has 15 operations. Callee field insertion cites layout, transfer
+  cites `Transfer`, caller receipt cites initialization, caller reads
+  cite access decisions, and caller destruction cites `Destroy`;
+- LLVM uses a fixed aggregate return ABI (`define %Range.Fixed`, aggregate
+  `ret`, aggregate `call`), stores the received value into caller storage, and
+  contains no `rangeConstruct*`, `malloc`, or `calloc`;
+- the ordinary no-directive executable exits `7`;
+- a callee-local aggregate returned without supported transfer placement fails
+  closed with exit `65`, preventing dual callee/caller ownership;
+- focused MemoryGraph, executable, and negative fixtures pass in `72.31 s`,
+  `72.27 s`, and `72.09 s`;
+- native compiler diagnostics are transported through the Range-authored
+  `compilerNativeOutputExitCode`; the specialized native entry module calls it
+  and returns its result instead of hardcoding success;
+- full Stage 2/Stage 3 fixed point: `357.69 s`;
+- measured maximum RSS: `4.83 GB` (`4,825,956,352` bytes);
+- compiler LLVM: `2,177,259` bytes;
+- Stage 2/3 LLVM SHA-256:
+  `739405a9183f67185b88684a0ae6532da19f806fb36584626217f36486654cf0`;
+- Stage 2/3 binary SHA-256:
+  `fd47130e708ab03e60f7322abce50bb189383c875762c6314389d0f2edc93981`;
+- returned-value MemoryGraph snapshot SHA-256:
+  `a9c2e48b84d21c7395d34a9a536e62cb60334c333c64f37bc46f16ed2f94b093`;
+- returned-value typed-IR snapshot SHA-256:
+  `834a28956b015f8dcae47d169c99d5458b8b0fecc5ba7500a47b15feb18e0043`;
+- framed directive LLVM SHA-256:
+  `65bbc91ec484b1a4e1fb44cef78a384d3db1d43764ac9af98afd299c62665d72`;
+- ordinary no-directive LLVM SHA-256:
+  `e46b9b26a9101ffa6a21e255534591d9a09a054e249c6515e3b941c2dfb72eb5`;
+- every snapshot/module hash matches independently between Stage 2 and Stage
+  3. The ordinary and framed LLVM hashes differ only because stable declaration
+  fingerprints include their different source-identity contexts;
+- time is 5.2% above the prior ordinary-path checkpoint and LLVM size is 2.6%
+  larger. Measured RSS is 32.1% lower, but it remains one-run evidence rather
+  than a causal optimization claim.
+
 Accepted first typed-body/Plotter fixed-point checkpoint:
 
 - 24 total SyntaxIDs: the prior 5 declaration-side IDs plus 19 body nodes;

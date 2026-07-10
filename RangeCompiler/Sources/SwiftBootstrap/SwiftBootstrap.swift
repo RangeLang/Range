@@ -860,16 +860,23 @@ public struct SwiftBootstrapCompiler {
         let smokeExecutable = stage2SmokeExecutablePath(compilerDirectory: compilerDirectory)
 
         try """
-        function nativeSmokeLeaf(): Int {
-            return 0
+        construct NativeSmokePair {
+            let first: Int
+            let second: Int
         }
 
-        function nativeSmokeValue(): Int {
-            return nativeSmokeLeaf()
+        function nativeSmokeFirst(): NativeSmokePair {
+            return NativeSmokePair(second: 2, first: 1)
+        }
+
+        function nativeSmokeSecond(): NativeSmokePair {
+            return NativeSmokePair(first: 3, second: 6)
         }
 
         @main {
-            return nativeSmokeValue()
+            let first: NativeSmokePair(nativeSmokeFirst())
+            state second: NativeSmokePair(nativeSmokeSecond())
+            return first.first + second.second
         }
         """.write(to: smokeSource, atomically: true, encoding: .utf8)
 
@@ -887,12 +894,16 @@ public struct SwiftBootstrapCompiler {
         }
 
         guard compileResult.stderr.isEmpty,
+            compileResult.stdout.contains("= type { i32, i32 }"),
             compileResult.stdout.contains("define i32 @main() {\nentry:"),
-            compileResult.stdout.contains("define i32 @nativeSmokeLeaf()"),
-            compileResult.stdout.contains("define i32 @nativeSmokeValue()"),
-            compileResult.stdout.contains("call i32 @nativeSmokeLeaf()"),
-            compileResult.stdout.contains("call i32 @nativeSmokeValue()"),
-            compileResult.stdout.contains("ret i32 0"),
+            compileResult.stdout.components(separatedBy: "define %Range.Fixed.").count == 3,
+            compileResult.stdout.components(separatedBy: "call %Range.Fixed.").count == 3,
+            compileResult.stdout.contains("%storage0 = alloca"),
+            compileResult.stdout.contains("%storage1 = alloca"),
+            compileResult.stdout.contains("extractvalue"),
+            !compileResult.stdout.contains("rangeConstruct"),
+            !compileResult.stdout.contains("malloc"),
+            !compileResult.stdout.contains("calloc"),
             !compileResult.stdout.contains("\\n")
         else {
             throw SwiftBootstrapError(
@@ -915,7 +926,7 @@ public struct SwiftBootstrapCompiler {
         )
 
         let runResult = try runExecutable(executable: smokeExecutable, arguments: [], stdin: nil)
-        guard runResult.exitCode == 0, runResult.stdout.isEmpty, runResult.stderr.isEmpty else {
+        guard runResult.exitCode == 7, runResult.stdout.isEmpty, runResult.stderr.isEmpty else {
             throw SwiftBootstrapError(
                 """
                 Linked Stage 2 compiler normal executable failed.

@@ -839,6 +839,38 @@ Stage 2/3 and exits `7`. The superseding ordinary-cutover fixed point is
 `339.90 s`, `7.10 GB` maximum RSS, and `2,122,020` bytes of compiler LLVM, with
 byte-identical Stage 2/3 compiler artifacts.
 
+Returned fixed aggregates now use the same model across a function boundary.
+MemoryGraph assigns storage only to the caller, marks the callee return as an
+ownership transfer, selects aggregate-value return ABI, suppresses callee
+destruction, records caller read accesses, and destroys once after the caller's
+last use. Typed IR cites those exact decisions and LLVM emits an aggregate
+`ret`/`call` with no dynamic construct runtime or allocator. A callee-local
+aggregate return that lacks supported transfer placement fails closed. The
+accepted fixed point is `357.69 s`, `4.83 GB` maximum RSS, and `2,177,259`
+bytes of compiler LLVM, with identical Stage 2/3 compiler, MemoryGraph, typed
+IR, and proof-module artifacts. The specialized native entry module now calls
+the Range-authored diagnostic exit helper, so fail-closed results propagate as
+native exit `65` rather than being printed with an incorrect success status.
+
+The returned-value path is now rule-driven across call sites instead of being
+shaped around one fixture. Each aggregate-returning application owns its own
+`Transfer` decision and caller destination; typed IR iterates returned
+functions and layout fields; and LLVM selects each callee from the function
+identity carried by the call operation. The accepted proof has two distinct
+returning functions, two caller storages, and a three-field variant, all with
+one fixed aggregate ABI and no construct runtime or allocator. `let` and
+`state` also survive typed capture as explicit immutable/mutable storage-policy
+decisions and typed-IR operations. This proves compile-time policy selection,
+not mutation checking: assignment/write effects, `binding` alias rules, and
+`derived` dependency edges remain outside the accepted subset.
+
+The superseding fixed point completes in `374.94 s`, emits `2,210,182` bytes
+of compiler LLVM, and produces byte-identical Stage 2/3 compiler artifacts.
+The ordinary no-directive two-helper/two-storage module is byte-identical from
+Stage 2 and Stage 3 and exits `7`. Peak RSS was `6.40 GB`; because accepted runs
+have ranged from `4.83 GB` to `7.10 GB`, this is deterministic-output evidence,
+not evidence that peak compiler memory has improved.
+
 ## Stage 0 Boundary
 
 Treat Stage 0 as **frozen semantics, movable substrate**.
@@ -1143,14 +1175,16 @@ The next work is three vertical milestones:
    semantic layer resolves the closed construct/function subset and derives
    explicit read/write/escape effects without moving resolution into Plotter.
 3. **MemoryGraph v0 to LLVM:** implemented and Stage 2/Stage 3 fixed-point
-   verified: fixed layout, local placement,
+   verified: fixed layout, local placement, caller-owned returned-value
+   placement, per-call ownership transfer, aggregate return ABI, iterated
+   returned functions and fields, immutable/mutable local storage policy,
    initialization, shared borrow, non-escape, by-value pass mode, and final
    destruction are explicit typed decisions. Next, carry those decisions
    through typed per-function IR into aggregate by-value LLVM without the
    linked construct runtime or heap allocation. The next work is deletion of
    migrated dynamic construct consumers plus contrasting unique-mutation,
-   alias-conflict, shared-borrow, and escaping-owner fixtures—not a second
-   compiler or memory model.
+   alias-conflict, shared-borrow multiplicity, and longer-lived escaping-owner
+   placement—not a second compiler or memory model.
 
 Every milestone records fixture behavior, graph/identity snapshots, elapsed
 time, peak RSS, and Stage 2/Stage 3 hashes. Current RSS measurements vary too

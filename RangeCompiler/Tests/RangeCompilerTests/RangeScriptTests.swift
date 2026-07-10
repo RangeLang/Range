@@ -1844,13 +1844,14 @@ struct RangeScriptTests {
         #expect(result.timedOut == false)
         #expect(result.exitCode == 0)
         #expect(result.stderr.isEmpty)
-        #expect(result.stdout.hasPrefix("memoryGraph\tvalid=true\tlayoutCount=1\tstorageCount=1\tdecisionCount=7\n"))
+        #expect(result.stdout.hasPrefix("memoryGraph\tvalid=true\tlayoutCount=1\tstorageCount=1\tdecisionCount=8\n"))
         #expect(result.stdout.contains("memoryLayout\trow=0\tvalues=0,2,8,4"))
         #expect(result.stdout.contains("memoryStorage\trow=0\tvalues=0,19,0,12,1,0"))
         #expect(result.stdout.contains("memoryDecision\trow=2\tvalues=3,14,0,0,1,19"))
         #expect(result.stdout.contains("memoryDecision\trow=3\tvalues=4,23,0,0,1,22"))
         #expect(result.stdout.contains("memoryDecision\trow=5\tvalues=6,4,-1,0,1,3"))
         #expect(result.stdout.contains("memoryDecision\trow=6\tvalues=7,24,0,0,1,19"))
+        #expect(result.stdout.contains("memoryDecision\trow=7\tvalues=11,19,0,0,1,19"))
     }
 
     @Test("Native compiler carries MemoryGraph decisions through typed IR")
@@ -1886,13 +1887,14 @@ struct RangeScriptTests {
         #expect(result.timedOut == false)
         #expect(result.exitCode == 0)
         #expect(result.stderr.isEmpty)
-        #expect(result.stdout.hasPrefix("typedIR\tvalid=true\tfunctionCount=2\toperationCount=14\n"))
+        #expect(result.stdout.hasPrefix("typedIR\tvalid=true\tfunctionCount=2\toperationCount=15\n"))
         #expect(result.stdout.contains("typedIROperation\trow=4\tvalues=14,12,9,0,0,0,3,0"))
-        #expect(result.stdout.contains("typedIROperation\trow=6\tvalues=14,12,1,0,0,3,4,2"))
+        #expect(result.stdout.contains("typedIROperation\trow=6\tvalues=14,12,1,0,0,2,0,2"))
         #expect(result.stdout.contains("typedIROperation\trow=9\tvalues=19,12,7,0,0,14,0,1"))
-        #expect(result.stdout.contains("typedIROperation\trow=10\tvalues=19,12,10,0,0,19,0,4"))
-        #expect(result.stdout.contains("typedIROperation\trow=11\tvalues=21,12,4,0,0,3,19,3"))
-        #expect(result.stdout.contains("typedIROperation\trow=12\tvalues=24,12,6,0,0,19,0,6"))
+        #expect(result.stdout.contains("typedIROperation\trow=10\tvalues=19,12,14,0,0,1,0,7"))
+        #expect(result.stdout.contains("typedIROperation\trow=11\tvalues=19,12,10,0,0,19,0,4"))
+        #expect(result.stdout.contains("typedIROperation\trow=12\tvalues=21,12,4,0,0,3,19,3"))
+        #expect(result.stdout.contains("typedIROperation\trow=13\tvalues=24,12,6,0,0,19,0,6"))
     }
 
     @Test("Native compiler lowers renamed fixed aggregate without construct runtime")
@@ -1950,6 +1952,248 @@ struct RangeScriptTests {
         #expect(executableResult.exitCode == 7)
         #expect(executableResult.stdout.isEmpty)
         #expect(executableResult.stderr.isEmpty)
+    }
+
+    @Test("MemoryGraph transfers returned aggregate into caller storage")
+    func memoryGraphTransfersReturnedAggregateIntoCallerStorage() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            compilerSourceFile\\tDuo.range
+            construct Duo {
+                let first: Int
+                let second: Int
+            }
+
+            function makeDuo(): Duo {
+                return Duo(second: 4, first: 3)
+            }
+            compilerSourceFile\\tMain.range
+            @main {
+                let value: Duo(makeDuo())
+                return value.first + value.second
+            }
+
+            """,
+            name: "ReturnedDuoMemoryGraph.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("memoryGraph\tvalid=true\tlayoutCount=1\tstorageCount=1\tdecisionCount=10\n"))
+        #expect(result.stdout.contains("memoryStorage\trow=0\tvalues=0,15,0,12,1,0"))
+        #expect(result.stdout.contains("memoryDecision\trow=2\tvalues=3,14,0,0,1,15"))
+        #expect(result.stdout.contains("memoryDecision\trow=4\tvalues=7,21,0,0,1,15"))
+        #expect(result.stdout.contains("memoryDecision\trow=5\tvalues=8,14,0,0,1,5"))
+        #expect(result.stdout.contains("memoryDecision\trow=6\tvalues=9,3,-1,0,1,10"))
+        #expect(result.stdout.contains("memoryDecision\trow=7\tvalues=10,17,0,0,1,16"))
+        #expect(result.stdout.contains("memoryDecision\trow=9\tvalues=11,15,0,0,1,15"))
+        #expect(!result.stdout.contains("values=7,10,"))
+    }
+
+    @Test("Native compiler executes returned aggregate ownership transfer")
+    func nativeCompilerExecutesReturnedAggregateOwnershipTransfer() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryLLVMText
+            compilerSourceFile\\tDuo.range
+            construct Duo {
+                let first: Int
+                let second: Int
+            }
+
+            function makeDuo(): Duo {
+                return Duo(second: 4, first: 3)
+            }
+            compilerSourceFile\\tMain.range
+            @main {
+                let value: Duo(makeDuo())
+                return value.first + value.second
+            }
+
+            """,
+            name: "ReturnedDuoLLVM.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("define %Range.Fixed."))
+        #expect(result.stdout.contains("call %Range.Fixed."))
+        #expect(result.stdout.contains("ret %Range.Fixed."))
+        #expect(result.stdout.contains("alloca"))
+        #expect(result.stdout.contains("store"))
+        #expect(result.stdout.contains("extractvalue"))
+        #expect(!result.stdout.contains("rangeConstruct"))
+        #expect(!result.stdout.contains("malloc"))
+        #expect(!result.stdout.contains("calloc"))
+
+        let llvm = directory.appendingPathComponent("ReturnedDuoLLVM.ll")
+        let executable = directory.appendingPathComponent("ReturnedDuoLLVM")
+        try result.stdout.write(to: llvm, atomically: true, encoding: .utf8)
+        let clangResult = try runCapturedProcess(
+            executable: "/usr/bin/env",
+            arguments: ["clang", "-Wno-override-module", "-x", "ir", llvm.path, "-o", executable.path]
+        )
+        #expect(clangResult.exitCode == 0)
+        #expect(clangResult.stderr.isEmpty)
+        let executableResult = try runCapturedProcess(executable: executable.path, arguments: [])
+        #expect(executableResult.exitCode == 7)
+        #expect(executableResult.stdout.isEmpty)
+        #expect(executableResult.stderr.isEmpty)
+    }
+
+    @Test("Typed IR preserves immutable and mutable caller storage policy")
+    func typedIRPreservesCallerStoragePolicy() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerTypedIR
+            compilerSourceFile\tDuo.range
+            construct Duo {
+                let first: Int
+                let second: Int
+            }
+            function makeFirst(): Duo {
+                return Duo(second: 2, first: 1)
+            }
+            function makeSecond(): Duo {
+                return Duo(first: 3, second: 6)
+            }
+            compilerSourceFile\tMain.range
+            @main {
+                let first: Duo(makeFirst())
+                state second: Duo(makeSecond())
+                return first.first + second.second
+            }
+
+            """,
+            name: "CallerStoragePolicy.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("typedIR\tvalid=true\tfunctionCount=3\toperationCount=28\n"))
+        #expect(result.stdout.contains("typedIROperation\trow=15\tvalues=23,20,14,0,0,1,0,15"))
+        #expect(result.stdout.contains("typedIROperation\trow=20\tvalues=26,20,14,0,1,2,0,16"))
+    }
+
+    @Test("Native compiler iterates returned functions and aggregate fields")
+    func nativeCompilerIteratesReturnedFunctionsAndAggregateFields() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryLLVMText
+            compilerSourceFile\tTriple.range
+            construct Triple {
+                let first: Int
+                let middle: Int
+                let last: Int
+            }
+            function makeFirst(): Triple {
+                return Triple(middle: 2, last: 4, first: 1)
+            }
+            function makeSecond(): Triple {
+                return Triple(last: 6, first: 3, middle: 5)
+            }
+            compilerSourceFile\tMain.range
+            @main {
+                let first: Triple(makeFirst())
+                state second: Triple(makeSecond())
+                return first.first + second.last
+            }
+
+            """,
+            name: "ReturnedTripleLLVM.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("= type { i32, i32, i32 }"))
+        #expect(result.stdout.components(separatedBy: "define %Range.Fixed.").count == 3)
+        #expect(result.stdout.components(separatedBy: "call %Range.Fixed.").count == 3)
+        #expect(result.stdout.contains("%storage0 = alloca"))
+        #expect(result.stdout.contains("%storage1 = alloca"))
+        #expect(result.stdout.contains(", 2\n"))
+        #expect(!result.stdout.contains("rangeConstruct"))
+        #expect(!result.stdout.contains("malloc"))
+        #expect(!result.stdout.contains("calloc"))
+
+        let llvm = directory.appendingPathComponent("ReturnedTripleLLVM.ll")
+        let executable = directory.appendingPathComponent("ReturnedTripleLLVM")
+        try result.stdout.write(to: llvm, atomically: true, encoding: .utf8)
+        let clangResult = try runCapturedProcess(
+            executable: "/usr/bin/env",
+            arguments: ["clang", "-Wno-override-module", "-x", "ir", llvm.path, "-o", executable.path]
+        )
+        #expect(clangResult.exitCode == 0)
+        #expect(clangResult.stderr.isEmpty)
+        let executableResult = try runCapturedProcess(executable: executable.path, arguments: [])
+        #expect(executableResult.exitCode == 7)
+        #expect(executableResult.stdout.isEmpty)
+        #expect(executableResult.stderr.isEmpty)
+    }
+
+    @Test("MemoryGraph rejects callee-local aggregate return without transfer placement")
+    func memoryGraphRejectsCalleeLocalAggregateReturnWithoutTransferPlacement() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            compilerSourceFile\\tDuo.range
+            construct Duo {
+                let first: Int
+                let second: Int
+            }
+
+            function makeDuo(): Duo {
+                let temporary: Duo(first: 3, second: 4)
+                return temporary
+            }
+            compilerSourceFile\\tMain.range
+            @main {
+                let value: Duo(makeDuo())
+                return value.first + value.second
+            }
+
+            """,
+            name: "UnsupportedCalleeLocalTransfer.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
     }
 
     @Test("MemoryGraph rejects returned local aggregate before placement")
