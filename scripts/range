@@ -14,6 +14,8 @@ Usage:
   scripts/range emit-llvm INPUT OUTPUT
   scripts/range compile-executable INPUT
   scripts/range check-bootstrap-compiler [DIR]
+  scripts/range check-stage1-compiler [DIR]
+  scripts/range check-stage2-compiler [DIR]
   scripts/range check-llvm-examples [DIR]
   scripts/range check-llvm-runs [MANIFEST]
 USAGE
@@ -73,6 +75,24 @@ case "$command" in
 
         compiler_dir="${1:-$REPO_ROOT/RangeCompiler/Range/Programs/Compiler}"
         range_compiler check-bootstrap-compiler --range-root "$RANGE_ROOT" "$compiler_dir"
+        ;;
+    check-stage1-compiler)
+        if [[ $# -gt 1 ]]; then
+            usage
+            exit 1
+        fi
+
+        compiler_dir="${1:-$REPO_ROOT/RangeCompiler/Range/Programs/Compiler}"
+        range_compiler check-stage1-compiler --range-root "$RANGE_ROOT" "$compiler_dir"
+        ;;
+    check-stage2-compiler)
+        if [[ $# -gt 1 ]]; then
+            usage
+            exit 1
+        fi
+
+        compiler_dir="${1:-$REPO_ROOT/RangeCompiler/Range/Programs/Compiler}"
+        range_compiler check-stage2-compiler --range-root "$RANGE_ROOT" "$compiler_dir"
         ;;
     check-llvm-examples)
         if [[ $# -gt 1 ]]; then

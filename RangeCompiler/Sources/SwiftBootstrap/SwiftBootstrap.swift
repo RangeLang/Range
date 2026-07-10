@@ -28,7 +28,11 @@ public struct SwiftBootstrapCompiler {
         )
 
         try emitLLVM(rangeRoot: rangeRoot, input: input, output: layout.llvmIR)
-        try linkExecutable(llvmIR: layout.llvmIR, executable: layout.executable)
+        try linkExecutable(
+            llvmIR: layout.llvmIR,
+            additionalInputs: coreRuntimeSupportPaths(rangeRoot: rangeRoot),
+            executable: layout.executable
+        )
         return layout.executable
     }
 
@@ -63,10 +67,12 @@ public struct SwiftBootstrapCompiler {
         guard mainResult.stdout.contains("macroAttribute\\t@main"),
             mainResult.stdout.contains("identifier\\tcommandLineArgumentCount"),
             mainResult.stdout.contains("keyword\\treturn"),
-            mainResult.stdout.contains("parse\\tmainBlock"),
-            mainResult.stdout.contains("stage2\\tmainFunction\\tname=main"),
-            mainResult.stdout.contains("llvm\\tmain\\treturn=0"),
-            mainResult.stdout.contains("llvmText\\tdefine i32 @main()")
+            mainResult.stdout.contains("ast\\tmainBlock"),
+            mainResult.stdout.contains("ast\\tstatement\\tkind=return\\texpression=integerLiteral(0)"),
+            mainResult.stdout.contains("compilerCoreLLVM\\tmain"),
+            mainResult.stdout.contains("compilerCoreLLVMText\\t"),
+            mainResult.stdout.contains("declare i32 @puts(ptr)"),
+            mainResult.stdout.contains("define i32 @main()")
         else {
             throw SwiftBootstrapError(
                 """
@@ -96,8 +102,9 @@ public struct SwiftBootstrapCompiler {
             lexerResult.stdout.contains("identifier\\tRangeLexedToken"),
             lexerResult.stdout.contains("identifier\\tlexNextRangeToken"),
             lexerResult.stdout.contains("stringLiteral\\t\"ellipsis\""),
-            lexerResult.stdout.contains("parse\\tnoMainBlock"),
-            lexerResult.stdout.contains("llvm\\tnoMainReturnInteger")
+            lexerResult.stdout.contains("ast\\tfunction\\tname=lexRangeSource"),
+            lexerResult.stdout.contains("ast\\tfunction\\tname=rangeToken"),
+            lexerResult.stdout.contains("ast\\tfunction\\tname=hasRangePrefix")
         else {
             throw SwiftBootstrapError(
                 """
@@ -110,35 +117,419 @@ public struct SwiftBootstrapCompiler {
             )
         }
 
-        let parserInput = compilerDirectory.appendingPathComponent("Parser.range")
-        let parserResult = try runExecutable(executable: executable, arguments: [parserInput.path], stdin: nil)
-        guard parserResult.exitCode == 0 else {
+        let compilerCoreInput = compilerDirectory.appendingPathComponent("CompilerCore.range")
+        let compilerCoreResult = try runExecutable(executable: executable, arguments: [compilerCoreInput.path], stdin: nil)
+        guard compilerCoreResult.exitCode == 0 else {
             throw SwiftBootstrapError(
                 """
-                Bootstrap compiler exited \(parserResult.exitCode): \(parserInput.path)
+                Bootstrap compiler exited \(compilerCoreResult.exitCode): \(compilerCoreInput.path)
                 --- stdout ---
-                \(prefixLines(parserResult.stdout))
+                \(prefixLines(compilerCoreResult.stdout))
                 --- stderr ---
-                \(prefixLines(parserResult.stderr))
+                \(prefixLines(compilerCoreResult.stderr))
                 """
             )
         }
-        guard parserResult.stdout.contains("parse\\tnoMainBlock"),
-            parserResult.stdout.contains("parse\\tfunction\\tname=parseRangeSource"),
-            parserResult.stdout.contains("parse\\tfunction\\tname=parseRangeFunctionDeclaration")
+        guard compilerCoreResult.stdout.contains("ast\\tfunction\\tname=compilerCoreASTSummary"),
+            compilerCoreResult.stdout.contains("ast\\tfunction\\tname=compilerCoreLLVM"),
+            compilerCoreResult.stdout.contains("ast\\tfunction\\tname=compilerCoreMainLLVM")
         else {
             throw SwiftBootstrapError(
                 """
-                Bootstrap compiler did not parse expected function declarations: \(parserInput.path)
+                Bootstrap compiler did not parse expected compiler-core declarations: \(compilerCoreInput.path)
                 --- stdout ---
-                \(prefixLines(parserResult.stdout))
+                \(prefixLines(compilerCoreResult.stdout))
                 --- stderr ---
-                \(prefixLines(parserResult.stderr))
+                \(prefixLines(compilerCoreResult.stderr))
                 """
             )
         }
         print("Bootstrap compiler check succeeded: \(executable.path)")
         return executable
+    }
+
+    @discardableResult
+    public func checkStage1Compiler(rangeRoot: URL, compilerDirectory: URL) throws -> URL {
+        let executable = try compileExecutable(rangeRoot: rangeRoot, input: compilerDirectory)
+        let sourceBundle = try stage1CompilerSourceBundle(
+            compilerDirectory: compilerDirectory,
+            directive: "compilerSourceInventory"
+        )
+        defer {
+            try? FileManager.default.removeItem(at: sourceBundle.deletingLastPathComponent())
+        }
+
+        let result = try runExecutable(executable: executable, arguments: [sourceBundle.path], stdin: nil)
+        guard result.exitCode == 0 else {
+            throw SwiftBootstrapError(
+                """
+                Stage 1 compiler inventory check exited \(result.exitCode): \(sourceBundle.path)
+                --- stdout ---
+                \(prefixLines(result.stdout))
+                --- stderr ---
+                \(prefixLines(result.stderr))
+                """
+            )
+        }
+
+        guard result.stdout.contains("sourceInventory\\tprogram"),
+            result.stdout.contains("sourceFile\\tindex=0\\tpath=Compiler.range"),
+            result.stdout.contains("sourceFile\\tindex=1\\tpath=CompilerCore.range"),
+            result.stdout.contains("sourceFile\\tindex=2\\tpath=Lexer.range"),
+            result.stdout.contains("sourceFile\\tindex=3\\tpath=Main.range"),
+            result.stdout.contains("sourceFileCount\\t4")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Stage 1 compiler did not emit expected source inventory: \(sourceBundle.path)
+                --- stdout ---
+                \(prefixLines(result.stdout))
+                --- stderr ---
+                \(prefixLines(result.stderr))
+                """
+            )
+        }
+
+        let astBundle = try stage1CompilerSourceBundle(
+            compilerDirectory: compilerDirectory,
+            directive: "compilerSourceSetAST"
+        )
+        defer {
+            try? FileManager.default.removeItem(at: astBundle.deletingLastPathComponent())
+        }
+
+        let astResult = try runExecutable(executable: executable, arguments: [astBundle.path], stdin: nil)
+        guard astResult.exitCode == 0 else {
+            throw SwiftBootstrapError(
+                """
+                Stage 1 compiler AST check exited \(astResult.exitCode): \(astBundle.path)
+                --- stdout ---
+                \(prefixLines(astResult.stdout))
+                --- stderr ---
+                \(prefixLines(astResult.stderr))
+                """
+            )
+        }
+
+        guard astResult.stdout.contains("sourceSetAST\\tprogram"),
+            astResult.stdout.contains("sourceFileAST\\tindex=0\\tpath=Compiler.range"),
+            astResult.stdout.contains("sourceFileAST\\tindex=1\\tpath=CompilerCore.range"),
+            astResult.stdout.contains("sourceFileAST\\tindex=2\\tpath=Lexer.range"),
+            astResult.stdout.contains("sourceFileAST\\tindex=3\\tpath=Main.range\\thasMainBlock=true"),
+            astResult.stdout.contains("ast\\tfunction\\tname=compileRangeSource"),
+            astResult.stdout.contains("ast\\tfunction\\tname=parseCompilerProgram"),
+            astResult.stdout.contains("ast\\tfunction\\tname=lexRangeSource"),
+            astResult.stdout.contains("sourceFileASTCount\\t4")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Stage 1 compiler did not emit expected source-set AST: \(astBundle.path)
+                --- stdout ---
+                \(prefixLines(astResult.stdout))
+                --- stderr ---
+                \(prefixLines(astResult.stderr))
+                """
+            )
+        }
+
+        let typesBundle = try stage1CompilerSourceBundle(
+            compilerDirectory: compilerDirectory,
+            directive: "compilerSourceSetTypes"
+        )
+        defer {
+            try? FileManager.default.removeItem(at: typesBundle.deletingLastPathComponent())
+        }
+
+        let typesResult = try runExecutable(executable: executable, arguments: [typesBundle.path], stdin: nil)
+        guard typesResult.exitCode == 0 else {
+            throw SwiftBootstrapError(
+                """
+                Stage 1 compiler type check exited \(typesResult.exitCode): \(typesBundle.path)
+                --- stdout ---
+                \(prefixLines(typesResult.stdout))
+                --- stderr ---
+                \(prefixLines(typesResult.stderr))
+                """
+            )
+        }
+
+        guard typesResult.stdout.contains("sourceSetTypes\\tprogram"),
+            typesResult.stdout.contains("sourceFileTypes\\tindex=0\\tpath=Compiler.range"),
+            typesResult.stdout.contains("sourceFileTypes\\tindex=1\\tpath=CompilerCore.range"),
+            typesResult.stdout.contains("sourceFileTypes\\tindex=2\\tpath=Lexer.range"),
+            typesResult.stdout.contains("sourceFileTypes\\tindex=3\\tpath=Main.range"),
+            typesResult.stdout.contains("symbol\\tkind=function\\tname=compileRangeSource"),
+            typesResult.stdout.contains("symbol\\tkind=function\\tname=parseCompilerProgram"),
+            typesResult.stdout.contains("symbol\\tkind=function\\tname=lexRangeSource"),
+            typesResult.stdout.contains("type\\tkind=return\\tscope=main\\tinferred=Int\\tdeclared=Int\\tstatus=ok"),
+            typesResult.stdout.contains("sourceFileTypesCount\\t4")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Stage 1 compiler did not emit expected source-set types: \(typesBundle.path)
+                --- stdout ---
+                \(prefixLines(typesResult.stdout))
+                --- stderr ---
+                \(prefixLines(typesResult.stderr))
+                """
+            )
+        }
+
+        let llvmBundle = try stage1CompilerSourceBundle(
+            compilerDirectory: compilerDirectory,
+            directive: "compilerSourceSetLLVM"
+        )
+        defer {
+            try? FileManager.default.removeItem(at: llvmBundle.deletingLastPathComponent())
+        }
+
+        let llvmResult = try runExecutable(executable: executable, arguments: [llvmBundle.path], stdin: nil)
+        guard llvmResult.exitCode == 0 else {
+            throw SwiftBootstrapError(
+                """
+                Stage 1 compiler LLVM check exited \(llvmResult.exitCode): \(llvmBundle.path)
+                --- stdout ---
+                \(prefixLines(llvmResult.stdout))
+                --- stderr ---
+                \(prefixLines(llvmResult.stderr))
+                """
+            )
+        }
+
+        guard llvmResult.stdout.contains("sourceSetLLVM\\tprogram"),
+            llvmResult.stdout.contains("sourceFileLLVM\\tindex=3\\tpath=Main.range\\thasMainBlock=true"),
+            llvmResult.stdout.contains("sourceFileLLVMText\\tpath=Main.range"),
+            llvmResult.stdout.contains("sourceSetLLVMProgram\\thasMainBlock=true"),
+            llvmResult.stdout.contains("sourceFileLLVMCount\\t4")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Stage 1 compiler did not emit expected source-set LLVM report: \(llvmBundle.path)
+                --- stdout ---
+                \(prefixLines(llvmResult.stdout))
+                --- stderr ---
+                \(prefixLines(llvmResult.stderr))
+                """
+            )
+        }
+
+        let loweringAuditText = try runStageCompilerSourceSetDirective(
+            executable: executable,
+            compilerDirectory: compilerDirectory,
+            directive: "compilerNativeSourceSetSelectedScanStats",
+            label: "Stage 1 reachable lowering audit"
+        )
+        guard loweringAuditText.contains("nativeSourceSetStats\\tphase=selectedScan"),
+            loweringAuditText.contains("selectedCount="),
+            loweringAuditText.contains("lowerableCount="),
+            loweringAuditText.contains("excludedCount=0"),
+            loweringAuditText.contains("placeholderCount=0")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Stage 1 compiler did not emit the expected reachable-lowering audit.
+                --- stdout ---
+                \(prefixLines(loweringAuditText))
+                """
+            )
+        }
+
+        print("Stage 1 compiler source-set check succeeded: \(executable.path)")
+        return executable
+    }
+
+    @discardableResult
+    public func checkStage2Compiler(rangeRoot: URL, compilerDirectory: URL) throws -> URL {
+        let stage1Executable = try compileExecutable(rangeRoot: rangeRoot, input: compilerDirectory)
+
+        let inventoryText = try runStageCompilerSourceSetDirective(
+            executable: stage1Executable,
+            compilerDirectory: compilerDirectory,
+            directive: "compilerSourceInventory",
+            label: "Stage 2 inventory"
+        )
+        guard inventoryText.contains("sourceInventory\\tprogram"),
+            inventoryText.contains("sourceFileCount\\t4")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Stage 2 candidate did not preserve source inventory shape.
+                --- stdout ---
+                \(prefixLines(inventoryText))
+                """
+            )
+        }
+
+        let astText = try runStageCompilerSourceSetDirective(
+            executable: stage1Executable,
+            compilerDirectory: compilerDirectory,
+            directive: "compilerSourceSetAST",
+            label: "Stage 2 AST"
+        )
+        guard astText.contains("sourceSetAST\\tprogram"),
+            astText.contains("ast\\tfunction\\tname=compileRangeSource"),
+            astText.contains("ast\\tfunction\\tname=parseCompilerProgram"),
+            astText.contains("sourceFileASTCount\\t4")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Stage 2 candidate did not preserve AST summary shape.
+                --- stdout ---
+                \(prefixLines(astText))
+                """
+            )
+        }
+
+        let typesText = try runStageCompilerSourceSetDirective(
+            executable: stage1Executable,
+            compilerDirectory: compilerDirectory,
+            directive: "compilerSourceSetTypes",
+            label: "Stage 2 types"
+        )
+        guard typesText.contains("sourceSetTypes\\tprogram"),
+            typesText.contains("symbol\\tkind=function\\tname=compileRangeSource"),
+            typesText.contains("type\\tkind=return\\tscope=main\\tinferred=Int\\tdeclared=Int\\tstatus=ok"),
+            typesText.contains("sourceFileTypesCount\\t4")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Stage 2 candidate did not preserve declaration/type summary shape.
+                --- stdout ---
+                \(prefixLines(typesText))
+                """
+            )
+        }
+
+        let llvmReportText = try runStageCompilerSourceSetDirective(
+            executable: stage1Executable,
+            compilerDirectory: compilerDirectory,
+            directive: "compilerSourceSetLLVM",
+            label: "Stage 2 LLVM report"
+        )
+        guard llvmReportText.contains("sourceSetLLVM\\tprogram"),
+            llvmReportText.contains("sourceFileLLVMCount\\t4")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Stage 2 candidate did not preserve LLVM source-set report shape.
+                --- stdout ---
+                \(prefixLines(llvmReportText))
+                """
+            )
+        }
+
+        let llvmText = try runStageCompilerNativeLLVMText(
+            executable: stage1Executable,
+            compilerDirectory: compilerDirectory,
+            label: "Stage 2 LLVM text"
+        )
+        guard !llvmText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw SwiftBootstrapError(
+                """
+                Stage 2 candidate did not emit LLVM text.
+                --- materialized stdout ---
+                \(prefixLines(llvmText))
+                """
+            )
+        }
+
+        let candidate = stage2CandidateLLVMPath(compilerDirectory: compilerDirectory)
+        try FileManager.default.createDirectory(
+            at: candidate.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try llvmText.write(to: candidate, atomically: true, encoding: .utf8)
+        try validateLLVMIR(llvmIR: candidate)
+        let runtimeSupport = stage2RuntimeSupportPath(compilerDirectory: compilerDirectory)
+        try stage2RuntimeSupportSource().write(to: runtimeSupport, atomically: true, encoding: .utf8)
+        let runtimeInputs = [runtimeSupport] + coreRuntimeSupportPaths(rangeRoot: rangeRoot)
+        let executable = stage2CandidateExecutablePath(compilerDirectory: compilerDirectory)
+        try linkExecutable(
+            llvmIR: candidate,
+            additionalInputs: runtimeInputs,
+            executable: executable
+        )
+        let stage2InventoryText = try runStageCompilerSourceSetDirective(
+            executable: executable,
+            compilerDirectory: compilerDirectory,
+            directive: "compilerSourceInventory",
+            label: "Linked Stage 2 inventory"
+        )
+        guard stage2InventoryText.contains("sourceInventory\\tprogram"),
+            stage2InventoryText.contains("sourceFile\\tindex=0\\tpath=Compiler.range"),
+            stage2InventoryText.contains("sourceFile\\tindex=1\\tpath=CompilerCore.range"),
+            stage2InventoryText.contains("sourceFile\\tindex=2\\tpath=Lexer.range"),
+            stage2InventoryText.contains("sourceFile\\tindex=3\\tpath=Main.range"),
+            stage2InventoryText.contains("sourceFileCount\\t4")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Linked Stage 2 compiler did not preserve source inventory.
+                --- stdout ---
+                \(prefixLines(stage2InventoryText))
+                """
+            )
+        }
+
+        let stage2BodyNamesText = try runStageCompilerSourceSetDirective(
+            executable: executable,
+            compilerDirectory: compilerDirectory,
+            directive: "compilerSourceSetBodyFunctionNames",
+            label: "Linked Stage 2 body names"
+        )
+        guard stage2BodyNamesText.contains("compileRangeNativeSource;"),
+            stage2BodyNamesText.contains("compilerSourceSetBodyFunctionNames;"),
+            stage2BodyNamesText.contains("compilerNativeSourceSetLLVMText;"),
+            stage2BodyNamesText.contains("compilerSourceSetProgramForLLVM;"),
+            stage2BodyNamesText.contains("parseCompilerProgramForLLVMNamedBodies;"),
+            stage2BodyNamesText.contains("compilerCoreMainParsedBlock;"),
+            stage2BodyNamesText.contains("compilerCoreParseStatements;"),
+            stage2BodyNamesText.contains("parseCompilerStatementWithToken;"),
+            stage2BodyNamesText.contains("parseCompilerIdentifierStatementWithTarget;"),
+            stage2BodyNamesText.contains("parseCompilerAssignmentStatement;"),
+            stage2BodyNamesText.contains("compilerCoreLLVMLowerBlockWithLocals;"),
+            stage2BodyNamesText.contains("compilerCoreLLVMLowerDirectLinearRecordBlockWithRecord;"),
+            stage2BodyNamesText.contains("compilerCoreLLVMLowerDirectLinearRecordBlockWithIf;"),
+            stage2BodyNamesText.contains("compilerCoreLLVMLowerDirectIfStatementRecord;"),
+            stage2BodyNamesText.contains("compilerCoreLLVMLowerDirectIfStatementRecordWithElse;"),
+            stage2BodyNamesText.contains("compilerCoreRenderedDirectIfElseStatementRecord;"),
+            stage2BodyNamesText.contains("compilerCoreLLVMLowerDirectIfStatementRecordWithAfter;"),
+            stage2BodyNamesText.contains("compilerCoreLLVMLowerLinearStatementRecord;"),
+            stage2BodyNamesText.contains("compilerCoreRenderedDirectReturnBlock;"),
+            stage2BodyNamesText.contains("compilerCoreNativeMainSourceLLVMText;"),
+            stage2BodyNamesText.contains("compilerSourceInventoryFileRecords;"),
+            stage2BodyNamesText.contains("isRangeLexerWhitespace;")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Linked Stage 2 compiler did not preserve selected body-name inventory.
+                --- stdout ---
+                \(prefixLines(stage2BodyNamesText))
+                """
+            )
+        }
+
+        try checkLinkedStage2NormalCompile(
+            executable: executable,
+            runtimeInputs: runtimeInputs,
+            compilerDirectory: compilerDirectory
+        )
+        let stage3Candidate = try checkLinkedStage2SelfRebuild(
+            executable: executable,
+            stage2LLVM: candidate,
+            runtimeInputs: runtimeInputs,
+            compilerDirectory: compilerDirectory
+        )
+
+        print("Stage 2 compiler candidate LLVM emitted: \(candidate.path)")
+        print("Stage 2 compiler candidate linked: \(executable.path)")
+        print("Linked Stage 2 compiler inventory check succeeded: \(executable.path)")
+        print("Linked Stage 2 compiler body-name check succeeded: \(executable.path)")
+        print("Linked Stage 2 compiler normal compile check succeeded: \(executable.path)")
+        print("Stage 3 compiler candidate LLVM emitted: \(stage3Candidate.path)")
+        print("Stage 3 compiler candidate linked: \(stage3Candidate.deletingPathExtension().path)")
+        print("Linked Stage 2 compiler self-rebuild check succeeded: \(stage3Candidate.path)")
+        return candidate
     }
 
     @discardableResult
@@ -300,6 +691,624 @@ public struct SwiftBootstrapCompiler {
         .sorted { $0.path < $1.path }
     }
 
+    private func stage1CompilerSourceBundle(compilerDirectory: URL, directive: String) throws -> URL {
+        let files = try topLevelRangeFiles(in: compilerDirectory)
+        if files.isEmpty {
+            throw SwiftBootstrapError("No compiler source files found in: \(compilerDirectory.path)")
+        }
+
+        let bundleRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("range-stage1-compiler-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: bundleRoot, withIntermediateDirectories: true)
+
+        let bundle = bundleRoot.appendingPathComponent("RangeCompilerSourceSet.range")
+        var text = "\(directive)\n"
+        for file in files {
+            text += "compilerSourceFile\\t\(file.lastPathComponent)\n"
+            text += try String(contentsOf: file, encoding: .utf8)
+            if !text.hasSuffix("\n") {
+                text += "\n"
+            }
+        }
+
+        try text.write(to: bundle, atomically: true, encoding: .utf8)
+        return bundle
+    }
+
+    private func runStageCompilerSourceSetDirective(
+        executable: URL,
+        compilerDirectory: URL,
+        directive: String,
+        label: String
+    ) throws -> String {
+        let bundle = try stage1CompilerSourceBundle(
+            compilerDirectory: compilerDirectory,
+            directive: directive
+        )
+
+        let result = try runExecutable(executable: executable, arguments: [bundle.path], stdin: nil)
+        guard result.exitCode == 0 else {
+            throw SwiftBootstrapError(
+                """
+                \(label) check exited \(result.exitCode): \(bundle.path)
+                --- stdout ---
+                \(prefixLines(result.stdout))
+                --- stderr ---
+                \(prefixLines(result.stderr))
+                """
+            )
+        }
+        try? FileManager.default.removeItem(at: bundle.deletingLastPathComponent())
+        return result.stdout
+    }
+
+    private func runStageCompilerNativeLLVMText(
+        executable: URL,
+        compilerDirectory: URL,
+        label: String
+    ) throws -> String {
+        let llvmText = try runStageCompilerSourceSetDirective(
+            executable: executable,
+            compilerDirectory: compilerDirectory,
+            directive: "compilerNativeSourceSetLLVMText",
+            label: label
+        )
+        guard !llvmText.hasPrefix("compilerError\\t") else {
+            throw SwiftBootstrapError(
+                """
+                \(label) failed in the Range-authored lowering pass.
+                --- stdout ---
+                \(prefixLines(llvmText, limit: 400))
+                """
+            )
+        }
+        return llvmText
+    }
+
+    private func stage2CandidateLLVMPath(compilerDirectory: URL) -> URL {
+        compilerDirectory
+            .appendingPathComponent(".range", isDirectory: true)
+            .appendingPathComponent("Build", isDirectory: true)
+            .appendingPathComponent("stage2", isDirectory: true)
+            .appendingPathComponent("RangeCompiler.ll")
+    }
+
+    private func stage2CandidateExecutablePath(compilerDirectory: URL) -> URL {
+        compilerDirectory
+            .appendingPathComponent(".range", isDirectory: true)
+            .appendingPathComponent("Build", isDirectory: true)
+            .appendingPathComponent("stage2", isDirectory: true)
+            .appendingPathComponent("RangeCompiler")
+    }
+
+    private func stage3CandidateLLVMPath(compilerDirectory: URL) -> URL {
+        compilerDirectory
+            .appendingPathComponent(".range", isDirectory: true)
+            .appendingPathComponent("Build", isDirectory: true)
+            .appendingPathComponent("stage3", isDirectory: true)
+            .appendingPathComponent("RangeCompiler.ll")
+    }
+
+    private func stage3CandidateExecutablePath(compilerDirectory: URL) -> URL {
+        compilerDirectory
+            .appendingPathComponent(".range", isDirectory: true)
+            .appendingPathComponent("Build", isDirectory: true)
+            .appendingPathComponent("stage3", isDirectory: true)
+            .appendingPathComponent("RangeCompiler")
+    }
+
+    private func stage2RuntimeSupportPath(compilerDirectory: URL) -> URL {
+        compilerDirectory
+            .appendingPathComponent(".range", isDirectory: true)
+            .appendingPathComponent("Build", isDirectory: true)
+            .appendingPathComponent("stage2", isDirectory: true)
+            .appendingPathComponent("RangeRuntime.c")
+    }
+
+    private func coreRuntimeSupportPaths(rangeRoot: URL) -> [URL] {
+        let runtimeRoot = rangeRoot
+            .deletingLastPathComponent()
+            .appendingPathComponent("Runtime", isDirectory: true)
+        return [
+            runtimeRoot.appendingPathComponent("RangeTextBuffer.c"),
+            runtimeRoot.appendingPathComponent("RangeString.c"),
+        ]
+    }
+
+    private func stage2SmokeSourcePath(compilerDirectory: URL) -> URL {
+        compilerDirectory
+            .appendingPathComponent(".range", isDirectory: true)
+            .appendingPathComponent("Build", isDirectory: true)
+            .appendingPathComponent("stage2", isDirectory: true)
+            .appendingPathComponent("Smoke.range")
+    }
+
+    private func stage2SmokeLLVMPath(compilerDirectory: URL) -> URL {
+        compilerDirectory
+            .appendingPathComponent(".range", isDirectory: true)
+            .appendingPathComponent("Build", isDirectory: true)
+            .appendingPathComponent("stage2", isDirectory: true)
+            .appendingPathComponent("Smoke.ll")
+    }
+
+    private func stage2SmokeExecutablePath(compilerDirectory: URL) -> URL {
+        compilerDirectory
+            .appendingPathComponent(".range", isDirectory: true)
+            .appendingPathComponent("Build", isDirectory: true)
+            .appendingPathComponent("stage2", isDirectory: true)
+            .appendingPathComponent("Smoke")
+    }
+
+    private func checkLinkedStage2NormalCompile(
+        executable: URL,
+        runtimeInputs: [URL],
+        compilerDirectory: URL
+    ) throws {
+        let smokeSource = stage2SmokeSourcePath(compilerDirectory: compilerDirectory)
+        let smokeLLVM = stage2SmokeLLVMPath(compilerDirectory: compilerDirectory)
+        let smokeExecutable = stage2SmokeExecutablePath(compilerDirectory: compilerDirectory)
+
+        try """
+        @main {
+            return 0
+        }
+        """.write(to: smokeSource, atomically: true, encoding: .utf8)
+
+        let compileResult = try runExecutable(executable: executable, arguments: [smokeSource.path], stdin: nil)
+        guard compileResult.exitCode == 0 else {
+            throw SwiftBootstrapError(
+                """
+                Linked Stage 2 compiler normal compile exited \(compileResult.exitCode): \(smokeSource.path)
+                --- stdout ---
+                \(prefixLines(compileResult.stdout))
+                --- stderr ---
+                \(prefixLines(compileResult.stderr))
+                """
+            )
+        }
+
+        guard compileResult.stderr.isEmpty,
+            compileResult.stdout.contains("define i32 @main() {\nentry:"),
+            compileResult.stdout.contains("ret i32 0"),
+            !compileResult.stdout.contains("\\n")
+        else {
+            throw SwiftBootstrapError(
+                """
+                Linked Stage 2 compiler did not emit linkable normal-program LLVM.
+                --- stdout ---
+                \(prefixLines(compileResult.stdout))
+                --- stderr ---
+                \(prefixLines(compileResult.stderr))
+                """
+            )
+        }
+
+        try compileResult.stdout.write(to: smokeLLVM, atomically: true, encoding: .utf8)
+        try validateLLVMIR(llvmIR: smokeLLVM)
+        try linkExecutable(
+            llvmIR: smokeLLVM,
+            additionalInputs: runtimeInputs,
+            executable: smokeExecutable
+        )
+
+        let runResult = try runExecutable(executable: smokeExecutable, arguments: [], stdin: nil)
+        guard runResult.exitCode == 0, runResult.stdout.isEmpty, runResult.stderr.isEmpty else {
+            throw SwiftBootstrapError(
+                """
+                Linked Stage 2 compiler normal executable failed.
+                --- exit ---
+                \(runResult.exitCode)
+                --- stdout ---
+                \(prefixLines(runResult.stdout))
+                --- stderr ---
+                \(prefixLines(runResult.stderr))
+                """
+            )
+        }
+    }
+
+    private func checkLinkedStage2SelfRebuild(
+        executable: URL,
+        stage2LLVM: URL,
+        runtimeInputs: [URL],
+        compilerDirectory: URL
+    ) throws -> URL {
+        let stage3LLVMText = try runStageCompilerNativeLLVMText(
+            executable: executable,
+            compilerDirectory: compilerDirectory,
+            label: "Linked Stage 2 self-rebuild"
+        )
+        guard !stage3LLVMText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw SwiftBootstrapError(
+                """
+                Linked Stage 2 compiler did not emit Stage 3 LLVM text.
+                --- materialized stdout ---
+                \(prefixLines(stage3LLVMText))
+                """
+            )
+        }
+
+        let candidate = stage3CandidateLLVMPath(compilerDirectory: compilerDirectory)
+        try FileManager.default.createDirectory(
+            at: candidate.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try stage3LLVMText.write(to: candidate, atomically: true, encoding: .utf8)
+        try validateLLVMIR(llvmIR: candidate)
+        try compareStageCompilerLLVM(stage2LLVM: stage2LLVM, stage3LLVM: candidate)
+
+        let executable = stage3CandidateExecutablePath(compilerDirectory: compilerDirectory)
+        try linkExecutable(
+            llvmIR: candidate,
+            additionalInputs: runtimeInputs,
+            executable: executable
+        )
+        try checkLinkedStage2NormalCompile(
+            executable: executable,
+            runtimeInputs: runtimeInputs,
+            compilerDirectory: compilerDirectory
+        )
+        return candidate
+    }
+
+    private func compareStageCompilerLLVM(stage2LLVM: URL, stage3LLVM: URL) throws {
+        let stage2Data = try Data(contentsOf: stage2LLVM)
+        let stage3Data = try Data(contentsOf: stage3LLVM)
+        let stage2Text = try String(contentsOf: stage2LLVM, encoding: .utf8)
+        let stage3Text = try String(contentsOf: stage3LLVM, encoding: .utf8)
+        let requiredMarkers = [
+            "define ptr @compileRangeNativeSource(ptr %source)",
+            "define ptr @parseCompilerAssignmentStatement(ptr %token",
+            "define ptr @compilerCoreRenderedDirectIfElseStatementRecord(ptr %program",
+            "define i32 @main()",
+            "call ptr @compileRangeNativeSource(ptr",
+        ]
+        for marker in requiredMarkers {
+            guard stage2Text.contains(marker), stage3Text.contains(marker) else {
+                throw SwiftBootstrapError("Stage compiler LLVM marker mismatch: \(marker)")
+            }
+        }
+        guard !stage2Text.contains("stringEqual(ptr null"),
+            !stage3Text.contains("stringEqual(ptr null"),
+            !stage2Text.contains("add i1 %"),
+            !stage3Text.contains("add i1 %")
+        else {
+            throw SwiftBootstrapError("Stage compiler LLVM contains a known-invalid lowering shape.")
+        }
+
+        guard stage2Data == stage3Data else {
+            let stage2Lines = stage2Text.split(separator: "\n", omittingEmptySubsequences: false)
+            let stage3Lines = stage3Text.split(separator: "\n", omittingEmptySubsequences: false)
+            let sharedLineCount = min(stage2Lines.count, stage3Lines.count)
+            var mismatchLine = sharedLineCount
+            for index in 0..<sharedLineCount where stage2Lines[index] != stage3Lines[index] {
+                mismatchLine = index
+                break
+            }
+            let stage2Mismatch = mismatchLine < stage2Lines.count ? String(stage2Lines[mismatchLine]) : "<end of file>"
+            let stage3Mismatch = mismatchLine < stage3Lines.count ? String(stage3Lines[mismatchLine]) : "<end of file>"
+            throw SwiftBootstrapError(
+                """
+                Stage 2 and Stage 3 compiler LLVM are not byte-identical.
+                First differing line: \(mismatchLine + 1)
+                --- stage2 ---
+                \(stage2Mismatch)
+                --- stage3 ---
+                \(stage3Mismatch)
+                """
+            )
+        }
+    }
+
+    private func stage2RuntimeSupportSource() -> String {
+        """
+        #include <stdint.h>
+        #include <stdbool.h>
+        #include <stdio.h>
+        #include <stdlib.h>
+        #include <string.h>
+        #include <crt_externs.h>
+
+        int32_t commandLineArgumentCount(void) {
+            return *_NSGetArgc() - 1;
+        }
+
+        char *commandLineArgument(int32_t index) {
+            int32_t actual = index + 1;
+            int argc = *_NSGetArgc();
+            char **argv = *_NSGetArgv();
+            if (actual < 0 || actual >= argc) {
+                return "";
+            }
+            return argv[actual];
+        }
+
+        char *readFile(char *path) {
+            FILE *file = fopen(path, "rb");
+            if (!file) {
+                return "";
+            }
+            if (fseek(file, 0, SEEK_END) != 0) {
+                fclose(file);
+                return "";
+            }
+            long size = ftell(file);
+            if (size < 0) {
+                fclose(file);
+                return "";
+            }
+            rewind(file);
+            char *buffer = malloc((size_t)size + 1);
+            if (!buffer) {
+                fclose(file);
+                return "";
+            }
+            size_t readCount = fread(buffer, 1, (size_t)size, file);
+            buffer[readCount] = 0;
+            fclose(file);
+            return buffer;
+        }
+
+        int32_t stringLength(char *value) {
+            if (!value) {
+                return 0;
+            }
+            return (int32_t)strlen(value);
+        }
+
+        int32_t stringIndexOf(char *source, char *needle, int32_t start) {
+            if (!source || !needle) {
+                return 0;
+            }
+            int32_t length = (int32_t)strlen(source);
+            if (start < 0) {
+                start = 0;
+            }
+            if (start > length) {
+                return length;
+            }
+            char *match = strstr(source + start, needle);
+            if (!match) {
+                return length;
+            }
+            return (int32_t)(match - source);
+        }
+
+        int32_t stringEqual(char *left, char *right) {
+            if (!left || !right) {
+                return left == right;
+            }
+            return strcmp(left, right) == 0;
+        }
+
+        int32_t stringCompare(char *left, char *right) {
+            if (!left) {
+                left = "";
+            }
+            if (!right) {
+                right = "";
+            }
+            return (int32_t)strcmp(left, right);
+        }
+
+        char *stringConcat(char *left, char *right) {
+            if (!left) {
+                left = "";
+            }
+            if (!right) {
+                right = "";
+            }
+            size_t leftLength = strlen(left);
+            size_t rightLength = strlen(right);
+            char *buffer = malloc(leftLength + rightLength + 1);
+            if (!buffer) {
+                return "";
+            }
+            memcpy(buffer, left, leftLength);
+            memcpy(buffer + leftLength, right, rightLength);
+            buffer[leftLength + rightLength] = 0;
+            return buffer;
+        }
+
+        char *stringFromInt(int32_t value) {
+            char buffer[32];
+            snprintf(buffer, sizeof(buffer), "%d", value);
+            char *copy = strdup(buffer);
+            if (!copy) {
+                return "";
+            }
+            return copy;
+        }
+
+        char *stringFromBool(bool value) {
+            return value ? "true" : "false";
+        }
+
+        typedef struct RangeConstructField {
+            char *name;
+            char *ptrValue;
+            int32_t intValue;
+            bool boolValue;
+            int32_t kind;
+            struct RangeConstructField *next;
+        } RangeConstructField;
+
+        typedef struct RangeConstructObject {
+            char *name;
+            RangeConstructField *fields;
+        } RangeConstructObject;
+
+        static RangeConstructField *rangeConstructFindField(RangeConstructObject *object, char *name) {
+            if (!object || !name) {
+                return NULL;
+            }
+            RangeConstructField *field = object->fields;
+            while (field) {
+                if (strcmp(field->name, name) == 0) {
+                    return field;
+                }
+                field = field->next;
+            }
+            field = calloc(1, sizeof(RangeConstructField));
+            if (!field) {
+                return NULL;
+            }
+            field->name = strdup(name);
+            field->next = object->fields;
+            object->fields = field;
+            return field;
+        }
+
+        void *rangeConstructCreate(char *name) {
+            RangeConstructObject *object = calloc(1, sizeof(RangeConstructObject));
+            if (!object) {
+                return NULL;
+            }
+            object->name = name ? strdup(name) : strdup("");
+            return object;
+        }
+
+        void *rangeConstructSetPtr(void *opaque, char *name, char *value) {
+            RangeConstructObject *object = (RangeConstructObject *)opaque;
+            RangeConstructField *field = rangeConstructFindField(object, name);
+            if (field) {
+                field->kind = 0;
+                field->ptrValue = value;
+            }
+            return opaque;
+        }
+
+        void *rangeConstructSetInt(void *opaque, char *name, int32_t value) {
+            RangeConstructObject *object = (RangeConstructObject *)opaque;
+            RangeConstructField *field = rangeConstructFindField(object, name);
+            if (field) {
+                field->kind = 1;
+                field->intValue = value;
+            }
+            return opaque;
+        }
+
+        void *rangeConstructSetBool(void *opaque, char *name, bool value) {
+            RangeConstructObject *object = (RangeConstructObject *)opaque;
+            RangeConstructField *field = rangeConstructFindField(object, name);
+            if (field) {
+                field->kind = 2;
+                field->boolValue = value;
+            }
+            return opaque;
+        }
+
+        char *rangeConstructGetPtr(void *opaque, char *name) {
+            RangeConstructObject *object = (RangeConstructObject *)opaque;
+            RangeConstructField *field = rangeConstructFindField(object, name);
+            if (!field || field->kind != 0 || !field->ptrValue) {
+                return "";
+            }
+            return field->ptrValue;
+        }
+
+        int32_t rangeConstructGetInt(void *opaque, char *name) {
+            RangeConstructObject *object = (RangeConstructObject *)opaque;
+            RangeConstructField *field = rangeConstructFindField(object, name);
+            if (!field || field->kind != 1) {
+                return 0;
+            }
+            return field->intValue;
+        }
+
+        bool rangeConstructGetBool(void *opaque, char *name) {
+            RangeConstructObject *object = (RangeConstructObject *)opaque;
+            RangeConstructField *field = rangeConstructFindField(object, name);
+            if (!field || field->kind != 2) {
+                return false;
+            }
+            return field->boolValue;
+        }
+
+        char *stringCharacter(char *value, int32_t index) {
+            if (!value || index < 0 || index >= (int32_t)strlen(value)) {
+                return "";
+            }
+            char *buffer = malloc(2);
+            if (!buffer) {
+                return "";
+            }
+            buffer[0] = value[index];
+            buffer[1] = 0;
+            return buffer;
+        }
+
+        char *stringSubstring(char *value, int32_t start, int32_t end) {
+            if (!value) {
+                return "";
+            }
+            int32_t length = (int32_t)strlen(value);
+            if (start < 0) {
+                start = 0;
+            }
+            if (end < start) {
+                end = start;
+            }
+            if (end > length) {
+                end = length;
+            }
+            size_t count = (size_t)(end - start);
+            char *buffer = malloc(count + 1);
+            if (!buffer) {
+                return "";
+            }
+            memcpy(buffer, value + start, count);
+            buffer[count] = 0;
+            return buffer;
+        }
+        """
+    }
+
+    private func validateLLVMIR(llvmIR: URL) throws {
+        let object = llvmIR.deletingPathExtension().appendingPathExtension("o")
+        defer { try? FileManager.default.removeItem(at: object) }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = [
+            "clang",
+            "-Wno-override-module",
+            "-x",
+            "ir",
+            "-c",
+            llvmIR.path,
+            "-o",
+            object.path,
+        ]
+
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.standardOutput = stdout
+        process.standardError = stderr
+
+        try process.run()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            let stderrText = String(
+                data: stderr.fileHandleForReading.readDataToEndOfFile(),
+                encoding: .utf8
+            ) ?? ""
+            let stdoutText = String(
+                data: stdout.fileHandleForReading.readDataToEndOfFile(),
+                encoding: .utf8
+            ) ?? ""
+            let details = [stderrText, stdoutText]
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n")
+            if details.isEmpty {
+                throw SwiftBootstrapError("clang could not parse LLVM IR: \(llvmIR.path)")
+            }
+            throw SwiftBootstrapError(details)
+        }
+    }
+
     private func sourceInput(for file: URL, role: SourceInputRole) throws -> SourceInput {
         SourceInput(
             path: file.path,
@@ -361,16 +1370,21 @@ public struct SwiftBootstrapCompiler {
         )
     }
 
-    private func linkExecutable(llvmIR: URL, executable: URL) throws {
+    private func linkExecutable(
+        llvmIR: URL,
+        additionalInputs: [URL],
+        executable: URL
+    ) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = [
             "clang",
             "-Wno-override-module",
             llvmIR.path,
-            "-o",
-            executable.path,
-        ]
+        ] + additionalInputs.map(\.path) + [
+                "-o",
+                executable.path,
+            ]
 
         let stdout = Pipe()
         let stderr = Pipe()
@@ -513,10 +1527,22 @@ public struct SwiftBootstrapCompiler {
         process.executableURL = executable
         process.arguments = arguments
 
-        let stdout = Pipe()
-        let stderr = Pipe()
-        process.standardOutput = stdout
-        process.standardError = stderr
+        let captureDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: captureDirectory,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: captureDirectory) }
+
+        let stdoutURL = captureDirectory.appendingPathComponent("stdout.txt")
+        let stderrURL = captureDirectory.appendingPathComponent("stderr.txt")
+        _ = FileManager.default.createFile(atPath: stdoutURL.path, contents: nil)
+        _ = FileManager.default.createFile(atPath: stderrURL.path, contents: nil)
+        let stdoutHandle = try FileHandle(forWritingTo: stdoutURL)
+        let stderrHandle = try FileHandle(forWritingTo: stderrURL)
+        process.standardOutput = stdoutHandle
+        process.standardError = stderrHandle
 
         let stdinPipe: Pipe?
         if stdin != nil {
@@ -535,14 +1561,11 @@ public struct SwiftBootstrapCompiler {
         }
 
         process.waitUntilExit()
-        let stdoutText = String(
-            data: stdout.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        ) ?? ""
-        let stderrText = String(
-            data: stderr.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        ) ?? ""
+        try? stdoutHandle.close()
+        try? stderrHandle.close()
+
+        let stdoutText = (try? String(contentsOf: stdoutURL, encoding: .utf8)) ?? ""
+        let stderrText = (try? String(contentsOf: stderrURL, encoding: .utf8)) ?? ""
 
         return ExecutionResult(
             exitCode: process.terminationStatus,

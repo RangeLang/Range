@@ -60,6 +60,6 @@ token stream. The lexer is a small direct port of the Swift bootstrap lexer path
 The test suite compares the native lexer stream against the Swift bootstrap
 lexer for the compiler entrypoint. The binary also parses the first tiny AST
 checkpoints: an `@main` block summary and top-level function declaration
-summaries with body bounds. The `@main` block also lowers to a stage-2 synthetic
-`main` function summary, and a direct `return <integer>` in that body emits the
-first Range-authored LLVM text checkpoint.
+summaries with body bounds. The `@main` block also lowers to a compiler `main`
+function summary, and a direct `return <integer>` in that body emits the first
+Range-authored LLVM text checkpoint.

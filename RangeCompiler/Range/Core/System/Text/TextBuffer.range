@@ -1,0 +1,20 @@
+@language
+construct TextBuffer {}
+
+@language
+function textBufferCreate(capacity: Int): TextBuffer
+
+@language
+function textBufferAppend(buffer: TextBuffer, text: String): Int
+
+@language
+function textBufferAppendInt(buffer: TextBuffer, value: Int): Int
+
+@language
+function textBufferAppendCharacter(buffer: TextBuffer, source: String, index: Int): Int
+
+@language
+function textBufferMaterialize(buffer: TextBuffer): String
+
+@language
+function textBufferDestroy(buffer: TextBuffer): Int

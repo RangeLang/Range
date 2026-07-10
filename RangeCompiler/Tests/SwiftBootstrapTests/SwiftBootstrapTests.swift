@@ -89,6 +89,73 @@ struct SwiftBootstrapTests {
         #expect(exitCode == 7)
     }
 
+    @Test("run links the shared TextBuffer runtime")
+    func runLinksSharedTextBufferRuntime() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("TextBuffer.range")
+        try """
+        @main {
+            let buffer: TextBuffer(textBufferCreate(capacity: 2))
+            if textBufferAppend(buffer: buffer, text: String("range")) != 0 {
+                return 1
+            }
+            if textBufferAppendInt(buffer: buffer, value: 56) != 0 {
+                return 2
+            }
+            if textBufferAppendCharacter(buffer: buffer, source: String("!"), index: 0) != 0 {
+                return 5
+            }
+            let text: String(textBufferMaterialize(buffer: buffer))
+            if textBufferDestroy(buffer: buffer) != 0 {
+                return 3
+            }
+            if text == String("range56!") {
+                return 0
+            }
+            return 4
+        }
+        """.write(to: source, atomically: true, encoding: .utf8)
+
+        let exitCode = try SwiftBootstrapCompiler().run(
+            rangeRoot: try rangeRoot(),
+            input: source,
+            arguments: []
+        )
+
+        #expect(exitCode == 0)
+    }
+
+    @Test("run links the shared String runtime")
+    func runLinksSharedStringRuntime() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("StringPrefix.range")
+        try """
+        @main {
+            let source: String("alpha|beta~gamma")
+            let firstSeparator: Int(stringFindFirstOf(source: source, start: 0, characters: String("|~")))
+            let recordSeparator: Int(stringFindFrom(source: source, start: 0, needle: String("~")))
+            let suffix: String(stringViewFrom(source: source, start: recordSeparator + 1))
+            let character: String(stringCharacterAt(source: source, index: firstSeparator + 1))
+            let byte: Int(stringByteAt(source: source, index: firstSeparator + 1))
+            let nextPipeOrTilde: Int(stringFindByteOf(source: source, start: 0, first: 124, second: 126, third: 0))
+            if firstSeparator == 5 && nextPipeOrTilde == 5 && recordSeparator == 10 && character == String("b") && byte == 98 && stringHasPrefix(source: suffix, start: 0, prefix: String("gamma")) {
+                return 0
+            }
+            return 1
+        }
+        """.write(to: source, atomically: true, encoding: .utf8)
+
+        let exitCode = try SwiftBootstrapCompiler().run(
+            rangeRoot: try rangeRoot(),
+            input: source,
+            arguments: []
+        )
+
+        #expect(exitCode == 0)
+    }
+
     @Test("checkBootstrapCompiler scans Range compiler sources")
     func checkBootstrapCompilerBuildsAndRunsRangeCompilerProgram() throws {
         let executable = try SwiftBootstrapCompiler().checkBootstrapCompiler(

@@ -16,9 +16,30 @@ public struct LLVMEmissionError: LocalizedError {
 public struct LLVMModuleEmitter {
     public init() {}
 
+    private static let textBufferRuntimeFunctionNames: Set<String> = [
+        "textBufferCreate",
+        "textBufferAppend",
+        "textBufferAppendInt",
+        "textBufferAppendCharacter",
+        "textBufferMaterialize",
+        "textBufferDestroy",
+    ]
+    private static let stringRuntimeFunctionNames: Set<String> = [
+        "stringHasPrefix",
+        "stringFindFrom",
+        "stringFindFirstOf",
+        "stringViewFrom",
+        "stringCharacterAt",
+        "stringByteAt",
+        "stringFindByteOf",
+    ]
+    private static let coreRuntimeFunctionNames = textBufferRuntimeFunctionNames
+        .union(stringRuntimeFunctionNames)
+
     public func emit(program: CompiledProgram) throws -> String {
         let mainBlock = try projectMainBlock(in: program)
         let callables = try projectCallables(in: program)
+        let coreRuntimeCallables = coreRuntimeCallables(in: program)
         let runtime = LLVMRuntime()
         let genericFunctionSpecializations = try concreteGenericFunctionSpecializations(
             callables: callables,
@@ -38,7 +59,7 @@ public struct LLVMModuleEmitter {
             runtime: runtime
         )
         let signatures = try functionSignatures(
-            for: callables,
+            for: callables + coreRuntimeCallables,
             genericFunctionSpecializations: genericFunctionSpecializations,
             constructLayouts: constructLayouts,
             enumLayouts: enumLayouts,
@@ -123,6 +144,19 @@ public struct LLVMModuleEmitter {
         program.projectExpandedFiles.flatMap { file in
             callables(in: file.sourceFile)
         }
+    }
+
+    private func coreRuntimeCallables(in program: CompiledProgram) -> [CallableDeclaration] {
+        program.expandedFiles
+            .filter { program.sourceRole(forPath: $0.path) == .core }
+            .flatMap { callables(in: $0.sourceFile) }
+            .filter { callable in
+                Self.coreRuntimeFunctionNames.contains(callable.name)
+                    && callable.isCore
+                    && callable.targetType == nil
+                    && callable.genericParameters.isEmpty
+                    && callable.body == nil
+            }
     }
 
     private func projectEnumStorageTypes(in program: CompiledProgram) -> [String: String] {
@@ -1584,6 +1618,8 @@ public struct LLVMModuleEmitter {
             return LLVMType(ir: "i1", array: nil, nominalName: nil)
         case "String":
             return LLVMType(ir: "ptr", array: nil, nominalName: nil)
+        case "TextBuffer":
+            return LLVMType(ir: "ptr", array: nil, nominalName: "TextBuffer")
         case "Void":
             return LLVMType(ir: "void", array: nil, nominalName: nil)
         default:
@@ -1740,6 +1776,9 @@ public struct LLVMModuleEmitter {
         private(set) var usesStrcmp = false
         private(set) var usesRead = false
         private(set) var usesCommandLineArguments = false
+        private(set) var usesStrstr = false
+        private(set) var usesTextBuffer = false
+        private(set) var usesStringRuntime = false
 
         static func arrayTypeName(for elementType: String) -> String {
             "%Range.Array.\(sanitizedTypeName(elementType))"
@@ -1813,6 +1852,18 @@ public struct LLVMModuleEmitter {
             usesStrcmp = true
         }
 
+        func markUsesStrstr() {
+            usesStrstr = true
+        }
+
+        func markUsesTextBuffer() {
+            usesTextBuffer = true
+        }
+
+        func markUsesStringRuntime() {
+            usesStringRuntime = true
+        }
+
         func registerArray(elementType: String) {
             arrayElementTypes.insert(elementType)
         }
@@ -1883,6 +1934,9 @@ public struct LLVMModuleEmitter {
             if usesStrcmp {
                 lines.append("declare i32 @strcmp(ptr, ptr)")
             }
+            if usesStrstr {
+                lines.append("declare ptr @strstr(ptr, ptr)")
+            }
             if usesFileWrite {
                 lines.append("declare i64 @fwrite(ptr, i64, i64, ptr)")
             }
@@ -1892,6 +1946,23 @@ public struct LLVMModuleEmitter {
             if usesCommandLineArguments {
                 lines.append("declare ptr @_NSGetArgc()")
                 lines.append("declare ptr @_NSGetArgv()")
+            }
+            if usesTextBuffer {
+                lines.append("declare ptr @textBufferCreate(i32)")
+                lines.append("declare i32 @textBufferAppend(ptr, ptr)")
+                lines.append("declare i32 @textBufferAppendInt(ptr, i32)")
+                lines.append("declare i32 @textBufferAppendCharacter(ptr, ptr, i32)")
+                lines.append("declare ptr @textBufferMaterialize(ptr)")
+                lines.append("declare i32 @textBufferDestroy(ptr)")
+            }
+            if usesStringRuntime {
+                lines.append("declare i1 @stringHasPrefix(ptr, i32, ptr)")
+                lines.append("declare i32 @stringFindFrom(ptr, i32, ptr)")
+                lines.append("declare i32 @stringFindFirstOf(ptr, i32, ptr)")
+                lines.append("declare ptr @stringViewFrom(ptr, i32)")
+                lines.append("declare ptr @stringCharacterAt(ptr, i32)")
+                lines.append("declare i32 @stringByteAt(ptr, i32)")
+                lines.append("declare i32 @stringFindByteOf(ptr, i32, i32, i32, i32)")
             }
             guard !lines.isEmpty else {
                 return ""
@@ -1965,6 +2036,7 @@ public struct LLVMModuleEmitter {
         private let constructLayouts: [String: ConstructLayout]
         private let enumLayouts: [String: EnumLayout]
         private let runtime: LLVMRuntime
+        private var entryAllocas: [String] = []
         private var instructions: [String] = []
         private var locals: [String: LocalSlot] = [:]
         private var temporaryIndex = 0
@@ -2401,7 +2473,7 @@ public struct LLVMModuleEmitter {
             }
 
             let indexPointer = "%\(nextRawName("for.index"))"
-            instructions.append("\(indexPointer) = alloca i32")
+            appendEntryAlloca(pointer: indexPointer, type: "i32")
             instructions.append("store i32 0, ptr \(indexPointer)")
 
             let bindingPointer = "%\(try llvmIdentifier(name)).\(nextRawName("for.element"))"
@@ -2419,7 +2491,7 @@ public struct LLVMModuleEmitter {
             defer {
                 locals[name] = previousLocal
             }
-            instructions.append("\(bindingPointer) = alloca \(array.elementType)")
+            appendEntryAlloca(pointer: bindingPointer, type: array.elementType)
 
             let conditionLabel = nextLabel("for.condition")
             let bodyLabel = nextLabel("for.body")
@@ -2615,7 +2687,7 @@ public struct LLVMModuleEmitter {
                 array: associatedValue.array,
                 nominalName: associatedValue.nominalName
             )
-            instructions.append("\(pointer) = alloca \(associatedValue.type)")
+            appendEntryAlloca(pointer: pointer, type: associatedValue.type)
             instructions.append("store \(associatedValue.type) \(payload), ptr \(pointer)")
             return (binding.name, previousLocal)
         }
@@ -2659,8 +2731,12 @@ public struct LLVMModuleEmitter {
                 optional: optional,
                 nominalName: nominalName
             )
-            instructions.append("\(pointer) = alloca \(type)")
+            appendEntryAlloca(pointer: pointer, type: type)
             return pointer
+        }
+
+        private mutating func appendEntryAlloca(pointer: String, type: String) {
+            entryAllocas.append("\(pointer) = alloca \(type)")
         }
 
         private mutating func emitAssignment(
@@ -3107,6 +3183,12 @@ public struct LLVMModuleEmitter {
 
             case .call(let name, let arguments) where name == "stringLength":
                 return try emitStringLengthCall(arguments: arguments)
+
+            case .call(let name, let arguments) where name == "stringIndexOf":
+                return try emitStringIndexOfCall(arguments: arguments)
+
+            case .call(let name, let arguments) where name == "stringSubstring":
+                return try emitStringSubstringFunctionCall(arguments: arguments)
 
             case .call(let name, let arguments):
                 if let enumCase = try enumCaseValue(
@@ -3855,6 +3937,8 @@ public struct LLVMModuleEmitter {
                 return LLVMType(ir: "i1", array: nil)
             case "String":
                 return LLVMType(ir: "ptr", array: nil)
+            case "TextBuffer":
+                return LLVMType(ir: "ptr", array: nil, nominalName: "TextBuffer")
             case "Void":
                 return LLVMType(ir: "void", array: nil)
             default:
@@ -4069,7 +4153,7 @@ public struct LLVMModuleEmitter {
             let payloadLabel = nextLabel("coalesce.payload")
             let fallbackLabel = nextLabel("coalesce.fallback")
             let endLabel = nextLabel("coalesce.end")
-            instructions.append("\(resultPointer) = alloca \(fallback.type)")
+            appendEntryAlloca(pointer: resultPointer, type: fallback.type)
             instructions.append("br i1 \(validity), label %\(payloadLabel), label %\(fallbackLabel)")
             instructions.append("\(payloadLabel):")
             instructions.append("store \(fallback.type) \(payload), ptr \(resultPointer)")
@@ -4578,7 +4662,7 @@ public struct LLVMModuleEmitter {
             let emptyLabel = nextLabel("arrayOptionalElement.empty")
             let valueLabel = nextLabel("arrayOptionalElement.value")
             let endLabel = nextLabel("arrayOptionalElement.end")
-            instructions.append("\(resultPointer) = alloca \(optionalType.ir)")
+            appendEntryAlloca(pointer: resultPointer, type: optionalType.ir)
             instructions.append("br i1 \(isEmpty), label %\(emptyLabel), label %\(valueLabel)")
             instructions.append("\(emptyLabel):")
             let nilValue = emitNilOptionalValue(optionalType)
@@ -4649,7 +4733,7 @@ public struct LLVMModuleEmitter {
             let emptyLabel = nextLabel("removeLast.empty")
             let valueLabel = nextLabel("removeLast.value")
             let endLabel = nextLabel("removeLast.end")
-            instructions.append("\(resultPointer) = alloca \(optionalType.ir)")
+            appendEntryAlloca(pointer: resultPointer, type: optionalType.ir)
             instructions.append("br i1 \(isEmpty), label %\(emptyLabel), label %\(valueLabel)")
             instructions.append("\(emptyLabel):")
             let nilValue = emitNilOptionalValue(optionalType)
@@ -5049,7 +5133,7 @@ public struct LLVMModuleEmitter {
             )
             let wrappedType = LLVMType(ir: "ptr", array: nil)
             let resultPointer = "%\(nextRawName("readFileIfExists.result"))"
-            instructions.append("\(resultPointer) = alloca \(optionalType.ir)")
+            appendEntryAlloca(pointer: resultPointer, type: optionalType.ir)
             let nilValue = emitNilOptionalValue(optionalType)
             instructions.append("store \(optionalType.ir) \(nilValue.operand), ptr \(resultPointer)")
             let mode = runtime.stringPointer(for: "rb")
@@ -5111,7 +5195,7 @@ public struct LLVMModuleEmitter {
             let buffer = nextTemporary()
             instructions.append("\(buffer) = call ptr @malloc(i64 \(bufferSize))")
             let indexPointer = "%\(nextRawName("readLine.index"))"
-            instructions.append("\(indexPointer) = alloca i64")
+            appendEntryAlloca(pointer: indexPointer, type: "i64")
             instructions.append("store i64 0, ptr \(indexPointer)")
             let loopLabel = nextLabel("readLine.loop")
             let readLabel = nextLabel("readLine.read")
@@ -5191,7 +5275,7 @@ public struct LLVMModuleEmitter {
             let wrappedType = LLVMType(ir: "ptr", array: nil)
 
             let resultPointer = "%\(nextRawName("commandLineArgument.result"))"
-            instructions.append("\(resultPointer) = alloca \(optionalType.ir)")
+            appendEntryAlloca(pointer: resultPointer, type: optionalType.ir)
             let nilValue = emitNilOptionalValue(optionalType)
             instructions.append("store \(optionalType.ir) \(nilValue.operand), ptr \(resultPointer)")
 
@@ -5292,6 +5376,102 @@ public struct LLVMModuleEmitter {
             return LLVMValue(type: "i32", operand: length, array: nil)
         }
 
+        private mutating func emitStringIndexOfCall(arguments: [CallArgument]) throws -> LLVMValue {
+            guard arguments.count == 3 else {
+                throw LLVMEmissionError("stringIndexOf(source:needle:start:) expects three arguments.")
+            }
+            let sourceArgument = arguments[0]
+            if let label = sourceArgument.label, label != "source" {
+                throw LLVMEmissionError("stringIndexOf(source:needle:start:) first argument label must be 'source'.")
+            }
+            let needleArgument = arguments[1]
+            if let label = needleArgument.label, label != "needle" {
+                throw LLVMEmissionError("stringIndexOf(source:needle:start:) second argument label must be 'needle'.")
+            }
+            let startArgument = arguments[2]
+            if let label = startArgument.label, label != "start" {
+                throw LLVMEmissionError("stringIndexOf(source:needle:start:) third argument label must be 'start'.")
+            }
+
+            let source = try emitValue(from: sourceArgument.value)
+            guard source.type == "ptr" else {
+                throw LLVMEmissionError("stringIndexOf(source:needle:start:) expects a String source.")
+            }
+            let needle = try emitValue(from: needleArgument.value)
+            guard needle.type == "ptr" else {
+                throw LLVMEmissionError("stringIndexOf(source:needle:start:) expects a String needle.")
+            }
+            let start = try emitValue(from: startArgument.value)
+            guard start.type == "i32" else {
+                throw LLVMEmissionError("stringIndexOf(source:needle:start:) expects an Int start.")
+            }
+
+            runtime.markUsesStrlen()
+            runtime.markUsesStrstr()
+            let wideLength = nextTemporary()
+            instructions.append("\(wideLength) = call i64 @strlen(ptr \(source.operand))")
+            let sourceLength = nextTemporary()
+            instructions.append("\(sourceLength) = trunc i64 \(wideLength) to i32")
+            let startIsNegative = nextTemporary()
+            instructions.append("\(startIsNegative) = icmp slt i32 \(start.operand), 0")
+            let nonNegativeStart = nextTemporary()
+            instructions.append("\(nonNegativeStart) = select i1 \(startIsNegative), i32 0, i32 \(start.operand)")
+            let startIsPastEnd = nextTemporary()
+            instructions.append("\(startIsPastEnd) = icmp sgt i32 \(nonNegativeStart), \(sourceLength)")
+            let boundedStart = nextTemporary()
+            instructions.append("\(boundedStart) = select i1 \(startIsPastEnd), i32 \(sourceLength), i32 \(nonNegativeStart)")
+            let startPointer = nextTemporary()
+            instructions.append("\(startPointer) = getelementptr inbounds i8, ptr \(source.operand), i32 \(boundedStart)")
+            let matchPointer = nextTemporary()
+            instructions.append("\(matchPointer) = call ptr @strstr(ptr \(startPointer), ptr \(needle.operand))")
+            let hasMatch = nextTemporary()
+            instructions.append("\(hasMatch) = icmp ne ptr \(matchPointer), null")
+            let matchAddress = nextTemporary()
+            instructions.append("\(matchAddress) = ptrtoint ptr \(matchPointer) to i64")
+            let sourceAddress = nextTemporary()
+            instructions.append("\(sourceAddress) = ptrtoint ptr \(source.operand) to i64")
+            let wideIndex = nextTemporary()
+            instructions.append("\(wideIndex) = sub i64 \(matchAddress), \(sourceAddress)")
+            let index = nextTemporary()
+            instructions.append("\(index) = trunc i64 \(wideIndex) to i32")
+            let result = nextTemporary()
+            instructions.append("\(result) = select i1 \(hasMatch), i32 \(index), i32 \(sourceLength)")
+            return LLVMValue(type: "i32", operand: result, array: nil)
+        }
+
+        private mutating func emitStringSubstringFunctionCall(arguments: [CallArgument]) throws -> LLVMValue {
+            guard arguments.count == 3 else {
+                throw LLVMEmissionError("stringSubstring(source:start:end:) expects three arguments.")
+            }
+            let sourceArgument = arguments[0]
+            if let label = sourceArgument.label, label != "source" {
+                throw LLVMEmissionError("stringSubstring(source:start:end:) first argument label must be 'source'.")
+            }
+            let startArgument = arguments[1]
+            if let label = startArgument.label, label != "start" {
+                throw LLVMEmissionError("stringSubstring(source:start:end:) second argument label must be 'start'.")
+            }
+            let endArgument = arguments[2]
+            if let label = endArgument.label, label != "end" {
+                throw LLVMEmissionError("stringSubstring(source:start:end:) third argument label must be 'end'.")
+            }
+
+            let source = try emitValue(from: sourceArgument.value)
+            guard source.type == "ptr", source.array == nil else {
+                throw LLVMEmissionError("stringSubstring(source:start:end:) source must be a String.")
+            }
+            let start = try emitValue(from: startArgument.value)
+            guard start.type == "i32" else {
+                throw LLVMEmissionError("stringSubstring(source:start:end:) start must be Int.")
+            }
+            let end = try emitValue(from: endArgument.value)
+            guard end.type == "i32" else {
+                throw LLVMEmissionError("stringSubstring(source:start:end:) end must be Int.")
+            }
+
+            return emitStringSubstringValue(receiver: source, start: start, end: end)
+        }
+
         private mutating func emitStringMemberCall(
             name: String,
             arguments: [CallArgument]
@@ -5373,6 +5553,14 @@ public struct LLVMModuleEmitter {
                 throw LLVMEmissionError("String.substring(start:end:) end must be Int.")
             }
 
+            return emitStringSubstringValue(receiver: receiver, start: start, end: end)
+        }
+
+        private mutating func emitStringSubstringValue(
+            receiver: LLVMValue,
+            start: LLVMValue,
+            end: LLVMValue
+        ) -> LLVMValue {
             runtime.markUsesMalloc()
             runtime.markUsesMemcpy()
             let length = nextTemporary()
@@ -5402,6 +5590,12 @@ public struct LLVMModuleEmitter {
             let resolvedName = substitutedCallName(name)
             guard let signature = signatures[resolvedName] else {
                 throw LLVMEmissionError("Unknown LLVM function '\(resolvedName)'.")
+            }
+            if LLVMModuleEmitter.textBufferRuntimeFunctionNames.contains(resolvedName) {
+                runtime.markUsesTextBuffer()
+            }
+            if LLVMModuleEmitter.stringRuntimeFunctionNames.contains(resolvedName) {
+                runtime.markUsesStringRuntime()
             }
 
             var emittedArguments: [String] = []
@@ -5612,7 +5806,7 @@ public struct LLVMModuleEmitter {
             returnType: String,
             parameters: [String]
         ) -> String {
-            let body = instructions.map { line in
+            let body = (entryAllocas + instructions).map { line in
                 line.hasSuffix(":") ? line : "  \(line)"
             }.joined(separator: "\n")
             return """

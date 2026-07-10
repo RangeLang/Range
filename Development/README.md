@@ -9,6 +9,9 @@ to look when deciding what to do next.
 The older docs and posts have been published elsewhere; this checklist is the
 implementation tracking surface.
 
+The current self-hosting direction is tracked in
+`Development/RangeAuthoredCompilerPlan.md`.
+
 ## Where We Stand
 
 ### Implemented Enough To Treat As Current Baseline
@@ -94,9 +97,18 @@ implementation tracking surface.
 - [x] `RangeCompiler/Range/Programs/Compiler` parses top-level function
       declaration summaries with body bounds.
 - [x] `RangeCompiler/Range/Programs/Compiler` lowers the parsed `@main` block to
-      a stage-2 synthetic `main` function summary.
+      a compiler `main` function summary.
 - [x] `RangeCompiler/Range/Programs/Compiler` emits the first Range-authored LLVM
       text checkpoint for `@main { return <integer> }`.
+- [ ] Replace fixture-shaped parser/lowering recognizers in
+      `RangeCompiler/Range/Programs/Compiler` with a small structural stage-1
+      parser. The first target should parse expressions generally, then
+      statements generally, then translate those records directly into the
+      Range-authored LLVM text backend.
+- [ ] Keep declaration graph, macro graph, and application graph semantics out of
+      the first structural parser subset. That subset should be able to parse
+      simple functions/statements/expressions before type and graph semantics are
+      attached.
 - [ ] The compiler/emission boundary still needs to shrink: Swift remains the
       compiler host and owns substantial parser/type/lowering machinery.
 - [ ] Memory graph and reactivity graph remain design documents, not concrete
@@ -237,6 +249,112 @@ implementation tracking surface.
       standard library is enough.
 - [ ] Keep script/host adapters outside the compiler core boundary.
 
+### 9a. Range-Authored Compiler Port Plan
+
+Goal: move the compiler toward `Range source -> Range-authored AST -> LLVM` for
+the `RangeCompiler/Range/Programs/Compiler` program. Swift remains stage-0
+bootstrap plumbing until the Range-authored compiler binary can compile enough
+of itself to become the active compiler.
+
+Stage definitions:
+
+- Stage 0: SwiftBootstrap compiles Range source, emits LLVM, links with `clang`,
+      and runs binaries. It is allowed to host files, processes, manifests,
+      package discovery, and temporary compatibility glue.
+- Stage 1: the Range-authored compiler program is compiled by Stage 0 and can
+      lex, parse, lower, emit LLVM, and compile a useful subset of Range source.
+      Its source of truth is Range code under
+      `RangeCompiler/Range/Programs/Compiler`.
+- Stage 2: the Stage 1 compiler compiles the Range-authored compiler program
+      through the same `Source -> AST -> LLVM` path. Swift is no longer needed
+      for compiler semantics.
+
+Phase 1: make the Range-authored compiler core structural.
+
+- [x] Keep the compiler entrypoint in Range and build it through
+      `scripts/range check-bootstrap-compiler`.
+- [x] Keep the Range lexer aligned with the Swift bootstrap lexer by comparing
+      token streams in tests.
+- [x] Parse the first `@main` and function declaration checkpoints.
+- [x] Emit direct LLVM for a small `@main` return checkpoint.
+- [x] Remove the old separate string-IR emitter path from the active
+      Range-authored compiler direction.
+- [ ] Replace ad hoc statement and expression recognizers with structural AST
+      records for declarations, blocks, statements, and expressions.
+- [ ] Preserve source ranges on AST records so later diagnostics and error
+      reporting are possible without re-parsing text.
+- [ ] Keep graph, macro, and type-system semantics out of this first parser
+      subset unless they are required to compile the compiler program.
+
+Phase 2: finish the parser subset needed by the compiler program.
+
+- [ ] Parse top-level declarations used by `RangeCompiler`: functions,
+      constructs, stored properties, parameters, and `@main`.
+- [ ] Parse block statements: `let`, `state`, assignment, expression statement,
+      `if`/`else`, `while`, `return`, `break`, and `continue`.
+- [ ] Parse expressions structurally: literals, identifiers, calls, member
+      access where needed, prefix operators, infix operators with precedence,
+      parenthesized expressions, and interpolation boundaries used by compiler
+      strings.
+- [ ] Add parser snapshot tests against representative compiler-source slices,
+      not tiny invented fixtures.
+- [ ] Keep the Swift parser only as a bootstrap comparison oracle, not as a
+      semantic implementation point for Stage 1.
+
+Phase 3: lower AST directly to LLVM.
+
+- [x] Lower integer returns, simple locals, calls, conditionals, loops, and
+      simple loop-carried locals to LLVM from Range-authored code.
+- [ ] Lower all simple compiler-program control flow from AST records, not
+      source-text rescans.
+- [ ] Generalize local SSA tracking enough for nested blocks, shadowing,
+      mutation, and multiple loop-carried values.
+- [ ] Add direct lowering for strings and boolean values used by the compiler
+      program.
+- [ ] Add structural call lowering for compiler helper functions, including
+      argument lists and return type lookup.
+- [ ] Keep LLVM rendering as a thin serialization of lowered LLVM records,
+      avoiding a second string-IR layer.
+
+Phase 4: define the minimum semantic layer.
+
+- [ ] Build a small declaration table from parsed compiler-source declarations:
+      function names, parameter types, return types, construct fields, and
+      callable signatures.
+- [ ] Resolve identifiers through lexical locals first, then declarations.
+- [ ] Check enough types to lower compiler code predictably: `Int`, `Bool`,
+      `String`, construct values, and function calls.
+- [ ] Treat unsupported language features as clear Stage 1 diagnostics instead
+      of silently defaulting or special-casing.
+- [ ] Defer full declaration graph, macro expansion, and RangeCore reconciliation
+      until the structural compiler path is real.
+
+Phase 5: compile the Range-authored compiler program end to end.
+
+- [ ] Point the Stage 1 compiler at
+      `RangeCompiler/Range/Programs/Compiler/*.range` as real input.
+- [ ] Emit one LLVM module for the compiler program, link it, and run it against
+      a Range input file.
+- [ ] Compare Stage 1 compiler output against the Stage 0 bootstrap output for
+      selected compiler-source slices.
+- [ ] Add a `check-stage1-compiler` lane once the Stage 1 compiler can compile
+      a meaningful subset without hand-picked tiny snippets.
+- [ ] Keep `check-bootstrap-compiler` as the Stage 0 safety lane until Stage 1
+      is stable.
+
+Phase 6: move toward Stage 2.
+
+- [ ] Use the Stage 1 binary to compile the Range-authored compiler sources.
+- [ ] Link and run the resulting Stage 2 compiler binary against the same smoke
+      inputs as Stage 1.
+- [ ] Compare Stage 1 and Stage 2 emitted LLVM or observable output for
+      deterministic checkpoints.
+- [ ] Retire Swift semantic code only after the Range-authored path owns the
+      same behavior with tests.
+- [ ] Keep SwiftBootstrap as a narrow host adapter until package loading,
+      filesystem access, process execution, and runtime support have Range-owned
+      equivalents or explicit host boundaries.
+
 ### 10. Tooling And Editor Parity
 
 - [ ] Add semantic origin modifiers for project vs core/external symbols.
@@ -281,15 +399,16 @@ implementation tracking surface.
 
 ## Immediate Next Slice
 
-1. Keep fixtures honest after the metadata-to-macro collapse.
-2. Introduce the uniform declaration descriptor surface on top of the existing
-   registries.
-3. Promote one missing relation to a first-class graph fact, starting with
-   `facetOf` because it clarifies macro target surfaces without changing
-   runtime behavior.
-4. Route one literal compatibility path through declaration graph facts and
-   `RangeCore` bridge protocols.
-5. Define the smallest non-diagnostic `MemoryGraph` projection pass.
+1. Convert the current Range-authored statement/expression lowering helpers to
+   consume structural AST records instead of rescanning source text.
+2. Add parser snapshots for real compiler-source slices in
+   `RangeCompiler/Range/Programs/Compiler`.
+3. Extend the Range-authored declaration table with function signatures and
+   construct fields needed by the compiler program.
+4. Add direct LLVM lowering for the next missing compiler-program value shape,
+   starting with `String` because compiler output construction depends on it.
+5. Add a `check-stage1-compiler` lane only after the Stage 1 compiler compiles
+   a meaningful compiler-source slice without invented fixtures.
 
 ## Verification Snapshot
 

@@ -1,0 +1,20 @@
+@language
+function stringHasPrefix(source: String, start: Int, prefix: String): Bool
+
+@language
+function stringFindFrom(source: String, start: Int, needle: String): Int
+
+@language
+function stringFindFirstOf(source: String, start: Int, characters: String): Int
+
+@language
+function stringViewFrom(source: String, start: Int): String
+
+@language
+function stringCharacterAt(source: String, index: Int): String
+
+@language
+function stringByteAt(source: String, index: Int): Int
+
+@language
+function stringFindByteOf(source: String, start: Int, first: Int, second: Int, third: Int): Int

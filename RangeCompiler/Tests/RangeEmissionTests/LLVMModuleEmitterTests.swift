@@ -1413,6 +1413,27 @@ struct LLVMModuleEmitterTests {
         )
     }
 
+    @Test("Loop locals allocate once in the entry block")
+    func loopLocalsAllocateOnceInEntryBlock() throws {
+        let module = try emit(
+            """
+            @main {
+                state count: Int(0)
+                while count < 3 {
+                    let next: Int(count + 1)
+                    count: next
+                }
+                return count
+            }
+            """
+        )
+
+        let nextAlloca = "%next = alloca i32"
+        #expect(module.components(separatedBy: nextAlloca).count == 2)
+        #expect(module.contains("entry:\n  %count = alloca i32\n  %next = alloca i32\n"))
+        #expect(!module.contains("while.body.1:\n  %next = alloca i32"))
+    }
+
     @Test("Break emits branch to loop end")
     func breakEmitsBranchToLoopEnd() throws {
         let module = try emit(
@@ -5569,6 +5590,77 @@ struct LLVMModuleEmitterTests {
         )
     }
 
+    @Test("String prefix checks use the shared external runtime ABI")
+    func stringPrefixChecksUseSharedExternalRuntimeABI() throws {
+        let module = try emit(
+            """
+            @main {
+                if stringHasPrefix(source: String("range"), start: 1, prefix: String("ang")) {
+                    return 0
+                }
+                return 1
+            }
+            """
+        )
+
+        #expect(module.contains("declare i1 @stringHasPrefix(ptr, i32, ptr)"))
+        #expect(module.contains("declare i32 @stringFindFrom(ptr, i32, ptr)"))
+        #expect(module.contains("declare i32 @stringFindFirstOf(ptr, i32, ptr)"))
+        #expect(module.contains("declare ptr @stringViewFrom(ptr, i32)"))
+        #expect(module.contains("declare ptr @stringCharacterAt(ptr, i32)"))
+        #expect(module.contains("declare i32 @stringByteAt(ptr, i32)"))
+        #expect(module.contains("declare i32 @stringFindByteOf(ptr, i32, i32, i32, i32)"))
+        #expect(module.contains("call i1 @stringHasPrefix(ptr"))
+        #expect(!module.contains("define i1 @stringHasPrefix"))
+    }
+
+    @Test("String first-of searches use the shared external runtime ABI")
+    func stringFirstOfSearchesUseSharedExternalRuntimeABI() throws {
+        let module = try emit(
+            """
+            @main {
+                return stringFindFirstOf(source: String("range|compiler~"), start: 0, characters: String("|~"))
+            }
+            """
+        )
+
+        #expect(module.contains("declare i32 @stringFindFirstOf(ptr, i32, ptr)"))
+        #expect(module.contains("call i32 @stringFindFirstOf(ptr"))
+        #expect(!module.contains("define i32 @stringFindFirstOf"))
+    }
+
+    @Test("TextBuffer uses the shared external runtime ABI")
+    func textBufferUsesSharedExternalRuntimeABI() throws {
+        let module = try emit(
+            """
+            @main {
+                let buffer: TextBuffer(textBufferCreate(capacity: 2))
+                textBufferAppend(buffer: buffer, text: String("range"))
+                textBufferAppendInt(buffer: buffer, value: 56)
+                textBufferAppendCharacter(buffer: buffer, source: String("!"), index: 0)
+                let text: String(textBufferMaterialize(buffer: buffer))
+                textBufferDestroy(buffer: buffer)
+                return stringLength(value: text)
+            }
+            """
+        )
+
+        #expect(module.contains("declare ptr @textBufferCreate(i32)"))
+        #expect(module.contains("declare i32 @textBufferAppend(ptr, ptr)"))
+        #expect(module.contains("declare i32 @textBufferAppendInt(ptr, i32)"))
+        #expect(module.contains("declare i32 @textBufferAppendCharacter(ptr, ptr, i32)"))
+        #expect(module.contains("declare ptr @textBufferMaterialize(ptr)"))
+        #expect(module.contains("declare i32 @textBufferDestroy(ptr)"))
+        #expect(module.contains("call ptr @textBufferCreate(i32 2)"))
+        #expect(module.contains("call i32 @textBufferAppend(ptr"))
+        #expect(module.contains("call i32 @textBufferAppendInt(ptr"))
+        #expect(module.contains("call i32 @textBufferAppendCharacter(ptr"))
+        #expect(module.contains("call ptr @textBufferMaterialize(ptr"))
+        #expect(module.contains("call i32 @textBufferDestroy(ptr"))
+        #expect(!module.contains("define ptr @textBufferCreate"))
+        #expect(!module.contains("define i32 @textBufferAppend"))
+    }
+
     @Test("Literal string interpolation emits global string")
     func literalStringInterpolationEmitsGlobalString() throws {
         let module = try emit(
@@ -5630,6 +5722,25 @@ struct LLVMModuleEmitterTests {
 
             """
         )
+    }
+
+    @Test("Self-appending string assignment does not free aliased storage")
+    func selfAppendingStringAssignmentDoesNotFreeAliasedStorage() throws {
+        let module = try emit(
+            """
+            @main {
+                state output: String("")
+                let alias: String(output)
+                output: String("\\(output)next")
+                print(value: alias)
+                return 0
+            }
+            """
+        )
+
+        #expect(!module.contains("@malloc_size"))
+        #expect(!module.contains("call void @free"))
+        #expect(!module.contains("free.owned"))
     }
 
     @Test("Interpolated print emits puts call")
