@@ -219,12 +219,14 @@ construct CompilerLLVMCallArguments {
 construct CompilerLLVMHelperFunctions {
     let renderedFunctions: String
     let instructionRecords: String
+    let nextTemporary: Int
 }
 
 construct CompilerLLVMHelperFunctionChunk {
     let renderedFunctions: String
     let instructionRecords: String
     let nextIndex: Int
+    let nextTemporary: Int
 }
 
 construct CompilerLLVMHelperAudit {
@@ -519,92 +521,13 @@ function compilerNativeSourceSetLLVMText(source: String): String {
 }
 
 function compilerSourceSetProgramForLLVM(source: String): CompilerProgram {
-    let slashPair: String("\\")
-    let slash: String(slashPair.substring(start: 0, end: 1))
-    let marker: String("compilerSourceFile\(slash)t")
-    let firstMarker: Int(compilerSourceNextFileMarker(source: source, start: 0))
-    let sourceLength: Int(stringLength(value: source))
-    if firstMarker >= sourceLength {
-        return parseCompilerProgramForLLVM(source: source)
-    }
-
-    return compilerSourceSetProgramForLLVMFromFirstMarker(source: source, firstMarker: firstMarker, marker: marker)
-}
-
-function compilerSourceSetProgramForLLVMFromFirstMarker(source: String, firstMarker: Int, marker: String): CompilerProgram {
-    return compilerSourceSetProgramForLLVMFromIndex(source: source, sourceIndex: firstMarker, marker: marker, program: compilerSourceSetEmptyProgram())
-}
-
-function compilerSourceSetEmptyProgram(): CompilerProgram {
-    let emptyBlock: CompilerBlock(CompilerBlock(start: 0, end: 0))
-    return CompilerProgram(source: String(""), hasMainBlock: false, mainAttributeStart: 0, mainBlock: emptyBlock, mainStatementRecords: String(""), mainStatementSummary: String(""), declarationRecords: String(""), declarationSummary: String(""), functionSummary: String(""))
-}
-
-function compilerSourceSetProgramForLLVMFromIndex(source: String, sourceIndex: Int, marker: String, program: CompilerProgram): CompilerProgram {
-    let sourceLength: Int(stringLength(value: source))
-    let markerStart: Int(compilerSourceNextFileMarker(source: source, start: sourceIndex))
-    if markerStart >= sourceLength {
-        return program
-    }
-
-    return compilerSourceSetProgramForLLVMAtMarker(source: source, markerStart: markerStart, marker: marker, program: program)
-}
-
-function compilerSourceSetProgramForLLVMAtMarker(source: String, markerStart: Int, marker: String, program: CompilerProgram): CompilerProgram {
-    let markerLength: Int(stringLength(value: marker))
-    let pathStart: Int(markerStart + markerLength)
-    let pathEnd: Int(compilerSourceFilePathEnd(source: source, start: pathStart))
-    let fileStart: Int(pathEnd + 1)
-    let nextMarker: Int(compilerSourceNextFileMarker(source: source, start: fileStart))
-    let fileSource: String(stringSubstring(source: source, start: fileStart, end: nextMarker))
-    return compilerSourceSetProgramForLLVMFileSource(source: source, fileSource: fileSource, nextMarker: nextMarker, marker: marker, program: program)
-}
-
-function compilerSourceSetProgramForLLVMFileSource(source: String, fileSource: String, nextMarker: Int, marker: String, program: CompilerProgram): CompilerProgram {
-    let fileProgram: CompilerProgram(parseCompilerProgramForLLVMNamedBodies(source: fileSource, bodyFunctionNames: compilerSourceSetBodyFunctionNames()))
-    let nextProgram: CompilerProgram(compilerSourceSetProgramAppendingFile(program: program, fileProgram: fileProgram))
-    return compilerSourceSetProgramForLLVMFromIndex(source: source, sourceIndex: nextMarker, marker: marker, program: nextProgram)
+    return parseCompilerProgramForLLVM(source: source)
 }
 
 function compilerNativeSourceSetProgramForLLVM(source: String): CompilerProgram {
-    let slashPair: String("\\")
-    let slash: String(slashPair.substring(start: 0, end: 1))
-    let marker: String("compilerSourceFile\(slash)t")
-    let firstMarker: Int(compilerSourceNextFileMarker(source: source, start: 0))
-    let sourceLength: Int(stringLength(value: source))
-    if firstMarker >= sourceLength {
-        return compilerNativeProgramForLLVMFileSource(fileSource: source)
-    }
-
-    return compilerNativeSourceSetProgramForLLVMFromIndex(source: source, sourceIndex: firstMarker, marker: marker, program: compilerSourceSetEmptyProgram())
-}
-
-function compilerNativeSourceSetProgramForLLVMFromIndex(source: String, sourceIndex: Int, marker: String, program: CompilerProgram): CompilerProgram {
-    let sourceLength: Int(stringLength(value: source))
-    let markerStart: Int(compilerSourceNextFileMarker(source: source, start: sourceIndex))
-    if markerStart >= sourceLength {
-        return program
-    }
-
-    return compilerNativeSourceSetProgramForLLVMAtMarker(source: source, markerStart: markerStart, marker: marker, program: program)
-}
-
-function compilerNativeSourceSetProgramForLLVMAtMarker(source: String, markerStart: Int, marker: String, program: CompilerProgram): CompilerProgram {
-    let markerLength: Int(stringLength(value: marker))
-    let pathStart: Int(markerStart + markerLength)
-    let pathEnd: Int(compilerSourceFilePathEnd(source: source, start: pathStart))
-    let fileStart: Int(pathEnd + 1)
-    let nextMarker: Int(compilerSourceNextFileMarker(source: source, start: fileStart))
-    let fileSource: String(stringSubstring(source: source, start: fileStart, end: nextMarker))
-    let fileProgram: CompilerProgram(compilerNativeProgramForLLVMFileSource(fileSource: fileSource))
-    let nextProgram: CompilerProgram(compilerSourceSetProgramAppendingFile(program: program, fileProgram: fileProgram))
-    return compilerNativeSourceSetProgramForLLVMFromIndex(source: source, sourceIndex: nextMarker, marker: marker, program: nextProgram)
-}
-
-function compilerNativeProgramForLLVMFileSource(fileSource: String): CompilerProgram {
-    let parsedDeclarations: CompilerParsedDeclarations(parseCompilerTopLevelDeclarationsForLLVMNamedBodies(source: fileSource, bodyFunctionNames: compilerSourceSetBodyFunctionNames()))
+    let parsedDeclarations: CompilerParsedDeclarations(parseCompilerTopLevelDeclarationsForLLVM(source: source))
     let emptyBlock: CompilerBlock(CompilerBlock(start: 0, end: 0))
-    return CompilerProgram(source: String(""), hasMainBlock: false, mainAttributeStart: 0, mainBlock: emptyBlock, mainStatementRecords: String(""), mainStatementSummary: String(""), declarationRecords: parsedDeclarations.records, declarationSummary: String(""), functionSummary: String(""))
+    return CompilerProgram(source: source, hasMainBlock: false, mainAttributeStart: 0, mainBlock: emptyBlock, mainStatementRecords: String(""), mainStatementSummary: String(""), declarationRecords: parsedDeclarations.records, declarationSummary: String(""), functionSummary: String(""))
 }
 
 function compilerSourceSetBodyFunctionNames(): String {
@@ -636,7 +559,7 @@ function compilerSourceSetBodyFunctionNamesNativeMain(): String {
 }
 
 function compilerSourceSetBodyFunctionNamesNativeProgram(): String {
-    return "parseCompilerProgramWithFunctionBodies;parseCompilerProgramWithFunctionBodyMode;parseCompilerTopLevelDeclarationsWithFunctionBodyMode;compilerCoreParseTopLevelDeclarationStep;compilerCoreParseConstructDeclarationStep;compilerCoreParseFunctionDeclarationStep;compilerCoreParseFunctionDeclarationStepFromDeclaration;compilerCoreAppendConstructDeclaration;compilerCoreAppendFunctionDeclaration;compilerCoreTopLevelDeclarationSummary;compilerCoreLLVMEntryTextForProgram;compilerCoreLLVMEntryTextForParsedBlock;compilerCoreLLVMEntryReachableFunctions;"
+    return "compilerCoreLLVMEntryTextForProgram;compilerCoreLLVMEntryTextForParsedBlock;compilerCoreLLVMEntryReachableFunctions;"
 }
 
 function compilerSourceSetBodyFunctionNamesSourceSetPrep(): String {
@@ -648,7 +571,7 @@ function compilerSourceSetBodyFunctionNamesSourceSetLLVM(): String {
 }
 
 function compilerSourceSetBodyFunctionNamesSourceSetLLVMCore(): String {
-    return "compilerSourceSetLLVMText;compilerNativeSourceSetLLVMText;compilerSourceSetProgramForLLVM;compilerSourceSetProgramForLLVMFromFirstMarker;compilerSourceSetEmptyProgram;compilerSourceSetProgramForLLVMFromIndex;compilerSourceSetProgramForLLVMAtMarker;compilerSourceSetProgramForLLVMFileSource;compilerNativeSourceSetProgramForLLVM;compilerNativeSourceSetProgramForLLVMFromIndex;compilerNativeSourceSetProgramForLLVMAtMarker;compilerNativeProgramForLLVMFileSource;compilerSourceSetProgramAppendingFile;"
+    return "compilerSourceSetLLVMText;compilerNativeSourceSetLLVMText;compilerSourceSetProgramForLLVM;compilerNativeSourceSetProgramForLLVM;"
 }
 
 function compilerSourceSetBodyFunctionNamesSourceSetLLVMRender(): String {
@@ -660,7 +583,7 @@ function compilerSourceSetBodyFunctionNamesSourceSetLLVMRenderEntry(): String {
 }
 
 function compilerSourceSetBodyFunctionNamesSourceSetLLVMRenderEntryDirectives(): String {
-    return "compilerSourceSetBodyFunctionNamesSourceSetLLVMRenderEntryDirectives;compilerSourceSetBodyFunctionNamesSourceSetLLVMRenderEntryLowering;compilerSourceSetProgramAppendingFileDeclarations;compilerSourceSetProgramAppendingFileWithoutProgramMain;compilerSourceSetProgramAppendingFileExisting;compilerSourceSetProgramAppendingFileMain;compilerNativeSourceSetParseStats;compilerNativeSourceSetReachableStats;compilerNativeSourceSetSelectedStats;compilerNativeSourceSetSelectedScanStats;compilerCoreParseDecimalInt;compilerCoreDecimalDigitValue;compilerCoreLLVMSourceSetEntryTextForProgram;compilerCoreLLVMSourceSetEntryTextForParsedBlock;"
+    return "compilerSourceSetBodyFunctionNamesSourceSetLLVMRenderEntryDirectives;compilerSourceSetBodyFunctionNamesSourceSetLLVMRenderEntryLowering;compilerNativeSourceSetParseStats;compilerNativeSourceSetReachableStats;compilerNativeSourceSetSelectedStats;compilerNativeSourceSetSelectedScanStats;compilerCoreParseDecimalInt;compilerCoreDecimalDigitValue;compilerCoreLLVMSourceSetEntryTextForProgram;compilerCoreLLVMSourceSetEntryTextForParsedBlock;"
 }
 
 function compilerSourceSetBodyFunctionNamesSourceSetLLVMRenderEntryLowering(): String {
@@ -676,7 +599,7 @@ function compilerSourceSetBodyFunctionNamesSourceSetLLVMRenderSelectionCore(): S
 }
 
 function compilerSourceSetBodyFunctionNamesSourceSetLLVMRenderSelectionAudit(): String {
-    return "compilerNativeSourceSetSelectedScanStats;compilerCoreLLVMSelectedHelperAudit;compilerCoreLLVMSelectedHelperAuditFromIndex;compilerCoreLLVMSelectedHelperAuditAppendingRecord;compilerCoreLLVMSelectedHelperAuditAppendingDeclaration;compilerCoreLLVMHelperAuditFailure;compilerCoreShouldLowerSelectedHelperFunction;compilerCoreSelectedHelperExclusionReason;"
+    return "compilerNativeSourceSetSelectedScanStats;compilerCoreLLVMSelectedHelperAudit;compilerCoreLLVMSelectedHelperAuditFromIndex;compilerCoreLLVMSelectedHelperAuditAppendingRecord;compilerCoreLLVMSelectedHelperAuditAppendingDeclaration;compilerCoreLLVMHelperAuditFailure;compilerCoreShouldLowerSelectedHelperFunction;compilerCoreSelectedHelperExclusionReason;compilerCoreFunctionDeclarationHasBodySource;"
 }
 
 function compilerSourceSetBodyFunctionNamesSourceSetLLVMRenderModule(): String {
@@ -761,35 +684,6 @@ function compilerSourceSetBodyFunctionNamesLexer(): String {
 
 function compilerSourceSetBodyFunctionNamesScanning(): String {
     return "compilerSourceInventoryFileRecords;compilerSourceInventoryFileRecordsFromIndex;compilerSourceInventoryFileRecordsAppending;compilerSourceInventoryFileCount;compilerSourceInventoryFileCountFromIndex;compilerSourceNextIndexAfterFileMarker;compilerSourceFilePathEnd;compilerSourceNextFileMarker;compilerSourceNextFileMarkerFromCandidate;compilerCoreFindMainAttributeStart;compilerCoreMainAttributeText;compilerCoreFirstNonWhitespaceIndex;hasRangePrefix;isRangeLexerWhitespace;"
-}
-
-function compilerSourceSetProgramAppendingFile(program: CompilerProgram, fileProgram: CompilerProgram): CompilerProgram {
-    let declarationRecords: String("\(program.declarationRecords)\(fileProgram.declarationRecords)")
-    return compilerSourceSetProgramAppendingFileDeclarations(program: program, fileProgram: fileProgram, declarationRecords: declarationRecords)
-}
-
-function compilerSourceSetProgramAppendingFileDeclarations(program: CompilerProgram, fileProgram: CompilerProgram, declarationRecords: String): CompilerProgram {
-    if program.hasMainBlock {
-        return compilerSourceSetProgramAppendingFileExisting(program: program, declarationRecords: declarationRecords)
-    }
-
-    return compilerSourceSetProgramAppendingFileWithoutProgramMain(program: program, fileProgram: fileProgram, declarationRecords: declarationRecords)
-}
-
-function compilerSourceSetProgramAppendingFileWithoutProgramMain(program: CompilerProgram, fileProgram: CompilerProgram, declarationRecords: String): CompilerProgram {
-    if fileProgram.hasMainBlock {
-        return compilerSourceSetProgramAppendingFileMain(fileProgram: fileProgram, declarationRecords: declarationRecords)
-    }
-
-    return compilerSourceSetProgramAppendingFileExisting(program: program, declarationRecords: declarationRecords)
-}
-
-function compilerSourceSetProgramAppendingFileExisting(program: CompilerProgram, declarationRecords: String): CompilerProgram {
-    return CompilerProgram(source: program.source, hasMainBlock: program.hasMainBlock, mainAttributeStart: program.mainAttributeStart, mainBlock: program.mainBlock, mainStatementRecords: program.mainStatementRecords, mainStatementSummary: program.mainStatementSummary, declarationRecords: declarationRecords, declarationSummary: String(""), functionSummary: String(""))
-}
-
-function compilerSourceSetProgramAppendingFileMain(fileProgram: CompilerProgram, declarationRecords: String): CompilerProgram {
-    return CompilerProgram(source: fileProgram.source, hasMainBlock: true, mainAttributeStart: fileProgram.mainAttributeStart, mainBlock: fileProgram.mainBlock, mainStatementRecords: fileProgram.mainStatementRecords, mainStatementSummary: fileProgram.mainStatementSummary, declarationRecords: declarationRecords, declarationSummary: String(""), functionSummary: String(""))
 }
 
 function compilerSourceSetProgramSource(source: String): String {
@@ -2511,7 +2405,7 @@ function compilerNativeSourceSetReachableStats(source: String): String {
 function compilerNativeSourceSetSelectedStats(source: String): String {
     let program: CompilerProgram(compilerNativeSourceSetProgramForLLVM(source: source))
     let names: String(compilerCoreLLVMNativeEntryReachableFunctions(program: program))
-    let selected: CompilerLLVMHelperFunctions(compilerCoreLLVMSelectedHelperFunctions(program: program, names: names))
+    let selected: CompilerLLVMHelperFunctions(compilerCoreLLVMSelectedHelperFunctions(program: program, names: names, initialTemporaryIndex: 0))
     let placeholderCount: Int(compilerCoreLLVMPlaceholderCount(text: selected.renderedFunctions))
     return "nativeSourceSetStats\tphase=selected\trenderedLength=\(stringLength(value: selected.renderedFunctions))\tinstructionRecordsLength=\(stringLength(value: selected.instructionRecords))\tplaceholderCount=\(placeholderCount)\tnamesLength=\(stringLength(value: names))\tdeclarationRecordsLength=\(stringLength(value: program.declarationRecords))\n"
 }
@@ -2520,7 +2414,7 @@ function compilerNativeSourceSetSelectedScanStats(source: String): String {
     let program: CompilerProgram(compilerNativeSourceSetProgramForLLVM(source: source))
     let names: String(compilerCoreLLVMNativeEntryReachableFunctions(program: program))
     let audit: CompilerLLVMHelperAudit(compilerCoreLLVMSelectedHelperAudit(program: program, names: names))
-    let selected: CompilerLLVMHelperFunctions(compilerCoreLLVMSelectedHelperFunctions(program: program, names: names))
+    let selected: CompilerLLVMHelperFunctions(compilerCoreLLVMSelectedHelperFunctions(program: program, names: names, initialTemporaryIndex: 0))
     let placeholderCount: Int(compilerCoreLLVMPlaceholderCount(text: selected.renderedFunctions))
     let recordsLength: Int(stringLength(value: program.declarationRecords))
     return "nativeSourceSetStats\tphase=selectedScan\tselectedCount=\(audit.selectedCount)\tlowerableCount=\(audit.lowerableCount)\texcludedCount=\(audit.excludedCount)\tplaceholderCount=\(placeholderCount)\tmaxBodyLength=\(audit.maxBodyLength)\tmaxBodyName=\(audit.maxBodyName)\tnamesLength=\(stringLength(value: names))\tdeclarationRecordsLength=\(recordsLength)\n\(audit.details)"
@@ -2539,27 +2433,27 @@ function compilerCoreLLVMSelectedHelperAuditFromIndex(program: CompilerProgram, 
     if record == String("") {
         return audit
     }
-    let nextAudit: CompilerLLVMHelperAudit(compilerCoreLLVMSelectedHelperAuditAppendingRecord(audit: audit, names: names, record: record))
+    let nextAudit: CompilerLLVMHelperAudit(compilerCoreLLVMSelectedHelperAuditAppendingRecord(program: program, audit: audit, names: names, record: record))
     let nextIndex: Int(compilerCoreTopLevelDeclarationRecordNextIndex(records: program.declarationRecords, start: sourceIndex))
     return compilerCoreLLVMSelectedHelperAuditFromIndex(program: program, names: names, sourceIndex: nextIndex, recordsLength: recordsLength, audit: nextAudit)
 }
 
-function compilerCoreLLVMSelectedHelperAuditAppendingRecord(audit: CompilerLLVMHelperAudit, names: String, record: String): CompilerLLVMHelperAudit {
+function compilerCoreLLVMSelectedHelperAuditAppendingRecord(program: CompilerProgram, audit: CompilerLLVMHelperAudit, names: String, record: String): CompilerLLVMHelperAudit {
     let kind: String(compilerCoreRecordField(record: record, prefix: String("kind=")))
     let name: String(compilerCoreRecordField(record: record, prefix: String("name=")))
     if kind != String("function") || !compilerCoreNameListContains(names: names, name: name) {
         return audit
     }
-    return compilerCoreLLVMSelectedHelperAuditAppendingDeclaration(audit: audit, declaration: compilerCoreTopLevelDeclarationFromRecord(record: record))
+    return compilerCoreLLVMSelectedHelperAuditAppendingDeclaration(program: program, audit: audit, declaration: compilerCoreTopLevelDeclarationFromRecord(record: record))
 }
 
-function compilerCoreLLVMSelectedHelperAuditAppendingDeclaration(audit: CompilerLLVMHelperAudit, declaration: CompilerTopLevelDeclaration): CompilerLLVMHelperAudit {
+function compilerCoreLLVMSelectedHelperAuditAppendingDeclaration(program: CompilerProgram, audit: CompilerLLVMHelperAudit, declaration: CompilerTopLevelDeclaration): CompilerLLVMHelperAudit {
     state bodyEnd: Int(0)
     bodyEnd: declaration.bodyEnd
     state bodyStart: Int(0)
     bodyStart: declaration.bodyStart
     let bodyLength: Int(bodyEnd - bodyStart)
-    let reason: String(compilerCoreSelectedHelperExclusionReason(declaration: declaration))
+    let reason: String(compilerCoreSelectedHelperExclusionReason(program: program, declaration: declaration))
     state maxLength: Int(0)
     maxLength: audit.maxBodyLength
     state maxName: String("")
@@ -2646,7 +2540,7 @@ function compilerCoreLLVMNativeEntryTextForProgram(program: CompilerProgram): St
     if audit.excludedCount > 0 {
         return compilerCoreLLVMHelperAuditFailure(audit: audit)
     }
-    let selectedHelperFunctions: CompilerLLVMHelperFunctions(compilerCoreLLVMSelectedHelperFunctions(program: program, names: reachableFunctions))
+    let selectedHelperFunctions: CompilerLLVMHelperFunctions(compilerCoreLLVMSelectedHelperFunctions(program: program, names: reachableFunctions, initialTemporaryIndex: 0))
     let placeholderCount: Int(compilerCoreLLVMPlaceholderCount(text: selectedHelperFunctions.renderedFunctions))
     if placeholderCount > 0 {
         return compilerCoreLLVMPlaceholderFailure(placeholderCount: placeholderCount, renderedText: selectedHelperFunctions.renderedFunctions)
@@ -2721,7 +2615,7 @@ function compilerCoreLLVMEntryReachableFunctions(program: CompilerProgram, parse
 }
 
 function compilerCoreLLVMEntryTextForLoweredBlock(program: CompilerProgram, loweredBlock: CompilerLLVMLoweredBlock, reachableFunctions: String): String {
-    let selectedHelperFunctions: CompilerLLVMHelperFunctions(compilerCoreLLVMSelectedHelperFunctions(program: program, names: reachableFunctions))
+    let selectedHelperFunctions: CompilerLLVMHelperFunctions(compilerCoreLLVMSelectedHelperFunctions(program: program, names: reachableFunctions, initialTemporaryIndex: loweredBlock.nextTemporary))
     let module: CompilerLLVMModule(compilerCoreLLVMEntryModule(program: program, block: loweredBlock, selectedHelperFunctions: selectedHelperFunctions, reachableFunctions: reachableFunctions))
     let renderedText: String(compilerCoreRenderLLVMModule(module: module))
     let placeholderCount: Int(compilerCoreLLVMPlaceholderCount(text: renderedText))
@@ -2779,7 +2673,7 @@ function compilerCoreLLVMHelperFunctions(program: CompilerProgram): CompilerLLVM
     while sourceIndex < recordsLength {
         let record: String(compilerCoreTopLevelDeclarationRecordAt(records: program.declarationRecords, start: sourceIndex))
         if record == String("") {
-            return CompilerLLVMHelperFunctions(renderedFunctions: renderedFunctions, instructionRecords: instructionRecords)
+            return CompilerLLVMHelperFunctions(renderedFunctions: renderedFunctions, instructionRecords: instructionRecords, nextTemporary: 0)
         }
 
             let declaration: CompilerTopLevelDeclaration(compilerCoreTopLevelDeclarationFromRecord(record: record))
@@ -2792,7 +2686,7 @@ function compilerCoreLLVMHelperFunctions(program: CompilerProgram): CompilerLLVM
         sourceIndex: compilerCoreTopLevelDeclarationRecordNextIndex(records: program.declarationRecords, start: sourceIndex)
     }
 
-    return CompilerLLVMHelperFunctions(renderedFunctions: renderedFunctions, instructionRecords: instructionRecords)
+    return CompilerLLVMHelperFunctions(renderedFunctions: renderedFunctions, instructionRecords: instructionRecords, nextTemporary: 0)
 }
 
 function compilerCoreDeclarationLookupRecords(records: String): String {
@@ -2843,86 +2737,90 @@ function compilerCoreProgramWithDeclarationLookupRecords(program: CompilerProgra
     )
 }
 
-function compilerCoreLLVMSelectedHelperFunctions(program: CompilerProgram, names: String): CompilerLLVMHelperFunctions {
+function compilerCoreLLVMSelectedHelperFunctions(program: CompilerProgram, names: String, initialTemporaryIndex: Int): CompilerLLVMHelperFunctions {
     let lookupRecords: String(compilerCoreDeclarationLookupRecords(records: program.declarationRecords))
     let loweringProgram: CompilerProgram(compilerCoreProgramWithDeclarationLookupRecords(program: program, declarationRecords: lookupRecords))
     let functionsBuffer: TextBuffer(textBufferCreate(capacity: 1048576))
     let recordsBuffer: TextBuffer(textBufferCreate(capacity: 1048576))
     state sourceIndex: Int(0)
+    state nextTemporary: Int(initialTemporaryIndex)
     let recordsLength: Int(stringLength(value: program.declarationRecords))
     let chunkLength: Int(100000)
 
     while sourceIndex < recordsLength {
         let chunkEnd: Int(sourceIndex + chunkLength)
-        let chunk: CompilerLLVMHelperFunctionChunk(compilerCoreLLVMSelectedHelperFunctionsChunk(program: program, loweringProgram: loweringProgram, names: names, sourceIndex: sourceIndex, chunkEnd: chunkEnd, recordsLength: recordsLength))
+        let chunk: CompilerLLVMHelperFunctionChunk(compilerCoreLLVMSelectedHelperFunctionsChunk(program: program, loweringProgram: loweringProgram, names: names, sourceIndex: sourceIndex, chunkEnd: chunkEnd, recordsLength: recordsLength, initialTemporaryIndex: nextTemporary))
         textBufferAppend(buffer: functionsBuffer, text: chunk.renderedFunctions)
         textBufferAppend(buffer: recordsBuffer, text: chunk.instructionRecords)
         if chunk.nextIndex <= sourceIndex {
-            return compilerCoreLLVMHelperFunctionsFromTextBuffers(functionsBuffer: functionsBuffer, recordsBuffer: recordsBuffer)
+            return compilerCoreLLVMHelperFunctionsFromTextBuffers(functionsBuffer: functionsBuffer, recordsBuffer: recordsBuffer, nextTemporary: chunk.nextTemporary)
         }
         sourceIndex: chunk.nextIndex
+        nextTemporary: chunk.nextTemporary
     }
 
-    return compilerCoreLLVMHelperFunctionsFromTextBuffers(functionsBuffer: functionsBuffer, recordsBuffer: recordsBuffer)
+    return compilerCoreLLVMHelperFunctionsFromTextBuffers(functionsBuffer: functionsBuffer, recordsBuffer: recordsBuffer, nextTemporary: nextTemporary)
 }
 
-function compilerCoreLLVMSelectedHelperFunctionsChunk(program: CompilerProgram, loweringProgram: CompilerProgram, names: String, sourceIndex: Int, chunkEnd: Int, recordsLength: Int): CompilerLLVMHelperFunctionChunk {
+function compilerCoreLLVMSelectedHelperFunctionsChunk(program: CompilerProgram, loweringProgram: CompilerProgram, names: String, sourceIndex: Int, chunkEnd: Int, recordsLength: Int, initialTemporaryIndex: Int): CompilerLLVMHelperFunctionChunk {
     let functionsBuffer: TextBuffer(textBufferCreate(capacity: 1048576))
     let recordsBuffer: TextBuffer(textBufferCreate(capacity: 1048576))
     state nextSourceIndex: Int(sourceIndex)
+    state nextTemporary: Int(initialTemporaryIndex)
 
     while nextSourceIndex < recordsLength && nextSourceIndex < chunkEnd {
         let record: String(compilerCoreTopLevelDeclarationRecordAt(records: program.declarationRecords, start: nextSourceIndex))
         if record == String("") {
-            return compilerCoreLLVMHelperFunctionChunkFromTextBuffers(functionsBuffer: functionsBuffer, recordsBuffer: recordsBuffer, nextIndex: recordsLength)
+            return compilerCoreLLVMHelperFunctionChunkFromTextBuffers(functionsBuffer: functionsBuffer, recordsBuffer: recordsBuffer, nextIndex: recordsLength, nextTemporary: nextTemporary)
         }
 
-        let selectedFunction: CompilerLLVMHelperFunctions(compilerCoreLLVMSelectedHelperFunctionForRecord(loweringProgram: loweringProgram, names: names, sourceIndex: nextSourceIndex, record: record))
+        let selectedFunction: CompilerLLVMHelperFunctions(compilerCoreLLVMSelectedHelperFunctionForRecord(loweringProgram: loweringProgram, names: names, initialTemporaryIndex: nextTemporary, record: record))
         textBufferAppend(buffer: functionsBuffer, text: selectedFunction.renderedFunctions)
         textBufferAppend(buffer: recordsBuffer, text: selectedFunction.instructionRecords)
+        nextTemporary: selectedFunction.nextTemporary
         nextSourceIndex: compilerCoreTopLevelDeclarationRecordNextIndex(records: program.declarationRecords, start: nextSourceIndex)
     }
 
-    return compilerCoreLLVMHelperFunctionChunkFromTextBuffers(functionsBuffer: functionsBuffer, recordsBuffer: recordsBuffer, nextIndex: nextSourceIndex)
+    return compilerCoreLLVMHelperFunctionChunkFromTextBuffers(functionsBuffer: functionsBuffer, recordsBuffer: recordsBuffer, nextIndex: nextSourceIndex, nextTemporary: nextTemporary)
 }
 
-function compilerCoreLLVMHelperFunctionsFromTextBuffers(functionsBuffer: TextBuffer, recordsBuffer: TextBuffer): CompilerLLVMHelperFunctions {
+function compilerCoreLLVMHelperFunctionsFromTextBuffers(functionsBuffer: TextBuffer, recordsBuffer: TextBuffer, nextTemporary: Int): CompilerLLVMHelperFunctions {
     let renderedFunctions: String(textBufferMaterialize(buffer: functionsBuffer))
     let instructionRecords: String(textBufferMaterialize(buffer: recordsBuffer))
     textBufferDestroy(buffer: functionsBuffer)
     textBufferDestroy(buffer: recordsBuffer)
-    return CompilerLLVMHelperFunctions(renderedFunctions: renderedFunctions, instructionRecords: instructionRecords)
+    return CompilerLLVMHelperFunctions(renderedFunctions: renderedFunctions, instructionRecords: instructionRecords, nextTemporary: nextTemporary)
 }
 
-function compilerCoreLLVMHelperFunctionChunkFromTextBuffers(functionsBuffer: TextBuffer, recordsBuffer: TextBuffer, nextIndex: Int): CompilerLLVMHelperFunctionChunk {
+function compilerCoreLLVMHelperFunctionChunkFromTextBuffers(functionsBuffer: TextBuffer, recordsBuffer: TextBuffer, nextIndex: Int, nextTemporary: Int): CompilerLLVMHelperFunctionChunk {
     let renderedFunctions: String(textBufferMaterialize(buffer: functionsBuffer))
     let instructionRecords: String(textBufferMaterialize(buffer: recordsBuffer))
     textBufferDestroy(buffer: functionsBuffer)
     textBufferDestroy(buffer: recordsBuffer)
-    return CompilerLLVMHelperFunctionChunk(renderedFunctions: renderedFunctions, instructionRecords: instructionRecords, nextIndex: nextIndex)
+    return CompilerLLVMHelperFunctionChunk(renderedFunctions: renderedFunctions, instructionRecords: instructionRecords, nextIndex: nextIndex, nextTemporary: nextTemporary)
 }
 
-function compilerCoreLLVMSelectedHelperFunctionForRecord(loweringProgram: CompilerProgram, names: String, sourceIndex: Int, record: String): CompilerLLVMHelperFunctions {
+function compilerCoreLLVMSelectedHelperFunctionForRecord(loweringProgram: CompilerProgram, names: String, initialTemporaryIndex: Int, record: String): CompilerLLVMHelperFunctions {
     let declarationKind: String(compilerCoreRecordField(record: record, prefix: String("kind=")))
     let declarationName: String(compilerCoreRecordField(record: record, prefix: String("name=")))
     if declarationKind == String("function") && compilerCoreNameListContains(names: names, name: declarationName) {
         let declaration: CompilerTopLevelDeclaration(compilerCoreTopLevelDeclarationFromRecord(record: record))
-        return compilerCoreLLVMSelectedHelperFunctionForDeclaration(loweringProgram: loweringProgram, declaration: declaration, sourceIndex: sourceIndex)
+        return compilerCoreLLVMSelectedHelperFunctionForDeclaration(loweringProgram: loweringProgram, declaration: declaration, initialTemporaryIndex: initialTemporaryIndex)
     }
 
-    return CompilerLLVMHelperFunctions(renderedFunctions: String(""), instructionRecords: String(""))
+    return CompilerLLVMHelperFunctions(renderedFunctions: String(""), instructionRecords: String(""), nextTemporary: initialTemporaryIndex)
 }
 
-function compilerCoreLLVMSelectedHelperFunctionForDeclaration(loweringProgram: CompilerProgram, declaration: CompilerTopLevelDeclaration, sourceIndex: Int): CompilerLLVMHelperFunctions {
-    if compilerCoreShouldLowerSelectedHelperFunction(declaration: declaration) {
-        let loweredFunction: CompilerLLVMLoweredBlock(compilerCoreLLVMLowerHelperFunction(program: loweringProgram, declaration: declaration, initialTemporaryIndex: sourceIndex))
+function compilerCoreLLVMSelectedHelperFunctionForDeclaration(loweringProgram: CompilerProgram, declaration: CompilerTopLevelDeclaration, initialTemporaryIndex: Int): CompilerLLVMHelperFunctions {
+    if compilerCoreShouldLowerSelectedHelperFunction(program: loweringProgram, declaration: declaration) {
+        let loweredFunction: CompilerLLVMLoweredBlock(compilerCoreLLVMLowerHelperFunction(program: loweringProgram, declaration: declaration, initialTemporaryIndex: initialTemporaryIndex))
         let renderedFunction: String(compilerCoreRenderLLVMHelperFunction(declaration: declaration, block: loweredFunction))
         let globalRecords: String(compilerCoreLLVMGlobalRecords(records: loweredFunction.instructionRecords))
-        return CompilerLLVMHelperFunctions(renderedFunctions: renderedFunction, instructionRecords: globalRecords)
+        return CompilerLLVMHelperFunctions(renderedFunctions: renderedFunction, instructionRecords: globalRecords, nextTemporary: loweredFunction.nextTemporary)
     }
 
     let declarationText: String(compilerCoreRenderLLVMHelperFunctionDeclaration(declaration: declaration))
-    return CompilerLLVMHelperFunctions(renderedFunctions: declarationText, instructionRecords: String(""))
+    return CompilerLLVMHelperFunctions(renderedFunctions: declarationText, instructionRecords: String(""), nextTemporary: initialTemporaryIndex)
 }
 
 function compilerCoreRenderLLVMFunctionDeclarations(program: CompilerProgram): String {
@@ -2994,18 +2892,22 @@ function compilerCoreRenderLLVMHelperFunctionDeclaration(declaration: CompilerTo
     return "declare \(llvmReturnType) @\(declaration.name)(\(compilerCoreLLVMFunctionParameterText(parameterSummary: declaration.parameterSummary)))\n"
 }
 
-function compilerCoreShouldLowerSelectedHelperFunction(declaration: CompilerTopLevelDeclaration): Bool {
-    return compilerCoreSelectedHelperExclusionReason(declaration: declaration) == String("")
+function compilerCoreShouldLowerSelectedHelperFunction(program: CompilerProgram, declaration: CompilerTopLevelDeclaration): Bool {
+    return compilerCoreSelectedHelperExclusionReason(program: program, declaration: declaration) == String("")
 }
 
-function compilerCoreSelectedHelperExclusionReason(declaration: CompilerTopLevelDeclaration): String {
-    if declaration.statementRecords == String("") {
+function compilerCoreSelectedHelperExclusionReason(program: CompilerProgram, declaration: CompilerTopLevelDeclaration): String {
+    if declaration.statementRecords == String("") && !compilerCoreFunctionDeclarationHasBodySource(program: program, declaration: declaration) {
         return String("missingStatementRecords")
     }
     if !compilerCoreFunctionSignatureUsesOnlyLLVMPrimitiveTypes(declaration: declaration) {
         return String("unsupportedSignature")
     }
     return String("")
+}
+
+function compilerCoreFunctionDeclarationHasBodySource(program: CompilerProgram, declaration: CompilerTopLevelDeclaration): Bool {
+    return declaration.bodyStart >= 0 && declaration.bodyEnd >= declaration.bodyStart && declaration.bodyEnd < stringLength(value: program.source)
 }
 
 function compilerCoreFunctionSignatureUsesOnlyLLVMPrimitiveTypes(declaration: CompilerTopLevelDeclaration): Bool {
@@ -6495,8 +6397,10 @@ function compilerCoreReachableFunctionRootNamesAppendingRecord(program: Compiler
     let declarationName: String(compilerCoreRecordField(record: record, prefix: String("name=")))
     if declarationKind == String("function") && compilerCoreNameListContains(names: roots, name: declarationName) {
         let declaration: CompilerTopLevelDeclaration(compilerCoreTopLevelDeclarationFromRecord(record: record))
-        let bodyCalledNames: String(compilerCoreFunctionDeclarationCalledFunctionNames(program: program, declaration: declaration))
-        return compilerCoreNameListAppendingMissing(names: reachableNames, additionalNames: bodyCalledNames)
+        if compilerCoreShouldExpandReachableFunction(program: program, declaration: declaration) {
+            let bodyCalledNames: String(compilerCoreFunctionDeclarationCalledFunctionNames(program: program, declaration: declaration))
+            return compilerCoreNameListAppendingMissing(names: reachableNames, additionalNames: bodyCalledNames)
+        }
     }
 
     return reachableNames
@@ -6531,7 +6435,7 @@ function compilerCoreReachableFunctionNamesAppendingRecord(program: CompilerProg
     let declarationName: String(compilerCoreRecordField(record: record, prefix: String("name=")))
     if declarationKind == String("function") && compilerCoreNameListContains(names: reachableNames, name: declarationName) && !compilerCoreNameListContains(names: previouslyExpandedNames, name: declarationName) {
         let declaration: CompilerTopLevelDeclaration(compilerCoreTopLevelDeclarationFromRecord(record: record))
-        if compilerCoreShouldExpandReachableFunction(declaration: declaration) {
+        if compilerCoreShouldExpandReachableFunction(program: program, declaration: declaration) {
             let bodyCalledNames: String(compilerCoreFunctionDeclarationCalledFunctionNames(program: program, declaration: declaration))
             return compilerCoreNameListAppendingMissing(names: reachableNames, additionalNames: bodyCalledNames)
         }
@@ -6540,15 +6444,11 @@ function compilerCoreReachableFunctionNamesAppendingRecord(program: CompilerProg
     return reachableNames
 }
 
-function compilerCoreShouldExpandReachableFunction(declaration: CompilerTopLevelDeclaration): Bool {
-    return compilerCoreSelectedHelperExclusionReason(declaration: declaration) == String("")
+function compilerCoreShouldExpandReachableFunction(program: CompilerProgram, declaration: CompilerTopLevelDeclaration): Bool {
+    return compilerCoreSelectedHelperExclusionReason(program: program, declaration: declaration) == String("")
 }
 
 function compilerCoreFunctionDeclarationCalledFunctionNames(program: CompilerProgram, declaration: CompilerTopLevelDeclaration): String {
-    if declaration.statementRecords == String("") {
-        return String("")
-    }
-
     return compilerCoreStatementRecordsCalledFunctionNames(records: compilerCoreFunctionDeclarationStatementRecords(program: program, declaration: declaration))
 }
 
@@ -6558,8 +6458,8 @@ function compilerCoreFunctionDeclarationStatementRecords(program: CompilerProgra
     }
 
     let functionBlock: CompilerBlock(CompilerBlock(start: declaration.bodyStart, end: declaration.bodyEnd))
-    let parsedFunctionBlock: CompilerParsedBlock(parseCompilerBlock(program: program, block: functionBlock))
-    return parsedFunctionBlock.statementRecords
+    let parsedStatements: CompilerParsedStatements(compilerCoreParseStatements(program: program, block: functionBlock))
+    return parsedStatements.records
 }
 
 function compilerCoreStatementRecordsWithoutExpressionRecords(records: String): String {
