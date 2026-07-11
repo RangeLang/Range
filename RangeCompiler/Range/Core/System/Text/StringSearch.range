@@ -2,6 +2,12 @@
 function stringHasPrefix(source: String, start: Int, prefix: String): Bool
 
 @language
+function stringTransientRegionMark(): Int
+
+@language
+function stringTransientRegionReset(mark: Int): Int
+
+@language
 function stringFindFrom(source: String, start: Int, needle: String): Int
 
 @language
@@ -9,6 +15,9 @@ function stringFindFirstOf(source: String, start: Int, characters: String): Int
 
 @language
 function stringViewFrom(source: String, start: Int): String
+
+@language
+function stringSliceUnchecked(source: String, start: Int, end: Int): String
 
 @language
 function stringCharacterAt(source: String, index: Int): String

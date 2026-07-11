@@ -1,3 +1,5 @@
+import CryptoKit
+import Darwin
 import Foundation
 @testable import RangeCompiler
 import Testing
@@ -218,7 +220,8 @@ struct RangeScriptTests {
 
         let smokeLLVMText = try String(contentsOf: smokeLLVM, encoding: .utf8)
         #expect(smokeLLVMText.contains("define i32 @main() {\nentry:"))
-        #expect(smokeLLVMText.contains("ret i32 0"))
+        #expect(smokeLLVMText.contains("%storage0 = alloca"))
+        #expect(smokeLLVMText.contains("ret i32 %value"))
         #expect(!smokeLLVMText.contains("\\n"))
 
         let stage3LLVMText = try String(contentsOf: stage3Candidate, encoding: .utf8)
@@ -264,59 +267,51 @@ struct RangeScriptTests {
 
     @Test("Native compiler parses main block")
     func nativeCompilerParsesMainBlock() throws {
-        let source = try repositoryRoot()
+        let mainSource = try repositoryRoot()
             .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Main.range")
-        let compiler = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
-        let result = try runRangeScript(
-            arguments: ["run", compiler.path, "--", source.path],
-            timeout: 90
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let result = try runTypedSyntaxFixture(
+            source: "compilerSourceSetAST\ncompilerSourceFile\\tMain.range\n\(try String(contentsOf: mainSource, encoding: .utf8))",
+            name: "MainSourceSetAST.range",
+            directory: directory
         )
 
         #expect(result.timedOut == false)
         #expect(result.exitCode == 0)
         #expect(result.stderr.isEmpty)
-        #expect(result.stdout.contains("ast\\tprogram\\thasMainBlock=true"))
-        #expect(result.stdout.contains("ast\\tmainBlock"))
-        #expect(result.stdout.contains("ast\\tblock\\tkind=main"))
-        #expect(result.stdout.contains("ast\\tstatement\\tkind=if\\tcondition=binary(call(identifier(commandLineArgumentCount),arguments=[]),!=,integerLiteral(1))"))
-        #expect(result.stdout.contains("statement0=kind=expression\\texpression=call(identifier(print),arguments=[argument0.value=call(identifier(String),arguments=[argument0=stringLiteral(\"usage: Compiler <input.range>\");]);])"))
-        #expect(result.stdout.contains("ast\\tstatement\\tkind=return\\texpression=integerLiteral(0)"))
-        #expect(result.stdout.contains("bodyStart="))
-        #expect(result.stdout.contains("bodyEnd="))
+        #expect(result.stdout.hasPrefix("sourceSetAST\\tprogram"))
+        #expect(result.stdout.contains("sourceFileAST\\tindex=0\\tpath=Main.range\\thasMainBlock=true"))
+        #expect(result.stdout.contains("sourceFileASTCount\\t1"))
     }
 
-    @Test("Native compiler emits default AST and LLVM")
-    func nativeCompilerEmitsDefaultASTAndLLVM() throws {
-        let source = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Main.range")
-        let compiler = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
-        let result = try runRangeScript(
-            arguments: ["run", compiler.path, "--", source.path],
-            timeout: 90
+    @Test("Native compiler emits clean ordinary LLVM")
+    func nativeCompilerEmitsCleanOrdinaryLLVM() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let result = try runTypedSyntaxFixture(
+            source: """
+            @main {
+                return 0
+            }
+
+            """,
+            name: "OrdinaryMain.range",
+            directory: directory
         )
 
         #expect(result.timedOut == false)
         #expect(result.exitCode == 0)
         #expect(result.stderr.isEmpty)
-        #expect(result.stdout.contains("ast\\tprogram\\thasMainBlock=true"))
-        #expect(result.stdout.contains("ast\\tmainBlock"))
-        #expect(result.stdout.contains("compilerCoreLLVM\\tmain"))
-        #expect(result.stdout.contains("@.str."))
+        #expect(!result.stdout.contains("ast\\t"))
+        #expect(!result.stdout.contains("compilerCoreLLVM\\t"))
         #expect(result.stdout.contains("declare i32 @puts(ptr)"))
-        #expect(result.stdout.contains("declare ptr @commandLineArgument(i32)"))
-        #expect(result.stdout.contains("declare ptr @readFile(ptr)"))
         #expect(result.stdout.contains("define i32 @main()"))
-        #expect(result.stdout.contains("call i32 @puts(ptr getelementptr inbounds"))
-        #expect(result.stdout.contains("call i32 @commandLineArgumentCount()"))
-        #expect(result.stdout.contains("call ptr @commandLineArgument(i32 0)"))
-        #expect(result.stdout.contains("call ptr @readFile(ptr %r4)"))
-        #expect(result.stdout.contains("call ptr @compileRangeSource(ptr"))
-        #expect(result.stdout.contains("br i1"))
         #expect(result.stdout.contains("ret i32 0"))
-        #expect(!result.stdout.contains("add i32 0, getelementptr"))
-        #expect(!result.stdout.contains("call ptr @readFile(i32"))
     }
 
     @Test("Native compiler parses compiler-core statement AST")
@@ -1854,6 +1849,459 @@ struct RangeScriptTests {
         #expect(result.stdout.contains("memoryDecision\trow=7\tvalues=11,19,0,0,1,19"))
     }
 
+    @Test("MemoryGraph proves scalar Int storage without an aggregate layout")
+    func memoryGraphProvesScalarIntStorage() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            compilerSourceFile\tMain.range
+            @main {
+                let count: Int(7)
+                return count
+            }
+
+            """,
+            name: "ScalarIntMemoryGraph.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("memoryGraph\tvalid=true\tlayoutCount=0\tstorageCount=1\tdecisionCount=6\n"))
+        #expect(result.stdout.contains("memoryStorage\trow=0\tvalues=0,"))
+        #expect(result.stdout.contains(",-1,"))
+        #expect(result.stdout.contains("memoryDecision\trow=4\tvalues=10,"))
+        #expect(result.stdout.contains("memoryDecision\trow=5\tvalues=11,"))
+    }
+
+    @Test("Typed syntax preserves language ABI provenance and signature-only functions")
+    func typedSyntaxPreservesLanguageABIProvenance() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerTypedSyntax
+            @language
+            construct IntBuffer {}
+            @language
+            function intBufferCreate(capacity: Int): IntBuffer
+            @language
+            function intBufferDestroy(buffer: IntBuffer): Int
+            @main {
+                return 0
+            }
+
+            """,
+            name: "LanguageABIProvenance.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("typedSyntax\tvalid=true"))
+        #expect(result.stdout.contains("declarationCount=3"))
+        #expect(result.stdout.components(separatedBy: "languageABI=1").count == 4)
+        #expect(result.stdout.contains("functionCount=2"))
+        #expect(result.stdout.contains("bodyStart=113\tbodyEnd=113"))
+    }
+
+    @Test("MemoryGraph owns and explicitly consumes an opaque IntBuffer handle")
+    func memoryGraphProvesOpaqueIntBufferOwnership() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let result = try runTypedSyntaxFixture(
+            source: opaqueIntBufferFixture(body: """
+                let buffer: IntBuffer(intBufferCreate(capacity: 4))
+                return intBufferDestroy(buffer: buffer)
+            """),
+            name: "OpaqueIntBufferOwnership.range",
+            directory: directory
+        )
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("memoryGraph\tvalid=true\tlayoutCount=0\tstorageCount=1\tdecisionCount=5\n"))
+        #expect(result.stdout.contains("memoryStorage\trow=0\tvalues=0,11,0,6,1,0"))
+        #expect(result.stdout.contains("memoryDecision\trow=1\tvalues=3,8,0,0,1,11"))
+        #expect(result.stdout.contains("memoryDecision\trow=2\tvalues=5,11,0,0,0,11"))
+        #expect(result.stdout.contains("memoryDecision\trow=3\tvalues=7,13,0,0,1,11"))
+    }
+
+    @Test("Typed IR cites opaque IntBuffer initialization and consume decisions")
+    func typedIRCarriesOpaqueIntBufferOwnership() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = opaqueIntBufferFixture(body: """
+            let buffer: IntBuffer(intBufferCreate(capacity: 4))
+            return intBufferDestroy(buffer: buffer)
+        """).replacingOccurrences(of: "compilerMemoryGraph", with: "compilerTypedIR")
+        let result = try runTypedSyntaxFixture(source: source, name: "OpaqueIntBufferTypedIR.range", directory: directory)
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("typedIR\tvalid=true\tfunctionCount=1"))
+        #expect(result.stdout.contains("operationCount=7"))
+        #expect(result.stdout.contains("typedIROperation\trow=0\tvalues=8,6,13,0,0,1,11,1"))
+        #expect(result.stdout.contains("typedIROperation\trow=5\tvalues=13,6,6,0,0,11,3,3"))
+    }
+
+    @Test("MemoryGraph rejects an opaque handle without explicit destruction")
+    func memoryGraphRejectsOpaqueIntBufferMissingDestroy() throws {
+        let result = try runOpaqueIntBufferFailureFixture(body: """
+            let buffer: IntBuffer(intBufferCreate(capacity: 4))
+            return 0
+        """, name: "OpaqueIntBufferMissingDestroy.range")
+        #expect(result.exitCode == 65)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
+    }
+
+    @Test("MemoryGraph rejects opaque handle double destruction")
+    func memoryGraphRejectsOpaqueIntBufferDoubleDestroy() throws {
+        let result = try runOpaqueIntBufferFailureFixture(body: """
+            let buffer: IntBuffer(intBufferCreate(capacity: 4))
+            let first: Int(intBufferDestroy(buffer: buffer))
+            return intBufferDestroy(buffer: buffer)
+        """, name: "OpaqueIntBufferDoubleDestroy.range")
+        #expect(result.exitCode == 65)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
+    }
+
+    @Test("MemoryGraph rejects opaque handle use after destruction")
+    func memoryGraphRejectsOpaqueIntBufferUseAfterDestroy() throws {
+        let result = try runOpaqueIntBufferFailureFixture(body: """
+            let buffer: IntBuffer(intBufferCreate(capacity: 4))
+            let status: Int(intBufferDestroy(buffer: buffer))
+            return intBufferCount(buffer: buffer)
+        """, name: "OpaqueIntBufferUseAfterDestroy.range", includeCount: true)
+        #expect(result.exitCode == 65)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
+    }
+
+    @Test("MemoryGraph rejects returning an opaque handle without transfer")
+    func memoryGraphRejectsOpaqueIntBufferReturnWithoutTransfer() throws {
+        let result = try runOpaqueIntBufferFailureFixture(body: """
+            let buffer: IntBuffer(intBufferCreate(capacity: 4))
+            return buffer
+        """, name: "OpaqueIntBufferReturn.range")
+        #expect(result.exitCode == 65)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
+    }
+
+    @Test("MemoryGraph does not infer opacity from an ordinary empty construct")
+    func memoryGraphRejectsOrdinaryEmptyConstructAsOpaque() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            construct Empty {}
+            @main {
+                return 0
+            }
+
+            """,
+            name: "OrdinaryEmptyConstruct.range",
+            directory: directory
+        )
+        #expect(result.exitCode == 65)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
+    }
+
+    @Test("MemoryGraph rejects malformed opaque destructor ABI")
+    func memoryGraphRejectsMalformedIntBufferDestructorABI() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            @language
+            construct IntBuffer {}
+            @language
+            function intBufferCreate(capacity: Int): IntBuffer
+            @language
+            function intBufferDestroy(buffer: Int): Int
+            @main {
+                let buffer: IntBuffer(intBufferCreate(capacity: 4))
+                return intBufferDestroy(buffer: buffer)
+            }
+
+            """,
+            name: "MalformedIntBufferDestructorABI.range",
+            directory: directory
+        )
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
+    }
+
+    @Test("MemoryGraph proves mutable scalar Int writes")
+    func memoryGraphProvesMutableScalarIntWrites() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            @main {
+                state count: Int(7)
+                count: 8
+                return count
+            }
+
+            """,
+            name: "MutableScalarIntMemoryGraph.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("memoryGraph\tvalid=true\tlayoutCount=0\tstorageCount=1\tdecisionCount=7\n"))
+        #expect(result.stdout.contains("memoryDecision\trow=4\tvalues=10,"))
+        #expect(result.stdout.contains(",2,"))
+        #expect(result.stdout.contains("memoryDecision\trow=6\tvalues=11,"))
+        #expect(result.stdout.contains(",2,"))
+    }
+
+    @Test("MemoryGraph rejects mutable access to scalar let storage")
+    func memoryGraphRejectsScalarIntWriteThroughLet() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            @main {
+                let count: Int(7)
+                count: 8
+                return count
+            }
+
+            """,
+            name: "ImmutableScalarIntMemoryGraph.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
+    }
+
+    @Test("MemoryGraph destroys branch-local scalar storage at its lexical region")
+    func memoryGraphProvesFallthroughIfLexicalLifetime() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            @main {
+                let outer: Int(1)
+                if 1 {
+                    state inner: Int(2)
+                    inner: 3
+                }
+                return outer
+            }
+
+            """,
+            name: "FallthroughIfLexicalLifetime.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("memoryGraph\tvalid=true\tlayoutCount=0\tstorageCount=2\tdecisionCount=12\n"))
+        #expect(result.stdout.contains("memoryStorage\trow=0\tvalues=0,3,-1,1,1,0"))
+        #expect(result.stdout.contains("memoryStorage\trow=1\tvalues=1,8,-1,6,1,0"))
+        #expect(result.stdout.contains("memoryDecision\trow=6\tvalues=7,6,1,-1,1,8"))
+        #expect(result.stdout.contains("memoryDecision\trow=7\tvalues=7,13,0,-1,1,3"))
+        #expect(result.stdout.contains("memoryDecision\trow=8\tvalues=10,11,1,-1,2,9"))
+        #expect(result.stdout.contains("memoryDecision\trow=9\tvalues=10,12,0,-1,1,12"))
+    }
+
+    @Test("MemoryGraph applies lexical destruction to branch-local aggregates")
+    func memoryGraphProvesAggregateFallthroughIfLexicalLifetime() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            construct Pair {
+                let left: Int
+                let right: Int
+            }
+            @main {
+                if 1 {
+                    let pair: Pair(left: 1, right: 2)
+                }
+                return 0
+            }
+
+            """,
+            name: "AggregateFallthroughIfLexicalLifetime.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("memoryGraph\tvalid=true\tlayoutCount=1\tstorageCount=1\tdecisionCount=6\n"))
+        #expect(result.stdout.contains("memoryStorage\trow=0\tvalues=0,"))
+    }
+
+    @Test("SemanticGraph rejects branch-local storage use after its region")
+    func semanticGraphRejectsBranchLocalUseAfterFallthroughIf() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            @main {
+                if 1 {
+                    let inner: Int(2)
+                }
+                return inner
+            }
+
+            """,
+            name: "EscapedBranchLocalName.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidSemanticGraph\n\n")
+    }
+
+    @Test("MemoryGraph copies scalar returns and destroys storage on each reachable path")
+    func memoryGraphProvesScalarEarlyReturnPathDestruction() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            @main {
+                let outer: Int(1)
+                if 1 {
+                    let inner: Int(2)
+                    return inner
+                }
+                return outer
+            }
+
+            """,
+            name: "ScalarEarlyReturnLifetime.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("memoryGraph\tvalid=true\tlayoutCount=0\tstorageCount=2\tdecisionCount=13\n"))
+        #expect(result.stdout.contains("memoryDecision\trow=4\tvalues=5,3,0,-1,0,3"))
+        #expect(result.stdout.contains("memoryDecision\trow=5\tvalues=5,8,1,-1,0,8"))
+        #expect(result.stdout.contains("memoryDecision\trow=6\tvalues=7,10,0,-1,1,3"))
+        #expect(result.stdout.contains("memoryDecision\trow=7\tvalues=7,10,1,-1,1,8"))
+        #expect(result.stdout.contains("memoryDecision\trow=8\tvalues=7,12,0,-1,1,3"))
+    }
+
+    @Test("MemoryGraph rejects branch-local aggregate return without transfer placement")
+    func memoryGraphRejectsAggregateEarlyReturnWithoutPlacement() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            construct Pair {
+                let left: Int
+                let right: Int
+            }
+            @main {
+                if 1 {
+                    let pair: Pair(left: 1, right: 2)
+                    return pair
+                }
+                return 0
+            }
+
+            """,
+            name: "AggregateEarlyReturnWithoutPlacement.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
+    }
+
+    @Test("Typed syntax rejects statements after a region return")
+    func typedSyntaxRejectsStatementAfterLexicalReturn() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            @main {
+                if 1 {
+                    let inner: Int(2)
+                    return inner
+                    let unreachable: Int(3)
+                }
+                return 0
+            }
+
+            """,
+            name: "StatementAfterLexicalReturn.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidTypedSyntaxSnapshot\n\n")
+    }
+
     @Test("Native compiler carries MemoryGraph decisions through typed IR")
     func nativeCompilerCarriesMemoryGraphDecisionsThroughTypedIR() throws {
         let directory = FileManager.default.temporaryDirectory
@@ -2103,6 +2551,135 @@ struct RangeScriptTests {
 
             """,
             name: "SharedBindingWriteConflict.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
+    }
+
+    @Test("Native compiler executes a unique write through a binding member")
+    func nativeCompilerExecutesUniqueBindingMemberWrite() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            construct Pair {
+                let left: Int
+                let right: Int
+            }
+            construct User {
+                let tag: Int
+                binding pair: Pair
+            }
+            @main {
+                state pair: Pair(left: 1, right: 2)
+                let user: User(tag: 1, pair: $pair)
+                user.pair: Pair(left: 3, right: 4)
+                return pair.left + pair.right
+            }
+
+            """,
+            name: "OrdinaryUniqueBindingMemberWrite.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.components(separatedBy: " = type { ").count == 3)
+        #expect(result.stdout.contains("%storage0 = alloca"))
+        #expect(result.stdout.contains("%storage1 = alloca"))
+        #expect(result.stdout.contains("%updated30_0"))
+        #expect(result.stdout.contains("ptr %storage0"))
+        #expect(!result.stdout.contains("rangeConstruct"))
+
+        let llvm = directory.appendingPathComponent("UniqueBindingMemberWrite.ll")
+        let executable = directory.appendingPathComponent("UniqueBindingMemberWrite")
+        try result.stdout.write(to: llvm, atomically: true, encoding: .utf8)
+        let clangResult = try runCapturedProcess(
+            executable: "/usr/bin/env",
+            arguments: ["clang", "-Wno-override-module", "-x", "ir", llvm.path, "-o", executable.path]
+        )
+        #expect(clangResult.exitCode == 0)
+        #expect(clangResult.stderr.isEmpty)
+        let executableResult = try runCapturedProcess(executable: executable.path, arguments: [])
+        #expect(executableResult.exitCode == 7)
+        #expect(executableResult.stdout.isEmpty)
+        #expect(executableResult.stderr.isEmpty)
+    }
+
+    @Test("MemoryGraph rejects shared and unique binding aliases")
+    func memoryGraphRejectsSharedAndUniqueBindingAliases() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            construct Pair {
+                let left: Int
+                let right: Int
+            }
+            construct User {
+                let tag: Int
+                binding pair: Pair
+            }
+            @main {
+                state pair: Pair(left: 1, right: 2)
+                let reader: User(tag: 1, pair: $pair)
+                let writer: User(tag: 2, pair: $pair)
+                writer.pair: Pair(left: 3, right: 4)
+                return pair.left + pair.right
+            }
+
+            """,
+            name: "SharedUniqueBindingConflict.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
+    }
+
+    @Test("MemoryGraph rejects two unique binding aliases")
+    func memoryGraphRejectsTwoUniqueBindingAliases() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            construct Pair {
+                let left: Int
+                let right: Int
+            }
+            construct User {
+                let tag: Int
+                binding pair: Pair
+            }
+            @main {
+                state pair: Pair(left: 1, right: 2)
+                let first: User(tag: 1, pair: $pair)
+                let second: User(tag: 2, pair: $pair)
+                first.pair: Pair(left: 3, right: 4)
+                second.pair: Pair(left: 5, right: 6)
+                return pair.left + pair.right
+            }
+
+            """,
+            name: "UniqueBindingConflict.range",
             directory: directory
         )
 
@@ -2852,9 +3429,240 @@ private func runTypedSyntaxFixture(
     try source.write(to: sourceURL, atomically: true, encoding: .utf8)
     let compiler = try repositoryRoot()
         .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
-    return try runRangeScript(
-        arguments: ["run", compiler.path, "--", sourceURL.path],
-        timeout: 120
+    let executable = try TypedSyntaxCompilerCache.shared.executable(for: compiler)
+    return try runFixtureExecutable(executable: executable, source: sourceURL, timeout: 120)
+}
+
+private func opaqueIntBufferFixture(body: String, includeCount: Bool = false) -> String {
+    let countDeclaration = includeCount ? """
+        @language
+        function intBufferCount(buffer: IntBuffer): Int
+        """ : ""
+    return """
+    compilerMemoryGraph
+    @language
+    construct IntBuffer {}
+    @language
+    function intBufferCreate(capacity: Int): IntBuffer
+    @language
+    function intBufferDestroy(buffer: IntBuffer): Int
+    \(countDeclaration)
+    @main {
+    \(body)
+    }
+
+    """
+}
+
+private func runOpaqueIntBufferFailureFixture(body: String, name: String, includeCount: Bool = false) throws -> ScriptResult {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let result = try runTypedSyntaxFixture(
+        source: opaqueIntBufferFixture(body: body, includeCount: includeCount),
+        name: name,
+        directory: directory
+    )
+    #expect(result.timedOut == false)
+    #expect(result.stderr.isEmpty)
+    return result
+}
+
+private final class TypedSyntaxCompilerCache: @unchecked Sendable {
+    static let shared = TypedSyntaxCompilerCache()
+
+    private let lock = NSLock()
+    private var cachedFingerprint: String?
+    private var cachedExecutable: URL?
+
+    func executable(for compilerDirectory: URL) throws -> URL {
+        let root = try repositoryRoot()
+        let sourceFiles = try FileManager.default.contentsOfDirectory(
+            at: compilerDirectory,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        )
+        .filter { $0.pathExtension == "range" }
+        .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        let toolInputs = try typedSyntaxCompilerToolInputs(root: root)
+        let clangVersion = try runCapturedProcess(
+            executable: "/usr/bin/env",
+            arguments: ["clang", "--version"]
+        )
+        guard clangVersion.exitCode == 0 else {
+            throw RangeScriptTestError.typedFixtureCompilerFailed(
+                clangVersion.stdout,
+                clangVersion.stderr
+            )
+        }
+        let fingerprint = try typedSyntaxCompilerFingerprint(
+            files: sourceFiles + toolInputs,
+            context: "typed-fixture-cache-v2\n\(ProcessInfo.processInfo.operatingSystemVersionString)\n\(clangVersion.stdout)\n\(clangVersion.stderr)"
+        )
+
+        lock.lock()
+        defer { lock.unlock() }
+        if cachedFingerprint == fingerprint,
+            let cachedExecutable,
+            FileManager.default.isExecutableFile(atPath: cachedExecutable.path)
+        {
+            return cachedExecutable
+        }
+
+        let cacheParent = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("RangeCompilerTests", isDirectory: true)
+            .appendingPathComponent("typed-fixture-v2", isDirectory: true)
+        try FileManager.default.createDirectory(at: cacheParent, withIntermediateDirectories: true)
+        let cacheRoot = cacheParent.appendingPathComponent(fingerprint, isDirectory: true)
+        let executable = cacheRoot.appendingPathComponent("Compiler/.range/Build/llvm/Compiler")
+        let ready = cacheRoot.appendingPathComponent("READY")
+        let lockURL = cacheParent.appendingPathComponent("\(fingerprint).lock")
+        try withTypedFixtureCacheLock(lockURL: lockURL) {
+            if typedFixtureCacheIsReady(executable: executable, ready: ready, fingerprint: fingerprint) {
+                return
+            }
+            try? FileManager.default.removeItem(at: cacheRoot)
+            let buildRoot = cacheParent.appendingPathComponent(
+                "\(fingerprint).build.\(ProcessInfo.processInfo.processIdentifier).\(UUID().uuidString)",
+                isDirectory: true
+            )
+            defer { try? FileManager.default.removeItem(at: buildRoot) }
+            let mirroredCompiler = buildRoot.appendingPathComponent("Compiler", isDirectory: true)
+            try FileManager.default.createDirectory(at: mirroredCompiler, withIntermediateDirectories: true)
+            for sourceFile in sourceFiles {
+                try FileManager.default.copyItem(
+                    at: sourceFile,
+                    to: mirroredCompiler.appendingPathComponent(sourceFile.lastPathComponent)
+                )
+            }
+            let build = try runRangeScript(
+                arguments: ["compile-executable", mirroredCompiler.path],
+                timeout: 180
+            )
+            guard !build.timedOut, build.exitCode == 0, build.stderr.isEmpty else {
+                throw RangeScriptTestError.typedFixtureCompilerFailed(build.stdout, build.stderr)
+            }
+            let builtExecutable = mirroredCompiler
+                .appendingPathComponent(".range/Build/llvm/Compiler")
+            guard FileManager.default.isExecutableFile(atPath: builtExecutable.path) else {
+                throw RangeScriptTestError.typedFixtureCompilerMissing(builtExecutable.path)
+            }
+            try "\(fingerprint)\n".write(
+                to: buildRoot.appendingPathComponent("READY"),
+                atomically: true,
+                encoding: .utf8
+            )
+            try FileManager.default.moveItem(at: buildRoot, to: cacheRoot)
+        }
+        guard typedFixtureCacheIsReady(executable: executable, ready: ready, fingerprint: fingerprint) else {
+            throw RangeScriptTestError.typedFixtureCompilerMissing(executable.path)
+        }
+        cachedFingerprint = fingerprint
+        cachedExecutable = executable
+        return executable
+    }
+}
+
+private func typedSyntaxCompilerToolInputs(root: URL) throws -> [URL] {
+    var inputs = [
+        root.appendingPathComponent("scripts/range"),
+        root.appendingPathComponent("RangeCompiler/Package.swift"),
+        root.appendingPathComponent("RangeCompiler/Runtime/RangeTextBuffer.c"),
+        root.appendingPathComponent("RangeCompiler/Runtime/RangeIntBuffer.c"),
+        root.appendingPathComponent("RangeCompiler/Runtime/RangeString.c"),
+    ]
+    let coreSources = root.appendingPathComponent("RangeCompiler/Range/Core", isDirectory: true)
+    let coreEnumerator = FileManager.default.enumerator(
+        at: coreSources,
+        includingPropertiesForKeys: [.isRegularFileKey],
+        options: [.skipsHiddenFiles]
+    )
+    while let file = coreEnumerator?.nextObject() as? URL {
+        if file.pathExtension == "range" { inputs.append(file) }
+    }
+    let sources = root.appendingPathComponent("RangeCompiler/Sources", isDirectory: true)
+    let enumerator = FileManager.default.enumerator(
+        at: sources,
+        includingPropertiesForKeys: [.isRegularFileKey],
+        options: [.skipsHiddenFiles]
+    )
+    while let file = enumerator?.nextObject() as? URL {
+        if file.pathExtension == "swift" { inputs.append(file) }
+    }
+    return inputs.sorted { $0.path < $1.path }
+}
+
+private func typedSyntaxCompilerFingerprint(files: [URL], context: String) throws -> String {
+    var hash = SHA256()
+    hash.update(data: Data(context.utf8))
+    for file in files.sorted(by: { $0.path < $1.path }) {
+        let path = Data(file.path.utf8)
+        withUnsafeBytes(of: UInt64(path.count).littleEndian) { hash.update(bufferPointer: $0) }
+        hash.update(data: path)
+        let contents = try Data(contentsOf: file, options: [.mappedIfSafe])
+        withUnsafeBytes(of: UInt64(contents.count).littleEndian) { hash.update(bufferPointer: $0) }
+        hash.update(data: contents)
+    }
+    return hash.finalize().map { String(format: "%02x", $0) }.joined()
+}
+
+private func typedFixtureCacheIsReady(executable: URL, ready: URL, fingerprint: String) -> Bool {
+    guard FileManager.default.isExecutableFile(atPath: executable.path),
+        let marker = try? String(contentsOf: ready, encoding: .utf8)
+    else { return false }
+    return marker == "\(fingerprint)\n"
+}
+
+private func withTypedFixtureCacheLock(lockURL: URL, body: () throws -> Void) throws {
+    let descriptor = open(lockURL.path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+    guard descriptor >= 0 else {
+        throw RangeScriptTestError.typedFixtureCacheLockFailed(lockURL.path)
+    }
+    defer { close(descriptor) }
+    guard flock(descriptor, LOCK_EX) == 0 else {
+        throw RangeScriptTestError.typedFixtureCacheLockFailed(lockURL.path)
+    }
+    defer { flock(descriptor, LOCK_UN) }
+    try body()
+}
+
+private func runFixtureExecutable(
+    executable: URL,
+    source: URL,
+    timeout: TimeInterval
+) throws -> ScriptResult {
+    let process = Process()
+    process.executableURL = executable
+    process.arguments = [source.path]
+
+    let captureDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: captureDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: captureDirectory) }
+    let stdoutURL = captureDirectory.appendingPathComponent("stdout.txt")
+    let stderrURL = captureDirectory.appendingPathComponent("stderr.txt")
+    _ = FileManager.default.createFile(atPath: stdoutURL.path, contents: nil)
+    _ = FileManager.default.createFile(atPath: stderrURL.path, contents: nil)
+    let stdoutHandle = try FileHandle(forWritingTo: stdoutURL)
+    let stderrHandle = try FileHandle(forWritingTo: stderrURL)
+    process.standardOutput = stdoutHandle
+    process.standardError = stderrHandle
+
+    try process.run()
+    let deadline = Date().addingTimeInterval(timeout)
+    while process.isRunning, Date() < deadline {
+        Thread.sleep(forTimeInterval: 0.05)
+    }
+    let timedOut = process.isRunning
+    if timedOut { process.terminate() }
+    process.waitUntilExit()
+    try? stdoutHandle.close()
+    try? stderrHandle.close()
+    return ScriptResult(
+        exitCode: process.terminationStatus,
+        stdout: (try? String(contentsOf: stdoutURL, encoding: .utf8)) ?? "",
+        stderr: (try? String(contentsOf: stderrURL, encoding: .utf8)) ?? "",
+        timedOut: timedOut
     )
 }
 
@@ -3156,4 +3964,7 @@ private enum RangeScriptTestError: Error {
     case repositoryRootNotFound
     case nativeLexerFailed(String, String)
     case swiftLexerFailed(String)
+    case typedFixtureCacheLockFailed(String)
+    case typedFixtureCompilerFailed(String, String)
+    case typedFixtureCompilerMissing(String)
 }

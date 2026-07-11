@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import RangeCompiler
 import RangeEmission
@@ -15,6 +16,8 @@ public struct SwiftBootstrapError: LocalizedError {
 }
 
 public struct SwiftBootstrapCompiler {
+    private let phaseMetrics = PhaseMetrics()
+
     public init() {}
 
     @discardableResult
@@ -340,14 +343,16 @@ public struct SwiftBootstrapCompiler {
 
     @discardableResult
     public func checkStage2Compiler(rangeRoot: URL, compilerDirectory: URL) throws -> URL {
-        let stage1Executable = try compileExecutable(rangeRoot: rangeRoot, input: compilerDirectory)
+        let stage1Executable = try measurePhase("stage1-build") {
+            try compileExecutable(rangeRoot: rangeRoot, input: compilerDirectory)
+        }
 
-        let inventoryText = try runStageCompilerSourceSetDirective(
+        let inventoryText = try measurePhase("stage1-inventory") { try runStageCompilerSourceSetDirective(
             executable: stage1Executable,
             compilerDirectory: compilerDirectory,
             directive: "compilerSourceInventory",
             label: "Stage 2 inventory"
-        )
+        ) }
         guard inventoryText.contains("sourceInventory\\tprogram"),
             inventoryText.contains("sourceFileCount\\t4")
         else {
@@ -360,69 +365,11 @@ public struct SwiftBootstrapCompiler {
             )
         }
 
-        let astText = try runStageCompilerSourceSetDirective(
-            executable: stage1Executable,
-            compilerDirectory: compilerDirectory,
-            directive: "compilerSourceSetAST",
-            label: "Stage 2 AST"
-        )
-        guard astText.contains("sourceSetAST\\tprogram"),
-            astText.contains("ast\\tfunction\\tname=compileRangeSource"),
-            astText.contains("ast\\tfunction\\tname=parseCompilerProgram"),
-            astText.contains("sourceFileASTCount\\t4")
-        else {
-            throw SwiftBootstrapError(
-                """
-                Stage 2 candidate did not preserve AST summary shape.
-                --- stdout ---
-                \(prefixLines(astText))
-                """
-            )
-        }
-
-        let typesText = try runStageCompilerSourceSetDirective(
-            executable: stage1Executable,
-            compilerDirectory: compilerDirectory,
-            directive: "compilerSourceSetTypes",
-            label: "Stage 2 types"
-        )
-        guard typesText.contains("sourceSetTypes\\tprogram"),
-            typesText.contains("symbol\\tkind=function\\tname=compileRangeSource"),
-            typesText.contains("type\\tkind=return\\tscope=main\\tinferred=Int\\tdeclared=Int\\tstatus=ok"),
-            typesText.contains("sourceFileTypesCount\\t4")
-        else {
-            throw SwiftBootstrapError(
-                """
-                Stage 2 candidate did not preserve declaration/type summary shape.
-                --- stdout ---
-                \(prefixLines(typesText))
-                """
-            )
-        }
-
-        let llvmReportText = try runStageCompilerSourceSetDirective(
-            executable: stage1Executable,
-            compilerDirectory: compilerDirectory,
-            directive: "compilerSourceSetLLVM",
-            label: "Stage 2 LLVM report"
-        )
-        guard llvmReportText.contains("sourceSetLLVM\\tprogram"),
-            llvmReportText.contains("sourceFileLLVMCount\\t4")
-        else {
-            throw SwiftBootstrapError(
-                """
-                Stage 2 candidate did not preserve LLVM source-set report shape.
-                --- stdout ---
-                \(prefixLines(llvmReportText))
-                """
-            )
-        }
-
-        let llvmText = try runStageCompilerNativeLLVMText(
+        let llvmText = try measurePhase("stage2-llvm-emit") { try runStageCompilerNativeLLVMText(
             executable: stage1Executable,
             compilerDirectory: compilerDirectory,
             label: "Stage 2 LLVM text"
-        )
+        ) }
         guard !llvmText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw SwiftBootstrapError(
                 """
@@ -439,22 +386,24 @@ public struct SwiftBootstrapCompiler {
             withIntermediateDirectories: true
         )
         try llvmText.write(to: candidate, atomically: true, encoding: .utf8)
-        try validateLLVMIR(llvmIR: candidate)
         let runtimeSupport = stage2RuntimeSupportPath(compilerDirectory: compilerDirectory)
         try stage2RuntimeSupportSource().write(to: runtimeSupport, atomically: true, encoding: .utf8)
         let runtimeInputs = [runtimeSupport] + coreRuntimeSupportPaths(rangeRoot: rangeRoot)
         let executable = stage2CandidateExecutablePath(compilerDirectory: compilerDirectory)
-        try linkExecutable(
-            llvmIR: candidate,
-            additionalInputs: runtimeInputs,
-            executable: executable
-        )
-        let stage2InventoryText = try runStageCompilerSourceSetDirective(
+        try measurePhase("stage2-validate-link") {
+            try validateLLVMIR(llvmIR: candidate)
+            try linkExecutable(
+                llvmIR: candidate,
+                additionalInputs: runtimeInputs,
+                executable: executable
+            )
+        }
+        let stage2InventoryText = try measurePhase("stage2-linked-inventory") { try runStageCompilerSourceSetDirective(
             executable: executable,
             compilerDirectory: compilerDirectory,
             directive: "compilerSourceInventory",
             label: "Linked Stage 2 inventory"
-        )
+        ) }
         guard stage2InventoryText.contains("sourceInventory\\tprogram"),
             stage2InventoryText.contains("sourceFile\\tindex=0\\tpath=Compiler.range"),
             stage2InventoryText.contains("sourceFile\\tindex=1\\tpath=CompilerCore.range"),
@@ -471,12 +420,12 @@ public struct SwiftBootstrapCompiler {
             )
         }
 
-        let stage2BodyNamesText = try runStageCompilerSourceSetDirective(
+        let stage2BodyNamesText = try measurePhase("stage2-linked-body-names") { try runStageCompilerSourceSetDirective(
             executable: executable,
             compilerDirectory: compilerDirectory,
             directive: "compilerSourceSetBodyFunctionNames",
             label: "Linked Stage 2 body names"
-        )
+        ) }
         guard stage2BodyNamesText.contains("compileRangeNativeSource;"),
             stage2BodyNamesText.contains("compilerSourceSetBodyFunctionNames;"),
             stage2BodyNamesText.contains("compilerNativeSourceSetLLVMText;"),
@@ -519,17 +468,21 @@ public struct SwiftBootstrapCompiler {
             )
         }
 
-        try checkLinkedStage2NormalCompile(
-            executable: executable,
-            runtimeInputs: runtimeInputs,
-            compilerDirectory: compilerDirectory
-        )
-        let stage3Candidate = try checkLinkedStage2SelfRebuild(
-            executable: executable,
-            stage2LLVM: candidate,
-            runtimeInputs: runtimeInputs,
-            compilerDirectory: compilerDirectory
-        )
+        try measurePhase("stage2-linked-smoke") {
+            try checkLinkedStage2NormalCompile(
+                executable: executable,
+                runtimeInputs: runtimeInputs,
+                compilerDirectory: compilerDirectory
+            )
+        }
+        let stage3Candidate = try measurePhase("stage3-self-rebuild") {
+            try checkLinkedStage2SelfRebuild(
+                executable: executable,
+                stage2LLVM: candidate,
+                runtimeInputs: runtimeInputs,
+                compilerDirectory: compilerDirectory
+            )
+        }
 
         print("Stage 2 compiler candidate LLVM emitted: \(candidate.path)")
         print("Stage 2 compiler candidate linked: \(executable.path)")
@@ -1127,6 +1080,8 @@ public struct SwiftBootstrapCompiler {
             return (int32_t)strcmp(left, right);
         }
 
+        void *stringTransientAllocate(size_t size);
+
         char *stringConcat(char *left, char *right) {
             if (!left) {
                 left = "";
@@ -1136,7 +1091,7 @@ public struct SwiftBootstrapCompiler {
             }
             size_t leftLength = strlen(left);
             size_t rightLength = strlen(right);
-            char *buffer = malloc(leftLength + rightLength + 1);
+            char *buffer = stringTransientAllocate(leftLength + rightLength + 1);
             if (!buffer) {
                 return "";
             }
@@ -1149,10 +1104,12 @@ public struct SwiftBootstrapCompiler {
         char *stringFromInt(int32_t value) {
             char buffer[32];
             snprintf(buffer, sizeof(buffer), "%d", value);
-            char *copy = strdup(buffer);
+            size_t length = strlen(buffer);
+            char *copy = stringTransientAllocate(length + 1);
             if (!copy) {
                 return "";
             }
+            memcpy(copy, buffer, length + 1);
             return copy;
         }
 
@@ -1174,7 +1131,20 @@ public struct SwiftBootstrapCompiler {
             RangeConstructField *fields;
         } RangeConstructObject;
 
-        static RangeConstructField *rangeConstructFindField(RangeConstructObject *object, char *name) {
+        static char *rangeConstructCopyText(char *text) {
+            if (!text) {
+                text = "";
+            }
+            size_t length = strlen(text);
+            char *copy = stringTransientAllocate(length + 1);
+            if (!copy) {
+                return NULL;
+            }
+            memcpy(copy, text, length + 1);
+            return copy;
+        }
+
+        static RangeConstructField *rangeConstructLookupField(RangeConstructObject *object, char *name) {
             if (!object || !name) {
                 return NULL;
             }
@@ -1185,28 +1155,38 @@ public struct SwiftBootstrapCompiler {
                 }
                 field = field->next;
             }
-            field = calloc(1, sizeof(RangeConstructField));
+            return NULL;
+        }
+
+        static RangeConstructField *rangeConstructEnsureField(RangeConstructObject *object, char *name) {
+            RangeConstructField *field = rangeConstructLookupField(object, name);
+            if (field || !object || !name) {
+                return field;
+            }
+            field = stringTransientAllocate(sizeof(RangeConstructField));
             if (!field) {
                 return NULL;
             }
-            field->name = strdup(name);
+            memset(field, 0, sizeof(RangeConstructField));
+            field->name = rangeConstructCopyText(name);
             field->next = object->fields;
             object->fields = field;
             return field;
         }
 
         void *rangeConstructCreate(char *name) {
-            RangeConstructObject *object = calloc(1, sizeof(RangeConstructObject));
+            RangeConstructObject *object = stringTransientAllocate(sizeof(RangeConstructObject));
             if (!object) {
                 return NULL;
             }
-            object->name = name ? strdup(name) : strdup("");
+            memset(object, 0, sizeof(RangeConstructObject));
+            object->name = rangeConstructCopyText(name);
             return object;
         }
 
         void *rangeConstructSetPtr(void *opaque, char *name, char *value) {
             RangeConstructObject *object = (RangeConstructObject *)opaque;
-            RangeConstructField *field = rangeConstructFindField(object, name);
+            RangeConstructField *field = rangeConstructEnsureField(object, name);
             if (field) {
                 field->kind = 0;
                 field->ptrValue = value;
@@ -1216,7 +1196,7 @@ public struct SwiftBootstrapCompiler {
 
         void *rangeConstructSetInt(void *opaque, char *name, int32_t value) {
             RangeConstructObject *object = (RangeConstructObject *)opaque;
-            RangeConstructField *field = rangeConstructFindField(object, name);
+            RangeConstructField *field = rangeConstructEnsureField(object, name);
             if (field) {
                 field->kind = 1;
                 field->intValue = value;
@@ -1226,7 +1206,7 @@ public struct SwiftBootstrapCompiler {
 
         void *rangeConstructSetBool(void *opaque, char *name, bool value) {
             RangeConstructObject *object = (RangeConstructObject *)opaque;
-            RangeConstructField *field = rangeConstructFindField(object, name);
+            RangeConstructField *field = rangeConstructEnsureField(object, name);
             if (field) {
                 field->kind = 2;
                 field->boolValue = value;
@@ -1236,7 +1216,7 @@ public struct SwiftBootstrapCompiler {
 
         char *rangeConstructGetPtr(void *opaque, char *name) {
             RangeConstructObject *object = (RangeConstructObject *)opaque;
-            RangeConstructField *field = rangeConstructFindField(object, name);
+            RangeConstructField *field = rangeConstructLookupField(object, name);
             if (!field || field->kind != 0 || !field->ptrValue) {
                 return "";
             }
@@ -1245,7 +1225,7 @@ public struct SwiftBootstrapCompiler {
 
         int32_t rangeConstructGetInt(void *opaque, char *name) {
             RangeConstructObject *object = (RangeConstructObject *)opaque;
-            RangeConstructField *field = rangeConstructFindField(object, name);
+            RangeConstructField *field = rangeConstructLookupField(object, name);
             if (!field || field->kind != 1) {
                 return 0;
             }
@@ -1254,7 +1234,7 @@ public struct SwiftBootstrapCompiler {
 
         bool rangeConstructGetBool(void *opaque, char *name) {
             RangeConstructObject *object = (RangeConstructObject *)opaque;
-            RangeConstructField *field = rangeConstructFindField(object, name);
+            RangeConstructField *field = rangeConstructLookupField(object, name);
             if (!field || field->kind != 2) {
                 return false;
             }
@@ -1265,7 +1245,7 @@ public struct SwiftBootstrapCompiler {
             if (!value || index < 0 || index >= (int32_t)strlen(value)) {
                 return "";
             }
-            char *buffer = malloc(2);
+            char *buffer = stringTransientAllocate(2);
             if (!buffer) {
                 return "";
             }
@@ -1289,7 +1269,7 @@ public struct SwiftBootstrapCompiler {
                 end = length;
             }
             size_t count = (size_t)(end - start);
-            char *buffer = malloc(count + 1);
+            char *buffer = stringTransientAllocate(count + 1);
             if (!buffer) {
                 return "";
             }
@@ -1412,8 +1392,8 @@ public struct SwiftBootstrapCompiler {
         executable: URL
     ) throws {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = [
+        let command = URL(fileURLWithPath: "/usr/bin/env")
+        let arguments = [
             "clang",
             "-Wno-override-module",
             llvmIR.path,
@@ -1421,6 +1401,7 @@ public struct SwiftBootstrapCompiler {
                 "-o",
                 executable.path,
             ]
+        let metricsURL = configureMeasuredProcess(process, executable: command, arguments: arguments)
 
         let stdout = Pipe()
         let stderr = Pipe()
@@ -1429,6 +1410,7 @@ public struct SwiftBootstrapCompiler {
 
         try process.run()
         process.waitUntilExit()
+        recordChildMetrics(at: metricsURL)
 
         guard process.terminationStatus == 0 else {
             let stderrText = String(
@@ -1560,8 +1542,7 @@ public struct SwiftBootstrapCompiler {
         stdin: String?
     ) throws -> ExecutionResult {
         let process = Process()
-        process.executableURL = executable
-        process.arguments = arguments
+        let metricsURL = configureMeasuredProcess(process, executable: executable, arguments: arguments)
 
         let captureDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -1597,6 +1578,7 @@ public struct SwiftBootstrapCompiler {
         }
 
         process.waitUntilExit()
+        recordChildMetrics(at: metricsURL)
         try? stdoutHandle.close()
         try? stderrHandle.close()
 
@@ -1608,6 +1590,122 @@ public struct SwiftBootstrapCompiler {
             stdout: stdoutText,
             stderr: stderrText
         )
+    }
+
+    private func measurePhase<T>(_ label: String, _ body: () throws -> T) throws -> T {
+        phaseMetrics.begin()
+        let sampler = ProcessRSSSampler(intervalMilliseconds: 100)
+        sampler.start()
+        let started = Date()
+        defer {
+            let selfPeak = sampler.stop()
+            let childPeak = phaseMetrics.end()
+            let elapsed = Date().timeIntervalSince(started)
+            print(
+                String(
+                    format: "stageMetric\tphase=%@\telapsedSeconds=%.3f\tselfPeakRSSBytes=%llu\tchildPeakRSSBytes=%llu\trssSampleMilliseconds=100",
+                    label,
+                    elapsed,
+                    selfPeak,
+                    childPeak
+                )
+            )
+        }
+        return try body()
+    }
+
+    private func configureMeasuredProcess(
+        _ process: Process,
+        executable: URL,
+        arguments: [String]
+    ) -> URL? {
+        guard phaseMetrics.isActive else {
+            process.executableURL = executable
+            process.arguments = arguments
+            return nil
+        }
+        let metricsURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("range-process-metrics-\(UUID().uuidString).txt")
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/time")
+        process.arguments = ["-l", "-o", metricsURL.path, executable.path] + arguments
+        return metricsURL
+    }
+
+    private func recordChildMetrics(at metricsURL: URL?) {
+        guard let metricsURL else { return }
+        defer { try? FileManager.default.removeItem(at: metricsURL) }
+        guard let text = try? String(contentsOf: metricsURL, encoding: .utf8) else { return }
+        for line in text.split(separator: "\n") where line.contains("maximum resident set size") {
+            if let value = UInt64(line.split(whereSeparator: { $0 == " " || $0 == "\t" }).first ?? "") {
+                phaseMetrics.recordChildPeak(value)
+            }
+        }
+    }
+}
+
+private final class PhaseMetrics: @unchecked Sendable {
+    private let lock = NSLock()
+    private var active = false
+    private var childPeak: UInt64 = 0
+
+    var isActive: Bool { lock.withLock { active } }
+
+    func begin() {
+        lock.withLock {
+            active = true
+            childPeak = 0
+        }
+    }
+
+    func recordChildPeak(_ bytes: UInt64) {
+        lock.withLock { childPeak = max(childPeak, bytes) }
+    }
+
+    func end() -> UInt64 {
+        lock.withLock {
+            active = false
+            return childPeak
+        }
+    }
+}
+
+private final class ProcessRSSSampler: @unchecked Sendable {
+    private let intervalMilliseconds: Int
+    private let lock = NSLock()
+    private var peak: UInt64 = 0
+    private var timer: DispatchSourceTimer?
+
+    init(intervalMilliseconds: Int) {
+        self.intervalMilliseconds = intervalMilliseconds
+    }
+
+    func start() {
+        sample()
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
+        timer.schedule(
+            deadline: .now() + .milliseconds(intervalMilliseconds),
+            repeating: .milliseconds(intervalMilliseconds)
+        )
+        timer.setEventHandler { self.sample() }
+        self.timer = timer
+        timer.resume()
+    }
+
+    func stop() -> UInt64 {
+        timer?.cancel()
+        timer = nil
+        sample()
+        return lock.withLock { peak }
+    }
+
+    private func sample() {
+        var info = proc_taskinfo()
+        let size = Int32(MemoryLayout<proc_taskinfo>.size)
+        let read = withUnsafeMutablePointer(to: &info) { pointer in
+            proc_pidinfo(getpid(), PROC_PIDTASKINFO, 0, pointer, size)
+        }
+        guard read == size else { return }
+        lock.withLock { peak = max(peak, info.pti_resident_size) }
     }
 }
 

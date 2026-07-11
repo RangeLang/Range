@@ -32,10 +32,13 @@ public struct LLVMModuleEmitter {
         "intBufferDestroy",
     ]
     private static let stringRuntimeFunctionNames: Set<String> = [
+        "stringTransientRegionMark",
+        "stringTransientRegionReset",
         "stringHasPrefix",
         "stringFindFrom",
         "stringFindFirstOf",
         "stringViewFrom",
+        "stringSliceUnchecked",
         "stringCharacterAt",
         "stringByteAt",
         "stringFindByteOf",
@@ -1978,10 +1981,14 @@ public struct LLVMModuleEmitter {
                 lines.append("declare i32 @intBufferDestroy(ptr)")
             }
             if usesStringRuntime {
+                lines.append("declare ptr @stringTransientAllocate(i64)")
+                lines.append("declare i32 @stringTransientRegionMark()")
+                lines.append("declare i32 @stringTransientRegionReset(i32)")
                 lines.append("declare i1 @stringHasPrefix(ptr, i32, ptr)")
                 lines.append("declare i32 @stringFindFrom(ptr, i32, ptr)")
                 lines.append("declare i32 @stringFindFirstOf(ptr, i32, ptr)")
                 lines.append("declare ptr @stringViewFrom(ptr, i32)")
+                lines.append("declare ptr @stringSliceUnchecked(ptr, i32, i32)")
                 lines.append("declare ptr @stringCharacterAt(ptr, i32)")
                 lines.append("declare i32 @stringByteAt(ptr, i32)")
                 lines.append("declare i32 @stringFindByteOf(ptr, i32, i32, i32, i32)")
@@ -3269,6 +3276,7 @@ public struct LLVMModuleEmitter {
             }
 
             runtime.markUsesSnprintf()
+            runtime.markUsesStringRuntime()
             var format = ""
             var arguments: [String] = []
 
@@ -3316,7 +3324,7 @@ public struct LLVMModuleEmitter {
             let allocationSize = nextTemporary()
             instructions.append("\(allocationSize) = add i64 \(wideLength), 1")
             let buffer = nextTemporary()
-            instructions.append("\(buffer) = call ptr @malloc(i64 \(allocationSize))")
+            instructions.append("\(buffer) = call ptr @stringTransientAllocate(i64 \(allocationSize))")
             let ignored = nextTemporary()
             instructions.append(
                 "\(ignored) = call i32 (ptr, i64, ptr, ...) @snprintf(ptr \(buffer), i64 \(allocationSize), ptr \(formatPointer)\(renderedArguments))"
@@ -5532,7 +5540,7 @@ public struct LLVMModuleEmitter {
                 throw LLVMEmissionError("String.character(index:) index must be Int.")
             }
 
-            runtime.markUsesMalloc()
+            runtime.markUsesStringRuntime()
             let wideIndex = nextTemporary()
             instructions.append("\(wideIndex) = sext i32 \(index.operand) to i64")
             let sourcePointer = nextTemporary()
@@ -5540,7 +5548,7 @@ public struct LLVMModuleEmitter {
             let character = nextTemporary()
             instructions.append("\(character) = load i8, ptr \(sourcePointer)")
             let buffer = nextTemporary()
-            instructions.append("\(buffer) = call ptr @malloc(i64 2)")
+            instructions.append("\(buffer) = call ptr @stringTransientAllocate(i64 2)")
             instructions.append("store i8 \(character), ptr \(buffer)")
             let terminatorPointer = nextTemporary()
             instructions.append("\(terminatorPointer) = getelementptr inbounds i8, ptr \(buffer), i64 1")
@@ -5585,7 +5593,7 @@ public struct LLVMModuleEmitter {
             start: LLVMValue,
             end: LLVMValue
         ) -> LLVMValue {
-            runtime.markUsesMalloc()
+            runtime.markUsesStringRuntime()
             runtime.markUsesMemcpy()
             let length = nextTemporary()
             instructions.append("\(length) = sub i32 \(end.operand), \(start.operand)")
@@ -5596,7 +5604,7 @@ public struct LLVMModuleEmitter {
             let allocationSize = nextTemporary()
             instructions.append("\(allocationSize) = add i64 \(wideLength), 1")
             let buffer = nextTemporary()
-            instructions.append("\(buffer) = call ptr @malloc(i64 \(allocationSize))")
+            instructions.append("\(buffer) = call ptr @stringTransientAllocate(i64 \(allocationSize))")
             let sourcePointer = nextTemporary()
             instructions.append("\(sourcePointer) = getelementptr inbounds i8, ptr \(receiver.operand), i64 \(wideStart)")
             instructions.append(

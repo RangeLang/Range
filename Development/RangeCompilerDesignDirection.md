@@ -898,13 +898,44 @@ or destruction. Multiple shared aliases to the same storage are accepted. A
 unique state write while a shared alias is live fails closed with
 `invalidMemoryGraph` and native exit `65`.
 
-This checkpoint is byte-identical across Stage 2/3 at `390.97 s`, `6.40 GB`
-maximum RSS, and `2,306,211` bytes of compiler LLVM. It proves non-owning alias
-identity and shared/write conflict enforcement for constructor binding
-arguments. It does not yet prove write/write conflict through binding-member
-mutation: typed assignment currently targets locals, so member-target writes
-and unique binding access must be added before that final conflict row can be
-claimed.
+The superseding binding-write checkpoint is byte-identical across Stage 2/3 at
+`398.24 s`, `5.70 GB` maximum RSS, and `2,323,183` bytes of compiler LLVM.
+Member-target assignment now traces `user.pair` through the receiver local,
+constructor argument, `$source`, and original `StorageID`. A write promotes
+that binding instance to `Alias(unique)`; SemanticGraph records the original
+storage owner, MemoryGraph emits `Access(write, unique)`, and typed IR emits a
+`Store` citing that decision. One unique binding may write. Shared/shared is
+accepted; direct-write/shared, shared/unique, and unique/unique combinations
+fail closed with `invalidMemoryGraph` and native exit `65`.
+
+Stage 2/3 compiler LLVM SHA-256 is
+`0795e6fd2846758609a404ad10e781bd3752d9fd2788f1b47746e79640a803e3`;
+the native binary SHA-256 is
+`88b2fccad5613ad10f69dcebf76bdd0e664ff1ded7b4abdeaa9bd4f398760c62`.
+The fixed LLVM renderer still accepts one aggregate type per proof program, so
+the two-construct binding-member write is proven through typed IR rather than
+claimed as executable LLVM. General multi-layout lowering is the next backend
+blocker. The measured RSS is better than the previous `6.40 GB` sample but is
+still not a causal low-memory result.
+
+The focused Swift fixture harness fingerprints the Range compiler sources,
+bootstrap executable or Swift sources, runtime C inputs, driver script, OS, and
+Clang version. It publishes one isolated mirrored compiler atomically into the
+user cache under a cross-process file lock. Fixtures in later Swift test
+processes execute that compiler directly while every fingerprint input remains
+unchanged.
+The three binding checks measured `74.735 s`, `0.138 s`, and `0.130 s`
+respectively (`75.005 s` test time total, down from roughly three compiler
+builds), while the state positive/negative pair measured `73.568 s` and
+`0.139 s`. This is feedback-loop caching only: it does not change compiler
+semantics, does not reuse the repository build directory, and is never a
+substitute for an uncached Stage 2/3 fixed-point gate.
+
+The persistent-cache checkpoint measured `91.30 s` for a cold invocation that
+also rebuilt the Swift test target, followed by `1.01 s` total for the identical
+command in a new process; the cached executable fixture itself completed in
+`0.369 s`. Cache publication requires a matching ready marker and executable,
+and corrupt or incomplete entries rebuild under the same fingerprint lock.
 
 ## Stage 0 Boundary
 
@@ -1217,17 +1248,168 @@ The next work is three vertical milestones:
    pass mode, and final destruction are explicit typed decisions. Typed IR
    cites them through fixed aggregate LLVM without the linked construct runtime
    or heap allocation. `binding` now references an existing `StorageID` with no
-   placement or destruction; shared/shared is accepted and shared/write is
-   rejected. Next, extend typed assignment through binding members and prove
-   unique binding plus write/write conflicts. `derived` dependency edges and
-   longer-lived escaping-owner placement follow—not a second compiler or
-   memory model.
+   placement or destruction. Member-target writes promote the selected binding
+   to unique access; shared/shared is accepted while direct-write/shared,
+   shared/unique, and unique/unique combinations are rejected. The next backend
+   step is general multi-layout LLVM lowering for the already-proven two-type
+   typed IR. `derived` dependency edges and longer-lived escaping-owner
+   placement follow—not a second compiler or memory model.
 
 Every milestone records fixture behavior, graph/identity snapshots, elapsed
 time, peak RSS, and Stage 2/Stage 3 hashes. Current RSS measurements vary too
 widely to claim a causal reduction. This sequence instead proves Range's memory
 model inside the self-hosted compiler, then removes legacy string consumers so
 the typed representation can produce an attributable efficiency result.
+
+Focused fixture batches reuse an isolated, persistent, source/toolchain-
+fingerprinted compiler across Swift test processes. Full fixed-point
+measurements remain uncached and authoritative.
+
+### 2026-07-10 fixed-point phase audit
+
+The authoritative gate now reports stable phase labels with elapsed time, a
+100 ms sampled Swift-process RSS peak, and the maximum raw child-process RSS.
+The measurements do not enter generated artifacts or the Stage 2/3 identity
+comparison.
+
+The first instrumented fixed point took 479.86 seconds. Native Stage 2 LLVM
+emission took 118.06 seconds and 6.50 GB child RSS; the Stage 3 self-rebuild
+took 259.01 seconds and 9.00 GB. Stage 1 compilation took 75.95 seconds and
+128 MB, while validation, linking, inventory, and smoke checks were all below
+one second each. Therefore the direct blocker is Range-authored compiler
+selection/lowering and its transient string state, not Swift compilation,
+clang, or byte comparison.
+
+Legacy Stage 1 AST/type/LLVM summary assertions no longer hard-root those
+reporting paths in the native entry. Bootstrap diagnostics remain available
+through `compileRangeSource`; ordinary source and the emitted compiler use the
+same native program compilation path.
+
+A measured experiment replaced the manual native root inventory with the
+existing transitive reachability walk. It remained Stage 2/3 byte-identical
+and reduced LLVM to 2,311,533 bytes, but regressed the gate to 515.30 seconds
+and about 10.15 GB. The experiment was reverted. Reachability correctness and
+reachability performance are separate concerns; the next optimization target
+is selected-helper lowering and transient text construction, not another
+compiler model or a weaker fixed-point gate.
+
+The first explicit transient-string region is now active around each selected
+helper lowering. Its rendered function and global records are copied into
+owned `TextBuffer`s before the region resets. The C substrate tracks only
+`stringConcat`, integer formatting, character extraction, and substring
+allocations while a region is active; file input, construct storage, and
+materialized text buffers remain outside this first boundary. The resulting
+Stage 2/3 LLVM is byte-identical at 2,428,874 bytes with SHA-256
+`19bb654dba929d87b8588e14b50810673f1ee3beb006683158683372a16689d0`.
+The gate took 451.46 seconds. Stage 3 child RSS fell from the immediately prior
+explicit-root measurement of 11.07 GB to 9.84 GB, while Stage 2 remained
+10.86 GB because Swift-emitted string primitives do not yet allocate through
+the region substrate. This proves the region boundary is viable but not yet
+sufficient for low-memory bootstrap.
+
+The focused compiler cache also fingerprints every Range core declaration.
+Core ABI changes must never reuse a compiler keyed only by project compiler
+sources or runtime C. The key hashes Swift sources and `Package.swift`
+directly; it deliberately excludes the mutable prebuilt `range` executable,
+because a cache build can relink that artifact and otherwise change its own
+next-process key.
+
+#### Region and record-processing result
+
+Stage 0 now emits interpolated-string, character, and substring temporaries
+through the same transient allocator used by the self-hosted compiler.
+`textBufferMaterialize` also participates only while a region is active;
+durable materializations outside a mark retain their prior lifetime. Generic
+construct getters are non-mutating, and fresh construct objects, fields, and
+copied names created during helper lowering share the helper region.
+
+Sampling then found the main linked-runtime CPU multiplier: extracting a small
+field from a declaration-record view called general `String.substring`, whose
+length clamp scanned the complete multi-megabyte suffix. The audited
+`stringSliceUnchecked` substrate is used only after delimiter search proves
+`0 <= start <= end <= length`; general substring behavior remains unchanged.
+Record encode/decode now classifies ordinary bytes before testing escape
+sequences, avoiding five prefix calls per byte while keeping the encoding
+policy in Range.
+
+The retained fixed point takes 276.21 seconds with 4,504,305,664 bytes peak
+RSS. Stage 2 emission is 88.67 seconds / 4.27 GB; Stage 3 self-rebuild is
+113.74 seconds / 4.50 GB. Stage 2/3 LLVM remains byte-identical at 2,429,360
+bytes with SHA-256
+`95b1b1378bea94a2dd7a88233ff5adcc8d89c0858be7e9cad470b58dd8777e94`.
+Relative to the first instrumented 479.86-second / 9.00 GB gate, this is about
+42% faster and half the peak resident memory without ARC, GC, a second
+compiler model, or a weaker identity gate. Direct field-marker lookup and
+span-based decoding were measured and removed after regressing this baseline;
+the worktree retains only the byte-classified decoder and bounded field slice.
+
+#### Scalar storage checkpoint
+
+MemoryGraph now assigns storage to authored `Int` locals without inventing a
+scalar layout or declaration. The existing semantic identity is preserved as
+`kind=Int, declaration=-1`. Scalar initialization is checked by semantic type;
+identifier reads cite the owning storage; `state` assignment produces unique
+write access; and the same assignment through `let` fails closed. This extends
+the aggregate proof instead of adding a scalar-specific compiler model.
+
+The three focused scalar fixtures pass in 0.51 seconds with the persistent
+compiler cache warm. The full Stage 2/3 gate then passed in 280.95 seconds.
+Both compiler LLVM artifacts are byte-identical at 2,437,516 bytes with
+SHA-256
+`dda331cd2513c52bf482aa100789af8173ce60a94157f8b39e068bb08fb75cc9`.
+The ordinary no-directive smoke artifact now permanently checks real
+caller-owned aggregate storage and a computed return, rather than the removed
+`ret i32 0` stub behavior.
+
+#### First control-flow lifetime checkpoint
+
+Typed syntax and Plotter now carry one canonical fallthrough `if` shape:
+an `If` statement owns its condition and a `LexicalRegion`, and that region
+owns its nested statements. MemoryGraph uses this ownership tree directly as
+the storage region; it does not inspect legacy statement records or construct
+a second CFG. Destroy decisions are ordered by their actual lifetime endpoint.
+
+The focused proof places an entry-local scalar in the entry region and destroys
+it at the final return, while a branch-local scalar is placed in the lexical
+region and destroyed at that region boundary. The same boundary is proven for
+a branch-local aggregate, and a branch-local name used after the region fails
+semantic resolution.
+
+The checkpoint passed the full Stage 2/3 gate in 284.49 seconds. Both compiler
+LLVM artifacts were byte-identical at 2,463,222 bytes with SHA-256
+`28b3220256ab10b28084a2a5a7bfd59ac26a75f50ab2ecb02e3a4bef42c60d12`.
+The superseding path-exit checkpoint derives terminal returns recursively from
+the same Plotter ownership facts. Destroy is now one decision per applicable
+`(storage, exit)` pair rather than one per storage. In the focused scalar
+fixture, an entry-owned `outer` value destroys at both the branch return and
+the final return; branch-owned `inner` destroys only at the branch return.
+Both returns copy scalar values and both storages retain `Escape(0)`. Returning
+a branch-local aggregate still fails `invalidMemoryGraph` because no caller
+placement or transfer exists, and a statement after a terminal return fails
+typed validation. The full Stage 2/3 gate passed in 285.08 seconds with
+byte-identical 2,476,499-byte LLVM artifacts and SHA-256
+`2f32401f8a74151448893c4c7406c74c9300faaab204ab4987aa6063fd266be8`.
+
+#### Opaque compiler-handle checkpoint
+
+Typed declaration capture now preserves leading `@language` provenance and
+accepts signature-only ABI functions without fabricating Range bodies. The
+first owned handle is the real Core `IntBuffer`: classification requires a
+validated `@language` zero-field `IntBuffer` declaration plus exact
+`intBufferCreate`, `intBufferDestroy`, and optional shared-read signatures.
+Ordinary empty constructs are never inferred to be opaque.
+
+MemoryGraph gives an owned IntBuffer local placement, initialization from its
+validated factory, `Escape(0)`, source storage policy, and exactly one explicit
+consuming destroy. It fails closed for missing destroy, double destroy,
+use-after-destroy, malformed destructor ABI, and return without transfer.
+Typed IR carries factory initialization as a call-receive citing `Initialize`
+and the consuming call as `Destroy`; no bespoke opaque LLVM renderer was added.
+
+The full Stage 2/3 gate passed in 291.97 seconds. Both compiler LLVM artifacts
+are byte-identical at 2,522,104 bytes with SHA-256
+`b08ad21f6b09606879edbbb7a7820e82cac84d6e8e66fb92ac013b5688e64cb5`.
+The warm eight-fixture opaque/provenance matrix completes in about 1.35 seconds.
 
 ## Explicit Non-Goals And Rejected Directions
 

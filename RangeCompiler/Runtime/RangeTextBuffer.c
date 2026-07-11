@@ -9,6 +9,8 @@ typedef struct RangeTextBuffer {
     char *data;
 } RangeTextBuffer;
 
+void *stringTransientAllocate(size_t size);
+
 static int32_t rangeTextBufferReserve(RangeTextBuffer *buffer, size_t additional) {
     if (!buffer || !buffer->data || buffer->count > buffer->capacity
         || buffer->count > SIZE_MAX - additional) {
@@ -110,7 +112,7 @@ char *textBufferMaterialize(void *opaqueBuffer) {
         return "";
     }
 
-    char *text = malloc(buffer->count + 1);
+    char *text = stringTransientAllocate(buffer->count + 1);
     if (!text) {
         abort();
     }

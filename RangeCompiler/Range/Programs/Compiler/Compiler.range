@@ -10,12 +10,7 @@ function compileRangeSource(source: String): String {
         return coreOutput
     }
 
-    if program.hasMainBlock {
-        let defaultLLVMProgram: CompilerProgram(parseCompilerProgramWithFunctionBodies(source: source))
-        return "\(lexRangeSource(source: source))\(compilerCoreASTSummaryForProgram(program: program))\(compilerCoreLLVMForProgram(program: defaultLLVMProgram))"
-    }
-
-    return "\(lexRangeSource(source: source))\(compilerCoreASTSummaryForProgram(program: program))"
+    return compileRangeNativeProgramOutput(source: source)
 }
 
 function compileRangeNativeSource(source: String): String {
@@ -98,7 +93,7 @@ function compileRangeNativeProgramOutput(source: String): String {
         return typedFixedOutput
     }
     let program: CompilerProgram(parseCompilerProgramForLLVM(source: source))
-    return compilerCoreLLVMEntryTextForProgram(program: program)
+    return compilerCoreLLVMTextForProgram(program: program)
 }
 
 function compileRangeSourceSetDirectiveOutput(source: String): String {
@@ -181,21 +176,21 @@ function compileRangeSourceSetDirectiveOutput(source: String): String {
 function compileRangeCoreDirectiveOutput(source: String, program: CompilerProgram): String {
     if compilerSourceRequestsCoreAST(source: source) {
         let astProgram: CompilerProgram(parseCompilerProgramWithFunctionBodies(source: source))
-        return "\(lexRangeSource(source: source))\(compilerCoreASTSummaryForProgram(program: astProgram))"
+        return compilerCoreASTSummaryForProgram(program: astProgram)
     }
 
     if compilerSourceRequestsCoreSymbols(source: source) {
-        return "\(lexRangeSource(source: source))\(compilerCoreSymbolSummaryForProgram(program: program))"
+        return compilerCoreSymbolSummaryForProgram(program: program)
     }
 
     if compilerSourceRequestsCoreTypes(source: source) {
         let typedProgram: CompilerProgram(parseCompilerProgramWithFunctionBodies(source: source))
-        return "\(lexRangeSource(source: source))\(compilerCoreTypeSummaryForProgram(program: typedProgram))"
+        return compilerCoreTypeSummaryForProgram(program: typedProgram)
     }
 
     if compilerSourceRequestsCoreLLVM(source: source) {
         let llvmProgram: CompilerProgram(parseCompilerProgramWithFunctionBodies(source: source))
-        return "\(lexRangeSource(source: source))\(compilerCoreLLVMForProgram(program: llvmProgram))"
+        return compilerCoreLLVMForProgram(program: llvmProgram)
     }
 
     if compilerSourceRequestsCompilerLLVMText(source: source) {

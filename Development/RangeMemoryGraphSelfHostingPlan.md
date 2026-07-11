@@ -77,6 +77,51 @@ region, lifetime, transfer, and destruction decisions.
   summaries or rendered snapshots. Minimal typed IR and decision-driven LLVM
   lowering remain pending.
 
+- Scalar authored storage is now part of the same MemoryGraph model. `Int`
+  locals use their existing semantic identity `(kind=Int, declaration=-1)`;
+  they do not receive a fabricated aggregate declaration or layout. `let Int`
+  proves placement, initialization, non-escape, destruction, immutable policy,
+  and scalar read access. `state Int` additionally proves unique write access,
+  while the identical write through `let` fails with `invalidMemoryGraph`.
+  The three focused fixtures complete in about 0.51 seconds after the shared
+  compiler cache is warm.
+- The scalar checkpoint is Stage 2/3 fixed-point verified. The authoritative
+  Swift gate passed in 280.95 seconds; both compiler LLVM artifacts are
+  2,437,516 bytes with SHA-256
+  `dda331cd2513c52bf482aa100789af8173ce60a94157f8b39e068bb08fb75cc9`.
+  The ordinary no-directive smoke program also emits and executes its real
+  caller-owned aggregate-storage flow rather than a stub return.
+- The first control-flow lifetime slice is implemented without a parallel CFG.
+  Typed syntax owns explicit `If` and `LexicalRegion` nodes, Plotter carries
+  those exact ownership facts, and MemoryGraph uses the lexical region as the
+  branch-local storage and destruction boundary. Scalar and aggregate locals
+  both destroy at that boundary; entry locals still destroy at the entry
+  return; and using a branch-local name afterward fails semantic resolution.
+  The Stage 2/3 gate passed in 284.49 seconds with identical 2,463,222-byte
+  compiler LLVM artifacts and SHA-256
+  `28b3220256ab10b28084a2a5a7bfd59ac26a75f50ab2ecb02e3a4bef42c60d12`.
+  Path-specific scalar early return is now implemented from those same facts:
+  destroy cardinality is per applicable `(storage, exit)` pair, so an
+  entry-owned scalar destroys on both early and final returns while a
+  branch-owned scalar destroys only on its branch return. Scalar return copies
+  the value and keeps `Escape(0)`. Branch-local aggregate return remains an
+  `invalidMemoryGraph` failure without caller placement and transfer, and
+  statements following a terminal return fail typed validation. This
+  superseding Stage 2/3 gate passed in 285.08 seconds with identical
+  2,476,499-byte compiler LLVM artifacts and SHA-256
+  `2f32401f8a74151448893c4c7406c74c9300faaab204ab4987aa6063fd266be8`.
+- Opaque compiler runtime handles are now proven first through the real Core
+  `IntBuffer` ABI. Typed syntax preserves `@language` provenance and captures
+  signature-only ABI functions. Opaque classification requires that provenance,
+  the zero-field IntBuffer declaration, and exact factory/destructor/shared-read
+  signatures; ordinary empty constructs remain invalid. MemoryGraph requires
+  exactly one explicit consuming destroy and rejects missing/double destroy,
+  use after destroy, malformed ABI, and return without transfer. Typed IR cites
+  the matching Initialize and Destroy decisions without adding a separate LLVM
+  model. The full Stage 2/3 gate passed in 291.97 seconds with identical
+  2,522,104-byte LLVM artifacts and SHA-256
+  `b08ad21f6b09606879edbbb7a7820e82cac84d6e8e66fb92ac013b5688e64cb5`.
+
 Accepted direct Pair semantic/MemoryGraph proof:
 
 - semantic graph: 12 resolutions, 25 node types, and 1 parameter-effect row;
@@ -240,10 +285,44 @@ hashes and measurements above):
 - output determinism is proven; low-memory compilation is not. This run is
   above the prior `5.60 GB` state-write sample and remains within the older
   observed range, so it does not establish a memory reduction;
-- write/write conflict through binding-member mutation remains unproven because
-  typed assignment targets are still local identifiers. The next slice is
-  member-target assignment, unique binding access, and the remaining conflict
-  row. `derived` remains afterward as storage-free dependency structure.
+- member-target assignment traces a binding use through its receiver local,
+  constructor argument, `$source`, and original `StorageID`;
+- one binding-member write promotes that binding instance to `Alias(unique)`,
+  emits `Access(write, unique)`, and produces a typed-IR `Store` citing the
+  access decision without placing or destroying binding storage;
+- shared/shared is accepted. Direct-write/shared, shared/unique, and
+  unique/unique aliases are rejected with `invalidMemoryGraph` and exit `65`;
+- the eight-test binding/state matrix passes in `72.895 s`: the initial
+  compiler build takes `71.552 s` and every reused semantic fixture takes less
+  than `0.5 s`;
+- full Stage 2/Stage 3 fixed point: `398.24 s`;
+- measured maximum RSS: `5.70 GB` (`5,696,176,128` bytes);
+- compiler LLVM: `2,323,183` bytes;
+- Stage 2/3 LLVM SHA-256:
+  `0795e6fd2846758609a404ad10e781bd3752d9fd2788f1b47746e79640a803e3`;
+- Stage 2/3 binary SHA-256:
+  `88b2fccad5613ad10f69dcebf76bdd0e664ff1ded7b4abdeaa9bd4f398760c62`;
+- the two-construct binding write is typed-IR proven but not yet emitted by the
+  fixed LLVM renderer, whose proof-candidate gate still requires exactly one
+  aggregate type. General multi-layout LLVM lowering is the next backend
+  blocker. `derived` remains afterward as storage-free dependency structure.
+
+Focused-test feedback-loop checkpoint:
+
+- the Swift fixture harness fingerprints compiler sources, the bootstrap
+  executable or Swift sources, runtime inputs, driver, OS, and Clang version;
+  it atomically publishes one isolated mirrored compiler under a cross-process
+  lock and reuses it across later Swift test processes;
+- three binding checks complete in `75.005 s` total: the initial compiler build
+  takes `74.735 s`, while the two reused fixtures take `0.138 s` and `0.130 s`;
+- the state positive/negative pair completes in `73.707 s`: `73.568 s` for the
+  initial build and `0.139 s` for the reused fixture;
+- the cache never uses the repository compiler build directory and never
+  participates in the full Stage 2/3 fixed-point gate. It accelerates semantic
+  iteration but is not evidence of lower compiler time or memory.
+- a cold invocation including Swift test recompilation measured `91.30 s`; the
+  identical command in a fresh process measured `1.01 s` total, with the cached
+  fixture itself completing in `0.369 s`.
 
 Historical first returned-aggregate ownership-transfer checkpoint:
 
@@ -512,10 +591,11 @@ eventual compiler service. Use three bounded implementation patches:
    MemoryGraph rows; aggregate LLVM contains no dynamic construct runtime or
    allocator dependency. Renamed/reordered-label, returned-local rejection,
    executable, unique `state` mutation, immutable-write rejection, non-owning
-   shared `binding`, shared/shared acceptance, shared/write rejection, and
-   Stage 2/3 snapshot gates pass. Binding-member writes, unique binding
-   conflicts, shared-borrow lifetime precision, and escaping-owner placement
-   remain follow-on expansions of the same graph and IR, not alternate models.
+   shared and unique `binding`, shared/shared acceptance, direct-write/shared,
+   shared/unique, and unique/unique rejection, and Stage 2/3 snapshot gates
+   pass. General multi-layout LLVM lowering, `derived` dependencies,
+   shared-borrow lifetime precision, and escaping-owner placement remain
+   follow-on expansions of the same graph and IR, not alternate models.
 
 The accelerated track may defer full Foundation identity, editor line maps,
 in-compiler content-hash persistence, StringID interning, body caching without
@@ -734,6 +814,48 @@ This matrix is a permanent regression gate but does not block the narrow
 MemoryGraph proof from beginning.
 
 ## Work Order
+
+### Current performance blocker (2026-07-10)
+
+Per-phase measurement proves that the MemoryGraph fixtures and fixed-point
+orchestration are not the long pole. Stage 1 is about 72--76 seconds and
+128 MB; native Stage 2 emission and the Stage 3 self-rebuild consume roughly
+375 seconds and 6.5--10+ GB. Validation, linking, inventory, and executable
+smoke checks are sub-second.
+
+The native entry no longer retains legacy Stage 1 AST/type/LLVM summaries.
+Those remain bootstrap diagnostics and are not self-hosting identity inputs.
+A transitive-reachability experiment stayed byte-identical but increased cost
+to 515.30 seconds and about 10.15 GB, so it was reverted. Before adding the
+remaining control-flow and escape fixtures, reduce transient memory in
+selected-helper lowering/text construction while retaining the explicit,
+proven native root set and the byte-identity gate.
+
+The first selected-helper transient region now proves a concrete lifetime:
+lower one helper, copy its rendered function and global records into durable
+buffers, retain the scalar next-temporary value, then destroy the helper's
+temporary string region. Stage 2/3 remain byte-identical at 2,428,874 bytes.
+Stage 3 peak child RSS fell from 11.07 GB to 9.84 GB in adjacent explicit-root
+measurements, but Stage 2 remained 10.86 GB because Stage 0's emitted string
+operations do not yet use the tracked allocator. The next slice is to make
+Stage 0 realize the same explicit region ABI, then separately audit the
+lifetime of `textBufferMaterialize` results. Do not broaden the reset to file
+input, construct storage, or materialized buffers without a MemoryGraph-backed
+escape proof.
+
+The bounded region work now covers both generations. Stage 0 string emission,
+active-region text materialization, and fresh helper-local construct wrappers
+use the same mark/reset substrate. Construct reads no longer create fields.
+The authoritative retained gate is 276.21 seconds / 4.50 GB, down from 479.86 seconds /
+9.00 GB, with Stage 2/3 LLVM byte-identical at SHA-256
+`95b1b1378bea94a2dd7a88233ff5adcc8d89c0858be7e9cad470b58dd8777e94`.
+
+This is a real hierarchical lifetime proof, not general ownership completion:
+compiler inputs outlive the selected-helper region; helper output is copied to
+durable buffers; only scalar progress crosses reset. General file buffers,
+arbitrary user strings, escaping constructs, and opaque runtime handles still
+require explicit MemoryGraph decisions. Continue from fresh profiles rather
+than broadening the dynamic region by convention.
 
 1. Check in the architecture and this plan.
 2. Implement Milestone 1 source/file identity and proof-subset typed records.
