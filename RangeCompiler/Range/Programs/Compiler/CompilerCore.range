@@ -10168,6 +10168,19 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
                     || (expectedType == String("i1") && actualTypeKind != compilerBodyTypeBool())
                     || (expectedType == String("ptr") && actualTypeKind != compilerBodyTypeString() && actualTypeKind != compilerBodyTypeConstruct()) { return 0 - 1 }
             }
+            if targetKind == compilerBodyResolutionFunction() {
+                let firstParameterRow: Int(compilerIntTableValue(table: arena.tables.functions, row: targetID, column: 2))
+                let parameterRow: Int(firstParameterRow + argumentOrdinal)
+                if parameterRow < 0 || parameterRow >= compilerIntTableRowCount(table: arena.tables.parameters) { return 0 - 1 }
+                let parameterFileID: Int(compilerIntTableValue(table: arena.tables.parameters, row: parameterRow, column: 1))
+                let expectedTypeKind: Int(compilerBodyArenaTypeKindForSpan(arena: arena, fileID: parameterFileID, start: compilerIntTableValue(table: arena.tables.parameters, row: parameterRow, column: 8), end: compilerIntTableValue(table: arena.tables.parameters, row: parameterRow, column: 9)))
+                let actualTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID))
+                if expectedTypeKind == compilerBodyTypeUnknown() || actualTypeKind != expectedTypeKind { return 0 - 1 }
+                if expectedTypeKind == compilerBodyTypeConstruct() {
+                    let expectedTypeID: Int(compilerBodyArenaTypeIDForSpan(arena: arena, fileID: parameterFileID, start: compilerIntTableValue(table: arena.tables.parameters, row: parameterRow, column: 8), end: compilerIntTableValue(table: arena.tables.parameters, row: parameterRow, column: 9)))
+                    if expectedTypeID < 0 || compilerBodyArenaExpressionTypeID(arena: arena, nodeID: valueNodeID) != expectedTypeID { return 0 - 1 }
+                }
+            }
             if targetKind == compilerBodyResolutionConstruct() {
                 let memberRow: Int(compilerBodyArenaConstructMemberRowAtOrdinal(arena: arena, constructSyntaxID: targetID, ordinal: argumentOrdinal))
                 if memberRow < 0 { return 0 - 1 }
@@ -10940,6 +10953,7 @@ function compilerBodyMIRAppendOperation(arena: CompilerBodyArena, blockID: Int, 
     let operationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
     state storageID: Int(0 - 1)
     if kind == compilerBodyMIROperationDirectCall() { storageID: compilerBodyStorageForCall(arena: arena, callNodeID: sourceNodeID) }
+    if kind == compilerBodyMIROperationReturn() { storageID: compilerBodyCalleeReturnStorage(arena: arena) }
     if compilerIntTableAppend(table: arena.mirOperations, value: operationID) != 0
         || compilerIntTableAppend(table: arena.mirOperations, value: blockID) != 0
         || compilerIntTableAppend(table: arena.mirOperations, value: kind) != 0
@@ -11604,7 +11618,17 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                 || compilerBodyMemoryOptionalInjectionTypeID(arena: arena, sourceNodeID: sourceNodeID) != optionalTypeID
                 || validationStorageID != 0 - 1 { return 3 }
         }
-        if operationKind != compilerBodyMIROperationDirectCall() && validationStorageID != 0 - 1 { return 3 }
+        if operationKind == compilerBodyMIROperationReturn() {
+            let ownerReturnMode: Int(compilerModuleABIPlanReturnMode(plan: abiPlan, tables: arena.tables, index: arena.declarationIndex, functionRow: arena.ownerFunctionRow))
+            if ownerReturnMode == compilerFunctionReturnABIIndirect() {
+                let returnSourceNodeID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationSourceColumn()))
+                if validationStorageID < 0 || validationStorageID >= compilerIntTableRowCount(table: arena.storages)
+                    || compilerIntTableValue(table: arena.storages, row: validationStorageID, column: compilerBodyStoragePlacementColumn()) != compilerBodyStorageCalleeReturn()
+                    || !compilerBodyMemoryHasFact(arena: arena, kind: compilerBodyMemoryFactReturnDestination(), sourceNodeID: arena.rootNodeID, subjectID: validationStorageID)
+                    || !compilerBodyMemoryHasFact(arena: arena, kind: compilerBodyMemoryFactInitialize(), sourceNodeID: returnSourceNodeID, subjectID: validationStorageID) { return 3 }
+            } else if validationStorageID != 0 - 1 { return 3 }
+        }
+        if operationKind != compilerBodyMIROperationDirectCall() && operationKind != compilerBodyMIROperationReturn() && validationStorageID != 0 - 1 { return 3 }
         if (operationKind == compilerBodyMIROperationLocalValue() || operationKind == compilerBodyMIROperationAssignVersion() || operationKind == compilerBodyMIROperationPhi()) && validationTargetKind != compilerBodyMIROperationTargetSymbol() { return 3 }
         if operationKind != compilerBodyMIROperationDirectCall() && operationKind != compilerBodyMIROperationConstruct() && operationKind != compilerBodyMIROperationOptionalNone() && operationKind != compilerBodyMIROperationOptionalCoalesce() && operationKind != compilerBodyMIROperationLocalValue() && operationKind != compilerBodyMIROperationAssignVersion() && operationKind != compilerBodyMIROperationPhi() && validationTargetKind != compilerBodyMIROperationTargetNone() { return 3 }
         if operationKind == compilerBodyMIROperationAssignVersion() {
