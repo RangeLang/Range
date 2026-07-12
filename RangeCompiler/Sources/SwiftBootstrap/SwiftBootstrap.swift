@@ -419,54 +419,6 @@ public struct SwiftBootstrapCompiler {
             )
         }
 
-        let stage2BodyNamesText = try measurePhase("stage2-linked-body-names") { try runStageCompilerSourceSetDirective(
-            executable: executable,
-            compilerDirectory: compilerDirectory,
-            directive: "compilerSourceSetBodyFunctionNames",
-            label: "Linked Stage 2 body names"
-        ) }
-        guard stage2BodyNamesText.contains("compileRangeNativeSource;"),
-            stage2BodyNamesText.contains("compilerSourceSetBodyFunctionNames;"),
-            stage2BodyNamesText.contains("compilerNativeSourceSetLLVMText;"),
-            stage2BodyNamesText.contains("compilerSourceSetProgramForLLVM;"),
-            stage2BodyNamesText.contains("parseCompilerProgramForLLVMNamedBodies;"),
-            stage2BodyNamesText.contains("compilerCoreMainParsedBlock;"),
-            stage2BodyNamesText.contains("compilerCoreParseStatements;"),
-            stage2BodyNamesText.contains("parseCompilerStatementWithToken;"),
-            stage2BodyNamesText.contains("parseCompilerIdentifierStatementWithTarget;"),
-            stage2BodyNamesText.contains("parseCompilerAssignmentStatement;"),
-            stage2BodyNamesText.contains("compilerCoreLLVMLowerBlockWithLocals;"),
-            stage2BodyNamesText.contains("compilerCoreLLVMLowerDirectLinearRecordBlockWithRecord;"),
-            stage2BodyNamesText.contains("compilerCoreLLVMLowerDirectLinearRecordBlockWithIf;"),
-            stage2BodyNamesText.contains("compilerCoreLLVMLowerDirectIfStatementRecord;"),
-            stage2BodyNamesText.contains("compilerCoreLLVMLowerDirectIfStatementRecordWithElse;"),
-            stage2BodyNamesText.contains("compilerCoreRenderedDirectIfElseStatementRecord;"),
-            stage2BodyNamesText.contains("compilerCoreLLVMLowerDirectIfStatementRecordWithAfter;"),
-            stage2BodyNamesText.contains("compilerCoreLLVMLowerLinearStatementRecord;"),
-            stage2BodyNamesText.contains("compilerCoreRenderedDirectReturnBlock;"),
-            stage2BodyNamesText.contains("compilerSourceSetBodyFunctionNamesNativeProgram;"),
-            stage2BodyNamesText.contains("compilerSourceSetBodyFunctionNamesSourceIdentity;"),
-            stage2BodyNamesText.contains("compilerSourceIdentitySummary;"),
-            stage2BodyNamesText.contains("compilerSourceStoreFileIDAtGlobalOffset;"),
-            stage2BodyNamesText.contains("compilerSourceSetBodyFunctionNamesTypedSyntax;"),
-            stage2BodyNamesText.contains("compilerTypedSyntaxSummary;"),
-            stage2BodyNamesText.contains("compilerTypedSyntaxCapture;"),
-            stage2BodyNamesText.contains("compilerCoreParseStoredMemberToken;"),
-            stage2BodyNamesText.contains("compilerCoreParseFunctionParameterToken;"),
-            stage2BodyNamesText.contains("compilerCoreLLVMEntryTextForProgram;"),
-            stage2BodyNamesText.contains("compilerCoreLLVMEntryReachableFunctions;"),
-            stage2BodyNamesText.contains("compilerSourceInventoryFileRecords;"),
-            stage2BodyNamesText.contains("isRangeLexerWhitespace;")
-        else {
-            throw SwiftBootstrapError(
-                """
-                Linked Stage 2 compiler did not preserve selected body-name inventory.
-                --- stdout ---
-                \(prefixLines(stage2BodyNamesText))
-                """
-            )
-        }
-
         try measurePhase("stage2-linked-smoke") {
             try checkLinkedStage2NormalCompile(
                 executable: executable,

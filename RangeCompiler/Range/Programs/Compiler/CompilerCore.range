@@ -5695,7 +5695,7 @@ function compilerSourceIdentitySummary(source: String): String {
         let contentEnd: Int(compilerSourceStoreFileContentEnd(store: store, fileID: fileID))
         state path: String("")
         if pathEnd > pathStart {
-            path: source.substring(start: pathStart, end: pathEnd)
+            path: stringSubstring(source: source, start: pathStart, end: pathEnd)
         }
         let mappedFileID: Int(compilerSourceStoreFileIDAtGlobalOffset(store: store, globalOffset: contentStart))
         let localOffset: Int(compilerSourceStoreFileLocalOffset(store: store, globalOffset: contentStart))
@@ -7869,7 +7869,8 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
             let invalidPlanTargetReturnMode: Int(intBufferElement(buffer: reachability.abiReturnModes, index: invalidPlanTarget))
             let invalidPlanAggregateParameter: Bool(compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: invalidPlanTarget))
             if (invalidPlanTargetReturnMode == compilerFunctionReturnABIIndirect() && invalidPlanOwnerParticipant != 1)
-                || (invalidPlanOwnerParticipant == 1 && invalidPlanAggregateParameter && invalidPlanTargetParticipant != 1) {
+                || (invalidPlanOwnerParticipant == 1 && invalidPlanAggregateParameter && invalidPlanTargetParticipant != 1)
+                || (invalidPlanTargetParticipant == 1 && invalidPlanAggregateParameter && invalidPlanOwnerParticipant != 1) {
                 return "compilerError\tkind=invalidModuleABIPlanEdge\townerFunctionRow=\(invalidPlanOwner)\ttargetFunctionRow=\(invalidPlanTarget)\townerParticipant=\(invalidPlanOwnerParticipant)\ttargetParticipant=\(invalidPlanTargetParticipant)\ttargetReturnMode=\(invalidPlanTargetReturnMode)\ttargetAggregateParameter=\(invalidPlanAggregateParameter)"
             }
             invalidPlanEdge: invalidPlanEdge + 1
@@ -7928,6 +7929,23 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
                 return "compilerError\tkind=aggregateParameterABIComponentBlocked\ttargetFunctionRow=\(parameterBlockerTarget)\ttarget=\(parameterBlockerTargetName)\ttargetStage=\(0 - intBufferElement(buffer: reachability.abiCapabilities, index: parameterBlockerTarget))\townerFunctionRow=\(parameterBlockerOwner)\towner=\(parameterBlockerOwnerName)"
             }
             parameterBlockerEdge: parameterBlockerEdge + 1
+        }
+        state aggregateCallerBlockerEdge: Int(0)
+        while aggregateCallerBlockerEdge < intBufferCount(buffer: reachability.edgeTargets) {
+            let aggregateCallerBlockerOwner: Int(intBufferElement(buffer: reachability.edgeOwners, index: aggregateCallerBlockerEdge))
+            let aggregateCallerBlockerTarget: Int(intBufferElement(buffer: reachability.edgeTargets, index: aggregateCallerBlockerEdge))
+            if compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: aggregateCallerBlockerTarget)
+                && intBufferElement(buffer: reachability.abiCapabilities, index: aggregateCallerBlockerTarget) == 1
+                && intBufferElement(buffer: reachability.abiCapabilities, index: aggregateCallerBlockerOwner) != 1 {
+                let aggregateCallerBlockerTargetSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: aggregateCallerBlockerTarget, column: 0))
+                let aggregateCallerBlockerOwnerSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: aggregateCallerBlockerOwner, column: 0))
+                let aggregateCallerBlockerTargetDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: aggregateCallerBlockerTargetSyntaxID))
+                let aggregateCallerBlockerOwnerDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: aggregateCallerBlockerOwnerSyntaxID))
+                let aggregateCallerBlockerTargetName: String(compilerTypedSyntaxLocalText(tables: reachability.context.tables, fileID: compilerIntTableValue(table: reachability.context.tables.declarations, row: aggregateCallerBlockerTargetDeclarationRow, column: 1), localStart: compilerIntTableValue(table: reachability.context.tables.declarations, row: aggregateCallerBlockerTargetDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: reachability.context.tables.declarations, row: aggregateCallerBlockerTargetDeclarationRow, column: 8)))
+                let aggregateCallerBlockerOwnerName: String(compilerTypedSyntaxLocalText(tables: reachability.context.tables, fileID: compilerIntTableValue(table: reachability.context.tables.declarations, row: aggregateCallerBlockerOwnerDeclarationRow, column: 1), localStart: compilerIntTableValue(table: reachability.context.tables.declarations, row: aggregateCallerBlockerOwnerDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: reachability.context.tables.declarations, row: aggregateCallerBlockerOwnerDeclarationRow, column: 8)))
+                return "compilerError\tkind=aggregateParameterABICallerBlocked\ttargetFunctionRow=\(aggregateCallerBlockerTarget)\ttarget=\(aggregateCallerBlockerTargetName)\townerFunctionRow=\(aggregateCallerBlockerOwner)\towner=\(aggregateCallerBlockerOwnerName)\townerStage=\(0 - intBufferElement(buffer: reachability.abiCapabilities, index: aggregateCallerBlockerOwner))"
+            }
+            aggregateCallerBlockerEdge: aggregateCallerBlockerEdge + 1
         }
         return String("compilerError\tkind=emptyIndirectABIActivation")
     }
@@ -8631,6 +8649,9 @@ function compilerReachableLLVMStateABIPlanIsValid(reachability: CompilerReachabl
         if intBufferElement(buffer: reachability.abiParticipants, index: ownerFunctionRow) == 1
             && compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: targetFunctionRow)
             && intBufferElement(buffer: reachability.abiParticipants, index: targetFunctionRow) != 1 { return false }
+        if intBufferElement(buffer: reachability.abiParticipants, index: targetFunctionRow) == 1
+            && compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: targetFunctionRow)
+            && intBufferElement(buffer: reachability.abiParticipants, index: ownerFunctionRow) != 1 { return false }
         edgeIndex: edgeIndex + 1
     }
     return true
@@ -8690,6 +8711,20 @@ function compilerReachableLLVMStateBuild(reachability: CompilerReachableLLVMStat
                     if intBufferSet(buffer: reachability.abiParticipants, index: parameterParticipationTarget, value: 1) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
                     parameterParticipationChanged: true
                 }
+                if intBufferElement(buffer: reachability.abiParticipants, index: parameterParticipationTarget) == 1
+                    && compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterParticipationTarget)
+                    && intBufferElement(buffer: reachability.abiCapabilities, index: parameterParticipationOwner) == 1
+                    && intBufferElement(buffer: reachability.abiParticipants, index: parameterParticipationOwner) == 0 {
+                    if intBufferSet(buffer: reachability.abiParticipants, index: parameterParticipationOwner, value: 1) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+                    parameterParticipationChanged: true
+                }
+                if intBufferElement(buffer: reachability.abiParticipants, index: parameterParticipationTarget) == 1
+                    && compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterParticipationTarget)
+                    && intBufferElement(buffer: reachability.abiCapabilities, index: parameterParticipationOwner) != 1
+                    && intBufferElement(buffer: reachability.abiParticipants, index: parameterParticipationOwner) == 0 {
+                    if intBufferSet(buffer: reachability.abiParticipants, index: parameterParticipationOwner, value: 2) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+                    parameterParticipationChanged: true
+                }
                 parameterParticipationEdge: parameterParticipationEdge + 1
             }
         }
@@ -8700,6 +8735,18 @@ function compilerReachableLLVMStateBuild(reachability: CompilerReachableLLVMStat
             while closureEdge < intBufferCount(buffer: reachability.edgeTargets) {
                 let closureCheckedOwner: Int(intBufferElement(buffer: reachability.edgeOwners, index: closureEdge))
                 let closureCheckedTarget: Int(intBufferElement(buffer: reachability.edgeTargets, index: closureEdge))
+                if compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget)
+                    && intBufferElement(buffer: reachability.abiParticipants, index: closureCheckedOwner) == 2
+                    && intBufferElement(buffer: reachability.abiParticipants, index: closureCheckedTarget) == 1 {
+                    if intBufferSet(buffer: reachability.abiParticipants, index: closureCheckedTarget, value: 2) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+                    blockingParticipationChanged: true
+                }
+                if compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget)
+                    && intBufferElement(buffer: reachability.abiParticipants, index: closureCheckedTarget) == 2
+                    && intBufferElement(buffer: reachability.abiParticipants, index: closureCheckedOwner) == 1 {
+                    if intBufferSet(buffer: reachability.abiParticipants, index: closureCheckedOwner, value: 2) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+                    blockingParticipationChanged: true
+                }
                 if intBufferElement(buffer: reachability.abiParticipants, index: closureCheckedOwner) == 1
                     && (intBufferElement(buffer: reachability.abiCapabilities, index: closureCheckedOwner) != 1
                         || (compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedOwner) == compilerFunctionReturnABIIndirect()
@@ -12585,7 +12632,11 @@ function compilerBodyLLVMValue(emitter: CompilerBodyLLVMEmitter, valueID: Int): 
     let kind: Int(compilerIntTableValue(table: emitter.valueAssignments, row: row, column: compilerBodyLLVMValueAssignmentKindColumn()))
     let number: Int(compilerIntTableValue(table: emitter.valueAssignments, row: row, column: compilerBodyLLVMValueAssignmentNumberColumn()))
     let aux: Int(compilerIntTableValue(table: emitter.valueAssignments, row: row, column: compilerBodyLLVMValueAssignmentAuxColumn()))
-    let typeName: String(compilerBodyLLVMTypeName(typeKind: compilerIntTableValue(table: emitter.arena.mirValues, row: valueID, column: compilerBodyMIRValueTypeColumn())))
+    state typeName: String(compilerBodyLLVMValueTypeName(arena: emitter.arena, valueID: valueID))
+    if kind == compilerBodyLLVMValueParameter()
+        && !compilerModuleABIPlanIsParticipant(plan: emitter.abiPlan, functionRow: emitter.arena.ownerFunctionRow) {
+        typeName: compilerBodyLLVMTypeName(typeKind: compilerIntTableValue(table: emitter.arena.mirValues, row: valueID, column: compilerBodyMIRValueTypeColumn()))
+    }
     if kind == compilerBodyLLVMValueImmediate() {
         let sourceNodeID: Int(compilerIntTableValue(table: emitter.arena.mirValues, row: valueID, column: compilerBodyMIRValueSourceColumn()))
         return CompilerLLVMValue(text: compilerBodyArenaNodeText(arena: emitter.arena, nodeID: sourceNodeID), typeName: typeName)
@@ -12702,28 +12753,17 @@ function compilerBodyLLVMEmitterInitializeLabels(emitter: CompilerBodyLLVMEmitte
     let blockCount: Int(compilerIntTableRowCount(table: emitter.arena.cfgBlocks))
     while blockRow < blockCount {
         if compilerIntTableAppend(table: emitter.blockLabels, value: blockRow) != 0
-            || compilerIntTableAppend(table: emitter.blockLabels, value: 0) != 0
-            || compilerIntTableAppend(table: emitter.blockLabels, value: 0 - 1) != 0 { return 0 - 1 }
+            || compilerIntTableAppend(table: emitter.blockLabels, value: compilerBodyLLVMBlockLabelAfter()) != 0
+            || compilerIntTableAppend(table: emitter.blockLabels, value: blockRow) != 0 { return 0 - 1 }
         blockRow: blockRow + 1
     }
     if intBufferSet(buffer: emitter.blockLabels.values, index: compilerBodyLLVMBlockLabelKindColumn(), value: compilerBodyLLVMBlockLabelEntry()) != 0 { return 0 - 1 }
-    let visited: IntBuffer(intBufferCreate(capacity: blockCount))
-    while intBufferCount(buffer: visited) < blockCount { intBufferAppend(buffer: visited, value: 0) }
-    let status: Int(compilerBodyLLVMEmitterInitializeLabelsDepthFirst(emitter: emitter, blockID: 0, visited: visited))
-    intBufferDestroy(buffer: visited)
-    return status
+    return 0
 }
 
 function compilerBodyLLVMBlockLabel(emitter: CompilerBodyLLVMEmitter, blockID: Int): String {
-    let kind: Int(compilerIntTableValue(table: emitter.blockLabels, row: blockID, column: compilerBodyLLVMBlockLabelKindColumn()))
-    let number: Int(compilerIntTableValue(table: emitter.blockLabels, row: blockID, column: compilerBodyLLVMBlockLabelNumberColumn()))
-    if kind == compilerBodyLLVMBlockLabelEntry() { return String("entry") }
-    if kind == compilerBodyLLVMBlockLabelThen() { return "if\(number)" }
-    if kind == compilerBodyLLVMBlockLabelElse() { return "else\(number)" }
-    if kind == compilerBodyLLVMBlockLabelWhile() { return "while\(number)" }
-    if kind == compilerBodyLLVMBlockLabelWhileBody() { return "whileBody\(number)" }
-    if kind == compilerBodyLLVMBlockLabelAfterWhile() { return "afterWhile\(number)" }
-    return "after\(number)"
+    if blockID == 0 { return String("entry") }
+    return "bb\(blockID)"
 }
 
 function compilerBodyLLVMFirstCFGTarget(arena: CompilerBodyArena, blockID: Int, role: Int): Int {
@@ -12798,6 +12838,13 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
         return 0
     }
     if operationKind == compilerBodyMIROperationMemberRead() {
+        let plannedMemberReceiverValueID: Int(compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0))
+        let plannedMemberReceiverValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: plannedMemberReceiverValueID))
+        if plannedMemberReceiverValue.typeName != String("ptr") {
+            if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary, aux: 0 - 1) != 0
+                || intBufferSet(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary(), value: plannedTemporary + 1) != 0 { return 0 - 1 }
+            return 0
+        }
         let plannedMemberSourceNodeID: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationSourceColumn()))
         let memberText: String(compilerBodyArenaNodeText(arena: emitter.arena, nodeID: plannedMemberSourceNodeID))
         let memberTextLength: Int(stringLength(value: memberText))
@@ -13037,6 +13084,13 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         let memberReceiverValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0)))
         if memberAssignmentRow < 0 || memberReceiverValue.text == String("") { return 0 - 1 }
         let memberCallTemporary: Int(compilerIntTableValue(table: emitter.valueAssignments, row: memberAssignmentRow, column: compilerBodyLLVMValueAssignmentNumberColumn()))
+        if memberReceiverValue.typeName != String("ptr") {
+            let nativeMemberRow: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationTargetIDColumn()))
+            if nativeMemberRow < 0 { return 0 - 1 }
+            let nativeMemberOrdinal: Int(compilerIntTableValue(table: emitter.arena.tables.members, row: nativeMemberRow, column: 3))
+            if nativeMemberOrdinal < 0 { return 0 - 1 }
+            return textBufferAppend(buffer: emitter.renderedBlocks, text: "  %r\(memberCallTemporary) = extractvalue \(memberReceiverValue.typeName) \(memberReceiverValue.text), \(nativeMemberOrdinal)\n")
+        }
         let memberGlobalTemporary: Int(memberCallTemporary - 1)
         let memberNodeID: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationSourceColumn()))
         let memberNameText: String(compilerBodyArenaNodeText(arena: emitter.arena, nodeID: memberNodeID))
@@ -13547,6 +13601,9 @@ function compilerCoreRenderLLVMHelperFunctionTyped(tables: CompilerSyntaxTables,
     let returnType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.functions, row: functionRow, column: 6), localEnd: compilerIntTableValue(table: tables.functions, row: functionRow, column: 7)))
     let functionBlock: CompilerLLVMBasicBlock(compilerCoreMainLLVMBasicBlock(block: block))
     state llvmReturnType: String(compilerCoreLLVMTypeNameForRangeType(typeName: returnType))
+    if compilerModuleABIPlanIsParticipant(plan: abiPlan, functionRow: functionRow) {
+        llvmReturnType: compilerCoreLLVMNativeABITypeName(tables: tables, index: index, typeName: returnType)
+    }
     state parameterText: String(compilerCoreLLVMFunctionParameterTextPlanned(tables: tables, index: index, functionRow: functionRow, abiPlan: abiPlan))
     if compilerModuleABIPlanReturnMode(plan: abiPlan, tables: tables, index: index, functionRow: functionRow) == compilerFunctionReturnABIIndirect() {
         llvmReturnType: String("void")

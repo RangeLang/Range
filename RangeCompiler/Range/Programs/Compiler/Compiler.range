@@ -71,10 +71,6 @@ function compileRangeNativeSourceDirectiveOutput(source: String): String {
 }
 
 function compileRangeNativeProgramOutput(source: String): String {
-    let typedFixedOutput: String(compilerTypedIRFixedLLVMIfSupported(source: source))
-    if typedFixedOutput != String("") {
-        return typedFixedOutput
-    }
     let program: CompilerProgram(parseCompilerProgramForLLVM(source: source))
     return compilerCoreLLVMTextForProgram(program: program)
 }
