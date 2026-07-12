@@ -792,6 +792,8 @@ function compilerSyntaxKindPrefixNot(): Int { return 31 }
 function compilerSyntaxKindPrefixNegate(): Int { return 32 }
 function compilerSyntaxKindWhile(): Int { return 33 }
 function compilerSyntaxKindOptionalCoalescing(): Int { return 34 }
+function compilerSyntaxKindInterpolatedString(): Int { return 35 }
+function compilerSyntaxKindStringSegment(): Int { return 36 }
 
 function compilerSyntaxLocalKindLet(): Int { return 1 }
 function compilerSyntaxLocalKindState(): Int { return 2 }
@@ -817,6 +819,7 @@ function compilerSyntaxRoleElseRegion(): Int { return 17 }
 function compilerSyntaxRoleGroupedValue(): Int { return 18 }
 function compilerSyntaxRoleOperand(): Int { return 19 }
 function compilerSyntaxRoleWhileBody(): Int { return 20 }
+function compilerSyntaxRoleInterpolationPart(): Int { return 21 }
 
 function compilerSyntaxTablesCreate(source: String): CompilerSyntaxTables {
     return CompilerSyntaxTables(
@@ -1152,10 +1155,10 @@ function compilerLegacyAppendInterpolatedStringEdges(tables: CompilerSyntaxTable
     let backslash: String(compilerCoreSingleBackslash())
     state sourceIndex: Int(0)
     while sourceIndex + 1 < contentLength {
-        if content.character(index: sourceIndex) == backslash && content.character(index: sourceIndex + 1) == String("(") {
+        if stringCharacterAt(source: content, index: sourceIndex) == backslash && stringCharacterAt(source: content, index: sourceIndex + 1) == String("(") {
             let expressionEnd: Int(compilerCoreInterpolatedExpressionEnd(content: content, start: sourceIndex + 2))
             if expressionEnd < contentLength {
-                let expressionText: String(content.substring(start: sourceIndex + 2, end: expressionEnd))
+                let expressionText: String(stringSubstring(source: content, start: sourceIndex + 2, end: expressionEnd))
                 let maybeExpression: Optional<CompilerExpression>(parseCompilerExpression(source: expressionText, start: 0, limit: stringLength(value: expressionText)))
                 if maybeExpression != nil {
                     let fallbackExpression: CompilerExpression(compilerCoreMissingExpression(start: 0))
@@ -7843,7 +7846,16 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
         let failedFunctions: String(textBufferMaterialize(buffer: reachability.functionsBuffer))
         let failedPlaceholderCount: Int(compilerCoreLLVMPlaceholderCount(text: failedFunctions))
         if failedPlaceholderCount > 0 { return compilerCoreLLVMPlaceholderFailure(placeholderCount: failedPlaceholderCount, renderedText: failedFunctions) }
-        return "compilerError\tkind=invalidFunctionReachability\tstage=\(intBufferElement(buffer: reachability.counters, index: compilerReachableLLVMFailureStage()))"
+        let failureStage: Int(intBufferElement(buffer: reachability.counters, index: compilerReachableLLVMFailureStage()))
+        if failureStage >= 100000 {
+            let failureFunctionRow: Int(failureStage - 100000)
+            let failureSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: failureFunctionRow, column: 0))
+            let failureDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: failureSyntaxID))
+            let failureFileID: Int(compilerIntTableValue(table: reachability.context.tables.declarations, row: failureDeclarationRow, column: 1))
+            let failureName: String(compilerTypedSyntaxLocalText(tables: reachability.context.tables, fileID: failureFileID, localStart: compilerIntTableValue(table: reachability.context.tables.declarations, row: failureDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: reachability.context.tables.declarations, row: failureDeclarationRow, column: 8)))
+            return "compilerError\tkind=invalidFunctionDiscovery\tfunctionRow=\(failureFunctionRow)\tfunction=\(failureName)\tfailureCode=\(0 - intBufferElement(buffer: reachability.abiCapabilities, index: failureFunctionRow))"
+        }
+        return "compilerError\tkind=invalidFunctionReachability\tstage=\(failureStage)"
     }
     if !compilerReachableLLVMStateABIPlanIsValid(reachability: reachability) { return String("compilerError\tkind=invalidModuleABIPlan") }
     if intBufferElement(buffer: reachability.counters, index: compilerReachableLLMIndirectCapabilities()) < 1 { return String("compilerError\tkind=emptyIndirectABICapability") }
@@ -8397,6 +8409,9 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
     state legacyEdgesAppended: Bool(false)
     if !typedReady {
         if usesTypedDiscovery && compilerBodyArenaTransitionSupportsFunction(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow) {
+            state retainedFailureCode: Int(typedFailureStage)
+            if intBufferCount(buffer: arena.failures) > 0 { retainedFailureCode: intBufferElement(buffer: arena.failures, index: 0) }
+            intBufferSet(buffer: reachability.abiCapabilities, index: functionRow, value: 0 - retainedFailureCode)
             compilerBodyArenaDestroy(arena: arena)
             stringTransientRegionReset(mark: transientMark)
             return 0 - 1
@@ -8567,7 +8582,7 @@ function compilerReachableLLVMStateBuild(reachability: CompilerReachableLLVMStat
     while intBufferElement(buffer: reachability.counters, index: compilerReachableLLMWorkIndex()) < intBufferCount(buffer: reachability.worklist) {
         let workIndex: Int(intBufferElement(buffer: reachability.counters, index: compilerReachableLLMWorkIndex()))
         let functionRow: Int(intBufferElement(buffer: reachability.worklist, index: workIndex))
-        if compilerReachableLLVMStateDiscoverFunction(reachability: reachability, functionRow: functionRow) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+        if compilerReachableLLVMStateDiscoverFunction(reachability: reachability, functionRow: functionRow) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 100000 + functionRow) }
         if intBufferSet(buffer: reachability.counters, index: compilerReachableLLMWorkIndex(), value: workIndex + 1) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
     }
     let closureTransientMark: Int(stringTransientRegionMark())
@@ -9405,6 +9420,9 @@ function compilerBodyMIROperationOptionalNone(): Int { return 25 }
 function compilerBodyMIROperationOptionalSome(): Int { return 27 }
 function compilerBodyMIROperationOptionalHasValue(): Int { return 28 }
 function compilerBodyMIROperationOptionalPayload(): Int { return 29 }
+function compilerBodyMIROperationStringConcat(): Int { return 30 }
+function compilerBodyMIROperationStringFromInt(): Int { return 31 }
+function compilerBodyMIROperationStringFromBool(): Int { return 32 }
 
 function compilerBodyMIROperandColumnCount(): Int { return 4 }
 function compilerBodyMIROperandOperationColumn(): Int { return 0 }
@@ -9456,6 +9474,7 @@ function compilerBodyLLVMGlobalDescriptorByteCountColumn(): Int { return 2 }
 function compilerBodyLLVMGlobalDescriptorKindColumn(): Int { return 3 }
 function compilerBodyLLVMGlobalDescriptorStringLiteral(): Int { return 1 }
 function compilerBodyLLVMGlobalDescriptorMemberName(): Int { return 2 }
+function compilerBodyLLVMGlobalDescriptorStringSegment(): Int { return 3 }
 function compilerBodyLLVMRuntimeStringEqual(): Int { return 1 }
 function compilerBodyLLVMRuntimeStringCompare(): Int { return 2 }
 function compilerBodyLLVMEmitterStateCount(): Int { return 5 }
@@ -9671,6 +9690,70 @@ function compilerBodyParseSuccess(nodeID: Int, nextIndex: Int): CompilerBodyPars
     return CompilerBodyParseResult(nodeID: nodeID, nextIndex: nextIndex, isValid: true)
 }
 
+function compilerBodyArenaInterpolationEnd(arena: CompilerBodyArena, start: Int, limit: Int): Int {
+    state cursor: Int(start)
+    state depth: Int(0)
+    while cursor < limit {
+        let character: String(arena.tables.sourceStore.source.character(index: cursor))
+        if character == String("(") { depth: depth + 1 }
+        if character == String(")") {
+            if depth == 0 { return cursor }
+            depth: depth - 1
+        }
+        cursor: cursor + 1
+    }
+    return 0 - 1
+}
+
+function compilerBodyArenaAppendInterpolationPart(arena: CompilerBodyArena, interpolationNodeID: Int, kind: Int, start: Int, end: Int, ordinal: Int): Int {
+    let partNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: kind, ordinal: ordinal, start: start, end: end, firstStart: start, firstEnd: end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if partNodeID < 0 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: interpolationNodeID, childNodeID: partNodeID, role: compilerSyntaxRoleInterpolationPart(), ordinal: ordinal) != 0 { return 0 - 1 }
+    return partNodeID
+}
+
+function compilerBodyArenaParseInterpolatedString(arena: CompilerBodyArena, token: RangeLexedToken): CompilerBodyParseResult {
+    state tokenStart: Int(0)
+    tokenStart: token.start
+    state tokenEnd: Int(0)
+    tokenEnd: token.end
+    let interpolationNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindInterpolatedString(), ordinal: 0, start: tokenStart, end: tokenEnd, firstStart: tokenStart, firstEnd: tokenEnd, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if interpolationNodeID < 0 { return compilerBodyParseFailure(index: tokenStart) }
+    let contentStart: Int(tokenStart + 1)
+    let contentEnd: Int(tokenEnd - 1)
+    let backslash: String(compilerCoreSingleBackslash())
+    state cursor: Int(0)
+    cursor: contentStart
+    state segmentStart: Int(0)
+    segmentStart: contentStart
+    state ordinal: Int(0)
+    while cursor + 1 < contentEnd {
+        if arena.tables.sourceStore.source.character(index: cursor) == backslash
+            && arena.tables.sourceStore.source.character(index: cursor + 1) == String("(") {
+            if segmentStart < cursor {
+                if compilerBodyArenaAppendInterpolationPart(arena: arena, interpolationNodeID: interpolationNodeID, kind: compilerSyntaxKindStringSegment(), start: segmentStart, end: cursor, ordinal: ordinal) < 0 { return compilerBodyParseFailure(index: cursor) }
+                ordinal: ordinal + 1
+            }
+            let expressionStart: Int(cursor + 2)
+            let expressionEnd: Int(compilerBodyArenaInterpolationEnd(arena: arena, start: expressionStart, limit: contentEnd))
+            if expressionEnd < expressionStart { return compilerBodyParseFailure(index: cursor) }
+            let expression: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: expressionStart, limit: expressionEnd, minimumPrecedence: 0))
+            if !expression.isValid || expression.nextIndex < expressionEnd
+                || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: interpolationNodeID, childNodeID: expression.nodeID, role: compilerSyntaxRoleInterpolationPart(), ordinal: ordinal) != 0 { return compilerBodyParseFailure(index: expressionStart) }
+            ordinal: ordinal + 1
+            cursor: expressionEnd + 1
+            segmentStart: cursor
+        } else {
+            cursor: cursor + 1
+        }
+    }
+    if segmentStart < contentEnd {
+        if compilerBodyArenaAppendInterpolationPart(arena: arena, interpolationNodeID: interpolationNodeID, kind: compilerSyntaxKindStringSegment(), start: segmentStart, end: contentEnd, ordinal: ordinal) < 0 { return compilerBodyParseFailure(index: segmentStart) }
+        ordinal: ordinal + 1
+    }
+    if ordinal == 0 { return compilerBodyParseFailure(index: tokenStart) }
+    return compilerBodyParseSuccess(nodeID: interpolationNodeID, nextIndex: tokenEnd)
+}
+
 function compilerBodyArenaBinaryKind(token: RangeLexedToken): Int {
     if token.kind == String("equalEqual") || token.kind == String("bangEqual") { return compilerSyntaxKindEquality() }
     if token.kind == String("andAnd") { return compilerSyntaxKindBooleanAnd() }
@@ -9706,7 +9789,7 @@ function compilerBodyArenaParsePrimary(arena: CompilerBodyArena, start: Int, lim
     state kind: Int(0 - 1)
     if token.kind == String("integer") { kind: compilerSyntaxKindIntegerLiteral() }
     if token.kind == String("stringLiteral") {
-        if compilerCoreStringContentHasInterpolation(content: compilerCoreStringLiteralContent(text: token.text)) { return compilerBodyParseFailure(index: start) }
+        if compilerCoreStringContentHasInterpolation(content: compilerCoreStringLiteralContent(text: token.text)) { return compilerBodyArenaParseInterpolatedString(arena: arena, token: token) }
         kind: compilerSyntaxKindStringLiteral()
     }
     if (token.kind == String("identifier") || token.kind == String("keyword")) && (token.text == String("true") || token.text == String("false")) { kind: compilerSyntaxKindBoolLiteral() }
@@ -10155,7 +10238,7 @@ function compilerBodyArenaNodeText(arena: CompilerBodyArena, nodeID: Int): Strin
 function compilerBodyArenaExpressionTypeKind(arena: CompilerBodyArena, nodeID: Int): Int {
     let kind: Int(compilerIntTableValue(table: arena.nodes, row: nodeID, column: 1))
     if kind == compilerSyntaxKindIntegerLiteral() { return compilerBodyTypeInt() }
-    if kind == compilerSyntaxKindStringLiteral() { return compilerBodyTypeString() }
+    if kind == compilerSyntaxKindStringLiteral() || kind == compilerSyntaxKindStringSegment() || kind == compilerSyntaxKindInterpolatedString() { return compilerBodyTypeString() }
     if kind == compilerSyntaxKindBoolLiteral() { return compilerBodyTypeBool() }
     if kind == compilerSyntaxKindGrouping() {
         let groupedNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleGroupedValue(), ordinal: 0))
@@ -10418,7 +10501,27 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
         }
         return 0
     }
-    if kind == compilerSyntaxKindIntegerLiteral() || kind == compilerSyntaxKindStringLiteral() || kind == compilerSyntaxKindBoolLiteral() { return 0 }
+    if kind == compilerSyntaxKindInterpolatedString() {
+        state interpolationOrdinal: Int(0)
+        state keepResolvingInterpolation: Bool(true)
+        while keepResolvingInterpolation {
+            let interpolationPartNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleInterpolationPart(), ordinal: interpolationOrdinal))
+            if interpolationPartNodeID < 0 {
+                keepResolvingInterpolation: false
+            } else {
+                let interpolationPartKind: Int(compilerIntTableValue(table: arena.nodes, row: interpolationPartNodeID, column: 1))
+                if interpolationPartKind != compilerSyntaxKindStringSegment() {
+                    if compilerBodyArenaResolveExpression(arena: arena, index: index, nodeID: interpolationPartNodeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
+                    let interpolationPartType: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: interpolationPartNodeID))
+                    if interpolationPartType != compilerBodyTypeString() && interpolationPartType != compilerBodyTypeInt() && interpolationPartType != compilerBodyTypeBool() { return 0 - 1 }
+                }
+                interpolationOrdinal: interpolationOrdinal + 1
+            }
+        }
+        if interpolationOrdinal == 0 { return 0 - 1 }
+        return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: nodeID, targetKind: compilerBodyResolutionOperator(), targetID: kind, typeKind: compilerBodyTypeString(), typeID: 0 - 1, regionNodeID: regionNodeID)
+    }
+    if kind == compilerSyntaxKindIntegerLiteral() || kind == compilerSyntaxKindStringLiteral() || kind == compilerSyntaxKindStringSegment() || kind == compilerSyntaxKindBoolLiteral() { return 0 }
     if kind == compilerSyntaxKindGrouping() {
         let groupedNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleGroupedValue(), ordinal: 0))
         if groupedNodeID < 0 { return 0 - 1 }
@@ -10623,6 +10726,22 @@ function compilerBodyArenaBuildCFGExpressionChildren(arena: CompilerBodyArena, n
             argumentOrdinal: argumentOrdinal + 1
         }
         return CompilerBodyCFGResult(blockID: currentBlockID, isTerminated: false, isValid: true)
+    }
+    if kind == compilerSyntaxKindInterpolatedString() {
+        state interpolationOrdinal: Int(0)
+        state keepSchedulingInterpolation: Bool(true)
+        while keepSchedulingInterpolation {
+            let interpolationPartNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleInterpolationPart(), ordinal: interpolationOrdinal))
+            if interpolationPartNodeID < 0 {
+                keepSchedulingInterpolation: false
+            } else {
+                let interpolationPartResult: CompilerBodyCFGResult(compilerBodyArenaBuildCFGExpression(arena: arena, nodeID: interpolationPartNodeID, entryBlockID: currentBlockID))
+                if !interpolationPartResult.isValid { return interpolationPartResult }
+                currentBlockID: interpolationPartResult.blockID
+                interpolationOrdinal: interpolationOrdinal + 1
+            }
+        }
+        return CompilerBodyCFGResult(blockID: currentBlockID, isTerminated: false, isValid: interpolationOrdinal > 0)
     }
     if kind == compilerSyntaxKindEquality() || kind == compilerSyntaxKindBooleanAnd() || kind == compilerSyntaxKindBooleanOr()
         || kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication()
@@ -10834,14 +10953,17 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindGreaterEqual()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindPrefixNot()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindPrefixNegate()
-                && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindOptionalCoalescing())
+                && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindOptionalCoalescing()
+                && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindInterpolatedString())
             || targetKind < compilerBodyResolutionLocalSymbol() || targetKind > compilerBodyResolutionConstruct() { return false }
         if targetKind == compilerBodyResolutionLocalSymbol() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.symbols)) { return false }
         if targetKind == compilerBodyResolutionFunction() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.functions)) { return false }
         if targetKind == compilerBodyResolutionBuiltin() && targetID != compilerBodyBuiltinString() && targetID != compilerBodyBuiltinRuntimeCall() && targetID != compilerBodyBuiltinNil() { return false }
         if targetKind == compilerBodyResolutionMember() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.members)) { return false }
         if targetKind == compilerBodyResolutionOperator()
-            && ((targetID < compilerSyntaxKindAddition() || targetID > compilerSyntaxKindPrefixNegate()) && targetID != compilerSyntaxKindOptionalCoalescing()) { return false }
+            && ((targetID < compilerSyntaxKindAddition() || targetID > compilerSyntaxKindPrefixNegate())
+                && targetID != compilerSyntaxKindOptionalCoalescing()
+                && targetID != compilerSyntaxKindInterpolatedString()) { return false }
         if targetKind == compilerBodyResolutionRuntimeBuiltin() && (targetID <= compilerBodyRuntimeBuiltinNone() || targetID > compilerBodyRuntimeBuiltinCount()) { return false }
         if targetKind == compilerBodyResolutionConstruct() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.syntaxIndex)
             || compilerIntTableValue(table: arena.tables.syntaxIndex, row: targetID, column: 0) != compilerSyntaxKindConstruct()) { return false }
@@ -10954,8 +11076,12 @@ function compilerBodyMemoryBuildValuePhase(arena: CompilerBodyArena): Int {
             nodeFactKind: compilerBodyMemoryFactLiteralValue()
             nodeTypeKind: compilerBodyTypeInt()
         }
-        if nodeKind == compilerSyntaxKindStringLiteral() {
+        if nodeKind == compilerSyntaxKindStringLiteral() || nodeKind == compilerSyntaxKindStringSegment() {
             nodeFactKind: compilerBodyMemoryFactLiteralValue()
+            nodeTypeKind: compilerBodyTypeString()
+        }
+        if nodeKind == compilerSyntaxKindInterpolatedString() {
+            nodeFactKind: compilerBodyMemoryFactBinaryValue()
             nodeTypeKind: compilerBodyTypeString()
         }
         if nodeKind == compilerSyntaxKindBoolLiteral() {
@@ -11635,12 +11761,54 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
             || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: compilerBodyMIROperationMemberRead(), resultValueID: memberValueID, sourceNodeID: nodeID, firstOperand: memberFirstOperand, operandCount: 1, targetKind: compilerBodyMIROperationTargetNone(), targetID: memberRow) != memberOperationID { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
         return CompilerBodyMIRValueResult(valueID: memberValueID, isValid: true)
     }
-    if kind == compilerSyntaxKindIntegerLiteral() || kind == compilerSyntaxKindBoolLiteral() || kind == compilerSyntaxKindStringLiteral() {
+    if kind == compilerSyntaxKindInterpolatedString() {
+        state interpolationOrdinal: Int(0)
+        state interpolationValueID: Int(0 - 1)
+        state keepBuildingInterpolation: Bool(true)
+        while keepBuildingInterpolation {
+            let interpolationPartNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleInterpolationPart(), ordinal: interpolationOrdinal))
+            if interpolationPartNodeID < 0 {
+                keepBuildingInterpolation: false
+            } else {
+                let interpolationPartValue: CompilerBodyMIRValueResult(compilerBodyMIRBuildExpression(arena: arena, nodeID: interpolationPartNodeID, blockID: blockID))
+                if !interpolationPartValue.isValid { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
+                state interpolationStringValueID: Int(0 - 1)
+                interpolationStringValueID: interpolationPartValue.valueID
+                let interpolationValueType: Int(compilerIntTableValue(table: arena.mirValues, row: interpolationPartValue.valueID, column: compilerBodyMIRValueTypeColumn()))
+                if interpolationValueType == compilerBodyTypeInt() || interpolationValueType == compilerBodyTypeBool() {
+                    let convertedValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueLocal(), typeKind: compilerBodyTypeString(), typeID: 0 - 1, sourceNodeID: nodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: interpolationPartNodeID))
+                    let conversionOperationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
+                    let conversionFirstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
+                    state conversionOperationKind: Int(compilerBodyMIROperationStringFromInt())
+                    if interpolationValueType == compilerBodyTypeBool() { conversionOperationKind: compilerBodyMIROperationStringFromBool() }
+                    if convertedValueID < 0
+                        || compilerBodyMIRAppendOperand(arena: arena, operationID: conversionOperationID, ordinal: 0, valueID: interpolationPartValue.valueID, role: compilerBodyMIROperandArgument()) != 0
+                        || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: conversionOperationKind, resultValueID: convertedValueID, sourceNodeID: nodeID, firstOperand: conversionFirstOperand, operandCount: 1, targetKind: compilerBodyMIROperationTargetNone(), targetID: 0 - 1) != conversionOperationID { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
+                    interpolationStringValueID: convertedValueID
+                } else if interpolationValueType != compilerBodyTypeString() { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
+                if interpolationValueID < 0 {
+                    interpolationValueID: interpolationStringValueID
+                } else {
+                    let concatenatedValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueLocal(), typeKind: compilerBodyTypeString(), typeID: 0 - 1, sourceNodeID: nodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: nodeID))
+                    let concatOperationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
+                    let concatFirstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
+                    if concatenatedValueID < 0
+                        || compilerBodyMIRAppendOperand(arena: arena, operationID: concatOperationID, ordinal: 0, valueID: interpolationValueID, role: compilerBodyMIROperandLeft()) != 0
+                        || compilerBodyMIRAppendOperand(arena: arena, operationID: concatOperationID, ordinal: 1, valueID: interpolationStringValueID, role: compilerBodyMIROperandRight()) != 0
+                        || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: compilerBodyMIROperationStringConcat(), resultValueID: concatenatedValueID, sourceNodeID: nodeID, firstOperand: concatFirstOperand, operandCount: 2, targetKind: compilerBodyMIROperationTargetNone(), targetID: 0 - 1) != concatOperationID { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
+                    interpolationValueID: concatenatedValueID
+                }
+                interpolationOrdinal: interpolationOrdinal + 1
+            }
+        }
+        return CompilerBodyMIRValueResult(valueID: interpolationValueID, isValid: interpolationValueID >= 0)
+    }
+    if kind == compilerSyntaxKindIntegerLiteral() || kind == compilerSyntaxKindBoolLiteral() || kind == compilerSyntaxKindStringLiteral() || kind == compilerSyntaxKindStringSegment() {
         state literalTypeKind: Int(compilerBodyTypeInt())
         state valueKind: Int(compilerBodyMIRValueConstant())
         state literalOperationKind: Int(compilerBodyMIROperationConstant())
         if kind == compilerSyntaxKindBoolLiteral() { literalTypeKind: compilerBodyTypeBool() }
-        if kind == compilerSyntaxKindStringLiteral() {
+        if kind == compilerSyntaxKindStringLiteral() || kind == compilerSyntaxKindStringSegment() {
             literalTypeKind: compilerBodyTypeString()
             valueKind: compilerBodyMIRValueStringGlobal()
             literalOperationKind: compilerBodyMIROperationStringGlobal()
@@ -12065,7 +12233,7 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
         if compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationIDColumn()) != operationRow
             || compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationBlockColumn()) < 0
             || compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationBlockColumn()) >= compilerIntTableRowCount(table: arena.mirBlocks)
-            || operationKind < compilerBodyMIROperationConstant() || operationKind > compilerBodyMIROperationOptionalPayload()
+            || operationKind < compilerBodyMIROperationConstant() || operationKind > compilerBodyMIROperationStringFromBool()
             || (!compilerBodyMIROperationIsTerminator(kind: operationKind) && (resultValueID < 0 || resultValueID >= valueCount))
             || (compilerBodyMIROperationIsTerminator(kind: operationKind) && resultValueID != 0 - 1) { return 300000 + operationRow * 100 + operationKind }
         if operationKind == compilerBodyMIROperationDirectCall() {
@@ -12131,6 +12299,28 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                 if payloadResolutionRow < 0
                     || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeIDColumn()) != compilerIntTableValue(table: arena.resolutions, row: payloadResolutionRow, column: compilerBodyResolutionTypeIDColumn()) { return 300000 + operationRow * 100 + operationKind }
             }
+        }
+        if operationKind == compilerBodyMIROperationStringConcat() {
+            let concatLeftValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
+            let concatRightValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 1))
+            if validationTargetKind != compilerBodyMIROperationTargetNone() || validationTargetID != 0 - 1
+                || compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()) != 2
+                || concatLeftValueID < 0 || concatRightValueID < 0
+                || compilerIntTableValue(table: arena.mirValues, row: concatLeftValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString()
+                || compilerIntTableValue(table: arena.mirValues, row: concatRightValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString()
+                || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString()
+                || validationStorageID != 0 - 1 { return 300000 + operationRow * 100 + operationKind }
+        }
+        if operationKind == compilerBodyMIROperationStringFromInt() || operationKind == compilerBodyMIROperationStringFromBool() {
+            let convertedOperandValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
+            state expectedConvertedType: Int(compilerBodyTypeInt())
+            if operationKind == compilerBodyMIROperationStringFromBool() { expectedConvertedType: compilerBodyTypeBool() }
+            if validationTargetKind != compilerBodyMIROperationTargetNone() || validationTargetID != 0 - 1
+                || compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()) != 1
+                || convertedOperandValueID < 0
+                || compilerIntTableValue(table: arena.mirValues, row: convertedOperandValueID, column: compilerBodyMIRValueTypeColumn()) != expectedConvertedType
+                || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString()
+                || validationStorageID != 0 - 1 { return 300000 + operationRow * 100 + operationKind }
         }
         if operationKind == compilerBodyMIROperationReturn() {
             let ownerReturnMode: Int(compilerModuleABIPlanReturnMode(plan: abiPlan, tables: arena.tables, index: arena.declarationIndex, functionRow: arena.ownerFunctionRow))
@@ -12476,13 +12666,18 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
     if operationKind == compilerBodyMIROperationStringGlobal() {
         let plannedStringSourceNodeID: Int(compilerIntTableValue(table: emitter.arena.mirValues, row: resultValueID, column: compilerBodyMIRValueSourceColumn()))
         let plannedLiteralText: String(compilerBodyArenaNodeText(arena: emitter.arena, nodeID: plannedStringSourceNodeID))
-        let literalContent: String(compilerCoreStringLiteralContent(text: plannedLiteralText))
+        state literalContent: String(compilerCoreStringLiteralContent(text: plannedLiteralText))
+        state stringDescriptorKind: Int(compilerBodyLLVMGlobalDescriptorStringLiteral())
+        if compilerIntTableValue(table: emitter.arena.nodes, row: plannedStringSourceNodeID, column: 1) == compilerSyntaxKindStringSegment() {
+            literalContent: compilerCoreDecodeStringLiteralContent(content: plannedLiteralText)
+            stringDescriptorKind: compilerBodyLLVMGlobalDescriptorStringSegment()
+        }
         let literalLength: Int(stringLength(value: literalContent))
         let byteCount: Int(literalLength + 1)
         if compilerIntTableAppend(table: emitter.globalDescriptors, value: plannedTemporary) != 0
             || compilerIntTableAppend(table: emitter.globalDescriptors, value: plannedStringSourceNodeID) != 0
             || compilerIntTableAppend(table: emitter.globalDescriptors, value: byteCount) != 0
-            || compilerIntTableAppend(table: emitter.globalDescriptors, value: compilerBodyLLVMGlobalDescriptorStringLiteral()) != 0
+            || compilerIntTableAppend(table: emitter.globalDescriptors, value: stringDescriptorKind) != 0
             || compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueGlobalString(), number: plannedTemporary, aux: byteCount) != 0
             || intBufferSet(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary(), value: plannedTemporary + 1) != 0 { return 0 - 1 }
         return 0
@@ -12682,6 +12877,27 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         if optionalAssignmentRow < 0 || optionalOperandValue.text == String("") || optionalAggregateType == String("") { return 0 - 1 }
         let optionalTemporary: Int(compilerIntTableValue(table: emitter.valueAssignments, row: optionalAssignmentRow, column: compilerBodyLLVMValueAssignmentNumberColumn()))
         return textBufferAppend(buffer: emitter.renderedBlocks, text: "  %r\(optionalTemporary) = extractvalue \(optionalAggregateType) \(optionalOperandValue.text), \(optionalFieldOrdinal)\n")
+    }
+    if operationKind == compilerBodyMIROperationStringConcat() {
+        let concatAssignmentRow: Int(compilerBodyLLVMValueAssignmentRow(emitter: emitter, valueID: resultValueID))
+        let concatLeftValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0)))
+        let concatRightValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 1)))
+        if concatAssignmentRow < 0 || concatLeftValue.typeName != String("ptr") || concatRightValue.typeName != String("ptr") { return 0 - 1 }
+        let concatTemporary: Int(compilerIntTableValue(table: emitter.valueAssignments, row: concatAssignmentRow, column: compilerBodyLLVMValueAssignmentNumberColumn()))
+        return textBufferAppend(buffer: emitter.renderedBlocks, text: "  %r\(concatTemporary) = call ptr @stringConcat(ptr \(concatLeftValue.text), ptr \(concatRightValue.text))\n")
+    }
+    if operationKind == compilerBodyMIROperationStringFromInt() || operationKind == compilerBodyMIROperationStringFromBool() {
+        let conversionAssignmentRow: Int(compilerBodyLLVMValueAssignmentRow(emitter: emitter, valueID: resultValueID))
+        let convertedValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0)))
+        state conversionFunctionName: String("stringFromInt")
+        state conversionOperandType: String("i32")
+        if operationKind == compilerBodyMIROperationStringFromBool() {
+            conversionFunctionName: String("stringFromBool")
+            conversionOperandType: String("i1")
+        }
+        if conversionAssignmentRow < 0 || convertedValue.typeName != conversionOperandType { return 0 - 1 }
+        let conversionTemporary: Int(compilerIntTableValue(table: emitter.valueAssignments, row: conversionAssignmentRow, column: compilerBodyLLVMValueAssignmentNumberColumn()))
+        return textBufferAppend(buffer: emitter.renderedBlocks, text: "  %r\(conversionTemporary) = call ptr @\(conversionFunctionName)(\(conversionOperandType) \(convertedValue.text))\n")
     }
     if operationKind == compilerBodyMIROperationPhi() {
         let phiAssignmentRow: Int(compilerBodyLLVMValueAssignmentRow(emitter: emitter, valueID: resultValueID))
@@ -12900,6 +13116,7 @@ function compilerBodyLLVMEmitterRenderGlobals(emitter: CompilerBodyLLVMEmitter):
         let descriptorText: String(compilerBodyArenaNodeText(arena: emitter.arena, nodeID: sourceNodeID))
         state descriptorContent: String(descriptorText)
         if descriptorKind == compilerBodyLLVMGlobalDescriptorStringLiteral() { descriptorContent: compilerCoreStringLiteralContent(text: descriptorText) }
+        if descriptorKind == compilerBodyLLVMGlobalDescriptorStringSegment() { descriptorContent: compilerCoreDecodeStringLiteralContent(content: descriptorText) }
         let renderedText: String(compilerCoreLLVMGlobalStringRenderedText(text: compilerCoreStatementRecordEncodeValue(value: descriptorContent)))
         textBufferAppend(buffer: output, text: "@.str.\(temporary) = private unnamed_addr constant [\(byteCount) x i8] c\"\(renderedText)\\00\"\n")
         row: row + 1
@@ -13005,7 +13222,7 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
         if compilerIntTableValue(table: arena.nodes, row: nodeRow, column: 0) != nodeRow
             || compilerIntTableValue(table: arena.nodes, row: nodeRow, column: 2) != arena.fileID
             || kind < compilerSyntaxKindEntry()
-            || kind > compilerSyntaxKindOptionalCoalescing() { return false }
+            || kind > compilerSyntaxKindStringSegment() { return false }
         nodeRow: nodeRow + 1
     }
     state edgeRow: Int(0)
@@ -13015,7 +13232,7 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
         let role: Int(compilerIntTableValue(table: arena.edges, row: edgeRow, column: 2))
         if ownerNodeID < 0 || ownerNodeID >= nodeCount
             || childNodeID < 0 || childNodeID >= nodeCount
-            || role < compilerSyntaxRoleStatement() || role > compilerSyntaxRoleWhileBody() { return false }
+            || role < compilerSyntaxRoleStatement() || role > compilerSyntaxRoleInterpolationPart() { return false }
         edgeRow: edgeRow + 1
     }
     return true
@@ -16970,10 +17187,10 @@ function compilerCoreInterpolatedStringContentCalledFunctionNames(content: Strin
     state sourceIndex: Int(0)
 
     while sourceIndex + 1 < contentLength {
-        if content.character(index: sourceIndex) == backslash && content.character(index: sourceIndex + 1) == String("(") {
+        if stringCharacterAt(source: content, index: sourceIndex) == backslash && stringCharacterAt(source: content, index: sourceIndex + 1) == String("(") {
             let expressionEnd: Int(compilerCoreInterpolatedExpressionEnd(content: content, start: sourceIndex + 2))
             if expressionEnd < contentLength {
-                let expressionText: String(content.substring(start: sourceIndex + 2, end: expressionEnd))
+                let expressionText: String(stringSubstring(source: content, start: sourceIndex + 2, end: expressionEnd))
                 let expressionLength: Int(stringLength(value: expressionText))
                 let maybeExpression: Optional<CompilerExpression>(parseCompilerExpression(source: expressionText, start: 0, limit: expressionLength))
                 if maybeExpression != nil {
@@ -18042,7 +18259,7 @@ function compilerCoreTokenExpressionWithSink(token: RangeLexedToken, kind: Strin
 
 function parseCompilerIdentifierStatement(program: CompilerProgram, cursor: CompilerTokenCursor, token: RangeLexedToken, bodyEnd: Int): Optional<CompilerStatement> {
     let tokenColonStart: Int(compilerCoreFirstNonWhitespaceIndex(source: cursor.source, start: token.end, end: bodyEnd))
-    if tokenColonStart < bodyEnd && cursor.source.substring(start: tokenColonStart, end: tokenColonStart + 1) == String(":") {
+    if tokenColonStart < bodyEnd && stringSubstring(source: cursor.source, start: tokenColonStart, end: tokenColonStart + 1) == String(":") {
         let tokenTarget: CompilerExpression(compilerCoreTokenExpression(token: token, kind: String("identifier"), value: token.text, summaryPrefix: String("identifier")))
         return parseCompilerIdentifierStatementWithTarget(cursor: cursor, token: token, target: tokenTarget, bodyEnd: bodyEnd)
     }
@@ -18063,7 +18280,7 @@ function parseCompilerIdentifierStatementWithTarget(cursor: CompilerTokenCursor,
         return compilerCoreExpressionStatement(expression: target)
     }
 
-    let colonText: String(cursor.source.substring(start: colonStart, end: colonStart + 1))
+    let colonText: String(stringSubstring(source: cursor.source, start: colonStart, end: colonStart + 1))
     if colonText != String(":") {
         return compilerCoreExpressionStatement(expression: target)
     }
