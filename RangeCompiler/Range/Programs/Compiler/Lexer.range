@@ -169,7 +169,7 @@ function lexRangeIdentifierLikeToken(source: String, start: Int, character: Stri
 }
 
 function rangeToken(kind: String, source: String, start: Int, end: Int): RangeLexedToken {
-    return RangeLexedToken(kind: kind, start: start, end: end, text: source.substring(start: start, end: end))
+    return RangeLexedToken(kind: kind, start: start, end: end, text: stringSubstring(source: source, start: start, end: end))
 }
 
 function readRangeLiteralToken(source: String, start: Int): Optional<RangeLexedToken> {
@@ -370,7 +370,7 @@ function readRangeStringInterpolationEnd(source: String, start: Int): Int {
 
 function rangeLexerSingleBackslash(): String {
     let pair: String("\\")
-    return pair.substring(start: 0, end: 1)
+    return stringSubstring(source: pair, start: 0, end: 1)
 }
 
 function readRangeSigilIdentifier(source: String, start: Int): Optional<RangeLexedToken> {
@@ -463,7 +463,7 @@ function readRangeIdentifier(source: String, start: Int): Optional<RangeLexedTok
         sourceIndex: sourceIndex + 1
     }
 
-    let text: String(source.substring(start: start, end: sourceIndex))
+    let text: String(stringSubstring(source: source, start: start, end: sourceIndex))
     if isRangeKeyword(value: text) {
         return rangeToken(kind: String("keyword"), source: source, start: start, end: sourceIndex)
     }

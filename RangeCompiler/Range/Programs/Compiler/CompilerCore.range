@@ -794,6 +794,8 @@ function compilerSyntaxKindWhile(): Int { return 33 }
 function compilerSyntaxKindOptionalCoalescing(): Int { return 34 }
 function compilerSyntaxKindInterpolatedString(): Int { return 35 }
 function compilerSyntaxKindStringSegment(): Int { return 36 }
+function compilerSyntaxKindDivision(): Int { return 37 }
+function compilerSyntaxKindRemainder(): Int { return 38 }
 
 function compilerSyntaxLocalKindLet(): Int { return 1 }
 function compilerSyntaxLocalKindState(): Int { return 2 }
@@ -5527,7 +5529,7 @@ function compilerTypedSyntaxLocalText(tables: CompilerSyntaxTables, fileID: Int,
     if globalStart < 0 || globalEnd < globalStart {
         return String("")
     }
-    return tables.sourceStore.source.substring(start: globalStart, end: globalEnd)
+    return stringSubstring(source: tables.sourceStore.source, start: globalStart, end: globalEnd)
 }
 
 function compilerTypedSyntaxRenderRawTable(name: String, table: CompilerIntTable): String {
@@ -7857,7 +7859,23 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
         }
         return "compilerError\tkind=invalidFunctionReachability\tstage=\(failureStage)"
     }
-    if !compilerReachableLLVMStateABIPlanIsValid(reachability: reachability) { return String("compilerError\tkind=invalidModuleABIPlan") }
+    if !compilerReachableLLVMStateABIPlanIsValid(reachability: reachability) {
+        state invalidPlanEdge: Int(0)
+        while invalidPlanEdge < intBufferCount(buffer: reachability.edgeTargets) {
+            let invalidPlanOwner: Int(intBufferElement(buffer: reachability.edgeOwners, index: invalidPlanEdge))
+            let invalidPlanTarget: Int(intBufferElement(buffer: reachability.edgeTargets, index: invalidPlanEdge))
+            let invalidPlanOwnerParticipant: Int(intBufferElement(buffer: reachability.abiParticipants, index: invalidPlanOwner))
+            let invalidPlanTargetParticipant: Int(intBufferElement(buffer: reachability.abiParticipants, index: invalidPlanTarget))
+            let invalidPlanTargetReturnMode: Int(intBufferElement(buffer: reachability.abiReturnModes, index: invalidPlanTarget))
+            let invalidPlanAggregateParameter: Bool(compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: invalidPlanTarget))
+            if (invalidPlanTargetReturnMode == compilerFunctionReturnABIIndirect() && invalidPlanOwnerParticipant != 1)
+                || (invalidPlanOwnerParticipant == 1 && invalidPlanAggregateParameter && invalidPlanTargetParticipant != 1) {
+                return "compilerError\tkind=invalidModuleABIPlanEdge\townerFunctionRow=\(invalidPlanOwner)\ttargetFunctionRow=\(invalidPlanTarget)\townerParticipant=\(invalidPlanOwnerParticipant)\ttargetParticipant=\(invalidPlanTargetParticipant)\ttargetReturnMode=\(invalidPlanTargetReturnMode)\ttargetAggregateParameter=\(invalidPlanAggregateParameter)"
+            }
+            invalidPlanEdge: invalidPlanEdge + 1
+        }
+        return String("compilerError\tkind=invalidModuleABIPlan")
+    }
     if intBufferElement(buffer: reachability.counters, index: compilerReachableLLMIndirectCapabilities()) < 1 { return String("compilerError\tkind=emptyIndirectABICapability") }
     if intBufferElement(buffer: reachability.counters, index: compilerReachableLLMIndirectActivations()) < 1 {
         state blockerEdge: Int(0)
@@ -7876,6 +7894,40 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
                 return "compilerError\tkind=indirectABIActivationBlocked\ttargetFunctionRow=\(blockerTarget)\ttarget=\(targetName)\townerFunctionRow=\(blockerOwner)\towner=\(ownerName)\townerStage=\(0 - intBufferElement(buffer: reachability.abiCapabilities, index: blockerOwner))"
             }
             blockerEdge: blockerEdge + 1
+        }
+        state incapableEdge: Int(0)
+        while incapableEdge < intBufferCount(buffer: reachability.edgeTargets) {
+            let incapableOwner: Int(intBufferElement(buffer: reachability.edgeOwners, index: incapableEdge))
+            let incapableTarget: Int(intBufferElement(buffer: reachability.edgeTargets, index: incapableEdge))
+            if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: incapableTarget) == compilerFunctionReturnABIIndirect()
+                && intBufferElement(buffer: reachability.abiCapabilities, index: incapableTarget) != 1
+                && intBufferElement(buffer: reachability.abiCapabilities, index: incapableOwner) == 1 {
+                let incapableTargetSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: incapableTarget, column: 0))
+                let incapableOwnerSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: incapableOwner, column: 0))
+                let incapableTargetDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: incapableTargetSyntaxID))
+                let incapableOwnerDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: incapableOwnerSyntaxID))
+                let incapableTargetName: String(compilerTypedSyntaxLocalText(tables: reachability.context.tables, fileID: compilerIntTableValue(table: reachability.context.tables.declarations, row: incapableTargetDeclarationRow, column: 1), localStart: compilerIntTableValue(table: reachability.context.tables.declarations, row: incapableTargetDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: reachability.context.tables.declarations, row: incapableTargetDeclarationRow, column: 8)))
+                let incapableOwnerName: String(compilerTypedSyntaxLocalText(tables: reachability.context.tables, fileID: compilerIntTableValue(table: reachability.context.tables.declarations, row: incapableOwnerDeclarationRow, column: 1), localStart: compilerIntTableValue(table: reachability.context.tables.declarations, row: incapableOwnerDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: reachability.context.tables.declarations, row: incapableOwnerDeclarationRow, column: 8)))
+                return "compilerError\tkind=indirectABIComponentBlocked\ttargetFunctionRow=\(incapableTarget)\ttarget=\(incapableTargetName)\ttargetStage=\(0 - intBufferElement(buffer: reachability.abiCapabilities, index: incapableTarget))\townerFunctionRow=\(incapableOwner)\towner=\(incapableOwnerName)"
+            }
+            incapableEdge: incapableEdge + 1
+        }
+        state parameterBlockerEdge: Int(0)
+        while parameterBlockerEdge < intBufferCount(buffer: reachability.edgeTargets) {
+            let parameterBlockerOwner: Int(intBufferElement(buffer: reachability.edgeOwners, index: parameterBlockerEdge))
+            let parameterBlockerTarget: Int(intBufferElement(buffer: reachability.edgeTargets, index: parameterBlockerEdge))
+            if compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterBlockerTarget)
+                && intBufferElement(buffer: reachability.abiCapabilities, index: parameterBlockerTarget) != 1
+                && intBufferElement(buffer: reachability.abiCapabilities, index: parameterBlockerOwner) == 1 {
+                let parameterBlockerTargetSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: parameterBlockerTarget, column: 0))
+                let parameterBlockerOwnerSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: parameterBlockerOwner, column: 0))
+                let parameterBlockerTargetDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: parameterBlockerTargetSyntaxID))
+                let parameterBlockerOwnerDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: parameterBlockerOwnerSyntaxID))
+                let parameterBlockerTargetName: String(compilerTypedSyntaxLocalText(tables: reachability.context.tables, fileID: compilerIntTableValue(table: reachability.context.tables.declarations, row: parameterBlockerTargetDeclarationRow, column: 1), localStart: compilerIntTableValue(table: reachability.context.tables.declarations, row: parameterBlockerTargetDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: reachability.context.tables.declarations, row: parameterBlockerTargetDeclarationRow, column: 8)))
+                let parameterBlockerOwnerName: String(compilerTypedSyntaxLocalText(tables: reachability.context.tables, fileID: compilerIntTableValue(table: reachability.context.tables.declarations, row: parameterBlockerOwnerDeclarationRow, column: 1), localStart: compilerIntTableValue(table: reachability.context.tables.declarations, row: parameterBlockerOwnerDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: reachability.context.tables.declarations, row: parameterBlockerOwnerDeclarationRow, column: 8)))
+                return "compilerError\tkind=aggregateParameterABIComponentBlocked\ttargetFunctionRow=\(parameterBlockerTarget)\ttarget=\(parameterBlockerTargetName)\ttargetStage=\(0 - intBufferElement(buffer: reachability.abiCapabilities, index: parameterBlockerTarget))\townerFunctionRow=\(parameterBlockerOwner)\towner=\(parameterBlockerOwnerName)"
+            }
+            parameterBlockerEdge: parameterBlockerEdge + 1
         }
         return String("compilerError\tkind=emptyIndirectABIActivation")
     }
@@ -8318,11 +8370,13 @@ function compilerReachableLLVMStateAppendLegacyEdges(reachability: CompilerReach
 }
 
 function compilerReachableLLVMStateShouldProbeIndirectABI(reachability: CompilerReachableLLVMState, functionRow: Int, edgeStart: Int): Bool {
-    if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow) == compilerFunctionReturnABIIndirect() { return true }
+    if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow) == compilerFunctionReturnABIIndirect()
+        || compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow) { return true }
     state edgeIndex: Int(edgeStart)
     while edgeIndex < intBufferCount(buffer: reachability.edgeTargets) {
         let targetFunctionRow: Int(intBufferElement(buffer: reachability.edgeTargets, index: edgeIndex))
-        if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: targetFunctionRow) == compilerFunctionReturnABIIndirect() { return true }
+        if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: targetFunctionRow) == compilerFunctionReturnABIIndirect()
+            || compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: targetFunctionRow) { return true }
         edgeIndex: edgeIndex + 1
     }
     return false
@@ -8332,7 +8386,8 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
     let transientMark: Int(stringTransientRegionMark())
     let edgeStart: Int(intBufferCount(buffer: reachability.edgeTargets))
     let usesTypedDiscovery: Bool(compilerBodyArenaFunctionUsesTypedParser(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow))
-    state shouldProbeIndirectABI: Bool(compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow) == compilerFunctionReturnABIIndirect())
+    state shouldProbeIndirectABI: Bool(compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow) == compilerFunctionReturnABIIndirect()
+        || compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow))
     if !usesTypedDiscovery {
         let probeEdgeOwners: IntBuffer(intBufferCreate(capacity: 16))
         let probeEdgeTargets: IntBuffer(intBufferCreate(capacity: 16))
@@ -8344,7 +8399,9 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
         }
         state probeEdgeIndex: Int(0)
         while probeEdgeIndex < intBufferCount(buffer: probeEdgeTargets) {
-            if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: intBufferElement(buffer: probeEdgeTargets, index: probeEdgeIndex)) == compilerFunctionReturnABIIndirect() { shouldProbeIndirectABI: true }
+            let probeTargetFunctionRow: Int(intBufferElement(buffer: probeEdgeTargets, index: probeEdgeIndex))
+            if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: probeTargetFunctionRow) == compilerFunctionReturnABIIndirect()
+                || compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: probeTargetFunctionRow) { shouldProbeIndirectABI: true }
             probeEdgeIndex: probeEdgeIndex + 1
         }
         if !shouldProbeIndirectABI {
@@ -8402,7 +8459,9 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
     if typedReady && !shouldProbeIndirectABI {
         state typedProbeEdgeIndex: Int(0)
         while typedProbeEdgeIndex < intBufferCount(buffer: typedEdgeTargets) {
-            if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: intBufferElement(buffer: typedEdgeTargets, index: typedProbeEdgeIndex)) == compilerFunctionReturnABIIndirect() { shouldProbeIndirectABI: true }
+            let typedProbeTargetFunctionRow: Int(intBufferElement(buffer: typedEdgeTargets, index: typedProbeEdgeIndex))
+            if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: typedProbeTargetFunctionRow) == compilerFunctionReturnABIIndirect()
+                || compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: typedProbeTargetFunctionRow) { shouldProbeIndirectABI: true }
             typedProbeEdgeIndex: typedProbeEdgeIndex + 1
         }
     }
@@ -8617,21 +8676,43 @@ function compilerReachableLLVMStateBuild(reachability: CompilerReachableLLVMStat
             }
             closureEdge: closureEdge + 1
         }
-        closureEdge: 0
-        while closureEdge < intBufferCount(buffer: reachability.edgeTargets) {
-            let closureCheckedOwner: Int(intBufferElement(buffer: reachability.edgeOwners, index: closureEdge))
-            let closureCheckedTarget: Int(intBufferElement(buffer: reachability.edgeTargets, index: closureEdge))
-            if intBufferElement(buffer: reachability.abiParticipants, index: closureCheckedOwner) == 1
-                && (intBufferElement(buffer: reachability.abiCapabilities, index: closureCheckedOwner) != 1
-                    || (compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedOwner) == compilerFunctionReturnABIIndirect()
-                        && intBufferElement(buffer: reachability.abiActivation, index: closureCheckedOwner) != 1)
-                    || (compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget) == compilerFunctionReturnABIIndirect()
-                        && intBufferElement(buffer: reachability.abiActivation, index: closureCheckedTarget) != 1)
-                    || (compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget)
-                        && intBufferElement(buffer: reachability.abiActivation, index: closureCheckedTarget) != 1)) {
-                if intBufferSet(buffer: reachability.abiParticipants, index: closureCheckedOwner, value: 2) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+        state parameterParticipationChanged: Bool(true)
+        while parameterParticipationChanged {
+            parameterParticipationChanged: false
+            state parameterParticipationEdge: Int(0)
+            while parameterParticipationEdge < intBufferCount(buffer: reachability.edgeTargets) {
+                let parameterParticipationOwner: Int(intBufferElement(buffer: reachability.edgeOwners, index: parameterParticipationEdge))
+                let parameterParticipationTarget: Int(intBufferElement(buffer: reachability.edgeTargets, index: parameterParticipationEdge))
+                if intBufferElement(buffer: reachability.abiParticipants, index: parameterParticipationOwner) == 1
+                    && compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterParticipationTarget)
+                    && intBufferElement(buffer: reachability.abiCapabilities, index: parameterParticipationTarget) == 1
+                    && intBufferElement(buffer: reachability.abiParticipants, index: parameterParticipationTarget) == 0 {
+                    if intBufferSet(buffer: reachability.abiParticipants, index: parameterParticipationTarget, value: 1) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+                    parameterParticipationChanged: true
+                }
+                parameterParticipationEdge: parameterParticipationEdge + 1
             }
-            closureEdge: closureEdge + 1
+        }
+        state blockingParticipationChanged: Bool(true)
+        while blockingParticipationChanged {
+            blockingParticipationChanged: false
+            closureEdge: 0
+            while closureEdge < intBufferCount(buffer: reachability.edgeTargets) {
+                let closureCheckedOwner: Int(intBufferElement(buffer: reachability.edgeOwners, index: closureEdge))
+                let closureCheckedTarget: Int(intBufferElement(buffer: reachability.edgeTargets, index: closureEdge))
+                if intBufferElement(buffer: reachability.abiParticipants, index: closureCheckedOwner) == 1
+                    && (intBufferElement(buffer: reachability.abiCapabilities, index: closureCheckedOwner) != 1
+                        || (compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedOwner) == compilerFunctionReturnABIIndirect()
+                            && intBufferElement(buffer: reachability.abiActivation, index: closureCheckedOwner) != 1)
+                        || (compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget) == compilerFunctionReturnABIIndirect()
+                            && intBufferElement(buffer: reachability.abiActivation, index: closureCheckedTarget) != 1)
+                        || (compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget)
+                            && intBufferElement(buffer: reachability.abiParticipants, index: closureCheckedTarget) != 1)) {
+                    if intBufferSet(buffer: reachability.abiParticipants, index: closureCheckedOwner, value: 2) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+                    blockingParticipationChanged: true
+                }
+                closureEdge: closureEdge + 1
+            }
         }
         closureFunctionRow: 0
         while closureFunctionRow < compilerIntTableRowCount(table: reachability.context.tables.functions) {
@@ -9131,6 +9212,7 @@ function compilerNominalLLVMFieldTypeNameAtDepth(tables: CompilerSyntaxTables, t
     if typeName == String("Int") { return String("i32") }
     if typeName == String("Bool") { return String("i1") }
     if typeName == String("String") { return String("ptr") }
+    if compilerBodyRuntimeABITypeIsOpaque(typeName: typeName) { return String("ptr") }
     if depth >= 16 { return String("") }
     let declarationRow: Int(compilerNominalDeclarationRowForName(tables: tables, name: typeName))
     if declarationRow >= 0 && compilerNominalLLVMLayoutIsSupportedAtDepth(tables: tables, declarationRow: declarationRow, depth: depth + 1) { return "%Range.\(typeName)" }
@@ -9423,6 +9505,8 @@ function compilerBodyMIROperationOptionalPayload(): Int { return 29 }
 function compilerBodyMIROperationStringConcat(): Int { return 30 }
 function compilerBodyMIROperationStringFromInt(): Int { return 31 }
 function compilerBodyMIROperationStringFromBool(): Int { return 32 }
+function compilerBodyMIROperationDivide(): Int { return 33 }
+function compilerBodyMIROperationRemainder(): Int { return 34 }
 
 function compilerBodyMIROperandColumnCount(): Int { return 4 }
 function compilerBodyMIROperandOperationColumn(): Int { return 0 }
@@ -9694,7 +9778,7 @@ function compilerBodyArenaInterpolationEnd(arena: CompilerBodyArena, start: Int,
     state cursor: Int(start)
     state depth: Int(0)
     while cursor < limit {
-        let character: String(arena.tables.sourceStore.source.character(index: cursor))
+        let character: String(stringCharacterAt(source: arena.tables.sourceStore.source, index: cursor))
         if character == String("(") { depth: depth + 1 }
         if character == String(")") {
             if depth == 0 { return cursor }
@@ -9727,8 +9811,8 @@ function compilerBodyArenaParseInterpolatedString(arena: CompilerBodyArena, toke
     segmentStart: contentStart
     state ordinal: Int(0)
     while cursor + 1 < contentEnd {
-        if arena.tables.sourceStore.source.character(index: cursor) == backslash
-            && arena.tables.sourceStore.source.character(index: cursor + 1) == String("(") {
+        if stringCharacterAt(source: arena.tables.sourceStore.source, index: cursor) == backslash
+            && stringCharacterAt(source: arena.tables.sourceStore.source, index: cursor + 1) == String("(") {
             if segmentStart < cursor {
                 if compilerBodyArenaAppendInterpolationPart(arena: arena, interpolationNodeID: interpolationNodeID, kind: compilerSyntaxKindStringSegment(), start: segmentStart, end: cursor, ordinal: ordinal) < 0 { return compilerBodyParseFailure(index: cursor) }
                 ordinal: ordinal + 1
@@ -9761,6 +9845,8 @@ function compilerBodyArenaBinaryKind(token: RangeLexedToken): Int {
     if token.kind == String("plus") { return compilerSyntaxKindAddition() }
     if token.kind == String("minus") { return compilerSyntaxKindSubtraction() }
     if token.kind == String("asterisk") { return compilerSyntaxKindMultiplication() }
+    if token.kind == String("slash") { return compilerSyntaxKindDivision() }
+    if token.kind == String("percent") { return compilerSyntaxKindRemainder() }
     if token.kind == String("less") { return compilerSyntaxKindLessThan() }
     if token.kind == String("lessEqual") { return compilerSyntaxKindLessEqual() }
     if token.kind == String("greater") { return compilerSyntaxKindGreaterThan() }
@@ -10546,7 +10632,7 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
         return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: nodeID, targetKind: compilerBodyResolutionOperator(), targetID: kind, typeKind: compilerBodyTypeConstruct(), typeID: rightTypeID, regionNodeID: regionNodeID)
     }
     if kind == compilerSyntaxKindEquality() || kind == compilerSyntaxKindBooleanAnd() || kind == compilerSyntaxKindBooleanOr()
-        || kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication()
+        || kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication() || kind == compilerSyntaxKindDivision() || kind == compilerSyntaxKindRemainder()
         || kind == compilerSyntaxKindLessThan() || kind == compilerSyntaxKindLessEqual() || kind == compilerSyntaxKindGreaterThan() || kind == compilerSyntaxKindGreaterEqual() {
         let binaryLeftNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleLeftOperand(), ordinal: 0))
         let binaryRightNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleRightOperand(), ordinal: 0))
@@ -10569,7 +10655,7 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
         let leftType: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: binaryLeftNodeID))
         let rightType: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: binaryRightNodeID))
         state binaryResultType: Int(compilerBodyTypeBool())
-        if kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication() {
+        if kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication() || kind == compilerSyntaxKindDivision() || kind == compilerSyntaxKindRemainder() {
             if leftType != compilerBodyTypeInt() || rightType != compilerBodyTypeInt() { return 0 - 1 }
             binaryResultType: compilerBodyTypeInt()
         } else if kind == compilerSyntaxKindBooleanAnd() || kind == compilerSyntaxKindBooleanOr() {
@@ -10744,7 +10830,7 @@ function compilerBodyArenaBuildCFGExpressionChildren(arena: CompilerBodyArena, n
         return CompilerBodyCFGResult(blockID: currentBlockID, isTerminated: false, isValid: interpolationOrdinal > 0)
     }
     if kind == compilerSyntaxKindEquality() || kind == compilerSyntaxKindBooleanAnd() || kind == compilerSyntaxKindBooleanOr()
-        || kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication()
+        || kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication() || kind == compilerSyntaxKindDivision() || kind == compilerSyntaxKindRemainder()
         || kind == compilerSyntaxKindLessThan() || kind == compilerSyntaxKindLessEqual() || kind == compilerSyntaxKindGreaterThan() || kind == compilerSyntaxKindGreaterEqual() {
         let leftNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleLeftOperand(), ordinal: 0))
         let rightNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleRightOperand(), ordinal: 0))
@@ -10947,6 +11033,8 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindAddition()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindSubtraction()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindMultiplication()
+                && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindDivision()
+                && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindRemainder()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindLessThan()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindLessEqual()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindGreaterThan()
@@ -10963,7 +11051,9 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
         if targetKind == compilerBodyResolutionOperator()
             && ((targetID < compilerSyntaxKindAddition() || targetID > compilerSyntaxKindPrefixNegate())
                 && targetID != compilerSyntaxKindOptionalCoalescing()
-                && targetID != compilerSyntaxKindInterpolatedString()) { return false }
+                && targetID != compilerSyntaxKindInterpolatedString()
+                && targetID != compilerSyntaxKindDivision()
+                && targetID != compilerSyntaxKindRemainder()) { return false }
         if targetKind == compilerBodyResolutionRuntimeBuiltin() && (targetID <= compilerBodyRuntimeBuiltinNone() || targetID > compilerBodyRuntimeBuiltinCount()) { return false }
         if targetKind == compilerBodyResolutionConstruct() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.syntaxIndex)
             || compilerIntTableValue(table: arena.tables.syntaxIndex, row: targetID, column: 0) != compilerSyntaxKindConstruct()) { return false }
@@ -11097,7 +11187,7 @@ function compilerBodyMemoryBuildValuePhase(arena: CompilerBodyArena): Int {
                 nodeTypeKind: compilerBodyTypeBool()
             }
         }
-        if nodeKind == compilerSyntaxKindAddition() || nodeKind == compilerSyntaxKindSubtraction() || nodeKind == compilerSyntaxKindMultiplication()
+        if nodeKind == compilerSyntaxKindAddition() || nodeKind == compilerSyntaxKindSubtraction() || nodeKind == compilerSyntaxKindMultiplication() || nodeKind == compilerSyntaxKindDivision() || nodeKind == compilerSyntaxKindRemainder()
             || nodeKind == compilerSyntaxKindLessThan() || nodeKind == compilerSyntaxKindLessEqual() || nodeKind == compilerSyntaxKindGreaterThan() || nodeKind == compilerSyntaxKindGreaterEqual()
             || nodeKind == compilerSyntaxKindPrefixNot() || nodeKind == compilerSyntaxKindPrefixNegate() {
             nodeFactKind: compilerBodyMemoryFactBinaryValue()
@@ -11548,23 +11638,46 @@ function compilerBodyMIRLatestVersionInBlock(arena: CompilerBodyArena, symbolID:
     return result
 }
 
-function compilerBodyMIRValueForSymbolAtBlock(arena: CompilerBodyArena, symbolID: Int, blockID: Int): Int {
+function compilerBodyMIRValueForSymbolAtBlockMemo(arena: CompilerBodyArena, symbolID: Int, blockID: Int, memo: IntBuffer): Int {
+    if blockID < 0 || blockID >= compilerIntTableRowCount(table: arena.cfgBlocks) { return 0 - 1 }
+    let memoizedValueID: Int(intBufferElement(buffer: memo, index: blockID))
+    if memoizedValueID == 0 - 3 { return 0 - 1 }
+    if memoizedValueID != 0 - 2 { return memoizedValueID }
+    if intBufferSet(buffer: memo, index: blockID, value: 0 - 3) != 0 { return 0 - 1 }
     let localValueID: Int(compilerBodyMIRLatestVersionInBlock(arena: arena, symbolID: symbolID, blockID: blockID))
-    if localValueID >= 0 { return localValueID }
+    if localValueID >= 0 {
+        intBufferSet(buffer: memo, index: blockID, value: localValueID)
+        return localValueID
+    }
     state inheritedValueID: Int(0 - 1)
     state edgeRow: Int(0)
     while edgeRow < compilerIntTableRowCount(table: arena.cfgEdges) {
         if compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeToColumn()) == blockID
             && compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeRoleColumn()) != compilerBodyCFGEdgeBackedge() {
             let predecessorID: Int(compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeFromColumn()))
-            let predecessorValueID: Int(compilerBodyMIRValueForSymbolAtBlock(arena: arena, symbolID: symbolID, blockID: predecessorID))
-            if predecessorValueID < 0 { return 0 - 1 }
-            if inheritedValueID >= 0 && inheritedValueID != predecessorValueID { return 0 - 1 }
+            let predecessorValueID: Int(compilerBodyMIRValueForSymbolAtBlockMemo(arena: arena, symbolID: symbolID, blockID: predecessorID, memo: memo))
+            if predecessorValueID < 0 {
+                intBufferSet(buffer: memo, index: blockID, value: 0 - 1)
+                return 0 - 1
+            }
+            if inheritedValueID >= 0 && inheritedValueID != predecessorValueID {
+                intBufferSet(buffer: memo, index: blockID, value: 0 - 1)
+                return 0 - 1
+            }
             inheritedValueID: predecessorValueID
         }
         edgeRow: edgeRow + 1
     }
+    intBufferSet(buffer: memo, index: blockID, value: inheritedValueID)
     return inheritedValueID
+}
+
+function compilerBodyMIRValueForSymbolAtBlock(arena: CompilerBodyArena, symbolID: Int, blockID: Int): Int {
+    let memo: IntBuffer(intBufferCreate(capacity: compilerIntTableRowCount(table: arena.cfgBlocks)))
+    while intBufferCount(buffer: memo) < compilerIntTableRowCount(table: arena.cfgBlocks) { intBufferAppend(buffer: memo, value: 0 - 2) }
+    let valueID: Int(compilerBodyMIRValueForSymbolAtBlockMemo(arena: arena, symbolID: symbolID, blockID: blockID, memo: memo))
+    intBufferDestroy(buffer: memo)
+    return valueID
 }
 
 function compilerBodyMemoryHasFact(arena: CompilerBodyArena, kind: Int, sourceNodeID: Int, subjectID: Int): Bool {
@@ -11878,7 +11991,7 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         return CompilerBodyMIRValueResult(valueID: prefixResultValueID, isValid: true)
     }
     if kind == compilerSyntaxKindEquality() || kind == compilerSyntaxKindBooleanAnd() || kind == compilerSyntaxKindBooleanOr()
-        || kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication()
+        || kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication() || kind == compilerSyntaxKindDivision() || kind == compilerSyntaxKindRemainder()
         || kind == compilerSyntaxKindLessThan() || kind == compilerSyntaxKindLessEqual() || kind == compilerSyntaxKindGreaterThan() || kind == compilerSyntaxKindGreaterEqual() {
         let binaryMIRLeftNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleLeftOperand(), ordinal: 0))
         let binaryMIRRightNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleRightOperand(), ordinal: 0))
@@ -11891,6 +12004,8 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         if kind == compilerSyntaxKindAddition() { binaryOperationKind: compilerBodyMIROperationAdd() }
         if kind == compilerSyntaxKindSubtraction() { binaryOperationKind: compilerBodyMIROperationSubtract() }
         if kind == compilerSyntaxKindMultiplication() { binaryOperationKind: compilerBodyMIROperationMultiply() }
+        if kind == compilerSyntaxKindDivision() { binaryOperationKind: compilerBodyMIROperationDivide() }
+        if kind == compilerSyntaxKindRemainder() { binaryOperationKind: compilerBodyMIROperationRemainder() }
         if kind == compilerSyntaxKindLessThan() { binaryOperationKind: compilerBodyMIROperationLessThan() }
         if kind == compilerSyntaxKindLessEqual() { binaryOperationKind: compilerBodyMIROperationLessEqual() }
         if kind == compilerSyntaxKindGreaterThan() { binaryOperationKind: compilerBodyMIROperationGreaterThan() }
@@ -11900,7 +12015,7 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
             if operatorText == String("!=") { binaryOperationKind: compilerBodyMIROperationNotEqual() }
         }
         state binaryTypeKind: Int(compilerBodyTypeBool())
-        if kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication() { binaryTypeKind: compilerBodyTypeInt() }
+        if kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication() || kind == compilerSyntaxKindDivision() || kind == compilerSyntaxKindRemainder() { binaryTypeKind: compilerBodyTypeInt() }
         let binaryValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueBinary(), typeKind: binaryTypeKind, typeID: 0 - 1, sourceNodeID: nodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: nodeID))
         let binaryOperationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
         let binaryFirstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
@@ -12233,7 +12348,7 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
         if compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationIDColumn()) != operationRow
             || compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationBlockColumn()) < 0
             || compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationBlockColumn()) >= compilerIntTableRowCount(table: arena.mirBlocks)
-            || operationKind < compilerBodyMIROperationConstant() || operationKind > compilerBodyMIROperationStringFromBool()
+            || operationKind < compilerBodyMIROperationConstant() || operationKind > compilerBodyMIROperationRemainder()
             || (!compilerBodyMIROperationIsTerminator(kind: operationKind) && (resultValueID < 0 || resultValueID >= valueCount))
             || (compilerBodyMIROperationIsTerminator(kind: operationKind) && resultValueID != 0 - 1) { return 300000 + operationRow * 100 + operationKind }
         if operationKind == compilerBodyMIROperationDirectCall() {
@@ -12953,7 +13068,8 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         return compilerBodyLLVMEmitterAppendInstruction(emitter: emitter, instruction: prefixInstruction)
     }
     if (operationKind >= compilerBodyMIROperationEqual() && operationKind <= compilerBodyMIROperationOr())
-        || (operationKind >= compilerBodyMIROperationAdd() && operationKind <= compilerBodyMIROperationGreaterEqual()) {
+        || (operationKind >= compilerBodyMIROperationAdd() && operationKind <= compilerBodyMIROperationGreaterEqual())
+        || operationKind == compilerBodyMIROperationDivide() || operationKind == compilerBodyMIROperationRemainder() {
         let leftValueID: Int(compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0))
         let rightValueID: Int(compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 1))
         let leftValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: leftValueID))
@@ -13010,6 +13126,8 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         if operationKind == compilerBodyMIROperationAdd() { instructionName: String("add") }
         if operationKind == compilerBodyMIROperationSubtract() { instructionName: String("sub") }
         if operationKind == compilerBodyMIROperationMultiply() { instructionName: String("mul") }
+        if operationKind == compilerBodyMIROperationDivide() { instructionName: String("sdiv") }
+        if operationKind == compilerBodyMIROperationRemainder() { instructionName: String("srem") }
         if operationKind == compilerBodyMIROperationLessThan() { instructionName: String("icmp slt") }
         if operationKind == compilerBodyMIROperationLessEqual() { instructionName: String("icmp sle") }
         if operationKind == compilerBodyMIROperationGreaterThan() { instructionName: String("icmp sgt") }
@@ -13222,7 +13340,7 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
         if compilerIntTableValue(table: arena.nodes, row: nodeRow, column: 0) != nodeRow
             || compilerIntTableValue(table: arena.nodes, row: nodeRow, column: 2) != arena.fileID
             || kind < compilerSyntaxKindEntry()
-            || kind > compilerSyntaxKindStringSegment() { return false }
+            || kind > compilerSyntaxKindRemainder() { return false }
         nodeRow: nodeRow + 1
     }
     state edgeRow: Int(0)
@@ -15292,8 +15410,8 @@ function compilerCoreLLVMLowerInterpolatedStringContent(context: CompilerLLVMLow
     nextTemporary: temporaryIndex
 
     while sourceIndex + 1 < contentLength {
-        if content.character(index: sourceIndex) == backslash && content.character(index: sourceIndex + 1) == String("(") {
-            let segment: String(content.substring(start: segmentStart, end: sourceIndex))
+        if stringCharacterAt(source: content, index: sourceIndex) == backslash && stringCharacterAt(source: content, index: sourceIndex + 1) == String("(") {
+            let segment: String(stringSubstring(source: content, start: segmentStart, end: sourceIndex))
             if segment != String("") {
                 let loweredSegment: CompilerLLVMLoweredExpression(compilerCoreLLVMLowerPlainStringContent(content: segment, temporaryIndex: nextTemporary))
                 let appendedSegment: CompilerLLVMLoweredExpression(compilerCoreLLVMAppendStringPart(instructionRecords: instructionRecords, currentOperand: currentOperand, part: loweredSegment, temporaryIndex: nextTemporary))
@@ -15304,7 +15422,7 @@ function compilerCoreLLVMLowerInterpolatedStringContent(context: CompilerLLVMLow
 
             let expressionEnd: Int(compilerCoreInterpolatedExpressionEnd(content: content, start: sourceIndex + 2))
             if expressionEnd < contentLength {
-                let expressionText: String(content.substring(start: sourceIndex + 2, end: expressionEnd))
+                let expressionText: String(stringSubstring(source: content, start: sourceIndex + 2, end: expressionEnd))
                 let loweredInterpolation: CompilerLLVMLoweredExpression(compilerCoreLLVMLowerInterpolatedExpression(context: context, localValues: localValues, expressionText: expressionText, temporaryIndex: nextTemporary))
                 let appendedInterpolation: CompilerLLVMLoweredExpression(compilerCoreLLVMAppendStringPart(instructionRecords: instructionRecords, currentOperand: currentOperand, part: loweredInterpolation, temporaryIndex: nextTemporary))
                 instructionRecords: appendedInterpolation.instructionRecords
@@ -15321,7 +15439,7 @@ function compilerCoreLLVMLowerInterpolatedStringContent(context: CompilerLLVMLow
     }
 
     if segmentStart < contentLength {
-        let trailingSegment: String(content.substring(start: segmentStart, end: contentLength))
+        let trailingSegment: String(stringSubstring(source: content, start: segmentStart, end: contentLength))
         if trailingSegment != String("") {
             let loweredTrailingSegment: CompilerLLVMLoweredExpression(compilerCoreLLVMLowerPlainStringContent(content: trailingSegment, temporaryIndex: nextTemporary))
             let appendedTrailingSegment: CompilerLLVMLoweredExpression(compilerCoreLLVMAppendStringPart(instructionRecords: instructionRecords, currentOperand: currentOperand, part: loweredTrailingSegment, temporaryIndex: nextTemporary))
