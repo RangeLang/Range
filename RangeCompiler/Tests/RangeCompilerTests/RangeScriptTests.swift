@@ -188,20 +188,20 @@ struct RangeScriptTests {
         #expect(llvmText.contains("define ptr @parseCompilerStatementWithToken(ptr %program, ptr %cursor, ptr %maybeToken, i32 %bodyEnd)"))
         #expect(llvmText.contains("define ptr @parseCompilerIdentifierStatementWithTarget(ptr %cursor, ptr %token"))
         #expect(llvmText.contains("define ptr @parseCompilerAssignmentStatement(ptr %token"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerBlockWithLocals(ptr %program, ptr %parsedBlock"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerBlockWithControl(ptr %program, ptr %parsedBlock"))
+        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerBlockWithLocals(ptr %context, ptr %parsedBlock"))
+        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerBlockWithControl(ptr %context, ptr %parsedBlock"))
         #expect(llvmText.contains("define ptr @compilerCoreLLVMLoweredBlockRenderedBlocks(ptr %block)"))
         #expect(llvmText.contains("call ptr @compilerCoreLLVMLoweredBlockRenderedBlocks(ptr"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectLinearRecordBlockWithRecord(ptr %program, ptr %parsedBlock"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectLinearRecordBlockWithIf(ptr %program, ptr %parsedBlock"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectIfStatementRecord(ptr %program, ptr %parsedBlock"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectIfStatementRecordWithElse(ptr %program"))
-        #expect(llvmText.contains("define ptr @compilerCoreRenderedDirectIfElseStatementRecord(ptr %program"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectIfStatementRecordWithAfter(ptr %program"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerLinearStatementRecord(ptr %program, ptr %statementRecord"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerLinearStatementRecordReturn(ptr %program"))
-        #expect(llvmText.contains("define ptr @compilerCoreRenderedDirectReturnBlock(ptr %program, ptr %parsedBlock"))
-        #expect(llvmText.contains("define i1 @compilerCoreCanLowerLocalType(ptr %declarationRecords, ptr %typeName)"))
+        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectLinearRecordBlockWithRecord(ptr %context, ptr %parsedBlock"))
+        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectLinearRecordBlockWithIf(ptr %context, ptr %parsedBlock"))
+        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectIfStatementRecord(ptr %context, ptr %parsedBlock"))
+        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectIfStatementRecordWithElse(ptr %context"))
+        #expect(llvmText.contains("define ptr @compilerCoreRenderedDirectIfElseStatementRecord(ptr %context"))
+        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectIfStatementRecordWithAfter(ptr %context"))
+        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerLinearStatementRecord(ptr %context, ptr %statementRecord"))
+        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerLinearStatementRecordReturn(ptr %context"))
+        #expect(llvmText.contains("define ptr @compilerCoreRenderedDirectReturnBlock(ptr %context, ptr %parsedBlock"))
+        #expect(llvmText.contains("define i1 @compilerCoreCanLowerLocalType(ptr %context, ptr %typeName)"))
         #expect(llvmText.contains("define i32 @main() {\nentry:\n  %r0 = call i32 @commandLineArgumentCount()"))
         #expect(llvmText.contains("br i1 %r1, label %if0, label %after0"))
         #expect(llvmText.contains("after0:\n"))
@@ -210,8 +210,8 @@ struct RangeScriptTests {
         #expect(llvmText.contains("call ptr @compileRangeNativeSource(ptr"))
         #expect(!llvmText.contains("define ptr @compilerCoreMainParsedBlock(ptr %program) {\nentry:\n  ret ptr null"))
         #expect(!llvmText.contains("define ptr @parseCompilerStatementWithToken(ptr %program, ptr %cursor, ptr %maybeToken, i32 %bodyEnd) {\nentry:\n  ret ptr null"))
-        #expect(!llvmText.contains("define ptr @compilerCoreLLVMLowerBlockWithControl(ptr %program, ptr %parsedBlock, ptr %initialLocalValues, i32 %initialTemporaryIndex, ptr %expectedReturnType, ptr %initialBlockLabel, ptr %fallthroughLabel, i32 %initialBranchIndex) {\nentry:\n  ret ptr null"))
-        #expect(!llvmText.contains("define ptr @compilerCoreLLVMLowerLinearStatementRecord(ptr %program, ptr %statementRecord, ptr %localValues, i32 %temporaryIndex, ptr %expectedReturnType) {\nentry:\n  ret ptr null"))
+        #expect(!llvmText.contains("define ptr @compilerCoreLLVMLowerBlockWithControl(ptr %context, ptr %parsedBlock, ptr %initialLocalValues, i32 %initialTemporaryIndex, ptr %expectedReturnType, ptr %initialBlockLabel, ptr %fallthroughLabel, i32 %initialBranchIndex) {\nentry:\n  ret ptr null"))
+        #expect(!llvmText.contains("define ptr @compilerCoreLLVMLowerLinearStatementRecord(ptr %context, ptr %statementRecord, ptr %localValues, i32 %temporaryIndex, ptr %expectedReturnType) {\nentry:\n  ret ptr null"))
         #expect(!llvmText.contains("define i32 @main() {\nentry:\n  ret i32 64\n}"))
         #expect(!llvmText.contains("add i1 %"))
         #expect(!llvmText.contains("stringEqual(ptr null"))
@@ -227,7 +227,7 @@ struct RangeScriptTests {
         let stage3LLVMText = try String(contentsOf: stage3Candidate, encoding: .utf8)
         #expect(stage3LLVMText.contains("define ptr @compileRangeNativeSource(ptr %source)"))
         #expect(stage3LLVMText.contains("define ptr @parseCompilerAssignmentStatement(ptr %token"))
-        #expect(stage3LLVMText.contains("define ptr @compilerCoreRenderedDirectIfElseStatementRecord(ptr %program"))
+        #expect(stage3LLVMText.contains("define ptr @compilerCoreRenderedDirectIfElseStatementRecord(ptr %context"))
         #expect(stage3LLVMText.contains("define i32 @main()"))
         #expect(stage3LLVMText.contains("call ptr @compileRangeNativeSource(ptr"))
         #expect(!stage3LLVMText.contains("stringEqual(ptr null"))
@@ -1213,6 +1213,7 @@ struct RangeScriptTests {
         #expect(result.stdout.contains("declare i32 @intBufferAppend(ptr, i32)"))
         #expect(result.stdout.contains("declare i32 @intBufferCount(ptr)"))
         #expect(result.stdout.contains("declare i32 @intBufferElement(ptr, i32)"))
+        #expect(result.stdout.contains("declare i32 @intBufferSet(ptr, i32, i32)"))
         #expect(result.stdout.contains("declare i32 @intBufferDestroy(ptr)"))
         #expect(result.stdout.contains("call ptr @intBufferCreate(i32 1)"))
         #expect(result.stdout.contains("call i32 @intBufferAppend(ptr"))
@@ -3092,6 +3093,962 @@ struct RangeScriptTests {
         #expect(!result.stdout.contains("ast\\t"))
     }
 
+    @Test("Native source-set declarations render from typed declaration tables")
+    func nativeSourceSetDeclarationsRenderFromTypedDeclarationTables() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let source = directory.appendingPathComponent("TypedNativeDeclarations.range")
+        try """
+        compilerNativeSourceSetLLVMText
+        compilerSourceFile\\tRuntime.range
+        function compileRangeNativeSource(source: String): String {
+            return source
+        }
+
+        @language
+        function firstExternal(value: Int, enabled: Bool): String
+
+        @language
+        function secondExternal(): Int
+        """.write(to: source, atomically: true, encoding: .utf8)
+
+        let compiler = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
+        let result = try runRangeScript(
+            arguments: ["run", compiler.path, "--", source.path],
+            timeout: 120
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        let first = "declare ptr @firstExternal(i32 %value, i1 %enabled)"
+        let second = "declare i32 @secondExternal()"
+        #expect(result.stdout.contains(first))
+        #expect(result.stdout.contains(second))
+        #expect(result.stdout.contains("define ptr @compileRangeNativeSource(ptr %source)"))
+        #expect(!result.stdout.contains("declare ptr @compileRangeNativeSource"))
+        let firstRange = result.stdout.range(of: first)
+        let secondRange = result.stdout.range(of: second)
+        #expect(firstRange != nil)
+        #expect(secondRange != nil)
+        if let firstRange, let secondRange {
+            #expect(firstRange.lowerBound < secondRange.lowerBound)
+        }
+        #expect(!result.stdout.contains("kind=invalidTypedDeclarations"))
+    }
+
+    @Test("Selected compiler bodies execute through canonical typed arenas")
+    func selectedCompilerBodiesExecuteThroughCanonicalTypedArenas() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let fixture = """
+        compilerNativeSourceSetSelectedStats
+        function compilerSourceFileTableColumnCount(): Int {
+            return 5
+        }
+
+        function compilerSourceRoleProject(): Int {
+            return 3
+        }
+
+        """
+        let first = try runTypedSyntaxFixture(
+            source: fixture,
+            name: "CompilerConstantBodyArenaFirst.range",
+            directory: directory
+        )
+        let second = try runTypedSyntaxFixture(
+            source: fixture,
+            name: "CompilerConstantBodyArenaSecond.range",
+            directory: directory
+        )
+
+        #expect(first.timedOut == false)
+        #expect(first.exitCode == 0)
+        #expect(first.stderr.isEmpty)
+        #expect(first.stdout.contains("typedParseAttempts=2"))
+        #expect(first.stdout.contains("arenaParsed=2"))
+        #expect(first.stdout.contains("legacyParsed=0"))
+        #expect(first.stdout.contains("arenaCreates=2"))
+        #expect(first.stdout.contains("arenaDestroys=2"))
+        #expect(first.stdout.contains("arenaRecordBytes=0"))
+        #expect(first.stdout.contains("committedFailures=0"))
+        #expect(first.stdout == second.stdout)
+        #expect(second.exitCode == 0)
+        #expect(second.stderr.isEmpty)
+    }
+
+    @Test("General typed body shape executes through a canonical arena")
+    func generalTypedBodyShapeExecutesThroughCanonicalArena() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let fixture = """
+        compilerNativeSourceSetSelectedStats
+        function compilerSourceFileTableColumnCount(value: Int): Int {
+            return value + 1
+        }
+
+        """
+        let result = try runTypedSyntaxFixture(
+            source: fixture,
+            name: "CompilerTypedBodyUnsupported.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("typedParseAttempts=1"))
+        #expect(result.stdout.contains("arenaParsed=1"))
+        #expect(result.stdout.contains("legacyParsed=0"))
+        #expect(result.stdout.contains("arenaCreates=1"))
+        #expect(result.stdout.contains("arenaDestroys=1"))
+        #expect(result.stdout.contains("committedFailures=0"))
+    }
+
+    @Test("Bare call statement flows through typed MemoryGraph MIR and LLVM")
+    func bareCallStatementFlowsThroughTypedPipeline() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let fixture = """
+        compilerNativeBodyLLVMDualStats
+        compilerDualTransitionFunctionID_0_
+        function appendValue(buffer: IntBuffer): Int {
+            intBufferAppend(buffer: buffer, value: 7)
+            return intBufferCount(buffer: buffer)
+        }
+
+        """
+        let result = try runTypedSyntaxFixture(
+            source: fixture,
+            name: "CompilerBareCallStatement.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("selectedCount=1"))
+        #expect(result.stdout.contains("exactCount=1"))
+        #expect(result.stdout.contains("typedInvalidCount=0"))
+        #expect(result.stdout.contains("typedPlaceholderCount=0"))
+        #expect(result.stdout.contains("typedRecordNonzeroCount=0"))
+    }
+
+    @Test("One-pass typed admission falls back only for unsupported syntax")
+    func onePassTypedAdmissionFallsBackForUnsupportedSyntax() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let fixture = """
+        compilerNativeSourceSetSelectedStats
+        function compilerSourceFileTableColumnCount(value: Int): String {
+            return "value \\(value)"
+        }
+
+        """
+        let result = try runTypedSyntaxFixture(
+            source: fixture,
+            name: "CompilerOnePassUnsupportedFallback.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("supportedCount=0"))
+        #expect(result.stdout.contains("typedParseAttempts=1"))
+        #expect(result.stdout.contains("arenaParsed=0"))
+        #expect(result.stdout.contains("legacyParsed=1"))
+        #expect(result.stdout.contains("arenaCreates=1"))
+        #expect(result.stdout.contains("arenaDestroys=1"))
+        #expect(result.stdout.contains("committedFailures=0"))
+    }
+
+    @Test("Canonical body arena parses the actual expression type inference family")
+    func canonicalBodyArenaParsesActualExpressionTypeInferenceFamily() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let root = try repositoryRoot()
+        let compilerSource = try String(
+            contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Compiler.range"),
+            encoding: .utf8
+        )
+        let compilerCoreSource = try String(
+            contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/CompilerCore.range"),
+            encoding: .utf8
+        )
+        let lexerSource = try String(
+            contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Lexer.range"),
+            encoding: .utf8
+        )
+        let fixture = """
+        compilerNativeBodyArenaStats
+        \(compilerSource)
+        \(compilerCoreSource)
+        \(lexerSource)
+        """
+        let result = try runTypedSyntaxFixture(
+            source: fixture,
+            name: "CompilerActualBodyArenaStats.range",
+            directory: directory
+        )
+        let repeated = try runTypedSyntaxFixture(
+            source: fixture,
+            name: "CompilerActualBodyArenaStatsRepeated.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        let arenaRows = result.stdout.components(separatedBy: "\\n")
+        let rangeTypeLine = arenaRows.first {
+            $0.contains("name=compilerCoreExpressionSummaryRangeTypeForLLVM")
+        }
+        let inferredTypeLine = arenaRows.first {
+            $0.contains("name=compilerCoreInferExpressionSummaryType")
+        }
+        #expect(repeated.timedOut == false)
+        #expect(repeated.exitCode == 0)
+        #expect(repeated.stderr.isEmpty)
+        #expect(repeated.stdout == result.stdout)
+        #expect(result.stdout.contains("runtimeBuiltinCount=34"))
+        #expect(result.stdout.contains("runtimeBuiltinABIValid=true"))
+        #expect(rangeTypeLine?.contains("valid=true") == true)
+        #expect(inferredTypeLine?.contains("valid=true") == true)
+        let rangeTypeFields = Dictionary(uniqueKeysWithValues: (rangeTypeLine ?? "").components(separatedBy: "\\t").compactMap { field -> (String, String)? in
+            let parts = field.split(separator: "=", maxSplits: 1)
+            guard parts.count == 2 else { return nil }
+            return (String(parts[0]), String(parts[1]))
+        })
+        let inferredTypeFields = Dictionary(uniqueKeysWithValues: (inferredTypeLine ?? "").components(separatedBy: "\\t").compactMap { field -> (String, String)? in
+            let parts = field.split(separator: "=", maxSplits: 1)
+            guard parts.count == 2 else { return nil }
+            return (String(parts[0]), String(parts[1]))
+        })
+        #expect(rangeTypeFields["nodes"] == "577")
+        #expect(rangeTypeFields["edges"] == "576")
+        #expect(rangeTypeFields["semanticStatus"] == "0")
+        #expect(rangeTypeFields["semanticValid"] == "true")
+        #expect(rangeTypeFields["symbols"] == "18")
+        // These diagnostic counts may move with canonical graph detail; the focused
+        // final-artifact equality oracle below is the compatibility authority.
+        #expect(rangeTypeFields["resolutions"] == "231")
+        #expect(rangeTypeFields["cfgStatus"] == "0")
+        #expect(rangeTypeFields["cfgValid"] == "true")
+        #expect(rangeTypeFields["cfgBlocks"] == "43")
+        #expect(rangeTypeFields["cfgEdges"] == "46")
+        #expect(rangeTypeFields["conditionTerminators"] == "21")
+        #expect(rangeTypeFields["returnTerminators"] == "18")
+        #expect(rangeTypeFields["mirBeforeMemoryStatus"] == "-1")
+        #expect(rangeTypeFields["memoryStatus"] == "0")
+        #expect(rangeTypeFields["memoryValid"] == "true")
+        #expect(rangeTypeFields["memoryFacts"] == "814")
+        #expect(rangeTypeFields["memoryValueFacts"] == "595")
+        #expect(rangeTypeFields["memoryPlacementFacts"] == "0")
+        #expect(rangeTypeFields["memoryAccessFacts"] == "83")
+        #expect(rangeTypeFields["memoryPassFacts"] == "136")
+        #expect(rangeTypeFields["memoryLifetimeFacts"] == "0")
+        #expect(rangeTypeFields["memoryOwnedValueFacts"] == "14")
+        #expect(rangeTypeFields["memoryBorrowedValueFacts"] == "4")
+        #expect(rangeTypeFields["memoryReadFacts"] == "83")
+        #expect(rangeTypeFields["memoryArgumentPassFacts"] == "118")
+        #expect(rangeTypeFields["memoryReturnEscapeFacts"] == "18")
+        #expect(rangeTypeFields["memoryTransferFacts"] == "0")
+        #expect(rangeTypeFields["memoryDestructionFacts"] == "0")
+        #expect(rangeTypeFields["mirStatus"] == "0")
+        #expect(rangeTypeFields["mirValid"] == "true")
+        #expect(rangeTypeFields["mirValidationCode"] == "0")
+        #expect(rangeTypeFields["mirValues"] == "236")
+        #expect(rangeTypeFields["mirBlocks"] == "43")
+        #expect(rangeTypeFields["mirOperations"] == "275")
+        #expect(rangeTypeFields["mirOperands"] == "301")
+        #expect(rangeTypeFields["llvmEmissionValid"] == "true")
+        #expect(rangeTypeFields["llvmRenderedLength"] == "11147")
+        #expect(rangeTypeFields["llvmRecordLength"] == "0")
+        #expect(rangeTypeFields["llvmNextTemporary"] == "187")
+        #expect(rangeTypeFields["llvmNextBranch"] == "21")
+        #expect(inferredTypeFields["nodes"] == "570")
+        #expect(inferredTypeFields["edges"] == "569")
+        #expect(inferredTypeFields["semanticStatus"] == "0")
+        #expect(inferredTypeFields["semanticValid"] == "true")
+        #expect(inferredTypeFields["symbols"] == "18")
+        #expect(inferredTypeFields["resolutions"] == "227")
+        #expect(inferredTypeFields["cfgStatus"] == "0")
+        #expect(inferredTypeFields["cfgValid"] == "true")
+        #expect(inferredTypeFields["cfgBlocks"] == "43")
+        #expect(inferredTypeFields["cfgEdges"] == "46")
+        #expect(inferredTypeFields["conditionTerminators"] == "21")
+        #expect(inferredTypeFields["returnTerminators"] == "18")
+        #expect(inferredTypeFields["mirBeforeMemoryStatus"] == "-1")
+        #expect(inferredTypeFields["memoryStatus"] == "0")
+        #expect(inferredTypeFields["memoryValid"] == "true")
+        #expect(inferredTypeFields["memoryFacts"] == "805")
+        #expect(inferredTypeFields["memoryValueFacts"] == "588")
+        #expect(inferredTypeFields["memoryPlacementFacts"] == "0")
+        #expect(inferredTypeFields["memoryAccessFacts"] == "82")
+        #expect(inferredTypeFields["memoryPassFacts"] == "135")
+        #expect(inferredTypeFields["memoryLifetimeFacts"] == "0")
+        #expect(inferredTypeFields["memoryOwnedValueFacts"] == "14")
+        #expect(inferredTypeFields["memoryBorrowedValueFacts"] == "4")
+        #expect(inferredTypeFields["memoryReadFacts"] == "82")
+        #expect(inferredTypeFields["memoryArgumentPassFacts"] == "117")
+        #expect(inferredTypeFields["memoryReturnEscapeFacts"] == "18")
+        #expect(inferredTypeFields["memoryTransferFacts"] == "0")
+        #expect(inferredTypeFields["memoryDestructionFacts"] == "0")
+        #expect(inferredTypeFields["mirStatus"] == "0")
+        #expect(inferredTypeFields["mirValid"] == "true")
+        #expect(inferredTypeFields["mirValidationCode"] == "0")
+        #expect(inferredTypeFields["mirValues"] == "232")
+        #expect(inferredTypeFields["mirBlocks"] == "43")
+        #expect(inferredTypeFields["mirOperations"] == "271")
+        #expect(inferredTypeFields["mirOperands"] == "296")
+        #expect(inferredTypeFields["llvmEmissionValid"] == "true")
+        #expect(inferredTypeFields["llvmRenderedLength"] == "11002")
+        #expect(inferredTypeFields["llvmRecordLength"] == "0")
+        #expect(inferredTypeFields["llvmNextTemporary"] == "183")
+        #expect(inferredTypeFields["llvmNextBranch"] == "21")
+        let summary = arenaRows.first
+        let summaryFields = Dictionary(uniqueKeysWithValues: (summary ?? "").components(separatedBy: "\\t").compactMap { field -> (String, String)? in
+            let parts = field.split(separator: "=", maxSplits: 1)
+            guard parts.count == 2 else { return nil }
+            return (String(parts[0]), String(parts[1]))
+        })
+        #expect(summaryFields["functionCount"] == summaryFields["destroyCount"])
+        #expect(summaryFields["transitionSupportedCount"] == summaryFields["transitionPipelineValidCount"])
+        #expect(summaryFields["transitionArenaFailureCount"] == "0")
+        #expect(summaryFields["transitionSemanticFailureCount"] == "0")
+        #expect(summaryFields["transitionCFGFailureCount"] == "0")
+        #expect(summaryFields["transitionMemoryFailureCount"] == "0")
+        #expect(summaryFields["transitionMIRFailureCount"] == "0")
+        #expect(summaryFields["transitionLLVMFailureCount"] == "0")
+    }
+
+    @Test("Canonical body arena diagnoses unresolved typed identifiers deterministically")
+    func canonicalBodyArenaDiagnosesUnresolvedTypedIdentifiersDeterministically() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = """
+        compilerNativeBodyArenaStats
+        function unresolvedValue(): String {
+            return missingValue
+        }
+
+        """
+        let first = try runTypedSyntaxFixture(source: fixture, name: "UnresolvedTypedBodyFirst.range", directory: directory)
+        let second = try runTypedSyntaxFixture(source: fixture, name: "UnresolvedTypedBodySecond.range", directory: directory)
+        #expect(first.timedOut == false)
+        #expect(first.exitCode == 0)
+        #expect(first.stderr.isEmpty)
+        #expect(first.stdout == second.stdout)
+        #expect(first.stdout.contains("name=unresolvedValue\\tvalid=true"))
+        #expect(first.stdout.contains("semanticStatus=-1\\tsemanticValid=false"))
+        #expect(first.stdout.contains("functionCount=1"))
+        #expect(first.stdout.contains("destroyCount=1"))
+    }
+
+    @Test("Typed MIR LLVM exactly matches legacy lowering for the actual inference family")
+    func typedMIRLLVMExactlyMatchesLegacyForActualInferenceFamily() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let root = try repositoryRoot()
+        let compilerSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Compiler.range"), encoding: .utf8)
+        let compilerCoreSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/CompilerCore.range"), encoding: .utf8)
+        let lexerSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Lexer.range"), encoding: .utf8)
+        let fixture = """
+        compilerNativeBodyLLVMDualStats
+        compilerDualFunction	compilerCoreExpressionSummaryRangeTypeForLLVM\\n
+        compilerDualFunction	compilerCoreInferExpressionSummaryType\\n
+        \(compilerSource)
+        \(compilerCoreSource)
+        \(lexerSource)
+        """
+        let result = try runTypedSyntaxFixture(source: fixture, name: "CompilerActualInferenceDualLLVM.range", directory: directory, timeout: 360)
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("selectedCount=2"))
+        #expect(result.stdout.components(separatedBy: "exact=true").count == 3)
+    }
+
+    @Test("Every transition-supported compiler function has a bounded dual classification")
+    func everyTransitionSupportedCompilerFunctionHasBoundedDualClassification() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let root = try repositoryRoot()
+        let compilerSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Compiler.range"), encoding: .utf8)
+        let compilerCoreSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/CompilerCore.range"), encoding: .utf8)
+        let lexerSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Lexer.range"), encoding: .utf8)
+        let fixture = """
+        compilerNativeBodyLLVMDualStats
+        BATCH_IDS
+        compilerDualSkipFunction\tcompilerSemanticGraphIsValid
+        compilerDualSkipFunction\tcompilerMemoryGraphIsValid
+        compilerDualSkipFunction\tcompilerBodyArenaIsValid
+        compilerDualSkipFunction\tcompilerCoreExpressionSummaryRangeTypeForLLVM
+        compilerDualSkipFunction\tcompilerCoreInferExpressionSummaryType
+        \(compilerSource)
+        \(compilerCoreSource)
+        \(lexerSource)
+        """
+        let sourceURL = directory.appendingPathComponent("CompilerTransitionSupportedDualLLVM.range")
+        let compiler = root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
+        let executable = try TypedSyntaxCompilerCache.shared.executable(for: compiler)
+        var totals: [String: Int] = [:]
+        var selectedIDs = Set<Int>()
+        var functionCount: Int?
+        var transitionSupportedTotal: Int?
+        var observedMaximumResidentBytes: UInt64 = 0
+        var resourceSplitCount = 0
+        let requestedStart = Int(ProcessInfo.processInfo.environment["RANGE_DUAL_AUDIT_START"] ?? "") ?? 0
+        let requestedEnd = Int(ProcessInfo.processInfo.environment["RANGE_DUAL_AUDIT_END"] ?? "") ?? 1400
+        var pendingBatches = stride(from: requestedStart, to: requestedEnd, by: 40).map { $0..<min($0 + 40, requestedEnd) }
+        while !pendingBatches.isEmpty {
+            let batch = pendingBatches.removeFirst()
+            let batchIDs = batch
+                .map { "compilerDualTransitionFunctionID_\($0)_" }
+                .joined(separator: "\n")
+            let batchFixture = fixture.replacingOccurrences(of: "BATCH_IDS", with: batchIDs)
+            try batchFixture.write(to: sourceURL, atomically: true, encoding: .utf8)
+            let result = try runFixtureExecutable(
+                executable: executable,
+                source: sourceURL,
+                timeout: 240,
+                maximumResidentBytes: 1024 * 1024 * 1024
+            )
+            #expect(result.timedOut == false)
+            if result.resourceLimited {
+                resourceSplitCount += 1
+                #expect(batch.count > 1)
+                if batch.count > 1 {
+                    let middle = batch.lowerBound + batch.count / 2
+                    pendingBatches.insert(middle..<batch.upperBound, at: 0)
+                    pendingBatches.insert(batch.lowerBound..<middle, at: 0)
+                }
+                continue
+            }
+            #expect(result.exitCode == 0)
+            #expect(result.stderr.isEmpty)
+            observedMaximumResidentBytes = max(observedMaximumResidentBytes, result.maximumResidentBytes)
+            let rows = result.stdout.components(separatedBy: "\\n")
+            for row in rows where row.hasPrefix("dualCompatibility\\t") && row.contains("legacyStructuralPhiDefect=true") { print(row) }
+            let summary = rows.first ?? ""
+            let fields = Dictionary(uniqueKeysWithValues: summary.components(separatedBy: "\\t").compactMap { field -> (String, Int)? in
+                let parts = field.split(separator: "=", maxSplits: 1)
+                guard parts.count == 2, let value = Int(parts[1]) else { return nil }
+                return (String(parts[0]), value)
+            })
+            if functionCount == nil { functionCount = fields["functionCount"] }
+            if transitionSupportedTotal == nil { transitionSupportedTotal = fields["transitionSupportedTotalCount"] }
+            #expect(fields["functionCount"] == functionCount)
+            #expect(fields["transitionSupportedTotalCount"] == transitionSupportedTotal)
+            let batchSelected = fields["selectedCount"] ?? 0
+            let batchExact = fields["exactCount"] ?? 0
+            let batchStructural = fields["legacyStructuralPhiDefectCount"] ?? 0
+            let batchUnclassified = fields["unclassifiedMismatchCount"] ?? 0
+            print("dualBatch start=\(batch.lowerBound) end=\(batch.upperBound) selected=\(batchSelected) exact=\(batchExact) structural=\(batchStructural) unclassified=\(batchUnclassified) maximumResidentBytes=\(result.maximumResidentBytes)")
+            if (fields["unclassifiedMismatchCount"] ?? 0) > 0 {
+                for row in rows where row.hasPrefix("dualLLVM\\t") && row.contains("exact=false") { print("unclassifiedCandidate \(row)") }
+                for row in rows where row.hasPrefix("dualCompatibility\\t") && row.contains("legacyStructuralPhiDefect=false") { print("unclassifiedCompatibility \(row)") }
+            }
+            for key in ["selectedCount", "exactCount", "typedInvalidCount", "legacyStructuralPhiDefectCount", "legacyPlaceholderMismatchCount", "legacyUnwrittenParameterPhiMismatchCount", "unclassifiedMismatchCount", "typedPlaceholderCount", "typedRecordNonzeroCount"] {
+                totals[key, default: 0] += fields[key] ?? 0
+            }
+            for row in rows where row.hasPrefix("dualLLVM\\t") {
+                for field in row.components(separatedBy: "\\t") where field.hasPrefix("functionID=") {
+                    if let functionID = Int(field.dropFirst("functionID=".count)) { #expect(selectedIDs.insert(functionID).inserted) }
+                }
+            }
+        }
+        // Three structurally defective legacy artifacts are covered by the dedicated
+        // incompatibility regression. Two legacy record-expansion hot functions are
+        // covered by the permanent exact final-artifact oracle. These exact names are
+        // resolved to current FunctionIDs only inside this test diagnostic.
+        let dedicatedExactCount = 2
+        let dedicatedIncompatibilityCount = 3
+        #expect(functionCount != nil)
+        #expect(functionCount! < 1400)
+        #expect(transitionSupportedTotal != nil)
+        if requestedStart == 0 && requestedEnd >= functionCount! {
+            #expect((totals["selectedCount"] ?? 0) + dedicatedExactCount + dedicatedIncompatibilityCount == transitionSupportedTotal!)
+        }
+        #expect(selectedIDs.count == totals["selectedCount"])
+        #expect(totals["typedInvalidCount"] == 0)
+        #expect(totals["typedPlaceholderCount"] == 0)
+        #expect(totals["typedRecordNonzeroCount"] == 0)
+        let classified = (totals["exactCount"] ?? 0) + (totals["legacyStructuralPhiDefectCount"] ?? 0)
+        #expect(classified == totals["selectedCount"])
+        #expect(totals["legacyPlaceholderMismatchCount"] == 0)
+        #expect(totals["legacyUnwrittenParameterPhiMismatchCount"] == 0)
+        #expect(totals["unclassifiedMismatchCount"] == 0)
+        #expect(observedMaximumResidentBytes <= 1024 * 1024 * 1024)
+        let selectedCount = totals["selectedCount"] ?? 0
+        let exactCount = totals["exactCount"] ?? 0
+        let structuralCount = totals["legacyStructuralPhiDefectCount"] ?? 0
+        print("broadDualAudit requestedStart=\(requestedStart) requestedEnd=\(requestedEnd) functionCount=\(functionCount!) transitionSupported=\(transitionSupportedTotal!) selected=\(selectedCount) dedicatedExact=\(dedicatedExactCount) dedicatedIncompatibility=\(dedicatedIncompatibilityCount) exact=\(exactCount) structural=\(structuralCount) resourceSplits=\(resourceSplitCount) maximumResidentBytes=\(observedMaximumResidentBytes)")
+    }
+
+    @Test("Typed MIR refuses an unfrozen MemoryGraph")
+    func typedMIRRefusesAnUnfrozenMemoryGraph() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = """
+        compilerNativeBodyArenaStats
+        function constantValue(): Int {
+            return 7
+        }
+
+        """
+        let first = try runTypedSyntaxFixture(source: fixture, name: "MIRUnfrozenMemoryFirst.range", directory: directory)
+        let second = try runTypedSyntaxFixture(source: fixture, name: "MIRUnfrozenMemorySecond.range", directory: directory)
+        #expect(first.timedOut == false)
+        #expect(first.exitCode == 0)
+        #expect(first.stderr.isEmpty)
+        #expect(first.stdout == second.stdout)
+        #expect(first.stdout.contains("name=constantValue\\tvalid=true"))
+        #expect(first.stdout.contains("mirBeforeMemoryStatus=-1"))
+        #expect(first.stdout.contains("memoryStatus=0\\tmemoryValid=true"))
+        #expect(first.stdout.contains("mirStatus=0\\tmirValid=true\\tmirValidationCode=0"))
+        #expect(first.stdout.contains("functionCount=1"))
+        #expect(first.stdout.contains("destroyCount=1"))
+    }
+
+    @Test("Canonical MemoryGraph records unique state writes without placement")
+    func canonicalMemoryGraphRecordsUniqueStateWrites() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = """
+        compilerNativeBodyArenaStats
+        function updateState(): Int {
+            state value: Int(0)
+            value: value + 1
+            return value
+        }
+
+        """
+        let result = try runTypedSyntaxFixture(source: fixture, name: "CanonicalStateWrite.range", directory: directory)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("name=updateState\\ttransitionSupported=true\\ttransitionReason=\\tvalid=true"))
+        #expect(result.stdout.contains("semanticStatus=0\\tsemanticValid=true"))
+        #expect(result.stdout.contains("memoryPlacementFacts=0"))
+        #expect(result.stdout.contains("memoryMutableValueFacts=1"))
+        #expect(result.stdout.contains("memoryWriteFacts=1"))
+    }
+
+    @Test("Canonical MIR versions mutable state through a while phi")
+    func canonicalMIRVersionsStateThroughWhilePhi() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = """
+        compilerNativeBodyArenaStats
+        function countToThree(): Int {
+            state value: Int(0)
+            while value < 3 {
+                value: value + 1
+            }
+            return value
+        }
+
+        """
+        let first = try runTypedSyntaxFixture(source: fixture, name: "CanonicalStateWhileMIR.range", directory: directory)
+        let second = try runTypedSyntaxFixture(source: fixture, name: "CanonicalStateWhileMIRRepeated.range", directory: directory)
+        #expect(first.exitCode == 0)
+        #expect(first.stderr.isEmpty)
+        #expect(first.stdout == second.stdout)
+        #expect(first.stdout.contains("name=countToThree\\ttransitionSupported=true\\ttransitionReason=\\tvalid=true"))
+        #expect(first.stdout.contains("memoryPlacementFacts=0"))
+        #expect(first.stdout.contains("memoryWriteFacts=1"))
+        #expect(first.stdout.contains("mirStatus=0\\tmirValid=true\\tmirValidationCode=0"))
+        #expect(first.stdout.contains("mirPhiOperations=1"))
+        #expect(first.stdout.contains("mirAssignVersionOperations=1"))
+        #expect(first.stdout.contains("llvmEmissionValid=true"))
+        #expect(first.stdout.contains("llvmRecordLength=0"))
+    }
+
+    @Test("Canonical state while MIR exactly matches legacy LLVM")
+    func canonicalStateWhileMIRExactlyMatchesLegacyLLVM() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = """
+        compilerNativeBodyLLVMDualStats
+        compilerDualFunction	countToThree
+        function countToThree(): Int {
+            state value: Int(0)
+            while value < 3 {
+                value: value + 1
+            }
+            return value
+        }
+
+        """
+        let result = try runTypedSyntaxFixture(source: fixture, name: "CanonicalStateWhileDualLLVMV2.range", directory: directory)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("selectedCount=1"))
+        #expect(result.stdout.contains("name=countToThree\\texact=true\\tcontentEqual=true\\ttypedValid=true"))
+        #expect(result.stdout.contains("typedRecordLength=0"))
+    }
+
+    @Test("Canonical ordered String comparison semantic MIR and LLVM exactly match legacy")
+    func canonicalOrderedStringComparisonMIRExactlyMatchesLegacyLLVM() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = """
+        compilerNativeBodyLLVMDualStats
+        compilerDualFunction\tstringComesBefore
+        function stringComesBefore(left: String, right: String): Bool {
+            return left < right
+        }
+
+        """
+        let result = try runTypedSyntaxFixture(source: fixture, name: "CanonicalOrderedStringComparisonDualLLVM.range", directory: directory)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("selectedCount=1"))
+        #expect(result.stdout.contains("name=stringComesBefore\\texact=true\\tcontentEqual=true\\ttypedValid=true"))
+        #expect(result.stdout.contains("typedRecordLength=0"))
+    }
+
+    @Test("Canonical MIR validates the actual validator family")
+    func canonicalMIRValidatesActualValidatorFamily() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let root = try repositoryRoot()
+        let compilerSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Compiler.range"), encoding: .utf8)
+        let compilerCoreSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/CompilerCore.range"), encoding: .utf8)
+        let lexerSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Lexer.range"), encoding: .utf8)
+        let fixture = """
+        compilerNativeBodyArenaStats
+        \(compilerSource)
+        \(compilerCoreSource)
+        \(lexerSource)
+        """
+        let result = try runTypedSyntaxFixture(source: fixture, name: "CompilerActualValidatorMIR.range", directory: directory, timeout: 360)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        for name in ["compilerSemanticGraphIsValid", "compilerMemoryGraphIsValid", "compilerBodyArenaIsValid"] {
+            let line = result.stdout.components(separatedBy: "\\n").first { $0.contains("name=\(name)\\t") }
+            #expect(line?.contains("memoryValid=true") == true)
+            #expect(line?.contains("mirStatus=0\\tmirValid=true\\tmirValidationCode=0") == true)
+            #expect(line?.contains("llvmRecordLength=0") == true)
+        }
+    }
+
+    @Test("Canonical validator MIR classifies legacy-only LLVM defects")
+    func canonicalValidatorMIRClassifiesLegacyOnlyLLVMDefects() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let root = try repositoryRoot()
+        let compilerSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Compiler.range"), encoding: .utf8)
+        let compilerCoreSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/CompilerCore.range"), encoding: .utf8)
+        let lexerSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Lexer.range"), encoding: .utf8)
+        let fixture = """
+        compilerNativeBodyLLVMDualStats
+        compilerDualFunction	compilerSemanticGraphIsValid
+        compilerDualFunction	compilerMemoryGraphIsValid
+        compilerDualFunction	compilerBodyArenaIsValid
+        \(compilerSource)
+        \(compilerCoreSource)
+        \(lexerSource)
+        """
+        let result = try runTypedSyntaxFixture(source: fixture, name: "CompilerActualValidatorLegacyDefects.range", directory: directory, timeout: 360)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("selectedCount=3"))
+        for name in ["compilerSemanticGraphIsValid", "compilerMemoryGraphIsValid"] {
+            let dual = result.stdout.components(separatedBy: "\\n").first { $0.contains("dualLLVM\\t") && $0.contains("name=\(name)\\t") }
+            let compatibility = result.stdout.components(separatedBy: "\\n").first { $0.contains("dualCompatibility\\t") && $0.contains("name=\(name)\\t") }
+            #expect(dual?.contains("exact=false") == true)
+            #expect(dual?.contains("typedValid=true") == true)
+            #expect(dual?.contains("typedRecordLength=0") == true)
+            #expect(compatibility?.contains("legacyPlaceholder=false") == true)
+            #expect(compatibility?.contains("typedPlaceholder=false") == true)
+            #expect(compatibility?.contains("legacyUnwrittenParameterPhi=true") == true)
+            #expect(compatibility?.contains("typedUnwrittenParameterPhi=false") == true)
+        }
+        let bodyDual = result.stdout.components(separatedBy: "\\n").first { $0.contains("dualLLVM\\t") && $0.contains("name=compilerBodyArenaIsValid\\t") }
+        let bodyCompatibility = result.stdout.components(separatedBy: "\\n").first { $0.contains("dualCompatibility\\t") && $0.contains("name=compilerBodyArenaIsValid\\t") }
+        #expect(bodyDual?.contains("exact=false") == true)
+        #expect(bodyDual?.contains("typedValid=true") == true)
+        #expect(bodyDual?.contains("typedRecordLength=0") == true)
+        #expect(bodyCompatibility?.contains("legacyPlaceholder=true") == true)
+        #expect(bodyCompatibility?.contains("typedPlaceholder=false") == true)
+    }
+
+    @Test("Canonical dual audit lowers CFG builder exactly with transient reset")
+    func canonicalDualAuditLowersCFGBuilderExactlyWithTransientReset() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let root = try repositoryRoot()
+        let compilerSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Compiler.range"), encoding: .utf8)
+        let compilerCoreSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/CompilerCore.range"), encoding: .utf8)
+        let lexerSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Lexer.range"), encoding: .utf8)
+        let fixture = """
+        compilerNativeBodyLLVMDualStats
+        compilerDualFunction	compilerBodyArenaBuildCFG
+        \(compilerSource)
+        \(compilerCoreSource)
+        \(lexerSource)
+        """
+        let result = try runTypedSyntaxFixture(source: fixture, name: "CompilerBodyArenaBuildCFGLegacyPreflight.range", directory: directory, timeout: 360)
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("selectedCount=1"))
+        #expect(result.stdout.contains("exactCount=1"))
+        #expect(result.stdout.contains("legacyStructuralPhiDefectCount=0"))
+        #expect(result.stdout.contains("name=compilerBodyArenaBuildCFG\\texact=true\\tcontentEqual=true\\ttypedValid=true"))
+        #expect(result.stdout.contains("legacyStructuralPhiDefect=false"))
+        #expect(result.stdout.contains("typedPlaceholder=false"))
+        #expect(result.stdout.contains("typedRecordLength=0"))
+    }
+
+    @Test("Canonical dual preflight exactly partitions semantic and memory functions")
+    func canonicalDualPreflightExactlyPartitionsSemanticAndMemoryFunctions() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let root = try repositoryRoot()
+        let compilerSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Compiler.range"), encoding: .utf8)
+        let compilerCoreSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/CompilerCore.range"), encoding: .utf8)
+        let lexerSource = try String(contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/Lexer.range"), encoding: .utf8)
+        let transitionMarkers = (240...319).map { "compilerDualTransitionFunctionID_\($0)_" }.joined(separator: "\n")
+        let fixture = """
+        compilerNativeBodyLLVMDualStats
+        compilerDualSkipFunction	compilerSemanticGraphIsValid
+        \(transitionMarkers)
+        \(compilerSource)
+        \(compilerCoreSource)
+        \(lexerSource)
+        """
+        let result = try runTypedSyntaxFixture(source: fixture, name: "CompilerSemanticMemoryLegacyPhiPartition.range", directory: directory, timeout: 360)
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("selectedCount=60"))
+        #expect(result.stdout.contains("exactCount=42"))
+        #expect(result.stdout.contains("typedInvalidCount=0"))
+        #expect(result.stdout.contains("legacyStructuralPhiDefectCount=18"))
+        #expect(result.stdout.contains("legacyPlaceholderMismatchCount=0"))
+        #expect(result.stdout.contains("legacyUnwrittenParameterPhiMismatchCount=0"))
+        #expect(result.stdout.contains("unclassifiedMismatchCount=0"))
+        #expect(result.stdout.contains("typedPlaceholderCount=0"))
+        #expect(result.stdout.contains("typedRecordNonzeroCount=0"))
+    }
+
+    @Test("Canonical semantics rejects writes through let")
+    func canonicalSemanticsRejectsLetWrites() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = """
+        compilerNativeBodyArenaStats
+        function rejectLetWrite(): Int {
+            let value: Int(0)
+            value: value + 1
+            return value
+        }
+
+        """
+        let first = try runTypedSyntaxFixture(source: fixture, name: "CanonicalLetWriteFirst.range", directory: directory)
+        let second = try runTypedSyntaxFixture(source: fixture, name: "CanonicalLetWriteSecond.range", directory: directory)
+        #expect(first.exitCode == 0)
+        #expect(first.stderr.isEmpty)
+        #expect(first.stdout == second.stdout)
+        #expect(first.stdout.contains("name=rejectLetWrite\\ttransitionSupported=true\\ttransitionReason=\\tvalid=true"))
+        #expect(first.stdout.contains("semanticStatus=-1\\tsemanticValid=false"))
+    }
+
+    @Test("Opt-in compiler cost metrics report actual selected-function work")
+    func optInCompilerCostMetricsReportActualSelectedFunctionWork() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let enabledFixture = """
+        compilerNativeSourceSetCostStats
+        function compilerSourceFileTableColumnCount(): Int {
+            return 5
+        }
+
+        function compilerSourceRoleProject(value: Int): Int {
+            return value + 1
+        }
+
+        """
+        let enabled = try runTypedSyntaxFixture(
+            source: enabledFixture,
+            name: "CompilerCostMetricsEnabled.range",
+            directory: directory
+        )
+
+        #expect(enabled.timedOut == false)
+        #expect(enabled.exitCode == 0)
+        #expect(enabled.stderr.isEmpty)
+        #expect(enabled.stdout.contains("phase=cost"))
+        #expect(enabled.stdout.contains("compilerCostMetrics\tenabled=0"))
+        #expect(metricValue(named: "textBufferAppendCalls", in: enabled.stdout) > 0)
+        #expect(metricValue(named: "textBufferAppendBytes", in: enabled.stdout) > 0)
+        let typedLine = enabled.stdout.split(separator: "\n").first {
+            $0.contains("compilerCostFunction") && $0.contains("name=compilerSourceFileTableColumnCount")
+        }
+        let legacyLine = enabled.stdout.split(separator: "\n").first {
+            $0.contains("compilerCostFunction") && $0.contains("name=compilerSourceRoleProject")
+        }
+        #expect(typedLine?.contains("legacyParses=0") == true)
+        #expect(typedLine?.contains("recordBytes=0") == true)
+        #expect(legacyLine?.contains("legacyParses=1") == true)
+        #expect(metricValue(named: "recordBytes", in: String(legacyLine ?? "")) > 0)
+        let enabledSecond = try runTypedSyntaxFixture(
+            source: enabledFixture,
+            name: "CompilerCostMetricsEnabledSecond.range",
+            directory: directory
+        )
+        #expect(enabledSecond.exitCode == 0)
+        #expect(enabledSecond.stderr.isEmpty)
+        #expect(enabled.stdout == enabledSecond.stdout)
+
+        let disabledFixture = enabledFixture.replacingOccurrences(
+            of: "compilerNativeSourceSetCostStats",
+            with: "compilerNativeSourceSetLLVMText"
+        )
+        let disabledFirst = try runTypedSyntaxFixture(
+            source: disabledFixture,
+            name: "CompilerCostMetricsDisabledFirst.range",
+            directory: directory
+        )
+        let disabledSecond = try runTypedSyntaxFixture(
+            source: disabledFixture,
+            name: "CompilerCostMetricsDisabledSecond.range",
+            directory: directory
+        )
+        #expect(disabledFirst.exitCode == 0)
+        #expect(disabledFirst.stderr.isEmpty)
+        #expect(disabledFirst.stdout == disabledSecond.stdout)
+        #expect(!disabledFirst.stdout.contains("compilerCostMetrics"))
+        #expect(!disabledFirst.stdout.contains("compilerCostFunction"))
+        #expect(!disabledFirst.stdout.contains("compilerMetricsReset"))
+    }
+
+    @Test("Shared compiler metrics runtime counts controlled operations only when enabled")
+    func sharedCompilerMetricsRuntimeCountsControlledOperationsOnlyWhenEnabled() throws {
+        let root = try repositoryRoot()
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let harness = directory.appendingPathComponent("CompilerMetricsHarness.c")
+        let executable = directory.appendingPathComponent("CompilerMetricsHarness")
+        try """
+        #include <stdbool.h>
+        #include <stdint.h>
+        #include <stdio.h>
+        int32_t compilerMetricsReset(void);
+        int32_t compilerMetricsSetEnabled(bool enabled);
+        char *compilerMetricsReport(void);
+        char *stringConcat(char *left, char *right);
+        char *stringSubstring(char *value, int32_t start, int32_t end);
+        void *rangeConstructCreate(char *name);
+        void *rangeConstructSetInt(void *object, char *name, int32_t value);
+        int32_t rangeConstructGetInt(void *object, char *name);
+        void *textBufferCreate(int32_t capacity);
+        int32_t textBufferAppend(void *buffer, char *text);
+        char *textBufferMaterialize(void *buffer);
+        int32_t textBufferDestroy(void *buffer);
+        int main(void) {
+            compilerMetricsReset();
+            compilerMetricsSetEnabled(true);
+            char *joined = stringConcat("ab", "cd");
+            stringSubstring(joined, 1, 3);
+            void *object = rangeConstructCreate("Probe");
+            rangeConstructSetInt(object, "value", 7);
+            rangeConstructGetInt(object, "value");
+            void *buffer = textBufferCreate(1);
+            textBufferAppend(buffer, "hello");
+            textBufferMaterialize(buffer);
+            textBufferDestroy(buffer);
+            compilerMetricsSetEnabled(false);
+            stringConcat("ignored", "work");
+            void *ignoredObject = rangeConstructCreate("Ignored");
+            rangeConstructSetInt(ignoredObject, "field", 1);
+            rangeConstructGetInt(ignoredObject, "field");
+            void *ignoredBuffer = textBufferCreate(1);
+            textBufferAppend(ignoredBuffer, "ignored");
+            textBufferMaterialize(ignoredBuffer);
+            textBufferDestroy(ignoredBuffer);
+            puts(compilerMetricsReport());
+            return 0;
+        }
+        """.write(to: harness, atomically: true, encoding: .utf8)
+        let runtime = root.appendingPathComponent("RangeCompiler/Runtime")
+        let compile = try runCapturedProcess(
+            executable: "/usr/bin/clang",
+            arguments: [
+                harness.path,
+                runtime.appendingPathComponent("RangeCompilerHost.c").path,
+                runtime.appendingPathComponent("RangeCompilerMetrics.c").path,
+                runtime.appendingPathComponent("RangeString.c").path,
+                runtime.appendingPathComponent("RangeTextBuffer.c").path,
+                "-o", executable.path,
+            ]
+        )
+        #expect(compile.exitCode == 0)
+        #expect(compile.stderr.isEmpty)
+        let enabled = try runCapturedProcess(executable: executable.path, arguments: [])
+        #expect(enabled.exitCode == 0)
+        #expect(enabled.stderr.isEmpty)
+        #expect(metricValue(named: "stringConcatCalls", in: enabled.stdout) == 1)
+        #expect(metricValue(named: "stringConcatBytes", in: enabled.stdout) == 4)
+        #expect(metricValue(named: "stringSubstringCalls", in: enabled.stdout) == 1)
+        #expect(metricValue(named: "stringSubstringSourceBytes", in: enabled.stdout) == 4)
+        #expect(metricValue(named: "stringSubstringResultBytes", in: enabled.stdout) == 2)
+        #expect(metricValue(named: "constructObjects", in: enabled.stdout) == 1)
+        #expect(metricValue(named: "constructFields", in: enabled.stdout) == 1)
+        #expect(metricValue(named: "constructNameBytes", in: enabled.stdout) == 10)
+        #expect(metricValue(named: "constructGetProbes", in: enabled.stdout) == 1)
+        #expect(metricValue(named: "textBufferAppendCalls", in: enabled.stdout) == 1)
+        #expect(metricValue(named: "textBufferAppendBytes", in: enabled.stdout) == 5)
+        #expect(metricValue(named: "textBufferMaterializeCalls", in: enabled.stdout) == 1)
+        #expect(metricValue(named: "textBufferMaterializeBytes", in: enabled.stdout) == 5)
+        #expect(metricValue(named: "textBufferReallocations", in: enabled.stdout) == 1)
+        #expect(metricValue(named: "textBufferReallocationBytes", in: enabled.stdout) == 0)
+    }
+
     @Test("Native compiler emits compiler-core LLVM from AST")
     func nativeCompilerEmitsCompilerCoreLLVMFromAST() throws {
         let directory = FileManager.default.temporaryDirectory
@@ -3423,14 +4380,15 @@ struct RangeScriptTests {
 private func runTypedSyntaxFixture(
     source: String,
     name: String,
-    directory: URL
+    directory: URL,
+    timeout: TimeInterval = 120
 ) throws -> ScriptResult {
     let sourceURL = directory.appendingPathComponent(name)
     try source.write(to: sourceURL, atomically: true, encoding: .utf8)
     let compiler = try repositoryRoot()
         .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
     let executable = try TypedSyntaxCompilerCache.shared.executable(for: compiler)
-    return try runFixtureExecutable(executable: executable, source: sourceURL, timeout: 120)
+    return try runFixtureExecutable(executable: executable, source: sourceURL, timeout: timeout)
 }
 
 private func opaqueIntBufferFixture(body: String, includeCount: Bool = false) -> String {
@@ -3567,6 +4525,8 @@ private func typedSyntaxCompilerToolInputs(root: URL) throws -> [URL] {
     var inputs = [
         root.appendingPathComponent("scripts/range"),
         root.appendingPathComponent("RangeCompiler/Package.swift"),
+        root.appendingPathComponent("RangeCompiler/Runtime/RangeCompilerHost.c"),
+        root.appendingPathComponent("RangeCompiler/Runtime/RangeCompilerMetrics.c"),
         root.appendingPathComponent("RangeCompiler/Runtime/RangeTextBuffer.c"),
         root.appendingPathComponent("RangeCompiler/Runtime/RangeIntBuffer.c"),
         root.appendingPathComponent("RangeCompiler/Runtime/RangeString.c"),
@@ -3590,6 +4550,13 @@ private func typedSyntaxCompilerToolInputs(root: URL) throws -> [URL] {
         if file.pathExtension == "swift" { inputs.append(file) }
     }
     return inputs.sorted { $0.path < $1.path }
+}
+
+private func metricValue(named name: String, in text: String) -> Int {
+    guard let range = text.range(of: "\(name)=") else { return -1 }
+    let suffix = text[range.upperBound...]
+    let digits = suffix.prefix { $0.isNumber }
+    return Int(digits) ?? -1
 }
 
 private func typedSyntaxCompilerFingerprint(files: [URL], context: String) throws -> String {
@@ -3629,7 +4596,8 @@ private func withTypedFixtureCacheLock(lockURL: URL, body: () throws -> Void) th
 private func runFixtureExecutable(
     executable: URL,
     source: URL,
-    timeout: TimeInterval
+    timeout: TimeInterval,
+    maximumResidentBytes: UInt64? = nil
 ) throws -> ScriptResult {
     let process = Process()
     process.executableURL = executable
@@ -3650,11 +4618,19 @@ private func runFixtureExecutable(
 
     try process.run()
     let deadline = Date().addingTimeInterval(timeout)
-    while process.isRunning, Date() < deadline {
+    var observedMaximumResidentBytes: UInt64 = 0
+    var resourceLimited = false
+    while process.isRunning, Date() < deadline, !resourceLimited {
+        var taskInfo = proc_taskinfo()
+        let taskInfoSize = Int32(MemoryLayout<proc_taskinfo>.stride)
+        if proc_pidinfo(process.processIdentifier, PROC_PIDTASKINFO, 0, &taskInfo, taskInfoSize) == taskInfoSize {
+            observedMaximumResidentBytes = max(observedMaximumResidentBytes, taskInfo.pti_resident_size)
+            if let maximumResidentBytes, observedMaximumResidentBytes > maximumResidentBytes { resourceLimited = true }
+        }
         Thread.sleep(forTimeInterval: 0.05)
     }
-    let timedOut = process.isRunning
-    if timedOut { process.terminate() }
+    let timedOut = process.isRunning && !resourceLimited
+    if timedOut || resourceLimited { process.terminate() }
     process.waitUntilExit()
     try? stdoutHandle.close()
     try? stderrHandle.close()
@@ -3662,7 +4638,9 @@ private func runFixtureExecutable(
         exitCode: process.terminationStatus,
         stdout: (try? String(contentsOf: stdoutURL, encoding: .utf8)) ?? "",
         stderr: (try? String(contentsOf: stderrURL, encoding: .utf8)) ?? "",
-        timedOut: timedOut
+        timedOut: timedOut,
+        maximumResidentBytes: observedMaximumResidentBytes,
+        resourceLimited: resourceLimited
     )
 }
 
@@ -3727,7 +4705,9 @@ private func runRangeScript(arguments: [String], timeout: TimeInterval = 10) thr
         exitCode: process.terminationStatus,
         stdout: (try? String(contentsOf: stdoutURL, encoding: .utf8)) ?? "",
         stderr: (try? String(contentsOf: stderrURL, encoding: .utf8)) ?? "",
-        timedOut: timedOut
+        timedOut: timedOut,
+        maximumResidentBytes: 0,
+        resourceLimited: false
     )
 }
 
@@ -3747,7 +4727,9 @@ private func runCapturedProcess(executable: String, arguments: [String]) throws 
         exitCode: process.terminationStatus,
         stdout: String(decoding: stdout.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self),
         stderr: String(decoding: stderr.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self),
-        timedOut: false
+        timedOut: false,
+        maximumResidentBytes: 0,
+        resourceLimited: false
     )
 }
 
@@ -3952,6 +4934,8 @@ private struct ScriptResult {
     var stdout: String
     var stderr: String
     var timedOut: Bool
+    var maximumResidentBytes: UInt64
+    var resourceLimited: Bool
 }
 
 private struct LexerTokenSnapshot: Equatable {

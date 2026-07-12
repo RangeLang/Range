@@ -10,6 +10,9 @@ typedef struct RangeTextBuffer {
 } RangeTextBuffer;
 
 void *stringTransientAllocate(size_t size);
+void compilerMetricsObserveTextBufferAppend(size_t bytes);
+void compilerMetricsObserveTextBufferMaterialize(size_t bytes);
+void compilerMetricsObserveTextBufferReallocation(size_t bytesCopied);
 
 static int32_t rangeTextBufferReserve(RangeTextBuffer *buffer, size_t additional) {
     if (!buffer || !buffer->data || buffer->count > buffer->capacity
@@ -34,6 +37,7 @@ static int32_t rangeTextBufferReserve(RangeTextBuffer *buffer, size_t additional
         capacity *= 2;
     }
 
+    size_t bytesCopied = buffer->count;
     char *data = realloc(buffer->data, capacity + 1);
     if (!data) {
         abort();
@@ -41,6 +45,7 @@ static int32_t rangeTextBufferReserve(RangeTextBuffer *buffer, size_t additional
 
     buffer->data = data;
     buffer->capacity = capacity;
+    compilerMetricsObserveTextBufferReallocation(bytesCopied);
     return 0;
 }
 
@@ -75,6 +80,7 @@ int32_t textBufferAppend(void *opaqueBuffer, char *text) {
     if (rangeTextBufferReserve(buffer, length) != 0) {
         return -1;
     }
+    compilerMetricsObserveTextBufferAppend(length);
 
     memcpy(buffer->data + buffer->count, text, length);
     buffer->count += length;
@@ -99,6 +105,7 @@ int32_t textBufferAppendCharacter(void *opaqueBuffer, char *source, int32_t inde
     if (rangeTextBufferReserve(buffer, 1) != 0) {
         return -1;
     }
+    compilerMetricsObserveTextBufferAppend(1);
 
     buffer->data[buffer->count] = source[index];
     buffer->count += 1;
@@ -112,6 +119,7 @@ char *textBufferMaterialize(void *opaqueBuffer) {
         return "";
     }
 
+    compilerMetricsObserveTextBufferMaterialize(buffer->count);
     char *text = stringTransientAllocate(buffer->count + 1);
     if (!text) {
         abort();

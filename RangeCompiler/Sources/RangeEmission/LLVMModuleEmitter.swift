@@ -29,6 +29,7 @@ public struct LLVMModuleEmitter {
         "intBufferAppend",
         "intBufferCount",
         "intBufferElement",
+        "intBufferSet",
         "intBufferDestroy",
     ]
     private static let stringRuntimeFunctionNames: Set<String> = [
@@ -43,9 +44,17 @@ public struct LLVMModuleEmitter {
         "stringByteAt",
         "stringFindByteOf",
     ]
+    private static let compilerMetricsRuntimeFunctionNames: Set<String> = [
+        "compilerMetricsReset",
+        "compilerMetricsSetEnabled",
+        "compilerMetricsFunctionBegin",
+        "compilerMetricsFunctionEnd",
+        "compilerMetricsReport",
+    ]
     private static let coreRuntimeFunctionNames = textBufferRuntimeFunctionNames
         .union(intBufferRuntimeFunctionNames)
         .union(stringRuntimeFunctionNames)
+        .union(compilerMetricsRuntimeFunctionNames)
 
     public func emit(program: CompiledProgram) throws -> String {
         let mainBlock = try projectMainBlock(in: program)
@@ -1793,6 +1802,7 @@ public struct LLVMModuleEmitter {
         private(set) var usesTextBuffer = false
         private(set) var usesIntBuffer = false
         private(set) var usesStringRuntime = false
+        private(set) var usesCompilerMetrics = false
 
         static func arrayTypeName(for elementType: String) -> String {
             "%Range.Array.\(sanitizedTypeName(elementType))"
@@ -1880,6 +1890,10 @@ public struct LLVMModuleEmitter {
 
         func markUsesStringRuntime() {
             usesStringRuntime = true
+        }
+
+        func markUsesCompilerMetrics() {
+            usesCompilerMetrics = true
         }
 
         func registerArray(elementType: String) {
@@ -1978,6 +1992,7 @@ public struct LLVMModuleEmitter {
                 lines.append("declare i32 @intBufferAppend(ptr, i32)")
                 lines.append("declare i32 @intBufferCount(ptr)")
                 lines.append("declare i32 @intBufferElement(ptr, i32)")
+                lines.append("declare i32 @intBufferSet(ptr, i32, i32)")
                 lines.append("declare i32 @intBufferDestroy(ptr)")
             }
             if usesStringRuntime {
@@ -1992,6 +2007,13 @@ public struct LLVMModuleEmitter {
                 lines.append("declare ptr @stringCharacterAt(ptr, i32)")
                 lines.append("declare i32 @stringByteAt(ptr, i32)")
                 lines.append("declare i32 @stringFindByteOf(ptr, i32, i32, i32, i32)")
+            }
+            if usesCompilerMetrics {
+                lines.append("declare i32 @compilerMetricsReset()")
+                lines.append("declare i32 @compilerMetricsSetEnabled(i1)")
+                lines.append("declare i32 @compilerMetricsFunctionBegin(i32, ptr)")
+                lines.append("declare i32 @compilerMetricsFunctionEnd(i32, i32)")
+                lines.append("declare ptr @compilerMetricsReport()")
             }
             guard !lines.isEmpty else {
                 return ""
@@ -5631,6 +5653,9 @@ public struct LLVMModuleEmitter {
             }
             if LLVMModuleEmitter.stringRuntimeFunctionNames.contains(resolvedName) {
                 runtime.markUsesStringRuntime()
+            }
+            if LLVMModuleEmitter.compilerMetricsRuntimeFunctionNames.contains(resolvedName) {
+                runtime.markUsesCompilerMetrics()
             }
 
             var emittedArguments: [String] = []

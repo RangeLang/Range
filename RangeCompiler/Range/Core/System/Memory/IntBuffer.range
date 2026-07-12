@@ -14,4 +14,7 @@ function intBufferCount(buffer: IntBuffer): Int
 function intBufferElement(buffer: IntBuffer, index: Int): Int
 
 @language
+function intBufferSet(buffer: IntBuffer, index: Int, value: Int): Int
+
+@language
 function intBufferDestroy(buffer: IntBuffer): Int

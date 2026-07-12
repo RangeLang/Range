@@ -1,0 +1,63 @@
+{
+  "formatVersion": 1,
+  "seed": {
+    "path": "RangeCompiler/Bootstrap/RangeCompilerSeed.ll",
+    "bytes": 2619518,
+    "sha256": "99248cfc74e544d6df93fc32ff452c49f53565140523cc272de8d36dd82918dd"
+  },
+  "expectedStage3LLVM": {
+    "bytes": 2619518,
+    "sha256": "99248cfc74e544d6df93fc32ff452c49f53565140523cc272de8d36dd82918dd"
+  },
+  "compilerSources": [
+    {
+      "path": "RangeCompiler/Range/Programs/Compiler/Compiler.range",
+      "sha256": "82ce8a6f7828a1f85baefcddc745f60d75ee669741271cbcc84737a2c31f2cea"
+    },
+    {
+      "path": "RangeCompiler/Range/Programs/Compiler/CompilerCore.range",
+      "sha256": "fc5b60359c3f9f7097bdfce29a33251505f433bff27cd35b3ce00ff58989d4bb"
+    },
+    {
+      "path": "RangeCompiler/Range/Programs/Compiler/Lexer.range",
+      "sha256": "1bbc3019658ce0135d362dc8b51f349add833c0b192c341ad85acadeca8e2352"
+    },
+    {
+      "path": "RangeCompiler/Range/Programs/Compiler/Main.range",
+      "sha256": "80635cc417d917ba2993ac91fec87723bff3ff74c6841cbf79e470a8887715b1"
+    }
+  ],
+  "runtimeABI": 1,
+  "runtimeSources": [
+    {
+      "path": "RangeCompiler/Runtime/RangeCompilerHost.c",
+      "sha256": "dda031b5f74d6cd99c4583867317b93c7aedd52374e53ad6efe4147ece8d4d67"
+    },
+    {
+      "path": "RangeCompiler/Runtime/RangeString.c",
+      "sha256": "e245e90ef6d97b7ed5070c612448e1eca7b9b383292fec2528d8dc889076b129"
+    },
+    {
+      "path": "RangeCompiler/Runtime/RangeTextBuffer.c",
+      "sha256": "cb59d4a3549d73c8346d92b842969ee959f8113acbab03cec447b0b26b93ab2d"
+    },
+    {
+      "path": "RangeCompiler/Runtime/RangeIntBuffer.c",
+      "sha256": "f217a4d24181575ab362999f6f0bc5e641e04ee0a55d190789a84ac096f0ff43"
+    },
+    {
+      "path": "RangeCompiler/Runtime/RangeCompilerMetrics.c",
+      "sha256": "2371a7f69c4f5d597425686cd83bba83851e04dd1bb8a2b6bb040237d1757307"
+    }
+  ],
+  "target": {
+    "platform": "macOS",
+    "architecture": "arm64",
+    "pointerBits": 64,
+    "minimumOS": "27.0"
+  },
+  "producer": {
+    "clang": "Apple clang version 21.0.0",
+    "fixedPointCommand": "scripts/range check-stage2-compiler"
+  }
+}

@@ -95,6 +95,15 @@ int32_t intBufferElement(void *opaqueBuffer, int32_t index) {
     return buffer->data[index];
 }
 
+int32_t intBufferSet(void *opaqueBuffer, int32_t index, int32_t value) {
+    RangeIntBuffer *buffer = opaqueBuffer;
+    if (!buffer || index < 0 || (size_t)index >= buffer->count) {
+        return -1;
+    }
+    buffer->data[index] = value;
+    return 0;
+}
+
 int32_t intBufferDestroy(void *opaqueBuffer) {
     RangeIntBuffer *buffer = opaqueBuffer;
     if (!buffer) {

@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+
+manifest_value() {
+    /usr/bin/plutil -extract "$1" raw -o - "$MANIFEST"
+}
+
+sha256() {
+    /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'
+}
+
+verify_file() {
+    local key="$1"
+    local path expected actual
+    path="$(manifest_value "$key.path")"
+    expected="$(manifest_value "$key.sha256")"
+    if [[ ! -f "$REPO_ROOT/$path" ]]; then
+        echo "Missing seed input: $path" >&2
+        exit 1
+    fi
+    actual="$(sha256 "$REPO_ROOT/$path")"
+    if [[ "$actual" != "$expected" ]]; then
+        echo "Seed input hash mismatch: $path" >&2
+        echo "expected $expected" >&2
+        echo "actual   $actual" >&2
+        exit 1
+    fi
+}
+
+if [[ "$(manifest_value formatVersion)" != "1" ]]; then
+    echo "Unsupported Range compiler seed manifest." >&2
+    exit 1
+fi
+
+if [[ "$(uname -m)" != "$(manifest_value target.architecture)" ]]; then
+    echo "Seed target architecture mismatch." >&2
+    exit 1
+fi
+
+verify_file seed
+for index in 0 1 2 3 4; do
+    verify_file "compilerSources.$index"
+    verify_file "runtimeSources.$index"
+done
+
+seed_relative="$(manifest_value seed.path)"
+seed="$REPO_ROOT/$seed_relative"
+seed_bytes="$(/usr/bin/stat -f %z "$seed")"
+if [[ "$seed_bytes" != "$(manifest_value seed.bytes)" ]]; then
+    echo "Seed byte length mismatch: $seed_relative" >&2
+    exit 1
+fi
+
+clang_identity="$(clang --version | /usr/bin/head -1)"
+expected_clang="$(manifest_value producer.clang)"
+if [[ "$clang_identity" != "$expected_clang"* ]]; then
+    echo "Seed verifier clang mismatch." >&2
+    echo "expected prefix $expected_clang" >&2
+    echo "actual          $clang_identity" >&2
+    exit 1
+fi
+
+build_root="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-seed-verify.XXXXXX")"
+trap '/bin/rm -rf "$build_root"' EXIT
+seed_executable="$build_root/RangeCompilerSeed"
+bundle="$build_root/RangeCompilerSourceSet.range"
+stage3="$build_root/RangeCompilerStage3.ll"
+
+runtime_inputs=()
+for index in 0 1 2 3 4; do
+    runtime_inputs+=("$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")")
+done
+
+clang -Wno-override-module -x ir "$seed" -x c "${runtime_inputs[@]}" -o "$seed_executable"
+
+/usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$bundle"
+for index in 0 1 2 3; do
+    source_relative="$(manifest_value "compilerSources.$index.path")"
+    source_path="$REPO_ROOT/$source_relative"
+    /usr/bin/printf 'compilerSourceFile\\t%s\n' "$(basename "$source_path")" >> "$bundle"
+    /bin/cat "$source_path" >> "$bundle"
+    if [[ -n "$(/usr/bin/tail -c 1 "$source_path")" ]]; then
+        /usr/bin/printf '\n' >> "$bundle"
+    fi
+done
+
+"$seed_executable" "$bundle" > "$stage3"
+
+if ! /usr/bin/cmp -s "$seed" "$stage3"; then
+    echo "Seed fixed-point verification failed: Stage 3 LLVM differs." >&2
+    /usr/bin/cmp -l "$seed" "$stage3" | /usr/bin/head -1 >&2 || true
+    exit 1
+fi
+
+stage3_hash="$(sha256 "$stage3")"
+stage3_bytes="$(/usr/bin/stat -f %z "$stage3")"
+if [[ "$stage3_hash" != "$(manifest_value expectedStage3LLVM.sha256)"
+    || "$stage3_bytes" != "$(manifest_value expectedStage3LLVM.bytes)" ]]; then
+    echo "Verified Stage 3 does not match its manifest result." >&2
+    exit 1
+fi
+
+echo "Range compiler seed verified."
+echo "sha256=$stage3_hash"
+echo "bytes=$stage3_bytes"

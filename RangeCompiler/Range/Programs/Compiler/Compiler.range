@@ -23,11 +23,6 @@ function compileRangeNativeSource(source: String): String {
 }
 
 function compileRangeNativeSourceDirectiveOutput(source: String): String {
-    if compilerSourceRequestsSourceSetBodyFunctionNames(source: source) {
-        let bodyFunctionNames: String("\(compilerSourceSetBodyFunctionNames())")
-        return bodyFunctionNames
-    }
-
     if compilerSourceRequestsSourceInventory(source: source) {
         return compilerSourceInventorySummary(source: source)
     }
@@ -60,24 +55,12 @@ function compileRangeNativeSourceDirectiveOutput(source: String): String {
         return compilerTypedIRFixedLLVMText(source: source)
     }
 
-    if compilerSourceRequestsNativeSourceSetParseStats(source: source) {
-        return compilerNativeSourceSetParseStats(source: source)
-    }
-
-    if compilerSourceRequestsNativeSourceSetReachableStats(source: source) {
-        return compilerNativeSourceSetReachableStats(source: source)
-    }
-
-    if compilerSourceRequestsNativeSourceSetSelectedStats(source: source) {
-        return compilerNativeSourceSetSelectedStats(source: source)
-    }
-
-    if compilerSourceRequestsNativeSourceSetSelectedScanStats(source: source) {
-        return compilerNativeSourceSetSelectedScanStats(source: source)
-    }
-
     if compilerSourceRequestsNativeSourceSetLLVMText(source: source) {
         return compilerNativeSourceSetLLVMText(source: source)
+    }
+
+    if compilerSourceRequestsProjectSourceSetLLVMText(source: source) {
+        return compilerSourceSetLLVMText(source: source)
     }
 
     if compilerSourceRequestsSourceSetLLVMText(source: source) {
@@ -97,29 +80,12 @@ function compileRangeNativeProgramOutput(source: String): String {
 }
 
 function compileRangeSourceSetDirectiveOutput(source: String): String {
-    if compilerSourceRequestsSourceSetBodyFunctionNames(source: source) {
-        let bodyFunctionNames: String("\(compilerSourceSetBodyFunctionNames())")
-        return bodyFunctionNames
-    }
-
     if compilerSourceRequestsNativeSourceSetLLVMText(source: source) {
         return compilerNativeSourceSetLLVMText(source: source)
     }
 
-    if compilerSourceRequestsNativeSourceSetParseStats(source: source) {
-        return compilerNativeSourceSetParseStats(source: source)
-    }
-
-    if compilerSourceRequestsNativeSourceSetReachableStats(source: source) {
-        return compilerNativeSourceSetReachableStats(source: source)
-    }
-
-    if compilerSourceRequestsNativeSourceSetSelectedStats(source: source) {
-        return compilerNativeSourceSetSelectedStats(source: source)
-    }
-
-    if compilerSourceRequestsNativeSourceSetSelectedScanStats(source: source) {
-        return compilerNativeSourceSetSelectedScanStats(source: source)
+    if compilerSourceRequestsProjectSourceSetLLVMText(source: source) {
+        return compilerSourceSetLLVMText(source: source)
     }
 
     if compilerSourceRequestsSourceSetAST(source: source) {
@@ -257,43 +223,8 @@ function compilerSourceRequestsMemoryLLVMText(source: String): Bool {
     return false
 }
 
-function compilerSourceRequestsSourceSetBodyFunctionNames(source: String): Bool {
-    if hasRangePrefix(source: source, start: 0, prefix: String("compilerSourceSetBodyFunctionNames")) {
-        return true
-    }
-    return false
-}
-
 function compilerSourceRequestsNativeSourceSetLLVMText(source: String): Bool {
     if hasRangePrefix(source: source, start: 0, prefix: String("compilerNativeSourceSetLLVMText")) {
-        return true
-    }
-    return false
-}
-
-function compilerSourceRequestsNativeSourceSetParseStats(source: String): Bool {
-    if hasRangePrefix(source: source, start: 0, prefix: String("compilerNativeSourceSetParseStats")) {
-        return true
-    }
-    return false
-}
-
-function compilerSourceRequestsNativeSourceSetReachableStats(source: String): Bool {
-    if hasRangePrefix(source: source, start: 0, prefix: String("compilerNativeSourceSetReachableStats")) {
-        return true
-    }
-    return false
-}
-
-function compilerSourceRequestsNativeSourceSetSelectedStats(source: String): Bool {
-    if hasRangePrefix(source: source, start: 0, prefix: String("compilerNativeSourceSetSelectedStats")) {
-        return true
-    }
-    return false
-}
-
-function compilerSourceRequestsNativeSourceSetSelectedScanStats(source: String): Bool {
-    if hasRangePrefix(source: source, start: 0, prefix: String("compilerNativeSourceSetSelectedScanStats")) {
         return true
     }
     return false
@@ -322,6 +253,13 @@ function compilerSourceRequestsSourceSetLLVM(source: String): Bool {
 
 function compilerSourceRequestsSourceSetLLVMText(source: String): Bool {
     if hasRangePrefix(source: source, start: 0, prefix: String("compilerSourceSetLLVMText")) {
+        return true
+    }
+    return false
+}
+
+function compilerSourceRequestsProjectSourceSetLLVMText(source: String): Bool {
+    if hasRangePrefix(source: source, start: 0, prefix: String("compilerProjectSourceSetLLVMText")) {
         return true
     }
     return false

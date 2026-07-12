@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RANGE_ROOT="${RANGE_ROOT:-$REPO_ROOT/RangeCompiler/Range}"
 RANGE_BIN="${RANGE_BIN:-}"
+RANGE_DRIVER="${RANGE_DRIVER:-native}"
 
 usage() {
     cat >&2 <<'USAGE'
@@ -15,7 +16,8 @@ Usage:
   scripts/range compile-executable INPUT
   scripts/range check-bootstrap-compiler [DIR]
   scripts/range check-stage1-compiler [DIR]
-  scripts/range check-stage2-compiler [DIR]
+  scripts/range check-stage2-compiler
+  scripts/range check-stage2-compiler-swift [DIR]
   scripts/range check-llvm-examples [DIR]
   scripts/range check-llvm-runs [MANIFEST]
 USAGE
@@ -27,6 +29,18 @@ range_compiler() {
     else
         swift run --package-path "$REPO_ROOT/RangeCompiler" range "$@"
     fi
+}
+
+range_normal_command() {
+    if [[ -n "$RANGE_BIN" || "$RANGE_DRIVER" == "swift" ]]; then
+        range_compiler "$@"
+        return
+    fi
+    if [[ "$RANGE_DRIVER" != "native" ]]; then
+        echo "Unknown RANGE_DRIVER: $RANGE_DRIVER" >&2
+        exit 64
+    fi
+    "$REPO_ROOT/scripts/range-native" "$@"
 }
 
 prepare_range_bin() {
@@ -58,14 +72,22 @@ case "$command" in
             usage
             exit 1
         fi
-        range_compiler emit-llvm --range-root "$RANGE_ROOT" "$1" "$2"
+        if [[ -n "$RANGE_BIN" || "$RANGE_DRIVER" == "swift" ]]; then
+            range_compiler emit-llvm --range-root "$RANGE_ROOT" "$1" "$2"
+        else
+            range_normal_command emit-llvm "$1" "$2"
+        fi
         ;;
     compile-executable)
         if [[ $# -ne 1 ]]; then
             usage
             exit 1
         fi
-        range_compiler compile-executable --range-root "$RANGE_ROOT" "$1"
+        if [[ -n "$RANGE_BIN" || "$RANGE_DRIVER" == "swift" ]]; then
+            range_compiler compile-executable --range-root "$RANGE_ROOT" "$1"
+        else
+            range_normal_command compile-executable "$1"
+        fi
         ;;
     check-bootstrap-compiler)
         if [[ $# -gt 1 ]]; then
@@ -86,11 +108,17 @@ case "$command" in
         range_compiler check-stage1-compiler --range-root "$RANGE_ROOT" "$compiler_dir"
         ;;
     check-stage2-compiler)
+        if [[ $# -ne 0 ]]; then
+            usage
+            exit 1
+        fi
+        "$REPO_ROOT/scripts/verify-range-compiler-seed"
+        ;;
+    check-stage2-compiler-swift)
         if [[ $# -gt 1 ]]; then
             usage
             exit 1
         fi
-
         compiler_dir="${1:-$REPO_ROOT/RangeCompiler/Range/Programs/Compiler}"
         range_compiler check-stage2-compiler --range-root "$RANGE_ROOT" "$compiler_dir"
         ;;
@@ -138,7 +166,11 @@ case "$command" in
             shift
         fi
 
-        range_compiler run --range-root "$RANGE_ROOT" "$input" -- "$@"
+        if [[ -n "$RANGE_BIN" || "$RANGE_DRIVER" == "swift" ]]; then
+            range_compiler run --range-root "$RANGE_ROOT" "$input" -- "$@"
+        else
+            range_normal_command run "$input" -- "$@"
+        fi
         ;;
     *)
         usage

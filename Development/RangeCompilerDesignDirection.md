@@ -759,7 +759,7 @@ Relevant implementation points:
 Reported fixed-point run evidence, with the resulting local artifacts verified:
 
 ```sh
-/usr/bin/time -l scripts/range check-stage2-compiler \
+/usr/bin/time -l scripts/range check-stage2-compiler-swift \
   RangeCompiler/Range/Programs/Compiler
 ```
 
@@ -1412,6 +1412,1049 @@ are byte-identical at 2,522,104 bytes with SHA-256
 The warm eight-fixture opaque/provenance matrix completes in about 1.35 seconds.
 
 ## Explicit Non-Goals And Rejected Directions
+
+## Usable Self-Host Replacement Plan
+
+This section supersedes any earlier ordering that treats the current typed
+fixture renderer, encoded declaration records, or fixed-point name strings as
+the scalable compiler implementation.  The migration is a sequence of
+ownership transfers.  A migrated compiler concern has one Range-owned typed
+authority; the corresponding record/string consumer is deleted before the
+next concern is migrated.
+
+### Corrected permanent phase order
+
+The permanent pipeline is:
+
+1. `SourceStore`: immutable source buffers and deterministic file identity.
+2. Typed structural syntax: top-level declarations and lazy per-function body
+   arenas with authored source ranges and provenance.
+3. Declaration and scope indexes: stable source-order IDs, collision-checked
+   name lookup, contiguous member/parameter ranges, and deterministic call
+   identity.
+4. `SemanticGraph`: resolution, types, callable summaries, and effect facts.
+5. Typed per-function HIR and CFG: blocks, edges, regions, exits, and use/def
+   facts.
+6. Phased `MemoryGraph`:
+   - layout and ABI;
+   - storage and placement;
+   - access, alias, and exclusivity constraints;
+   - escape, transfer, and return;
+   - CFG liveness and destruction on edges.
+7. SSA/value numbering.
+8. Typed generic per-function backend IR.
+9. Bounded LLVM serialization through append-only buffers/sinks.
+
+Layout and ABI may be derived before CFG construction.  Liveness, conflicting
+access, transfer, and destruction may not: they consume real control-flow
+facts.  The current source-order/lexical-parent lifetime reconstruction is a
+bounded proof, not the final implementation for loops, joins, `break`,
+`continue`, or path-sensitive initialization.
+
+Persistent module state is limited to source, declaration/signature/type
+indexes, stable identities, and compact call/effect summaries.  Body syntax,
+local scopes, CFG, detailed MemoryGraph facts, SSA, and backend IR are owned by
+one function compilation and released after that function is serialized.
+Replacing strings with a whole-program permanently-live graph is explicitly
+not acceptable.
+
+### Corrected performance diagnosis
+
+The retained native Stage 2/3 path currently selects helpers from an explicit
+root inventory.  It does not run the transitive fixed-point reachability walk.
+The fixed-point name-string algorithm remains a normal-program scaling defect,
+but it is not an evidenced cause of the current retained native gate.
+
+The active structural costs are instead:
+
+- top-level declarations serialized into escaped records and decoded again;
+- repeated full declaration scans for audit, selection, external declarations,
+  return types, parameter types, constructs, and members;
+- linear membership in delimited name strings;
+- legacy local environments and instructions used as encoded databases;
+- cumulative string construction during lowering and LLVM rendering.
+
+The reported 291.97-second fixed-point result and the approximately 4.5 GB
+peak-RSS checkpoint are useful baselines, but they were not captured as a
+same-revision measurement pair.  Every accepted performance claim from this
+point records commit, command, elapsed time, peak RSS, output size, output
+hash, and compiler phase counters together.
+
+### Ordered ownership transfers
+
+#### Milestone 1: typed declaration store owns native compilation
+
+Capture top-level constructs, functions, members, parameters, language
+provenance, signature ranges, and body ranges once.  Bodies remain lazy.
+Build deterministic indexes from names to collision-checked declaration IDs,
+functions to signatures/body ranges, constructs to contiguous members, and
+functions to contiguous parameters.  Source order—not hash-table order—owns
+diagnostic and emission order.  Convert the manual native root inventory to a
+FunctionID selection set once.
+
+Route selected-helper audit/enumeration, external declaration rendering,
+return/parameter lookup, construct/member lookup, and the legacy body
+lowerer's global declaration queries through this store.
+
+Deletion gate: native `compileRangeNativeSource` neither constructs nor scans
+`CompilerProgram.declarationRecords`.  Native call graphs no longer contain
+`compilerCoreDeclarationLookupRecords`, native uses of top-level declaration
+record decoding, or declaration-record return/parameter/construct/member
+lookups.  Unsupported native declarations diagnose; they never silently build
+both declaration models.
+
+#### Milestone 2: indexed call discovery and lazy typed bodies
+
+Parse each selected body once into a per-function typed arena.  Resolve calls
+to FunctionIDs and use a deterministic worklist/bitmap for reachability.
+Cache only immutable signature summaries globally; release body detail after
+emission unless an explicit incremental cache owns it.
+
+Deletion gate: reachable functions and selected bodies are never represented
+as semicolon-delimited names or recursively decoded statement/expression
+records.  The manual native inventory remains only as seed roots until normal
+entry discovery proves equivalent.
+
+#### Milestone 3: one real compiler leaf family through CFG and backend IR
+
+Take a bounded but real compiler leaf family through typed body syntax,
+SemanticGraph, typed CFG, phased MemoryGraph, SSA, generic backend IR, and the
+bounded emitter.  Choose by dependency shape and profiling, not by fixture
+shape.  Typed ownership is decided before lowering; an unsupported construct
+diagnoses instead of falling back after duplicate parsing.
+
+Deletion gate: the migrated family has no legacy statement/expression record
+lowering and no fixed-shape LLVM renderer.  `compilerTypedIRFixedLLVMRender`
+must be deleted when its last coverage case is handled by the generic emitter,
+not extended.
+
+#### Milestone 4: expand vertical families and delete legacy lowering
+
+Migrate control flow, calls, aggregates, mutation, aliases, transfers, and
+opaque handles as general rules.  Each family deletes its old parser/lowerer
+consumer before the next begins.  Complete the binding conflict matrix and
+then add `derived` dependency facts without default storage.
+
+Deletion gate: encoded statements, expressions, local environments,
+instruction records, and rendered LLVM are no longer semantic databases.
+
+#### Milestone 5: bounded generic module emission
+
+Serialize functions as they settle into a bounded sink with deterministic
+module ordering.  Globals, declarations, types, and functions have explicit
+ordered inventories.  Transient IDs and hash iteration never affect bytes.
+
+Deletion gate: cumulative module/function string concatenation and fixed-shape
+module rendering are absent from the self-host path.
+
+#### Milestone 6: daily self-hosting leaves Swift
+
+This is a separate bootstrap/driver track and must not obscure compiler
+architecture measurements.  Extract one checked-in runtime C implementation
+shared by Swift-oracle and native builds.  Check in a Stage 2 LLVM seed with a
+manifest containing its source inventory, toolchain/target assumptions, size,
+and hash.  A small deterministic native driver verifies the manifest, builds
+the seed, accepts the normal source-set interface, and performs Stage 2/3
+identity checks.  Swift remains an explicit bootstrap oracle until seed
+reproduction and rollback are proven; it stops owning ordinary developer
+commands once interface and behavior parity pass.
+
+Deletion gate: normal compile, focused test, and fixed-point commands do not
+launch the Swift compiler.  Runtime C is not duplicated in Swift and native
+drivers, and a seed rollover is reproducible and auditable.
+
+### Acceptance gates
+
+Every milestone must retain:
+
+- focused positive and failure behavior matrices;
+- zero reachable placeholder helpers;
+- deterministic diagnostics and emission order;
+- exact Stage 2/Stage 3 LLVM byte identity for the full gate;
+- no dynamic construct runtime/allocator symbols for statically placed
+  non-escaping aggregates;
+- identical MemoryGraph snapshots where the gate covers them.
+
+Performance acceptance is measured, never inferred.  Record wall time, CPU
+time where available, peak RSS, bytes retained by persistent/per-function
+arenas, declaration lookup count/probes, bodies parsed, record fields decoded,
+bytes appended/materialized, and phase durations.  A performance change is
+retained only when behavior and determinism pass and either elapsed time or
+peak RSS improves without a material unexplained regression in the other.
+Milestone budgets are set from the immediately preceding same-revision
+baseline; no unmeasured speedup estimate is a completion claim.
+
+### Declaration-store migration checkpoint
+
+The first live ownership transfer now uses declaration-only typed capture for
+native external function declarations.  It iterates declaration/function/
+parameter tables in source order and renders names and types directly from
+`SourceStore` spans; it does not decode top-level records or parameter-summary
+strings for that decision.
+
+The compiler now also has a permanent collision-checked declaration-name
+index.  Hash buckets and chain links use bounds-checked `IntBuffer` mutation;
+lookup verifies complete source names after matching the cached hash.  Manual
+native root names are mapped once to a function-row bitmap for typed external
+declaration exclusion.  Hash iteration never determines emission order.
+
+The obsolete `compilerCoreDeclarationLookupRecords` copy and its record/program
+rebuilders have been deleted.  Native parsing already omitted function bodies,
+so that code was duplicating an already-bodyless declaration database.
+
+Native selected-helper audit and enumeration now also iterate typed declaration
+rows and the FunctionID selection bitmap.  Capability checks read body,
+return-type, and parameter spans from typed tables.  Selected function bodies
+are located by typed body spans, parameter locals are derived from typed
+parameter rows, and helper signatures are rendered from typed spans.  This
+removes native record scans and `CompilerTopLevelDeclaration` reconstruction
+from selection while the selected body parser/lowerer remains temporarily
+legacy-owned.
+
+The declaration index now includes a second collision-checked index keyed by
+construct `SyntaxID` and complete member name.  Function return-type and
+construct-member-type accessors return authored type spans directly; they do
+not create member summaries.  Native selected lowering now enters through a
+borrowed `CompilerLLVMLoweringContext` containing the source program, typed
+tables, and declaration index.  The entry owner alone destroys tables and
+index buffers.  Recursive lowering will be migrated through this context so
+source parsing remains available while global semantic queries stop using
+`CompilerProgram.declarationRecords`.
+
+This is partial Milestone 1, not its completion: legacy body-lowering
+function/construct/member queries still consume the original encoded
+declaration records.  The next ownership transfer must thread the typed
+declaration/index context through those recursive lowering consumers; only
+then can native top-level record construction itself be deleted.
+
+#### Typed selection/index fixed-point measurement
+
+The first full fixed-point gate after typed declaration rendering, indexed root
+selection, typed audit/enumeration, member indexing, and the borrowed lowering
+context passed exact determinism and behavior gates:
+
+- Stage 2 and Stage 3 LLVM are byte-identical;
+- each artifact is 2,599,184 bytes;
+- SHA-256 is
+  `7afe466ce15aa11b61e1ea964c5ab60c2f6883fb75181f8ba9855cbcbccbe375`;
+- linked inventory, body-name, normal compile, and self-rebuild checks passed.
+
+The measured performance is not acceptable as a retained optimization result:
+
+- total elapsed: 322.85 seconds;
+- peak RSS: 4,775,067,648 bytes;
+- Stage 1 build: 78.104 seconds;
+- Stage 2 LLVM emission: 103.808 seconds, 3,950,247,936-byte child peak;
+- Stage 3 self-rebuild: 138.088 seconds, 4,775,067,648-byte child peak.
+
+This checkpoint still constructs both typed declarations/indexes and the
+legacy top-level record database needed by recursive body lowering.  It proves
+the ownership direction and exact fixed point, but it does not satisfy the
+performance acceptance rule and must not be described as a speedup.  The next
+accepted deletion checkpoint must remove the recursive lowerer's record fact
+queries and native declaration-record construction; if that does not recover
+both time and memory, the typed representation itself must be profiled before
+expansion.
+
+#### Record-free native declaration milestone
+
+The recursive expression, statement, direct-linear, structured-control, and
+legacy-control lowerers now borrow one `CompilerLLVMLoweringContext`.  Function
+existence/returns, construct existence, and member types are resolved through
+collision-checked typed indexes.  Native selected functions use that context
+directly; ordinary program roots use explicit owners that capture typed
+declarations, build the index, lower, and destroy it.  No lowering path uses a
+global context, optional record fallback, or typed-to-record adapter.
+
+`compilerNativeSourceSetProgramForLLVM` now sets `declarationRecords` to the
+empty string and performs no top-level record parse.  Typed tables own native
+declaration identity, signatures, body spans, audit, selection, global fact
+queries, and external declarations.  Native diagnostic selection/statistics
+also use the typed pipeline and report `declarationRecordsLength=0`.
+
+The corrected full fixed-point gate passed:
+
+- total elapsed: 290.97 seconds;
+- peak RSS: 4,263,608,320 bytes;
+- Stage 1 build: 80.148 seconds;
+- Stage 2 LLVM emission: 87.885 seconds, 4,095,246,336-byte child peak;
+- Stage 3 self-rebuild: 118.162 seconds, 4,263,608,320-byte child peak;
+- Stage 2 and Stage 3 LLVM are byte-identical at 2,603,767 bytes;
+- SHA-256 is
+  `486bbc224dd3abbd2fb4849d5caf824f3a45987c297780cc05b1371cf54473b9`;
+- inventory, body-name, normal compile, validation/link, smoke, and self-rebuild
+  checks passed.
+
+Compared with the immediately preceding dual-model checkpoint, this deletion
+recovered about 31.9 seconds and 511 MB peak RSS.  Compared with the earlier
+working approximately 292-second/4.5 GB baseline, elapsed time is essentially
+restored while peak RSS is lower by roughly 240 MB.  This is the first accepted
+Milestone 1 performance result.  It does not prove that ordinary compilation,
+statement/expression records, local-value records, or backend instruction
+records are finished; those remain subsequent deletion milestones.
+
+#### Shared compiler host runtime checkpoint
+
+The Darwin compiler-host/runtime C previously embedded in
+`SwiftBootstrap.stage2RuntimeSupportSource()` now lives once in the checked-in
+`RangeCompiler/Runtime/RangeCompilerHost.c`.  Stage 2 linking consumes that
+file directly alongside `RangeString.c`, `RangeTextBuffer.c`, and
+`RangeIntBuffer.c`; Swift no longer materializes a generated `RangeRuntime.c`
+copy.  The source separates host/process and legacy dynamic-construct support
+from compiler policy, and it can be consumed unchanged by the forthcoming
+native seed driver.
+
+`clang -fsyntax-only` passes for the extracted source, the Swift package builds,
+and the shared IntBuffer runtime/link test passes.  This extraction is a
+bootstrap consistency prerequisite, not itself a compiler performance claim.
+
+#### Verified native seed checkpoint
+
+`RangeCompiler/Bootstrap/RangeCompilerSeed.ll` is now a checked-in fixed-point
+seed with `RangeCompilerSeed.json` as its provenance and integrity manifest.
+The manifest fixes:
+
+- seed and expected Stage 3 byte length and SHA-256;
+- canonical ordered compiler source paths and hashes;
+- shared runtime ABI version, paths, and hashes;
+- Darwin arm64 pointer/target assumptions;
+- producer Clang identity and Swift-oracle regeneration command.
+
+`scripts/verify-range-compiler-seed` verifies every manifest input, links the
+seed directly with the checked-in runtime, constructs the canonical four-file
+compiler source bundle, rebuilds the compiler with the Range-owned executable,
+and requires byte-for-byte equality with the seed.  The verified artifact is
+2,619,518 bytes with SHA-256
+`99248cfc74e544d6df93fc32ff452c49f53565140523cc272de8d36dd82918dd`.
+
+The native verification path completed in 117.58 seconds with 4,380,688,384
+bytes peak RSS.  The same-revision Swift-orchestrated full gate completed in
+289.31 seconds with 4,230,234,112 bytes peak RSS.  Native verification therefore
+removes about 171.7 seconds of wall time by eliminating Stage 1 and the duplicate
+Stage 2 emission, at a measured roughly 150 MB higher process peak for this
+single run.  It preserves exact compiler bytes and is retained as the normal
+self-host verification path; memory remains a backend/compiler target rather
+than being hidden by the driver cutover.
+
+`scripts/range check-stage2-compiler` now invokes the verified native seed.
+The prior Swift route remains available explicitly as
+`scripts/range check-stage2-compiler-swift [DIR]` for recovery, oracle checks,
+and seed rollover.  This removes Swift from normal fixed-point verification
+without deleting the trusted bootstrap escape hatch.
+
+#### Native single-file developer driver checkpoint
+
+`scripts/range-native` now owns manifested-seed linking, validated LLVM
+emission, atomic executable linking, and execution for one `.range` source
+file.  `scripts/range emit-llvm`, `compile-executable`, and `run` use this
+native driver by default.  `RANGE_DRIVER=swift` remains an explicit oracle
+override; there is no silent fallback when native input is unsupported.
+
+The driver verifies seed and runtime hashes before use, caches the linked seed
+binary by seed hash, rejects non-file/non-Range inputs, turns compiler-error
+output into a failing command, validates LLVM with Clang before committing it,
+and links ordinary programs against the same four checked-in runtime sources.
+
+A cold native `compile-executable` measurement for `ReturnInteger.range`
+completed in 0.86 seconds with 60,620,800 bytes peak RSS.  The same command
+through the Swift override completed in 4.23 seconds with 47,267,840 bytes peak
+RSS.  The native path is about 3.37 seconds faster on this small case while
+using about 13 MB more peak memory.  The permanent regression test compiles and
+runs a temporary program through the native driver and verifies exit status 7;
+it completed in about one second with a warm linked-seed cache.
+
+The native driver now also supports general multi-file project directories
+through a distinct `compilerProjectSourceSetLLVMText` directive.  It recursively
+discovers `.range` files while pruning `.git`, `.range`, and `.build`, sorts
+bytewise relative paths, rejects path whitespace not representable by the
+current marker grammar, and transports every file through an authored
+`compilerSourceFile` identity marker.  The project directive invokes the
+general source-set lowerer; it is not aliased to the compiler-specific manual
+root inventory.
+
+A cold nested two-file project compile completed in 1.13 seconds with
+60,047,360 bytes peak RSS and executed with exit 7.  Two independent emissions
+were byte-identical.  Permanent single-file and nested multi-file native-driver
+tests both pass in under one second each with a warm linked-seed cache.
+
+The source-manifest change passed the full Swift-oracle fixed point in 289.62
+seconds with 4,379,197,440 bytes peak RSS.  Stage 2 and Stage 3 remained
+byte-identical, and the rolled manifested seed reproduced itself through the
+native verifier.  Normal file and directory emit/link/run workflows are now
+off Swift; Swift remains explicit oracle/recovery infrastructure.
+
+### Canonical per-function body arena checkpoint
+
+The first literal-return arena experiment established that selected bodies can
+avoid `CompilerStatement` and `CompilerExpression` record construction, but its
+private node vocabulary, eligibility-derived counters, and direct LLVM return
+renderer were not accepted as permanent architecture. They bypassed the
+canonical parser and the future semantic, CFG, MemoryGraph, and MIR pipeline.
+
+That experiment has been replaced by the beginning of the canonical
+function-owned body pipeline. The arena now uses the shared syntax kind and
+role vocabulary and the canonical body-node column layout. It owns dense local
+nodes, edges, and failures while borrowing persistent source and declaration
+tables. A lexical-region root, generic statement parser, Pratt-shaped
+expression entry, canonical edges, graph validation, and generic node-driven
+lowering form the growth point for subsequent body families. No encoded
+statement or expression record is created for a migrated body.
+
+The migration boundary still performs a shallow, non-owning lexical support
+probe so unsupported bodies remain on the legacy path before arena allocation.
+It retains no spans or syntax facts and must disappear as the canonical parser
+absorbs all selected bodies. Once a function commits to typed parsing, failure
+is deterministic and cannot fall back to records.
+
+Telemetry is propagated from executed helper lowering rather than inferred by
+a separate eligibility scan. It records typed parse attempts and successes,
+legacy parses, arena creation and destruction, encoded record bytes, and
+committed failures. The focused migrated-body gate observed two attempts, two
+successes, zero legacy parses, two creations, two destructions, zero record
+bytes, and zero committed failures with deterministic repeated output. The
+unsupported-shape gate observed one legacy parse and zero typed attempts or
+arena allocations. After correcting destroy-failure accounting, the migrated
+gate passed in 87.167 seconds. These are correctness and ownership proofs, not
+yet evidence of a compiler-wide time or RSS improvement.
+
+The next accepted migration is not another recognized expression shape. It is
+a profiled, nontrivial straight-line compiler family carried through the same
+canonical arena, resolution to stable IDs, typed CFG, explicitly phased
+MemoryGraph, SSA/MIR, and generic emission. At that gate the corresponding
+record encoders, decoders, local-value strings, legacy lowering branch, and
+fallback are deleted together. Before another full fixed point, phase timing,
+per-function parse counts, record encode/decode bytes, transient live bytes,
+string copy volume, dynamic-construct activity, and serialization
+materialization must be observable. The 117.58-second native rebuild and
+289.62-second Swift gate remain baselines because the current compiler source
+no longer matches the manifested seed.
+
+### Opt-in compiler cost telemetry checkpoint
+
+The checked-in shared runtime now has one opt-in compiler-metrics substrate,
+linked identically by Swift bootstrap, the native driver, and the seed
+verifier. Normal compilation leaves it disabled. The explicit
+`compilerNativeSourceSetCostStats` directive resets and enables counters only
+around the real selected-function pipeline, disables them before reporting,
+and never places observations or variable values in emitted LLVM.
+
+The runtime counts actual string-concatenation calls and copied bytes,
+substring calls plus scanned source and copied result bytes, dynamic construct
+objects, fields, copied name bytes and field-list probes, and TextBuffer append
+and materialization calls and bytes. TextBuffer growth reports reallocations
+and the live bytes at each growth as the strongest portable copy-pressure
+proxy; `realloc` does not expose whether it moved an allocation.
+
+Each selected FunctionID is reported in stable selection order with its name
+as a label, actual legacy parse count and encoded record bytes, and deltas for
+the string and TextBuffer counters observed while that function was lowered.
+Function names do not affect compiler behavior. Begin/end ownership is located
+in the selected-function loop, so all returns from typed or legacy lowering
+rejoin before the active metric scope is closed. Timing is deliberately absent
+from this deterministic report.
+
+Focused runtime coverage observed exact controlled concat, substring,
+construct, lookup, append, materialization, and growth counts. The compiler
+coverage observed one typed function with zero record bytes and one actually
+executed legacy function with 335 record bytes, deterministic repeated cost
+reports, and byte-identical ordinary LLVM across repeated metrics-disabled
+runs with no metrics symbols in the output. The final compiler-level gate
+passed in 83.866 seconds; this is selection evidence, not a performance
+improvement.
+
+`scripts/range-compiler-cost-report` then ran the directive over the real
+four-file compiler source set through a current Swift-built compiler. The
+instrumented run completed in 181.05 seconds with 3,750,264,832 bytes peak RSS.
+It discovered 979 functions, selected 932, compiled 129 through typed arenas,
+and compiled 803 through legacy records. Legacy bodies produced 513,007,418
+final record bytes. The runtime observed 2,390,754,344 TextBuffer appends,
+5,204,276,878 appended/materialized bytes, and a 4,548,715,504-byte
+reallocation live-byte proxy. Counter overhead makes this a diagnostic run,
+not a replacement performance baseline.
+
+The report identified one decisive first migration family. The near-clone
+`compilerCoreExpressionSummaryRangeTypeForLLVM` and
+`compilerCoreInferExpressionSummaryType` bodies independently produced about
+166 MB of final records and 1.79 GB of append volume each. These are exclusive
+selected-function observations, not nested rows. Expression records embed and
+escape complete child records, call arguments re-encode expressions,
+statements re-encode expressions and nested bodies, and each embedding escapes
+the previous payload again. Roughly ten kilobytes of authored body therefore
+grows to roughly 166 MB of transient semantic text per clone.
+
+Their shared syntax closure defines the next vertical gate: typed immutable
+locals, sequential regions, repeated `if` with early returns, final return,
+identifiers, String literals, grouping, direct calls with labeled arguments,
+nested calls, and eager equality and boolean operators. The family moves
+through canonical typed parsing, stable local and global symbol IDs, explicit
+CFG, phased MemoryGraph, SSA/MIR, and generic emission. Immutable String `let`
+values remain SSA/provenance facts unless semantics require addressable
+storage; this migration must not manufacture stack storage or ARC behavior.
+Exact branch order, eager `&&` and `||`, argument order, literal-global order,
+and temporary numbering are identity gates. Once the structural family
+commits, fallback is forbidden. Shared record helpers are deleted only when
+their last legacy consumer reaches zero.
+
+The canonical parser checkpoint now covers that closure on the actual compiler
+source without activating lowering. `compilerCoreExpressionSummaryRangeTypeForLLVM`
+parses into 577 dense nodes and 576 canonical edges;
+`compilerCoreInferExpressionSummaryType` parses into 570 nodes and 569 edges.
+The actual-source diagnostic created and destroyed all 998 function arenas.
+The parser uses one record-free cursor/result API, sequential region iteration,
+typed immutable `let`, `if` regions, early/final return, and a shared Pratt core
+for literals, identifiers, grouping, nested direct calls, labeled arguments,
+and eager equality/boolean operators. Failures retain their original cursor and
+source token. Symbol, resolution, CFG, MemoryGraph, and MIR buffers are owned by
+the arena but empty at this checkpoint; their names are not evidence until
+typed passes populate and validate them.
+
+The next checkpoint populated those tables without activating LLVM lowering.
+Both bodies now have stable parameter and lexical-let SymbolIDs, identifier
+resolutions, direct-call resolutions to authoritative FunctionIDs, exact
+argument-label and arity validation, and deterministic CFGs with condition,
+return, and fallthrough terminators. The first body has 18 symbols, 166
+resolutions, 43 CFG blocks, and 46 edges; the second has 18, 164, 43, and 46.
+
+MemoryGraph derivation is explicitly ordered and frozen: value/provenance,
+placement, access verification, pass/escape/transfer, then lifetime/destruction.
+The first body produces 814 facts (595 value/provenance, zero placement, 83
+access, 136 pass/escape, zero lifetime); the second produces 805
+(588, zero, 82, 135, zero). Both have zero transfer and destruction facts.
+This proves that immutable String lets remain SSA/provenance values in this
+family rather than becoming stack storage or ARC-managed objects.
+
+Validated deterministic MIR is also populated from syntax, resolutions, CFG,
+and frozen MemoryGraph only. The first body has 236 values, 43 MIR blocks, 275
+operations, and 301 operands; the second has 232, 43, 271, and 296. Operations
+carry an explicit target kind plus target ID so builtin IDs, SymbolIDs, and
+FunctionIDs cannot alias semantically. MIR refuses unfrozen MemoryGraph input.
+LLVM emission and family activation remain deliberately inactive until generic
+MIR emission is byte-identical to the legacy function/global output.
+
+That exact emitter gate now passes. A generic MIR emitter owns numeric
+ValueID-to-operand and MIRBlockID-to-label maps plus final serialization
+buffers. It inventories String globals in deterministic evaluation order,
+resolves calls by FunctionID, preserves eager boolean operations, and assigns
+labels and renders blocks through the same CFG depth-first projection. This
+keeps numeric CFG identity stable while matching the legacy nested-branch text
+order. For multi-block functions, outer return-summary metadata uses the LLVM
+type default while concrete returns remain in rendered blocks, matching the
+existing generic block contract.
+
+A test-only dual path independently lowered the same parsed bodies through the
+legacy record pipeline and the typed syntax-to-MemoryGraph-to-MIR pipeline with
+identical initial counters. Both real hot functions now have no differing byte
+in rendered functions, instruction records, or globals; temporary counts,
+branch counts, and return metadata are identical. The first function emits
+11,286 bytes and 16,450 record bytes with temporary 187 and branch 21; the
+second emits 11,144 and 16,153 with temporary 183 and branch 21. The focused
+dual gate passed in 153.417 seconds. Normal lowering is still unchanged at this
+checkpoint; activation must make this structural family typed-only and remove
+its normal legacy parse/fallback path before performance is claimed.
+
+The transition gate was then generalized without names, FunctionIDs, source
+spans, signature counts, or fixture-shaped statement counts. The canonical
+body parser now has a borrowed recognition mode that executes the same
+statement, Pratt, postfix, and argument decisions while suppressing all fact
+emission. Recognition retains no arena tables. Declaration-index checks reject
+unresolved and construct call targets before arena allocation; supported
+return types are `Int`, `Bool`, and `String`, and interpolated String literals
+remain an explicit unsupported emitter feature. CFG fallthrough selects the
+legacy-control outer return-summary default; fully returning direct-control
+bodies expose the actual final operand. Concrete LLVM returns are unchanged.
+
+On the actual selected compiler set, recognition admitted 408 FunctionIDs and
+all 408 completed typed parsing, semantics, CFG, frozen MemoryGraph, MIR, and
+generic emission. A test-only exact-name adapter resolved requested names once
+to an exact FunctionID bitmap. Eleven independent dual-oracle processes (40
+FunctionIDs per process, with a final partial batch) proved all 408 fully exact:
+zero rendered-function, instruction-record, global, counter, or metadata
+differences. The broader pre-filter run had identified 28 genuine content
+mismatches, all attributable to interpolated String literals, and 363
+metadata-only mismatches before the structural CFG fallthrough rule.
+
+Normal activation of those 408 functions was attempted and rejected by the
+measured retention gate. Correctness-focused typed/legacy routing tests passed,
+but the real instrumented compiler report took 191.93 seconds and reached
+10,016,800,768 bytes peak RSS. It lowered 408 functions through typed arenas
+and 742 through legacy records, reducing final legacy record bytes to
+152,517,090. However, TextBuffer appended/materialized volume increased to
+8,886,507,089 bytes and the reallocation live-byte proxy increased to
+9,578,345,168 bytes. Against the 181.05-second, 3,750,264,832-byte baseline,
+this is slower and roughly 2.7 times the RSS, so the activation was rolled
+back. The prior single-integer normal slice remains active; the 408-function
+capability and exact oracle remain proof infrastructure only. There was no seed
+rollover and no Stage 2/Stage 3 fixed-point run.
+
+The focused `compilerSourceSetLLVMText` formatting regression remained after
+the activation rollback: output includes runtime declarations before helpers
+and uses globally offset temporary numbers where the older test expects helper
+text at byte zero and `%r0`. Because rollback did not change that result, it is
+not evidence caused by the rejected 408-function activation. The assertion is
+left failing and unchanged pending separate project-source output isolation.
+
+The next blocker is therefore inside the typed pipeline's serialization and
+accumulation strategy, not semantic coverage. Record elimination succeeded,
+but per-operation String records, per-block buffers, repeated materialization,
+and final helper/global accumulation more than replaced the removed legacy
+volume. The next retained change must make MIR/emission write compact numeric
+data and final LLVM directly into bounded sinks, avoiding duplicated
+instruction-record and rendered-block text, before the 408-function activation
+is retried.
+
+That streaming checkpoint is now implemented and changes the diagnosis. Typed
+MIR instructions serialize exactly once into one per-function sink; there is no
+typed instruction-record buffer and no per-block materialization. String
+globals retain compact temporary/source-NodeID/byte-count descriptors, runtime
+requirements are numeric, and selected helper assembly appends each function's
+typed or legacy global text immediately in selected declaration order before
+destroying its transient state. The final module never rescans typed rendered
+text or recreates typed instruction records.
+
+The two original hot functions remain byte-exact. Regenerating the current
+reachable capability inventory produced 414 candidates rather than the older
+408 because the streaming/module substrate added selected functions. Eleven
+bounded processes proved 414/414 exact final functions, globals, runtime bits,
+counters, and metadata. The stale recovered candidate manifest included
+`compileRangeNativeSourceDirectiveOutput`; current shared recognition correctly
+excludes it as `unsupportedBodyCapability` because it contains interpolation.
+
+A guarded normal activation passed ordinary LLVM correctness but was not
+retained. It improved wall time to 99.74 seconds, but still reached
+9,586,507,776 bytes maximum RSS, 8,893,209,852 appended/materialized TextBuffer
+bytes, and a 9,583,118,205-byte reallocation proxy. The prior narrow selector
+was restored because this remains far above the 3,750,264,832-byte memory
+baseline.
+
+Per-function attribution proves the streaming emitter is not responsible for
+that pressure. All 414 typed functions together account for only 406,316
+append/materialize bytes and 109,911 reallocation bytes. The 748 legacy
+functions account for 8,889,499,614 append/materialize bytes and 9,578,889,346
+reallocation bytes. `compilerBodyArenaIsValid` alone contributes
+7,407,541,424 append/materialize bytes and 8,590,897,556 reallocation bytes;
+`compilerMemoryGraphIsValid` contributes 205,297,648 bytes and
+`compilerCoreIsBinaryOperator` 147,607,765 bytes. Only about 3.30 MB lies
+outside per-function lowering, so helper/global/module accumulation is no
+longer the dominant blocker. The next performance slice must eliminate the
+legacy parser/record amplification in the large validator/control bodies,
+starting with `compilerBodyArenaIsValid`, while preserving the one typed model.
+
+### Current broad typed-oracle checkpoint
+
+The current source has 1,350 functions, of which 836 satisfy the canonical
+transition capability. The bounded audit is partitioned without changing
+compiler behavior: three known legacy incompatibilities have dedicated
+regressions, and the two record-expansion hot inference declarations have a
+permanent exact final-artifact oracle. Exact declaration names are resolved to
+current FunctionIDs only inside the test diagnostic.
+
+Across the remaining 831 functions, the current broad oracle reports 693 exact
+functions and 138 structurally classified legacy loop-phi defects, with zero
+typed invalid functions, placeholders, typed instruction records, post-lowering
+phi mismatches, or unclassified differences. Coverage closes exactly:
+
+`831 broad + 2 dedicated exact + 3 dedicated incompatibility = 836 supported`.
+
+The current authoritative middle range peaked at 67,682,304 bytes RSS and the
+high range at 457,080,832 bytes; neither needed a resource split after the two
+record-expansion declarations moved to the dedicated exact partition. The
+current dedicated two-function final-artifact oracle passed in 103.782 seconds
+with 3,654,811,648 bytes maximum RSS. That deliberately expensive oracle is
+kept separate from the bounded broad batches rather than hidden behind a
+production heuristic.
+
+The
+legacy phi preflight is structural rather than name-based: it detects a CFG
+backedge with a live immutable parameter or prior lexical `let`. This matches
+the legacy lowerer's unconditional loop-local phi behavior and runs before
+legacy records are constructed. A separate generic CFG-region/statement-ordinal
+continuation lookup also removed the previously unclassified `after-1` label
+without fixture-shaped function logic.
+
+### Broad typed activation and first bounded fixed point
+
+The current transition capability was activated for normal selected helper
+lowering after the bounded current-source audit closed exactly. The broad gate
+classified 831 functions: 693 byte-exact and 138 differences caused solely by
+the legacy unwritten-value loop-phi defect. Two record-expansion hot functions
+passed their separate exact final-artifact oracle, and three validator
+functions remain covered by the dedicated legacy-incompatibility regression.
+Together these account for all 836 functions admitted by that audit, with zero
+typed-invalid bodies, placeholders, typed instruction records, unclassified
+differences, or resource-unverified functions.
+
+Normal activation initially measured 175.79 seconds and 335,970,304 bytes peak
+RSS, versus the retained pre-activation baseline of 181.05 seconds and
+3,750,264,832 bytes. It reduced final legacy record bytes from 513,007,418 to
+63,144,207, TextBuffer append/materialize volume from 5,204,276,878 to
+696,323,200 bytes, and the reallocation proxy from 4,548,715,504 to
+452,086,506 bytes. Runtime fixed-point execution then exposed two proof
+boundaries that text identity alone could not establish:
+
+- scalar functions that call aggregate-returning functions must remain on the
+  legacy path until general aggregate caller ABI and ownership transfer are
+  proved; the transition predicate now rejects them by semantic declaration
+  kind rather than by function name;
+- accumulated telemetry was allocated inside a per-function transient region
+  and retained after reset. The loop now copies its scalar facts, resets the
+  region, and constructs the accumulated value in the surviving region.
+
+The canonical runtime-call ABI now contains 34 checked entries, including the
+five optional compiler-metrics calls. The Stage 2 source-set closure also
+contains the newly reachable typed-pipeline helpers; these manual name lists
+remain bootstrap debt and should be replaced by transitive typed call-edge
+reachability.
+
+With those fixes, the full Swift-oracle gate completed successfully. Stage 2
+emitted and linked, passed inventory, body-name, and normal executable smoke
+checks, then rebuilt Stage 3. The gate's exact Stage 2/Stage 3 LLVM comparison
+passed. Total wall time was 336.03 seconds and peak RSS was 681,279,488 bytes;
+Stage 2 LLVM emission took 78.071 seconds with 335,953,920 child peak RSS, and
+the linked Stage 2 compiler produced Stage 3 in 152.271 seconds with
+681,279,488 child peak RSS. This is the first broadly activated fixed point
+with bounded memory, but it is not yet a retained speed victory over the old
+289.62-second full-gate baseline.
+
+The post-boundary normal cost report measured 190.23 seconds and 367,394,816
+bytes peak RSS. It selected 799 reachable typed functions and 512 legacy
+functions, with 69,389,942 legacy record bytes, 787,622,704 TextBuffer bytes,
+and a 504,612,145-byte reallocation proxy. Memory is about 90 percent below the
+old normal baseline, but wall time is about nine seconds slower than 181.05
+seconds. Do not roll the seed at this checkpoint. The next retained slice must
+recover that time while preserving the fixed point and bounded RSS. Current
+telemetry points first to general expression statements in scalar functions
+and then to aggregate-return lowering: `compilerBodyArenaAppendNode` alone
+accounts for 10,490,537 legacy record bytes and 68,409,597 TextBuffer bytes,
+while the next largest legacy bodies primarily return aggregates and therefore
+belong to the aggregate caller-placement proof rather than a name-based
+exception.
+
+The first follow-up slice added general bare call expression statements without
+a wrapper syntax kind or a second lowering route. An existing Application node
+may now appear directly on a region's Statement edge; semantics resolves it,
+CFG treats it as an ordinary nonterminator, MemoryGraph reuses its CallValue
+and ArgumentPass facts, and MIR builds the existing DirectCall operation while
+discarding only the returned SSA value. A focused final-artifact dual oracle
+passes with zero typed records or placeholders. This moved
+`compilerBodyArenaAppendNode` from 10,490,537 legacy record bytes and
+68,409,597 TextBuffer bytes to zero legacy records and 10,163 TextBuffer bytes.
+The normal cost report now selects 843 typed and 469 legacy reachable
+functions, with 52,178,967 legacy record bytes, 640,170,762 TextBuffer bytes,
+and a 391,577,089-byte reallocation proxy. Peak RSS fell again to 302,481,408
+bytes. Wall time improved only from 190.23 to 189.45 seconds, so the seed remains
+unrolled and the time gate remains open.
+
+The following one-pass admission slice removed the production non-retaining
+recognition parse. Normal lowering now performs only cheap signature and
+aggregate-call ABI preflight, creates one retained arena, and carries that same
+arena through parsing, semantics, CFG, MemoryGraph, MIR, and LLVM. Unsupported
+syntax or a currently unsupported later typed phase destroys the attempted
+arena and uses legacy lowering; audited transition coverage remains the hard
+gate that prevents a migrated function from disappearing silently. Arena
+parsing now also requires full body consumption, interpolation rejection lives
+in the real parser rather than only the deleted probe path, and LLVM emission
+is never invoked after an earlier typed phase fails. Telemetry therefore counts
+both successful typed bodies and attempted arenas that safely fall back.
+
+The retained normal cost report is now 172.17 seconds with 323,960,832 bytes
+peak RSS. It reports 844 successful typed bodies, 970 typed attempts, and 470
+legacy bodies; 126 candidates perform one real typed attempt before explicit
+fallback. This beats the original 181.05-second normal baseline while retaining
+the roughly 91 percent RSS reduction from 3,750,264,832 bytes. Legacy record
+bytes are 52,205,659, TextBuffer volume is 640,375,826 bytes, and the
+reallocation-pressure proxy is 391,662,427 bytes.
+
+The exact Swift-oracle fixed point also passes after this change. Total time is
+310.27 seconds with 612,745,216 bytes peak RSS, compared with 336.03 seconds and
+681,279,488 bytes at the prior fixed point. Stage 2 LLVM emission fell from
+78.071 to 66.961 seconds and its child peak RSS from 335,953,920 to 307,216,384
+bytes. The linked Stage 2 compiler produced Stage 3 in 136.257 seconds rather
+than 152.271 seconds. Stage 2 and Stage 3 LLVM remain exactly identical; both
+link, and the inventory, body-name, and normal executable smoke gates pass.
+The next deletion frontier is typed FunctionID call-edge reachability replacing
+the manual semicolon-delimited function-name inventory.
+
+The first reachability implementation now exists beside the retained selector.
+It resolves the two native-main roots (`compileRangeNativeSource` and
+`compilerNativeOutputExitCode`) to FunctionIDs, follows calls with a stable
+bitmap/FIFO worklist, records compact owner/target FunctionID edges, and emits
+later in declaration order. On the live compiler source, it discovers no
+function absent from the manual inventory; the inventory contains 136
+additional functions with no discovered path from the real roots. A permanent
+focused parity gate checks this direction explicitly.
+
+Two attempted production cutovers were rejected by the retention gate. Parsing
+complete legacy statement records to recover calls inside interpolated strings
+completed the exact fixed point but regressed it to 370.16 seconds and
+1,570,947,072 bytes peak RSS. Limiting recovery to direct interpolation
+expression scanning removed that bridge, but the monolithic Range-authored
+reachability builder itself still returns an aggregate and therefore lowered
+through the legacy record path; compiling that large body amplified to
+11,080,810,496 bytes and the linked Stage 2 rebuild terminated. Normal
+selection was restored to the proven bitmap populated from the inventory. The
+graph and parity diagnostic remain. Before the next cutover, the builder must
+be decomposed into small scalar-returning typed functions (or aggregate caller
+placement must become available) so the compiler compiles its own reachability
+engine through the new pipeline rather than creating a new legacy hot body.
+
+The first decomposition attempt separated target recording, range scanning,
+interpolation scanning, root seeding, worklist expansion, and construction.
+That was structurally smaller but did not cross the typed admission boundary:
+the range scanner still calls `lexNextRangeToken`, whose
+`Optional<RangeLexedToken>` result is an aggregate. The aggregate-call ABI
+preflight therefore kept the scanner on legacy lowering. Two bounded attempts
+to select the decomposed family were stopped after the live compiler process
+reached roughly 7.2–7.5 GB RSS before producing output. The diagnostic wiring
+was removed again, so the retained production selector remains the proven
+manual bitmap path.
+
+This makes aggregate-return caller placement a prerequisite for reachability
+cleanup, not an unrelated feature expansion. Replacing the lexer with a second
+character-level call scanner would create a fragile semantic side channel and
+is rejected. The next implementation must let a typed caller provide storage
+for an aggregate-returning callee, make MemoryGraph own the placement and
+transfer decision at that call site, carry the destination through MIR, and
+lower the ABI without restoring encoded records. Once the real lexer call is
+typed, the decomposed FunctionID worklist can be measured again.
+
+The first aggregate-caller layer is now implemented below the ABI boundary.
+BodyArena local declarations parse complete type references rather than one
+token, and each arena interns canonical type text into deterministic TypeIDs.
+Function-call resolutions retain the callee return TypeID, including generic
+types such as `Optional<Box>`, instead of recording `-1`. Nominal member lookup
+now follows the type instance to its declaration rather than treating TypeID
+as a declaration row.
+
+For an aggregate-returning call used as a local initializer, MemoryGraph now
+creates one explicit caller storage row and requires exactly one placement,
+initialization, return-transfer, and destruction fact. MIR carries that
+StorageID on the direct-call operation and rejects an aggregate function call
+without the matching transfer fact. A focused `Optional<Box>` caller reaches
+valid semantics, CFG, MemoryGraph, and MIR with one storage, two placement-
+phase facts (placement plus initialization), one transfer, one destruction,
+and aggregate validation code zero. The ABI preflight still deliberately
+rejects production activation, so the current LLVM emitter cannot mistake its
+existing pointer call for completed caller placement.
+
+An initial validator integration accidentally failed MemoryGraph for every
+typed scalar function, causing the cost run to climb past 3.35 GB; that run was
+stopped and rejected. Aggregate validation is now isolated behind a nonzero
+storage count while the original scalar validator remains its exact fast path.
+The retained post-isolation cost report is bounded at 175.23 seconds and
+318,717,952 bytes peak RSS, with 875 typed successes, 470 legacy bodies,
+52,209,216 legacy record bytes, and no invalid selected pipeline. This is a
+small wall-time regression from 172.17 seconds and remains subject to the final
+non-regression gate rather than being treated as the finished milestone.
+
+The next layer is one shared indirect-return ABI query consumed by typed
+function declarations, definitions, and call emission. Nontrivial layouts must
+be emitted structurally, callers must pass their proven storage as `sret`, and
+callees must initialize that destination. The aggregate-call preflight remains
+in place until all three sites agree; a pointer slot around the existing
+dynamic object ABI is not accepted as caller-owned aggregate placement.
+
+The native compiler no longer uses the manual semicolon-delimited function
+inventory for production selection. A deterministic FIFO worklist is seeded by
+the two native roots, lowers one FunctionID at a time, records typed call edges
+from BodyArena resolutions, and records the remaining legacy call edges by
+walking the already-parsed statement/expression records directly. Functions
+are marked when enqueued, so each reachable body is lowered once and output
+order is stable. A rejected experiment scanned rendered LLVM for calls; it
+missed semantic edges and failed the fixed-point gate, so rendered text is not
+used as a reachability database.
+
+The obsolete `compilerSourceSetBodyFunctionNames` directive and its complete
+manual inventory block have now been deleted. The older source-set and audit
+selectors no longer inject compiler-helper names into reachability. The two
+superseded legacy edge collectors (semicolon name-list construction and
+rendered-LLVM scanning) are also deleted. After this destructive cut, linked
+Stage 2 and Stage 3 LLVM are byte-identical at SHA-256
+`2db9419cc1e91d69ad87ab0cb0983be6bc055882864f7648943a3a88a70f09f7`.
+The retained self-rebuild measured 133.14 seconds and 533,348,352 bytes peak
+RSS, versus 150.23 seconds and 556,204,032 bytes for the preceding exact
+direct-edge build and 136.257 seconds for the earlier best checkpoint. The
+production directive dispatcher no longer exposes the parse-stat, BodyArena
+stat, dual-lowering, selected-scan, reachability-comparison, or cost probes;
+their implementations and the obsolete selection-analysis aggregate were
+physically deleted so declaration capture no longer indexes them. Remaining
+reachable legacy body lowering is the next measured time frontier rather than
+a completed migration milestone.
+
+Typed-body admission now has one ownership rule instead of silent post-
+admission fallback. The cheap ABI preflight runs first and the retaining
+BodyArena parser runs once. A structural parse rejection may use the legacy
+lowerer. If a partial arena reaches a later pipeline failure, the conservative
+recognition pass is run only for that ambiguous body: a rejected capability may
+use legacy, while a body recognized as transition-supported fails closed.
+Thus semantics, CFG, MemoryGraph, MIR, LLVM, and typed call-edge failures can no
+longer fall back after admission. The full arena audit reported 870 transition-
+supported bodies and 870 valid complete pipelines with zero stage failures.
+The retained native compiler contains zero emitted placeholder comments, and
+the ordinary no-directive `@main { return 7 }` regression links and exits 7
+with LLVM SHA-256
+`c164c3bd807150fec743cc3240be45ac2a8749a11ca6dd1975d9766fc5d9f272`.
+
+Aggregate ABI classification now has one module-stable authority keyed by the
+typed function row and declaration index. It classifies `Int`, `Bool`, and
+`String` as direct returns, fixed nominal constructs as indirect returns, and
+everything without a proven layout as no ABI. Both return preflight and lexical
+aggregate-call detection consume this query instead of separately comparing
+type-name strings. Generic applications such as `Optional<T>` deliberately
+remain unclassified until specialization gives them stable layout identity.
+This changes no production signature yet: the aggregate preflight remains
+closed because BodyArena still lacks construct-initializer resolution,
+structural aggregate MIR values, callee return-destination facts, and a nominal
+LLVM layout renderer. Declaration, definition, and call sites must all consume
+the shared query before indirect returns are activated.
+
+The fixed nominal substrate now crosses the next deterministic checkpoint.
+Supported nominal constructs receive module-level LLVM layouts in declaration
+order, construct initializers resolve against their declared field order, MIR
+retains nominal TypeIDs, and structural construction lowers through a sequence
+of `insertvalue` operations. MemoryGraph also creates a distinct callee-owned
+return destination and requires aggregate return exits to initialize it. A
+first activation attempt exposed and rejected a mixed-ABI error: applying a
+nominal LLVM type to ordinary pointer-shaped parameters made callers pass a
+value where existing definitions expected `ptr`. Nominal value typing is now
+kept structural until declarations, definitions, calls, and returns switch to
+the indirect-result ABI together.
+
+The compiler generation that first contains the corrected nominal layout and
+construction emitter reproduces the next generation byte-for-byte at SHA-256
+`b8e1a313f6cfc45ff8565172fe0e90a40979c49339f5b3b9e6d9cde7b86efc79`.
+Adjacent self-rebuilds measured `138.57 s` / `537,542,656` bytes and `138.60 s`
+/ `535,707,648` bytes peak RSS. This proves deterministic, bounded nominal
+layout emission; it does not yet activate aggregate returns. The activation
+gate remains closed until the shared ABI query controls all four signature
+sites and any function requiring that ABI is forbidden from falling back to
+legacy lowering.
+
+An attempted atomic ABI activation implemented the intended `sret` declaration,
+definition, caller allocation/load, callee store, and structural member-read
+surfaces, but it was rejected rather than retained. Globally enabling every
+fixed scalar-layout construct admitted foundational compiler records at once;
+the first fail-closed run reported 22 unsupported typed functions and reached
+about 5.06 GB RSS. A structural source scan and then a cached classification
+did not solve the ownership boundary: later runs accumulated 13--19 GB, and a
+live sample showed the compiler spending its time in legacy encoded-record
+field parsing, with one run observing a 76.3 GB peak footprint before it was
+stopped. The entire signature/call activation was removed, and the exact
+bounded checkpoint above was restored at `136.55 s` / `537,444,352` bytes for
+the producing generation and `138.94 s` / `536,592,384` bytes for its exact
+self-rebuild.
+
+The conclusion is narrower than "aggregate ABI is too expensive." The ABI
+instructions were not the measured hot path. Activation introduced new helper
+reachability and weakened the cheap unknown-call preflight, causing more work
+to enter the legacy record model. The next cutover must therefore store ABI
+capability beside the typed FunctionID reachability decision, reuse that O(1)
+decision in all four LLVM sites, and fail closed without lexically rescanning
+bodies or adding a legacy-lowered signature-helper chain. Only after that
+authority is typed and bounded should caller allocation and `sret` emission be
+reactivated.
+
+The first part of that authority is now retained. `CompilerReachableLLVMState`
+owns a FunctionID-indexed ABI-capability bitmap. While processing a reachable
+function whose classified return is a fixed nominal aggregate, the compiler
+runs only the retaining BodyArena, resolution, CFG, MemoryGraph, and MIR
+pipeline, destroys the arena inside the existing transient region, and records
+one capability bit when every middle-layer validator succeeds. It deliberately
+does not alter declarations, definitions, calls, returns, or ordinary typed
+admission yet, so capability discovery cannot create a mixed ABI.
+
+This checkpoint is byte-identical across consecutive generations at SHA-256
+`c8090771a7d97684cc4dc61a8fe1040a316ec8100ac21381d1223e20ebd034bf`.
+The producing generation measured `136.85 s` and `541,884,416` bytes peak RSS;
+the self-rebuild measured `139.26 s` and `538,787,840` bytes. The next step is
+to close this candidate bitmap over incoming typed call edges: an aggregate
+callee may be activated only when every reachable caller proves its caller
+placement path. That closure, rather than a lexical body scan or global nominal
+switch, becomes the single O(1) ABI decision consumed by all four LLVM sites.
+
+Caller closure is now implemented as a second FunctionID bitmap. A reachable
+function is probed after its real call edges are known when it either returns a
+classified indirect nominal or calls one. Failed probes retain their first
+middle-pipeline stage in the capability slot. The closure seeds only capable
+indirect-return functions, rejects a callee with any incapable incoming
+caller, and propagates rejection through aggregate-return callers until stable.
+No LLVM signature consumes the activation bitmap yet.
+
+A temporary non-empty audit then established an important correction: the
+current reachable compiler graph contains zero functions classified into this
+fixed-nominal ABI family. The audit reported `functionRow=-1, stage=0`, meaning
+no probe was attempted, rather than every probe failing. `rangeToken` is emitted
+as a reachable pointer-returning helper and `%Range.RangeLexedToken` has a
+fixed layout, but the compiler-facing lexer edge remains
+`lexNextRangeToken -> Optional<RangeLexedToken>`. Generic applications are
+still deliberately classified as no ABI, so that edge cannot seed the fixed
+nominal closure. The temporary failing audit was removed; stage-coded slots
+and deterministic caller closure remain ready for a real candidate.
+
+The restored usable checkpoint is byte-identical at SHA-256
+`0ac952aa4ce380c9511e86c63cd60b5481aa514bab9845f83fc011af1b0f569b`.
+The two generations measured `140.02 s` / `539,656,192` bytes and `141.34 s` /
+`539,394,048` bytes peak RSS. The actual prerequisite for activating the lexer
+family is therefore deterministic generic layout identity or specialization
+for `Optional<RangeLexedToken>`, not another fixed-nominal signature switch.
+
+### Optional ownership family and non-empty ABI closure
+
+The prerequisite is now implemented structurally. Concrete
+`Optional<FixedNominal>` types receive stable named layouts containing a tag
+and payload, and fixed nominal layouts may contain other acyclic fixed nominal
+layouts through bounded recursive validation. This admits compiler types such
+as `CompilerProgram { mainBlock: CompilerBlock, ... }` without a
+`CompilerProgram` special case. Cyclic or unsupported field graphs remain
+unclassified rather than silently becoming pointers.
+
+The typed body pipeline now represents all three Optional operations required
+by the first lexer/caller family. `nil` becomes `OptionalNone`; returning a
+payload from an Optional-returning function creates an explicit
+`OptionalInjection` MemoryGraph fact and `OptionalSome` MIR operation; and
+`left ?? fallback` resolves to the payload TypeID. Coalescing preserves lazy
+semantics in MIR by evaluating only the Optional operand and retaining the
+fallback syntax node as a deferred branch target. It is not lowered as an
+eager generic binary operation or copied from the legacy `i32 == 0`
+implementation. LLVM lowering still needs present/fallback/join blocks before
+this operation can become an emitted typed-only function.
+
+Caller placement, return transfer, callee return destination, Optional
+injection, and MIR validation now share `compilerFunctionReturnABI` as their
+single admission decision. This fixed two inconsistencies: MemoryGraph and MIR
+previously demanded storage for every construct-valued call even when no
+indirect ABI existed, while placement could create storage that transfer
+correctly refused. MemoryGraph phase construction is now sequential and
+stage-coded, so a failed value, placement, access, pass/escape, lifetime, or
+final-validation phase cannot execute later phases through Range's eager
+boolean operators. The ordinary typed lowering gate was corrected in the same
+way. FunctionID edge collection likewise appends only actual function
+resolutions; eager boolean evaluation can no longer manufacture edges from
+locals, members, or builtins.
+
+The reachable ABI capability bitmap and incoming-caller closure are now both
+non-empty on the real compiler source. This proves a coherent Optional-return
+family through BodyArena, resolution, CFG, MemoryGraph, and MIR. It does not
+yet mean LLVM consumes the activation bitmap: definitions, declarations,
+calls, returns, `OptionalSome`, `OptionalNone`, and lazy coalescing must switch
+together before legacy lowering for the family can be deleted.
+
+After removing the temporary lexer-name and packed storage diagnostics, two
+linked self-generations are byte-identical at SHA-256
+`2f4e81ef0f13ee7a3dfc995ed0c92f3c4df3139a6797974715ee91aeb7311a66`.
+They measured `158.67 s` / `543,637,504` bytes and `160.26 s` /
+`548,585,472` bytes peak RSS. This is a retained capability/closure
+checkpoint, not the performance milestone: the remaining roughly 160-second
+cost still comes from emitted legacy lowering and must fall when the proven
+family becomes typed-only and its encoded-record consumers are deleted.
+
+### Explicit deferrals
+
+Do not add compiler concurrency before one-function memory is bounded and
+phase telemetry exists.  Defer incremental cross-build caching, advanced
+optimizer work, whole-program specialization, protocols-as-macros expansion,
+and `derived` runtime scheduling until they block a migrated vertical family.
+Do not implement ARC, garbage collection, a universal heap object model, or a
+second compiler representation to ease the transition.
 
 Do not:
 

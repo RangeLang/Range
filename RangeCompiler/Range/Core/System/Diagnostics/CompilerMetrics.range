@@ -1,0 +1,14 @@
+@language
+function compilerMetricsReset(): Int
+
+@language
+function compilerMetricsSetEnabled(enabled: Bool): Int
+
+@language
+function compilerMetricsFunctionBegin(functionID: Int, name: String): Int
+
+@language
+function compilerMetricsFunctionEnd(legacyParses: Int, recordBytes: Int): Int
+
+@language
+function compilerMetricsReport(): String

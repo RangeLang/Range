@@ -143,17 +143,20 @@ struct SwiftBootstrapTests {
             if intBufferAppend(buffer: buffer, value: 42) != 0 {
                 return 3
             }
+            if intBufferSet(buffer: buffer, index: 1, value: 13) != 0 {
+                return 4
+            }
             let count: Int(intBufferCount(buffer: buffer))
             let first: Int(intBufferElement(buffer: buffer, index: 0))
             let second: Int(intBufferElement(buffer: buffer, index: 1))
             let third: Int(intBufferElement(buffer: buffer, index: 2))
             if intBufferDestroy(buffer: buffer) != 0 {
-                return 4
+                return 5
             }
-            if count == 3 && first == 7 && second == 11 && third == 42 {
+            if count == 3 && first == 7 && second == 13 && third == 42 {
                 return 0
             }
-            return 5
+            return 6
         }
         """.write(to: source, atomically: true, encoding: .utf8)
 
@@ -206,6 +209,113 @@ struct SwiftBootstrapTests {
         #expect(FileManager.default.isExecutableFile(atPath: executable.path))
         #expect(executable.lastPathComponent == "Compiler")
     }
+
+    @Test("native seed driver compiles and runs a single source file")
+    func nativeSeedDriverCompilesAndRunsSingleSourceFile() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("NativeSeven.range")
+        try """
+        @main {
+            return 7
+        }
+        """.write(to: source, atomically: true, encoding: .utf8)
+
+        let root = try repositoryRoot()
+        let driver = root.appendingPathComponent("scripts/range-native")
+        let compile = try runNativeDriver(
+            driver: driver,
+            arguments: ["compile-executable", source.path],
+            currentDirectory: root
+        )
+        #expect(compile.exitCode == 0)
+        #expect(compile.stderr.isEmpty)
+        let executable = compile.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        #expect(FileManager.default.isExecutableFile(atPath: executable))
+
+        let run = try runNativeDriver(
+            driver: driver,
+            arguments: ["run", source.path],
+            currentDirectory: root
+        )
+        #expect(run.exitCode == 7)
+        #expect(run.stdout.isEmpty)
+        #expect(run.stderr.isEmpty)
+    }
+
+    @Test("native seed driver deterministically compiles a multi-file directory")
+    func nativeSeedDriverDeterministicallyCompilesMultiFileDirectory() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let project = directory.appendingPathComponent("NativeProject", isDirectory: true)
+        let nested = project.appendingPathComponent("Sources", isDirectory: true)
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        try """
+        @main {
+            return helper()
+        }
+        """.write(to: project.appendingPathComponent("Main.range"), atomically: true, encoding: .utf8)
+        try """
+        function helper(): Int {
+            return 7
+        }
+        """.write(to: nested.appendingPathComponent("Helper.range"), atomically: true, encoding: .utf8)
+
+        let root = try repositoryRoot()
+        let driver = root.appendingPathComponent("scripts/range-native")
+        let firstLLVM = directory.appendingPathComponent("First.ll")
+        let secondLLVM = directory.appendingPathComponent("Second.ll")
+        let first = try runNativeDriver(
+            driver: driver,
+            arguments: ["emit-llvm", project.path, firstLLVM.path],
+            currentDirectory: root
+        )
+        let second = try runNativeDriver(
+            driver: driver,
+            arguments: ["emit-llvm", project.path, secondLLVM.path],
+            currentDirectory: root
+        )
+        #expect(first.exitCode == 0)
+        #expect(second.exitCode == 0)
+        #expect(try Data(contentsOf: firstLLVM) == Data(contentsOf: secondLLVM))
+
+        let run = try runNativeDriver(
+            driver: driver,
+            arguments: ["run", project.path],
+            currentDirectory: root
+        )
+        #expect(run.exitCode == 7)
+        #expect(run.stdout.isEmpty)
+        #expect(run.stderr.isEmpty)
+    }
+}
+
+private struct NativeDriverResult {
+    let exitCode: Int32
+    let stdout: String
+    let stderr: String
+}
+
+private func runNativeDriver(
+    driver: URL,
+    arguments: [String],
+    currentDirectory: URL
+) throws -> NativeDriverResult {
+    let process = Process()
+    process.executableURL = driver
+    process.arguments = arguments
+    process.currentDirectoryURL = currentDirectory
+    let stdout = Pipe()
+    let stderr = Pipe()
+    process.standardOutput = stdout
+    process.standardError = stderr
+    try process.run()
+    process.waitUntilExit()
+    return NativeDriverResult(
+        exitCode: process.terminationStatus,
+        stdout: String(data: stdout.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "",
+        stderr: String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+    )
 }
 
 private func temporaryDirectory() throws -> URL {

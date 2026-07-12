@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+
+usage() {
+    cat >&2 <<'USAGE'
+Usage:
+  scripts/range-native emit-llvm INPUT OUTPUT
+  scripts/range-native compile-executable INPUT
+  scripts/range-native run INPUT [-- ARGS...]
+
+Directory inputs are bundled recursively in bytewise relative-path order using
+Range's compilerSourceFile transport markers.
+USAGE
+}
+
+manifest_value() {
+    /usr/bin/plutil -extract "$1" raw -o - "$MANIFEST"
+}
+
+sha256() {
+    /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'
+}
+
+verify_manifest_file() {
+    local key="$1"
+    local path expected actual
+    path="$(manifest_value "$key.path")"
+    expected="$(manifest_value "$key.sha256")"
+    if [[ ! -f "$REPO_ROOT/$path" ]]; then
+        echo "Missing native compiler input: $path" >&2
+        exit 1
+    fi
+    actual="$(sha256 "$REPO_ROOT/$path")"
+    if [[ "$actual" != "$expected" ]]; then
+        echo "Native compiler input hash mismatch: $path" >&2
+        echo "Run scripts/range check-stage2-compiler-swift and roll the seed intentionally." >&2
+        exit 1
+    fi
+}
+
+verify_manifest_inputs() {
+    if [[ "$(manifest_value formatVersion)" != "1" ]]; then
+        echo "Unsupported Range compiler seed manifest." >&2
+        exit 1
+    fi
+    if [[ "$(uname -m)" != "$(manifest_value target.architecture)" ]]; then
+        echo "Native compiler seed target architecture mismatch." >&2
+        exit 1
+    fi
+    verify_manifest_file seed
+    for index in 0 1 2 3 4; do
+        verify_manifest_file "runtimeSources.$index"
+    done
+}
+
+runtime_inputs() {
+    local index
+    for index in 0 1 2 3 4; do
+        /usr/bin/printf '%s\n' "$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")"
+    done
+}
+
+ensure_seed_compiler() {
+    verify_manifest_inputs
+    local seed_hash cache_root executable seed
+    local -a runtimes
+    seed_hash="$(manifest_value seed.sha256)"
+    cache_root="$REPO_ROOT/.range/NativeSeed/$seed_hash"
+    executable="$cache_root/RangeCompiler"
+    seed="$REPO_ROOT/$(manifest_value seed.path)"
+    if [[ ! -x "$executable" ]]; then
+        /bin/mkdir -p "$cache_root"
+        runtimes=(
+            "$REPO_ROOT/$(manifest_value runtimeSources.0.path)"
+            "$REPO_ROOT/$(manifest_value runtimeSources.1.path)"
+            "$REPO_ROOT/$(manifest_value runtimeSources.2.path)"
+            "$REPO_ROOT/$(manifest_value runtimeSources.3.path)"
+            "$REPO_ROOT/$(manifest_value runtimeSources.4.path)"
+        )
+        clang -Wno-override-module -x ir "$seed" -x c "${runtimes[@]}" -o "$executable.tmp"
+        /bin/mv "$executable.tmp" "$executable"
+    fi
+    /usr/bin/printf '%s\n' "$executable"
+}
+
+require_source_input() {
+    local input="$1"
+    if [[ ! -f "$input" && ! -d "$input" ]]; then
+        echo "Missing native Range input: $input" >&2
+        exit 1
+    fi
+    if [[ -f "$input" && "${input##*.}" != "range" ]]; then
+        echo "Native Range driver requires a .range source file: $input" >&2
+        exit 1
+    fi
+}
+
+project_bundle() {
+    local directory="$1"
+    local bundle="$2"
+    local absolute relative count
+    directory="$(cd "$directory" && pwd)"
+    /usr/bin/printf '%s\n' 'compilerProjectSourceSetLLVMText' > "$bundle"
+    count=0
+    while IFS= read -r absolute; do
+        relative="${absolute#"$directory/"}"
+        if [[ "$relative" == *$'\t'* || "$relative" == *$'\n'* || "$relative" == *' '* ]]; then
+            echo "Range source paths may not contain whitespace: $relative" >&2
+            return 64
+        fi
+        /usr/bin/printf 'compilerSourceFile\\t%s\n' "$relative" >> "$bundle"
+        /bin/cat "$absolute" >> "$bundle"
+        if [[ -n "$(/usr/bin/tail -c 1 "$absolute")" ]]; then
+            /usr/bin/printf '\n' >> "$bundle"
+        fi
+        count=$((count + 1))
+    done < <(/usr/bin/find "$directory" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print | LC_ALL=C /usr/bin/sort)
+    if [[ "$count" -eq 0 ]]; then
+        echo "No .range source files found in: $directory" >&2
+        return 66
+    fi
+}
+
+emit_llvm() {
+    local input="$1"
+    local output="$2"
+    local compiler output_dir temporary object compiler_input bundle
+    require_source_input "$input"
+    compiler="$(ensure_seed_compiler)"
+    output_dir="$(cd "$(dirname "$output")" 2>/dev/null && pwd || true)"
+    if [[ -z "$output_dir" ]]; then
+        /bin/mkdir -p "$(dirname "$output")"
+        output_dir="$(cd "$(dirname "$output")" && pwd)"
+    fi
+    output="$output_dir/$(basename "$output")"
+    temporary="$output.tmp.$$"
+    object="$output.o.$$"
+    compiler_input="$input"
+    bundle=""
+    if [[ -d "$input" ]]; then
+        bundle="${TMPDIR:-/tmp}/range-project-bundle.$$.range"
+        project_bundle "$input" "$bundle"
+        compiler_input="$bundle"
+    fi
+    trap '/bin/rm -f "$temporary" "$object"' RETURN
+    "$compiler" "$compiler_input" > "$temporary"
+    if [[ -n "$bundle" ]]; then /bin/rm -f "$bundle"; fi
+    if /usr/bin/head -1 "$temporary" | /usr/bin/grep -q '^compilerError'; then
+        /bin/cat "$temporary" >&2
+        return 65
+    fi
+    clang -Wno-override-module -x ir -c "$temporary" -o "$object"
+    /bin/mv "$temporary" "$output"
+    /bin/rm -f "$object"
+    trap - RETURN
+}
+
+compile_executable() {
+    local input="$1"
+    local source_dir executable_name build_root llvm executable
+    local -a runtimes
+    require_source_input "$input"
+    if [[ -d "$input" ]]; then
+        source_dir="$(cd "$input" && pwd)"
+        input="$source_dir"
+        executable_name="$(basename "$source_dir")"
+    else
+        source_dir="$(cd "$(dirname "$input")" && pwd)"
+        input="$source_dir/$(basename "$input")"
+        executable_name="$(basename "${input%.range}")"
+    fi
+    build_root="$source_dir/.range/Build/llvm"
+    llvm="$build_root/Main.ll"
+    executable="$build_root/$executable_name"
+    /bin/mkdir -p "$build_root"
+    emit_llvm "$input" "$llvm"
+    runtimes=(
+        "$REPO_ROOT/$(manifest_value runtimeSources.0.path)"
+        "$REPO_ROOT/$(manifest_value runtimeSources.1.path)"
+        "$REPO_ROOT/$(manifest_value runtimeSources.2.path)"
+        "$REPO_ROOT/$(manifest_value runtimeSources.3.path)"
+        "$REPO_ROOT/$(manifest_value runtimeSources.4.path)"
+    )
+    clang -Wno-override-module "$llvm" "${runtimes[@]}" -o "$executable.tmp"
+    /bin/mv "$executable.tmp" "$executable"
+    /usr/bin/printf '%s\n' "$executable"
+}
+
+command="${1:-}"
+if [[ -z "$command" ]]; then
+    usage
+    exit 1
+fi
+shift
+
+case "$command" in
+    emit-llvm)
+        if [[ $# -ne 2 ]]; then usage; exit 1; fi
+        emit_llvm "$1" "$2"
+        ;;
+    compile-executable)
+        if [[ $# -ne 1 ]]; then usage; exit 1; fi
+        compile_executable "$1"
+        ;;
+    run)
+        if [[ $# -lt 1 ]]; then usage; exit 1; fi
+        input="$1"
+        shift
+        if [[ "${1:-}" == "--" ]]; then shift; fi
+        executable="$(compile_executable "$input")"
+        "$executable" "$@"
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
