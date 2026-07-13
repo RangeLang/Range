@@ -2447,6 +2447,25 @@ checkpoint, not the performance milestone: the remaining roughly 160-second
 cost still comes from emitted legacy lowering and must fall when the proven
 family becomes typed-only and its encoded-record consumers are deleted.
 
+### Legacy reachability recovery deletion checkpoint
+
+The obsolete record-based reachability recovery slice is now deleted: ordinary
+FunctionID call edges come only from typed BodyArena resolutions and MIR. The
+diagnostic and legacy lowering record model remains in place for its remaining
+callers; ordinary discovery no longer contains a legacy edge path or legacy
+parse activity.
+
+The authoritative Stage 2/3 gate passed validation/link, inventory, normal
+smoke, mixed aggregate-ABI rejection before emission, and self-rebuild. Stage 2
+LLVM emission measured `29.937 s` with `70,402,048` bytes child RSS; Stage 3
+self-rebuild measured `29.904 s` with `71,139,328` bytes child RSS. The outer
+`/usr/bin/time -l` gate measured `181.85 s` real time and `171,507,712` bytes
+peak RSS. Stage 2 and Stage 3 LLVM are byte-identical at SHA-256
+`9771e9668e939b06cb58f05f5b0774597e81669c6c67ddcc85e29328722ddfa9` and
+`2,971,047` bytes; their executables are byte-identical at SHA-256
+`5bb6eca32b44b8ba156e0e9157246caf6badffd56e828af0ced06727e433c541` and
+`1,447,840` bytes.
+
 ### Explicit deferrals
 
 Do not add compiler concurrency before one-function memory is bounded and

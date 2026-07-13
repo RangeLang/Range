@@ -132,6 +132,26 @@ struct RangeScriptTests {
         #expect(result.stderr.isEmpty)
     }
 
+    @Test("Ordinary reachability discovery uses typed body edges only")
+    func ordinaryReachabilityDiscoveryUsesTypedBodyEdgesOnly() throws {
+        let root = try repositoryRoot()
+        let source = try String(
+            contentsOf: root.appendingPathComponent("RangeCompiler/Range/Programs/Compiler/CompilerCore.range"),
+            encoding: .utf8
+        )
+        guard let start = source.range(of: "function compilerReachableLLVMStateDiscoverFunction("),
+              let end = source.range(of: "\nfunction compilerReachableLLVMStateEmitFunction(", range: start.upperBound..<source.endIndex) else {
+            #expect(Bool(false))
+            return
+        }
+        let discovery = String(source[start.lowerBound..<end.lowerBound])
+        #expect(discovery.contains("compilerBodyArenaAppendFunctionEdges"))
+        #expect(discovery.contains("compilerBodyMIRAppendFunctionEdges"))
+        #expect(!discovery.contains("compilerCoreParseStatements"))
+        #expect(!discovery.contains("compilerLegacyAppend"))
+        #expect(!discovery.contains("parseCompilerExpression"))
+    }
+
     @Test("Stage 2 compiler check emits candidate LLVM from Stage 1")
     func stage2CompilerCheckEmitsCandidateLLVMFromStage1() throws {
         let result = try runRangeScript(arguments: ["check-stage2-compiler"], timeout: 720)

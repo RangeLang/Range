@@ -1178,109 +1178,6 @@ function compilerBodyArenaHasUnplannedRepresentationSensitiveCall(arena: Compile
     return false
 }
 
-function compilerLegacyAppendFunctionNameEdge(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, ownerFunctionRow: Int, name: String, edgeOwners: IntBuffer, edgeTargets: IntBuffer): Int {
-    if name == String("") { return 0 }
-    let declarationRow: Int(compilerDeclarationIndexLookup(tables: tables, index: index, name: name, kindTag: compilerSyntaxKindFunction()))
-    if declarationRow < 0 { return 0 }
-    let syntaxID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 0))
-    let targetFunctionRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 1))
-    return compilerFunctionEdgesAppend(edgeOwners: edgeOwners, edgeTargets: edgeTargets, ownerFunctionRow: ownerFunctionRow, targetFunctionRow: targetFunctionRow)
-}
-
-function compilerLegacyAppendFunctionNameListEdges(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, ownerFunctionRow: Int, names: String, edgeOwners: IntBuffer, edgeTargets: IntBuffer): Int {
-    state nameIndex: Int(0)
-    while nameIndex < stringLength(value: names) {
-        let name: String(compilerCoreNameListNameAt(names: names, start: nameIndex))
-        if compilerLegacyAppendFunctionNameEdge(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, name: name, edgeOwners: edgeOwners, edgeTargets: edgeTargets) != 0 { return 0 - 1 }
-        nameIndex: compilerCoreNameListNextIndex(names: names, start: nameIndex)
-    }
-    return 0
-}
-
-function compilerLegacyAppendExpressionRecordEdges(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, ownerFunctionRow: Int, record: String, fallbackSummary: String, edgeOwners: IntBuffer, edgeTargets: IntBuffer): Int {
-    if record == String("") {
-        return compilerLegacyAppendFunctionNameListEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, names: compilerCoreExpressionSummaryCalledFunctionNames(summary: fallbackSummary), edgeOwners: edgeOwners, edgeTargets: edgeTargets)
-    }
-    let kind: String(compilerCoreExpressionRecordKind(record: record))
-    if kind == String("stringLiteral") {
-        return compilerLegacyAppendInterpolatedStringEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, content: compilerCoreStringLiteralContent(text: compilerCoreExpressionRecordValue(record: record)), edgeOwners: edgeOwners, edgeTargets: edgeTargets)
-    }
-    if kind == String("call") {
-        let calleeRecord: String(compilerCoreExpressionRecordLeft(record: record))
-        if compilerCoreExpressionRecordKind(record: calleeRecord) == String("identifier")
-            && compilerLegacyAppendFunctionNameEdge(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, name: compilerCoreExpressionRecordValue(record: calleeRecord), edgeOwners: edgeOwners, edgeTargets: edgeTargets) != 0 { return 0 - 1 }
-        return compilerLegacyAppendCallArgumentRecordEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, records: compilerCoreExpressionRecordArguments(record: record), edgeOwners: edgeOwners, edgeTargets: edgeTargets)
-    }
-    if kind == String("binary") || kind == String("index") {
-        let binaryLeft: String(compilerCoreExpressionRecordLeft(record: record))
-        let binaryRight: String(compilerCoreExpressionRecordRight(record: record))
-        if binaryLeft == String("") || binaryRight == String("") {
-            return compilerLegacyAppendFunctionNameListEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, names: compilerCoreExpressionSummaryCalledFunctionNames(summary: fallbackSummary), edgeOwners: edgeOwners, edgeTargets: edgeTargets)
-        }
-        if compilerLegacyAppendExpressionRecordEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, record: binaryLeft, fallbackSummary: String(""), edgeOwners: edgeOwners, edgeTargets: edgeTargets) != 0 { return 0 - 1 }
-        return compilerLegacyAppendExpressionRecordEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, record: binaryRight, fallbackSummary: String(""), edgeOwners: edgeOwners, edgeTargets: edgeTargets)
-    }
-    if kind == String("prefix") || kind == String("member") {
-        let unaryLeft: String(compilerCoreExpressionRecordLeft(record: record))
-        if unaryLeft == String("") {
-            return compilerLegacyAppendFunctionNameListEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, names: compilerCoreExpressionSummaryCalledFunctionNames(summary: fallbackSummary), edgeOwners: edgeOwners, edgeTargets: edgeTargets)
-        }
-        return compilerLegacyAppendExpressionRecordEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, record: unaryLeft, fallbackSummary: String(""), edgeOwners: edgeOwners, edgeTargets: edgeTargets)
-    }
-    return 0
-}
-
-function compilerLegacyAppendCallArgumentRecordEdges(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, ownerFunctionRow: Int, records: String, edgeOwners: IntBuffer, edgeTargets: IntBuffer): Int {
-    state sourceIndex: Int(0)
-    while sourceIndex < stringLength(value: records) {
-        let record: String(compilerCoreCallArgumentRecordAt(records: records, start: sourceIndex))
-        if record == String("") { return 0 }
-        if compilerLegacyAppendExpressionRecordEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, record: compilerCoreCallArgumentExpressionRecord(record: record), fallbackSummary: compilerCoreCallArgumentExpressionSummary(record: record), edgeOwners: edgeOwners, edgeTargets: edgeTargets) != 0 { return 0 - 1 }
-        sourceIndex: compilerCoreCallArgumentRecordNextIndex(records: records, start: sourceIndex)
-    }
-    return 0
-}
-
-function compilerLegacyAppendInterpolatedStringEdges(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, ownerFunctionRow: Int, content: String, edgeOwners: IntBuffer, edgeTargets: IntBuffer): Int {
-    if !compilerCoreStringContentHasInterpolation(content: content) { return 0 }
-    let contentLength: Int(stringLength(value: content))
-    let backslash: String(compilerCoreSingleBackslash())
-    state sourceIndex: Int(0)
-    while sourceIndex + 1 < contentLength {
-        if stringCharacterAt(source: content, index: sourceIndex) == backslash && stringCharacterAt(source: content, index: sourceIndex + 1) == String("(") {
-            let expressionEnd: Int(compilerCoreInterpolatedExpressionEnd(content: content, start: sourceIndex + 2))
-            if expressionEnd < contentLength {
-                let expressionText: String(stringSubstring(source: content, start: sourceIndex + 2, end: expressionEnd))
-                let maybeExpression: Optional<CompilerExpression>(parseCompilerExpression(source: expressionText, start: 0, limit: stringLength(value: expressionText)))
-                if maybeExpression != nil {
-                    let fallbackExpression: CompilerExpression(compilerCoreMissingExpression(start: 0))
-                    let expression: CompilerExpression(maybeExpression ?? fallbackExpression)
-                    if compilerLegacyAppendExpressionRecordEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, record: expression.record, fallbackSummary: expression.summary, edgeOwners: edgeOwners, edgeTargets: edgeTargets) != 0 { return 0 - 1 }
-                }
-                sourceIndex: expressionEnd + 1
-            } else { sourceIndex: sourceIndex + 1 }
-        } else { sourceIndex: sourceIndex + 1 }
-    }
-    return 0
-}
-
-function compilerLegacyAppendStatementRecordEdges(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, ownerFunctionRow: Int, records: String, edgeOwners: IntBuffer, edgeTargets: IntBuffer): Int {
-    state statementIndex: Int(0)
-    while statementIndex < stringLength(value: records) {
-        let statementRecord: String(compilerCoreStatementRecordAt(records: records, start: statementIndex))
-        if statementRecord == String("") { return 0 }
-        let statement: CompilerStatement(compilerCoreStatementFromRecord(record: statementRecord))
-        if compilerLegacyAppendExpressionRecordEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, record: statement.expressionRecord, fallbackSummary: statement.expressionSummary, edgeOwners: edgeOwners, edgeTargets: edgeTargets) != 0 { return 0 - 1 }
-        if compilerLegacyAppendExpressionRecordEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, record: statement.targetRecord, fallbackSummary: statement.targetSummary, edgeOwners: edgeOwners, edgeTargets: edgeTargets) != 0 { return 0 - 1 }
-        if statement.kind == String("if") || statement.kind == String("while") {
-            if compilerLegacyAppendStatementRecordEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, records: statement.bodyStatementRecords, edgeOwners: edgeOwners, edgeTargets: edgeTargets) != 0 { return 0 - 1 }
-            if compilerLegacyAppendStatementRecordEdges(tables: tables, index: index, ownerFunctionRow: ownerFunctionRow, records: statement.elseStatementRecords, edgeOwners: edgeOwners, edgeTargets: edgeTargets) != 0 { return 0 - 1 }
-        }
-        statementIndex: compilerCoreStatementRecordNextIndex(records: records, start: statementIndex)
-    }
-    return 0
-}
-
 function compilerFunctionReachabilityRecordTarget(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: IntBuffer, edgeOwners: IntBuffer, edgeTargets: IntBuffer, ownerFunctionRow: Int, targetName: String): Int {
     if targetName == String("String") || compilerBodyRuntimeBuiltinID(name: targetName) != compilerBodyRuntimeBuiltinNone() { return 0 }
     let declarationRow: Int(compilerDeclarationIndexLookup(tables: tables, index: index, name: targetName, kindTag: compilerSyntaxKindFunction()))
@@ -8606,31 +8503,6 @@ function compilerReachableLLVMStateAccumulate(reachability: CompilerReachableLLV
     return intBufferSet(buffer: reachability.counters, index: compilerReachableLLVMNextTemporary(), value: selected.helpers.nextTemporary)
 }
 
-function compilerReachableLLVMAppendLegacyEdges(context: CompilerLLVMLoweringContext, functionRow: Int, edgeOwners: IntBuffer, edgeTargets: IntBuffer): Int {
-    let fileID: Int(compilerIntTableValue(table: context.tables.functions, row: functionRow, column: 1))
-    let bodyStart: Int(compilerSourceStoreGlobalOffset(store: context.tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: context.tables.functions, row: functionRow, column: 8)))
-    let bodyEnd: Int(compilerSourceStoreGlobalOffset(store: context.tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: context.tables.functions, row: functionRow, column: 9)))
-    let parsedStatements: CompilerParsedStatements(compilerCoreParseStatements(program: context.program, block: CompilerBlock(start: bodyStart, end: bodyEnd)))
-    return compilerLegacyAppendStatementRecordEdges(tables: context.tables, index: context.declarationIndex, ownerFunctionRow: functionRow, records: parsedStatements.records, edgeOwners: edgeOwners, edgeTargets: edgeTargets)
-}
-
-function compilerReachableLLVMStateAppendLegacyEdges(reachability: CompilerReachableLLVMState, functionRow: Int): Int {
-    return compilerReachableLLVMAppendLegacyEdges(context: reachability.context, functionRow: functionRow, edgeOwners: reachability.edgeOwners, edgeTargets: reachability.edgeTargets)
-}
-
-function compilerReachableLLVMStateShouldProbeIndirectABI(reachability: CompilerReachableLLVMState, functionRow: Int, edgeStart: Int): Bool {
-    if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow) == compilerFunctionReturnABIIndirect()
-        || compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow) { return true }
-    state edgeIndex: Int(edgeStart)
-    while edgeIndex < intBufferCount(buffer: reachability.edgeTargets) {
-        let targetFunctionRow: Int(intBufferElement(buffer: reachability.edgeTargets, index: edgeIndex))
-        if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: targetFunctionRow) == compilerFunctionReturnABIIndirect()
-            || compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: targetFunctionRow) { return true }
-        edgeIndex: edgeIndex + 1
-    }
-    return false
-}
-
 function compilerReachableLLVMStatePlannedReturnMode(reachability: CompilerReachableLLVMState, functionRow: Int): Int {
     let signatureMode: Int(compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow))
     if signatureMode == compilerFunctionReturnABINone()
@@ -8950,54 +8822,7 @@ function compilerReachableLLVMStateProbeCandidateABIPlan(reachability: CompilerR
 function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReachableLLVMState, functionRow: Int): Int {
     let transientMark: Int(stringTransientRegionMark())
     let edgeStart: Int(intBufferCount(buffer: reachability.edgeTargets))
-    let usesTypedDiscovery: Bool(true)
-    state shouldProbeIndirectABI: Bool(compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow) == compilerFunctionReturnABIIndirect()
-        || compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow))
-    if !usesTypedDiscovery {
-        let probeEdgeOwners: IntBuffer(intBufferCreate(capacity: 16))
-        let probeEdgeTargets: IntBuffer(intBufferCreate(capacity: 16))
-        if compilerReachableLLVMAppendLegacyEdges(context: reachability.context, functionRow: functionRow, edgeOwners: probeEdgeOwners, edgeTargets: probeEdgeTargets) != 0 {
-            intBufferDestroy(buffer: probeEdgeOwners)
-            intBufferDestroy(buffer: probeEdgeTargets)
-            stringTransientRegionReset(mark: transientMark)
-            return 0 - 1
-        }
-        state probeEdgeIndex: Int(0)
-        while probeEdgeIndex < intBufferCount(buffer: probeEdgeTargets) {
-            let probeTargetFunctionRow: Int(intBufferElement(buffer: probeEdgeTargets, index: probeEdgeIndex))
-            if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: probeTargetFunctionRow) == compilerFunctionReturnABIIndirect()
-                || compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: probeTargetFunctionRow) { shouldProbeIndirectABI: true }
-            probeEdgeIndex: probeEdgeIndex + 1
-        }
-        if !shouldProbeIndirectABI {
-            probeEdgeIndex: 0
-            while probeEdgeIndex < intBufferCount(buffer: probeEdgeTargets) {
-                if intBufferAppend(buffer: reachability.edgeOwners, value: intBufferElement(buffer: probeEdgeOwners, index: probeEdgeIndex)) != 0 {
-                    intBufferDestroy(buffer: probeEdgeOwners)
-                    intBufferDestroy(buffer: probeEdgeTargets)
-                    stringTransientRegionReset(mark: transientMark)
-                    return 0 - 1
-                }
-                if intBufferAppend(buffer: reachability.edgeTargets, value: intBufferElement(buffer: probeEdgeTargets, index: probeEdgeIndex)) != 0 {
-                    intBufferDestroy(buffer: probeEdgeOwners)
-                    intBufferDestroy(buffer: probeEdgeTargets)
-                    stringTransientRegionReset(mark: transientMark)
-                    return 0 - 1
-                }
-                probeEdgeIndex: probeEdgeIndex + 1
-            }
-            intBufferDestroy(buffer: probeEdgeOwners)
-            intBufferDestroy(buffer: probeEdgeTargets)
-            let enqueueStatus: Int(compilerReachableLLVMStateEnqueueEdges(reachability: reachability, edgeStart: edgeStart))
-            stringTransientRegionReset(mark: transientMark)
-            return enqueueStatus
-        }
-        if intBufferDestroy(buffer: probeEdgeOwners) != 0 || intBufferDestroy(buffer: probeEdgeTargets) != 0 {
-            stringTransientRegionReset(mark: transientMark)
-            return 0 - 1
-        }
-    }
-    shouldProbeIndirectABI: false
+    state shouldProbeIndirectABI: Bool(false)
     let typedEdgeOwners: IntBuffer(intBufferCreate(capacity: 16))
     let typedEdgeTargets: IntBuffer(intBufferCreate(capacity: 16))
     let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreate(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow)))
