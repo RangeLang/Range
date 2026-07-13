@@ -145,7 +145,7 @@ write_expected_inventory() {
 
     /usr/bin/printf 'sourceInventory\\tprogram\\n' > "$output"
     for index in "${!SOURCE_FILES[@]}"; do
-        /usr/bin/printf 'sourceFile\\tindex=%s\\tpath=%s\\n' "$index" "${SOURCE_RELATIVE_PATHS[$index]}" >> "$output"
+        /usr/bin/printf 'sourceFile\\tindex=%s\\trole=project\\tpath=%s\\n' "$index" "${SOURCE_RELATIVE_PATHS[$index]}" >> "$output"
     done
     /usr/bin/printf 'sourceFileCount\\t%s\\n' "${#SOURCE_FILES[@]}" >> "$output"
     /usr/bin/printf '\n' >> "$output"
@@ -309,12 +309,197 @@ audit_mixed_abi() {
     echo "$stage_label mixed aggregate ABI rejection: pass (exit 65, pre-emission)"
 }
 
+write_role_bundle() {
+    local output="$1"
+    local directive="$2"
+
+    /usr/bin/printf '%s\n' \
+        "$directive" \
+        'compilerSourceFile\trole=core\tpath=Core.range' \
+        'construct RoleCore {}' \
+        'compilerSourceFile\trole=foundation\tpath=Foundation.range' \
+        'construct RoleFoundation {}' \
+        'compilerSourceFile\trole=generated\tpath=Generated.range' \
+        'construct RoleGenerated {}' \
+        'compilerSourceFile\trole=project\tpath=Project.range' \
+        'construct RoleProject {}' \
+        'compilerSourceFile\tLegacy.range' \
+        'construct RoleLegacy {}' > "$output"
+}
+
+write_fingerprint_bundle() {
+    local output="$1"
+    local role="$2"
+
+    /usr/bin/printf '%s\n' \
+        'compilerTypedSyntax' \
+        "compilerSourceFile\\trole=$role\\tpath=Fingerprint.range" \
+        'construct FingerprintRole {}' > "$output"
+}
+
+write_invalid_role_bundle() {
+    local output="$1"
+    local marker="$2"
+
+    /usr/bin/printf '%s\n' \
+        'compilerSourceInventory' \
+        "$marker" \
+        'construct InvalidRole {}' > "$output"
+}
+
+write_core_bundle() {
+    local output="$1"
+    local directive="$2"
+
+    if [[ -n "$directive" ]]; then
+        /usr/bin/printf '%s\n' "$directive" > "$output"
+    else
+        /usr/bin/printf '%s' '' > "$output"
+    fi
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=RangeCompiler/Range/Core/System/Memory/IntBuffer.range' >> "$output"
+    /bin/cat "$CORE_SOURCE_PATH" >> "$output"
+    if [[ -n "$(/usr/bin/tail -c 1 "$CORE_SOURCE_PATH")" ]]; then
+        /usr/bin/printf '\n' >> "$output"
+    fi
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=project\tpath=CoreUse.range' \
+        '@main {' \
+        '    let buffer: IntBuffer(intBufferCreate(capacity: 0))' \
+        '    return intBufferDestroy(buffer: buffer) + 7' \
+        '}' >> "$output"
+}
+
+assert_role_identity() {
+    local output="$1"
+
+    for expected in \
+        $'sourceFile\tid=0\trole=core\tpath=Core.range' \
+        $'sourceFile\tid=1\trole=foundation\tpath=Foundation.range' \
+        $'sourceFile\tid=2\trole=generated\tpath=Generated.range' \
+        $'sourceFile\tid=3\trole=project\tpath=Project.range' \
+        $'sourceFile\tid=4\trole=project\tpath=Legacy.range'; do
+        /usr/bin/grep -Fq "$expected" "$output" || fail "role identity missing: $expected"
+    done
+}
+
+audit_role_markers() {
+    local stage_label="$1"
+    local executable="$2"
+    local identity_bundle="$WORK_ROOT/$stage_label.roles.identity.range"
+    local identity_output="$WORK_ROOT/$stage_label.roles.identity.out"
+    local identity_error="$WORK_ROOT/$stage_label.roles.identity.err"
+    local inventory_bundle="$WORK_ROOT/$stage_label.roles.inventory.range"
+    local inventory_output="$WORK_ROOT/$stage_label.roles.inventory.out"
+    local inventory_error="$WORK_ROOT/$stage_label.roles.inventory.err"
+    local expected_inventory="$WORK_ROOT/$stage_label.roles.inventory.expected"
+    local malformed_bundle="$WORK_ROOT/$stage_label.roles.malformed.range"
+    local malformed_output="$WORK_ROOT/$stage_label.roles.malformed.out"
+    local malformed_error="$WORK_ROOT/$stage_label.roles.malformed.err"
+    local malformed_expected="$WORK_ROOT/$stage_label.roles.malformed.expected"
+    local fingerprint_project_bundle="$WORK_ROOT/$stage_label.roles.fingerprint.project.range"
+    local fingerprint_project_first="$WORK_ROOT/$stage_label.roles.fingerprint.project.first.out"
+    local fingerprint_project_second="$WORK_ROOT/$stage_label.roles.fingerprint.project.second.out"
+    local fingerprint_project_error="$WORK_ROOT/$stage_label.roles.fingerprint.project.err"
+    local fingerprint_core_bundle="$WORK_ROOT/$stage_label.roles.fingerprint.core.range"
+    local fingerprint_core_output="$WORK_ROOT/$stage_label.roles.fingerprint.core.out"
+    local fingerprint_core_error="$WORK_ROOT/$stage_label.roles.fingerprint.core.err"
+
+    write_role_bundle "$identity_bundle" compilerSourceIdentity
+    run_capture "$executable" "$identity_bundle" "$identity_output" "$identity_error"
+    require_successful_output "$stage_label role identity" "$identity_output" "$identity_error"
+    assert_role_identity "$identity_output"
+    run_capture "$executable" "$identity_bundle" "$WORK_ROOT/$stage_label.roles.identity.repeat.out" "$WORK_ROOT/$stage_label.roles.identity.repeat.err"
+    require_successful_output "$stage_label repeated role identity" "$WORK_ROOT/$stage_label.roles.identity.repeat.out" "$WORK_ROOT/$stage_label.roles.identity.repeat.err"
+    /usr/bin/cmp -s "$identity_output" "$WORK_ROOT/$stage_label.roles.identity.repeat.out" || fail "$stage_label role identity was not deterministic"
+
+    write_role_bundle "$inventory_bundle" compilerSourceInventory
+    /usr/bin/printf 'sourceInventory\\tprogram\\n' > "$expected_inventory"
+    /usr/bin/printf 'sourceFile\\tindex=0\\trole=core\\tpath=Core.range\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFile\\tindex=1\\trole=foundation\\tpath=Foundation.range\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFile\\tindex=2\\trole=generated\\tpath=Generated.range\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFile\\tindex=3\\trole=project\\tpath=Project.range\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFile\\tindex=4\\trole=project\\tpath=Legacy.range\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFileCount\\t5\\n' >> "$expected_inventory"
+    /usr/bin/printf '\n' >> "$expected_inventory"
+    run_capture "$executable" "$inventory_bundle" "$inventory_output" "$inventory_error"
+    require_successful_output "$stage_label role inventory" "$inventory_output" "$inventory_error"
+    /usr/bin/cmp -s "$inventory_output" "$expected_inventory" || fail "$stage_label role inventory differs from expected roles"
+
+    write_invalid_role_bundle "$malformed_bundle" 'compilerSourceFile\trole=unknown\tpath=Bad.range'
+    run_capture "$executable" "$malformed_bundle" "$malformed_output" "$malformed_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label malformed role exited $RUN_STATUS"
+    [[ ! -s "$malformed_error" ]] || fail "$stage_label malformed role wrote stderr"
+    /usr/bin/printf 'compilerError\tkind=invalidSourceFileTable\n\n' > "$malformed_expected"
+    /usr/bin/cmp -s "$malformed_output" "$malformed_expected" \
+        || fail "$stage_label malformed role diagnostic changed: $(/usr/bin/head -c 240 "$malformed_output")"
+
+    write_fingerprint_bundle "$fingerprint_project_bundle" project
+    run_capture "$executable" "$fingerprint_project_bundle" "$fingerprint_project_first" "$fingerprint_project_error"
+    require_successful_output "$stage_label project fingerprint" "$fingerprint_project_first" "$fingerprint_project_error"
+    run_capture "$executable" "$fingerprint_project_bundle" "$fingerprint_project_second" "$WORK_ROOT/$stage_label.roles.fingerprint.project.repeat.err"
+    require_successful_output "$stage_label repeated project fingerprint" "$fingerprint_project_second" "$WORK_ROOT/$stage_label.roles.fingerprint.project.repeat.err"
+    /usr/bin/cmp -s "$fingerprint_project_first" "$fingerprint_project_second" || fail "$stage_label project fingerprint was not deterministic"
+    /usr/bin/grep -Fq $'declaration\trow=0' "$fingerprint_project_first" || fail "$stage_label project fingerprint omitted declaration output"
+
+    write_fingerprint_bundle "$fingerprint_core_bundle" core
+    run_capture "$executable" "$fingerprint_core_bundle" "$fingerprint_core_output" "$fingerprint_core_error"
+    require_successful_output "$stage_label core fingerprint" "$fingerprint_core_output" "$fingerprint_core_error"
+    /usr/bin/cmp -s "$fingerprint_project_first" "$fingerprint_core_output" && fail "$stage_label role-only fingerprint change was not observed"
+    echo "$stage_label roles: pass (four explicit roles, legacy project, malformed rejection, deterministic role-sensitive fingerprint)"
+}
+
+audit_canonical_core() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local identity_bundle="$WORK_ROOT/$stage_label.canonical-core.identity.range"
+    local identity_output="$WORK_ROOT/$stage_label.canonical-core.identity.out"
+    local identity_error="$WORK_ROOT/$stage_label.canonical-core.identity.err"
+    local core_bundle="$WORK_ROOT/$stage_label.canonical-core.range"
+    local core_output="$stage_directory/CanonicalCore.ll"
+    local core_error="$WORK_ROOT/$stage_label.canonical-core.err"
+    local core_executable="$stage_directory/CanonicalCore"
+    local run_output="$WORK_ROOT/$stage_label.canonical-core.run.out"
+    local run_error="$WORK_ROOT/$stage_label.canonical-core.run.err"
+
+    write_core_bundle "$identity_bundle" compilerSourceIdentity
+    run_capture "$executable" "$identity_bundle" "$identity_output" "$identity_error"
+    require_successful_output "$stage_label canonical Core identity" "$identity_output" "$identity_error"
+    /usr/bin/grep -Fq $'sourceFile\tid=0\trole=core\tpath=RangeCompiler/Range/Core/System/Memory/IntBuffer.range' "$identity_output" \
+        || fail "$stage_label canonical Core was not stored as role=core"
+    /usr/bin/grep -Fq $'sourceFile\tid=1\trole=project\tpath=CoreUse.range' "$identity_output" \
+        || fail "$stage_label canonical Core project file was not stored as role=project"
+
+    write_core_bundle "$core_bundle" ''
+    emit_candidate_llvm "$executable" "$core_bundle" "$core_output" "$stage_label.canonical-core"
+    for marker in \
+        'define i32 @main() {' \
+        'declare ptr @intBufferCreate(i32)' \
+        'declare i32 @intBufferDestroy(ptr)' \
+        'call ptr @intBufferCreate(i32 0)' \
+        'call i32 @intBufferDestroy(ptr'; do
+        /usr/bin/grep -Fq "$marker" "$core_output" || fail "$stage_label canonical Core LLVM missing: $marker"
+    done
+    validate_llvm "$core_output"
+    link_llvm "$core_output" "$core_executable"
+    if "$core_executable" > "$run_output" 2> "$run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label canonical Core executable exited $RUN_STATUS"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label canonical Core executable wrote output"
+    echo "$stage_label canonical Core: pass (actual IntBuffer.range role=core, project use, validate/link, exit 7)"
+}
+
 audit_stage() {
     local stage_label="$1"
     local executable="$2"
     local stage_directory="$3"
 
     audit_inventory "$stage_label" "$executable"
+    audit_role_markers "$stage_label" "$executable"
+    audit_canonical_core "$stage_label" "$executable" "$stage_directory"
     audit_smoke "$stage_label" "$executable" "$stage_directory"
     audit_mixed_abi "$stage_label" "$executable"
 }
@@ -338,6 +523,8 @@ main() {
 
     WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compiler-candidate.XXXXXX")"
     trap '/bin/rm -rf "$WORK_ROOT"' EXIT
+    CORE_SOURCE_PATH="$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/IntBuffer.range"
+    [[ -f "$CORE_SOURCE_PATH" ]] || fail "missing canonical Core proof input: $CORE_SOURCE_PATH"
 
     RUNTIME_INPUTS=()
     while IFS= read -r runtime; do

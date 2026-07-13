@@ -2505,6 +2505,35 @@ rollover remains explicit. Role-aware Core loading and native macros are the
 next slices; Swift is not yet removable because macro and tooling parity is
 incomplete.
 
+### Source roles and canonical Core checkpoint
+
+Source roles are now first-class in the self-hosted compiler source model:
+`core=0`, `foundation=1`, `generated=2`, and `project=3`. The legacy
+`compilerSourceFile\tpath` transport remains valid and decodes as `project`.
+Explicit role markers are decoded centrally into deterministic path and content
+boundaries, and those boundaries feed source inventory, identity, typed syntax,
+fingerprints, and source-set handling. Unknown or malformed roles fail closed.
+
+The authoritative `/usr/bin/time -l scripts/range check-compiler-candidate`
+run completed in `61.31 s` real time with `73,580,544` bytes maximum RSS and no
+Swift invocation. Stage 2 and Stage 3 both passed the explicit-role, legacy
+project, malformed-marker, deterministic identity/fingerprint, and ordinary
+smoke audits. The canonical proof read the checked-in
+`RangeCompiler/Range/Core/System/Memory/IntBuffer.range` as `role=core`, loaded
+a project source as `role=project`, validated and linked the emitted LLVM, and
+executed with exit status `7` in both stages.
+
+Stage 2 and Stage 3 LLVM are byte-identical at SHA-256
+`fdec0503efbcd2ac37961eee0a0029640e32ace9e42953d52ae49ccc02481c9b` and
+`2,992,386` bytes. Their linked executables are byte-identical at SHA-256
+`459dc4b9dc3f19a3fd48bdc356bd66a4b79a50f9c19313c6e184171c2ca0d6c0` and
+`1,464,976` bytes. The seed and manifest were not changed; seed rollover
+remains explicit and Swift is not yet removable.
+
+This proves first-class roles and one supported canonical Core leaf usable from
+project code. Full Core/Foundation loading and macro declaration/application
+values remain subsequent slices; macros are not implemented by this checkpoint.
+
 ### Explicit deferrals
 
 Do not add compiler concurrency before one-function memory is bounded and

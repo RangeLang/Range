@@ -176,10 +176,10 @@ public struct SwiftBootstrapCompiler {
         }
 
         guard result.stdout.contains("sourceInventory\\tprogram"),
-            result.stdout.contains("sourceFile\\tindex=0\\tpath=Compiler.range"),
-            result.stdout.contains("sourceFile\\tindex=1\\tpath=CompilerCore.range"),
-            result.stdout.contains("sourceFile\\tindex=2\\tpath=Lexer.range"),
-            result.stdout.contains("sourceFile\\tindex=3\\tpath=Main.range"),
+            result.stdout.contains("sourceFile\\tindex=0\\trole=project\\tpath=Compiler.range"),
+            result.stdout.contains("sourceFile\\tindex=1\\trole=project\\tpath=CompilerCore.range"),
+            result.stdout.contains("sourceFile\\tindex=2\\trole=project\\tpath=Lexer.range"),
+            result.stdout.contains("sourceFile\\tindex=3\\trole=project\\tpath=Main.range"),
             result.stdout.contains("sourceFileCount\\t4")
         else {
             throw SwiftBootstrapError(
@@ -404,10 +404,10 @@ public struct SwiftBootstrapCompiler {
             label: "Linked Stage 2 inventory"
         ) }
         guard stage2InventoryText.contains("sourceInventory\\tprogram"),
-            stage2InventoryText.contains("sourceFile\\tindex=0\\tpath=Compiler.range"),
-            stage2InventoryText.contains("sourceFile\\tindex=1\\tpath=CompilerCore.range"),
-            stage2InventoryText.contains("sourceFile\\tindex=2\\tpath=Lexer.range"),
-            stage2InventoryText.contains("sourceFile\\tindex=3\\tpath=Main.range"),
+            stage2InventoryText.contains("sourceFile\\tindex=0\\trole=project\\tpath=Compiler.range"),
+            stage2InventoryText.contains("sourceFile\\tindex=1\\trole=project\\tpath=CompilerCore.range"),
+            stage2InventoryText.contains("sourceFile\\tindex=2\\trole=project\\tpath=Lexer.range"),
+            stage2InventoryText.contains("sourceFile\\tindex=3\\trole=project\\tpath=Main.range"),
             stage2InventoryText.contains("sourceFileCount\\t4")
         else {
             throw SwiftBootstrapError(
