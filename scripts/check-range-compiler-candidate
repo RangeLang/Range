@@ -650,6 +650,262 @@ audit_macro_linking() {
     echo "$stage_label macro linking: pass (cross-role positive, deterministic identities/ordinals, unresolved/ambiguous/malformed/mismatch rejection)"
 }
 
+write_macro_execution_bundle() {
+    local output="$1"
+    local kind="$2"
+
+    case "$kind" in
+        positive)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/Diagnostic.range' \
+                'macro Signal(): Construct -> Void { target, diagnostics, graph in' \
+                '    return diagnostics.information("checked")' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/DiagnosticUse.range' \
+                '@Signal' \
+                'construct Target {}' > "$output"
+            ;;
+        multiple)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/Diagnostics.range' \
+                'macro Signal(): Construct -> Void { target, diagnostics, graph in' \
+                '    return diagnostics.information("checked")' \
+                '}' \
+                'macro Notice(): Construct -> Void { target, diagnostics, graph in' \
+                '    return diagnostics.warning("noticed")' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/DiagnosticsUse.range' \
+                '@Signal' \
+                'construct Target {}' \
+                '@Notice' \
+                'construct Other {}' > "$output"
+            ;;
+        error)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/Reject.range' \
+                'macro Reject(): Construct -> Void { target, diagnostics, graph in' \
+                '    return diagnostics.error("rejected")' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/RejectUse.range' \
+                '@Reject' \
+                'construct Target {}' > "$output"
+            ;;
+        denied)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/Denied.range' \
+                'macro Probe(): Construct -> Void { target, diagnostics, graph in' \
+                '    return graph.macros()' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/DeniedUse.range' \
+                '@Probe' \
+                'construct Target {}' > "$output"
+            ;;
+        fuel)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/Fuel.range' \
+                'macro Exhaust(): Construct -> Void { target, diagnostics, graph in' > "$output"
+            local index=0
+            while [[ "$index" -lt 70 ]]; do
+                /usr/bin/printf '    diagnostics.information("step%s")\n' "$index" >> "$output"
+                index=$((index + 1))
+            done
+            /usr/bin/printf '%b\n' \
+                '    return diagnostics.information("tail")' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/FuelUse.range' \
+                '@Exhaust' \
+                'construct Target {}' >> "$output"
+            ;;
+        malformed-header)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/MalformedHeader.range' \
+                'macro Broken(): Construct -> Void { target, diagnostics in' \
+                '    return diagnostics.information("bad")' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/MalformedHeaderUse.range' \
+                '@Broken' \
+                'construct Target {}' > "$output"
+            ;;
+        duplicate-header)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/DuplicateHeader.range' \
+                'macro Duplicate(): Construct -> Void { target, target, graph in' \
+                '    return diagnostics.information("bad")' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/DuplicateHeaderUse.range' \
+                '@Duplicate' \
+                'construct Target {}' > "$output"
+            ;;
+        *)
+            fail "unknown macro execution fixture: $kind"
+            ;;
+    esac
+}
+
+write_macro_execution_llvm_bundle() {
+    local output="$1"
+    local kind="$2"
+    local temporary="$output.tmp"
+
+    write_macro_execution_bundle "$output" "$kind"
+    /usr/bin/sed '1s/^compilerMacroSnapshot$/compilerNativeSourceSetLLVMText/' "$output" > "$temporary"
+    /bin/mv "$temporary" "$output"
+}
+
+write_macro_execution_native_integration_bundle() {
+    local output="$1"
+
+    /usr/bin/printf '%b\n' \
+        'compilerSourceFile\trole=core\tpath=Core/DiagnosticNative.range' \
+        'macro Signal(): Construct -> Void { target, diagnostics, graph in' \
+        '    return diagnostics.information("checked")' \
+        '}' \
+        'compilerSourceFile\trole=project\tpath=Project/DiagnosticNativeUse.range' \
+        '@Signal' \
+        'construct Target {}' \
+        '' \
+        '@main {' \
+        '    return 7' \
+        '}' > "$output"
+}
+
+audit_macro_execution() {
+    local stage_label="$1"
+    local executable="$2"
+    local bundle output repeat_output error repeat_error llvm_bundle llvm_output llvm_error
+
+    bundle="$WORK_ROOT/$stage_label.macro.execution-positive.range"
+    output="$WORK_ROOT/$stage_label.macro.execution-positive.out"
+    error="$WORK_ROOT/$stage_label.macro.execution-positive.err"
+    repeat_output="$WORK_ROOT/$stage_label.macro.execution-positive.repeat.out"
+    repeat_error="$WORK_ROOT/$stage_label.macro.execution-positive.repeat.err"
+    write_macro_execution_bundle "$bundle" positive
+    run_capture "$executable" "$bundle" "$output" "$error"
+    require_successful_output "$stage_label macro execution positive" "$output" "$error"
+    run_capture "$executable" "$bundle" "$repeat_output" "$repeat_error"
+    require_successful_output "$stage_label repeated macro execution positive" "$repeat_output" "$repeat_error"
+    /usr/bin/cmp -s "$output" "$repeat_output" || fail "$stage_label macro execution positive was not deterministic"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=3\teventCount=1\tgraphDeltaNodeCount=0\tgraphDeltaFactCount=0\treadDependencyCount=0' "$output" || fail "$stage_label macro execution positive counts changed"
+    /usr/bin/grep -Fq $'macroInvocation\trow=0\tapplicationRow=0\tdeclarationRow=0\ttargetSyntaxID=' "$output" || fail "$stage_label macro execution omitted invocation provenance"
+    /usr/bin/grep -Fq $'macroExecutionEvent\trow=0\tinvocationRow=0\tseverity=1\toperation=1\tmessage=checked' "$output" || fail "$stage_label macro execution omitted information event"
+
+    bundle="$WORK_ROOT/$stage_label.macro.execution-multiple.range"
+    output="$WORK_ROOT/$stage_label.macro.execution-multiple.out"
+    error="$WORK_ROOT/$stage_label.macro.execution-multiple.err"
+    write_macro_execution_bundle "$bundle" multiple
+    run_capture "$executable" "$bundle" "$output" "$error"
+    require_successful_output "$stage_label multiple macro execution" "$output" "$error"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2\tcapabilityHandleCount=6\teventCount=2' "$output" || fail "$stage_label multiple macro execution counts changed"
+    /usr/bin/grep -Fq $'message=checked' "$output" || fail "$stage_label multiple macro execution omitted first arbitrary macro"
+    /usr/bin/grep -Fq $'message=noticed' "$output" || fail "$stage_label multiple macro execution omitted second arbitrary macro"
+
+    bundle="$WORK_ROOT/$stage_label.macro.execution-error.range"
+    output="$WORK_ROOT/$stage_label.macro.execution-error.out"
+    error="$WORK_ROOT/$stage_label.macro.execution-error.err"
+    write_macro_execution_bundle "$bundle" error
+    run_capture "$executable" "$bundle" "$output" "$error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label macro execution error exited $RUN_STATUS"
+    [[ ! -s "$error" ]] || fail "$stage_label macro execution error wrote stderr"
+    /usr/bin/grep -Fq 'diagnosticKind=macroExecutionError' "$output" || fail "$stage_label macro execution error missed severity diagnostic"
+    /usr/bin/grep -Fq 'message=rejected' "$output" || fail "$stage_label macro execution error missed message"
+    for expected in applicationFileID= targetFileID= macroDeclarationFileID= macroBodyStart= eventSourceStart=; do
+        /usr/bin/grep -Fq "$expected" "$output" || fail "$stage_label macro execution error missed provenance $expected"
+    done
+    if /usr/bin/grep -Fq 'define ' "$output" || /usr/bin/grep -Fq 'call ' "$output"; then
+        fail "$stage_label macro execution error emitted LLVM before rejection"
+    fi
+
+    llvm_bundle="$WORK_ROOT/$stage_label.macro.execution-error-llvm.range"
+    llvm_output="$WORK_ROOT/$stage_label.macro.execution-error-llvm.out"
+    llvm_error="$WORK_ROOT/$stage_label.macro.execution-error-llvm.err"
+    write_macro_execution_llvm_bundle "$llvm_bundle" error
+    run_capture "$executable" "$llvm_bundle" "$llvm_output" "$llvm_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label native LLVM macro error exited $RUN_STATUS"
+    [[ ! -s "$llvm_error" ]] || fail "$stage_label native LLVM macro error wrote stderr"
+    /usr/bin/grep -Fq 'diagnosticKind=macroExecutionError' "$llvm_output" || fail "$stage_label native LLVM macro error missed diagnostic"
+    if /usr/bin/grep -Fq 'define ' "$llvm_output" || /usr/bin/grep -Fq 'call ' "$llvm_output"; then
+        fail "$stage_label native LLVM macro error emitted LLVM before rejection"
+    fi
+
+    bundle="$WORK_ROOT/$stage_label.macro.execution-denied.range"
+    output="$WORK_ROOT/$stage_label.macro.execution-denied.out"
+    error="$WORK_ROOT/$stage_label.macro.execution-denied.err"
+    write_macro_execution_bundle "$bundle" denied
+    run_capture "$executable" "$bundle" "$output" "$error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label macro capability denial exited $RUN_STATUS"
+    [[ ! -s "$error" ]] || fail "$stage_label macro capability denial wrote stderr"
+    /usr/bin/grep -Fq 'diagnosticKind=macroCapabilityDenied' "$output" || fail "$stage_label macro capability denial missed diagnostic"
+    /usr/bin/grep -Fq $'graphDeltaNodeCount=0\tgraphDeltaFactCount=0' "$output" || fail "$stage_label macro capability denial committed a non-empty graph delta"
+    if /usr/bin/grep -Fq 'define ' "$output"; then
+        fail "$stage_label macro capability denial committed graph or emitted LLVM"
+    fi
+
+    bundle="$WORK_ROOT/$stage_label.macro.execution-fuel.range"
+    output="$WORK_ROOT/$stage_label.macro.execution-fuel.out"
+    error="$WORK_ROOT/$stage_label.macro.execution-fuel.err"
+    write_macro_execution_bundle "$bundle" fuel
+    run_capture "$executable" "$bundle" "$output" "$error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label macro execution fuel fixture exited $RUN_STATUS"
+    [[ ! -s "$error" ]] || fail "$stage_label macro execution fuel fixture wrote stderr"
+    /usr/bin/grep -Fq 'diagnosticKind=macroExecutionFuelExhausted' "$output" || fail "$stage_label macro execution fuel fixture missed diagnostic"
+
+    local kind expected
+    for kind in malformed-header duplicate-header; do
+        bundle="$WORK_ROOT/$stage_label.macro.execution-$kind.range"
+        output="$WORK_ROOT/$stage_label.macro.execution-$kind.out"
+        error="$WORK_ROOT/$stage_label.macro.execution-$kind.err"
+        write_macro_execution_bundle "$bundle" "$kind"
+        run_capture "$executable" "$bundle" "$output" "$error"
+        [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label macro $kind exited $RUN_STATUS"
+        [[ ! -s "$error" ]] || fail "$stage_label macro $kind wrote stderr"
+        expected='diagnosticKind=macroCapabilityHeaderMalformed'
+        if [[ "$kind" == duplicate-header ]]; then expected='diagnosticKind=macroCapabilityBindingDuplicate'; fi
+        /usr/bin/grep -Fq "$expected" "$output" || fail "$stage_label macro $kind missed diagnostic $expected"
+    done
+    echo "$stage_label macro execution: pass (shared BodyArena/MIR information and error events, arbitrary names, denial, fuel, header validation)"
+}
+
+audit_macro_native_integration() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local bundle="$WORK_ROOT/$stage_label.macro.execution-native.range"
+    local first="$WORK_ROOT/$stage_label.macro.execution-native.first.ll"
+    local second="$WORK_ROOT/$stage_label.macro.execution-native.repeat.ll"
+    local first_error="$WORK_ROOT/$stage_label.macro.execution-native.first.err"
+    local second_error="$WORK_ROOT/$stage_label.macro.execution-native.repeat.err"
+    local llvm="$stage_directory/MacroExecution.ll"
+    local linked="$stage_directory/MacroExecution"
+    local run_output="$WORK_ROOT/$stage_label.macro.execution-native.run.out"
+    local run_error="$WORK_ROOT/$stage_label.macro.execution-native.run.err"
+
+    write_macro_execution_native_integration_bundle "$bundle"
+    run_capture "$executable" "$bundle" "$first" "$first_error"
+    require_successful_output "$stage_label native macro execution integration" "$first" "$first_error"
+    run_capture "$executable" "$bundle" "$second" "$second_error"
+    require_successful_output "$stage_label repeated native macro execution integration" "$second" "$second_error"
+    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label native macro execution integration was not deterministic"
+    /bin/mkdir -p "$stage_directory"
+    /bin/cp "$first" "$llvm"
+    validate_llvm "$llvm"
+    link_llvm "$llvm" "$linked"
+    if "$linked" > "$run_output" 2> "$run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label native macro execution integration exited $RUN_STATUS"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label native macro execution integration wrote output"
+    echo "$stage_label native macro execution integration: pass (ordinary LLVM validation/link, exit 7, deterministic)"
+}
+
 audit_stage() {
     local stage_label="$1"
     local executable="$2"
@@ -659,6 +915,8 @@ audit_stage() {
     audit_role_markers "$stage_label" "$executable"
     audit_canonical_core "$stage_label" "$executable" "$stage_directory"
     audit_macro_linking "$stage_label" "$executable"
+    audit_macro_execution "$stage_label" "$executable"
+    audit_macro_native_integration "$stage_label" "$executable" "$stage_directory"
     audit_smoke "$stage_label" "$executable" "$stage_directory"
     audit_mixed_abi "$stage_label" "$executable"
 }
@@ -766,8 +1024,18 @@ main() {
     echo "Stage 3 candidate validate/link and fixed point: pass"
     audit_stage Stage3 "$stage3_executable" "$stage3_directory"
 
+    /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.execution-native.first.ll" "$WORK_ROOT/Stage3.macro.execution-native.first.ll" \
+        || fail "Stage 2 and Stage 3 native macro integration LLVM differs"
+    /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.execution-native.repeat.ll" "$WORK_ROOT/Stage3.macro.execution-native.repeat.ll" \
+        || fail "Stage 2 and Stage 3 repeated native macro integration LLVM differs"
+    /usr/bin/cmp -s "$stage2_directory/MacroExecution.ll" "$stage3_directory/MacroExecution.ll" \
+        || fail "Stage 2 and Stage 3 native macro integration artifacts differ"
+    /usr/bin/cmp -s "$stage2_directory/MacroExecution" "$stage3_directory/MacroExecution" \
+        || fail "Stage 2 and Stage 3 native macro integration executables differ"
+    echo "Stage 2/Stage 3 native macro integration: byte-identical LLVM/executable"
+
     local macro_snapshot_suffix
-    for macro_snapshot_suffix in positive.first.out positive.reordered.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out; do
+    for macro_snapshot_suffix in positive.first.out positive.reordered.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out execution-positive.out execution-positive.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
         /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.$macro_snapshot_suffix" "$WORK_ROOT/Stage3.macro.$macro_snapshot_suffix" \
             || fail "Stage 2 and Stage 3 macro snapshot differs: $macro_snapshot_suffix"
     done
@@ -784,6 +1052,10 @@ main() {
     report_artifact stage3_llvm "$stage3_llvm"
     report_artifact stage2_executable "$stage2_executable"
     report_artifact stage3_executable "$stage3_executable"
+    report_artifact stage2_macro_execution_llvm "$stage2_directory/MacroExecution.ll"
+    report_artifact stage3_macro_execution_llvm "$stage3_directory/MacroExecution.ll"
+    report_artifact stage2_macro_execution_executable "$stage2_directory/MacroExecution"
+    report_artifact stage3_macro_execution_executable "$stage3_directory/MacroExecution"
     echo "stage2_stage3_llvm=byte-identical"
     echo "stage2_stage3_executable=byte-identical"
     echo "swift_invocation=none"

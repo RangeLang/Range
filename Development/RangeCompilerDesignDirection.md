@@ -2572,6 +2572,54 @@ and semantic validation but still reports the pre-existing obsolete
 `invalidEntryReachability stage=2`; that directive is absent from both the
 live source and `HEAD` and was not added here.
 
+### Native diagnostic-only macro execution checkpoint
+
+Resolved cross-role applications can now create a typed application-phase
+invocation with stable application/declaration identities, target provenance,
+three driver-issued capability handles, an explicit 64-step budget, staged
+diagnostic events, zero read dependencies, and an empty `GraphDelta`. The
+handles are authority frames, not dependency rows; the authored capability header is
+captured structurally; its executable span is parsed through the ordinary
+retained `BodyArena`, symbol/resolution, semantic/MemoryGraph, and canonical
+body-MIR phases. A bounded evaluator consumes that shared MIR and admits
+literal diagnostic operations, return, and closed capability denial. It does
+not emit ordinary LLVM for macro bodies, allocate runtime strings, access I/O,
+or mutate the graph.
+
+The focused gate proves arbitrary informational and warning macros, multiple
+invocation ordinals, source-attributed error events, direct native LLVM
+pre-emission rejection for error severity, explicit graph capability denial,
+fuel exhaustion, malformed and duplicate capability headers, repeated positive
+determinism, and byte-identical Stage 2/Stage 3 execution snapshots. A second
+ordinary native integration fixture runs the same arbitrary diagnostic macro
+and application alongside `@main { return 7 }`, validates and links LLVM, and
+exits `7` in both stages with byte-identical output. Existing macro-linking
+negatives, canonical Core, aggregate smoke, mixed-ABI rejection, and fixed-
+point checks remain green.
+
+`/usr/bin/time -l bash scripts/check-range-compiler-candidate
+RangeCompiler/Range/Programs/Compiler` completed in `76.08 s` real time with
+`91,635,712` bytes maximum RSS and `swift_invocation=none`. Stage 2 and Stage 3
+LLVM are byte-identical at SHA-256
+`126e50b67b99113bfd23d119d1debedecc17a1152f9e3740f35933db66f94a0f` and
+`3,388,196` bytes. Their linked executables are byte-identical at SHA-256
+`10940f4ade6a3a5183f555031e2cc9a75cd3ee1dde8dd41e3558fff1893aaf94` and
+`1,954,384` bytes. The required Stage 1 source walk still reaches the known
+obsolete `invalidEntryReachability stage=2` post-pass after successful source
+processing; no Swift or legacy audit restoration was made.
+
+The ordinary integration LLVM is byte-identical at SHA-256
+`11700b9c2a06c8179a54b5025e5b476dcc07181126cb043d90b3bff077d3cbcc` and
+`1,185` bytes; its linked executable is byte-identical at SHA-256
+`6527f4bf00ebcda8f8a140faad0ea1d734fcac90a6db5546924ebc13927c53cc` and
+`38,336` bytes.
+
+Graph queries and graph mutation, target reads/mutation operations, arrays,
+closures, `where`, `count`, generic `Macro.Application` values, expansion,
+requirements/protocol evaluation, `@self`, `@graph`, the authored `Project`
+macro, general control flow, runtime calls, and full Foundation execution
+remain outside this diagnostic-only slice.
+
 ### Explicit deferrals
 
 Do not add compiler concurrency before one-function memory is bounded and
