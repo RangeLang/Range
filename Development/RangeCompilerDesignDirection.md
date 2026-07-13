@@ -2614,7 +2614,7 @@ The ordinary integration LLVM is byte-identical at SHA-256
 `6527f4bf00ebcda8f8a140faad0ea1d734fcac90a6db5546924ebc13927c53cc` and
 `38,336` bytes.
 
-### Native read-query and staged expansion-delta checkpoint
+### Native read-query and committed omission-expansion checkpoint
 
 The graph capability now has one selective read-only operation:
 `graph.declarationCount(kind, name)`. The bootstrap surface accepts the
@@ -2644,28 +2644,45 @@ zero-result dependencies, invalid-query rejection before LLVM, combined query
 plus omission, transactional duplicate rejection, and denied unknown target
 operations. The ordinary native integration also executes a graph query
 before LLVM validation/link and still exits `7`. The complete fixed-point
-gate passes with no Swift invocation. Stage 2 and Stage 3 LLVM are byte-
-identical at SHA-256
-`c94e01bc901b4284d7f0b63aad7c9eaa02ed3b7b0c67cd54c8294a5f045a4afc` and
-`3,461,788` bytes; their linked executables are byte-identical at SHA-256
-`ac147682ec9d64881a5d7cff70ebdef31306babaa4956bfe9a2dc10e8be1e9de` and
-`2,022,432` bytes.
+gate passes with no Swift invocation.
 
-This checkpoint proves deterministic delta production, not delta commitment.
-The returned omission delta is validated and then destroyed by the current
-ordinary LLVM driver; a scheduler still needs to merge successful deltas into
-the next immutable graph snapshot before lowering. Likewise, declaration
-counting alone is not protocol validation. Protocols-as-requirement-macros are
-now close enough to build on this substrate, but they still need selective
-target/member/requirement queries, macro evaluation that follows typed CFG
-conditions, and a typed derived `satisfiesRequirement` fact or carried
-behavior delta. Those features must extend this query/delta model rather than
-create a separate protocol engine.
+Successful omission deltas are now committed for ordinary compilation through
+a second declaration index that owns a compact omission overlay. Authored
+syntax tables remain immutable. The expanded index excludes omitted
+declarations and members from name/member lookup, nominal-layout rendering,
+and unselected function declarations. The ordinary commitment fixture omits
+the complete `Hidden` construct and one stored member from `Retained`; emitted
+LLVM contains no `Hidden` layout and contains exactly
+`%Range.Retained = type { i32 }`, then validates, links, and exits `7`.
+Repeated Stage 2 and Stage 3 expansion LLVM is byte-identical at SHA-256
+`ed7a269089d5bf5fe33a746f58c303ef2f9763e083a734135e0f399de1ec9759`
+and `1,217` bytes; the linked executables are byte-identical at SHA-256
+`2aaad69ee5925273b9245c3754ee850147429ad09cf066f9b89e939c8098a32e`
+and `38,336` bytes.
 
-Arrays, closures, `where`, generic `Macro.Application` values, committed
-expansion scheduling, requirements/protocol evaluation, `@self`, Foundation
-`@graph`, the authored `Project` macro, general compile-time control flow,
-runtime calls, and full Foundation execution remain outside this slice.
+The complete compiler remains at a fixed point: Stage 2 and Stage 3 LLVM are
+byte-identical at SHA-256
+`7acaed4a1e2d02e70648258a0af0b6c80436236eca78cadbf02b09b70d4439ad`
+and `3,473,799` bytes; their linked executables are byte-identical at SHA-256
+`dbc1342b779e2c352a8f31da0306a39f9c17dc1456578c1ff80584fe80dcccb6`
+and `2,039,312` bytes.
+
+This is real delta commitment for typed omission, not a general expansion
+scheduler. Generated nodes/declarations, replacement values, carried behavior,
+multi-round macro scheduling, and conflict resolution beyond duplicate
+omission remain unimplemented. Likewise, declaration counting alone is not
+protocol validation. Protocols-as-requirement-macros are now close enough to
+build on this substrate, but they still need selective target/member/
+requirement queries, macro evaluation that follows typed CFG conditions, and a
+typed derived `satisfiesRequirement` fact or carried behavior delta. Those
+features must extend this query/delta model rather than create a separate
+protocol engine.
+
+Arrays, closures, `where`, generic `Macro.Application` values, generated and
+replacement expansion scheduling, requirements/protocol evaluation, `@self`,
+Foundation `@graph`, the authored `Project` macro, general compile-time
+control flow, runtime calls, and full Foundation execution remain outside this
+slice.
 
 ### Explicit deferrals
 

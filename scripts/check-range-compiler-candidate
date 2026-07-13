@@ -867,6 +867,36 @@ write_macro_execution_native_integration_bundle() {
         '}' > "$output"
 }
 
+write_macro_expansion_commit_bundle() {
+    local output="$1"
+
+    /usr/bin/printf '%b\n' \
+        'compilerSourceFile\trole=core\tpath=Core/ExpansionCommit.range' \
+        'macro OmitConstruct(): Construct -> Void { target, diagnostics, graph in' \
+        '    graph.declarationCount("Construct", "Hidden")' \
+        '    target.omit()' \
+        '    return diagnostics.information("omitted construct")' \
+        '}' \
+        'macro OmitMember(): Member -> Void { target, diagnostics, graph in' \
+        '    target.omit()' \
+        '    return diagnostics.information("omitted member")' \
+        '}' \
+        'compilerSourceFile\trole=project\tpath=Project/ExpansionCommitUse.range' \
+        '@OmitConstruct' \
+        'construct Hidden {' \
+        '    let value: Int' \
+        '}' \
+        'construct Retained {' \
+        '    @OmitMember' \
+        '    let removed: Int' \
+        '    let value: Int' \
+        '}' \
+        '' \
+        '@main {' \
+        '    return 7' \
+        '}' > "$output"
+}
+
 audit_macro_execution() {
     local stage_label="$1"
     local executable="$2"
@@ -1085,6 +1115,44 @@ audit_macro_native_integration() {
     echo "$stage_label native macro execution integration: pass (ordinary query plus LLVM validation/link, exit 7, deterministic)"
 }
 
+audit_macro_expansion_commit() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local bundle="$WORK_ROOT/$stage_label.macro.expansion-commit.range"
+    local first="$WORK_ROOT/$stage_label.macro.expansion-commit.first.ll"
+    local second="$WORK_ROOT/$stage_label.macro.expansion-commit.repeat.ll"
+    local first_error="$WORK_ROOT/$stage_label.macro.expansion-commit.first.err"
+    local second_error="$WORK_ROOT/$stage_label.macro.expansion-commit.repeat.err"
+    local llvm="$stage_directory/MacroExpansion.ll"
+    local linked="$stage_directory/MacroExpansion"
+    local run_output="$WORK_ROOT/$stage_label.macro.expansion-commit.run.out"
+    local run_error="$WORK_ROOT/$stage_label.macro.expansion-commit.run.err"
+
+    write_macro_expansion_commit_bundle "$bundle"
+    run_capture "$executable" "$bundle" "$first" "$first_error"
+    require_successful_output "$stage_label committed macro expansion" "$first" "$first_error"
+    run_capture "$executable" "$bundle" "$second" "$second_error"
+    require_successful_output "$stage_label repeated committed macro expansion" "$second" "$second_error"
+    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label committed macro expansion was not deterministic"
+    if /usr/bin/grep -Fq '%Range.Hidden = type' "$first"; then
+        fail "$stage_label committed macro expansion retained the omitted construct layout"
+    fi
+    /usr/bin/grep -Fq '%Range.Retained = type { i32 }' "$first" || fail "$stage_label committed macro expansion did not remove exactly one member"
+    /bin/mkdir -p "$stage_directory"
+    /bin/cp "$first" "$llvm"
+    validate_llvm "$llvm"
+    link_llvm "$llvm" "$linked"
+    if "$linked" > "$run_output" 2> "$run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label committed macro expansion exited $RUN_STATUS"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label committed macro expansion wrote output"
+    echo "$stage_label committed macro expansion: pass (immutable omission overlay removes construct/member layouts, validate/link, exit 7, deterministic)"
+}
+
 audit_stage() {
     local stage_label="$1"
     local executable="$2"
@@ -1096,6 +1164,7 @@ audit_stage() {
     audit_macro_linking "$stage_label" "$executable"
     audit_macro_execution "$stage_label" "$executable"
     audit_macro_native_integration "$stage_label" "$executable" "$stage_directory"
+    audit_macro_expansion_commit "$stage_label" "$executable" "$stage_directory"
     audit_smoke "$stage_label" "$executable" "$stage_directory"
     audit_mixed_abi "$stage_label" "$executable"
 }
@@ -1213,6 +1282,16 @@ main() {
         || fail "Stage 2 and Stage 3 native macro integration executables differ"
     echo "Stage 2/Stage 3 native macro integration: byte-identical LLVM/executable"
 
+    /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.expansion-commit.first.ll" "$WORK_ROOT/Stage3.macro.expansion-commit.first.ll" \
+        || fail "Stage 2 and Stage 3 committed macro expansion LLVM differs"
+    /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.expansion-commit.repeat.ll" "$WORK_ROOT/Stage3.macro.expansion-commit.repeat.ll" \
+        || fail "Stage 2 and Stage 3 repeated committed macro expansion LLVM differs"
+    /usr/bin/cmp -s "$stage2_directory/MacroExpansion.ll" "$stage3_directory/MacroExpansion.ll" \
+        || fail "Stage 2 and Stage 3 committed macro expansion artifacts differ"
+    /usr/bin/cmp -s "$stage2_directory/MacroExpansion" "$stage3_directory/MacroExpansion" \
+        || fail "Stage 2 and Stage 3 committed macro expansion executables differ"
+    echo "Stage 2/Stage 3 committed macro expansion: byte-identical LLVM/executable"
+
     local macro_snapshot_suffix
     for macro_snapshot_suffix in positive.first.out positive.reordered.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out execution-positive.out execution-positive.repeat.out execution-query.out execution-query.repeat.out execution-query-reordered.out execution-query-zero.out execution-expansion.out execution-expansion.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-query-invalid.out execution-expansion-duplicate.out execution-target-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
         /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.$macro_snapshot_suffix" "$WORK_ROOT/Stage3.macro.$macro_snapshot_suffix" \
@@ -1235,6 +1314,10 @@ main() {
     report_artifact stage3_macro_execution_llvm "$stage3_directory/MacroExecution.ll"
     report_artifact stage2_macro_execution_executable "$stage2_directory/MacroExecution"
     report_artifact stage3_macro_execution_executable "$stage3_directory/MacroExecution"
+    report_artifact stage2_macro_expansion_llvm "$stage2_directory/MacroExpansion.ll"
+    report_artifact stage3_macro_expansion_llvm "$stage3_directory/MacroExpansion.ll"
+    report_artifact stage2_macro_expansion_executable "$stage2_directory/MacroExpansion"
+    report_artifact stage3_macro_expansion_executable "$stage3_directory/MacroExpansion"
     echo "stage2_stage3_llvm=byte-identical"
     echo "stage2_stage3_executable=byte-identical"
     echo "swift_invocation=none"

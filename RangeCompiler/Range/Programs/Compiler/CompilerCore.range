@@ -214,6 +214,7 @@ construct CompilerDeclarationIndex {
     let memberNextRows: IntBuffer
     let memberHashes: IntBuffer
     let memberBucketCount: Int
+    let omittedSyntaxIDs: IntBuffer
     let isValid: Bool
 }
 
@@ -1156,7 +1157,16 @@ function compilerDeclarationMemberHash(parentSyntaxID: Int, name: String): Int {
     return (compilerDeclarationNameHash(name: name) * 127 + parentSyntaxID + 1) % 16000057
 }
 
-function compilerDeclarationIndexCreate(tables: CompilerSyntaxTables): CompilerDeclarationIndex {
+function compilerDeclarationIndexOmissionBufferContains(omittedSyntaxIDs: IntBuffer, syntaxID: Int): Bool {
+    state row: Int(0)
+    while row < intBufferCount(buffer: omittedSyntaxIDs) {
+        if intBufferElement(buffer: omittedSyntaxIDs, index: row) == syntaxID { return true }
+        row: row + 1
+    }
+    return false
+}
+
+function compilerDeclarationIndexCreateWithOmittedSyntaxIDs(tables: CompilerSyntaxTables, omittedSyntaxIDs: IntBuffer): CompilerDeclarationIndex {
     let declarationCount: Int(compilerIntTableRowCount(table: tables.declarations))
     let bucketCount: Int(declarationCount * 2 + 1)
     let bucketHeads: IntBuffer(intBufferCreate(capacity: bucketCount))
@@ -1167,7 +1177,16 @@ function compilerDeclarationIndexCreate(tables: CompilerSyntaxTables): CompilerD
     let memberBucketHeads: IntBuffer(intBufferCreate(capacity: memberBucketCount))
     let memberNextRows: IntBuffer(intBufferCreate(capacity: memberCount))
     let memberHashes: IntBuffer(intBufferCreate(capacity: memberCount))
+    let indexOmittedSyntaxIDs: IntBuffer(intBufferCreate(capacity: intBufferCount(buffer: omittedSyntaxIDs)))
     state valid: Bool(true)
+    state omissionRow: Int(0)
+    while omissionRow < intBufferCount(buffer: omittedSyntaxIDs) {
+        let omittedSyntaxID: Int(intBufferElement(buffer: omittedSyntaxIDs, index: omissionRow))
+        if omittedSyntaxID < 0 || omittedSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
+            || compilerDeclarationIndexOmissionBufferContains(omittedSyntaxIDs: indexOmittedSyntaxIDs, syntaxID: omittedSyntaxID)
+            || intBufferAppend(buffer: indexOmittedSyntaxIDs, value: omittedSyntaxID) != 0 { valid: false }
+        omissionRow: omissionRow + 1
+    }
     state bucket: Int(0)
     while bucket < bucketCount {
         if intBufferAppend(buffer: bucketHeads, value: 0 - 1) != 0 { valid: false }
@@ -1175,14 +1194,19 @@ function compilerDeclarationIndexCreate(tables: CompilerSyntaxTables): CompilerD
     }
     state row: Int(0)
     while row < declarationCount {
-        let fileID: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 1))
-        let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: row, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: row, column: 8)))
-        let hash: Int(compilerDeclarationNameHash(name: name))
-        let nameBucket: Int(hash % bucketCount)
-        let priorHead: Int(intBufferElement(buffer: bucketHeads, index: nameBucket))
-        if intBufferAppend(buffer: nextRows, value: priorHead) != 0 { valid: false }
-        if intBufferAppend(buffer: nameHashes, value: hash) != 0 { valid: false }
-        if intBufferSet(buffer: bucketHeads, index: nameBucket, value: row) != 0 { valid: false }
+        let syntaxID: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 0))
+        if compilerDeclarationIndexOmissionBufferContains(omittedSyntaxIDs: indexOmittedSyntaxIDs, syntaxID: syntaxID) {
+            if intBufferAppend(buffer: nextRows, value: 0 - 1) != 0 || intBufferAppend(buffer: nameHashes, value: 0) != 0 { valid: false }
+        } else {
+            let fileID: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 1))
+            let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: row, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: row, column: 8)))
+            let hash: Int(compilerDeclarationNameHash(name: name))
+            let nameBucket: Int(hash % bucketCount)
+            let priorHead: Int(intBufferElement(buffer: bucketHeads, index: nameBucket))
+            if intBufferAppend(buffer: nextRows, value: priorHead) != 0 { valid: false }
+            if intBufferAppend(buffer: nameHashes, value: hash) != 0 { valid: false }
+            if intBufferSet(buffer: bucketHeads, index: nameBucket, value: row) != 0 { valid: false }
+        }
         row: row + 1
     }
     bucket: 0
@@ -1193,17 +1217,52 @@ function compilerDeclarationIndexCreate(tables: CompilerSyntaxTables): CompilerD
     row: 0
     while row < memberCount {
         let parentSyntaxID: Int(compilerIntTableValue(table: tables.members, row: row, column: 2))
-        let memberFileID: Int(compilerIntTableValue(table: tables.members, row: row, column: 1))
-        let memberName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: memberFileID, localStart: compilerIntTableValue(table: tables.members, row: row, column: 6), localEnd: compilerIntTableValue(table: tables.members, row: row, column: 7)))
-        let memberHash: Int(compilerDeclarationMemberHash(parentSyntaxID: parentSyntaxID, name: memberName))
-        let memberBucket: Int(memberHash % memberBucketCount)
-        let memberPriorHead: Int(intBufferElement(buffer: memberBucketHeads, index: memberBucket))
-        if intBufferAppend(buffer: memberNextRows, value: memberPriorHead) != 0 { valid: false }
-        if intBufferAppend(buffer: memberHashes, value: memberHash) != 0 { valid: false }
-        if intBufferSet(buffer: memberBucketHeads, index: memberBucket, value: row) != 0 { valid: false }
+        let memberSyntaxID: Int(compilerIntTableValue(table: tables.members, row: row, column: 0))
+        if compilerDeclarationIndexOmissionBufferContains(omittedSyntaxIDs: indexOmittedSyntaxIDs, syntaxID: parentSyntaxID)
+            || compilerDeclarationIndexOmissionBufferContains(omittedSyntaxIDs: indexOmittedSyntaxIDs, syntaxID: memberSyntaxID) {
+            if intBufferAppend(buffer: memberNextRows, value: 0 - 1) != 0 || intBufferAppend(buffer: memberHashes, value: 0) != 0 { valid: false }
+        } else {
+            let memberFileID: Int(compilerIntTableValue(table: tables.members, row: row, column: 1))
+            let memberName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: memberFileID, localStart: compilerIntTableValue(table: tables.members, row: row, column: 6), localEnd: compilerIntTableValue(table: tables.members, row: row, column: 7)))
+            let memberHash: Int(compilerDeclarationMemberHash(parentSyntaxID: parentSyntaxID, name: memberName))
+            let memberBucket: Int(memberHash % memberBucketCount)
+            let memberPriorHead: Int(intBufferElement(buffer: memberBucketHeads, index: memberBucket))
+            if intBufferAppend(buffer: memberNextRows, value: memberPriorHead) != 0 { valid: false }
+            if intBufferAppend(buffer: memberHashes, value: memberHash) != 0 { valid: false }
+            if intBufferSet(buffer: memberBucketHeads, index: memberBucket, value: row) != 0 { valid: false }
+        }
         row: row + 1
     }
-    return CompilerDeclarationIndex(bucketHeads: bucketHeads, nextRows: nextRows, nameHashes: nameHashes, bucketCount: bucketCount, memberBucketHeads: memberBucketHeads, memberNextRows: memberNextRows, memberHashes: memberHashes, memberBucketCount: memberBucketCount, isValid: valid)
+    return CompilerDeclarationIndex(bucketHeads: bucketHeads, nextRows: nextRows, nameHashes: nameHashes, bucketCount: bucketCount, memberBucketHeads: memberBucketHeads, memberNextRows: memberNextRows, memberHashes: memberHashes, memberBucketCount: memberBucketCount, omittedSyntaxIDs: indexOmittedSyntaxIDs, isValid: valid)
+}
+
+function compilerDeclarationIndexCreate(tables: CompilerSyntaxTables): CompilerDeclarationIndex {
+    let omittedSyntaxIDs: IntBuffer(intBufferCreate(capacity: 0))
+    let index: CompilerDeclarationIndex(compilerDeclarationIndexCreateWithOmittedSyntaxIDs(tables: tables, omittedSyntaxIDs: omittedSyntaxIDs))
+    intBufferDestroy(buffer: omittedSyntaxIDs)
+    return index
+}
+
+function compilerDeclarationIndexCreateWithGraphDelta(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): CompilerDeclarationIndex {
+    let omittedSyntaxIDs: IntBuffer(intBufferCreate(capacity: compilerIntTableRowCount(table: delta.facts)))
+    state valid: Bool(compilerMacroGraphDeltaIsValid(tables: tables, delta: delta))
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: delta.facts) && valid {
+        if compilerIntTableValue(table: delta.facts, row: row, column: 0) != compilerGraphFactOmitted() {
+            valid: false
+        } else {
+            let subjectNodeID: Int(compilerIntTableValue(table: delta.facts, row: row, column: 1))
+            if subjectNodeID < 0 || subjectNodeID >= compilerIntTableRowCount(table: delta.nodes)
+                || intBufferAppend(buffer: omittedSyntaxIDs, value: compilerIntTableValue(table: delta.nodes, row: subjectNodeID, column: 2)) != 0 { valid: false }
+        }
+        row: row + 1
+    }
+    let index: CompilerDeclarationIndex(compilerDeclarationIndexCreateWithOmittedSyntaxIDs(tables: tables, omittedSyntaxIDs: omittedSyntaxIDs))
+    if intBufferDestroy(buffer: omittedSyntaxIDs) != 0 { valid: false }
+    if !valid {
+        return CompilerDeclarationIndex(bucketHeads: index.bucketHeads, nextRows: index.nextRows, nameHashes: index.nameHashes, bucketCount: index.bucketCount, memberBucketHeads: index.memberBucketHeads, memberNextRows: index.memberNextRows, memberHashes: index.memberHashes, memberBucketCount: index.memberBucketCount, omittedSyntaxIDs: index.omittedSyntaxIDs, isValid: false)
+    }
+    return index
 }
 
 function compilerDeclarationIndexDestroy(index: CompilerDeclarationIndex): Int {
@@ -1214,7 +1273,12 @@ function compilerDeclarationIndexDestroy(index: CompilerDeclarationIndex): Int {
     if intBufferDestroy(buffer: index.memberBucketHeads) != 0 { status: 0 - 1 }
     if intBufferDestroy(buffer: index.memberNextRows) != 0 { status: 0 - 1 }
     if intBufferDestroy(buffer: index.memberHashes) != 0 { status: 0 - 1 }
+    if intBufferDestroy(buffer: index.omittedSyntaxIDs) != 0 { status: 0 - 1 }
     return status
+}
+
+function compilerDeclarationIndexSyntaxIsOmitted(index: CompilerDeclarationIndex, syntaxID: Int): Bool {
+    return compilerDeclarationIndexOmissionBufferContains(omittedSyntaxIDs: index.omittedSyntaxIDs, syntaxID: syntaxID)
 }
 
 function compilerDeclarationIndexLookup(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, name: String, kindTag: Int): Int {
@@ -7888,10 +7952,10 @@ function compilerNativeSourceSetLLVMText(source: String): String {
         compilerSyntaxTablesDestroy(tables: declarationTables)
         return executionOutput
     }
-    compilerGraphDeltaDestroy(delta: execution.graphDelta)
     compilerDeclarationIndexDestroy(index: executionIndex)
     let combinedProgram: CompilerProgram(compilerNativeSourceSetProgramForLLVM(source: source))
-    let output: String(compilerCoreLLVMNativeEntryTextForProgram(program: combinedProgram, declarationTables: declarationTables))
+    let output: String(compilerCoreLLVMNativeEntryTextForProgram(program: combinedProgram, declarationTables: declarationTables, expansionDelta: execution.graphDelta))
+    compilerGraphDeltaDestroy(delta: execution.graphDelta)
     compilerSyntaxTablesDestroy(tables: declarationTables)
     return output
 }
@@ -9955,21 +10019,28 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
         compilerSyntaxTablesDestroy(tables: tables)
         return macroDiagnosticOutput
     }
-    let declarationIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: tables))
-    if !declarationIndex.isValid {
-        compilerDeclarationIndexDestroy(index: declarationIndex)
+    let executionIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: tables))
+    if !executionIndex.isValid {
+        compilerDeclarationIndexDestroy(index: executionIndex)
         compilerSyntaxTablesDestroy(tables: tables)
         return String("compilerError\tkind=invalidDeclarationIndex")
     }
-    let execution: CompilerMacroExecutionResult(compilerMacroExecution(tables: tables, index: declarationIndex))
+    let execution: CompilerMacroExecutionResult(compilerMacroExecution(tables: tables, index: executionIndex))
     if execution.status != 0 {
         let executionOutput: String(compilerMacroRenderExecutionError(tables: tables, result: execution))
         compilerGraphDeltaDestroy(delta: execution.graphDelta)
-        compilerDeclarationIndexDestroy(index: declarationIndex)
+        compilerDeclarationIndexDestroy(index: executionIndex)
         compilerSyntaxTablesDestroy(tables: tables)
         return executionOutput
     }
-    compilerGraphDeltaDestroy(delta: execution.graphDelta)
+    compilerDeclarationIndexDestroy(index: executionIndex)
+    let declarationIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreateWithGraphDelta(tables: tables, delta: execution.graphDelta))
+    if !declarationIndex.isValid {
+        compilerDeclarationIndexDestroy(index: declarationIndex)
+        compilerGraphDeltaDestroy(delta: execution.graphDelta)
+        compilerSyntaxTablesDestroy(tables: tables)
+        return String("compilerError\tkind=invalidExpansionOverlay")
+    }
     let program: CompilerProgram(compilerNativeSourceSetProgramForLLVM(source: source))
     let context: CompilerLLVMLoweringContext(CompilerLLVMLoweringContext(program: program, tables: tables, declarationIndex: declarationIndex))
     let reachability: CompilerReachableLLVMState(compilerReachableLLVMStateCreate(context: context))
@@ -10009,12 +10080,13 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
     }
     compilerReachableLLVMStateDestroy(reachability: reachability)
     compilerDeclarationIndexDestroy(index: declarationIndex)
+    compilerGraphDeltaDestroy(delta: execution.graphDelta)
     compilerSyntaxTablesDestroy(tables: tables)
     return output
 }
 
-function compilerCoreLLVMNativeEntryTextForProgram(program: CompilerProgram, declarationTables: CompilerSyntaxTables): String {
-    let declarationIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: declarationTables))
+function compilerCoreLLVMNativeEntryTextForProgram(program: CompilerProgram, declarationTables: CompilerSyntaxTables, expansionDelta: CompilerGraphDelta): String {
+    let declarationIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreateWithGraphDelta(tables: declarationTables, delta: expansionDelta))
     if !declarationIndex.isValid {
         compilerDeclarationIndexDestroy(index: declarationIndex)
         return String("compilerError\tkind=invalidDeclarationIndex")
@@ -10159,7 +10231,7 @@ function compilerReachableLLVMStateRenderModule(reachability: CompilerReachableL
     let nominalLayouts: String(compilerCoreRenderLLVMNominalLayouts(tables: reachability.context.tables, index: reachability.context.declarationIndex))
     let allRenderedFunctions: String("\(selected.renderedFunctions)\(mainText)")
     let runtimeDeclarations: String(compilerCoreRenderLLVMRuntimeDeclarationsTyped(records: selected.instructionRecords, renderedFunctions: allRenderedFunctions, runtimeRequirements: runtimeRequirements))
-    let declarations: String(compilerCoreRenderLLVMFunctionDeclarationsExcludingTyped(tables: reachability.context.tables, selection: reachability.selection))
+    let declarations: String(compilerCoreRenderLLVMFunctionDeclarationsExcludingTyped(tables: reachability.context.tables, index: reachability.context.declarationIndex, selection: reachability.selection))
     let text: String(compilerCoreLLVMNativeEntryTextFromParts(usage: usage, globals: "\(nominalLayouts)\(typedSelected.renderedGlobals)\(extraGlobals)", runtime: runtimeDeclarations, helpers: selected.renderedFunctions, declarations: declarations, main: mainText))
     let materialized: String(compilerCoreMaterializeLLVMText(text: text))
     let signatureAuditCode: Int(compilerCoreLLVMDirectCallSignatureAudit(tables: reachability.context.tables, index: reachability.context.declarationIndex, selection: reachability.selection, abiPlan: compilerReachableLLVMStateABIPlan(reachability: reachability), text: materialized))
@@ -10438,16 +10510,16 @@ function compilerCoreRenderLLVMFunctionDeclarationsExcluding(program: CompilerPr
     return compilerCoreTextBufferMaterializeAndDestroy(buffer: outputBuffer)
 }
 
-function compilerCoreRenderLLVMFunctionDeclarationsExcludingTyped(tables: CompilerSyntaxTables, selection: CompilerFunctionSelection): String {
+function compilerCoreRenderLLVMFunctionDeclarationsExcludingTyped(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection): String {
     let outputBuffer: TextBuffer(textBufferCreate(capacity: 65536))
-    let declarationCount: Int(compilerCoreAppendLLVMFunctionDeclarationsTyped(tables: tables, selection: selection, outputBuffer: outputBuffer))
+    let declarationCount: Int(compilerCoreAppendLLVMFunctionDeclarationsTyped(tables: tables, index: index, selection: selection, outputBuffer: outputBuffer))
     if declarationCount > 0 {
         textBufferAppend(buffer: outputBuffer, text: String("\n"))
     }
     return compilerCoreTextBufferMaterializeAndDestroy(buffer: outputBuffer)
 }
 
-function compilerCoreAppendLLVMFunctionDeclarationsTyped(tables: CompilerSyntaxTables, selection: CompilerFunctionSelection, outputBuffer: TextBuffer): Int {
+function compilerCoreAppendLLVMFunctionDeclarationsTyped(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, outputBuffer: TextBuffer): Int {
     state declarationRow: Int(0)
     state declarationCount: Int(0)
     let rowCount: Int(compilerIntTableRowCount(table: tables.declarations))
@@ -10455,7 +10527,9 @@ function compilerCoreAppendLLVMFunctionDeclarationsTyped(tables: CompilerSyntaxT
         if compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 2) == compilerSyntaxKindFunction() {
             let syntaxID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 0))
             let functionRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 1))
-            declarationCount: declarationCount + compilerCoreAppendLLVMFunctionDeclarationTyped(tables: tables, declarationRow: declarationRow, functionRow: functionRow, selection: selection, outputBuffer: outputBuffer)
+            if !compilerDeclarationIndexSyntaxIsOmitted(index: index, syntaxID: syntaxID) {
+                declarationCount: declarationCount + compilerCoreAppendLLVMFunctionDeclarationTyped(tables: tables, declarationRow: declarationRow, functionRow: functionRow, selection: selection, outputBuffer: outputBuffer)
+            }
         }
         declarationRow: declarationRow + 1
     }
@@ -12106,7 +12180,7 @@ function compilerSpecializedOptionalLLVMTypeName(tables: CompilerSyntaxTables, i
     return "%Range.Optional.\(payloadName)"
 }
 
-function compilerNominalLLVMLayoutText(tables: CompilerSyntaxTables, declarationRow: Int): String {
+function compilerNominalLLVMLayoutText(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, declarationRow: Int): String {
     let typeName: String(compilerNominalLLVMTypeName(tables: tables, declarationRow: declarationRow))
     if typeName == String("") { return String("") }
     let syntaxID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 0))
@@ -12114,7 +12188,9 @@ function compilerNominalLLVMLayoutText(tables: CompilerSyntaxTables, declaration
     state fieldCount: Int(0)
     state memberRow: Int(0)
     while memberRow < compilerIntTableRowCount(table: tables.members) {
-        if compilerIntTableValue(table: tables.members, row: memberRow, column: 2) == syntaxID {
+        let memberSyntaxID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 0))
+        if compilerIntTableValue(table: tables.members, row: memberRow, column: 2) == syntaxID
+            && !compilerDeclarationIndexSyntaxIsOmitted(index: index, syntaxID: memberSyntaxID) {
             let fileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
             let sourceType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
             if fieldCount > 0 { textBufferAppend(buffer: fields, text: String(", ")) }
@@ -12133,8 +12209,10 @@ function compilerCoreRenderLLVMNominalLayouts(tables: CompilerSyntaxTables, inde
     state layoutCount: Int(0)
     state declarationRow: Int(0)
     while declarationRow < compilerIntTableRowCount(table: tables.declarations) {
-        if compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 2) == compilerSyntaxKindConstruct() {
-            let layout: String(compilerNominalLLVMLayoutText(tables: tables, declarationRow: declarationRow))
+        let declarationSyntaxID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 0))
+        if compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 2) == compilerSyntaxKindConstruct()
+            && !compilerDeclarationIndexSyntaxIsOmitted(index: index, syntaxID: declarationSyntaxID) {
+            let layout: String(compilerNominalLLVMLayoutText(tables: tables, index: index, declarationRow: declarationRow))
             if layout != String("") {
                 textBufferAppend(buffer: layouts, text: layout)
                 layoutCount: layoutCount + 1
@@ -12145,10 +12223,12 @@ function compilerCoreRenderLLVMNominalLayouts(tables: CompilerSyntaxTables, inde
     let optionalPayloads: IntBuffer(intBufferCreate(capacity: 8))
     state functionRow: Int(0)
     while functionRow < compilerIntTableRowCount(table: tables.functions) {
-        let functionFileID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 1))
-        let functionReturnType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: functionFileID, localStart: compilerIntTableValue(table: tables.functions, row: functionRow, column: 6), localEnd: compilerIntTableValue(table: tables.functions, row: functionRow, column: 7)))
-        let payloadName: String(compilerOptionalPayloadTypeName(typeName: functionReturnType))
-        if payloadName != String("") {
+        let functionSyntaxID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 0))
+        if !compilerDeclarationIndexSyntaxIsOmitted(index: index, syntaxID: functionSyntaxID) {
+            let functionFileID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 1))
+            let functionReturnType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: functionFileID, localStart: compilerIntTableValue(table: tables.functions, row: functionRow, column: 6), localEnd: compilerIntTableValue(table: tables.functions, row: functionRow, column: 7)))
+            let payloadName: String(compilerOptionalPayloadTypeName(typeName: functionReturnType))
+            if payloadName != String("") {
             let payloadDeclarationRow: Int(compilerDeclarationIndexLookup(tables: tables, index: index, name: payloadName, kindTag: compilerSyntaxKindConstruct()))
             if payloadDeclarationRow >= 0 && compilerNominalLLVMTypeName(tables: tables, declarationRow: payloadDeclarationRow) != String("") {
                 let payloadSyntaxID: Int(compilerIntTableValue(table: tables.declarations, row: payloadDeclarationRow, column: 0))
@@ -12168,6 +12248,7 @@ function compilerCoreRenderLLVMNominalLayouts(tables: CompilerSyntaxTables, inde
                     }
                 }
             }
+        }
         }
         functionRow: functionRow + 1
     }
