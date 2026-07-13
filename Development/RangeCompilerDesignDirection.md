@@ -2466,6 +2466,28 @@ peak RSS. Stage 2 and Stage 3 LLVM are byte-identical at SHA-256
 `5bb6eca32b44b8ba156e0e9157246caf6badffd56e828af0ced06727e433c541` and
 `1,447,840` bytes.
 
+### Native seed rollover checkpoint
+
+Immediately before the rollover, the Stage 2 and Stage 3 candidate LLVM
+artifacts were byte-identical at `2,971,047` bytes and SHA-256
+`9771e9668e939b06cb58f05f5b0774597e81669c6c67ddcc85e29328722ddfa9`.  The
+checked-in seed now exactly matches that Stage 2 artifact.  The manifest also
+records the current four compiler-source hashes while retaining the verified
+runtime ABI, runtime inputs, target assumptions, Clang provenance, and native
+fixed-point command.
+
+`/usr/bin/time -l scripts/range check-stage2-compiler` verified every manifest
+input, linked the seed with the shared five-file runtime, rebuilt the canonical
+four-source bundle without invoking Swift, and reproduced the seed byte for
+byte.  It completed in `27.81 s` real time with `71,286,784` bytes maximum RSS
+and reported SHA-256 `9771e9668e939b06cb58f05f5b0774597e81669c6c67ddcc85e29328722ddfa9`
+at `2,971,047` bytes.  The normal native run of
+`RangePlayground/Examples/LLVM/ReturnInteger.range` exited with status `7`.
+
+Swift is no longer needed for normal seed reproduction/daily fixed-point
+verification, but remains an explicit recovery/oracle path pending a separate
+deletion slice.
+
 ### Explicit deferrals
 
 Do not add compiler concurrency before one-function memory is bounded and

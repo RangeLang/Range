@@ -42,8 +42,10 @@ if [[ "$(uname -m)" != "$(manifest_value target.architecture)" ]]; then
 fi
 
 verify_file seed
-for index in 0 1 2 3 4; do
+for index in 0 1 2 3; do
     verify_file "compilerSources.$index"
+done
+for index in 0 1 2 3 4; do
     verify_file "runtimeSources.$index"
 done
 

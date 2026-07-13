@@ -2,25 +2,25 @@
   "formatVersion": 1,
   "seed": {
     "path": "RangeCompiler/Bootstrap/RangeCompilerSeed.ll",
-    "bytes": 2619518,
-    "sha256": "99248cfc74e544d6df93fc32ff452c49f53565140523cc272de8d36dd82918dd"
+    "bytes": 2971047,
+    "sha256": "9771e9668e939b06cb58f05f5b0774597e81669c6c67ddcc85e29328722ddfa9"
   },
   "expectedStage3LLVM": {
-    "bytes": 2619518,
-    "sha256": "99248cfc74e544d6df93fc32ff452c49f53565140523cc272de8d36dd82918dd"
+    "bytes": 2971047,
+    "sha256": "9771e9668e939b06cb58f05f5b0774597e81669c6c67ddcc85e29328722ddfa9"
   },
   "compilerSources": [
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Compiler.range",
-      "sha256": "82ce8a6f7828a1f85baefcddc745f60d75ee669741271cbcc84737a2c31f2cea"
+      "sha256": "58bd8713f8d02f2c4874b27819fa5bd9307deff0c4a3731ea3360a297937effc"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerCore.range",
-      "sha256": "fc5b60359c3f9f7097bdfce29a33251505f433bff27cd35b3ce00ff58989d4bb"
+      "sha256": "a10eded3cccc3d2b2d5d79d45a0567cf65ad7ce30c12ba7e9a1b499e2f2681f4"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Lexer.range",
-      "sha256": "1bbc3019658ce0135d362dc8b51f349add833c0b192c341ad85acadeca8e2352"
+      "sha256": "6a0676e90250117d06a87739e948f7c81b846129411f5337e138bb93b2ccce9f"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Main.range",
