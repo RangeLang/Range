@@ -2488,6 +2488,23 @@ Swift is no longer needed for normal seed reproduction/daily fixed-point
 verification, but remains an explicit recovery/oracle path pending a separate
 deletion slice.
 
+### Native compiler-evolution checkpoint
+
+`/usr/bin/time -l scripts/range check-compiler-candidate` now builds from the
+checked-in seed while intentionally ignoring `compilerSources.*` hashes, so
+native compiler evolution no longer needs Swift. The verified run completed in
+`58.80 s` real time with `73,039,872` bytes maximum RSS. Dynamic inventory,
+deterministic aggregate smoke, mixed aggregate-ABI rejection before emission,
+Stage 2/3 validation and linking, and the no-Swift path all passed. Stage 2
+and Stage 3 LLVM are byte-identical at SHA-256
+`9771e9668e939b06cb58f05f5b0774597e81669c6c67ddcc85e29328722ddfa9` and
+`2,971,047` bytes; linked executables are byte-identical at SHA-256
+`c815cf8d1d6922c10e32d3ae064a91a1650616879fb940cf0ab876fc59ac5f74` and
+`1,447,840` bytes. The command does not mutate the seed or manifest, so seed
+rollover remains explicit. Role-aware Core loading and native macros are the
+next slices; Swift is not yet removable because macro and tooling parity is
+incomplete.
+
 ### Explicit deferrals
 
 Do not add compiler concurrency before one-function memory is bounded and

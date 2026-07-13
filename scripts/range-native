@@ -37,7 +37,7 @@ verify_manifest_file() {
     actual="$(sha256 "$REPO_ROOT/$path")"
     if [[ "$actual" != "$expected" ]]; then
         echo "Native compiler input hash mismatch: $path" >&2
-        echo "Run scripts/range check-stage2-compiler-swift and roll the seed intentionally." >&2
+        echo "For compiler-source changes, run scripts/range check-compiler-candidate; repair or intentionally roll the seed for seed/runtime mismatches." >&2
         exit 1
     fi
 }

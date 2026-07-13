@@ -1,0 +1,440 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+DEFAULT_COMPILER_DIR="$REPO_ROOT/RangeCompiler/Range/Programs/Compiler"
+
+usage() {
+    cat >&2 <<'USAGE'
+Usage:
+  scripts/check-range-compiler-candidate [DIR]
+
+DIR defaults to RangeCompiler/Range/Programs/Compiler.
+USAGE
+}
+
+fail() {
+    echo "Range compiler candidate check failed: $*" >&2
+    exit 1
+}
+
+manifest_value() {
+    /usr/bin/plutil -extract "$1" raw -o - "$MANIFEST"
+}
+
+sha256() {
+    /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'
+}
+
+bytes() {
+    /usr/bin/stat -f %z "$1"
+}
+
+verify_manifest_file() {
+    local key="$1"
+    local label="$2"
+    local relative expected actual path
+
+    relative="$(manifest_value "$key.path")"
+    expected="$(manifest_value "$key.sha256")"
+    path="$REPO_ROOT/$relative"
+    [[ -f "$path" ]] || fail "missing $label: $relative"
+    actual="$(sha256 "$path")"
+    [[ "$actual" == "$expected" ]] || fail "$label hash mismatch: $relative"
+}
+
+verify_manifest() {
+    [[ "$(manifest_value formatVersion)" == "1" ]] || fail "unsupported seed manifest format"
+    [[ "$(manifest_value target.platform)" == "macOS" ]] || fail "unsupported seed target platform"
+    [[ "$(manifest_value target.pointerBits)" == "64" ]] || fail "unsupported seed pointer width"
+    [[ "$(uname -m)" == "$(manifest_value target.architecture)" ]] || fail "seed target architecture mismatch"
+
+    local seed_relative seed_expected seed_path seed_actual seed_bytes expected_bytes
+    seed_relative="$(manifest_value seed.path)"
+    seed_expected="$(manifest_value seed.sha256)"
+    seed_path="$REPO_ROOT/$seed_relative"
+    [[ -f "$seed_path" ]] || fail "missing checked-in seed: $seed_relative"
+    seed_actual="$(sha256 "$seed_path")"
+    [[ "$seed_actual" == "$seed_expected" ]] || fail "checked-in seed hash mismatch"
+    seed_bytes="$(bytes "$seed_path")"
+    expected_bytes="$(manifest_value seed.bytes)"
+    [[ "$seed_bytes" == "$expected_bytes" ]] || fail "checked-in seed byte length mismatch"
+
+    local clang_identity expected_clang
+    clang_identity="$(clang --version | /usr/bin/head -1)"
+    expected_clang="$(manifest_value producer.clang)"
+    [[ "$clang_identity" == "$expected_clang"* ]] || fail "seed verifier clang mismatch: $clang_identity"
+
+    local index
+    for index in 0 1 2 3 4; do
+        verify_manifest_file "runtimeSources.$index" "runtime input $index"
+    done
+}
+
+runtime_inputs() {
+    local index
+    for index in 0 1 2 3 4; do
+        /usr/bin/printf '%s\n' "$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")"
+    done
+}
+
+SOURCE_FILES=()
+SOURCE_RELATIVE_PATHS=()
+
+discover_sources() {
+    local directory="$1"
+    local work_root="$2"
+    local raw_list="$work_root/source-paths.raw"
+    local sorted_list="$work_root/source-paths.sorted"
+    local absolute relative
+
+    [[ -d "$directory" ]] || fail "missing compiler directory: $directory"
+    directory="$(cd "$directory" && pwd)"
+    SOURCE_FILES=()
+    SOURCE_RELATIVE_PATHS=()
+
+    /usr/bin/find "$directory" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print0 > "$raw_list"
+    : > "$sorted_list"
+    while IFS= read -r -d '' absolute; do
+        relative="${absolute#"$directory/"}"
+        if [[ "$relative" == *$' '* || "$relative" == *$'\t'* || "$relative" == *$'\n'* ]]; then
+            fail "Range source paths may not contain whitespace: $relative"
+        fi
+        /usr/bin/printf '%s\n' "$absolute" >> "$sorted_list"
+    done < "$raw_list"
+
+    while IFS= read -r absolute; do
+        [[ -n "$absolute" ]] || continue
+        SOURCE_FILES+=("$absolute")
+        SOURCE_RELATIVE_PATHS+=("${absolute#"$directory/"}")
+    done < <(LC_ALL=C /usr/bin/sort "$sorted_list")
+
+    [[ "${#SOURCE_FILES[@]}" -gt 0 ]] || fail "no .range source files found in: $directory"
+}
+
+write_source_bundle() {
+    local output="$1"
+    local index source
+
+    /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$output"
+    for index in "${!SOURCE_FILES[@]}"; do
+        source="${SOURCE_FILES[$index]}"
+        /usr/bin/printf 'compilerSourceFile\\t%s\n' "${SOURCE_RELATIVE_PATHS[$index]}" >> "$output"
+        /bin/cat "$source" >> "$output"
+        if [[ -n "$(/usr/bin/tail -c 1 "$source")" ]]; then
+            /usr/bin/printf '\n' >> "$output"
+        fi
+    done
+}
+
+write_inventory_bundle() {
+    local output="$1"
+    local index
+
+    /usr/bin/printf '%s\n' 'compilerSourceInventory' > "$output"
+    for index in "${!SOURCE_FILES[@]}"; do
+        /usr/bin/printf 'compilerSourceFile\\t%s\n' "${SOURCE_RELATIVE_PATHS[$index]}" >> "$output"
+    done
+}
+
+write_expected_inventory() {
+    local output="$1"
+    local index
+
+    /usr/bin/printf 'sourceInventory\\tprogram\\n' > "$output"
+    for index in "${!SOURCE_FILES[@]}"; do
+        /usr/bin/printf 'sourceFile\\tindex=%s\\tpath=%s\\n' "$index" "${SOURCE_RELATIVE_PATHS[$index]}" >> "$output"
+    done
+    /usr/bin/printf 'sourceFileCount\\t%s\\n' "${#SOURCE_FILES[@]}" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+}
+
+run_capture() {
+    local executable="$1"
+    local input="$2"
+    local output="$3"
+    local error="$4"
+    local status
+
+    if "$executable" "$input" > "$output" 2> "$error"; then
+        status=0
+    else
+        status=$?
+    fi
+    RUN_STATUS="$status"
+}
+
+require_successful_output() {
+    local label="$1"
+    local output="$2"
+    local error="$3"
+
+    [[ "$RUN_STATUS" -eq 0 ]] || fail "$label exited $RUN_STATUS: $(/usr/bin/head -c 240 "$output")"
+    [[ ! -s "$error" ]] || fail "$label wrote stderr: $(/usr/bin/head -c 240 "$error")"
+    if /usr/bin/head -1 "$output" | /usr/bin/grep -Fq 'compilerError'; then
+        fail "$label emitted compilerError: $(/usr/bin/head -c 400 "$output")"
+    fi
+    [[ -s "$output" ]] || fail "$label emitted empty output"
+}
+
+emit_candidate_llvm() {
+    local executable="$1"
+    local bundle="$2"
+    local output="$3"
+    local label="$4"
+    local captured="$WORK_ROOT/$label.llvm"
+    local error="$WORK_ROOT/$label.stderr"
+
+    run_capture "$executable" "$bundle" "$captured" "$error"
+    require_successful_output "$label" "$captured" "$error"
+    /bin/mkdir -p "$(dirname "$output")"
+    /bin/mv "$captured" "$output"
+}
+
+validate_llvm() {
+    local llvm="$1"
+    local object="$WORK_ROOT/$(basename "$llvm").o"
+    clang -Wno-override-module -x ir -c "$llvm" -o "$object"
+    /bin/rm -f "$object"
+}
+
+link_llvm() {
+    local llvm="$1"
+    local executable="$2"
+    local temporary="$WORK_ROOT/$(basename "$executable").tmp"
+
+    clang -Wno-override-module "$llvm" "${RUNTIME_INPUTS[@]}" -o "$temporary"
+    /bin/mkdir -p "$(dirname "$executable")"
+    /bin/mv "$temporary" "$executable"
+}
+
+audit_inventory() {
+    local stage_label="$1"
+    local executable="$2"
+    local output="$WORK_ROOT/$stage_label.inventory.out"
+    local error="$WORK_ROOT/$stage_label.inventory.err"
+
+    run_capture "$executable" "$INVENTORY_BUNDLE" "$output" "$error"
+    require_successful_output "$stage_label inventory" "$output" "$error"
+    /usr/bin/cmp -s "$output" "$EXPECTED_INVENTORY" || fail "$stage_label inventory differs from discovered source order"
+    echo "$stage_label inventory: pass (${#SOURCE_FILES[@]} files)"
+}
+
+assert_smoke_shape() {
+    local llvm="$1"
+    local define_count call_count
+
+    for marker in \
+        '%Range.NativeSmokePair = type { i32, i32 }' \
+        'define i32 @main() {' \
+        'define void @nativeSmokeFirst(ptr %returnDestination)' \
+        'define void @nativeSmokeSecond(ptr %returnDestination)' \
+        '%storage0 = alloca' \
+        '%storage1 = alloca' \
+        'insertvalue %Range.NativeSmokePair' \
+        'extractvalue'; do
+        /usr/bin/grep -Fq "$marker" "$llvm" || fail "normal smoke missing LLVM marker: $marker"
+    done
+
+    define_count="$(/usr/bin/grep -F -c 'define void @nativeSmoke' "$llvm")"
+    call_count="$(/usr/bin/grep -F -c 'call void @nativeSmoke' "$llvm")"
+    [[ "$define_count" -eq 2 ]] || fail "normal smoke emitted $define_count native aggregate definitions"
+    [[ "$call_count" -eq 2 ]] || fail "normal smoke emitted $call_count native aggregate calls"
+
+    for forbidden in rangeConstruct malloc calloc realloc free; do
+        if /usr/bin/grep -Fq "$forbidden" "$llvm"; then
+            fail "normal smoke emitted forbidden dynamic/allocator symbol: $forbidden"
+        fi
+    done
+    if /usr/bin/grep -Fq '\n' "$llvm"; then
+        fail "normal smoke emitted an escaped newline marker"
+    fi
+    if /usr/bin/grep -Fq 'call %Range.NativeSmokePair' "$llvm"; then
+        fail "normal smoke used aggregate-return calls instead of caller-owned storage"
+    fi
+}
+
+audit_smoke() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local first="$WORK_ROOT/$stage_label.smoke.first.ll"
+    local second="$WORK_ROOT/$stage_label.smoke.second.ll"
+    local first_error="$WORK_ROOT/$stage_label.smoke.first.err"
+    local second_error="$WORK_ROOT/$stage_label.smoke.second.err"
+    local smoke_llvm="$stage_directory/Smoke.ll"
+    local smoke_executable="$stage_directory/Smoke"
+    local run_output="$WORK_ROOT/$stage_label.smoke.run.out"
+    local run_error="$WORK_ROOT/$stage_label.smoke.run.err"
+
+    run_capture "$executable" "$SMOKE_SOURCE" "$first" "$first_error"
+    require_successful_output "$stage_label normal smoke" "$first" "$first_error"
+    run_capture "$executable" "$SMOKE_SOURCE" "$second" "$second_error"
+    require_successful_output "$stage_label repeated normal smoke" "$second" "$second_error"
+    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label normal smoke was not deterministic"
+    assert_smoke_shape "$first"
+
+    /bin/mkdir -p "$stage_directory"
+    /bin/cp "$first" "$smoke_llvm"
+    validate_llvm "$smoke_llvm"
+    link_llvm "$smoke_llvm" "$smoke_executable"
+
+    if "$smoke_executable" > "$run_output" 2> "$run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label normal smoke executable exited $RUN_STATUS"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label normal smoke executable wrote output"
+    echo "$stage_label deterministic aggregate smoke: pass (exit 7)"
+}
+
+audit_mixed_abi() {
+    local stage_label="$1"
+    local executable="$2"
+    local output="$WORK_ROOT/$stage_label.mixed-abi.out"
+    local error="$WORK_ROOT/$stage_label.mixed-abi.err"
+
+    run_capture "$executable" "$MIXED_ABI_SOURCE" "$output" "$error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label mixed aggregate ABI check exited $RUN_STATUS"
+    [[ ! -s "$error" ]] || fail "$stage_label mixed aggregate ABI check wrote stderr"
+    /usr/bin/grep -Fq 'compilerError' "$output" \
+        && /usr/bin/grep -Fq 'kind=representationSensitiveABICapabilityBlocked' "$output" \
+        || fail "$stage_label mixed aggregate ABI check missed capability diagnostic"
+    if /usr/bin/grep -Fq 'define ' "$output" || /usr/bin/grep -Fq 'call ' "$output"; then
+        fail "$stage_label mixed aggregate ABI check emitted LLVM before rejection"
+    fi
+    echo "$stage_label mixed aggregate ABI rejection: pass (exit 65, pre-emission)"
+}
+
+audit_stage() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+
+    audit_inventory "$stage_label" "$executable"
+    audit_smoke "$stage_label" "$executable" "$stage_directory"
+    audit_mixed_abi "$stage_label" "$executable"
+}
+
+report_artifact() {
+    local label="$1"
+    local path="$2"
+    printf '%s_path=%s\n' "$label" "$path"
+    printf '%s_sha256=%s\n' "$label" "$(sha256 "$path")"
+    printf '%s_bytes=%s\n' "$label" "$(bytes "$path")"
+}
+
+main() {
+    [[ "$#" -le 1 ]] || { usage; exit 64; }
+    local compiler_input="${1:-$DEFAULT_COMPILER_DIR}"
+    [[ -d "$compiler_input" ]] || fail "missing compiler directory: $compiler_input"
+    local compiler_directory
+    compiler_directory="$(cd "$compiler_input" && pwd)"
+
+    verify_manifest
+
+    WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compiler-candidate.XXXXXX")"
+    trap '/bin/rm -rf "$WORK_ROOT"' EXIT
+
+    RUNTIME_INPUTS=()
+    while IFS= read -r runtime; do
+        RUNTIME_INPUTS+=("$runtime")
+    done < <(runtime_inputs)
+
+    discover_sources "$compiler_directory" "$WORK_ROOT"
+    SOURCE_BUNDLE="$WORK_ROOT/RangeCompilerSourceSet.range"
+    INVENTORY_BUNDLE="$WORK_ROOT/RangeCompilerInventory.range"
+    EXPECTED_INVENTORY="$WORK_ROOT/RangeCompilerInventory.expected"
+    write_source_bundle "$SOURCE_BUNDLE"
+    write_inventory_bundle "$INVENTORY_BUNDLE"
+    write_expected_inventory "$EXPECTED_INVENTORY"
+
+    SMOKE_SOURCE="$WORK_ROOT/NativeSmoke.range"
+    /usr/bin/printf '%s\n' \
+        'construct NativeSmokePair {' \
+        '    let first: Int' \
+        '    let second: Int' \
+        '}' \
+        '' \
+        'function nativeSmokeFirst(): NativeSmokePair {' \
+        '    return NativeSmokePair(second: 2, first: 1)' \
+        '}' \
+        '' \
+        'function nativeSmokeSecond(): NativeSmokePair {' \
+        '    return NativeSmokePair(first: 3, second: 6)' \
+        '}' \
+        '' \
+        '@main {' \
+        '    let first: NativeSmokePair(nativeSmokeFirst())' \
+        '    state second: NativeSmokePair(nativeSmokeSecond())' \
+        '    second: NativeSmokePair(first: 3, second: 6)' \
+        '    return first.first + second.second' \
+        '}' > "$SMOKE_SOURCE"
+
+    MIXED_ABI_SOURCE="$WORK_ROOT/MixedABINegative.range"
+    /usr/bin/printf '%s\n' \
+        'construct ABIPair {' \
+        '    let first: Int' \
+        '    let second: Int' \
+        '}' \
+        '' \
+        'function brokenPair(): ABIPair {' \
+        '    return 1' \
+        '}' \
+        '' \
+        '@main {' \
+        '    let value: ABIPair(brokenPair())' \
+        '    return value.first' \
+        '}' > "$MIXED_ABI_SOURCE"
+
+    local seed seed_executable
+    seed="$REPO_ROOT/$(manifest_value seed.path)"
+    seed_executable="$WORK_ROOT/RangeCompilerSeed"
+    clang -Wno-override-module -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
+    echo "bootstrap seed link: pass"
+
+    local build_root stage2_directory stage3_directory
+    local stage2_llvm stage2_executable stage3_llvm stage3_executable
+    build_root="$compiler_directory/.range/Build"
+    stage2_directory="$build_root/stage2"
+    stage3_directory="$build_root/stage3"
+    stage2_llvm="$stage2_directory/RangeCompiler.ll"
+    stage2_executable="$stage2_directory/RangeCompiler"
+    stage3_llvm="$stage3_directory/RangeCompiler.ll"
+    stage3_executable="$stage3_directory/RangeCompiler"
+
+    emit_candidate_llvm "$seed_executable" "$SOURCE_BUNDLE" "$stage2_llvm" stage2
+    validate_llvm "$stage2_llvm"
+    link_llvm "$stage2_llvm" "$stage2_executable"
+    echo "Stage 2 candidate validate/link: pass"
+    audit_stage Stage2 "$stage2_executable" "$stage2_directory"
+
+    emit_candidate_llvm "$stage2_executable" "$SOURCE_BUNDLE" "$stage3_llvm" stage3
+    validate_llvm "$stage3_llvm"
+    link_llvm "$stage3_llvm" "$stage3_executable"
+    /usr/bin/cmp -s "$stage2_llvm" "$stage3_llvm" || fail "Stage 2 and Stage 3 LLVM are not byte-identical"
+    /usr/bin/cmp -s "$stage2_executable" "$stage3_executable" || fail "Stage 2 and Stage 3 executables are not byte-identical"
+    echo "Stage 3 candidate validate/link and fixed point: pass"
+    audit_stage Stage3 "$stage3_executable" "$stage3_directory"
+
+    echo "Range compiler candidate check succeeded."
+    printf 'compiler_directory=%s\n' "$compiler_directory"
+    printf 'source_inventory_count=%s\n' "${#SOURCE_FILES[@]}"
+    local index
+    for index in "${!SOURCE_RELATIVE_PATHS[@]}"; do
+        printf 'source_inventory_path_%s=%s\n' "$index" "${SOURCE_RELATIVE_PATHS[$index]}"
+    done
+    report_artifact stage2_llvm "$stage2_llvm"
+    report_artifact stage3_llvm "$stage3_llvm"
+    report_artifact stage2_executable "$stage2_executable"
+    report_artifact stage3_executable "$stage3_executable"
+    echo "stage2_stage3_llvm=byte-identical"
+    echo "stage2_stage3_executable=byte-identical"
+    echo "swift_invocation=none"
+    echo "candidate_fixed_point=pass"
+}
+
+main "$@"
