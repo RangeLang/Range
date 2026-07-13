@@ -492,6 +492,164 @@ audit_canonical_core() {
     echo "$stage_label canonical Core: pass (actual IntBuffer.range role=core, project use, validate/link, exit 7)"
 }
 
+write_macro_positive_bundle() {
+    local output="$1"
+    local order="${2:-normal}"
+
+    : > "$output"
+    /usr/bin/printf '%s\n' \
+        'compilerMacroSnapshot' >> "$output"
+    if [[ "$order" == "reordered" ]]; then
+        /usr/bin/printf '%s\n' \
+            'compilerSourceFile\trole=foundation\tpath=Foundation/Unrelated.range' \
+            'construct Unrelated {}' >> "$output"
+    fi
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro.range' \
+        'open macro CrossConstruct(): Construct -> Void {}' \
+        'macro CrossFunction(): Function -> Void {}' \
+        'macro CrossMember(): Member -> Void {}' \
+        'macro CrossParameter(value: Int): Parameter -> Void {}' >> "$output"
+    if [[ "$order" != "reordered" ]]; then
+        /usr/bin/printf '%s\n' \
+            'compilerSourceFile\trole=foundation\tpath=Foundation/Unrelated.range' \
+            'construct Unrelated {}' >> "$output"
+    fi
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=project\tpath=Project/MacroUse.range' \
+        '@CrossConstruct' \
+        'construct First {' \
+        '    @CrossMember' \
+        '    let value: Int' \
+        '}' \
+        '@CrossConstruct' \
+        'construct Second {}' \
+        '@CrossFunction' \
+        'function target(@CrossParameter value: Int): Int { return 1 }' >> "$output"
+}
+
+write_macro_negative_bundle() {
+    local output="$1"
+    local kind="$2"
+
+    case "$kind" in
+        unresolved)
+            /usr/bin/printf '%s\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/Known.range' \
+                'macro Known(): Construct -> Void {}' \
+                'compilerSourceFile\trole=project\tpath=Project/Missing.range' \
+                '@Missing' \
+                'construct Target {}' > "$output"
+            ;;
+        duplicate)
+            /usr/bin/printf '%s\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/First.range' \
+                'macro Dup(): Construct -> Void {}' \
+                'compilerSourceFile\trole=foundation\tpath=Foundation/Second.range' \
+                'macro Dup(): Construct -> Void {}' \
+                'compilerSourceFile\trole=project\tpath=Project/Duplicate.range' \
+                '@Dup' \
+                'construct Target {}' > "$output"
+            ;;
+        malformed-declaration)
+            /usr/bin/printf '%s\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/Broken.range' \
+                'macro Broken(: Construct -> Void {}' \
+                'compilerSourceFile\trole=project\tpath=Project/BrokenUse.range' \
+                'construct Target {}' > "$output"
+            ;;
+        malformed-application)
+            /usr/bin/printf '%s\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/Known.range' \
+                'macro Known(): Construct -> Void {}' \
+                'compilerSourceFile\trole=project\tpath=Project/BrokenApplication.range' \
+                '@Known(' \
+                'construct Target {}' > "$output"
+            ;;
+        mismatch)
+            /usr/bin/printf '%s\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/FunctionOnly.range' \
+                'macro FunctionOnly(): Function -> Void {}' \
+                'compilerSourceFile\trole=project\tpath=Project/WrongTarget.range' \
+                '@FunctionOnly' \
+                'construct Target {}' > "$output"
+            ;;
+        *)
+            fail "unknown macro negative fixture: $kind"
+            ;;
+    esac
+}
+
+audit_macro_linking() {
+    local stage_label="$1"
+    local executable="$2"
+    local positive_bundle="$WORK_ROOT/$stage_label.macro.positive.range"
+    local first="$WORK_ROOT/$stage_label.macro.positive.first.out"
+    local second="$WORK_ROOT/$stage_label.macro.positive.second.out"
+    local first_error="$WORK_ROOT/$stage_label.macro.positive.first.err"
+    local second_error="$WORK_ROOT/$stage_label.macro.positive.second.err"
+    local reordered_bundle="$WORK_ROOT/$stage_label.macro.positive.reordered.range"
+    local reordered_output="$WORK_ROOT/$stage_label.macro.positive.reordered.out"
+    local reordered_error="$WORK_ROOT/$stage_label.macro.positive.reordered.err"
+    local first_projection="$WORK_ROOT/$stage_label.macro.positive.projection.out"
+    local reordered_projection="$WORK_ROOT/$stage_label.macro.positive.reordered.projection.out"
+
+    write_macro_positive_bundle "$positive_bundle"
+    run_capture "$executable" "$positive_bundle" "$first" "$first_error"
+    require_successful_output "$stage_label macro positive" "$first" "$first_error"
+    run_capture "$executable" "$positive_bundle" "$second" "$second_error"
+    require_successful_output "$stage_label repeated macro positive" "$second" "$second_error"
+    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label macro snapshot was not deterministic"
+    /usr/bin/grep -Fq $'macroGraph\tvalid=true\tdeclarationCount=4\tparameterCount=1\tapplicationCount=5\tedgeCount=10\tappliesToCount=5\tresolvedByCount=5\tdigest=' "$first" || fail "$stage_label macro positive counts/digest changed"
+    for expected in \
+        $'macroGraph\tvalid=true' \
+        $'declarationCount=4' \
+        $'parameterCount=1' \
+        $'applicationCount=5' \
+        $'edgeCount=10' \
+        $'appliesToCount=5' \
+        $'resolvedByCount=5' \
+        $'digest='; do
+        /usr/bin/grep -Fq "$expected" "$first" || fail "$stage_label macro positive missing: $expected"
+    done
+    /usr/bin/grep -Fq $'macroStableProjection\tidentityDigest=' "$first" || fail "$stage_label macro positive missing stable identity projection"
+
+    write_macro_positive_bundle "$reordered_bundle" reordered
+    run_capture "$executable" "$reordered_bundle" "$reordered_output" "$reordered_error"
+    require_successful_output "$stage_label reordered macro positive" "$reordered_output" "$reordered_error"
+    /usr/bin/grep -F 'macroStableProjection' "$first" > "$first_projection" || fail "$stage_label missing first stable projection"
+    /usr/bin/grep -F 'macroStableProjection' "$reordered_output" > "$reordered_projection" || fail "$stage_label missing reordered stable projection"
+    /usr/bin/cmp -s "$first_projection" "$reordered_projection" || fail "$stage_label reordered macro identity projection changed"
+
+    local kind negative_bundle negative_output negative_error expected
+    for kind in unresolved duplicate malformed-declaration malformed-application mismatch; do
+        negative_bundle="$WORK_ROOT/$stage_label.macro.$kind.range"
+        negative_output="$WORK_ROOT/$stage_label.macro.$kind.out"
+        negative_error="$WORK_ROOT/$stage_label.macro.$kind.err"
+        write_macro_negative_bundle "$negative_bundle" "$kind"
+        run_capture "$executable" "$negative_bundle" "$negative_output" "$negative_error"
+        [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label macro $kind exited $RUN_STATUS"
+        [[ ! -s "$negative_error" ]] || fail "$stage_label macro $kind wrote stderr"
+        case "$kind" in
+            unresolved) expected='diagnosticKind=unresolvedMacro' ;;
+            duplicate) expected='diagnosticKind=ambiguousMacroDeclaration' ;;
+            malformed-declaration) expected='diagnosticKind=malformedMacroDeclaration' ;;
+            malformed-application) expected='diagnosticKind=malformedMacroApplication' ;;
+            mismatch) expected='diagnosticKind=macroTargetSurfaceMismatch' ;;
+        esac
+        /usr/bin/grep -Fq "$expected" "$negative_output" || fail "$stage_label macro $kind missed diagnostic $expected"
+        if /usr/bin/grep -Fq 'define ' "$negative_output" || /usr/bin/grep -Fq 'call ' "$negative_output"; then
+            fail "$stage_label macro $kind emitted LLVM before rejection"
+        fi
+    done
+    echo "$stage_label macro linking: pass (cross-role positive, deterministic identities/ordinals, unresolved/ambiguous/malformed/mismatch rejection)"
+}
+
 audit_stage() {
     local stage_label="$1"
     local executable="$2"
@@ -500,6 +658,7 @@ audit_stage() {
     audit_inventory "$stage_label" "$executable"
     audit_role_markers "$stage_label" "$executable"
     audit_canonical_core "$stage_label" "$executable" "$stage_directory"
+    audit_macro_linking "$stage_label" "$executable"
     audit_smoke "$stage_label" "$executable" "$stage_directory"
     audit_mixed_abi "$stage_label" "$executable"
 }
@@ -606,6 +765,13 @@ main() {
     /usr/bin/cmp -s "$stage2_executable" "$stage3_executable" || fail "Stage 2 and Stage 3 executables are not byte-identical"
     echo "Stage 3 candidate validate/link and fixed point: pass"
     audit_stage Stage3 "$stage3_executable" "$stage3_directory"
+
+    local macro_snapshot_suffix
+    for macro_snapshot_suffix in positive.first.out positive.reordered.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out; do
+        /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.$macro_snapshot_suffix" "$WORK_ROOT/Stage3.macro.$macro_snapshot_suffix" \
+            || fail "Stage 2 and Stage 3 macro snapshot differs: $macro_snapshot_suffix"
+    done
+    echo "Stage 2/Stage 3 focused macro snapshots: byte-identical"
 
     echo "Range compiler candidate check succeeded."
     printf 'compiler_directory=%s\n' "$compiler_directory"

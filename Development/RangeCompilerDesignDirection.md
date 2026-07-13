@@ -2534,6 +2534,44 @@ This proves first-class roles and one supported canonical Core leaf usable from
 project code. Full Core/Foundation loading and macro declaration/application
 values remain subsequent slices; macros are not implemented by this checkpoint.
 
+### Native typed macro linking checkpoint
+
+The native compiler now stores macro declarations, macro parameters, macro
+applications, and one authoritative edge table directly in `CompilerSyntaxTables`.
+Rows retain role-aware `FileID` provenance, authored and semantic spans,
+source-backed names and target surfaces, compact fingerprints, and stable
+ordinals. The shared typed capture path recognizes general macro declarations
+and arbitrary declaration/member/parameter annotations. Linking validates the
+target surface and records `appliesTo` and `resolvedBy` edges without executing
+macro bodies or emitting expansions.
+
+The focused native gate proves a cross-role Core declaration to project
+application graph with four declarations, one macro parameter, five
+applications, five `appliesTo` edges, and five `resolvedBy` edges; repeated
+snapshots and Stage 2/Stage 3 snapshots are identical. A second positive bundle
+puts the macro-free Foundation file first and compares a reorder-stable
+identity projection over stored identity pairs and per-file ordinals; the raw
+graph digest remains a table/provenance observer and is not claimed reorder
+invariant. Unresolved, duplicate/ambiguous, malformed declaration, malformed
+application, and target-surface mismatch fixtures reject before emission.
+`/usr/bin/time -l scripts/range check-compiler-candidate` completed in
+`66.22 s` real time with `80,134,144` bytes maximum RSS and no Swift
+invocation. Stage 2 and Stage 3 LLVM are byte-identical at SHA-256
+`6a6101f94193256b898f8845bb0bce7d09ca19938ee99b8164b5094c3dc98fe5` and
+`3,200,790` bytes. Their linked executables are byte-identical at SHA-256
+`356b5a5ea5b8d0c070576cad3a617e49394a252ee4d1ef69fdf29c1fd35d3ffd` and
+`1,701,488` bytes. Ordinary aggregate smoke still exits `7`, and mixed
+aggregate-ABI rejection still exits `65` before emission in both stages.
+
+This is a linking/modeling proof only. Macro-body execution, target/
+diagnostics/graph capabilities, `@self` and `@graph` realization, expansion,
+requirement/protocol evaluation, full Foundation loading, Swift deletion, and
+seed rollover remain deferred. The required Stage 1 source walk passes parsing
+and semantic validation but still reports the pre-existing obsolete
+`compilerNativeSourceSetSelectedScanStats` post-pass audit as
+`invalidEntryReachability stage=2`; that directive is absent from both the
+live source and `HEAD` and was not added here.
+
 ### Explicit deferrals
 
 Do not add compiler concurrency before one-function memory is bounded and

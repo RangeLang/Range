@@ -35,6 +35,10 @@ function compileRangeNativeSourceDirectiveOutput(source: String): String {
         return compilerTypedSyntaxSummary(source: source)
     }
 
+    if compilerSourceRequestsMacroSnapshot(source: source) {
+        return compilerMacroSummary(source: source)
+    }
+
     if compilerSourceRequestsPlotter(source: source) {
         return compilerPlotterSummary(source: source)
     }
@@ -111,6 +115,10 @@ function compileRangeSourceSetDirectiveOutput(source: String): String {
         return compilerTypedSyntaxSummary(source: source)
     }
 
+    if compilerSourceRequestsMacroSnapshot(source: source) {
+        return compilerMacroSummary(source: source)
+    }
+
     if compilerSourceRequestsPlotter(source: source) {
         return compilerPlotterSummary(source: source)
     }
@@ -181,6 +189,10 @@ function compilerSourceRequestsTypedSyntax(source: String): Bool {
         return true
     }
     return false
+}
+
+function compilerSourceRequestsMacroSnapshot(source: String): Bool {
+    return hasRangePrefix(source: source, start: 0, prefix: String("compilerMacroSnapshot"))
 }
 
 function compilerSourceRequestsPlotter(source: String): Bool {
