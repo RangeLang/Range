@@ -863,7 +863,7 @@ public struct SwiftBootstrapCompiler {
         )
         guard mixedABIResult.exitCode == 65,
             mixedABIResult.stderr.isEmpty,
-            mixedABIResult.stdout.contains("compilerError\\tkind=representationSensitiveABICapabilityBlocked"),
+            mixedABIResult.stdout.contains("compilerError\tkind=representationSensitiveABICapabilityBlocked"),
             !mixedABIResult.stdout.contains("define "),
             !mixedABIResult.stdout.contains("call ")
         else {
@@ -947,8 +947,8 @@ public struct SwiftBootstrapCompiler {
         let stage3Text = try String(contentsOf: stage3LLVM, encoding: .utf8)
         let requiredMarkers = [
             "define ptr @compileRangeNativeSource(ptr %source)",
-            "define ptr @parseCompilerAssignmentStatement(ptr %token",
-            "define ptr @compilerCoreRenderedDirectIfElseStatementRecord(ptr %context",
+            "define void @parseCompilerAssignmentStatement(ptr %returnDestination, %Range.RangeLexedToken %token",
+            "define void @compilerCoreRenderedDirectIfElseStatementRecord(ptr %returnDestination, %Range.CompilerLLVMLoweringContext %context",
             "define i32 @main()",
             "call ptr @compileRangeNativeSource(ptr",
         ]

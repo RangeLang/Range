@@ -1113,6 +1113,23 @@ function compilerBodyArenaAppendFunctionEdges(arena: CompilerBodyArena, edgeOwne
     return 0
 }
 
+function compilerBodyArenaMarkRepresentationSensitiveTargets(arena: CompilerBodyArena, sensitiveFunctions: IntBuffer): Int {
+    state resolutionRow: Int(0)
+    while resolutionRow < compilerIntTableRowCount(table: arena.resolutions) {
+        if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) == compilerBodyResolutionFunction()
+            && compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) == compilerBodyTypeConstruct() {
+            let targetFunctionRow: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+            let resultTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeIDColumn()))
+            if targetFunctionRow < 0 || targetFunctionRow >= intBufferCount(buffer: sensitiveFunctions) { return 0 - 1 }
+            if compilerBodyLLVMNominalTypeNameForTypeID(arena: arena, typeID: resultTypeID) != String("") {
+                if intBufferSet(buffer: sensitiveFunctions, index: targetFunctionRow, value: 1) != 0 { return 0 - 1 }
+            }
+        }
+        resolutionRow: resolutionRow + 1
+    }
+    return 0
+}
+
 function compilerBodyMIRAppendFunctionEdges(arena: CompilerBodyArena, edgeOwners: IntBuffer, edgeTargets: IntBuffer): Int {
     if arena.ownerKind != compilerBodyArenaOwnerFunction() { return 0 - 1 }
     state operationRow: Int(0)
@@ -5599,10 +5616,12 @@ function compilerTypedIRFixedLLVMIfSupported(source: String): String {
 function compilerTypedSyntaxLocalText(tables: CompilerSyntaxTables, fileID: Int, localStart: Int, localEnd: Int): String {
     let globalStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: localStart))
     let globalEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: localEnd))
-    if globalStart < 0 || globalEnd < globalStart {
+    if globalStart < 0 || globalEnd < globalStart
+        || fileID < 0 || fileID >= compilerSourceStoreFileCount(store: tables.sourceStore)
+        || globalEnd > compilerSourceStoreFileContentEnd(store: tables.sourceStore, fileID: fileID) {
         return String("")
     }
-    return stringSubstring(source: tables.sourceStore.source, start: globalStart, end: globalEnd)
+    return stringSliceUnchecked(source: tables.sourceStore.source, start: globalStart, end: globalEnd)
 }
 
 function compilerTypedSyntaxRenderRawTable(name: String, table: CompilerIntTable): String {
@@ -8730,29 +8749,32 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
         }
     }
     if capable {
-        if compilerBodyMIRAppendFunctionEdges(arena: arena, edgeOwners: probeEdgeOwners, edgeTargets: probeEdgeTargets) != 0
-            || compilerBodyMIRMarkRepresentationSensitiveTargets(arena: arena, sensitiveFunctions: reachability.abiSensitiveFunctions) != 0 {
+        if compilerBodyMIRAppendFunctionEdges(arena: arena, edgeOwners: probeEdgeOwners, edgeTargets: probeEdgeTargets) != 0 {
             failureStage: 10
             capable: false
         }
     }
+    if capable {
+        if compilerBodyMIRMarkRepresentationSensitiveTargets(arena: arena, sensitiveFunctions: reachability.abiSensitiveFunctions) != 0 {
+            failureStage: 10001
+            capable: false
+        }
+    }
+    state discoveredSensitiveTarget: Bool(false)
+    if capable && compilerReachableLLVMStateSensitiveCount(reachability: reachability) != sensitiveCountBefore { discoveredSensitiveTarget: true }
     if capable {
         state probeEdgeIndex: Int(0)
         while capable && probeEdgeIndex < intBufferCount(buffer: probeEdgeTargets) {
             if !compilerFunctionEdgesContain(edgeOwners: reachability.edgeOwners, edgeTargets: reachability.edgeTargets, ownerFunctionRow: intBufferElement(buffer: probeEdgeOwners, index: probeEdgeIndex), targetFunctionRow: intBufferElement(buffer: probeEdgeTargets, index: probeEdgeIndex)) {
-                failureStage: 10
+                failureStage: 10002
                 capable: false
             }
             probeEdgeIndex: probeEdgeIndex + 1
         }
-        if capable && compilerReachableLLVMStateSensitiveCount(reachability: reachability) != sensitiveCountBefore {
-            failureStage: 10
-            capable: false
-        }
     }
     stringTransientRegionReset(mark: transientMark)
     transientMark: stringTransientRegionMark()
-    if capable {
+    if capable && !discoveredSensitiveTarget {
         let validationCode: Int(compilerBodyMIRValidationCode(arena: arena, abiPlan: candidatePlan))
         if validationCode != 0 {
             failureStage: 8000 + validationCode
@@ -8763,6 +8785,7 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
     transientMark: stringTransientRegionMark()
     state capabilityValue: Int(1)
     if !capable { capabilityValue: 0 - failureStage }
+    if discoveredSensitiveTarget { capabilityValue: 0 }
     state status: Int(intBufferSet(buffer: reachability.abiCapabilities, index: functionRow, value: capabilityValue))
     if compilerBodyArenaDestroy(arena: arena) != 0 { status: 0 - 1 }
     if intBufferDestroy(buffer: probeEdgeOwners) != 0 || intBufferDestroy(buffer: probeEdgeTargets) != 0 { status: 0 - 1 }
@@ -8999,6 +9022,12 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
             typedReady: false
         }
     }
+    if typedReady {
+        if compilerBodyArenaMarkRepresentationSensitiveTargets(arena: arena, sensitiveFunctions: reachability.abiSensitiveFunctions) != 0 {
+            typedFailureStage: 10
+            typedReady: false
+        }
+    }
     if typedReady && !shouldProbeIndirectABI {
         state typedProbeEdgeIndex: Int(0)
         while typedProbeEdgeIndex < intBufferCount(buffer: typedEdgeTargets) {
@@ -9194,6 +9223,7 @@ function compilerReachableLLVMStateBuildABIComponents(reachability: CompilerReac
     let componentQueue: IntBuffer(intBufferCreate(capacity: functionCount))
     let sensitiveFunctions: IntBuffer(intBufferCreate(capacity: functionCount))
     state firstBlockedFunction: Int(0 - 1)
+    state componentRequiresRestart: Bool(false)
     if intBufferSet(buffer: reachability.counters, index: compilerReachableLLMIndirectActivations(), value: 0) != 0 {
         intBufferDestroy(buffer: sensitiveFunctions)
         intBufferDestroy(buffer: componentQueue)
@@ -9216,7 +9246,7 @@ function compilerReachableLLVMStateBuildABIComponents(reachability: CompilerReac
         sensitivityFunctionRow: sensitivityFunctionRow + 1
     }
     state seedFunctionRow: Int(0)
-    while seedFunctionRow < functionCount {
+    while seedFunctionRow < functionCount && !componentRequiresRestart {
         if intBufferElement(buffer: reachability.abiParticipants, index: seedFunctionRow) == 0
             && compilerFunctionSelectionContains(selection: reachability.selection, functionRow: seedFunctionRow)
             && intBufferElement(buffer: sensitiveFunctions, index: seedFunctionRow) == 1 {
@@ -9276,23 +9306,25 @@ function compilerReachableLLVMStateBuildABIComponents(reachability: CompilerReac
                 componentPrepare: componentPrepare + 1
             }
             state componentProbe: Int(componentEnd - 1)
-            while !componentBlocked && componentProbe >= componentStart {
+            while !componentBlocked && !componentRequiresRestart && componentProbe >= componentStart {
                 let probeMember: Int(intBufferElement(buffer: componentQueue, index: componentProbe))
                 if intBufferElement(buffer: reachability.abiCapabilities, index: probeMember) == 0 {
+                    let sensitiveCountBeforeProbe: Int(compilerReachableLLVMStateSensitiveCount(reachability: reachability))
                     if compilerReachableLLVMStateProbeCandidateFunction(reachability: reachability, functionRow: probeMember) != 0 {
                         intBufferDestroy(buffer: sensitiveFunctions)
                         intBufferDestroy(buffer: componentQueue)
                         return 0 - 1
                     }
+                    if compilerReachableLLVMStateSensitiveCount(reachability: reachability) != sensitiveCountBeforeProbe { componentRequiresRestart: true }
                 }
-                if intBufferElement(buffer: reachability.abiCapabilities, index: probeMember) != 1 {
+                if !componentRequiresRestart && intBufferElement(buffer: reachability.abiCapabilities, index: probeMember) != 1 {
                     componentBlocked: true
                     if firstBlockedFunction < 0 { firstBlockedFunction: probeMember }
                 }
                 componentProbe: componentProbe - 1
             }
             state componentFinalize: Int(componentStart)
-            while componentFinalize < componentEnd {
+            while !componentRequiresRestart && componentFinalize < componentEnd {
                 let finalizedMember: Int(intBufferElement(buffer: componentQueue, index: componentFinalize))
                 state finalizedParticipant: Int(1)
                 if componentBlocked { finalizedParticipant: 2 }
@@ -9315,6 +9347,7 @@ function compilerReachableLLVMStateBuildABIComponents(reachability: CompilerReac
     }
     state componentDestroyStatus: Int(intBufferDestroy(buffer: sensitiveFunctions))
     if intBufferDestroy(buffer: componentQueue) != 0 { componentDestroyStatus: 0 - 1 }
+    if componentDestroyStatus == 0 && componentRequiresRestart { return functionCount + 1 }
     if componentDestroyStatus == 0 && firstBlockedFunction >= 0 { return firstBlockedFunction + 1 }
     return componentDestroyStatus
 }
@@ -9363,9 +9396,21 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
         if compilerReachableLLVMStateDiscoverFunction(reachability: reachability, functionRow: functionRow) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 100000 + functionRow) }
         if intBufferSet(buffer: reachability.counters, index: compilerReachableLLMWorkIndex(), value: workIndex + 1) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
     }
-    if compilerReachableLLVMStatePrepareCandidateABIPlan(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 40) }
-    let abiComponentStatus: Int(compilerReachableLLVMStateBuildABIComponents(reachability: reachability))
+    state abiComponentStatus: Int(0)
+    state abiComponentIteration: Int(0)
+    state abiComponentChanged: Bool(true)
+    let abiComponentFunctionCount: Int(compilerIntTableRowCount(table: reachability.context.tables.functions))
+    while abiComponentStatus == 0 && abiComponentChanged {
+        if abiComponentIteration > abiComponentFunctionCount { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 40) }
+        let sensitiveCountBeforeComponents: Int(compilerReachableLLVMStateSensitiveCount(reachability: reachability))
+        if compilerReachableLLVMStatePrepareCandidateABIPlan(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 40) }
+        abiComponentStatus: compilerReachableLLVMStateBuildABIComponents(reachability: reachability)
+        if abiComponentStatus == abiComponentFunctionCount + 1 { abiComponentStatus: 0 }
+        abiComponentChanged: compilerReachableLLVMStateSensitiveCount(reachability: reachability) != sensitiveCountBeforeComponents
+        abiComponentIteration: abiComponentIteration + 1
+    }
     if abiComponentStatus < 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 41) }
+    if abiComponentStatus > 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 200000 + abiComponentStatus - 1) }
     if compilerReachableLLVMStateRefreshCapabilityCounter(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 42) }
     let closureTransientMark: Int(stringTransientRegionMark())
     state activationWorkIndex: Int(intBufferCount(buffer: reachability.worklist))

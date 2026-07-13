@@ -32,9 +32,8 @@ function lexRangeSource(source: String): String {
 
 function lexNextRangeToken(source: String, start: Int): Optional<RangeLexedToken> {
     let sourceIndex: Int(rangeLexerFirstNonWhitespace(source: source, start: start))
-    let sourceLength: Int(stringLength(value: source))
 
-    if sourceIndex >= sourceLength {
+    if stringByteAt(source: source, index: sourceIndex) == 0 {
         return nil
     }
 
@@ -48,9 +47,9 @@ function lexNextRangeToken(source: String, start: Int): Optional<RangeLexedToken
 
 function rangeLexerFirstNonWhitespace(source: String, start: Int): Int {
     state sourceIndex: Int(start)
-    let sourceLength: Int(stringLength(value: source))
 
-    while sourceIndex < sourceLength && isRangeLexerWhitespace(character: stringCharacterAt(source: source, index: sourceIndex)) {
+    while stringByteAt(source: source, index: sourceIndex) != 0
+        && isRangeLexerWhitespace(character: stringCharacterAt(source: source, index: sourceIndex)) {
         sourceIndex: sourceIndex + 1
     }
 
@@ -169,7 +168,7 @@ function lexRangeIdentifierLikeToken(source: String, start: Int, character: Stri
 }
 
 function rangeToken(kind: String, source: String, start: Int, end: Int): RangeLexedToken {
-    return RangeLexedToken(kind: kind, start: start, end: end, text: stringSubstring(source: source, start: start, end: end))
+    return RangeLexedToken(kind: kind, start: start, end: end, text: stringSliceUnchecked(source: source, start: start, end: end))
 }
 
 function readRangeLiteralToken(source: String, start: Int): Optional<RangeLexedToken> {
@@ -375,9 +374,8 @@ function rangeLexerSingleBackslash(): String {
 
 function readRangeSigilIdentifier(source: String, start: Int): Optional<RangeLexedToken> {
     state sourceIndex: Int(start + 1)
-    let sourceLength: Int(stringLength(value: source))
 
-    if sourceIndex >= sourceLength {
+    if stringByteAt(source: source, index: sourceIndex) == 0 {
         return rangeToken(kind: String("unknown"), source: source, start: start, end: start + 1)
     }
     if isRangeIdentifierStart(character: stringCharacterAt(source: source, index: sourceIndex)) {
@@ -389,8 +387,8 @@ function readRangeSigilIdentifier(source: String, start: Int): Optional<RangeLex
 function readRangeSigilIdentifierFromStart(source: String, start: Int, sourceIndex: Int): Optional<RangeLexedToken> {
     state endIndex: Int(0)
     endIndex: sourceIndex
-    let sourceLength: Int(stringLength(value: source))
-    while endIndex < sourceLength && isRangeIdentifierPart(character: stringCharacterAt(source: source, index: endIndex)) {
+    while stringByteAt(source: source, index: endIndex) != 0
+        && isRangeIdentifierPart(character: stringCharacterAt(source: source, index: endIndex)) {
         endIndex: endIndex + 1
     }
 
@@ -399,13 +397,13 @@ function readRangeSigilIdentifierFromStart(source: String, start: Int, sourceInd
 
 function readRangeEscapedIdentifier(source: String, start: Int): Optional<RangeLexedToken> {
     state sourceIndex: Int(start + 1)
-    let sourceLength: Int(stringLength(value: source))
 
-    while sourceIndex < sourceLength && stringCharacterAt(source: source, index: sourceIndex) != String("`") {
+    while stringByteAt(source: source, index: sourceIndex) != 0
+        && stringCharacterAt(source: source, index: sourceIndex) != String("`") {
         sourceIndex: sourceIndex + 1
     }
 
-    if sourceIndex < sourceLength {
+    if stringByteAt(source: source, index: sourceIndex) != 0 {
         return rangeToken(kind: String("identifier"), source: source, start: start, end: sourceIndex + 1)
     }
 
@@ -414,9 +412,9 @@ function readRangeEscapedIdentifier(source: String, start: Int): Optional<RangeL
 
 function readRangeNumber(source: String, start: Int): Optional<RangeLexedToken> {
     state sourceIndex: Int(start)
-    let sourceLength: Int(stringLength(value: source))
 
-    while sourceIndex < sourceLength && isRangeDigit(character: stringCharacterAt(source: source, index: sourceIndex)) {
+    while stringByteAt(source: source, index: sourceIndex) != 0
+        && isRangeDigit(character: stringCharacterAt(source: source, index: sourceIndex)) {
         sourceIndex: sourceIndex + 1
     }
 
@@ -432,14 +430,13 @@ function readRangeNumberAfterInteger(source: String, start: Int, sourceIndex: In
 }
 
 function readRangeNumberHasFraction(source: String, sourceIndex: Int): Bool {
-    let sourceLength: Int(stringLength(value: source))
-    if sourceIndex >= sourceLength {
+    if stringByteAt(source: source, index: sourceIndex) == 0 {
         return false
     }
     if stringCharacterAt(source: source, index: sourceIndex) != String(".") {
         return false
     }
-    if sourceIndex + 1 >= sourceLength {
+    if stringByteAt(source: source, index: sourceIndex + 1) == 0 {
         return false
     }
     return isRangeDigit(character: stringCharacterAt(source: source, index: sourceIndex + 1))
@@ -448,8 +445,8 @@ function readRangeNumberHasFraction(source: String, sourceIndex: Int): Bool {
 function readRangeFractionalNumber(source: String, start: Int, sourceIndex: Int): Optional<RangeLexedToken> {
     state numberEnd: Int(0)
     numberEnd: sourceIndex + 1
-    let sourceLength: Int(stringLength(value: source))
-    while numberEnd < sourceLength && isRangeDigit(character: stringCharacterAt(source: source, index: numberEnd)) {
+    while stringByteAt(source: source, index: numberEnd) != 0
+        && isRangeDigit(character: stringCharacterAt(source: source, index: numberEnd)) {
         numberEnd: numberEnd + 1
     }
     return rangeToken(kind: String("double"), source: source, start: start, end: numberEnd)
@@ -457,13 +454,13 @@ function readRangeFractionalNumber(source: String, start: Int, sourceIndex: Int)
 
 function readRangeIdentifier(source: String, start: Int): Optional<RangeLexedToken> {
     state sourceIndex: Int(start)
-    let sourceLength: Int(stringLength(value: source))
 
-    while sourceIndex < sourceLength && isRangeIdentifierPart(character: stringCharacterAt(source: source, index: sourceIndex)) {
+    while stringByteAt(source: source, index: sourceIndex) != 0
+        && isRangeIdentifierPart(character: stringCharacterAt(source: source, index: sourceIndex)) {
         sourceIndex: sourceIndex + 1
     }
 
-    let text: String(stringSubstring(source: source, start: start, end: sourceIndex))
+    let text: String(stringSliceUnchecked(source: source, start: start, end: sourceIndex))
     if isRangeKeyword(value: text) {
         return rangeToken(kind: String("keyword"), source: source, start: start, end: sourceIndex)
     }
