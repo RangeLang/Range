@@ -191,6 +191,7 @@ construct CompilerSyntaxTables {
     let macroInvocations: CompilerIntTable
     let macroCapabilityHandles: CompilerIntTable
     let macroExecutionEvents: CompilerIntTable
+    let macroReadDependencies: CompilerIntTable
     let bodyNodes: CompilerIntTable
     let bodyEdges: CompilerIntTable
     let failures: IntBuffer
@@ -877,12 +878,15 @@ function compilerSyntaxMacroCapabilityColumnCount(): Int { return 10 }
 function compilerSyntaxMacroInvocationColumnCount(): Int { return 33 }
 function compilerSyntaxMacroCapabilityHandleColumnCount(): Int { return 8 }
 function compilerSyntaxMacroExecutionEventColumnCount(): Int { return 12 }
+function compilerSyntaxMacroReadDependencyColumnCount(): Int { return 14 }
 
 function compilerMacroCapabilityTarget(): Int { return 1 }
 function compilerMacroCapabilityDiagnostics(): Int { return 2 }
 function compilerMacroCapabilityGraph(): Int { return 3 }
 function compilerMacroCapabilityAuthorityRead(): Int { return 1 }
 function compilerMacroCapabilityAuthorityAppendDiagnostic(): Int { return 2 }
+function compilerMacroCapabilityAuthorityQueryDeclarations(): Int { return 3 }
+function compilerMacroCapabilityAuthorityExpandTarget(): Int { return 4 }
 function compilerMacroCapabilityAuthorityNone(): Int { return 0 }
 function compilerMacroCapabilitySetInvalid(): Int { return 0 }
 
@@ -897,6 +901,8 @@ function compilerMacroDiagnosticCapabilityDenied(): Int { return 10 }
 function compilerMacroDiagnosticFuelExhausted(): Int { return 11 }
 function compilerMacroDiagnosticBodyInvalid(): Int { return 12 }
 function compilerMacroDiagnosticExecutionError(): Int { return 13 }
+function compilerMacroDiagnosticGraphQueryInvalid(): Int { return 14 }
+function compilerMacroDiagnosticGraphDeltaInvalid(): Int { return 15 }
 
 function compilerMacroSeverityInformation(): Int { return 1 }
 function compilerMacroSeverityWarning(): Int { return 2 }
@@ -907,6 +913,8 @@ function compilerMacroOperationInformation(): Int { return 1 }
 function compilerMacroOperationWarning(): Int { return 2 }
 function compilerMacroOperationHint(): Int { return 3 }
 function compilerMacroOperationError(): Int { return 4 }
+function compilerMacroGraphOperationDeclarationCount(): Int { return 1 }
+function compilerMacroTargetOperationOmit(): Int { return 1 }
 
 function compilerMacroCapabilityHeaderValid(): Int { return 0 }
 function compilerMacroCapabilityHeaderMalformed(): Int { return 1 }
@@ -1032,6 +1040,7 @@ function compilerSyntaxTablesCreate(source: String): CompilerSyntaxTables {
         macroInvocations: compilerIntTableCreate(columnCount: compilerSyntaxMacroInvocationColumnCount(), estimatedRowCount: 128),
         macroCapabilityHandles: compilerIntTableCreate(columnCount: compilerSyntaxMacroCapabilityHandleColumnCount(), estimatedRowCount: 384),
         macroExecutionEvents: compilerIntTableCreate(columnCount: compilerSyntaxMacroExecutionEventColumnCount(), estimatedRowCount: 128),
+        macroReadDependencies: compilerIntTableCreate(columnCount: compilerSyntaxMacroReadDependencyColumnCount(), estimatedRowCount: 128),
         bodyNodes: compilerIntTableCreate(columnCount: compilerSyntaxBodyNodeColumnCount(), estimatedRowCount: 256),
         bodyEdges: compilerIntTableCreate(columnCount: compilerSyntaxBodyEdgeColumnCount(), estimatedRowCount: 256),
         failures: intBufferCreate(capacity: 1)
@@ -1082,6 +1091,9 @@ function compilerSyntaxTablesDestroy(tables: CompilerSyntaxTables): Int {
     if compilerIntTableDestroy(table: tables.macroExecutionEvents) != 0 {
         status: 0 - 1
     }
+    if compilerIntTableDestroy(table: tables.macroReadDependencies) != 0 {
+        status: 0 - 1
+    }
     if compilerIntTableDestroy(table: tables.bodyNodes) != 0 {
         status: 0 - 1
     }
@@ -1120,6 +1132,7 @@ function compilerSyntaxTablesIsValid(tables: CompilerSyntaxTables): Bool {
         && compilerIntTableIsComplete(table: tables.macroInvocations)
         && compilerIntTableIsComplete(table: tables.macroCapabilityHandles)
         && compilerIntTableIsComplete(table: tables.macroExecutionEvents)
+        && compilerIntTableIsComplete(table: tables.macroReadDependencies)
         && compilerIntTableIsComplete(table: tables.bodyNodes)
         && compilerIntTableIsComplete(table: tables.bodyEdges)
     if !tablesAreComplete {
@@ -1671,6 +1684,7 @@ function compilerBodySyntaxSinkDisabled(source: String): CompilerBodySyntaxSink 
         macroInvocations: CompilerIntTable(values: nullBuffer, columnCount: compilerSyntaxMacroInvocationColumnCount()),
         macroCapabilityHandles: CompilerIntTable(values: nullBuffer, columnCount: compilerSyntaxMacroCapabilityHandleColumnCount()),
         macroExecutionEvents: CompilerIntTable(values: nullBuffer, columnCount: compilerSyntaxMacroExecutionEventColumnCount()),
+        macroReadDependencies: CompilerIntTable(values: nullBuffer, columnCount: compilerSyntaxMacroReadDependencyColumnCount()),
         bodyNodes: CompilerIntTable(values: nullBuffer, columnCount: compilerSyntaxBodyNodeColumnCount()),
         bodyEdges: CompilerIntTable(values: nullBuffer, columnCount: compilerSyntaxBodyEdgeColumnCount()),
         failures: nullBuffer
@@ -2238,9 +2252,9 @@ function compilerTypedSyntaxCaptureMacroWithPolicy(source: String, tables: Compi
         let targetFingerprint: CompilerFingerprint(compilerMacroCapabilityFingerprint(tables: tables, fileID: fileID, nameStart: targetNameStart, nameEnd: targetNameEnd, capabilityKind: compilerMacroCapabilityTarget(), capabilitySetID: capabilitySetID))
         let diagnosticsFingerprint: CompilerFingerprint(compilerMacroCapabilityFingerprint(tables: tables, fileID: fileID, nameStart: diagnosticsNameStart, nameEnd: diagnosticsNameEnd, capabilityKind: compilerMacroCapabilityDiagnostics(), capabilitySetID: capabilitySetID))
         let graphFingerprint: CompilerFingerprint(compilerMacroCapabilityFingerprint(tables: tables, fileID: fileID, nameStart: graphNameStart, nameEnd: graphNameEnd, capabilityKind: compilerMacroCapabilityGraph(), capabilitySetID: capabilitySetID))
-        if compilerSyntaxAppendMacroCapability(tables: tables, macroDeclarationRow: macroRow, ordinal: 0, capabilityKind: compilerMacroCapabilityTarget(), nameStart: targetNameStart, nameEnd: targetNameEnd, authority: compilerMacroCapabilityAuthorityRead(), capabilitySetID: capabilitySetID, fingerprint: targetFingerprint) < 0
+        if compilerSyntaxAppendMacroCapability(tables: tables, macroDeclarationRow: macroRow, ordinal: 0, capabilityKind: compilerMacroCapabilityTarget(), nameStart: targetNameStart, nameEnd: targetNameEnd, authority: compilerMacroCapabilityAuthorityExpandTarget(), capabilitySetID: capabilitySetID, fingerprint: targetFingerprint) < 0
             || compilerSyntaxAppendMacroCapability(tables: tables, macroDeclarationRow: macroRow, ordinal: 1, capabilityKind: compilerMacroCapabilityDiagnostics(), nameStart: diagnosticsNameStart, nameEnd: diagnosticsNameEnd, authority: compilerMacroCapabilityAuthorityAppendDiagnostic(), capabilitySetID: capabilitySetID, fingerprint: diagnosticsFingerprint) < 0
-            || compilerSyntaxAppendMacroCapability(tables: tables, macroDeclarationRow: macroRow, ordinal: 2, capabilityKind: compilerMacroCapabilityGraph(), nameStart: graphNameStart, nameEnd: graphNameEnd, authority: compilerMacroCapabilityAuthorityNone(), capabilitySetID: capabilitySetID, fingerprint: graphFingerprint) < 0 { compilerSyntaxTablesPoison(tables: tables) }
+            || compilerSyntaxAppendMacroCapability(tables: tables, macroDeclarationRow: macroRow, ordinal: 2, capabilityKind: compilerMacroCapabilityGraph(), nameStart: graphNameStart, nameEnd: graphNameEnd, authority: compilerMacroCapabilityAuthorityQueryDeclarations(), capabilitySetID: capabilitySetID, fingerprint: graphFingerprint) < 0 { compilerSyntaxTablesPoison(tables: tables) }
     }
     if !parameterCapture.isValid {
         compilerMacroDiagnosticAppend(tables: tables, code: compilerMacroDiagnosticMalformedDeclaration(), fileID: fileID, start: parts.parameterRange.start, end: parts.parameterRange.end, relatedKind: 1, relatedRow: macroRow, identity: identity)
@@ -3021,9 +3035,9 @@ function compilerMacroCapabilitiesAreStructurallyValid(tables: CompilerSyntaxTab
         if compilerIntTableValue(table: tables.macroCapabilities, row: row, column: 0) != row
             || declarationRow < 0 || declarationRow >= declarationCount || ordinal < 0
             || kind < compilerMacroCapabilityTarget() || kind > compilerMacroCapabilityGraph()
-            || (kind == compilerMacroCapabilityTarget() && compilerIntTableValue(table: tables.macroCapabilities, row: row, column: 6) != compilerMacroCapabilityAuthorityRead())
+            || (kind == compilerMacroCapabilityTarget() && compilerIntTableValue(table: tables.macroCapabilities, row: row, column: 6) != compilerMacroCapabilityAuthorityExpandTarget())
             || (kind == compilerMacroCapabilityDiagnostics() && compilerIntTableValue(table: tables.macroCapabilities, row: row, column: 6) != compilerMacroCapabilityAuthorityAppendDiagnostic())
-            || (kind == compilerMacroCapabilityGraph() && compilerIntTableValue(table: tables.macroCapabilities, row: row, column: 6) != compilerMacroCapabilityAuthorityNone())
+            || (kind == compilerMacroCapabilityGraph() && compilerIntTableValue(table: tables.macroCapabilities, row: row, column: 6) != compilerMacroCapabilityAuthorityQueryDeclarations())
             || compilerIntTableValue(table: tables.macroCapabilities, row: row, column: 7) <= 0
             || !compilerMacroLocalRangeIsValid(tables: tables, fileID: fileID, start: compilerIntTableValue(table: tables.macroCapabilities, row: row, column: 4), end: compilerIntTableValue(table: tables.macroCapabilities, row: row, column: 5), optional: false) { return false }
         state expectedOrdinal: Int(0)
@@ -3121,7 +3135,8 @@ function compilerMacroExecutionTablesAreStructurallyValid(tables: CompilerSyntax
     let declarationCount: Int(compilerIntTableRowCount(table: tables.macroDeclarations))
     if !compilerIntTableIsComplete(table: tables.macroInvocations)
         || !compilerIntTableIsComplete(table: tables.macroCapabilityHandles)
-        || !compilerIntTableIsComplete(table: tables.macroExecutionEvents) { return false }
+        || !compilerIntTableIsComplete(table: tables.macroExecutionEvents)
+        || !compilerIntTableIsComplete(table: tables.macroReadDependencies) { return false }
     state row: Int(0)
     while row < invocationCount {
         if compilerIntTableValue(table: tables.macroInvocations, row: row, column: 0) != row
@@ -3152,6 +3167,21 @@ function compilerMacroExecutionTablesAreStructurallyValid(tables: CompilerSyntax
             || compilerIntTableValue(table: tables.macroExecutionEvents, row: row, column: 1) >= invocationCount
             || compilerIntTableValue(table: tables.macroExecutionEvents, row: row, column: 2) < compilerMacroSeverityInformation()
             || compilerIntTableValue(table: tables.macroExecutionEvents, row: row, column: 2) > compilerMacroSeverityError() { return false }
+        row: row + 1
+    }
+    row: 0
+    while row < compilerIntTableRowCount(table: tables.macroReadDependencies) {
+        let dependencyInvocationRow: Int(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 1))
+        let dependencyKind: Int(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 3))
+        let dependencyFileID: Int(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 4))
+        if compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 0) != row
+            || dependencyInvocationRow < 0 || dependencyInvocationRow >= invocationCount
+            || compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 2) != compilerMacroGraphOperationDeclarationCount()
+            || (dependencyKind != compilerSyntaxKindConstruct() && dependencyKind != compilerSyntaxKindFunction())
+            || dependencyFileID < 0 || dependencyFileID >= compilerSourceStoreFileCount(store: tables.sourceStore)
+            || !compilerMacroLocalRangeIsValid(tables: tables, fileID: dependencyFileID, start: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 5), end: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 6), optional: false)
+            || !compilerMacroLocalRangeIsValid(tables: tables, fileID: dependencyFileID, start: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 7), end: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 8), optional: false)
+            || compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 9) < 0 { return false }
         row: row + 1
     }
     return true
@@ -3515,8 +3545,107 @@ function compilerMacroExecutionErrorIdentity(base: CompilerFingerprint, code: In
     return identity
 }
 
+function compilerMacroExecutionLiteralForValue(arena: CompilerBodyArena, valueID: Int): String {
+    if valueID < 0 || valueID >= compilerIntTableRowCount(table: arena.mirValues) { return String("") }
+    let sourceNodeID: Int(compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueSourceColumn()))
+    if sourceNodeID < 0 || sourceNodeID >= compilerIntTableRowCount(table: arena.nodes)
+        || compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindStringLiteral() { return String("") }
+    return compilerCoreStringLiteralContent(text: compilerBodyArenaNodeText(arena: arena, nodeID: sourceNodeID))
+}
+
+function compilerMacroExecutionDeclarationObservation(tables: CompilerSyntaxTables, kindTag: Int, name: String, queryIdentity: CompilerFingerprint): CompilerFingerprint {
+    state observation: CompilerFingerprint(queryIdentity)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.declarations) {
+        if compilerIntTableValue(table: tables.declarations, row: row, column: 2) == kindTag {
+            let fileID: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 1))
+            let candidate: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: row, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: row, column: 8)))
+            if candidate == name {
+                observation: compilerFingerprintAppendInt(fingerprint: observation, value: compilerIntTableValue(table: tables.declarations, row: row, column: 11))
+                observation: compilerFingerprintAppendInt(fingerprint: observation, value: compilerIntTableValue(table: tables.declarations, row: row, column: 12))
+            }
+        }
+        row: row + 1
+    }
+    return observation
+}
+
+function compilerMacroExecutionDeclarationCount(tables: CompilerSyntaxTables, kindTag: Int, name: String): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.declarations) {
+        if compilerIntTableValue(table: tables.declarations, row: row, column: 2) == kindTag {
+            let fileID: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 1))
+            let candidate: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: row, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: row, column: 8)))
+            if candidate == name { count: count + 1 }
+        }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerMacroExecutionAppendReadDependency(tables: CompilerSyntaxTables, invocationRow: Int, operation: Int, arena: CompilerBodyArena, operationRow: Int, kindValueID: Int, nameValueID: Int, kindTag: Int, observedCount: Int, queryIdentity: CompilerFingerprint, observation: CompilerFingerprint): Int {
+    let kindNodeID: Int(compilerIntTableValue(table: arena.mirValues, row: kindValueID, column: compilerBodyMIRValueSourceColumn()))
+    let nameNodeID: Int(compilerIntTableValue(table: arena.mirValues, row: nameValueID, column: compilerBodyMIRValueSourceColumn()))
+    if invocationRow < 0 || kindNodeID < 0 || nameNodeID < 0 || observedCount < 0 { return 0 - 1 }
+    let row: Int(compilerIntTableRowCount(table: tables.macroReadDependencies))
+    if compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: row) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: invocationRow) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: operation) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: kindTag) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: arena.fileID) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: compilerIntTableValue(table: arena.nodes, row: kindNodeID, column: 4)) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: compilerIntTableValue(table: arena.nodes, row: kindNodeID, column: 5)) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: compilerIntTableValue(table: arena.nodes, row: nameNodeID, column: 4)) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: compilerIntTableValue(table: arena.nodes, row: nameNodeID, column: 5)) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: observedCount) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: queryIdentity.first) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: queryIdentity.second) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: observation.first) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroReadDependencies, value: observation.second) != 0 { return 0 - 1 }
+    return row
+}
+
+function compilerMacroGraphDeltaAppendOmission(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, targetSyntaxID: Int): Int {
+    let nodeID: Int(compilerIntTableRowCount(table: delta.nodes))
+    if targetSyntaxID < 0 || targetSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
+        || compilerPlotterAppendSyntaxNode(tables: tables, delta: delta, syntaxID: targetSyntaxID) != nodeID { return 0 - 1 }
+    return compilerGraphDeltaAppendFact(delta: delta, factKind: compilerGraphFactOmitted(), subjectNodeID: nodeID, objectNodeID: nodeID, roleTag: compilerGraphRoleExpansion(), ordinal: nodeID)
+}
+
+function compilerMacroGraphDeltaIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Bool {
+    if intBufferCount(buffer: delta.failures) != 0 || !compilerIntTableIsComplete(table: delta.nodes) || !compilerIntTableIsComplete(table: delta.facts) { return false }
+    let nodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
+    if compilerIntTableRowCount(table: delta.facts) != nodeCount { return false }
+    state row: Int(0)
+    while row < nodeCount {
+        let syntaxID: Int(compilerIntTableValue(table: delta.nodes, row: row, column: 2))
+        let fileID: Int(compilerIntTableValue(table: delta.nodes, row: row, column: 4))
+        if compilerIntTableValue(table: delta.nodes, row: row, column: 0) != row
+            || syntaxID < 0 || syntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
+            || fileID < 0 || fileID >= compilerSourceStoreFileCount(store: tables.sourceStore)
+            || compilerIntTableValue(table: delta.nodes, row: row, column: 1) != compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 0)
+            || compilerIntTableValue(table: delta.nodes, row: row, column: 7) != compilerPlotterFacetKind(kindTag: compilerIntTableValue(table: delta.nodes, row: row, column: 1))
+            || compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: delta.nodes, row: row, column: 5)) < 0
+            || compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: delta.nodes, row: row, column: 6)) < 0
+            || compilerIntTableValue(table: delta.facts, row: row, column: 0) != compilerGraphFactOmitted()
+            || compilerIntTableValue(table: delta.facts, row: row, column: 1) != row
+            || compilerIntTableValue(table: delta.facts, row: row, column: 2) != row
+            || compilerIntTableValue(table: delta.facts, row: row, column: 3) != compilerGraphRoleExpansion()
+            || compilerIntTableValue(table: delta.facts, row: row, column: 4) != row { return false }
+        state prior: Int(0)
+        while prior < row {
+            if compilerIntTableValue(table: delta.nodes, row: prior, column: 2) == syntaxID { return false }
+            prior: prior + 1
+        }
+        row: row + 1
+    }
+    return true
+}
+
 function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex): CompilerMacroExecutionResult {
     let graphDelta: CompilerGraphDelta(compilerGraphDeltaCreate())
+    let pendingOmissionTargets: IntBuffer(intBufferCreate(capacity: 8))
     state status: Int(0)
     state diagnosticCode: Int(0)
     state invocationCount: Int(0)
@@ -3571,6 +3700,12 @@ function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDec
                             compilerMacroExecutionSetInvocation(tables: tables, row: invocationRow, status: compilerMacroInvocationFailed(), diagnosticCode: diagnosticCode, diagnosticFileID: compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 1), diagnosticStart: bodyStart, diagnosticEnd: bodyEnd, resultIdentity: bodyIdentity, mirOperationCount: compilerIntTableRowCount(table: arena.mirOperations), stepCount: 0)
                             mirOperationCount: mirOperationCount + compilerIntTableRowCount(table: arena.mirOperations)
                         } else {
+                            let evaluationValues: IntBuffer(intBufferCreate(capacity: compilerIntTableRowCount(table: arena.mirValues)))
+                            state evaluationValueRow: Int(0)
+                            while evaluationValueRow < compilerIntTableRowCount(table: arena.mirValues) {
+                                intBufferAppend(buffer: evaluationValues, value: 0)
+                                evaluationValueRow: evaluationValueRow + 1
+                            }
                             state operationRow: Int(0)
                             state invocationSteps: Int(0)
                             while operationRow < compilerIntTableRowCount(table: arena.mirOperations) && status == 0 {
@@ -3600,12 +3735,57 @@ function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDec
                                                 compilerMacroExecutionSetInvocation(tables: tables, row: invocationRow, status: compilerMacroInvocationFailed(), diagnosticCode: diagnosticCode, diagnosticFileID: arena.fileID, diagnosticStart: compilerIntTableValue(table: arena.nodes, row: errorSourceNodeID, column: 4), diagnosticEnd: compilerIntTableValue(table: arena.nodes, row: errorSourceNodeID, column: 5), resultIdentity: errorIdentity, mirOperationCount: compilerIntTableRowCount(table: arena.mirOperations), stepCount: invocationSteps)
                                             }
                                         }
+                                    } else if operationKind == compilerBodyMIROperationMacroTargetExpansion() {
+                                        let targetOperation: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationTargetIDColumn()))
+                                        let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12))
+                                        state duplicateTarget: Bool(false)
+                                        state pendingRow: Int(0)
+                                        while pendingRow < intBufferCount(buffer: pendingOmissionTargets) {
+                                            if intBufferElement(buffer: pendingOmissionTargets, index: pendingRow) == targetSyntaxID { duplicateTarget: true }
+                                            pendingRow: pendingRow + 1
+                                        }
+                                        if targetOperation != compilerMacroTargetOperationOmit() || targetSyntaxID < 0 || duplicateTarget
+                                            || intBufferAppend(buffer: pendingOmissionTargets, value: targetSyntaxID) != 0 {
+                                            status: 0 - 1
+                                            diagnosticCode: compilerMacroDiagnosticGraphDeltaInvalid()
+                                            let expansionSourceNodeID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationSourceColumn()))
+                                            let expansionIdentity: CompilerFingerprint(compilerMacroExecutionErrorIdentity(base: compilerMacroExecutionInvocationIdentity(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow), code: diagnosticCode, row: operationRow))
+                                            compilerMacroExecutionSetInvocation(tables: tables, row: invocationRow, status: compilerMacroInvocationFailed(), diagnosticCode: diagnosticCode, diagnosticFileID: arena.fileID, diagnosticStart: compilerIntTableValue(table: arena.nodes, row: expansionSourceNodeID, column: 4), diagnosticEnd: compilerIntTableValue(table: arena.nodes, row: expansionSourceNodeID, column: 5), resultIdentity: expansionIdentity, mirOperationCount: compilerIntTableRowCount(table: arena.mirOperations), stepCount: invocationSteps)
+                                        }
                                     } else if operationKind == compilerBodyMIROperationMacroCapabilityDenied() {
                                         status: 0 - 1
                                         diagnosticCode: compilerMacroDiagnosticCapabilityDenied()
                                         let deniedSourceNodeID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationSourceColumn()))
                                         let deniedIdentity: CompilerFingerprint(compilerMacroExecutionErrorIdentity(base: compilerMacroExecutionInvocationIdentity(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow), code: diagnosticCode, row: operationRow))
                                         compilerMacroExecutionSetInvocation(tables: tables, row: invocationRow, status: compilerMacroInvocationFailed(), diagnosticCode: diagnosticCode, diagnosticFileID: arena.fileID, diagnosticStart: compilerIntTableValue(table: arena.nodes, row: deniedSourceNodeID, column: 4), diagnosticEnd: compilerIntTableValue(table: arena.nodes, row: deniedSourceNodeID, column: 5), resultIdentity: deniedIdentity, mirOperationCount: compilerIntTableRowCount(table: arena.mirOperations), stepCount: invocationSteps)
+                                    } else if operationKind == compilerBodyMIROperationMacroGraphQuery() {
+                                        let queryKindValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 1))
+                                        let queryNameValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 2))
+                                        let queryKindName: String(compilerMacroExecutionLiteralForValue(arena: arena, valueID: queryKindValueID))
+                                        let queryName: String(compilerMacroExecutionLiteralForValue(arena: arena, valueID: queryNameValueID))
+                                        let queryKindTag: Int(compilerMacroTargetKindForText(text: queryKindName))
+                                        if (queryKindTag != compilerSyntaxKindConstruct() && queryKindTag != compilerSyntaxKindFunction()) || queryName == String("") {
+                                            status: 0 - 1
+                                            diagnosticCode: compilerMacroDiagnosticGraphQueryInvalid()
+                                            let querySourceNodeID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationSourceColumn()))
+                                            let invalidQueryIdentity: CompilerFingerprint(compilerMacroExecutionErrorIdentity(base: compilerMacroExecutionInvocationIdentity(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow), code: diagnosticCode, row: operationRow))
+                                            compilerMacroExecutionSetInvocation(tables: tables, row: invocationRow, status: compilerMacroInvocationFailed(), diagnosticCode: diagnosticCode, diagnosticFileID: arena.fileID, diagnosticStart: compilerIntTableValue(table: arena.nodes, row: querySourceNodeID, column: 4), diagnosticEnd: compilerIntTableValue(table: arena.nodes, row: querySourceNodeID, column: 5), resultIdentity: invalidQueryIdentity, mirOperationCount: compilerIntTableRowCount(table: arena.mirOperations), stepCount: invocationSteps)
+                                        } else {
+                                            state queryIdentity: CompilerFingerprint(compilerFingerprintInitial())
+                                            queryIdentity: compilerFingerprintAppendInt(fingerprint: queryIdentity, value: compilerMacroGraphOperationDeclarationCount())
+                                            queryIdentity: compilerFingerprintAppendInt(fingerprint: queryIdentity, value: queryKindTag)
+                                            queryIdentity: compilerFingerprintAppendText(fingerprint: queryIdentity, tag: 710, text: queryName)
+                                            let observedCount: Int(compilerMacroExecutionDeclarationCount(tables: tables, kindTag: queryKindTag, name: queryName))
+                                            let observation: CompilerFingerprint(compilerMacroExecutionDeclarationObservation(tables: tables, kindTag: queryKindTag, name: queryName, queryIdentity: queryIdentity))
+                                            let queryResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
+                                            if compilerMacroExecutionAppendReadDependency(tables: tables, invocationRow: invocationRow, operation: compilerMacroGraphOperationDeclarationCount(), arena: arena, operationRow: operationRow, kindValueID: queryKindValueID, nameValueID: queryNameValueID, kindTag: queryKindTag, observedCount: observedCount, queryIdentity: queryIdentity, observation: observation) < 0
+                                                || intBufferSet(buffer: evaluationValues, index: queryResultValueID, value: observedCount) != 0 {
+                                                status: 0 - 1
+                                                diagnosticCode: compilerMacroDiagnosticBodyInvalid()
+                                            } else {
+                                                readDependencyCount: readDependencyCount + 1
+                                            }
+                                        }
                                     } else if operationKind != compilerBodyMIROperationStringGlobal() && operationKind != compilerBodyMIROperationReturn() {
                                         status: 0 - 1
                                         diagnosticCode: compilerMacroDiagnosticBodyInvalid()
@@ -3618,6 +3798,7 @@ function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDec
                                 let successIdentity: CompilerFingerprint(compilerMacroExecutionInvocationIdentity(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow))
                                 compilerMacroExecutionSetInvocation(tables: tables, row: invocationRow, status: compilerMacroInvocationSuccess(), diagnosticCode: 0, diagnosticFileID: 0 - 1, diagnosticStart: 0 - 1, diagnosticEnd: 0 - 1, resultIdentity: successIdentity, mirOperationCount: compilerIntTableRowCount(table: arena.mirOperations), stepCount: invocationSteps)
                             }
+                            intBufferDestroy(buffer: evaluationValues)
                         }
                         compilerBodyArenaDestroy(arena: arena)
                         intBufferDestroy(buffer: emptyReturnModes)
@@ -3628,6 +3809,21 @@ function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDec
         }
         applicationRow: applicationRow + 1
     }
+    if status == 0 {
+        state omissionRow: Int(0)
+        while omissionRow < intBufferCount(buffer: pendingOmissionTargets) && status == 0 {
+            if compilerMacroGraphDeltaAppendOmission(tables: tables, delta: graphDelta, targetSyntaxID: intBufferElement(buffer: pendingOmissionTargets, index: omissionRow)) != 0 {
+                status: 0 - 1
+                diagnosticCode: compilerMacroDiagnosticGraphDeltaInvalid()
+            }
+            omissionRow: omissionRow + 1
+        }
+        if status == 0 && !compilerMacroGraphDeltaIsValid(tables: tables, delta: graphDelta) {
+            status: 0 - 1
+            diagnosticCode: compilerMacroDiagnosticGraphDeltaInvalid()
+        }
+    }
+    intBufferDestroy(buffer: pendingOmissionTargets)
     return CompilerMacroExecutionResult(status: status, diagnosticCode: diagnosticCode, invocationCount: invocationCount, capabilityHandleCount: handleCount, eventCount: eventCount, readDependencyCount: readDependencyCount, mirOperationCount: mirOperationCount, stepCount: stepCount, graphDelta: graphDelta)
 }
 
@@ -3699,8 +3895,10 @@ function compilerGraphNodeColumnCount(): Int { return 8 }
 function compilerGraphFactColumnCount(): Int { return 5 }
 function compilerGraphFactOwns(): Int { return 1 }
 function compilerGraphFactAppliesTo(): Int { return 2 }
+function compilerGraphFactOmitted(): Int { return 3 }
 function compilerGraphRoleMember(): Int { return 10 }
 function compilerGraphRoleParameter(): Int { return 11 }
+function compilerGraphRoleExpansion(): Int { return 22 }
 function compilerGraphFacetDeclaration(): Int { return 1 }
 function compilerGraphFacetMember(): Int { return 2 }
 function compilerGraphFacetParameter(): Int { return 3 }
@@ -7002,6 +7200,8 @@ function compilerMacroDiagnosticName(code: Int): String {
     if code == compilerMacroDiagnosticFuelExhausted() { return String("macroExecutionFuelExhausted") }
     if code == compilerMacroDiagnosticBodyInvalid() { return String("macroExecutionBodyInvalid") }
     if code == compilerMacroDiagnosticExecutionError() { return String("macroExecutionError") }
+    if code == compilerMacroDiagnosticGraphQueryInvalid() { return String("macroGraphQueryInvalid") }
+    if code == compilerMacroDiagnosticGraphDeltaInvalid() { return String("macroGraphDeltaInvalid") }
     return String("invalidMacroDiagnostic")
 }
 
@@ -7044,6 +7244,48 @@ function compilerMacroObserverDigest(tables: CompilerSyntaxTables): CompilerFing
         column: 0
         while column < compilerSyntaxMacroEdgeColumnCount() {
             digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: tables.macroEdges, row: row, column: column))
+            column: column + 1
+        }
+        row: row + 1
+    }
+    return digest
+}
+
+function compilerMacroReadDependencyDigest(tables: CompilerSyntaxTables): CompilerFingerprint {
+    state digest: CompilerFingerprint(compilerFingerprintInitial())
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.macroReadDependencies) {
+        digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 2))
+        digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 3))
+        digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 9))
+        digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 10))
+        digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 11))
+        digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 12))
+        digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 13))
+        row: row + 1
+    }
+    return digest
+}
+
+function compilerMacroGraphDeltaDigest(delta: CompilerGraphDelta): CompilerFingerprint {
+    state digest: CompilerFingerprint(compilerFingerprintInitial())
+    state row: Int(0)
+    state column: Int(0)
+    digest: compilerFingerprintAppendInt(fingerprint: digest, value: 900)
+    while row < compilerIntTableRowCount(table: delta.nodes) {
+        column: 0
+        while column < compilerGraphNodeColumnCount() {
+            digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: delta.nodes, row: row, column: column))
+            column: column + 1
+        }
+        row: row + 1
+    }
+    digest: compilerFingerprintAppendInt(fingerprint: digest, value: 901)
+    row: 0
+    while row < compilerIntTableRowCount(table: delta.facts) {
+        column: 0
+        while column < compilerGraphFactColumnCount() {
+            digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: delta.facts, row: row, column: column))
             column: column + 1
         }
         row: row + 1
@@ -7125,6 +7367,16 @@ function compilerMacroExecutionDigest(tables: CompilerSyntaxTables): CompilerFin
         }
         row: row + 1
     }
+    digest: compilerFingerprintAppendInt(fingerprint: digest, value: tableTag + 3)
+    row: 0
+    while row < compilerIntTableRowCount(table: tables.macroReadDependencies) {
+        column: 0
+        while column < compilerSyntaxMacroReadDependencyColumnCount() {
+            digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: column))
+            column: column + 1
+        }
+        row: row + 1
+    }
     return digest
 }
 
@@ -7140,6 +7392,42 @@ function compilerMacroRenderExecutionEvents(tables: CompilerSyntaxTables): Strin
         let rawMessage: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: messageStart, localEnd: messageEnd))
         let message: String(compilerCoreStringLiteralContent(text: rawMessage))
         textBufferAppend(buffer: outputBuffer, text: "macroExecutionEvent\(tab)row=\(row)\(tab)invocationRow=\(compilerIntTableValue(table: tables.macroExecutionEvents, row: row, column: 1))\(tab)severity=\(compilerIntTableValue(table: tables.macroExecutionEvents, row: row, column: 2))\(tab)operation=\(compilerIntTableValue(table: tables.macroExecutionEvents, row: row, column: 3))\(tab)message=\(message)\(tab)messageFileID=\(fileID)\(tab)messageStart=\(messageStart)\(tab)messageEnd=\(messageEnd)\(tab)sourceFileID=\(compilerIntTableValue(table: tables.macroExecutionEvents, row: row, column: 7))\(tab)sourceStart=\(compilerIntTableValue(table: tables.macroExecutionEvents, row: row, column: 8))\(tab)sourceEnd=\(compilerIntTableValue(table: tables.macroExecutionEvents, row: row, column: 9))\(newline)")
+        row: row + 1
+    }
+    return compilerCoreTextBufferMaterializeAndDestroy(buffer: outputBuffer)
+}
+
+function compilerMacroRenderReadDependencies(tables: CompilerSyntaxTables): String {
+    let outputBuffer: TextBuffer(textBufferCreate(capacity: 512))
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.macroReadDependencies) {
+        let fileID: Int(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 4))
+        let kindStart: Int(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 5))
+        let kindEnd: Int(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 6))
+        let nameStart: Int(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 7))
+        let nameEnd: Int(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 8))
+        let kindName: String(compilerCoreStringLiteralContent(text: compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: kindStart, localEnd: kindEnd)))
+        let declarationName: String(compilerCoreStringLiteralContent(text: compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: nameStart, localEnd: nameEnd)))
+        textBufferAppend(buffer: outputBuffer, text: "macroReadDependency\(tab)row=\(row)\(tab)invocationRow=\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 1))\(tab)operation=\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 2))\(tab)kind=\(kindName)\(tab)name=\(declarationName)\(tab)observedCount=\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 9))\(tab)queryIdentity=\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 10)):\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 11))\(tab)observation=\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 12)):\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 13))\(newline)")
+        row: row + 1
+    }
+    return compilerCoreTextBufferMaterializeAndDestroy(buffer: outputBuffer)
+}
+
+function compilerMacroRenderGraphDelta(delta: CompilerGraphDelta): String {
+    let outputBuffer: TextBuffer(textBufferCreate(capacity: 256))
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: delta.nodes) {
+        textBufferAppend(buffer: outputBuffer, text: "macroGraphDeltaNode\(tab)row=\(row)\(tab)kind=\(compilerSyntaxKindName(kindTag: compilerIntTableValue(table: delta.nodes, row: row, column: 1)))\(tab)targetSyntaxID=\(compilerIntTableValue(table: delta.nodes, row: row, column: 2))\(tab)fileID=\(compilerIntTableValue(table: delta.nodes, row: row, column: 4))\(tab)start=\(compilerIntTableValue(table: delta.nodes, row: row, column: 5))\(tab)end=\(compilerIntTableValue(table: delta.nodes, row: row, column: 6))\(newline)")
+        row: row + 1
+    }
+    row: 0
+    while row < compilerIntTableRowCount(table: delta.facts) {
+        textBufferAppend(buffer: outputBuffer, text: "macroGraphDeltaFact\(tab)row=\(row)\(tab)operation=omit\(tab)subjectNodeID=\(compilerIntTableValue(table: delta.facts, row: row, column: 1))\(tab)objectNodeID=\(compilerIntTableValue(table: delta.facts, row: row, column: 2))\(tab)role=\(compilerIntTableValue(table: delta.facts, row: row, column: 3))\(tab)ordinal=\(compilerIntTableValue(table: delta.facts, row: row, column: 4))\(newline)")
         row: row + 1
     }
     return compilerCoreTextBufferMaterializeAndDestroy(buffer: outputBuffer)
@@ -7181,13 +7469,17 @@ function compilerMacroRenderExecutionError(tables: CompilerSyntaxTables, result:
 
 function compilerMacroRenderExecutionSnapshot(tables: CompilerSyntaxTables, result: CompilerMacroExecutionResult): String {
     let digest: CompilerFingerprint(compilerMacroExecutionDigest(tables: tables))
-    state output: String("macroExecution\tvalid=true\tinvocationCount=\(compilerIntTableRowCount(table: tables.macroInvocations))\tcapabilityHandleCount=\(compilerIntTableRowCount(table: tables.macroCapabilityHandles))\teventCount=\(compilerIntTableRowCount(table: tables.macroExecutionEvents))\tgraphDeltaNodeCount=0\tgraphDeltaFactCount=0\treadDependencyCount=\(result.readDependencyCount)\texecutionDigest=\(digest.first):\(digest.second)\n")
+    let dependencyDigest: CompilerFingerprint(compilerMacroReadDependencyDigest(tables: tables))
+    let graphDeltaDigest: CompilerFingerprint(compilerMacroGraphDeltaDigest(delta: result.graphDelta))
+    state output: String("macroExecution\tvalid=true\tinvocationCount=\(compilerIntTableRowCount(table: tables.macroInvocations))\tcapabilityHandleCount=\(compilerIntTableRowCount(table: tables.macroCapabilityHandles))\teventCount=\(compilerIntTableRowCount(table: tables.macroExecutionEvents))\tgraphDeltaNodeCount=\(compilerIntTableRowCount(table: result.graphDelta.nodes))\tgraphDeltaFactCount=\(compilerIntTableRowCount(table: result.graphDelta.facts))\treadDependencyCount=\(result.readDependencyCount)\treadDependencyDigest=\(dependencyDigest.first):\(dependencyDigest.second)\tgraphDeltaDigest=\(graphDeltaDigest.first):\(graphDeltaDigest.second)\texecutionDigest=\(digest.first):\(digest.second)\n")
     state row: Int(0)
     while row < compilerIntTableRowCount(table: tables.macroInvocations) {
         output: "\(output)macroInvocation\trow=\(row)\tapplicationRow=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 1))\tdeclarationRow=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 2))\ttargetSyntaxID=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 3))\tphase=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 5))\tordinal=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 6))\tstatus=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 9))\tbudget=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 8))\tmirOperationCount=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 27))\tstepCount=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 28))\tapplicationIdentity=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 29)):\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 30))\tdeclarationIdentity=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 31)):\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 32))\n"
         row: row + 1
     }
     output: "\(output)\(compilerMacroRenderExecutionEvents(tables: tables))"
+    output: "\(output)\(compilerMacroRenderReadDependencies(tables: tables))"
+    output: "\(output)\(compilerMacroRenderGraphDelta(delta: result.graphDelta))"
     return output
 }
 
@@ -11346,6 +11638,8 @@ function compilerBodyResolutionConstruct(): Int { return 7 }
 function compilerBodyResolutionMemberRuntimeBuiltin(): Int { return 8 }
 function compilerBodyResolutionMacroCapability(): Int { return 9 }
 function compilerBodyResolutionMacroCapabilityDenied(): Int { return 10 }
+function compilerBodyResolutionMacroGraphQuery(): Int { return 11 }
+function compilerBodyResolutionMacroTargetOperation(): Int { return 12 }
 function compilerBodyBuiltinString(): Int { return 1 }
 function compilerBodyBuiltinRuntimeCall(): Int { return 2 }
 function compilerBodyBuiltinNil(): Int { return 3 }
@@ -12056,7 +12350,9 @@ function compilerBodyMIROperationDivide(): Int { return 33 }
 function compilerBodyMIROperationRemainder(): Int { return 34 }
 function compilerBodyMIROperationMacroDiagnostic(): Int { return 35 }
 function compilerBodyMIROperationMacroCapabilityDenied(): Int { return 36 }
-function compilerBodyMIROperationLast(): Int { return compilerBodyMIROperationMacroCapabilityDenied() }
+function compilerBodyMIROperationMacroGraphQuery(): Int { return 37 }
+function compilerBodyMIROperationMacroTargetExpansion(): Int { return 38 }
+function compilerBodyMIROperationLast(): Int { return compilerBodyMIROperationMacroTargetExpansion() }
 
 function compilerBodyMIROperandColumnCount(): Int { return 4 }
 function compilerBodyMIROperandOperationColumn(): Int { return 0 }
@@ -12846,6 +13142,16 @@ function compilerMacroDiagnosticsOperationForName(name: String): Int {
     return 0
 }
 
+function compilerMacroGraphOperationForName(name: String): Int {
+    if name == String("declarationCount") { return compilerMacroGraphOperationDeclarationCount() }
+    return 0
+}
+
+function compilerMacroTargetOperationForName(name: String): Int {
+    if name == String("omit") { return compilerMacroTargetOperationOmit() }
+    return 0
+}
+
 function compilerMacroDiagnosticsSeverityForOperation(operation: Int): Int {
     if operation == compilerMacroOperationInformation() { return compilerMacroSeverityInformation() }
     if operation == compilerMacroOperationWarning() { return compilerMacroSeverityWarning() }
@@ -13163,6 +13469,14 @@ function compilerBodyArenaResolveCapabilityExpression(arena: CompilerBodyArena, 
         if memberCapabilityKind == compilerMacroCapabilityDiagnostics() && memberOperation > 0 {
             return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: nodeID, targetKind: compilerBodyResolutionMacroCapability(), targetID: memberOperation, typeKind: compilerBodyTypeVoid(), typeID: 0 - 1, regionNodeID: regionNodeID)
         }
+        let targetOperation: Int(compilerMacroTargetOperationForName(name: compilerBodyArenaNodeText(arena: arena, nodeID: nodeID)))
+        if memberCapabilityKind == compilerMacroCapabilityTarget() && targetOperation > 0 {
+            return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: nodeID, targetKind: compilerBodyResolutionMacroTargetOperation(), targetID: targetOperation, typeKind: compilerBodyTypeVoid(), typeID: 0 - 1, regionNodeID: regionNodeID)
+        }
+        let graphOperation: Int(compilerMacroGraphOperationForName(name: compilerBodyArenaNodeText(arena: arena, nodeID: nodeID)))
+        if memberCapabilityKind == compilerMacroCapabilityGraph() && graphOperation > 0 {
+            return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: nodeID, targetKind: compilerBodyResolutionMacroGraphQuery(), targetID: graphOperation, typeKind: compilerBodyTypeInt(), typeID: 0 - 1, regionNodeID: regionNodeID)
+        }
         return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: nodeID, targetKind: compilerBodyResolutionMacroCapabilityDenied(), targetID: 0, typeKind: compilerBodyTypeVoid(), typeID: 0 - 1, regionNodeID: regionNodeID)
     }
     if kind == compilerSyntaxKindApplication() {
@@ -13176,12 +13490,24 @@ function compilerBodyArenaResolveCapabilityExpression(arena: CompilerBodyArena, 
         let applicationCapabilityKind: Int(compilerMacroCapabilityKindForTypeKind(typeKind: applicationReceiverTypeKind))
         if applicationCapabilityKind <= 0 { return 0 - 1 }
         let applicationOperation: Int(compilerMacroDiagnosticsOperationForName(name: compilerBodyArenaNodeText(arena: arena, nodeID: calleeNodeID)))
+        let applicationGraphOperation: Int(compilerMacroGraphOperationForName(name: compilerBodyArenaNodeText(arena: arena, nodeID: calleeNodeID)))
+        let applicationTargetOperation: Int(compilerMacroTargetOperationForName(name: compilerBodyArenaNodeText(arena: arena, nodeID: calleeNodeID)))
         state targetKind: Int(compilerBodyResolutionMacroCapabilityDenied())
         state targetID: Int(0)
+        state resultTypeKind: Int(compilerBodyTypeVoid())
         if applicationCapabilityKind == compilerMacroCapabilityDiagnostics() && applicationOperation > 0 {
             targetKind: compilerBodyResolutionMacroCapability()
             targetID: applicationOperation
             if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 1 { return 0 - 1 }
+        } else if applicationCapabilityKind == compilerMacroCapabilityTarget() && applicationTargetOperation > 0 {
+            targetKind: compilerBodyResolutionMacroTargetOperation()
+            targetID: applicationTargetOperation
+            if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 0 { return 0 - 1 }
+        } else if applicationCapabilityKind == compilerMacroCapabilityGraph() && applicationGraphOperation > 0 {
+            targetKind: compilerBodyResolutionMacroGraphQuery()
+            targetID: applicationGraphOperation
+            resultTypeKind: compilerBodyTypeInt()
+            if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 2 { return 0 - 1 }
         } else if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 0 { return 0 - 1 }
         let argumentCount: Int(compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID))
         state argumentOrdinal: Int(0)
@@ -13189,10 +13515,11 @@ function compilerBodyArenaResolveCapabilityExpression(arena: CompilerBodyArena, 
             let argumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleArgument(), ordinal: argumentOrdinal))
             let valueNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: argumentNodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0))
             if argumentNodeID < 0 || valueNodeID < 0 || compilerBodyArenaResolveExpression(arena: arena, index: index, nodeID: valueNodeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
-            if targetKind == compilerBodyResolutionMacroCapability() && compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID) != compilerBodyTypeString() { return 0 - 1 }
+            if (targetKind == compilerBodyResolutionMacroCapability() || targetKind == compilerBodyResolutionMacroGraphQuery())
+                && compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID) != compilerBodyTypeString() { return 0 - 1 }
             argumentOrdinal: argumentOrdinal + 1
         }
-        return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: calleeNodeID, targetKind: targetKind, targetID: targetID, typeKind: compilerBodyTypeVoid(), typeID: 0 - 1, regionNodeID: regionNodeID)
+        return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: calleeNodeID, targetKind: targetKind, targetID: targetID, typeKind: resultTypeKind, typeID: 0 - 1, regionNodeID: regionNodeID)
     }
     return 0 - 1
 }
@@ -13831,7 +14158,7 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindPrefixNegate()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindOptionalCoalescing()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindInterpolatedString())
-            || targetKind < compilerBodyResolutionLocalSymbol() || targetKind > compilerBodyResolutionMacroCapabilityDenied() { return false }
+            || targetKind < compilerBodyResolutionLocalSymbol() || targetKind > compilerBodyResolutionMacroTargetOperation() { return false }
         if targetKind == compilerBodyResolutionLocalSymbol() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.symbols)) { return false }
         if targetKind == compilerBodyResolutionFunction() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.functions)) { return false }
         if targetKind == compilerBodyResolutionBuiltin() && targetID != compilerBodyBuiltinString() && targetID != compilerBodyBuiltinRuntimeCall() && targetID != compilerBodyBuiltinNil() { return false }
@@ -13846,6 +14173,8 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
         if targetKind == compilerBodyResolutionMemberRuntimeBuiltin() && (targetID <= compilerBodyRuntimeBuiltinNone() || targetID > compilerBodyRuntimeBuiltinCount()) { return false }
         if targetKind == compilerBodyResolutionMacroCapability() && (targetID < compilerMacroOperationInformation() || targetID > compilerMacroOperationError()) { return false }
         if targetKind == compilerBodyResolutionMacroCapabilityDenied() && targetID != 0 { return false }
+        if targetKind == compilerBodyResolutionMacroGraphQuery() && targetID != compilerMacroGraphOperationDeclarationCount() { return false }
+        if targetKind == compilerBodyResolutionMacroTargetOperation() && targetID != compilerMacroTargetOperationOmit() { return false }
         if targetKind == compilerBodyResolutionConstruct() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.syntaxIndex)
             || compilerIntTableValue(table: arena.tables.syntaxIndex, row: targetID, column: 0) != compilerSyntaxKindConstruct()) { return false }
         if (targetKind == compilerBodyResolutionLocalSymbol() || targetKind == compilerBodyResolutionFunction() || targetKind == compilerBodyResolutionMember() || targetKind == compilerBodyResolutionConstruct())
@@ -14737,7 +15066,10 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         if resolutionTargetKind == compilerBodyResolutionRuntimeBuiltin() { callTargetKind: compilerBodyMIROperationTargetRuntimeBuiltin() }
         if resolutionTargetKind == compilerBodyResolutionMemberRuntimeBuiltin() { callTargetKind: compilerBodyMIROperationTargetRuntimeBuiltin() }
         if resolutionTargetKind == compilerBodyResolutionConstruct() { callTargetKind: compilerBodyMIROperationTargetConstruct() }
-        if resolutionTargetKind == compilerBodyResolutionMacroCapability() || resolutionTargetKind == compilerBodyResolutionMacroCapabilityDenied() { callTargetKind: compilerBodyMIROperationTargetNone() }
+        if resolutionTargetKind == compilerBodyResolutionMacroCapability()
+            || resolutionTargetKind == compilerBodyResolutionMacroCapabilityDenied()
+            || resolutionTargetKind == compilerBodyResolutionMacroGraphQuery()
+            || resolutionTargetKind == compilerBodyResolutionMacroTargetOperation() { callTargetKind: compilerBodyMIROperationTargetNone() }
         let callTypeKind: Int(compilerIntTableValue(table: arena.resolutions, row: callResolutionRow, column: compilerBodyResolutionTypeKindColumn()))
         let callTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: callResolutionRow, column: compilerBodyResolutionTypeIDColumn()))
         let callValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueCall(), typeKind: callTypeKind, typeID: compilerBodyMIRNominalTypeID(typeKind: callTypeKind, typeID: callTypeID), sourceNodeID: nodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: nodeID))
@@ -14745,11 +15077,15 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         state callOperandCount: Int(argumentCount)
         if resolutionTargetKind == compilerBodyResolutionMemberRuntimeBuiltin()
             || resolutionTargetKind == compilerBodyResolutionMacroCapability()
-            || resolutionTargetKind == compilerBodyResolutionMacroCapabilityDenied() { callOperandCount: callOperandCount + 1 }
+            || resolutionTargetKind == compilerBodyResolutionMacroCapabilityDenied()
+            || resolutionTargetKind == compilerBodyResolutionMacroGraphQuery()
+            || resolutionTargetKind == compilerBodyResolutionMacroTargetOperation() { callOperandCount: callOperandCount + 1 }
         let argumentValues: IntBuffer(intBufferCreate(capacity: callOperandCount))
         if resolutionTargetKind == compilerBodyResolutionMemberRuntimeBuiltin()
             || resolutionTargetKind == compilerBodyResolutionMacroCapability()
-            || resolutionTargetKind == compilerBodyResolutionMacroCapabilityDenied() {
+            || resolutionTargetKind == compilerBodyResolutionMacroCapabilityDenied()
+            || resolutionTargetKind == compilerBodyResolutionMacroGraphQuery()
+            || resolutionTargetKind == compilerBodyResolutionMacroTargetOperation() {
             let memberCallReceiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: calleeNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
             if memberCallReceiverNodeID < 0 {
                 intBufferDestroy(buffer: argumentValues)
@@ -14795,6 +15131,8 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         if resolutionTargetKind == compilerBodyResolutionConstruct() { callOperationKind: compilerBodyMIROperationConstruct() }
         if resolutionTargetKind == compilerBodyResolutionMacroCapability() { callOperationKind: compilerBodyMIROperationMacroDiagnostic() }
         if resolutionTargetKind == compilerBodyResolutionMacroCapabilityDenied() { callOperationKind: compilerBodyMIROperationMacroCapabilityDenied() }
+        if resolutionTargetKind == compilerBodyResolutionMacroGraphQuery() { callOperationKind: compilerBodyMIROperationMacroGraphQuery() }
+        if resolutionTargetKind == compilerBodyResolutionMacroTargetOperation() { callOperationKind: compilerBodyMIROperationMacroTargetExpansion() }
         if callValueID < 0 || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: callOperationKind, resultValueID: callValueID, sourceNodeID: nodeID, firstOperand: callFirstOperand, operandCount: callOperandCount, targetKind: callTargetKind, targetID: targetID) != callOperationID { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
         return CompilerBodyMIRValueResult(valueID: callValueID, isValid: true)
     }
@@ -15220,21 +15558,41 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                 }
             } else if validationStorageID != 0 - 1 { return 312000 + callResultTypeKind * 10 + callReturnABI }
         }
-        if operationKind == compilerBodyMIROperationMacroDiagnostic() || operationKind == compilerBodyMIROperationMacroCapabilityDenied() {
+        if operationKind == compilerBodyMIROperationMacroDiagnostic()
+            || operationKind == compilerBodyMIROperationMacroCapabilityDenied()
+            || operationKind == compilerBodyMIROperationMacroGraphQuery()
+            || operationKind == compilerBodyMIROperationMacroTargetExpansion() {
             let macroOperandCount: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()))
             let macroReceiverValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
             if validationTargetKind != compilerBodyMIROperationTargetNone()
                 || validationStorageID != 0 - 1
-                || macroReceiverValueID < 0 || macroReceiverValueID >= valueCount
-                || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeVoid() { return 320000 + operationRow }
+                || macroReceiverValueID < 0 || macroReceiverValueID >= valueCount { return 320000 + operationRow }
             if operationKind == compilerBodyMIROperationMacroDiagnostic() {
                 let messageValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 1))
                 if validationTargetID < compilerMacroOperationInformation() || validationTargetID > compilerMacroOperationError()
                     || macroOperandCount != 2
+                    || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeVoid()
                     || compilerIntTableValue(table: arena.mirValues, row: macroReceiverValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeMacroDiagnostics()
                     || messageValueID < 0 || messageValueID >= valueCount
                     || compilerIntTableValue(table: arena.mirValues, row: messageValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString() { return 320100 + operationRow }
-            } else if validationTargetID != 0 || macroOperandCount != 1 { return 320200 + operationRow }
+            } else if operationKind == compilerBodyMIROperationMacroCapabilityDenied() {
+                if validationTargetID != 0 || macroOperandCount != 1
+                    || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeVoid() { return 320200 + operationRow }
+            } else if operationKind == compilerBodyMIROperationMacroTargetExpansion() {
+                if validationTargetID != compilerMacroTargetOperationOmit() || macroOperandCount != 1
+                    || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeVoid()
+                    || compilerIntTableValue(table: arena.mirValues, row: macroReceiverValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeMacroTarget() { return 320300 + operationRow }
+            } else {
+                let queryKindValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 1))
+                let queryNameValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 2))
+                if validationTargetID != compilerMacroGraphOperationDeclarationCount() || macroOperandCount != 3
+                    || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeInt()
+                    || compilerIntTableValue(table: arena.mirValues, row: macroReceiverValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeMacroGraph()
+                    || queryKindValueID < 0 || queryKindValueID >= valueCount
+                    || queryNameValueID < 0 || queryNameValueID >= valueCount
+                    || compilerIntTableValue(table: arena.mirValues, row: queryKindValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString()
+                    || compilerIntTableValue(table: arena.mirValues, row: queryNameValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString() { return 320400 + operationRow }
+            }
         }
         if operationKind == compilerBodyMIROperationConstruct() {
             let constructResultTypeID: Int(compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeIDColumn()))

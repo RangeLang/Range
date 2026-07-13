@@ -2614,11 +2614,58 @@ The ordinary integration LLVM is byte-identical at SHA-256
 `6527f4bf00ebcda8f8a140faad0ea1d734fcac90a6db5546924ebc13927c53cc` and
 `38,336` bytes.
 
-Graph queries and graph mutation, target reads/mutation operations, arrays,
-closures, `where`, `count`, generic `Macro.Application` values, expansion,
-requirements/protocol evaluation, `@self`, `@graph`, the authored `Project`
-macro, general control flow, runtime calls, and full Foundation execution
-remain outside this diagnostic-only slice.
+### Native read-query and staged expansion-delta checkpoint
+
+The graph capability now has one selective read-only operation:
+`graph.declarationCount(kind, name)`. The bootstrap surface accepts the
+literal declaration selectors `Construct` and `Function`, resolves the call
+through the ordinary macro `BodyArena` and canonical MIR, and produces an
+`Int` value. Every observation records an exact dependency row containing the
+numeric declaration kind, queried name identity, observed count, and an
+observation fingerprint over matching stable declaration identities. A
+zero-result query still records the absent bucket. This makes both positive
+and negative observations incrementally meaningful without granting macros a
+mutable or unrestricted graph view.
+
+The target capability now admits the existing `SyntaxOmittable` shape
+`target.omit()`. Execution stages the target syntax node with source
+provenance and a typed `omitted` expansion fact in a non-empty
+`CompilerGraphDelta`; it does not rewrite source text. Expansion requests are
+transactional across the macro run. Repeating omission for the same target is
+rejected as `macroGraphDeltaInvalid`, and no partial delta is returned.
+Unknown graph and target operations remain capability-denied. The graph
+capability remains read-only; only the target capability can stage a target-
+scoped expansion fact.
+
+Focused Stage 2 and Stage 3 gates prove repeated query and expansion
+determinism, dependency stability when an unrelated source file changes file
+ordering, dependency-digest changes when the observed bucket changes,
+zero-result dependencies, invalid-query rejection before LLVM, combined query
+plus omission, transactional duplicate rejection, and denied unknown target
+operations. The ordinary native integration also executes a graph query
+before LLVM validation/link and still exits `7`. The complete fixed-point
+gate passes with no Swift invocation. Stage 2 and Stage 3 LLVM are byte-
+identical at SHA-256
+`c94e01bc901b4284d7f0b63aad7c9eaa02ed3b7b0c67cd54c8294a5f045a4afc` and
+`3,461,788` bytes; their linked executables are byte-identical at SHA-256
+`ac147682ec9d64881a5d7cff70ebdef31306babaa4956bfe9a2dc10e8be1e9de` and
+`2,022,432` bytes.
+
+This checkpoint proves deterministic delta production, not delta commitment.
+The returned omission delta is validated and then destroyed by the current
+ordinary LLVM driver; a scheduler still needs to merge successful deltas into
+the next immutable graph snapshot before lowering. Likewise, declaration
+counting alone is not protocol validation. Protocols-as-requirement-macros are
+now close enough to build on this substrate, but they still need selective
+target/member/requirement queries, macro evaluation that follows typed CFG
+conditions, and a typed derived `satisfiesRequirement` fact or carried
+behavior delta. Those features must extend this query/delta model rather than
+create a separate protocol engine.
+
+Arrays, closures, `where`, generic `Macro.Application` values, committed
+expansion scheduling, requirements/protocol evaluation, `@self`, Foundation
+`@graph`, the authored `Project` macro, general compile-time control flow,
+runtime calls, and full Foundation execution remain outside this slice.
 
 ### Explicit deferrals
 

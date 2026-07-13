@@ -682,6 +682,96 @@ write_macro_execution_bundle() {
                 '@Notice' \
                 'construct Other {}' > "$output"
             ;;
+        query)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/GraphQuery.range' \
+                'macro Observe(): Construct -> Void { target, diagnostics, graph in' \
+                '    graph.declarationCount("Construct", "Observed")' \
+                '    return diagnostics.information("observed")' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/GraphQueryUse.range' \
+                '@Observe' \
+                'construct Target {}' \
+                'construct Observed {}' > "$output"
+            ;;
+        query-reordered)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=foundation\tpath=Foundation/Unrelated.range' \
+                'construct Unrelated {}' \
+                'compilerSourceFile\trole=core\tpath=Core/GraphQuery.range' \
+                'macro Observe(): Construct -> Void { target, diagnostics, graph in' \
+                '    graph.declarationCount("Construct", "Observed")' \
+                '    return diagnostics.information("observed")' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/GraphQueryUse.range' \
+                '@Observe' \
+                'construct Target {}' \
+                'construct Observed {}' > "$output"
+            ;;
+        query-zero)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/GraphQueryZero.range' \
+                'macro ObserveMissing(): Construct -> Void { target, diagnostics, graph in' \
+                '    graph.declarationCount("Construct", "Missing")' \
+                '    return diagnostics.information("observed zero")' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/GraphQueryZeroUse.range' \
+                '@ObserveMissing' \
+                'construct Target {}' > "$output"
+            ;;
+        query-invalid)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/GraphQueryInvalid.range' \
+                'macro ObserveInvalid(): Construct -> Void { target, diagnostics, graph in' \
+                '    graph.declarationCount("Unknown", "Missing")' \
+                '    return diagnostics.information("unreachable")' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/GraphQueryInvalidUse.range' \
+                '@ObserveInvalid' \
+                'construct Target {}' > "$output"
+            ;;
+        expansion)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/Expansion.range' \
+                'macro OmitObserved(): Construct -> Void { target, diagnostics, graph in' \
+                '    graph.declarationCount("Construct", "Observed")' \
+                '    target.omit()' \
+                '    return diagnostics.information("omitted")' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/ExpansionUse.range' \
+                '@OmitObserved' \
+                'construct Target {}' \
+                'construct Observed {}' > "$output"
+            ;;
+        expansion-duplicate)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/DuplicateExpansion.range' \
+                'macro OmitTwice(): Construct -> Void { target, diagnostics, graph in' \
+                '    target.omit()' \
+                '    target.omit()' \
+                '    return diagnostics.information("unreachable")' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/DuplicateExpansionUse.range' \
+                '@OmitTwice' \
+                'construct Target {}' > "$output"
+            ;;
+        target-denied)
+            /usr/bin/printf '%b\n' \
+                'compilerMacroSnapshot' \
+                'compilerSourceFile\trole=core\tpath=Core/TargetDenied.range' \
+                'macro ReplaceDenied(): Construct -> Void { target, diagnostics, graph in' \
+                '    return target.replace()' \
+                '}' \
+                'compilerSourceFile\trole=project\tpath=Project/TargetDeniedUse.range' \
+                '@ReplaceDenied' \
+                'construct Target {}' > "$output"
+            ;;
         error)
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
@@ -765,6 +855,7 @@ write_macro_execution_native_integration_bundle() {
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=core\tpath=Core/DiagnosticNative.range' \
         'macro Signal(): Construct -> Void { target, diagnostics, graph in' \
+        '    graph.declarationCount("Construct", "Target")' \
         '    return diagnostics.information("checked")' \
         '}' \
         'compilerSourceFile\trole=project\tpath=Project/DiagnosticNativeUse.range' \
@@ -795,6 +886,62 @@ audit_macro_execution() {
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=3\teventCount=1\tgraphDeltaNodeCount=0\tgraphDeltaFactCount=0\treadDependencyCount=0' "$output" || fail "$stage_label macro execution positive counts changed"
     /usr/bin/grep -Fq $'macroInvocation\trow=0\tapplicationRow=0\tdeclarationRow=0\ttargetSyntaxID=' "$output" || fail "$stage_label macro execution omitted invocation provenance"
     /usr/bin/grep -Fq $'macroExecutionEvent\trow=0\tinvocationRow=0\tseverity=1\toperation=1\tmessage=checked' "$output" || fail "$stage_label macro execution omitted information event"
+
+    local query_bundle="$WORK_ROOT/$stage_label.macro.execution-query.range"
+    local query_output="$WORK_ROOT/$stage_label.macro.execution-query.out"
+    local query_repeat_output="$WORK_ROOT/$stage_label.macro.execution-query.repeat.out"
+    local query_error="$WORK_ROOT/$stage_label.macro.execution-query.err"
+    local query_repeat_error="$WORK_ROOT/$stage_label.macro.execution-query.repeat.err"
+    local query_reordered_bundle="$WORK_ROOT/$stage_label.macro.execution-query-reordered.range"
+    local query_reordered_output="$WORK_ROOT/$stage_label.macro.execution-query-reordered.out"
+    local query_reordered_error="$WORK_ROOT/$stage_label.macro.execution-query-reordered.err"
+    local query_zero_bundle="$WORK_ROOT/$stage_label.macro.execution-query-zero.range"
+    local query_zero_output="$WORK_ROOT/$stage_label.macro.execution-query-zero.out"
+    local query_zero_error="$WORK_ROOT/$stage_label.macro.execution-query-zero.err"
+    local query_digest="$WORK_ROOT/$stage_label.macro.execution-query.digest"
+    local query_reordered_digest="$WORK_ROOT/$stage_label.macro.execution-query-reordered.digest"
+    local query_zero_digest="$WORK_ROOT/$stage_label.macro.execution-query-zero.digest"
+    write_macro_execution_bundle "$query_bundle" query
+    run_capture "$executable" "$query_bundle" "$query_output" "$query_error"
+    require_successful_output "$stage_label macro graph query" "$query_output" "$query_error"
+    run_capture "$executable" "$query_bundle" "$query_repeat_output" "$query_repeat_error"
+    require_successful_output "$stage_label repeated macro graph query" "$query_repeat_output" "$query_repeat_error"
+    /usr/bin/cmp -s "$query_output" "$query_repeat_output" || fail "$stage_label macro graph query was not deterministic"
+    /usr/bin/grep -Fq $'eventCount=1\tgraphDeltaNodeCount=0\tgraphDeltaFactCount=0\treadDependencyCount=1' "$query_output" || fail "$stage_label macro graph query counts changed"
+    /usr/bin/grep -Fq $'macroReadDependency\trow=0\tinvocationRow=0\toperation=1\tkind=Construct\tname=Observed\tobservedCount=1' "$query_output" || fail "$stage_label macro graph query omitted its exact observed bucket"
+    /usr/bin/sed -n 's/.*readDependencyDigest=\([^[:space:]]*\).*/\1/p' "$query_output" > "$query_digest"
+    [[ -s "$query_digest" ]] || fail "$stage_label macro graph query omitted dependency digest"
+
+    write_macro_execution_bundle "$query_reordered_bundle" query-reordered
+    run_capture "$executable" "$query_reordered_bundle" "$query_reordered_output" "$query_reordered_error"
+    require_successful_output "$stage_label reordered macro graph query" "$query_reordered_output" "$query_reordered_error"
+    /usr/bin/sed -n 's/.*readDependencyDigest=\([^[:space:]]*\).*/\1/p' "$query_reordered_output" > "$query_reordered_digest"
+    /usr/bin/cmp -s "$query_digest" "$query_reordered_digest" || fail "$stage_label unrelated source reorder changed macro read dependency digest"
+
+    write_macro_execution_bundle "$query_zero_bundle" query-zero
+    run_capture "$executable" "$query_zero_bundle" "$query_zero_output" "$query_zero_error"
+    require_successful_output "$stage_label zero-result macro graph query" "$query_zero_output" "$query_zero_error"
+    /usr/bin/grep -Fq $'macroReadDependency\trow=0\tinvocationRow=0\toperation=1\tkind=Construct\tname=Missing\tobservedCount=0' "$query_zero_output" || fail "$stage_label zero-result macro graph query did not record its bucket"
+    /usr/bin/sed -n 's/.*readDependencyDigest=\([^[:space:]]*\).*/\1/p' "$query_zero_output" > "$query_zero_digest"
+    if /usr/bin/cmp -s "$query_digest" "$query_zero_digest"; then
+        fail "$stage_label changed macro graph observation did not change dependency digest"
+    fi
+
+    local expansion_bundle="$WORK_ROOT/$stage_label.macro.execution-expansion.range"
+    local expansion_output="$WORK_ROOT/$stage_label.macro.execution-expansion.out"
+    local expansion_repeat_output="$WORK_ROOT/$stage_label.macro.execution-expansion.repeat.out"
+    local expansion_error="$WORK_ROOT/$stage_label.macro.execution-expansion.err"
+    local expansion_repeat_error="$WORK_ROOT/$stage_label.macro.execution-expansion.repeat.err"
+    write_macro_execution_bundle "$expansion_bundle" expansion
+    run_capture "$executable" "$expansion_bundle" "$expansion_output" "$expansion_error"
+    require_successful_output "$stage_label macro graph expansion" "$expansion_output" "$expansion_error"
+    run_capture "$executable" "$expansion_bundle" "$expansion_repeat_output" "$expansion_repeat_error"
+    require_successful_output "$stage_label repeated macro graph expansion" "$expansion_repeat_output" "$expansion_repeat_error"
+    /usr/bin/cmp -s "$expansion_output" "$expansion_repeat_output" || fail "$stage_label macro graph expansion was not deterministic"
+    /usr/bin/grep -Fq $'eventCount=1\tgraphDeltaNodeCount=1\tgraphDeltaFactCount=1\treadDependencyCount=1' "$expansion_output" || fail "$stage_label macro graph expansion counts changed"
+    /usr/bin/grep -Fq $'macroReadDependency\trow=0\tinvocationRow=0\toperation=1\tkind=Construct\tname=Observed\tobservedCount=1' "$expansion_output" || fail "$stage_label macro graph expansion omitted its read dependency"
+    /usr/bin/grep -Fq $'macroGraphDeltaNode\trow=0\tkind=construct\ttargetSyntaxID=' "$expansion_output" || fail "$stage_label macro graph expansion omitted target provenance"
+    /usr/bin/grep -Fq $'macroGraphDeltaFact\trow=0\toperation=omit\tsubjectNodeID=0\tobjectNodeID=0\trole=22\tordinal=0' "$expansion_output" || fail "$stage_label macro graph expansion omitted its typed omission fact"
 
     bundle="$WORK_ROOT/$stage_label.macro.execution-multiple.range"
     output="$WORK_ROOT/$stage_label.macro.execution-multiple.out"
@@ -847,6 +994,38 @@ audit_macro_execution() {
         fail "$stage_label macro capability denial committed graph or emitted LLVM"
     fi
 
+    bundle="$WORK_ROOT/$stage_label.macro.execution-query-invalid.range"
+    output="$WORK_ROOT/$stage_label.macro.execution-query-invalid.out"
+    error="$WORK_ROOT/$stage_label.macro.execution-query-invalid.err"
+    write_macro_execution_bundle "$bundle" query-invalid
+    run_capture "$executable" "$bundle" "$output" "$error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label invalid macro graph query exited $RUN_STATUS"
+    [[ ! -s "$error" ]] || fail "$stage_label invalid macro graph query wrote stderr"
+    /usr/bin/grep -Fq 'diagnosticKind=macroGraphQueryInvalid' "$output" || fail "$stage_label invalid macro graph query missed diagnostic"
+    if /usr/bin/grep -Fq 'define ' "$output" || /usr/bin/grep -Fq 'call ' "$output"; then
+        fail "$stage_label invalid macro graph query emitted LLVM before rejection"
+    fi
+
+    bundle="$WORK_ROOT/$stage_label.macro.execution-expansion-duplicate.range"
+    output="$WORK_ROOT/$stage_label.macro.execution-expansion-duplicate.out"
+    error="$WORK_ROOT/$stage_label.macro.execution-expansion-duplicate.err"
+    write_macro_execution_bundle "$bundle" expansion-duplicate
+    run_capture "$executable" "$bundle" "$output" "$error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label duplicate macro graph expansion exited $RUN_STATUS"
+    [[ ! -s "$error" ]] || fail "$stage_label duplicate macro graph expansion wrote stderr"
+    /usr/bin/grep -Fq 'diagnosticKind=macroGraphDeltaInvalid' "$output" || fail "$stage_label duplicate macro graph expansion missed diagnostic"
+    /usr/bin/grep -Fq $'graphDeltaNodeCount=0\tgraphDeltaFactCount=0' "$output" || fail "$stage_label duplicate macro graph expansion returned a partial delta"
+
+    bundle="$WORK_ROOT/$stage_label.macro.execution-target-denied.range"
+    output="$WORK_ROOT/$stage_label.macro.execution-target-denied.out"
+    error="$WORK_ROOT/$stage_label.macro.execution-target-denied.err"
+    write_macro_execution_bundle "$bundle" target-denied
+    run_capture "$executable" "$bundle" "$output" "$error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label denied macro target operation exited $RUN_STATUS"
+    [[ ! -s "$error" ]] || fail "$stage_label denied macro target operation wrote stderr"
+    /usr/bin/grep -Fq 'diagnosticKind=macroCapabilityDenied' "$output" || fail "$stage_label denied macro target operation missed diagnostic"
+    /usr/bin/grep -Fq $'graphDeltaNodeCount=0\tgraphDeltaFactCount=0' "$output" || fail "$stage_label denied macro target operation returned a graph delta"
+
     bundle="$WORK_ROOT/$stage_label.macro.execution-fuel.range"
     output="$WORK_ROOT/$stage_label.macro.execution-fuel.out"
     error="$WORK_ROOT/$stage_label.macro.execution-fuel.err"
@@ -869,7 +1048,7 @@ audit_macro_execution() {
         if [[ "$kind" == duplicate-header ]]; then expected='diagnosticKind=macroCapabilityBindingDuplicate'; fi
         /usr/bin/grep -Fq "$expected" "$output" || fail "$stage_label macro $kind missed diagnostic $expected"
     done
-    echo "$stage_label macro execution: pass (shared BodyArena/MIR information and error events, arbitrary names, denial, fuel, header validation)"
+    echo "$stage_label macro execution: pass (shared BodyArena/MIR, diagnostics, deterministic queries/dependencies, transactional typed omission delta, denial, fuel, header validation)"
 }
 
 audit_macro_native_integration() {
@@ -903,7 +1082,7 @@ audit_macro_native_integration() {
     fi
     [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label native macro execution integration exited $RUN_STATUS"
     [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label native macro execution integration wrote output"
-    echo "$stage_label native macro execution integration: pass (ordinary LLVM validation/link, exit 7, deterministic)"
+    echo "$stage_label native macro execution integration: pass (ordinary query plus LLVM validation/link, exit 7, deterministic)"
 }
 
 audit_stage() {
@@ -1035,7 +1214,7 @@ main() {
     echo "Stage 2/Stage 3 native macro integration: byte-identical LLVM/executable"
 
     local macro_snapshot_suffix
-    for macro_snapshot_suffix in positive.first.out positive.reordered.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out execution-positive.out execution-positive.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
+    for macro_snapshot_suffix in positive.first.out positive.reordered.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out execution-positive.out execution-positive.repeat.out execution-query.out execution-query.repeat.out execution-query-reordered.out execution-query-zero.out execution-expansion.out execution-expansion.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-query-invalid.out execution-expansion-duplicate.out execution-target-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
         /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.$macro_snapshot_suffix" "$WORK_ROOT/Stage3.macro.$macro_snapshot_suffix" \
             || fail "Stage 2 and Stage 3 macro snapshot differs: $macro_snapshot_suffix"
     done
