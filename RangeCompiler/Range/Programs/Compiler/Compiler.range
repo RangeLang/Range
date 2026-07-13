@@ -71,8 +71,7 @@ function compileRangeNativeSourceDirectiveOutput(source: String): String {
 }
 
 function compileRangeNativeProgramOutput(source: String): String {
-    let program: CompilerProgram(parseCompilerProgramForLLVM(source: source))
-    return compilerCoreLLVMTextForProgram(program: program)
+    return compilerCoreLLVMNativeProgramText(source: source)
 }
 
 function compileRangeSourceSetDirectiveOutput(source: String): String {

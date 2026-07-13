@@ -208,9 +208,12 @@ construct CompilerLLVMLoweringContext {
 construct CompilerBodyArena {
     let tables: CompilerSyntaxTables
     let declarationIndex: CompilerDeclarationIndex
+    let ownerKind: Int
     let ownerDeclarationSyntaxID: Int
     let ownerFunctionRow: Int
     let fileID: Int
+    let bodyStart: Int
+    let bodyEnd: Int
     let rootNodeID: Int
     let retainsFacts: Bool
     let nodes: CompilerIntTable
@@ -483,6 +486,7 @@ construct CompilerReachableLLVMState {
     let abiActivation: IntBuffer
     let abiReturnModes: IntBuffer
     let abiParticipants: IntBuffer
+    let abiSensitiveFunctions: IntBuffer
     let functionsBuffer: TextBuffer
     let globalsBuffer: TextBuffer
     let counters: IntBuffer
@@ -1077,15 +1081,84 @@ function compilerFunctionEdgesAppend(edgeOwners: IntBuffer, edgeTargets: IntBuff
     return 0
 }
 
+function compilerFunctionEdgesAppendMissing(edgeOwners: IntBuffer, edgeTargets: IntBuffer, ownerFunctionRow: Int, targetFunctionRow: Int): Int {
+    state edgeIndex: Int(0)
+    while edgeIndex < intBufferCount(buffer: edgeTargets) {
+        if intBufferElement(buffer: edgeOwners, index: edgeIndex) == ownerFunctionRow
+            && intBufferElement(buffer: edgeTargets, index: edgeIndex) == targetFunctionRow { return 0 }
+        edgeIndex: edgeIndex + 1
+    }
+    return compilerFunctionEdgesAppend(edgeOwners: edgeOwners, edgeTargets: edgeTargets, ownerFunctionRow: ownerFunctionRow, targetFunctionRow: targetFunctionRow)
+}
+
+function compilerFunctionEdgesContain(edgeOwners: IntBuffer, edgeTargets: IntBuffer, ownerFunctionRow: Int, targetFunctionRow: Int): Bool {
+    state edgeIndex: Int(0)
+    while edgeIndex < intBufferCount(buffer: edgeTargets) {
+        if intBufferElement(buffer: edgeOwners, index: edgeIndex) == ownerFunctionRow
+            && intBufferElement(buffer: edgeTargets, index: edgeIndex) == targetFunctionRow { return true }
+        edgeIndex: edgeIndex + 1
+    }
+    return false
+}
+
 function compilerBodyArenaAppendFunctionEdges(arena: CompilerBodyArena, edgeOwners: IntBuffer, edgeTargets: IntBuffer): Int {
+    if arena.ownerKind != compilerBodyArenaOwnerFunction() { return 0 - 1 }
     state row: Int(0)
     while row < compilerIntTableRowCount(table: arena.resolutions) {
         if compilerIntTableValue(table: arena.resolutions, row: row, column: compilerBodyResolutionTargetKindColumn()) == compilerBodyResolutionFunction() {
-            if compilerFunctionEdgesAppend(edgeOwners: edgeOwners, edgeTargets: edgeTargets, ownerFunctionRow: arena.ownerFunctionRow, targetFunctionRow: compilerIntTableValue(table: arena.resolutions, row: row, column: compilerBodyResolutionTargetIDColumn())) != 0 { return 0 - 1 }
+            if compilerFunctionEdgesAppendMissing(edgeOwners: edgeOwners, edgeTargets: edgeTargets, ownerFunctionRow: arena.ownerFunctionRow, targetFunctionRow: compilerIntTableValue(table: arena.resolutions, row: row, column: compilerBodyResolutionTargetIDColumn())) != 0 { return 0 - 1 }
         }
         row: row + 1
     }
     return 0
+}
+
+function compilerBodyMIRAppendFunctionEdges(arena: CompilerBodyArena, edgeOwners: IntBuffer, edgeTargets: IntBuffer): Int {
+    if arena.ownerKind != compilerBodyArenaOwnerFunction() { return 0 - 1 }
+    state operationRow: Int(0)
+    while operationRow < compilerIntTableRowCount(table: arena.mirOperations) {
+        if compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationKindColumn()) == compilerBodyMIROperationDirectCall()
+            && compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationTargetKindColumn()) == compilerBodyMIROperationTargetFunction() {
+            if compilerFunctionEdgesAppendMissing(edgeOwners: edgeOwners, edgeTargets: edgeTargets, ownerFunctionRow: arena.ownerFunctionRow, targetFunctionRow: compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationTargetIDColumn())) != 0 { return 0 - 1 }
+        }
+        operationRow: operationRow + 1
+    }
+    return 0
+}
+
+function compilerBodyMIRMarkRepresentationSensitiveTargets(arena: CompilerBodyArena, sensitiveFunctions: IntBuffer): Int {
+    state operationRow: Int(0)
+    while operationRow < compilerIntTableRowCount(table: arena.mirOperations) {
+        if compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationKindColumn()) == compilerBodyMIROperationDirectCall()
+            && compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationTargetKindColumn()) == compilerBodyMIROperationTargetFunction() {
+            let targetFunctionRow: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationTargetIDColumn()))
+            let resultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
+            if targetFunctionRow < 0 || targetFunctionRow >= intBufferCount(buffer: sensitiveFunctions)
+                || resultValueID < 0 || resultValueID >= compilerIntTableRowCount(table: arena.mirValues) { return 0 - 1 }
+            if compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeConstruct() {
+                let resultTypeID: Int(compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeIDColumn()))
+                if compilerBodyLLVMNominalTypeNameForTypeID(arena: arena, typeID: resultTypeID) != String("") {
+                    if intBufferSet(buffer: sensitiveFunctions, index: targetFunctionRow, value: 1) != 0 { return 0 - 1 }
+                }
+            }
+        }
+        operationRow: operationRow + 1
+    }
+    return 0
+}
+
+function compilerBodyArenaHasUnplannedRepresentationSensitiveCall(arena: CompilerBodyArena, abiPlan: CompilerModuleABIPlan): Bool {
+    state resolutionRow: Int(0)
+    while resolutionRow < compilerIntTableRowCount(table: arena.resolutions) {
+        if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) == compilerBodyResolutionFunction() {
+            let targetFunctionRow: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+            if compilerFunctionHasRepresentationSensitiveABI(tables: arena.tables, index: arena.declarationIndex, functionRow: targetFunctionRow)
+                && (!compilerBodyArenaOwnerIsParticipant(arena: arena, plan: abiPlan)
+                    || !compilerModuleABIPlanIsParticipant(plan: abiPlan, functionRow: targetFunctionRow)) { return true }
+        }
+        resolutionRow: resolutionRow + 1
+    }
+    return false
 }
 
 function compilerLegacyAppendFunctionNameEdge(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, ownerFunctionRow: Int, name: String, edgeOwners: IntBuffer, edgeTargets: IntBuffer): Int {
@@ -7827,6 +7900,67 @@ function compilerCoreLLVMPlaceholderFailure(placeholderCount: Int, renderedText:
     return "compilerError\tkind=unsupportedReachableLowering\tplaceholderCount=\(placeholderCount)\(compilerCoreNewlineCharacter())\(details)"
 }
 
+function compilerCoreRenderLLVMEntryFunction(block: CompilerLLVMLoweredBlock): String {
+    let llvmFunction: CompilerLLVMFunction(CompilerLLVMFunction(name: String("main"), returnType: String("i32"), parameterText: String(""), renderedBlocks: block.renderedBlocks, block: compilerCoreMainLLVMBasicBlock(block: block)))
+    return compilerCoreRenderLLVMFunction(llvmFunction: llvmFunction)
+}
+
+function compilerCoreLLVMNativeProgramText(source: String): String {
+    let tables: CompilerSyntaxTables(compilerSyntaxTablesCreate(source: source))
+    let captureStatus: Int(compilerTypedDeclarationsCapture(source: source, tables: tables))
+    if captureStatus != 0 || !compilerSyntaxTablesIsValid(tables: tables) {
+        compilerSyntaxTablesDestroy(tables: tables)
+        return String("compilerError\tkind=invalidTypedDeclarations")
+    }
+    let declarationIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: tables))
+    if !declarationIndex.isValid {
+        compilerDeclarationIndexDestroy(index: declarationIndex)
+        compilerSyntaxTablesDestroy(tables: tables)
+        return String("compilerError\tkind=invalidDeclarationIndex")
+    }
+    let program: CompilerProgram(compilerNativeSourceSetProgramForLLVM(source: source))
+    let context: CompilerLLVMLoweringContext(CompilerLLVMLoweringContext(program: program, tables: tables, declarationIndex: declarationIndex))
+    let reachability: CompilerReachableLLVMState(compilerReachableLLVMStateCreate(context: context))
+    state output: String("compilerError\tkind=invalidEntryReachability")
+    let seedStatus: Int(compilerReachableLLVMStateSeedEntryRoots(reachability: reachability))
+    state buildStatus: Int(0 - 1)
+    if seedStatus != 0 {
+        compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 50000 + seedStatus)
+        output: "compilerError\tkind=invalidEntryReachability\tstage=\(seedStatus)"
+    } else {
+        buildStatus: compilerReachableLLVMStateBuildSelected(reachability: reachability)
+    }
+    if seedStatus == 0 && buildStatus != 0 {
+        output: compilerReachableLLVMStateRender(reachability: reachability)
+    }
+    if seedStatus == 0 && buildStatus == 0 {
+        state blockedSensitiveFunctionRow: Int(0)
+        while buildStatus == 0 && blockedSensitiveFunctionRow < intBufferCount(buffer: reachability.abiSensitiveFunctions) {
+            if compilerFunctionSelectionContains(selection: reachability.selection, functionRow: blockedSensitiveFunctionRow)
+                && intBufferElement(buffer: reachability.abiSensitiveFunctions, index: blockedSensitiveFunctionRow) == 1
+                && intBufferElement(buffer: reachability.abiCapabilities, index: blockedSensitiveFunctionRow) != 1 {
+                buildStatus: compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 200000 + blockedSensitiveFunctionRow)
+                output: compilerReachableLLVMStateRender(reachability: reachability)
+            }
+            blockedSensitiveFunctionRow: blockedSensitiveFunctionRow + 1
+        }
+    }
+    if seedStatus == 0 && buildStatus == 0 {
+        let abiPlan: CompilerModuleABIPlan(compilerReachableLLVMStateABIPlan(reachability: reachability))
+        let entryLowering: CompilerTypedBodyLowering(compilerCoreLLVMLowerEntryTyped(context: context, initialTemporaryIndex: intBufferElement(buffer: reachability.counters, index: compilerReachableLLVMNextTemporary()), abiPlan: abiPlan))
+        if !entryLowering.isValid {
+            output: "compilerError\tkind=invalidEntryLowering\tstage=\(entryLowering.failureStage)"
+        } else {
+            let mainText: String(compilerCoreRenderLLVMEntryFunction(block: entryLowering.block))
+            output: compilerReachableLLVMStateRenderModule(reachability: reachability, usage: String(""), extraGlobals: entryLowering.renderedGlobals, extraRuntimeRequirements: entryLowering.runtimeRequirements, mainText: mainText)
+        }
+    }
+    compilerReachableLLVMStateDestroy(reachability: reachability)
+    compilerDeclarationIndexDestroy(index: declarationIndex)
+    compilerSyntaxTablesDestroy(tables: tables)
+    return output
+}
+
 function compilerCoreLLVMNativeEntryTextForProgram(program: CompilerProgram, declarationTables: CompilerSyntaxTables): String {
     let declarationIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: declarationTables))
     if !declarationIndex.isValid {
@@ -7836,8 +7970,7 @@ function compilerCoreLLVMNativeEntryTextForProgram(program: CompilerProgram, dec
     let context: CompilerLLVMLoweringContext(CompilerLLVMLoweringContext(program: program, tables: declarationTables, declarationIndex: declarationIndex))
     let reachability: CompilerReachableLLVMState(compilerReachableLLVMStateCreate(context: context))
     let buildStatus: Int(compilerReachableLLVMStateBuild(reachability: reachability))
-    state output: String("compilerError\tkind=invalidFunctionReachability")
-    if buildStatus == 0 { output: compilerReachableLLVMStateRender(reachability: reachability) }
+    let output: String(compilerReachableLLVMStateRender(reachability: reachability))
     compilerReachableLLVMStateDestroy(reachability: reachability)
     compilerDeclarationIndexDestroy(index: declarationIndex)
     return output
@@ -7849,6 +7982,14 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
         let failedPlaceholderCount: Int(compilerCoreLLVMPlaceholderCount(text: failedFunctions))
         if failedPlaceholderCount > 0 { return compilerCoreLLVMPlaceholderFailure(placeholderCount: failedPlaceholderCount, renderedText: failedFunctions) }
         let failureStage: Int(intBufferElement(buffer: reachability.counters, index: compilerReachableLLVMFailureStage()))
+        if failureStage >= 200000 {
+            let blockedFunctionRow: Int(failureStage - 200000)
+            let blockedSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: blockedFunctionRow, column: 0))
+            let blockedDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: blockedSyntaxID))
+            let blockedFileID: Int(compilerIntTableValue(table: reachability.context.tables.declarations, row: blockedDeclarationRow, column: 1))
+            let blockedName: String(compilerTypedSyntaxLocalText(tables: reachability.context.tables, fileID: blockedFileID, localStart: compilerIntTableValue(table: reachability.context.tables.declarations, row: blockedDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: reachability.context.tables.declarations, row: blockedDeclarationRow, column: 8)))
+            return "compilerError\tkind=representationSensitiveABICapabilityBlocked\tfunctionRow=\(blockedFunctionRow)\tfunction=\(blockedName)\tcapabilityStage=\(0 - intBufferElement(buffer: reachability.abiCapabilities, index: blockedFunctionRow))"
+        }
         if failureStage >= 100000 {
             let failureFunctionRow: Int(failureStage - 100000)
             let failureSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: failureFunctionRow, column: 0))
@@ -7949,6 +8090,10 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
         }
         return String("compilerError\tkind=emptyIndirectABIActivation")
     }
+    return compilerReachableLLVMStateRenderModule(reachability: reachability, usage: compilerCoreNativeMainUsageGlobalLLVMText(), extraGlobals: String(""), extraRuntimeRequirements: 0, mainText: compilerCoreNativeMainLLVMText())
+}
+
+function compilerReachableLLVMStateRenderModule(reachability: CompilerReachableLLVMState, usage: String, extraGlobals: String, extraRuntimeRequirements: Int, mainText: String): String {
     let audit: CompilerLLVMHelperAudit(compilerCoreLLVMSelectedHelperAuditTyped(tables: reachability.context.tables, selection: reachability.selection))
     if audit.excludedCount > 0 { return compilerCoreLLVMHelperAuditFailure(audit: audit) }
     let typedSelected: CompilerTypedLLVMHelpers(compilerReachableLLVMStateHelpers(reachability: reachability))
@@ -7956,11 +8101,74 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
     let placeholderCount: Int(compilerCoreLLVMPlaceholderCount(text: selected.renderedFunctions))
     if placeholderCount > 0 { return compilerCoreLLVMPlaceholderFailure(placeholderCount: placeholderCount, renderedText: selected.renderedFunctions) }
     if intBufferElement(buffer: reachability.counters, index: compilerReachableLLMCommittedFailures()) != 0 { return String("compilerError\tkind=invalidFunctionReachability") }
+    state runtimeRequirements: Int(0)
+    runtimeRequirements: typedSelected.runtimeRequirements
+    if extraRuntimeRequirements > runtimeRequirements { runtimeRequirements: extraRuntimeRequirements }
     let nominalLayouts: String(compilerCoreRenderLLVMNominalLayouts(tables: reachability.context.tables, index: reachability.context.declarationIndex))
-    let runtimeDeclarations: String(compilerCoreRenderLLVMRuntimeDeclarationsTyped(records: selected.instructionRecords, renderedFunctions: selected.renderedFunctions, runtimeRequirements: typedSelected.runtimeRequirements))
+    let allRenderedFunctions: String("\(selected.renderedFunctions)\(mainText)")
+    let runtimeDeclarations: String(compilerCoreRenderLLVMRuntimeDeclarationsTyped(records: selected.instructionRecords, renderedFunctions: allRenderedFunctions, runtimeRequirements: runtimeRequirements))
     let declarations: String(compilerCoreRenderLLVMFunctionDeclarationsExcludingTyped(tables: reachability.context.tables, selection: reachability.selection))
-    let text: String(compilerCoreLLVMNativeEntryTextFromParts(usage: compilerCoreNativeMainUsageGlobalLLVMText(), globals: "\(nominalLayouts)\(typedSelected.renderedGlobals)", runtime: runtimeDeclarations, helpers: selected.renderedFunctions, declarations: declarations, main: compilerCoreNativeMainLLVMText()))
-    return compilerCoreMaterializeLLVMText(text: text)
+    let text: String(compilerCoreLLVMNativeEntryTextFromParts(usage: usage, globals: "\(nominalLayouts)\(typedSelected.renderedGlobals)\(extraGlobals)", runtime: runtimeDeclarations, helpers: selected.renderedFunctions, declarations: declarations, main: mainText))
+    let materialized: String(compilerCoreMaterializeLLVMText(text: text))
+    let signatureAuditCode: Int(compilerCoreLLVMDirectCallSignatureAudit(tables: reachability.context.tables, index: reachability.context.declarationIndex, selection: reachability.selection, abiPlan: compilerReachableLLVMStateABIPlan(reachability: reachability), text: materialized))
+    if signatureAuditCode != 0 { return "compilerError\tkind=directCallSignatureAudit\tfunctionRow=\(signatureAuditCode - 1)" }
+    return materialized
+}
+
+function compilerCoreLLVMDirectCallSignatureAudit(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, abiPlan: CompilerModuleABIPlan, text: String): Int {
+    state functionRow: Int(0)
+    while functionRow < compilerIntTableRowCount(table: tables.functions) {
+        if compilerFunctionSelectionContains(selection: selection, functionRow: functionRow) {
+            let syntaxID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 0))
+            let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: syntaxID))
+            if declarationRow < 0 { return functionRow + 1 }
+            let fileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
+            let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
+            let returnType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.functions, row: functionRow, column: 6), localEnd: compilerIntTableValue(table: tables.functions, row: functionRow, column: 7)))
+            state llvmReturnType: String("")
+            llvmReturnType: compilerCoreLLVMTypeNameForRangeType(typeName: returnType)
+            if compilerModuleABIPlanIsParticipant(plan: abiPlan, functionRow: functionRow) {
+                llvmReturnType: compilerCoreLLVMNativeABITypeName(tables: tables, index: index, typeName: returnType)
+            }
+            let returnMode: Int(compilerModuleABIPlanReturnMode(plan: abiPlan, tables: tables, index: index, functionRow: functionRow))
+            if returnMode == compilerFunctionReturnABIIndirect() { llvmReturnType: String("void") }
+            let symbolNeedle: String("@\(name)(")
+            let definitionPrefix: String("define \(llvmReturnType) ")
+            let callPrefix: String("call \(llvmReturnType) ")
+            state symbolNeedleLength: Int(0)
+            state definitionPrefixLength: Int(0)
+            state callPrefixLength: Int(0)
+            symbolNeedleLength: stringLength(value: symbolNeedle)
+            definitionPrefixLength: stringLength(value: definitionPrefix)
+            callPrefixLength: stringLength(value: callPrefix)
+            state definitionCount: Int(0)
+            state occurrence: Int(0)
+            occurrence: stringFindFrom(source: text, start: 0, needle: symbolNeedle)
+            while occurrence >= 0 {
+                state recognized: Bool(false)
+                if occurrence >= definitionPrefixLength {
+                    if text.substring(start: occurrence - definitionPrefixLength, end: occurrence) == definitionPrefix {
+                        definitionCount: definitionCount + 1
+                        recognized: true
+                    }
+                }
+                if !recognized && occurrence >= callPrefixLength {
+                    if text.substring(start: occurrence - callPrefixLength, end: occurrence) == callPrefix {
+                        recognized: true
+                        if returnMode == compilerFunctionReturnABIIndirect() {
+                            let firstArgumentStart: Int(occurrence + symbolNeedleLength)
+                            if !stringHasPrefix(source: text, start: firstArgumentStart, prefix: String("ptr ")) { return functionRow + 1 }
+                        }
+                    }
+                }
+                if !recognized { return functionRow + 1 }
+                occurrence: stringFindFrom(source: text, start: occurrence + symbolNeedleLength, needle: symbolNeedle)
+            }
+            if definitionCount != 1 { return functionRow + 1 }
+        }
+        functionRow: functionRow + 1
+    }
+    return 0
 }
 
 function compilerCoreLLVMNativeEntryTextFromParts(usage: String, globals: String, runtime: String, helpers: String, declarations: String, main: String): String {
@@ -8309,12 +8517,14 @@ function compilerReachableLLVMStateCreate(context: CompilerLLVMLoweringContext):
     let abiActivation: IntBuffer(intBufferCreate(capacity: functionCount))
     let abiReturnModes: IntBuffer(intBufferCreate(capacity: functionCount))
     let abiParticipants: IntBuffer(intBufferCreate(capacity: functionCount))
+    let abiSensitiveFunctions: IntBuffer(intBufferCreate(capacity: functionCount))
     state capabilityRow: Int(0)
     while capabilityRow < functionCount {
         intBufferAppend(buffer: abiCapabilities, value: 0)
         intBufferAppend(buffer: abiActivation, value: 0)
         intBufferAppend(buffer: abiReturnModes, value: compilerFunctionReturnABINone())
         intBufferAppend(buffer: abiParticipants, value: 0)
+        intBufferAppend(buffer: abiSensitiveFunctions, value: 0)
         capabilityRow: capabilityRow + 1
     }
     return CompilerReachableLLVMState(
@@ -8327,6 +8537,7 @@ function compilerReachableLLVMStateCreate(context: CompilerLLVMLoweringContext):
         abiActivation: abiActivation,
         abiReturnModes: abiReturnModes,
         abiParticipants: abiParticipants,
+        abiSensitiveFunctions: abiSensitiveFunctions,
         functionsBuffer: textBufferCreate(capacity: 1048576),
         globalsBuffer: textBufferCreate(capacity: 65536),
         counters: counters
@@ -8334,7 +8545,8 @@ function compilerReachableLLVMStateCreate(context: CompilerLLVMLoweringContext):
 }
 
 function compilerReachableLLVMStateSetInvalid(reachability: CompilerReachableLLVMState): Int {
-    return intBufferSet(buffer: reachability.counters, index: compilerReachableLLMValid(), value: 0)
+    if intBufferSet(buffer: reachability.counters, index: compilerReachableLLMValid(), value: 0) != 0 { return 0 - 1 }
+    return 0 - 1
 }
 
 function compilerReachableLLVMStateSetInvalidAt(reachability: CompilerReachableLLVMState, stage: Int): Int {
@@ -8400,10 +8612,322 @@ function compilerReachableLLVMStateShouldProbeIndirectABI(reachability: Compiler
     return false
 }
 
+function compilerReachableLLVMStatePlannedReturnMode(reachability: CompilerReachableLLVMState, functionRow: Int): Int {
+    let signatureMode: Int(compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow))
+    if signatureMode == compilerFunctionReturnABINone()
+        && intBufferElement(buffer: reachability.abiSensitiveFunctions, index: functionRow) == 1 { return compilerFunctionReturnABIIndirect() }
+    return signatureMode
+}
+
+function compilerReachableLLVMStateFunctionIsRepresentationSensitive(reachability: CompilerReachableLLVMState, functionRow: Int): Bool {
+    if intBufferElement(buffer: reachability.abiSensitiveFunctions, index: functionRow) == 1 { return true }
+    return compilerFunctionHasRepresentationSensitiveABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow)
+}
+
+function compilerReachableLLVMStatePrepareCandidateABIPlan(reachability: CompilerReachableLLVMState): Int {
+    let functionCount: Int(compilerIntTableRowCount(table: reachability.context.tables.functions))
+    state functionRow: Int(0)
+    while functionRow < functionCount {
+        let functionTransientMark: Int(stringTransientRegionMark())
+        let returnMode: Int(compilerReachableLLVMStatePlannedReturnMode(reachability: reachability, functionRow: functionRow))
+        state participant: Int(0)
+        if compilerFunctionSelectionContains(selection: reachability.selection, functionRow: functionRow) {
+            if compilerReachableLLVMStateFunctionIsRepresentationSensitive(reachability: reachability, functionRow: functionRow) { participant: 1 }
+        }
+        if intBufferSet(buffer: reachability.abiReturnModes, index: functionRow, value: returnMode) != 0
+            || intBufferSet(buffer: reachability.abiParticipants, index: functionRow, value: participant) != 0 {
+            stringTransientRegionReset(mark: functionTransientMark)
+            return 0 - 1
+        }
+        stringTransientRegionReset(mark: functionTransientMark)
+        functionRow: functionRow + 1
+    }
+    state edgeIndex: Int(0)
+    while edgeIndex < intBufferCount(buffer: reachability.edgeTargets) {
+        let ownerFunctionRow: Int(intBufferElement(buffer: reachability.edgeOwners, index: edgeIndex))
+        let targetFunctionRow: Int(intBufferElement(buffer: reachability.edgeTargets, index: edgeIndex))
+        if ownerFunctionRow < 0 || ownerFunctionRow >= functionCount || targetFunctionRow < 0 || targetFunctionRow >= functionCount { return 0 - 1 }
+        let edgeTransientMark: Int(stringTransientRegionMark())
+        if compilerReachableLLVMStateFunctionIsRepresentationSensitive(reachability: reachability, functionRow: targetFunctionRow) {
+            if intBufferSet(buffer: reachability.abiParticipants, index: ownerFunctionRow, value: 1) != 0
+                || intBufferSet(buffer: reachability.abiParticipants, index: targetFunctionRow, value: 1) != 0 {
+                stringTransientRegionReset(mark: edgeTransientMark)
+                return 0 - 1
+            }
+        }
+        stringTransientRegionReset(mark: edgeTransientMark)
+        edgeIndex: edgeIndex + 1
+    }
+    return 0
+}
+
+function compilerReachableLLVMStateSensitiveCount(reachability: CompilerReachableLLVMState): Int {
+    state count: Int(0)
+    state functionRow: Int(0)
+    while functionRow < intBufferCount(buffer: reachability.abiSensitiveFunctions) {
+        if intBufferElement(buffer: reachability.abiSensitiveFunctions, index: functionRow) == 1 { count: count + 1 }
+        functionRow: functionRow + 1
+    }
+    return count
+}
+
+function compilerReachableLLVMStateProbeCandidateFunction(reachability: CompilerReachableLLVMState, functionRow: Int): Int {
+    state transientMark: Int(stringTransientRegionMark())
+    let probeEdgeOwners: IntBuffer(intBufferCreate(capacity: 16))
+    let probeEdgeTargets: IntBuffer(intBufferCreate(capacity: 16))
+    let sensitiveCountBefore: Int(compilerReachableLLVMStateSensitiveCount(reachability: reachability))
+    let candidatePlan: CompilerModuleABIPlan(CompilerModuleABIPlan(returnModes: reachability.abiReturnModes, participants: reachability.abiParticipants, isFrozen: true))
+    let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreate(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow)))
+    state capable: Bool(compilerBodyArenaIsValid(arena: arena))
+    state failureStage: Int(1)
+    if capable {
+        if compilerBodyArenaBuildSymbolsAndResolutions(arena: arena, index: reachability.context.declarationIndex) != 0 {
+            failureStage: 2
+            capable: false
+        }
+    }
+    if capable {
+        if !compilerBodyArenaSymbolsAndResolutionsAreValid(arena: arena) {
+            failureStage: 3
+            capable: false
+        }
+    }
+    if capable {
+        if compilerBodyArenaAppendFunctionEdges(arena: arena, edgeOwners: probeEdgeOwners, edgeTargets: probeEdgeTargets) != 0 {
+            failureStage: 10
+            capable: false
+        }
+    }
+    stringTransientRegionReset(mark: transientMark)
+    transientMark: stringTransientRegionMark()
+    if capable {
+        if compilerBodyArenaBuildCFG(arena: arena) != 0 {
+            failureStage: 4
+            capable: false
+        }
+    }
+    if capable {
+        if !compilerBodyArenaCFGIsValid(arena: arena) {
+            failureStage: 5
+            capable: false
+        }
+    }
+    stringTransientRegionReset(mark: transientMark)
+    transientMark: stringTransientRegionMark()
+    if capable {
+        let memoryBuildStatus: Int(compilerBodyMemoryBuildAndFreeze(arena: arena, abiPlan: candidatePlan))
+        if memoryBuildStatus != 0 {
+            failureStage: 6000 + memoryBuildStatus
+            capable: false
+        }
+    }
+    stringTransientRegionReset(mark: transientMark)
+    transientMark: stringTransientRegionMark()
+    if capable {
+        if compilerBodyMIRBuild(arena: arena) != 0 {
+            failureStage: 7
+            capable: false
+        }
+    }
+    if capable {
+        if compilerBodyMIRAppendFunctionEdges(arena: arena, edgeOwners: probeEdgeOwners, edgeTargets: probeEdgeTargets) != 0
+            || compilerBodyMIRMarkRepresentationSensitiveTargets(arena: arena, sensitiveFunctions: reachability.abiSensitiveFunctions) != 0 {
+            failureStage: 10
+            capable: false
+        }
+    }
+    if capable {
+        state probeEdgeIndex: Int(0)
+        while capable && probeEdgeIndex < intBufferCount(buffer: probeEdgeTargets) {
+            if !compilerFunctionEdgesContain(edgeOwners: reachability.edgeOwners, edgeTargets: reachability.edgeTargets, ownerFunctionRow: intBufferElement(buffer: probeEdgeOwners, index: probeEdgeIndex), targetFunctionRow: intBufferElement(buffer: probeEdgeTargets, index: probeEdgeIndex)) {
+                failureStage: 10
+                capable: false
+            }
+            probeEdgeIndex: probeEdgeIndex + 1
+        }
+        if capable && compilerReachableLLVMStateSensitiveCount(reachability: reachability) != sensitiveCountBefore {
+            failureStage: 10
+            capable: false
+        }
+    }
+    stringTransientRegionReset(mark: transientMark)
+    transientMark: stringTransientRegionMark()
+    if capable {
+        let validationCode: Int(compilerBodyMIRValidationCode(arena: arena, abiPlan: candidatePlan))
+        if validationCode != 0 {
+            failureStage: 8000 + validationCode
+            capable: false
+        }
+    }
+    stringTransientRegionReset(mark: transientMark)
+    transientMark: stringTransientRegionMark()
+    state capabilityValue: Int(1)
+    if !capable { capabilityValue: 0 - failureStage }
+    state status: Int(intBufferSet(buffer: reachability.abiCapabilities, index: functionRow, value: capabilityValue))
+    if compilerBodyArenaDestroy(arena: arena) != 0 { status: 0 - 1 }
+    if intBufferDestroy(buffer: probeEdgeOwners) != 0 || intBufferDestroy(buffer: probeEdgeTargets) != 0 { status: 0 - 1 }
+    stringTransientRegionReset(mark: transientMark)
+    return status
+}
+
+function compilerReachableLLVMStateRefreshCapabilityCounter(reachability: CompilerReachableLLVMState): Int {
+    state capabilityCount: Int(0)
+    state functionRow: Int(0)
+    while functionRow < intBufferCount(buffer: reachability.abiCapabilities) {
+        if compilerFunctionSelectionContains(selection: reachability.selection, functionRow: functionRow)
+            && intBufferElement(buffer: reachability.abiCapabilities, index: functionRow) == 1 { capabilityCount: capabilityCount + 1 }
+        functionRow: functionRow + 1
+    }
+    return intBufferSet(buffer: reachability.counters, index: compilerReachableLLMIndirectCapabilities(), value: capabilityCount)
+}
+
+function compilerReachableLLVMStatePruneFailedCandidateComponents(reachability: CompilerReachableLLVMState): Int {
+    state functionRow: Int(0)
+    while functionRow < intBufferCount(buffer: reachability.abiCapabilities) {
+        if intBufferElement(buffer: reachability.abiParticipants, index: functionRow) == 1
+            && intBufferElement(buffer: reachability.abiCapabilities, index: functionRow) < 0 {
+            if intBufferSet(buffer: reachability.abiParticipants, index: functionRow, value: 2) != 0 { return 0 - 1 }
+        }
+        functionRow: functionRow + 1
+    }
+    state changed: Bool(true)
+    while changed {
+        changed: false
+        state edgeIndex: Int(0)
+        while edgeIndex < intBufferCount(buffer: reachability.edgeTargets) {
+            let ownerFunctionRow: Int(intBufferElement(buffer: reachability.edgeOwners, index: edgeIndex))
+            let targetFunctionRow: Int(intBufferElement(buffer: reachability.edgeTargets, index: edgeIndex))
+            if compilerReachableLLVMStateFunctionIsRepresentationSensitive(reachability: reachability, functionRow: targetFunctionRow) {
+                if intBufferElement(buffer: reachability.abiParticipants, index: ownerFunctionRow) == 2
+                    && intBufferElement(buffer: reachability.abiParticipants, index: targetFunctionRow) == 1 {
+                    if intBufferSet(buffer: reachability.abiParticipants, index: targetFunctionRow, value: 2) != 0 { return 0 - 1 }
+                    changed: true
+                }
+                if intBufferElement(buffer: reachability.abiParticipants, index: targetFunctionRow) == 2
+                    && intBufferElement(buffer: reachability.abiParticipants, index: ownerFunctionRow) == 1 {
+                    if intBufferSet(buffer: reachability.abiParticipants, index: ownerFunctionRow, value: 2) != 0 { return 0 - 1 }
+                    changed: true
+                }
+            }
+            edgeIndex: edgeIndex + 1
+        }
+    }
+    return 0
+}
+
+function compilerReachableLLVMStatePreclassifyCandidateBodies(reachability: CompilerReachableLLVMState): Int {
+    state candidateIndex: Int(0)
+    while candidateIndex < intBufferCount(buffer: reachability.worklist) {
+        let functionRow: Int(intBufferElement(buffer: reachability.worklist, index: candidateIndex))
+        if intBufferElement(buffer: reachability.abiParticipants, index: functionRow) == 1
+            && intBufferElement(buffer: reachability.abiCapabilities, index: functionRow) == 0 {
+            if !compilerBodyArenaRecognizesFunction(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow) {
+                if intBufferSet(buffer: reachability.abiCapabilities, index: functionRow, value: 0 - 1) != 0 { return 0 - 1 }
+                if compilerReachableLLVMStatePruneFailedCandidateComponents(reachability: reachability) != 0 { return 0 - 1 }
+            }
+        }
+        candidateIndex: candidateIndex + 1
+    }
+    return 0
+}
+
+function compilerReachableLLVMStatePreclassifyCandidateCFG(reachability: CompilerReachableLLVMState): Int {
+    state candidateIndex: Int(0)
+    while candidateIndex < intBufferCount(buffer: reachability.worklist) {
+        let functionRow: Int(intBufferElement(buffer: reachability.worklist, index: candidateIndex))
+        if intBufferElement(buffer: reachability.abiParticipants, index: functionRow) == 1
+            && intBufferElement(buffer: reachability.abiCapabilities, index: functionRow) == 0 {
+            let transientMark: Int(stringTransientRegionMark())
+            let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreate(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow)))
+            state capable: Bool(compilerBodyArenaIsValid(arena: arena))
+            state failureStage: Int(1)
+            if capable {
+                if compilerBodyArenaBuildSymbolsAndResolutions(arena: arena, index: reachability.context.declarationIndex) != 0 {
+                    failureStage: 2
+                    capable: false
+                }
+            }
+            if capable {
+                if !compilerBodyArenaSymbolsAndResolutionsAreValid(arena: arena) {
+                    failureStage: 3
+                    capable: false
+                }
+            }
+            if capable {
+                if compilerBodyArenaBuildCFG(arena: arena) != 0 {
+                    failureStage: 4
+                    capable: false
+                }
+            }
+            if capable {
+                if !compilerBodyArenaCFGIsValid(arena: arena) {
+                    failureStage: 5
+                    capable: false
+                }
+            }
+            if !capable {
+                if intBufferSet(buffer: reachability.abiCapabilities, index: functionRow, value: 0 - failureStage) != 0 {
+                    compilerBodyArenaDestroy(arena: arena)
+                    stringTransientRegionReset(mark: transientMark)
+                    return 0 - 1
+                }
+            }
+            if compilerBodyArenaDestroy(arena: arena) != 0 {
+                stringTransientRegionReset(mark: transientMark)
+                return 0 - 1
+            }
+            stringTransientRegionReset(mark: transientMark)
+            if compilerReachableLLVMStatePruneFailedCandidateComponents(reachability: reachability) != 0 { return 0 - 1 }
+        }
+        candidateIndex: candidateIndex + 1
+    }
+    return 0
+}
+
+function compilerReachableLLVMStateProbeCandidateABIPlan(reachability: CompilerReachableLLVMState): Int {
+    let functionCount: Int(compilerIntTableRowCount(table: reachability.context.tables.functions))
+    state iteration: Int(0)
+    state graphChanged: Bool(true)
+    while graphChanged {
+        if iteration > functionCount { return 0 - 1 }
+        graphChanged: false
+        let edgeCountBefore: Int(intBufferCount(buffer: reachability.edgeTargets))
+        let sensitiveCountBefore: Int(compilerReachableLLVMStateSensitiveCount(reachability: reachability))
+        let workCountBefore: Int(intBufferCount(buffer: reachability.worklist))
+        if compilerReachableLLVMStatePrepareCandidateABIPlan(reachability: reachability) != 0 { return 0 - 1 }
+        if compilerReachableLLVMStatePreclassifyCandidateBodies(reachability: reachability) != 0 { return 0 - 1 }
+        if compilerReachableLLVMStatePruneFailedCandidateComponents(reachability: reachability) != 0 { return 0 - 1 }
+        if compilerReachableLLVMStatePreclassifyCandidateCFG(reachability: reachability) != 0 { return 0 - 1 }
+        state candidateIndex: Int(0)
+        while candidateIndex < intBufferCount(buffer: reachability.worklist) {
+            let candidateFunctionRow: Int(intBufferElement(buffer: reachability.worklist, index: candidateIndex))
+            if intBufferElement(buffer: reachability.abiParticipants, index: candidateFunctionRow) == 1
+                && intBufferElement(buffer: reachability.abiCapabilities, index: candidateFunctionRow) == 0 {
+                if compilerReachableLLVMStateProbeCandidateFunction(reachability: reachability, functionRow: candidateFunctionRow) != 0 { return 0 - 1 }
+                if compilerReachableLLVMStatePruneFailedCandidateComponents(reachability: reachability) != 0 { return 0 - 1 }
+            }
+            candidateIndex: candidateIndex + 1
+        }
+        while intBufferElement(buffer: reachability.counters, index: compilerReachableLLMWorkIndex()) < intBufferCount(buffer: reachability.worklist) {
+            let workIndex: Int(intBufferElement(buffer: reachability.counters, index: compilerReachableLLMWorkIndex()))
+            let discoveredFunctionRow: Int(intBufferElement(buffer: reachability.worklist, index: workIndex))
+            if compilerReachableLLVMStateDiscoverFunction(reachability: reachability, functionRow: discoveredFunctionRow) != 0 { return 0 - 1 }
+            if intBufferSet(buffer: reachability.counters, index: compilerReachableLLMWorkIndex(), value: workIndex + 1) != 0 { return 0 - 1 }
+        }
+        if intBufferCount(buffer: reachability.edgeTargets) != edgeCountBefore
+            || compilerReachableLLVMStateSensitiveCount(reachability: reachability) != sensitiveCountBefore
+            || intBufferCount(buffer: reachability.worklist) != workCountBefore { graphChanged: true }
+        iteration: iteration + 1
+    }
+    if compilerReachableLLVMStatePrepareCandidateABIPlan(reachability: reachability) != 0 { return 0 - 1 }
+    if compilerReachableLLVMStatePruneFailedCandidateComponents(reachability: reachability) != 0 { return 0 - 1 }
+    return compilerReachableLLVMStateRefreshCapabilityCounter(reachability: reachability)
+}
+
 function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReachableLLVMState, functionRow: Int): Int {
     let transientMark: Int(stringTransientRegionMark())
     let edgeStart: Int(intBufferCount(buffer: reachability.edgeTargets))
-    let usesTypedDiscovery: Bool(compilerBodyArenaFunctionUsesTypedParser(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow))
+    let usesTypedDiscovery: Bool(true)
     state shouldProbeIndirectABI: Bool(compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow) == compilerFunctionReturnABIIndirect()
         || compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow))
     if !usesTypedDiscovery {
@@ -8450,6 +8974,7 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
             return 0 - 1
         }
     }
+    shouldProbeIndirectABI: false
     let typedEdgeOwners: IntBuffer(intBufferCreate(capacity: 16))
     let typedEdgeTargets: IntBuffer(intBufferCreate(capacity: 16))
     let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreate(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow)))
@@ -8483,22 +9008,18 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
             typedProbeEdgeIndex: typedProbeEdgeIndex + 1
         }
     }
-    state legacyEdgesAppended: Bool(false)
     if !typedReady {
-        if usesTypedDiscovery && compilerBodyArenaTransitionSupportsFunction(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow) {
-            state retainedFailureCode: Int(typedFailureStage)
-            if intBufferCount(buffer: arena.failures) > 0 { retainedFailureCode: intBufferElement(buffer: arena.failures, index: 0) }
-            intBufferSet(buffer: reachability.abiCapabilities, index: functionRow, value: 0 - retainedFailureCode)
+        state retainedFailureCode: Int(typedFailureStage)
+        if intBufferCount(buffer: arena.failures) > 0 { retainedFailureCode: intBufferElement(buffer: arena.failures, index: 0) }
+        if retainedFailureCode <= 0 { retainedFailureCode: 1 }
+        if intBufferSet(buffer: reachability.abiCapabilities, index: functionRow, value: 0 - retainedFailureCode) != 0 {
             compilerBodyArenaDestroy(arena: arena)
             stringTransientRegionReset(mark: transientMark)
             return 0 - 1
         }
-        if compilerReachableLLVMStateAppendLegacyEdges(reachability: reachability, functionRow: functionRow) != 0 {
-            compilerBodyArenaDestroy(arena: arena)
-            stringTransientRegionReset(mark: transientMark)
-            return 0 - 1
-        }
-        legacyEdgesAppended: true
+        compilerBodyArenaDestroy(arena: arena)
+        stringTransientRegionReset(mark: transientMark)
+        return 0 - 1
     }
     state typedEdgesAccepted: Bool(typedReady)
     state indirectCapableForPlan: Bool(typedReady)
@@ -8530,6 +9051,18 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
             }
         }
         if indirectCapableForPlan {
+            if compilerBodyMIRAppendFunctionEdges(arena: arena, edgeOwners: typedEdgeOwners, edgeTargets: typedEdgeTargets) != 0 {
+                indirectFailureStage: 10
+                indirectCapableForPlan: false
+            }
+        }
+        if indirectCapableForPlan {
+            if compilerBodyMIRMarkRepresentationSensitiveTargets(arena: arena, sensitiveFunctions: reachability.abiSensitiveFunctions) != 0 {
+                indirectFailureStage: 10
+                indirectCapableForPlan: false
+            }
+        }
+        if indirectCapableForPlan {
             let discoveryMIRValidationCode: Int(compilerBodyMIRValidationCode(arena: arena, abiPlan: compilerReachableLLVMStateABIPlan(reachability: reachability)))
             if discoveryMIRValidationCode != 0 {
                 indirectFailureStage: 8000 + discoveryMIRValidationCode
@@ -8551,7 +9084,6 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
                 return 0 - 1
             }
         } else {
-            typedEdgesAccepted: false
             if intBufferSet(buffer: reachability.abiCapabilities, index: functionRow, value: 0 - indirectFailureStage) != 0 {
                 compilerBodyArenaDestroy(arena: arena)
                 stringTransientRegionReset(mark: transientMark)
@@ -8566,9 +9098,6 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
             if intBufferAppend(buffer: reachability.edgeTargets, value: intBufferElement(buffer: typedEdgeTargets, index: acceptedEdgeIndex)) != 0 { return 0 - 1 }
             acceptedEdgeIndex: acceptedEdgeIndex + 1
         }
-    } else if typedReady && !legacyEdgesAppended {
-        if compilerReachableLLVMStateAppendLegacyEdges(reachability: reachability, functionRow: functionRow) != 0 { return 0 - 1 }
-        legacyEdgesAppended: true
     }
     if intBufferDestroy(buffer: typedEdgeOwners) != 0 || intBufferDestroy(buffer: typedEdgeTargets) != 0 { return 0 - 1 }
     if compilerBodyArenaDestroy(arena: arena) != 0
@@ -8604,7 +9133,7 @@ function compilerReachableLLVMStateFreezeABIPlan(reachability: CompilerReachable
     state functionRow: Int(0)
     while functionRow < functionCount {
         state returnMode: Int(compilerFunctionReturnABINone())
-        let capabilityMode: Int(compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow))
+        let capabilityMode: Int(compilerReachableLLVMStatePlannedReturnMode(reachability: reachability, functionRow: functionRow))
         if capabilityMode == compilerFunctionReturnABIDirect() { returnMode: compilerFunctionReturnABIDirect() }
         if intBufferElement(buffer: reachability.abiActivation, index: functionRow) == 1 { returnMode: compilerFunctionReturnABIIndirect() }
         if intBufferSet(buffer: reachability.abiReturnModes, index: functionRow, value: returnMode) != 0 { return 0 - 1 }
@@ -8637,7 +9166,10 @@ function compilerReachableLLVMStateABIPlanIsValid(reachability: CompilerReachabl
         if returnMode == compilerFunctionReturnABIIndirect()
             && (intBufferElement(buffer: reachability.abiActivation, index: functionRow) != 1
                 || intBufferElement(buffer: reachability.abiParticipants, index: functionRow) != 1
-                || compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow) != compilerFunctionReturnABIIndirect()) { return false }
+                || compilerReachableLLVMStatePlannedReturnMode(reachability: reachability, functionRow: functionRow) != compilerFunctionReturnABIIndirect()) { return false }
+        if intBufferElement(buffer: reachability.abiParticipants, index: functionRow) == 1
+            && compilerReachableLLVMStateFunctionIsRepresentationSensitive(reachability: reachability, functionRow: functionRow)
+            && intBufferElement(buffer: reachability.abiCapabilities, index: functionRow) != 1 { return false }
         functionRow: functionRow + 1
     }
     state edgeIndex: Int(0)
@@ -8647,26 +9179,196 @@ function compilerReachableLLVMStateABIPlanIsValid(reachability: CompilerReachabl
         if intBufferElement(buffer: reachability.abiReturnModes, index: targetFunctionRow) == compilerFunctionReturnABIIndirect()
             && intBufferElement(buffer: reachability.abiParticipants, index: ownerFunctionRow) != 1 { return false }
         if intBufferElement(buffer: reachability.abiParticipants, index: ownerFunctionRow) == 1
-            && compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: targetFunctionRow)
+            && compilerReachableLLVMStateFunctionIsRepresentationSensitive(reachability: reachability, functionRow: targetFunctionRow)
             && intBufferElement(buffer: reachability.abiParticipants, index: targetFunctionRow) != 1 { return false }
         if intBufferElement(buffer: reachability.abiParticipants, index: targetFunctionRow) == 1
-            && compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: targetFunctionRow)
+            && compilerReachableLLVMStateFunctionIsRepresentationSensitive(reachability: reachability, functionRow: targetFunctionRow)
             && intBufferElement(buffer: reachability.abiParticipants, index: ownerFunctionRow) != 1 { return false }
         edgeIndex: edgeIndex + 1
     }
     return true
 }
 
-function compilerReachableLLVMStateBuild(reachability: CompilerReachableLLVMState): Int {
-    if !reachability.selection.isValid || compilerFunctionReachabilitySeedRoots(tables: reachability.context.tables, index: reachability.context.declarationIndex, selection: reachability.selection, worklist: reachability.worklist, rootNames: String("compileRangeNativeSource;compilerNativeOutputExitCode;")) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+function compilerReachableLLVMStateBuildABIComponents(reachability: CompilerReachableLLVMState): Int {
+    let functionCount: Int(compilerIntTableRowCount(table: reachability.context.tables.functions))
+    let componentQueue: IntBuffer(intBufferCreate(capacity: functionCount))
+    let sensitiveFunctions: IntBuffer(intBufferCreate(capacity: functionCount))
+    state firstBlockedFunction: Int(0 - 1)
+    if intBufferSet(buffer: reachability.counters, index: compilerReachableLLMIndirectActivations(), value: 0) != 0 {
+        intBufferDestroy(buffer: sensitiveFunctions)
+        intBufferDestroy(buffer: componentQueue)
+        return 0 - 1
+    }
+    state sensitivityFunctionRow: Int(0)
+    while sensitivityFunctionRow < functionCount {
+        let sensitivityMark: Int(stringTransientRegionMark())
+        state isSensitiveFunction: Int(0)
+        if compilerReachableLLVMStateFunctionIsRepresentationSensitive(reachability: reachability, functionRow: sensitivityFunctionRow) { isSensitiveFunction: 1 }
+        if intBufferSet(buffer: reachability.abiParticipants, index: sensitivityFunctionRow, value: 0) != 0
+            || intBufferSet(buffer: reachability.abiActivation, index: sensitivityFunctionRow, value: 0) != 0
+            || intBufferAppend(buffer: sensitiveFunctions, value: isSensitiveFunction) != 0 {
+            stringTransientRegionReset(mark: sensitivityMark)
+            intBufferDestroy(buffer: sensitiveFunctions)
+            intBufferDestroy(buffer: componentQueue)
+            return 0 - 1
+        }
+        stringTransientRegionReset(mark: sensitivityMark)
+        sensitivityFunctionRow: sensitivityFunctionRow + 1
+    }
+    state seedFunctionRow: Int(0)
+    while seedFunctionRow < functionCount {
+        if intBufferElement(buffer: reachability.abiParticipants, index: seedFunctionRow) == 0
+            && compilerFunctionSelectionContains(selection: reachability.selection, functionRow: seedFunctionRow)
+            && intBufferElement(buffer: sensitiveFunctions, index: seedFunctionRow) == 1 {
+            let componentStart: Int(intBufferCount(buffer: componentQueue))
+            if intBufferSet(buffer: reachability.abiParticipants, index: seedFunctionRow, value: 3) != 0
+                || intBufferAppend(buffer: componentQueue, value: seedFunctionRow) != 0 {
+                intBufferDestroy(buffer: componentQueue)
+                return 0 - 1
+            }
+            state componentCursor: Int(componentStart)
+            state componentBlocked: Bool(false)
+            while componentCursor < intBufferCount(buffer: componentQueue) {
+                let componentMember: Int(intBufferElement(buffer: componentQueue, index: componentCursor))
+                state componentEdge: Int(0)
+                while componentEdge < intBufferCount(buffer: reachability.edgeTargets) {
+                    let componentOwner: Int(intBufferElement(buffer: reachability.edgeOwners, index: componentEdge))
+                    let componentTarget: Int(intBufferElement(buffer: reachability.edgeTargets, index: componentEdge))
+                    if componentOwner < 0 || componentOwner >= functionCount || componentTarget < 0 || componentTarget >= functionCount {
+                        intBufferDestroy(buffer: componentQueue)
+                        return 0 - 1
+                    }
+                    if intBufferElement(buffer: sensitiveFunctions, index: componentTarget) == 1 {
+                        state componentNeighbor: Int(0 - 1)
+                        if componentOwner == componentMember { componentNeighbor: componentTarget }
+                        if componentTarget == componentMember { componentNeighbor: componentOwner }
+                        if componentNeighbor >= 0 {
+                            if intBufferElement(buffer: reachability.abiParticipants, index: componentNeighbor) == 0 {
+                                if intBufferSet(buffer: reachability.abiParticipants, index: componentNeighbor, value: 3) != 0
+                                    || intBufferAppend(buffer: componentQueue, value: componentNeighbor) != 0 {
+                                    intBufferDestroy(buffer: componentQueue)
+                                    return 0 - 1
+                                }
+                            }
+                        }
+                    }
+                    componentEdge: componentEdge + 1
+                }
+                componentCursor: componentCursor + 1
+            }
+            let componentEnd: Int(intBufferCount(buffer: componentQueue))
+            state componentKnownFailure: Int(componentStart)
+            while componentKnownFailure < componentEnd {
+                let knownFailureMember: Int(intBufferElement(buffer: componentQueue, index: componentKnownFailure))
+                if intBufferElement(buffer: reachability.abiCapabilities, index: knownFailureMember) < 0 {
+                    componentBlocked: true
+                    if firstBlockedFunction < 0 { firstBlockedFunction: knownFailureMember }
+                }
+                componentKnownFailure: componentKnownFailure + 1
+            }
+            state componentPrepare: Int(componentStart)
+            while componentPrepare < componentEnd {
+                if intBufferSet(buffer: reachability.abiParticipants, index: intBufferElement(buffer: componentQueue, index: componentPrepare), value: 1) != 0 {
+                    intBufferDestroy(buffer: sensitiveFunctions)
+                    intBufferDestroy(buffer: componentQueue)
+                    return 0 - 1
+                }
+                componentPrepare: componentPrepare + 1
+            }
+            state componentProbe: Int(componentEnd - 1)
+            while !componentBlocked && componentProbe >= componentStart {
+                let probeMember: Int(intBufferElement(buffer: componentQueue, index: componentProbe))
+                if intBufferElement(buffer: reachability.abiCapabilities, index: probeMember) == 0 {
+                    if compilerReachableLLVMStateProbeCandidateFunction(reachability: reachability, functionRow: probeMember) != 0 {
+                        intBufferDestroy(buffer: sensitiveFunctions)
+                        intBufferDestroy(buffer: componentQueue)
+                        return 0 - 1
+                    }
+                }
+                if intBufferElement(buffer: reachability.abiCapabilities, index: probeMember) != 1 {
+                    componentBlocked: true
+                    if firstBlockedFunction < 0 { firstBlockedFunction: probeMember }
+                }
+                componentProbe: componentProbe - 1
+            }
+            state componentFinalize: Int(componentStart)
+            while componentFinalize < componentEnd {
+                let finalizedMember: Int(intBufferElement(buffer: componentQueue, index: componentFinalize))
+                state finalizedParticipant: Int(1)
+                if componentBlocked { finalizedParticipant: 2 }
+                if intBufferSet(buffer: reachability.abiParticipants, index: finalizedMember, value: finalizedParticipant) != 0 {
+                    intBufferDestroy(buffer: componentQueue)
+                    return 0 - 1
+                }
+                if !componentBlocked
+                    && compilerReachableLLVMStatePlannedReturnMode(reachability: reachability, functionRow: finalizedMember) == compilerFunctionReturnABIIndirect() {
+                    if intBufferSet(buffer: reachability.abiActivation, index: finalizedMember, value: 1) != 0
+                        || compilerReachableLLVMStateAddCounter(reachability: reachability, index: compilerReachableLLMIndirectActivations(), value: 1) != 0 {
+                        intBufferDestroy(buffer: componentQueue)
+                        return 0 - 1
+                    }
+                }
+                componentFinalize: componentFinalize + 1
+            }
+        }
+        seedFunctionRow: seedFunctionRow + 1
+    }
+    state componentDestroyStatus: Int(intBufferDestroy(buffer: sensitiveFunctions))
+    if intBufferDestroy(buffer: componentQueue) != 0 { componentDestroyStatus: 0 - 1 }
+    if componentDestroyStatus == 0 && firstBlockedFunction >= 0 { return firstBlockedFunction + 1 }
+    return componentDestroyStatus
+}
+
+function compilerReachableLLVMStateSeedEntryRoots(reachability: CompilerReachableLLVMState): Int {
+    let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreateEntry(tables: reachability.context.tables, index: reachability.context.declarationIndex)))
+    state status: Int(0)
+    if !compilerBodyArenaIsValid(arena: arena) { status: 1 }
+    if status == 0 {
+        if compilerBodyArenaBuildSymbolsAndResolutions(arena: arena, index: reachability.context.declarationIndex) != 0 { status: 2 }
+    }
+    if status == 0 {
+        if !compilerBodyArenaSymbolsAndResolutionsAreValid(arena: arena) { status: 3 }
+    }
+    state resolutionRow: Int(0)
+    while status == 0 && resolutionRow < compilerIntTableRowCount(table: arena.resolutions) {
+        if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) == compilerBodyResolutionFunction() {
+            let targetFunctionRow: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+            if targetFunctionRow < 0 || targetFunctionRow >= intBufferCount(buffer: reachability.selection.selectedRows) {
+                status: 4
+            } else {
+                if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) == compilerBodyTypeConstruct() {
+                    if intBufferSet(buffer: reachability.abiSensitiveFunctions, index: targetFunctionRow, value: 1) != 0 { status: 5 }
+                }
+                if status == 0 {
+                    if !compilerFunctionSelectionContains(selection: reachability.selection, functionRow: targetFunctionRow) {
+                        if compilerFunctionSelectionMark(selection: reachability.selection, functionRow: targetFunctionRow) != 0 { status: 6 }
+                        if status == 0 {
+                            if intBufferAppend(buffer: reachability.worklist, value: targetFunctionRow) != 0 { status: 7 }
+                        }
+                    }
+                }
+            }
+        }
+        resolutionRow: resolutionRow + 1
+    }
+    if compilerBodyArenaDestroy(arena: arena) != 0 && status == 0 { status: 8 }
+    return status
+}
+
+function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachableLLVMState): Int {
+    if !reachability.selection.isValid { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
     while intBufferElement(buffer: reachability.counters, index: compilerReachableLLMWorkIndex()) < intBufferCount(buffer: reachability.worklist) {
         let workIndex: Int(intBufferElement(buffer: reachability.counters, index: compilerReachableLLMWorkIndex()))
         let functionRow: Int(intBufferElement(buffer: reachability.worklist, index: workIndex))
         if compilerReachableLLVMStateDiscoverFunction(reachability: reachability, functionRow: functionRow) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 100000 + functionRow) }
         if intBufferSet(buffer: reachability.counters, index: compilerReachableLLMWorkIndex(), value: workIndex + 1) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
     }
+    if compilerReachableLLVMStatePrepareCandidateABIPlan(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 40) }
+    let abiComponentStatus: Int(compilerReachableLLVMStateBuildABIComponents(reachability: reachability))
+    if abiComponentStatus < 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 41) }
+    if compilerReachableLLVMStateRefreshCapabilityCounter(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 42) }
     let closureTransientMark: Int(stringTransientRegionMark())
-    state activationWorkIndex: Int(0)
+    state activationWorkIndex: Int(intBufferCount(buffer: reachability.worklist))
     while activationWorkIndex < intBufferCount(buffer: reachability.worklist) {
         let activationFunctionRow: Int(intBufferElement(buffer: reachability.worklist, index: activationWorkIndex))
         if intBufferElement(buffer: reachability.abiCapabilities, index: activationFunctionRow) == 1
@@ -8676,7 +9378,7 @@ function compilerReachableLLVMStateBuild(reachability: CompilerReachableLLVMStat
         }
         activationWorkIndex: activationWorkIndex + 1
     }
-    state closureChanged: Bool(true)
+    state closureChanged: Bool(false)
     while closureChanged {
         let closureIterationMark: Int(stringTransientRegionMark())
         closureChanged: false
@@ -8705,21 +9407,33 @@ function compilerReachableLLVMStateBuild(reachability: CompilerReachableLLVMStat
                 let parameterParticipationOwner: Int(intBufferElement(buffer: reachability.edgeOwners, index: parameterParticipationEdge))
                 let parameterParticipationTarget: Int(intBufferElement(buffer: reachability.edgeTargets, index: parameterParticipationEdge))
                 if intBufferElement(buffer: reachability.abiParticipants, index: parameterParticipationOwner) == 1
-                    && compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterParticipationTarget)
+                    && compilerFunctionHasRepresentationSensitiveABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterParticipationTarget)
                     && intBufferElement(buffer: reachability.abiCapabilities, index: parameterParticipationTarget) == 1
                     && intBufferElement(buffer: reachability.abiParticipants, index: parameterParticipationTarget) == 0 {
                     if intBufferSet(buffer: reachability.abiParticipants, index: parameterParticipationTarget, value: 1) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+                    if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterParticipationTarget) == compilerFunctionReturnABIIndirect()
+                        && intBufferElement(buffer: reachability.abiActivation, index: parameterParticipationTarget) == 0 {
+                        if intBufferSet(buffer: reachability.abiActivation, index: parameterParticipationTarget, value: 1) != 0
+                            || compilerReachableLLVMStateAddCounter(reachability: reachability, index: compilerReachableLLMIndirectActivations(), value: 1) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+                        closureChanged: true
+                    }
                     parameterParticipationChanged: true
                 }
                 if intBufferElement(buffer: reachability.abiParticipants, index: parameterParticipationTarget) == 1
-                    && compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterParticipationTarget)
+                    && compilerFunctionHasRepresentationSensitiveABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterParticipationTarget)
                     && intBufferElement(buffer: reachability.abiCapabilities, index: parameterParticipationOwner) == 1
                     && intBufferElement(buffer: reachability.abiParticipants, index: parameterParticipationOwner) == 0 {
                     if intBufferSet(buffer: reachability.abiParticipants, index: parameterParticipationOwner, value: 1) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+                    if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterParticipationOwner) == compilerFunctionReturnABIIndirect()
+                        && intBufferElement(buffer: reachability.abiActivation, index: parameterParticipationOwner) == 0 {
+                        if intBufferSet(buffer: reachability.abiActivation, index: parameterParticipationOwner, value: 1) != 0
+                            || compilerReachableLLVMStateAddCounter(reachability: reachability, index: compilerReachableLLMIndirectActivations(), value: 1) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+                        closureChanged: true
+                    }
                     parameterParticipationChanged: true
                 }
                 if intBufferElement(buffer: reachability.abiParticipants, index: parameterParticipationTarget) == 1
-                    && compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterParticipationTarget)
+                    && compilerFunctionHasRepresentationSensitiveABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterParticipationTarget)
                     && intBufferElement(buffer: reachability.abiCapabilities, index: parameterParticipationOwner) != 1
                     && intBufferElement(buffer: reachability.abiParticipants, index: parameterParticipationOwner) == 0 {
                     if intBufferSet(buffer: reachability.abiParticipants, index: parameterParticipationOwner, value: 2) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
@@ -8735,13 +9449,13 @@ function compilerReachableLLVMStateBuild(reachability: CompilerReachableLLVMStat
             while closureEdge < intBufferCount(buffer: reachability.edgeTargets) {
                 let closureCheckedOwner: Int(intBufferElement(buffer: reachability.edgeOwners, index: closureEdge))
                 let closureCheckedTarget: Int(intBufferElement(buffer: reachability.edgeTargets, index: closureEdge))
-                if compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget)
+                if compilerFunctionHasRepresentationSensitiveABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget)
                     && intBufferElement(buffer: reachability.abiParticipants, index: closureCheckedOwner) == 2
                     && intBufferElement(buffer: reachability.abiParticipants, index: closureCheckedTarget) == 1 {
                     if intBufferSet(buffer: reachability.abiParticipants, index: closureCheckedTarget, value: 2) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
                     blockingParticipationChanged: true
                 }
-                if compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget)
+                if compilerFunctionHasRepresentationSensitiveABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget)
                     && intBufferElement(buffer: reachability.abiParticipants, index: closureCheckedTarget) == 2
                     && intBufferElement(buffer: reachability.abiParticipants, index: closureCheckedOwner) == 1 {
                     if intBufferSet(buffer: reachability.abiParticipants, index: closureCheckedOwner, value: 2) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
@@ -8753,7 +9467,7 @@ function compilerReachableLLVMStateBuild(reachability: CompilerReachableLLVMStat
                             && intBufferElement(buffer: reachability.abiActivation, index: closureCheckedOwner) != 1)
                         || (compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget) == compilerFunctionReturnABIIndirect()
                             && intBufferElement(buffer: reachability.abiActivation, index: closureCheckedTarget) != 1)
-                        || (compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget)
+                        || (compilerFunctionHasRepresentationSensitiveABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget)
                             && intBufferElement(buffer: reachability.abiParticipants, index: closureCheckedTarget) != 1)) {
                     if intBufferSet(buffer: reachability.abiParticipants, index: closureCheckedOwner, value: 2) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
                     blockingParticipationChanged: true
@@ -8797,17 +9511,32 @@ function compilerReachableLLVMStateBuild(reachability: CompilerReachableLLVMStat
         if compilerReachableLLVMStateEmitFunction(reachability: reachability, functionRow: emissionFunctionRow, emissionEdgeOwners: emissionEdgeOwners, emissionEdgeTargets: emissionEdgeTargets) != 0 { emissionStatus: 20 }
         if emissionStatus == 0 && intBufferSet(buffer: reachability.counters, index: compilerReachableLLVMEmissionIndex(), value: emissionIndex + 1) != 0 { emissionStatus: 21 }
     }
-    if intBufferCount(buffer: emissionEdgeOwners) != intBufferCount(buffer: reachability.edgeOwners)
-        || intBufferCount(buffer: emissionEdgeTargets) != intBufferCount(buffer: reachability.edgeTargets) { emissionStatus: 30 }
+    if intBufferCount(buffer: emissionEdgeOwners) != intBufferCount(buffer: emissionEdgeTargets)
+        || intBufferCount(buffer: reachability.edgeOwners) != intBufferCount(buffer: reachability.edgeTargets) { emissionStatus: 30 }
     state emissionEdgeIndex: Int(0)
-    while emissionStatus == 0 && emissionEdgeIndex < intBufferCount(buffer: reachability.edgeTargets) {
-        if intBufferElement(buffer: emissionEdgeOwners, index: emissionEdgeIndex) != intBufferElement(buffer: reachability.edgeOwners, index: emissionEdgeIndex)
-            || intBufferElement(buffer: emissionEdgeTargets, index: emissionEdgeIndex) != intBufferElement(buffer: reachability.edgeTargets, index: emissionEdgeIndex) { emissionStatus: 31 }
+    while emissionStatus == 0 && emissionEdgeIndex < intBufferCount(buffer: emissionEdgeTargets) {
+        if !compilerFunctionEdgesContain(edgeOwners: reachability.edgeOwners, edgeTargets: reachability.edgeTargets, ownerFunctionRow: intBufferElement(buffer: emissionEdgeOwners, index: emissionEdgeIndex), targetFunctionRow: intBufferElement(buffer: emissionEdgeTargets, index: emissionEdgeIndex)) { emissionStatus: 31 }
         emissionEdgeIndex: emissionEdgeIndex + 1
     }
-    if intBufferDestroy(buffer: emissionEdgeOwners) != 0 || intBufferDestroy(buffer: emissionEdgeTargets) != 0 { emissionStatus: 32 }
+    state plannedEdgeIndex: Int(0)
+    while emissionStatus == 0 && plannedEdgeIndex < intBufferCount(buffer: reachability.edgeTargets) {
+        let plannedOwner: Int(intBufferElement(buffer: reachability.edgeOwners, index: plannedEdgeIndex))
+        let plannedTarget: Int(intBufferElement(buffer: reachability.edgeTargets, index: plannedEdgeIndex))
+        let plannedEdgeTransientMark: Int(stringTransientRegionMark())
+        if compilerReachableLLVMStateFunctionIsRepresentationSensitive(reachability: reachability, functionRow: plannedTarget) {
+            if !compilerFunctionEdgesContain(edgeOwners: emissionEdgeOwners, edgeTargets: emissionEdgeTargets, ownerFunctionRow: plannedOwner, targetFunctionRow: plannedTarget) { emissionStatus: 32 }
+        }
+        stringTransientRegionReset(mark: plannedEdgeTransientMark)
+        plannedEdgeIndex: plannedEdgeIndex + 1
+    }
+    if intBufferDestroy(buffer: emissionEdgeOwners) != 0 || intBufferDestroy(buffer: emissionEdgeTargets) != 0 { emissionStatus: 33 }
     if emissionStatus != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: emissionStatus) }
     return 0
+}
+
+function compilerReachableLLVMStateBuild(reachability: CompilerReachableLLVMState): Int {
+    if !reachability.selection.isValid || compilerFunctionReachabilitySeedRoots(tables: reachability.context.tables, index: reachability.context.declarationIndex, selection: reachability.selection, worklist: reachability.worklist, rootNames: String("compileRangeNativeSource;compilerNativeOutputExitCode;")) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+    return compilerReachableLLVMStateBuildSelected(reachability: reachability)
 }
 
 function compilerReachableLLVMStateHelpers(reachability: CompilerReachableLLVMState): CompilerTypedLLVMHelpers {
@@ -8838,6 +9567,7 @@ function compilerReachableLLVMStateDestroy(reachability: CompilerReachableLLVMSt
     if intBufferDestroy(buffer: reachability.abiActivation) != 0 { status: 0 - 1 }
     if intBufferDestroy(buffer: reachability.abiReturnModes) != 0 { status: 0 - 1 }
     if intBufferDestroy(buffer: reachability.abiParticipants) != 0 { status: 0 - 1 }
+    if intBufferDestroy(buffer: reachability.abiSensitiveFunctions) != 0 { status: 0 - 1 }
     if textBufferDestroy(buffer: reachability.functionsBuffer) != 0 { status: 0 - 1 }
     if textBufferDestroy(buffer: reachability.globalsBuffer) != 0 { status: 0 - 1 }
     if intBufferDestroy(buffer: reachability.counters) != 0 { status: 0 - 1 }
@@ -8849,7 +9579,7 @@ function compilerCoreLLVMSelectedHelperFunctionTyped(context: CompilerLLVMLoweri
     if !lowering.isValid {
         let fileID: Int(compilerIntTableValue(table: context.tables.declarations, row: declarationRow, column: 1))
         let name: String(compilerTypedSyntaxLocalText(tables: context.tables, fileID: fileID, localStart: compilerIntTableValue(table: context.tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: context.tables.declarations, row: declarationRow, column: 8)))
-        let placeholder: String("; RANGE_LOWERING_PLACEHOLDER function=\(name) reason=typedBodyPipelineFailure stage=\(lowering.failureStage)\n")
+        let placeholder: String("; RANGE_LOWERING_PLACEHOLDER functionID=\(functionRow) function=\(name) reason=typedBodyPipelineFailure stage=\(lowering.failureStage)\n")
         return CompilerTypedLLVMHelpers(helpers: CompilerLLVMHelperFunctions(renderedFunctions: placeholder, instructionRecords: String(""), nextTemporary: initialTemporaryIndex), renderedGlobals: String(""), runtimeRequirements: 0, telemetry: lowering.telemetry)
     }
     let renderedFunction: String(compilerCoreRenderLLVMHelperFunctionTyped(tables: context.tables, index: context.declarationIndex, declarationRow: declarationRow, functionRow: functionRow, block: lowering.block, abiPlan: abiPlan))
@@ -9238,6 +9968,23 @@ function compilerModuleABIPlanIsParticipant(plan: CompilerModuleABIPlan, functio
         && intBufferElement(buffer: plan.participants, index: functionRow) == 1
 }
 
+function compilerBodyArenaOwnerIsParticipant(arena: CompilerBodyArena, plan: CompilerModuleABIPlan): Bool {
+    if compilerBodyArenaIsEntry(arena: arena) { return plan.isFrozen }
+    if arena.ownerKind != compilerBodyArenaOwnerFunction() { return false }
+    return compilerModuleABIPlanIsParticipant(plan: plan, functionRow: arena.ownerFunctionRow)
+}
+
+function compilerBodyArenaOwnerReturnMode(arena: CompilerBodyArena, plan: CompilerModuleABIPlan): Int {
+    if compilerBodyArenaIsEntry(arena: arena) { return compilerFunctionReturnABIDirect() }
+    if arena.ownerKind != compilerBodyArenaOwnerFunction() { return compilerFunctionReturnABINone() }
+    return compilerModuleABIPlanReturnMode(plan: plan, tables: arena.tables, index: arena.declarationIndex, functionRow: arena.ownerFunctionRow)
+}
+
+function compilerBodyArenaOwnerAuxID(arena: CompilerBodyArena): Int {
+    if compilerBodyArenaIsEntry(arena: arena) { return arena.ownerDeclarationSyntaxID }
+    return arena.ownerFunctionRow
+}
+
 function compilerReachableLLVMStateABIPlan(reachability: CompilerReachableLLVMState): CompilerModuleABIPlan {
     return CompilerModuleABIPlan(returnModes: reachability.abiReturnModes, participants: reachability.abiParticipants, isFrozen: intBufferElement(buffer: reachability.counters, index: compilerReachableLLVMPlanFrozen()) == 1)
 }
@@ -9421,6 +10168,11 @@ function compilerFunctionHasAggregateParameterABI(tables: CompilerSyntaxTables, 
         ordinal: ordinal + 1
     }
     return false
+}
+
+function compilerFunctionHasRepresentationSensitiveABI(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, functionRow: Int): Bool {
+    return compilerFunctionReturnABI(tables: tables, index: index, functionRow: functionRow) == compilerFunctionReturnABIIndirect()
+        || compilerFunctionHasAggregateParameterABI(tables: tables, index: index, functionRow: functionRow)
 }
 
 function compilerFunctionNamedReturnABI(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, name: String): Int {
@@ -9645,14 +10397,26 @@ function compilerBodyArenaStatementKind(token: RangeLexedToken): Int {
     return 0 - 1
 }
 
+function compilerBodyArenaOwnerFunction(): Int { return 1 }
+function compilerBodyArenaOwnerEntry(): Int { return 2 }
+
+function compilerBodyArenaIsEntry(arena: CompilerBodyArena): Bool {
+    return arena.ownerKind == compilerBodyArenaOwnerEntry()
+}
+
 function compilerBodyArenaRecognitionContext(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, functionRow: Int): CompilerBodyArena {
     let fileID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 1))
+    let bodyStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.functions, row: functionRow, column: 8)))
+    let bodyEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.functions, row: functionRow, column: 9)))
     return CompilerBodyArena(
         tables: tables,
         declarationIndex: index,
+        ownerKind: compilerBodyArenaOwnerFunction(),
         ownerDeclarationSyntaxID: compilerIntTableValue(table: tables.functions, row: functionRow, column: 0),
         ownerFunctionRow: functionRow,
         fileID: fileID,
+        bodyStart: bodyStart,
+        bodyEnd: bodyEnd,
         rootNodeID: 0,
         retainsFacts: false,
         nodes: tables.bodyNodes,
@@ -9678,12 +10442,16 @@ function compilerBodyArenaRecognitionContext(tables: CompilerSyntaxTables, index
 }
 
 function compilerBodyArenaRecognizesFunction(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, functionRow: Int): Bool {
+    let transientMark: Int(stringTransientRegionMark())
     let arena: CompilerBodyArena(compilerBodyArenaRecognitionContext(tables: tables, index: index, functionRow: functionRow))
-    let bodyStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: tables.functions, row: functionRow, column: 8)))
-    let bodyEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: tables.functions, row: functionRow, column: 9)))
-    if bodyStart < 0 || bodyEnd <= bodyStart { return false }
-    let result: CompilerBodyParseResult(compilerBodyArenaParseRegionInto(arena: arena, regionNodeID: 0, start: bodyStart, limit: bodyEnd))
-    return result.isValid && result.nextIndex >= bodyEnd
+    state recognized: Bool(false)
+    if arena.bodyStart >= 0 && arena.bodyEnd > arena.bodyStart {
+        let result: CompilerBodyParseResult(compilerBodyArenaParseRegionInto(arena: arena, regionNodeID: 0, start: arena.bodyStart, limit: arena.bodyEnd))
+        if result.isValid && result.nextIndex >= arena.bodyEnd { recognized: true }
+    }
+    compilerBodyArenaDestroy(arena: arena)
+    stringTransientRegionReset(mark: transientMark)
+    return recognized
 }
 
 function compilerBodyArenaHasAggregateCall(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, functionRow: Int): Bool {
@@ -9777,8 +10545,7 @@ function compilerBodyArenaAppendEdge(arena: CompilerBodyArena, ownerNodeID: Int,
     return 0
 }
 
-function compilerBodyArenaCreate(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, functionRow: Int): CompilerBodyArena {
-    let fileID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 1))
+function compilerBodyArenaCreateForBody(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, ownerKind: Int, ownerSyntaxID: Int, ownerFunctionRow: Int, fileID: Int, bodyStart: Int, bodyEnd: Int): CompilerBodyArena {
     let memoryState: IntBuffer(intBufferCreate(capacity: compilerBodyMemoryStateCount()))
     intBufferAppend(buffer: memoryState, value: 0)
     intBufferAppend(buffer: memoryState, value: 0)
@@ -9786,9 +10553,12 @@ function compilerBodyArenaCreate(tables: CompilerSyntaxTables, index: CompilerDe
     return CompilerBodyArena(
         tables: tables,
         declarationIndex: index,
-        ownerDeclarationSyntaxID: compilerIntTableValue(table: tables.functions, row: functionRow, column: 0),
-        ownerFunctionRow: functionRow,
+        ownerKind: ownerKind,
+        ownerDeclarationSyntaxID: ownerSyntaxID,
+        ownerFunctionRow: ownerFunctionRow,
         fileID: fileID,
+        bodyStart: bodyStart,
+        bodyEnd: bodyEnd,
         rootNodeID: 0,
         retainsFacts: true,
         nodes: compilerIntTableCreate(columnCount: compilerBodyArenaNodeColumnCount(), estimatedRowCount: 64),
@@ -9811,6 +10581,26 @@ function compilerBodyArenaCreate(tables: CompilerSyntaxTables, index: CompilerDe
         mirTraversal: intBufferCreate(capacity: 32),
         failures: intBufferCreate(capacity: 1)
     )
+}
+
+function compilerBodyArenaCreate(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, functionRow: Int): CompilerBodyArena {
+    let fileID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 1))
+    let bodyStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.functions, row: functionRow, column: 8)))
+    let bodyEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.functions, row: functionRow, column: 9)))
+    return compilerBodyArenaCreateForBody(tables: tables, index: index, ownerKind: compilerBodyArenaOwnerFunction(), ownerSyntaxID: compilerIntTableValue(table: tables.functions, row: functionRow, column: 0), ownerFunctionRow: functionRow, fileID: fileID, bodyStart: bodyStart, bodyEnd: bodyEnd)
+}
+
+function compilerBodyArenaCreateEntry(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex): CompilerBodyArena {
+    let maybeMain: Optional<CompilerMainBlock>(compilerCoreParseMainBlock(source: tables.sourceStore.source))
+    if maybeMain == nil {
+        let invalidArena: CompilerBodyArena(compilerBodyArenaCreateForBody(tables: tables, index: index, ownerKind: compilerBodyArenaOwnerEntry(), ownerSyntaxID: 0 - 1, ownerFunctionRow: 0 - 1, fileID: 0, bodyStart: 0 - 1, bodyEnd: 0 - 1))
+        intBufferAppend(buffer: invalidArena.failures, value: 0 - 1)
+        return invalidArena
+    }
+    let fallbackMain: CompilerMainBlock(CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
+    let mainBlock: CompilerMainBlock(maybeMain ?? fallbackMain)
+    let fileID: Int(compilerSourceStoreFileIDAtGlobalOffset(store: tables.sourceStore, globalOffset: mainBlock.attributeStart))
+    return compilerBodyArenaCreateForBody(tables: tables, index: index, ownerKind: compilerBodyArenaOwnerEntry(), ownerSyntaxID: mainBlock.attributeStart, ownerFunctionRow: 0 - 1, fileID: fileID, bodyStart: mainBlock.bodyStart, bodyEnd: mainBlock.bodyEnd)
 }
 
 function compilerBodyParseFailure(index: Int): CompilerBodyParseResult {
@@ -10251,8 +11041,10 @@ function compilerBodyArenaParseStatement(arena: CompilerBodyArena, start: Int, l
 }
 
 function compilerBodyArenaParseFunction(arena: CompilerBodyArena): CompilerBodyArena {
-    let bodyStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 8)))
-    let bodyEnd: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 9)))
+    state bodyStart: Int(0)
+    bodyStart: arena.bodyStart
+    state bodyEnd: Int(0)
+    bodyEnd: arena.bodyEnd
     if bodyStart < 0 || bodyEnd <= bodyStart {
         intBufferAppend(buffer: arena.failures, value: bodyStart)
         return arena
@@ -10495,21 +11287,42 @@ function compilerBodyArenaConstructMemberCount(arena: CompilerBodyArena, constru
     return count
 }
 
+function compilerBodyArenaConstructMemberRowForArgument(arena: CompilerBodyArena, constructSyntaxID: Int, argumentNodeID: Int): Int {
+    if argumentNodeID < 0 || argumentNodeID >= compilerIntTableRowCount(table: arena.nodes) { return 0 - 1 }
+    let labelStart: Int(compilerIntTableValue(table: arena.nodes, row: argumentNodeID, column: 6))
+    let labelEnd: Int(compilerIntTableValue(table: arena.nodes, row: argumentNodeID, column: 7))
+    if labelStart < 0 || labelEnd <= labelStart { return 0 - 1 }
+    let label: String(compilerTypedSyntaxLocalText(tables: arena.tables, fileID: arena.fileID, localStart: labelStart, localEnd: labelEnd))
+    return compilerDeclarationIndexMemberLookup(tables: arena.tables, index: arena.declarationIndex, parentSyntaxID: constructSyntaxID, name: label)
+}
+
+function compilerBodyArenaConstructArgumentOrdinalForMemberOrdinal(arena: CompilerBodyArena, applicationNodeID: Int, constructSyntaxID: Int, memberOrdinal: Int): Int {
+    let memberRow: Int(compilerBodyArenaConstructMemberRowAtOrdinal(arena: arena, constructSyntaxID: constructSyntaxID, ordinal: memberOrdinal))
+    if memberRow < 0 { return 0 - 1 }
+    state argumentOrdinal: Int(0)
+    let argumentCount: Int(compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: applicationNodeID))
+    while argumentOrdinal < argumentCount {
+        let argumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: applicationNodeID, role: compilerSyntaxRoleArgument(), ordinal: argumentOrdinal))
+        if compilerBodyArenaConstructMemberRowForArgument(arena: arena, constructSyntaxID: constructSyntaxID, argumentNodeID: argumentNodeID) == memberRow { return argumentOrdinal }
+        argumentOrdinal: argumentOrdinal + 1
+    }
+    return 0 - 1
+}
+
 function compilerBodyArenaCallLabelsMatchConstruct(arena: CompilerBodyArena, applicationNodeID: Int, constructSyntaxID: Int): Bool {
     let memberCount: Int(compilerBodyArenaConstructMemberCount(arena: arena, constructSyntaxID: constructSyntaxID))
     if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: applicationNodeID) != memberCount { return false }
     state ordinal: Int(0)
     while ordinal < memberCount {
         let argumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: applicationNodeID, role: compilerSyntaxRoleArgument(), ordinal: ordinal))
-        let memberRow: Int(compilerBodyArenaConstructMemberRowAtOrdinal(arena: arena, constructSyntaxID: constructSyntaxID, ordinal: ordinal))
+        let memberRow: Int(compilerBodyArenaConstructMemberRowForArgument(arena: arena, constructSyntaxID: constructSyntaxID, argumentNodeID: argumentNodeID))
         if argumentNodeID < 0 || memberRow < 0 { return false }
-        let labelStart: Int(compilerIntTableValue(table: arena.nodes, row: argumentNodeID, column: 6))
-        let labelEnd: Int(compilerIntTableValue(table: arena.nodes, row: argumentNodeID, column: 7))
-        if labelStart < 0 || labelEnd < labelStart { return false }
-        let label: String(compilerTypedSyntaxLocalText(tables: arena.tables, fileID: arena.fileID, localStart: labelStart, localEnd: labelEnd))
-        let memberFileID: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 1))
-        let memberName: String(compilerTypedSyntaxLocalText(tables: arena.tables, fileID: memberFileID, localStart: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 6), localEnd: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 7)))
-        if label != memberName { return false }
+        state priorOrdinal: Int(0)
+        while priorOrdinal < ordinal {
+            let priorArgumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: applicationNodeID, role: compilerSyntaxRoleArgument(), ordinal: priorOrdinal))
+            if compilerBodyArenaConstructMemberRowForArgument(arena: arena, constructSyntaxID: constructSyntaxID, argumentNodeID: priorArgumentNodeID) == memberRow { return false }
+            priorOrdinal: priorOrdinal + 1
+        }
         ordinal: ordinal + 1
     }
     return true
@@ -10519,6 +11332,7 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
     let kind: Int(compilerIntTableValue(table: arena.nodes, row: nodeID, column: 1))
     if kind == compilerSyntaxKindIdentifier() {
         if compilerBodyArenaNodeText(arena: arena, nodeID: nodeID) == String("nil") && compilerBodyArenaNodeIsReturnValue(arena: arena, nodeID: nodeID) {
+            if compilerBodyArenaIsEntry(arena: arena) { return 0 - 1 }
             let nilReturnFileID: Int(compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 1))
             let nilReturnTypeID: Int(compilerBodyArenaTypeIDForSpan(arena: arena, fileID: nilReturnFileID, start: compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 6), end: compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 7)))
             return compilerBodyArenaAppendNilResolution(arena: arena, nodeID: nodeID, typeKind: compilerBodyTypeConstruct(), typeID: nilReturnTypeID, regionNodeID: regionNodeID)
@@ -10624,7 +11438,7 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
                 }
             }
             if targetKind == compilerBodyResolutionConstruct() {
-                let constructMemberRow: Int(compilerBodyArenaConstructMemberRowAtOrdinal(arena: arena, constructSyntaxID: targetID, ordinal: argumentOrdinal))
+                let constructMemberRow: Int(compilerBodyArenaConstructMemberRowForArgument(arena: arena, constructSyntaxID: targetID, argumentNodeID: argumentNodeID))
                 if constructMemberRow < 0 { return 0 - 1 }
                 let constructMemberFileID: Int(compilerIntTableValue(table: arena.tables.members, row: constructMemberRow, column: 1))
                 let constructExpectedTypeKind: Int(compilerBodyArenaTypeKindForSpan(arena: arena, fileID: constructMemberFileID, start: compilerIntTableValue(table: arena.tables.members, row: constructMemberRow, column: 8), end: compilerIntTableValue(table: arena.tables.members, row: constructMemberRow, column: 9)))
@@ -10730,6 +11544,8 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
 }
 
 function compilerBodyArenaSeedParameterSymbols(arena: CompilerBodyArena): Int {
+    if compilerBodyArenaIsEntry(arena: arena) { return 0 }
+    if arena.ownerKind != compilerBodyArenaOwnerFunction() { return 0 - 1 }
     let firstParameterRow: Int(compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 2))
     let parameterCount: Int(compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 3))
     state ordinal: Int(0)
@@ -11344,7 +12160,7 @@ function compilerBodyCalleeReturnStorage(arena: CompilerBodyArena): Int {
 }
 
 function compilerBodyMemoryBuildCalleeReturnDestination(arena: CompilerBodyArena, phase: Int, abiPlan: CompilerModuleABIPlan): Int {
-    if compilerModuleABIPlanReturnMode(plan: abiPlan, tables: arena.tables, index: arena.declarationIndex, functionRow: arena.ownerFunctionRow) != compilerFunctionReturnABIIndirect() { return 0 }
+    if compilerBodyArenaOwnerReturnMode(arena: arena, plan: abiPlan) != compilerFunctionReturnABIIndirect() { return 0 }
     let returnFileID: Int(compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 1))
     let returnTypeID: Int(compilerBodyArenaTypeIDForSpan(arena: arena, fileID: returnFileID, start: compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 6), end: compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 7)))
     if returnTypeID < 0 { return 0 - 1 }
@@ -11442,7 +12258,7 @@ function compilerBodyMemoryBuildPassEscapePhase(arena: CompilerBodyArena, abiPla
         if nodeKind == compilerSyntaxKindReturn() {
             let returnValueNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeRow, role: compilerSyntaxRoleReturnValue(), ordinal: 0))
             if returnValueNodeID < 0 { return 40000 + nodeRow }
-            if compilerBodyMemoryAppendFact(arena: arena, phase: phase, kind: compilerBodyMemoryFactReturnEscape(), sourceNodeID: nodeRow, subjectKind: compilerBodyMemorySubjectNode(), subjectID: returnValueNodeID, auxID: arena.ownerFunctionRow) < 0 { return 41000 + nodeRow }
+            if compilerBodyMemoryAppendFact(arena: arena, phase: phase, kind: compilerBodyMemoryFactReturnEscape(), sourceNodeID: nodeRow, subjectKind: compilerBodyMemorySubjectNode(), subjectID: returnValueNodeID, auxID: compilerBodyArenaOwnerAuxID(arena: arena)) < 0 { return 41000 + nodeRow }
             let returnStorageID: Int(compilerBodyCalleeReturnStorage(arena: arena))
             if returnStorageID >= 0 {
                 let returnTypeID: Int(compilerBodyArenaExpressionTypeID(arena: arena, nodeID: returnValueNodeID))
@@ -12007,7 +12823,15 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         let callFirstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
         ordinal: 0
         while ordinal < argumentCount {
-            if compilerBodyMIRAppendOperand(arena: arena, operationID: callOperationID, ordinal: ordinal, valueID: intBufferElement(buffer: argumentValues, index: ordinal), role: compilerBodyMIROperandArgument()) != 0 {
+            state valueOrdinal: Int(ordinal)
+            if resolutionTargetKind == compilerBodyResolutionConstruct() {
+                valueOrdinal: compilerBodyArenaConstructArgumentOrdinalForMemberOrdinal(arena: arena, applicationNodeID: nodeID, constructSyntaxID: targetID, memberOrdinal: ordinal)
+            }
+            if valueOrdinal < 0 {
+                intBufferDestroy(buffer: argumentValues)
+                return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
+            }
+            if compilerBodyMIRAppendOperand(arena: arena, operationID: callOperationID, ordinal: ordinal, valueID: intBufferElement(buffer: argumentValues, index: valueOrdinal), role: compilerBodyMIROperandArgument()) != 0 {
                 intBufferDestroy(buffer: argumentValues)
                 return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
             }
@@ -12406,6 +13230,14 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
             let callResultTypeKind: Int(compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()))
             state callReturnABI: Int(compilerFunctionReturnABINone())
             if validationTargetKind == compilerBodyMIROperationTargetFunction() { callReturnABI: compilerModuleABIPlanReturnMode(plan: abiPlan, tables: arena.tables, index: arena.declarationIndex, functionRow: validationTargetID) }
+            if abiPlan.isFrozen && validationTargetKind == compilerBodyMIROperationTargetFunction()
+                && callResultTypeKind == compilerBodyTypeConstruct()
+                && (!compilerBodyArenaOwnerIsParticipant(arena: arena, plan: abiPlan)
+                    || !compilerModuleABIPlanIsParticipant(plan: abiPlan, functionRow: validationTargetID)) { return 311008 }
+            if abiPlan.isFrozen && validationTargetKind == compilerBodyMIROperationTargetFunction()
+                && compilerFunctionHasRepresentationSensitiveABI(tables: arena.tables, index: arena.declarationIndex, functionRow: validationTargetID)
+                && (!compilerBodyArenaOwnerIsParticipant(arena: arena, plan: abiPlan)
+                    || !compilerModuleABIPlanIsParticipant(plan: abiPlan, functionRow: validationTargetID)) { return 311008 }
             if validationTargetKind == compilerBodyMIROperationTargetFunction() && callResultTypeKind == compilerBodyTypeConstruct() && callReturnABI == compilerFunctionReturnABIIndirect() {
                 if validationStorageID < 0 || validationStorageID >= compilerIntTableRowCount(table: arena.storages) { return 311005 }
                 let callSourceNodeID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationSourceColumn()))
@@ -12485,7 +13317,7 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                 || validationStorageID != 0 - 1 { return 300000 + operationRow * 100 + operationKind }
         }
         if operationKind == compilerBodyMIROperationReturn() {
-            let ownerReturnMode: Int(compilerModuleABIPlanReturnMode(plan: abiPlan, tables: arena.tables, index: arena.declarationIndex, functionRow: arena.ownerFunctionRow))
+            let ownerReturnMode: Int(compilerBodyArenaOwnerReturnMode(arena: arena, plan: abiPlan))
             if ownerReturnMode == compilerFunctionReturnABIIndirect() {
                 let returnSourceNodeID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationSourceColumn()))
                 if validationStorageID < 0 || validationStorageID >= compilerIntTableRowCount(table: arena.storages)
@@ -12634,7 +13466,7 @@ function compilerBodyLLVMValue(emitter: CompilerBodyLLVMEmitter, valueID: Int): 
     let aux: Int(compilerIntTableValue(table: emitter.valueAssignments, row: row, column: compilerBodyLLVMValueAssignmentAuxColumn()))
     state typeName: String(compilerBodyLLVMValueTypeName(arena: emitter.arena, valueID: valueID))
     if kind == compilerBodyLLVMValueParameter()
-        && !compilerModuleABIPlanIsParticipant(plan: emitter.abiPlan, functionRow: emitter.arena.ownerFunctionRow) {
+        && !compilerBodyArenaOwnerIsParticipant(arena: emitter.arena, plan: emitter.abiPlan) {
         typeName: compilerBodyLLVMTypeName(typeKind: compilerIntTableValue(table: emitter.arena.mirValues, row: valueID, column: compilerBodyMIRValueTypeColumn()))
     }
     if kind == compilerBodyLLVMValueImmediate() {
@@ -13211,7 +14043,7 @@ function compilerBodyLLVMEmitterRenderBlock(emitter: CompilerBodyLLVMEmitter, mi
     if terminatorKind == compilerBodyMIROperationReturn() {
         let returnValueID: Int(compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: terminatorOperationID, ordinal: 0))
         let returnValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: returnValueID))
-        if compilerModuleABIPlanReturnMode(plan: emitter.abiPlan, tables: emitter.arena.tables, index: emitter.arena.declarationIndex, functionRow: emitter.arena.ownerFunctionRow) == compilerFunctionReturnABIIndirect() {
+        if compilerBodyArenaOwnerReturnMode(arena: emitter.arena, plan: emitter.abiPlan) == compilerFunctionReturnABIIndirect() {
             if textBufferAppend(buffer: emitter.renderedBlocks, text: "  store \(returnValue.typeName) \(returnValue.text), ptr %returnDestination\n") != 0 { return 0 - 1 }
             terminal: CompilerLLVMTerminator(kind: String("return"), typeName: String("void"), value: String(""), trueLabel: String(""), falseLabel: String(""))
         } else {
@@ -13297,8 +14129,10 @@ function compilerBodyLLVMEmitterRenderGlobals(emitter: CompilerBodyLLVMEmitter):
 }
 
 function compilerBodyLLVMEmit(arena: CompilerBodyArena, initialTemporary: Int, initialBranch: Int, abiPlan: CompilerModuleABIPlan): CompilerBodyLLVMEmissionResult {
-    let bodyStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 8)))
-    let bodyEnd: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 9)))
+    state bodyStart: Int(0)
+    bodyStart: arena.bodyStart
+    state bodyEnd: Int(0)
+    bodyEnd: arena.bodyEnd
     let emptyBlock: CompilerLLVMLoweredBlock(CompilerLLVMLoweredBlock(block: CompilerBlock(start: bodyStart, end: bodyEnd), declarationRecords: String(""), renderedBlocks: String(""), instructionRecords: String(""), localValues: String(""), nextTemporary: initialTemporary, nextBranchIndex: initialBranch, exitLabel: String("entry"), hasEntryBranch: false, entryBranchCondition: String(""), entryBranchThenLabel: String(""), entryBranchElseLabel: String(""), hasReturn: false, returnLLVMType: String(""), returnLLVMValue: String("")))
     if !compilerBodyMIRIsValid(arena: arena, abiPlan: abiPlan) || !compilerBodyMemoryIsFrozenAndValid(arena: arena) { return CompilerBodyLLVMEmissionResult(block: emptyBlock, renderedGlobals: String(""), runtimeRequirements: 0, isValid: false) }
     let emitter: CompilerBodyLLVMEmitter(compilerBodyLLVMEmitterCreate(arena: arena, initialTemporary: initialTemporary, initialBranch: initialBranch, abiPlan: abiPlan))
@@ -13362,10 +14196,23 @@ function compilerBodyLLVMEmit(arena: CompilerBodyArena, initialTemporary: Int, i
 }
 
 function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
-    if arena.ownerFunctionRow < 0
-        || arena.ownerFunctionRow >= compilerIntTableRowCount(table: arena.tables.functions)
-        || arena.ownerDeclarationSyntaxID != compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 0)
-        || arena.fileID != compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 1)
+    if arena.ownerKind == compilerBodyArenaOwnerFunction() {
+        if arena.ownerFunctionRow < 0 || arena.ownerFunctionRow >= compilerIntTableRowCount(table: arena.tables.functions) { return false }
+        if arena.ownerDeclarationSyntaxID != compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 0)
+            || arena.fileID != compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: 1) { return false }
+    } else if arena.ownerKind == compilerBodyArenaOwnerEntry() {
+        if arena.ownerFunctionRow != 0 - 1 { return false }
+        let maybeMain: Optional<CompilerMainBlock>(compilerCoreParseMainBlock(source: arena.tables.sourceStore.source))
+        if maybeMain == nil { return false }
+        let fallbackMain: CompilerMainBlock(CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
+        let mainBlock: CompilerMainBlock(maybeMain ?? fallbackMain)
+        if arena.ownerDeclarationSyntaxID != mainBlock.attributeStart
+            || arena.fileID != compilerSourceStoreFileIDAtGlobalOffset(store: arena.tables.sourceStore, globalOffset: mainBlock.attributeStart)
+            || arena.bodyStart != mainBlock.bodyStart
+            || arena.bodyEnd != mainBlock.bodyEnd { return false }
+    } else { return false }
+    if arena.bodyStart < 0
+        || arena.bodyEnd <= arena.bodyStart
         || arena.rootNodeID != 0
         || intBufferCount(buffer: arena.failures) != 0
         || !compilerIntTableIsComplete(table: arena.nodes)
@@ -13411,6 +14258,7 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
 }
 
 function compilerBodyArenaCanLowerFunction(arena: CompilerBodyArena): Bool {
+    if arena.ownerKind != compilerBodyArenaOwnerFunction() { return false }
     let statementNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: arena.rootNodeID, role: compilerSyntaxRoleStatement(), ordinal: 0))
     if statementNodeID < 0 || compilerIntTableValue(table: arena.nodes, row: statementNodeID, column: 1) != compilerSyntaxKindReturn() { return false }
     let expressionNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleReturnValue(), ordinal: 0))
@@ -13420,6 +14268,7 @@ function compilerBodyArenaCanLowerFunction(arena: CompilerBodyArena): Bool {
 }
 
 function compilerBodyArenaDestroy(arena: CompilerBodyArena): Int {
+    if !arena.retainsFacts { return 0 }
     let nodeStatus: Int(compilerIntTableDestroy(table: arena.nodes))
     let edgeStatus: Int(compilerIntTableDestroy(table: arena.edges))
     let symbolStatus: Int(compilerIntTableDestroy(table: arena.symbols))
@@ -13488,32 +14337,104 @@ function compilerCoreLLVMTypedBodyFailureBlock(context: CompilerLLVMLoweringCont
     return CompilerLLVMLoweredBlock(block: CompilerBlock(start: bodyStart, end: bodyEnd), declarationRecords: String(""), renderedBlocks: String(""), instructionRecords: String(""), localValues: String(""), nextTemporary: initialTemporaryIndex, nextBranchIndex: 0, exitLabel: String("entry"), hasEntryBranch: false, entryBranchCondition: String(""), entryBranchThenLabel: String(""), entryBranchElseLabel: String(""), hasReturn: false, returnLLVMType: String(""), returnLLVMValue: String(""))
 }
 
-function compilerCoreLLVMLowerHelperFunctionLegacyObserved(context: CompilerLLVMLoweringContext, functionRow: Int, initialTemporaryIndex: Int, typedParseAttempts: Int, arenaCreates: Int, arenaDestroys: Int, edgeOwners: IntBuffer, edgeTargets: IntBuffer): CompilerTypedBodyLowering {
-    let fileID: Int(compilerIntTableValue(table: context.tables.functions, row: functionRow, column: 1))
-    let bodyStart: Int(compilerSourceStoreGlobalOffset(store: context.tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: context.tables.functions, row: functionRow, column: 8)))
-    let bodyEnd: Int(compilerSourceStoreGlobalOffset(store: context.tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: context.tables.functions, row: functionRow, column: 9)))
-    let functionBlock: CompilerBlock(CompilerBlock(start: bodyStart, end: bodyEnd))
-    let parsedStatements: CompilerParsedStatements(compilerCoreParseStatements(program: context.program, block: functionBlock))
-    let parsedFunctionBlock: CompilerParsedBlock(CompilerParsedBlock(block: functionBlock, statementRecords: parsedStatements.records, statementSummary: String("")))
-    let parameterLocals: String(compilerCoreLLVMFunctionParameterLocalValuesTyped(tables: context.tables, functionRow: functionRow))
-    let returnType: String(compilerTypedSyntaxLocalText(tables: context.tables, fileID: fileID, localStart: compilerIntTableValue(table: context.tables.functions, row: functionRow, column: 6), localEnd: compilerIntTableValue(table: context.tables.functions, row: functionRow, column: 7)))
-    let loweredLegacy: CompilerLLVMLoweredBlock(compilerCoreLLVMLowerBlockWithLocals(context: context, parsedBlock: parsedFunctionBlock, initialLocalValues: parameterLocals, initialTemporaryIndex: initialTemporaryIndex, expectedReturnType: returnType))
-    let edgeStatus: Int(compilerLegacyAppendStatementRecordEdges(tables: context.tables, index: context.declarationIndex, ownerFunctionRow: functionRow, records: parsedStatements.records, edgeOwners: edgeOwners, edgeTargets: edgeTargets))
-    return CompilerTypedBodyLowering(block: loweredLegacy, renderedGlobals: String(""), runtimeRequirements: 0, telemetry: CompilerBodyTelemetry(supportedCount: 0, typedParseAttempts: typedParseAttempts, typedParseSuccesses: 0, legacyParses: 1, arenaCreates: arenaCreates, arenaDestroys: arenaDestroys, recordBytes: stringLength(value: parsedStatements.records), committedFailures: 0), failureStage: 0, isValid: edgeStatus == 0)
+function compilerCoreLLVMTypedEntryFailureBlock(arena: CompilerBodyArena, initialTemporaryIndex: Int): CompilerLLVMLoweredBlock {
+    return CompilerLLVMLoweredBlock(block: CompilerBlock(start: arena.bodyStart, end: arena.bodyEnd), declarationRecords: String(""), renderedBlocks: String(""), instructionRecords: String(""), localValues: String(""), nextTemporary: initialTemporaryIndex, nextBranchIndex: 0, exitLabel: String("entry"), hasEntryBranch: false, entryBranchCondition: String(""), entryBranchThenLabel: String(""), entryBranchElseLabel: String(""), hasReturn: false, returnLLVMType: String(""), returnLLVMValue: String(""))
+}
+
+function compilerBodyArenaEntryReturnsInt(arena: CompilerBodyArena): Bool {
+    if !compilerBodyArenaIsEntry(arena: arena) { return false }
+    state returnCount: Int(0)
+    state operationRow: Int(0)
+    while operationRow < compilerIntTableRowCount(table: arena.mirOperations) {
+        if compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationKindColumn()) == compilerBodyMIROperationReturn() {
+            let returnValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
+            if returnValueID < 0 || returnValueID >= compilerIntTableRowCount(table: arena.mirValues) { return false }
+            if compilerIntTableValue(table: arena.mirValues, row: returnValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeInt() { return false }
+            returnCount: returnCount + 1
+        }
+        operationRow: operationRow + 1
+    }
+    return returnCount > 0
+}
+
+function compilerCoreLLVMLowerEntryTyped(context: CompilerLLVMLoweringContext, initialTemporaryIndex: Int, abiPlan: CompilerModuleABIPlan): CompilerTypedBodyLowering {
+    let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreateEntry(tables: context.tables, index: context.declarationIndex)))
+    let failureBlock: CompilerLLVMLoweredBlock(compilerCoreLLVMTypedEntryFailureBlock(arena: arena, initialTemporaryIndex: initialTemporaryIndex))
+    state valid: Bool(compilerBodyArenaIsValid(arena: arena))
+    state failureStage: Int(1)
+    if valid {
+        if compilerBodyArenaBuildSymbolsAndResolutions(arena: arena, index: context.declarationIndex) != 0 { valid: false } else { failureStage: 2 }
+    }
+    if valid {
+        if !compilerBodyArenaSymbolsAndResolutionsAreValid(arena: arena) { valid: false } else { failureStage: 3 }
+    }
+    if valid {
+        if compilerBodyArenaHasUnplannedRepresentationSensitiveCall(arena: arena, abiPlan: abiPlan) { valid: false } else { failureStage: 4 }
+    }
+    if valid {
+        if compilerBodyArenaBuildCFG(arena: arena) != 0 { valid: false } else { failureStage: 5 }
+    }
+    if valid {
+        if !compilerBodyArenaCFGIsValid(arena: arena) { valid: false } else { failureStage: 6 }
+    }
+    if valid {
+        let memoryStatus: Int(compilerBodyMemoryBuildAndFreeze(arena: arena, abiPlan: abiPlan))
+        if memoryStatus != 0 {
+            failureStage: 6000 + memoryStatus
+            valid: false
+        } else { failureStage: 7 }
+    }
+    if valid {
+        if compilerBodyMIRBuild(arena: arena) != 0 { valid: false } else { failureStage: 8 }
+    }
+    if valid {
+        let validationCode: Int(compilerBodyMIRValidationCode(arena: arena, abiPlan: abiPlan))
+        if validationCode != 0 {
+            failureStage: 8000 + validationCode
+            valid: false
+        } else { failureStage: 9 }
+    }
+    if valid {
+        if !compilerBodyArenaEntryReturnsInt(arena: arena) {
+            failureStage: 10
+            valid: false
+        }
+    }
+    state emission: CompilerBodyLLVMEmissionResult(CompilerBodyLLVMEmissionResult(block: failureBlock, renderedGlobals: String(""), runtimeRequirements: 0, isValid: false))
+    if valid { emission: compilerBodyLLVMEmit(arena: arena, initialTemporary: initialTemporaryIndex, initialBranch: 0, abiPlan: abiPlan) }
+    if valid && !emission.isValid {
+        failureStage: 11
+        valid: false
+    }
+    state loweredBlock: CompilerLLVMLoweredBlock(failureBlock)
+    state renderedGlobals: String("")
+    state runtimeRequirements: Int(0)
+    if valid {
+        loweredBlock: emission.block
+        renderedGlobals: emission.renderedGlobals
+        runtimeRequirements: emission.runtimeRequirements
+    }
+    let destroyStatus: Int(compilerBodyArenaDestroy(arena: arena))
+    if destroyStatus != 0 {
+        valid: false
+        failureStage: 12
+    }
+    if !valid {
+        return CompilerTypedBodyLowering(block: failureBlock, renderedGlobals: String(""), runtimeRequirements: 0, telemetry: CompilerBodyTelemetry(supportedCount: 0, typedParseAttempts: 1, typedParseSuccesses: 0, legacyParses: 0, arenaCreates: 1, arenaDestroys: 1, recordBytes: 0, committedFailures: 1), failureStage: failureStage, isValid: false)
+    }
+    return CompilerTypedBodyLowering(block: loweredBlock, renderedGlobals: renderedGlobals, runtimeRequirements: runtimeRequirements, telemetry: CompilerBodyTelemetry(supportedCount: 1, typedParseAttempts: 1, typedParseSuccesses: 1, legacyParses: 0, arenaCreates: 1, arenaDestroys: 1, recordBytes: 0, committedFailures: 0), failureStage: 0, isValid: true)
 }
 
 function compilerCoreLLVMLowerHelperFunctionTypedObserved(context: CompilerLLVMLoweringContext, functionRow: Int, initialTemporaryIndex: Int, edgeOwners: IntBuffer, edgeTargets: IntBuffer, abiPlan: CompilerModuleABIPlan): CompilerTypedBodyLowering {
-    let isABIPlanParticipant: Bool(compilerModuleABIPlanIsParticipant(plan: abiPlan, functionRow: functionRow))
-    if isABIPlanParticipant || compilerBodyArenaFunctionUsesTypedParser(tables: context.tables, index: context.declarationIndex, functionRow: functionRow) {
+    if functionRow >= 0 {
         let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreate(tables: context.tables, index: context.declarationIndex, functionRow: functionRow)))
         let parsedArenaValid: Bool(compilerBodyArenaIsValid(arena: arena))
         if !parsedArenaValid {
             let rejectedDestroyStatus: Int(compilerBodyArenaDestroy(arena: arena))
-            if rejectedDestroyStatus == 0 {
-                return compilerCoreLLVMLowerHelperFunctionLegacyObserved(context: context, functionRow: functionRow, initialTemporaryIndex: initialTemporaryIndex, typedParseAttempts: 1, arenaCreates: 1, arenaDestroys: 1, edgeOwners: edgeOwners, edgeTargets: edgeTargets)
-            }
             let rejectedBlock: CompilerLLVMLoweredBlock(compilerCoreLLVMTypedBodyFailureBlock(context: context, functionRow: functionRow, initialTemporaryIndex: initialTemporaryIndex))
-            return CompilerTypedBodyLowering(block: rejectedBlock, renderedGlobals: String(""), runtimeRequirements: 0, telemetry: CompilerBodyTelemetry(supportedCount: 0, typedParseAttempts: 1, typedParseSuccesses: 0, legacyParses: 0, arenaCreates: 1, arenaDestroys: 1, recordBytes: 0, committedFailures: 1), failureStage: 1, isValid: false)
+            state rejectedFailureStage: Int(1)
+            if rejectedDestroyStatus != 0 { rejectedFailureStage: 12 }
+            return CompilerTypedBodyLowering(block: rejectedBlock, renderedGlobals: String(""), runtimeRequirements: 0, telemetry: CompilerBodyTelemetry(supportedCount: 0, typedParseAttempts: 1, typedParseSuccesses: 0, legacyParses: 0, arenaCreates: 1, arenaDestroys: 1, recordBytes: 0, committedFailures: 1), failureStage: rejectedFailureStage, isValid: false)
         }
         state typedValid: Bool(true)
         state typedFailureStage: Int(0)
@@ -13526,6 +14447,12 @@ function compilerCoreLLVMLowerHelperFunctionTypedObserved(context: CompilerLLVML
         if typedValid {
             if !compilerBodyArenaSymbolsAndResolutionsAreValid(arena: arena) {
                 typedFailureStage: 3
+                typedValid: false
+            }
+        }
+        if typedValid {
+            if compilerBodyArenaHasUnplannedRepresentationSensitiveCall(arena: arena, abiPlan: abiPlan) {
+                typedFailureStage: 11
                 typedValid: false
             }
         }
@@ -13574,6 +14501,12 @@ function compilerCoreLLVMLowerHelperFunctionTypedObserved(context: CompilerLLVML
             }
         }
         if typedValid {
+            if compilerBodyMIRAppendFunctionEdges(arena: arena, edgeOwners: edgeOwners, edgeTargets: edgeTargets) != 0 {
+                typedFailureStage: 10
+                typedValid: false
+            }
+        }
+        if typedValid {
             state loweredArena: CompilerLLVMLoweredBlock(compilerCoreLLVMTypedBodyFailureBlock(context: context, functionRow: functionRow, initialTemporaryIndex: initialTemporaryIndex))
             state renderedGlobals: String("")
             state runtimeRequirements: Int(0)
@@ -13586,13 +14519,12 @@ function compilerCoreLLVMLowerHelperFunctionTypedObserved(context: CompilerLLVML
             return CompilerTypedBodyLowering(block: loweredArena, renderedGlobals: renderedGlobals, runtimeRequirements: runtimeRequirements, telemetry: CompilerBodyTelemetry(supportedCount: 1, typedParseAttempts: 1, typedParseSuccesses: 1, legacyParses: 0, arenaCreates: 1, arenaDestroys: 1, recordBytes: 0, committedFailures: destroyFailures), failureStage: 0, isValid: destroyStatus == 0)
         }
         let failedDestroyStatus: Int(compilerBodyArenaDestroy(arena: arena))
-        if failedDestroyStatus == 0 && !isABIPlanParticipant && !compilerBodyArenaTransitionSupportsFunction(tables: context.tables, index: context.declarationIndex, functionRow: functionRow) {
-            return compilerCoreLLVMLowerHelperFunctionLegacyObserved(context: context, functionRow: functionRow, initialTemporaryIndex: initialTemporaryIndex, typedParseAttempts: 1, arenaCreates: 1, arenaDestroys: 1, edgeOwners: edgeOwners, edgeTargets: edgeTargets)
-        }
+        if failedDestroyStatus != 0 { typedFailureStage: 12 }
         let invalidBlock: CompilerLLVMLoweredBlock(compilerCoreLLVMTypedBodyFailureBlock(context: context, functionRow: functionRow, initialTemporaryIndex: initialTemporaryIndex))
         return CompilerTypedBodyLowering(block: invalidBlock, renderedGlobals: String(""), runtimeRequirements: 0, telemetry: CompilerBodyTelemetry(supportedCount: 0, typedParseAttempts: 1, typedParseSuccesses: 0, legacyParses: 0, arenaCreates: 1, arenaDestroys: 1, recordBytes: 0, committedFailures: 1), failureStage: typedFailureStage, isValid: false)
     }
-    return compilerCoreLLVMLowerHelperFunctionLegacyObserved(context: context, functionRow: functionRow, initialTemporaryIndex: initialTemporaryIndex, typedParseAttempts: 0, arenaCreates: 0, arenaDestroys: 0, edgeOwners: edgeOwners, edgeTargets: edgeTargets)
+    let unreachableBlock: CompilerLLVMLoweredBlock(compilerCoreLLVMTypedBodyFailureBlock(context: context, functionRow: functionRow, initialTemporaryIndex: initialTemporaryIndex))
+    return CompilerTypedBodyLowering(block: unreachableBlock, renderedGlobals: String(""), runtimeRequirements: 0, telemetry: CompilerBodyTelemetry(supportedCount: 0, typedParseAttempts: 0, typedParseSuccesses: 0, legacyParses: 0, arenaCreates: 0, arenaDestroys: 0, recordBytes: 0, committedFailures: 1), failureStage: 13, isValid: false)
 }
 
 function compilerCoreRenderLLVMHelperFunctionTyped(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, declarationRow: Int, functionRow: Int, block: CompilerLLVMLoweredBlock, abiPlan: CompilerModuleABIPlan): String {
@@ -14047,12 +14979,21 @@ function compilerCoreTextBufferConcat(left: String, right: String): String {
 }
 
 function compilerCoreRenderLLVMRuntimeDeclarations(records: String, renderedFunctions: String): String {
-    let baseDeclarations: String("declare i32 @puts(ptr)\ndeclare i32 @stringLength(ptr)\ndeclare i32 @stringIndexOf(ptr, ptr, i32)\ndeclare i32 @stringEqual(ptr, ptr)\ndeclare i32 @stringCompare(ptr, ptr)\ndeclare i1 @stringHasPrefix(ptr, i32, ptr)\ndeclare i32 @stringFindFrom(ptr, i32, ptr)\ndeclare i32 @stringFindFirstOf(ptr, i32, ptr)\ndeclare ptr @stringViewFrom(ptr, i32)\ndeclare ptr @stringSliceUnchecked(ptr, i32, i32)\ndeclare ptr @stringCharacterAt(ptr, i32)\ndeclare i32 @stringByteAt(ptr, i32)\ndeclare i32 @stringFindByteOf(ptr, i32, i32, i32, i32)\ndeclare i32 @stringTransientRegionMark()\ndeclare i32 @stringTransientRegionReset(i32)\ndeclare ptr @commandLineArgument(i32)\ndeclare i32 @commandLineArgumentCount()\ndeclare ptr @readFile(ptr)\ndeclare ptr @stringCharacter(ptr, i32)\ndeclare ptr @stringSubstring(ptr, i32, i32)\ndeclare ptr @stringConcat(ptr, ptr)\ndeclare ptr @stringFromInt(i32)\ndeclare ptr @stringFromBool(i1)\ndeclare ptr @rangeConstructCreate(ptr)\ndeclare ptr @rangeConstructSetPtr(ptr, ptr, ptr)\ndeclare ptr @rangeConstructSetInt(ptr, ptr, i32)\ndeclare ptr @rangeConstructSetBool(ptr, ptr, i1)\ndeclare ptr @rangeConstructGetPtr(ptr, ptr)\ndeclare i32 @rangeConstructGetInt(ptr, ptr)\ndeclare i1 @rangeConstructGetBool(ptr, ptr)\ndeclare ptr @textBufferCreate(i32)\ndeclare i32 @textBufferAppend(ptr, ptr)\ndeclare i32 @textBufferAppendInt(ptr, i32)\ndeclare i32 @textBufferAppendCharacter(ptr, ptr, i32)\ndeclare ptr @textBufferMaterialize(ptr)\ndeclare i32 @textBufferDestroy(ptr)\n")
+    let baseDeclarations: String("declare i32 @puts(ptr)\ndeclare i32 @stringLength(ptr)\ndeclare i32 @stringIndexOf(ptr, ptr, i32)\ndeclare i32 @stringEqual(ptr, ptr)\ndeclare i32 @stringCompare(ptr, ptr)\ndeclare i1 @stringHasPrefix(ptr, i32, ptr)\ndeclare i32 @stringFindFrom(ptr, i32, ptr)\ndeclare i32 @stringFindFirstOf(ptr, i32, ptr)\ndeclare ptr @stringViewFrom(ptr, i32)\ndeclare ptr @stringSliceUnchecked(ptr, i32, i32)\ndeclare ptr @stringCharacterAt(ptr, i32)\ndeclare i32 @stringByteAt(ptr, i32)\ndeclare i32 @stringFindByteOf(ptr, i32, i32, i32, i32)\ndeclare i32 @stringTransientRegionMark()\ndeclare i32 @stringTransientRegionReset(i32)\ndeclare ptr @commandLineArgument(i32)\ndeclare i32 @commandLineArgumentCount()\ndeclare ptr @readFile(ptr)\ndeclare ptr @stringCharacter(ptr, i32)\ndeclare ptr @stringSubstring(ptr, i32, i32)\ndeclare ptr @stringConcat(ptr, ptr)\ndeclare ptr @stringFromInt(i32)\ndeclare ptr @stringFromBool(i1)\ndeclare ptr @textBufferCreate(i32)\ndeclare i32 @textBufferAppend(ptr, ptr)\ndeclare i32 @textBufferAppendInt(ptr, i32)\ndeclare i32 @textBufferAppendCharacter(ptr, ptr, i32)\ndeclare ptr @textBufferMaterialize(ptr)\ndeclare i32 @textBufferDestroy(ptr)\n")
+    let dynamicConstructDeclarations: String(compilerCoreRenderLLVMDynamicConstructDeclarations(records: records, renderedFunctions: renderedFunctions))
     let metricsDeclarations: String(compilerCoreLLVMRuntimeMetricsDeclarations(records: records, renderedFunctions: renderedFunctions))
     if compilerCoreLLVMRecordsUseIntBuffer(records: records, renderedFunctions: renderedFunctions) {
-        return "\(baseDeclarations)\(metricsDeclarations)declare ptr @intBufferCreate(i32)\ndeclare i32 @intBufferAppend(ptr, i32)\ndeclare i32 @intBufferCount(ptr)\ndeclare i32 @intBufferElement(ptr, i32)\ndeclare i32 @intBufferSet(ptr, i32, i32)\ndeclare i32 @intBufferDestroy(ptr)\n\n"
+        return "\(baseDeclarations)\(dynamicConstructDeclarations)\(metricsDeclarations)declare ptr @intBufferCreate(i32)\ndeclare i32 @intBufferAppend(ptr, i32)\ndeclare i32 @intBufferCount(ptr)\ndeclare i32 @intBufferElement(ptr, i32)\ndeclare i32 @intBufferSet(ptr, i32, i32)\ndeclare i32 @intBufferDestroy(ptr)\n\n"
     }
-    return "\(baseDeclarations)\(metricsDeclarations)\n"
+    return "\(baseDeclarations)\(dynamicConstructDeclarations)\(metricsDeclarations)\n"
+}
+
+function compilerCoreRenderLLVMDynamicConstructDeclarations(records: String, renderedFunctions: String): String {
+    if compilerCoreRecordContains(record: renderedFunctions, text: String("@rangeConstruct"))
+        || compilerCoreRecordContains(record: records, text: String("rangeConstruct")) {
+        return String("declare ptr @rangeConstructCreate(ptr)\ndeclare ptr @rangeConstructSetPtr(ptr, ptr, ptr)\ndeclare ptr @rangeConstructSetInt(ptr, ptr, i32)\ndeclare ptr @rangeConstructSetBool(ptr, ptr, i1)\ndeclare ptr @rangeConstructGetPtr(ptr, ptr)\ndeclare i32 @rangeConstructGetInt(ptr, ptr)\ndeclare i1 @rangeConstructGetBool(ptr, ptr)\n")
+    }
+    return String("")
 }
 
 function compilerCoreRenderLLVMRuntimeDeclarationsTyped(records: String, renderedFunctions: String, runtimeRequirements: Int): String {
@@ -16812,9 +17753,20 @@ function compilerCoreStatementRecordTrailingField(record: String, prefix: String
 }
 
 function compilerCoreStatementRecordEncodeValue(value: String): String {
-    let outputBuffer: TextBuffer(textBufferCreate(capacity: 1024))
-    state sourceIndex: Int(0)
     let valueLength: Int(stringLength(value: value))
+    state encodedLength: Int(valueLength)
+    state sizingIndex: Int(0)
+    while sizingIndex < valueLength {
+        let sizingByte: Int(stringByteAt(source: value, index: sizingIndex))
+        if sizingByte == 64 { encodedLength: encodedLength + 3 }
+        if sizingByte == 124 { encodedLength: encodedLength + 5 }
+        if sizingByte == 126 { encodedLength: encodedLength + 6 }
+        if sizingByte == 10 { encodedLength: encodedLength + 8 }
+        if sizingByte == 59 { encodedLength: encodedLength + 10 }
+        sizingIndex: sizingIndex + 1
+    }
+    let outputBuffer: TextBuffer(textBufferCreate(capacity: encodedLength))
+    state sourceIndex: Int(0)
 
     while sourceIndex < valueLength {
         let byte: Int(stringByteAt(source: value, index: sourceIndex))

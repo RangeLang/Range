@@ -143,7 +143,6 @@ struct RangeScriptTests {
         #expect(result.stdout.contains("Stage 2 compiler candidate linked:"))
         #expect(result.stdout.contains("/Programs/Compiler/.range/Build/stage2/RangeCompiler"))
         #expect(result.stdout.contains("Linked Stage 2 compiler inventory check succeeded:"))
-        #expect(result.stdout.contains("Linked Stage 2 compiler body-name check succeeded:"))
         #expect(result.stdout.contains("Linked Stage 2 compiler normal compile check succeeded:"))
         #expect(result.stdout.contains("Stage 3 compiler candidate LLVM emitted:"))
         #expect(result.stdout.contains("/Programs/Compiler/.range/Build/stage3/RangeCompiler.ll"))

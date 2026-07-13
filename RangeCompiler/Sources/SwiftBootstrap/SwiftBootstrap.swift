@@ -438,7 +438,6 @@ public struct SwiftBootstrapCompiler {
         print("Stage 2 compiler candidate LLVM emitted: \(candidate.path)")
         print("Stage 2 compiler candidate linked: \(executable.path)")
         print("Linked Stage 2 compiler inventory check succeeded: \(executable.path)")
-        print("Linked Stage 2 compiler body-name check succeeded: \(executable.path)")
         print("Linked Stage 2 compiler normal compile check succeeded: \(executable.path)")
         print("Stage 3 compiler candidate LLVM emitted: \(stage3Candidate.path)")
         print("Stage 3 compiler candidate linked: \(stage3Candidate.deletingPathExtension().path)")
@@ -799,14 +798,17 @@ public struct SwiftBootstrapCompiler {
         }
 
         guard compileResult.stderr.isEmpty,
-            compileResult.stdout.contains("= type { i32, i32 }"),
+            compileResult.stdout.contains("%Range.NativeSmokePair = type { i32, i32 }"),
             compileResult.stdout.contains("define i32 @main() {\nentry:"),
-            compileResult.stdout.components(separatedBy: "define %Range.Fixed.").count == 3,
-            compileResult.stdout.components(separatedBy: "call %Range.Fixed.").count == 3,
+            compileResult.stdout.components(separatedBy: "define void @nativeSmoke").count == 3,
+            compileResult.stdout.components(separatedBy: "call void @nativeSmoke").count == 3,
+            compileResult.stdout.contains("define void @nativeSmokeFirst(ptr %returnDestination)"),
+            compileResult.stdout.contains("define void @nativeSmokeSecond(ptr %returnDestination)"),
             compileResult.stdout.contains("%storage0 = alloca"),
             compileResult.stdout.contains("%storage1 = alloca"),
-            compileResult.stdout.contains("%updated"),
+            compileResult.stdout.contains("insertvalue %Range.NativeSmokePair"),
             compileResult.stdout.contains("extractvalue"),
+            !compileResult.stdout.contains("call %Range.NativeSmokePair"),
             !compileResult.stdout.contains("rangeConstruct"),
             !compileResult.stdout.contains("malloc"),
             !compileResult.stdout.contains("calloc"),
@@ -820,6 +822,53 @@ public struct SwiftBootstrapCompiler {
                 --- stderr ---
                 \(prefixLines(compileResult.stderr))
                 """
+            )
+        }
+
+        let repeatCompileResult = try runExecutable(
+            executable: executable,
+            arguments: [smokeSource.path],
+            stdin: nil
+        )
+        guard repeatCompileResult.exitCode == 0,
+            repeatCompileResult.stderr.isEmpty,
+            repeatCompileResult.stdout == compileResult.stdout
+        else {
+            throw SwiftBootstrapError(
+                "Linked Stage 2 compiler normal compile was not deterministic."
+            )
+        }
+
+        let mixedABISource = smokeSource.deletingLastPathComponent()
+            .appendingPathComponent("MixedABINegative.range")
+        try """
+        construct ABIPair {
+            let first: Int
+            let second: Int
+        }
+
+        function brokenPair(): ABIPair {
+            return 1
+        }
+
+        @main {
+            let value: ABIPair(brokenPair())
+            return value.first
+        }
+        """.write(to: mixedABISource, atomically: true, encoding: .utf8)
+        let mixedABIResult = try runExecutable(
+            executable: executable,
+            arguments: [mixedABISource.path],
+            stdin: nil
+        )
+        guard mixedABIResult.exitCode == 65,
+            mixedABIResult.stderr.isEmpty,
+            mixedABIResult.stdout.contains("compilerError\\tkind=representationSensitiveABICapabilityBlocked"),
+            !mixedABIResult.stdout.contains("define "),
+            !mixedABIResult.stdout.contains("call ")
+        else {
+            throw SwiftBootstrapError(
+                "Linked Stage 2 compiler did not reject a mixed aggregate ABI component before LLVM emission."
             )
         }
 
