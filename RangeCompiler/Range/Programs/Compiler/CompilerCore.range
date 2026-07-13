@@ -9627,6 +9627,7 @@ function compilerBodyResolutionMember(): Int { return 4 }
 function compilerBodyResolutionOperator(): Int { return 5 }
 function compilerBodyResolutionRuntimeBuiltin(): Int { return 6 }
 function compilerBodyResolutionConstruct(): Int { return 7 }
+function compilerBodyResolutionMemberRuntimeBuiltin(): Int { return 8 }
 function compilerBodyBuiltinString(): Int { return 1 }
 function compilerBodyBuiltinRuntimeCall(): Int { return 2 }
 function compilerBodyBuiltinNil(): Int { return 3 }
@@ -9865,6 +9866,29 @@ function compilerBodyRuntimeBuiltinReturnTypeKind(id: Int): Int {
     return compilerBodyRuntimeBuiltinTypeKind(typeName: compilerBodyRuntimeBuiltinReturnType(id: id))
 }
 
+function compilerBodyMemberRuntimeBuiltinID(receiverTypeKind: Int, receiverTypeID: Int, memberName: String): Int {
+    if receiverTypeKind == compilerBodyTypeString() {
+        if memberName == String("character") { return compilerBodyRuntimeBuiltinStringCharacterAt() }
+        if memberName == String("substring") { return compilerBodyRuntimeBuiltinStringSubstring() }
+    }
+    return compilerBodyRuntimeBuiltinNone()
+}
+
+function compilerBodyMemberRuntimeBuiltinArgumentCount(id: Int): Int {
+    if id == compilerBodyRuntimeBuiltinStringCharacterAt() { return 1 }
+    if id == compilerBodyRuntimeBuiltinStringSubstring() { return 2 }
+    return 0 - 1
+}
+
+function compilerBodyMemberRuntimeBuiltinArgumentLabel(id: Int, ordinal: Int): String {
+    if id == compilerBodyRuntimeBuiltinStringCharacterAt() && ordinal == 0 { return String("index") }
+    if id == compilerBodyRuntimeBuiltinStringSubstring() {
+        if ordinal == 0 { return String("start") }
+        if ordinal == 1 { return String("end") }
+    }
+    return String("")
+}
+
 function compilerBodyRuntimeABITypeIsOpaque(typeName: String): Bool {
     return typeName == String("IntBuffer") || typeName == String("TextBuffer")
 }
@@ -9962,10 +9986,9 @@ function compilerModuleABIPlanReturnMode(plan: CompilerModuleABIPlan, tables: Co
 }
 
 function compilerModuleABIPlanIsParticipant(plan: CompilerModuleABIPlan, functionRow: Int): Bool {
-    return plan.isFrozen
-        && functionRow >= 0
-        && functionRow < intBufferCount(buffer: plan.participants)
-        && intBufferElement(buffer: plan.participants, index: functionRow) == 1
+    if !plan.isFrozen { return false }
+    if functionRow < 0 || functionRow >= intBufferCount(buffer: plan.participants) { return false }
+    return intBufferElement(buffer: plan.participants, index: functionRow) == 1
 }
 
 function compilerBodyArenaOwnerIsParticipant(arena: CompilerBodyArena, plan: CompilerModuleABIPlan): Bool {
@@ -10768,6 +10791,7 @@ function compilerBodyArenaParsePostfix(arena: CompilerBodyArena, start: Int, lim
     if !result.isValid { return result }
     let fallback: RangeLexedToken(RangeLexedToken(kind: String("eof"), start: start, end: start, text: String("")))
     state keepScanning: Bool(true)
+    state resultIsMemberRead: Bool(false)
     while keepScanning && result.nextIndex < limit {
         let maybeSuffix: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: result.nextIndex))
         if maybeSuffix == nil { return result }
@@ -10784,8 +10808,9 @@ function compilerBodyArenaParsePostfix(arena: CompilerBodyArena, start: Int, lim
             let memberNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindMemberRead(), ordinal: 0, start: receiverStart, end: member.end, firstStart: member.start, firstEnd: member.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
             if memberNodeID < 0 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: memberNodeID, childNodeID: receiverNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: suffix.end) }
             result: compilerBodyParseSuccess(nodeID: memberNodeID, nextIndex: member.end)
+            resultIsMemberRead: true
         } else if suffix.kind == String("leftParen") {
-            if !arena.retainsFacts {
+            if !arena.retainsFacts && !resultIsMemberRead {
                 let maybeCalleeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: start))
                 if maybeCalleeToken == nil { return compilerBodyParseFailure(index: start) }
                 let calleeToken: RangeLexedToken(maybeCalleeToken ?? fallback)
@@ -10804,6 +10829,7 @@ function compilerBodyArenaParsePostfix(arena: CompilerBodyArena, start: Int, lim
             if !arguments.isValid { return arguments }
             if arena.retainsFacts && intBufferSet(buffer: arena.nodes.values, index: callNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: arguments.nextIndex)) != 0 { return compilerBodyParseFailure(index: result.nextIndex) }
             result: compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: arguments.nextIndex)
+            resultIsMemberRead: false
         } else {
             keepScanning: false
         }
@@ -11267,6 +11293,23 @@ function compilerBodyArenaCallLabelsMatchFunction(arena: CompilerBodyArena, appl
     return true
 }
 
+function compilerBodyArenaCallLabelsMatchMemberRuntimeBuiltin(arena: CompilerBodyArena, applicationNodeID: Int, builtinID: Int): Bool {
+    let argumentCount: Int(compilerBodyMemberRuntimeBuiltinArgumentCount(id: builtinID))
+    if argumentCount < 0 || compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: applicationNodeID) != argumentCount { return false }
+    state ordinal: Int(0)
+    while ordinal < argumentCount {
+        let argumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: applicationNodeID, role: compilerSyntaxRoleArgument(), ordinal: ordinal))
+        if argumentNodeID < 0 { return false }
+        let labelStart: Int(compilerIntTableValue(table: arena.nodes, row: argumentNodeID, column: 6))
+        let labelEnd: Int(compilerIntTableValue(table: arena.nodes, row: argumentNodeID, column: 7))
+        if labelStart < 0 || labelEnd <= labelStart { return false }
+        let label: String(compilerTypedSyntaxLocalText(tables: arena.tables, fileID: arena.fileID, localStart: labelStart, localEnd: labelEnd))
+        if label != compilerBodyMemberRuntimeBuiltinArgumentLabel(id: builtinID, ordinal: ordinal) { return false }
+        ordinal: ordinal + 1
+    }
+    return true
+}
+
 function compilerBodyArenaConstructMemberRowAtOrdinal(arena: CompilerBodyArena, constructSyntaxID: Int, ordinal: Int): Int {
     state memberRow: Int(0)
     while memberRow < compilerIntTableRowCount(table: arena.tables.members) {
@@ -11362,13 +11405,27 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
     }
     if kind == compilerSyntaxKindApplication() {
         let calleeNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleCallee(), ordinal: 0))
-        if calleeNodeID < 0 || compilerIntTableValue(table: arena.nodes, row: calleeNodeID, column: 1) != compilerSyntaxKindIdentifier() { return 0 - 1 }
+        if calleeNodeID < 0 { return 0 - 1 }
+        let calleeKind: Int(compilerIntTableValue(table: arena.nodes, row: calleeNodeID, column: 1))
+        if calleeKind != compilerSyntaxKindIdentifier() && calleeKind != compilerSyntaxKindMemberRead() { return 0 - 1 }
         let calleeName: String(compilerBodyArenaNodeText(arena: arena, nodeID: calleeNodeID))
         state targetKind: Int(compilerBodyResolutionFunction())
         state targetID: Int(0 - 1)
         state returnTypeKind: Int(compilerBodyTypeUnknown())
         state returnTypeID: Int(0 - 1)
-        if calleeName == String("String") {
+        if calleeKind == compilerSyntaxKindMemberRead() {
+            let memberCallReceiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: calleeNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
+            if memberCallReceiverNodeID < 0 || compilerBodyArenaResolveExpression(arena: arena, index: index, nodeID: memberCallReceiverNodeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
+            let memberCallReceiverResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: memberCallReceiverNodeID))
+            if memberCallReceiverResolutionRow < 0 { return 0 - 1 }
+            let memberCallReceiverTypeKind: Int(compilerIntTableValue(table: arena.resolutions, row: memberCallReceiverResolutionRow, column: compilerBodyResolutionTypeKindColumn()))
+            let memberCallReceiverTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: memberCallReceiverResolutionRow, column: compilerBodyResolutionTypeIDColumn()))
+            targetID: compilerBodyMemberRuntimeBuiltinID(receiverTypeKind: memberCallReceiverTypeKind, receiverTypeID: memberCallReceiverTypeID, memberName: calleeName)
+            if targetID == compilerBodyRuntimeBuiltinNone()
+                || !compilerBodyArenaCallLabelsMatchMemberRuntimeBuiltin(arena: arena, applicationNodeID: nodeID, builtinID: targetID) { return 0 - 1 }
+            targetKind: compilerBodyResolutionMemberRuntimeBuiltin()
+            returnTypeKind: compilerBodyRuntimeBuiltinReturnTypeKind(id: targetID)
+        } else if calleeName == String("String") {
             if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 1 { return 0 - 1 }
             let builtinArgument: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleArgument(), ordinal: 0))
             if builtinArgument < 0 || compilerIntTableValue(table: arena.nodes, row: builtinArgument, column: 6) >= 0 { return 0 - 1 }
@@ -11417,8 +11474,10 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
             let argumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleArgument(), ordinal: argumentOrdinal))
             let valueNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: argumentNodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0))
             if valueNodeID < 0 || compilerBodyArenaResolveExpression(arena: arena, index: index, nodeID: valueNodeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
-            if targetKind == compilerBodyResolutionRuntimeBuiltin() {
-                let expectedType: String(compilerBodyRuntimeBuiltinParameterType(id: targetID, ordinal: argumentOrdinal))
+            if targetKind == compilerBodyResolutionRuntimeBuiltin() || targetKind == compilerBodyResolutionMemberRuntimeBuiltin() {
+                state runtimeParameterOrdinal: Int(argumentOrdinal)
+                if targetKind == compilerBodyResolutionMemberRuntimeBuiltin() { runtimeParameterOrdinal: argumentOrdinal + 1 }
+                let expectedType: String(compilerBodyRuntimeBuiltinParameterType(id: targetID, ordinal: runtimeParameterOrdinal))
                 let builtinActualTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID))
                 if (expectedType == String("i32") && builtinActualTypeKind != compilerBodyTypeInt())
                     || (expectedType == String("i1") && builtinActualTypeKind != compilerBodyTypeBool())
@@ -11663,6 +11722,15 @@ function compilerBodyArenaBuildCFGExpressionChildren(arena: CompilerBodyArena, n
         return compilerBodyArenaBuildCFGExpression(arena: arena, nodeID: childNodeID, entryBlockID: currentBlockID)
     }
     if kind == compilerSyntaxKindApplication() {
+        let calleeNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleCallee(), ordinal: 0))
+        if calleeNodeID < 0 { return CompilerBodyCFGResult(blockID: currentBlockID, isTerminated: false, isValid: false) }
+        if compilerIntTableValue(table: arena.nodes, row: calleeNodeID, column: 1) == compilerSyntaxKindMemberRead() {
+            let receiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: calleeNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
+            if receiverNodeID < 0 { return CompilerBodyCFGResult(blockID: currentBlockID, isTerminated: false, isValid: false) }
+            let receiverResult: CompilerBodyCFGResult(compilerBodyArenaBuildCFGExpression(arena: arena, nodeID: receiverNodeID, entryBlockID: currentBlockID))
+            if !receiverResult.isValid { return receiverResult }
+            currentBlockID: receiverResult.blockID
+        }
         state argumentOrdinal: Int(0)
         let argumentCount: Int(compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID))
         while argumentOrdinal < argumentCount {
@@ -11906,7 +11974,7 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindPrefixNegate()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindOptionalCoalescing()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindInterpolatedString())
-            || targetKind < compilerBodyResolutionLocalSymbol() || targetKind > compilerBodyResolutionConstruct() { return false }
+            || targetKind < compilerBodyResolutionLocalSymbol() || targetKind > compilerBodyResolutionMemberRuntimeBuiltin() { return false }
         if targetKind == compilerBodyResolutionLocalSymbol() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.symbols)) { return false }
         if targetKind == compilerBodyResolutionFunction() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.functions)) { return false }
         if targetKind == compilerBodyResolutionBuiltin() && targetID != compilerBodyBuiltinString() && targetID != compilerBodyBuiltinRuntimeCall() && targetID != compilerBodyBuiltinNil() { return false }
@@ -11918,6 +11986,7 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
                 && targetID != compilerSyntaxKindDivision()
                 && targetID != compilerSyntaxKindRemainder()) { return false }
         if targetKind == compilerBodyResolutionRuntimeBuiltin() && (targetID <= compilerBodyRuntimeBuiltinNone() || targetID > compilerBodyRuntimeBuiltinCount()) { return false }
+        if targetKind == compilerBodyResolutionMemberRuntimeBuiltin() && (targetID <= compilerBodyRuntimeBuiltinNone() || targetID > compilerBodyRuntimeBuiltinCount()) { return false }
         if targetKind == compilerBodyResolutionConstruct() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.syntaxIndex)
             || compilerIntTableValue(table: arena.tables.syntaxIndex, row: targetID, column: 0) != compilerSyntaxKindConstruct()) { return false }
         if (targetKind == compilerBodyResolutionLocalSymbol() || targetKind == compilerBodyResolutionFunction() || targetKind == compilerBodyResolutionMember() || targetKind == compilerBodyResolutionConstruct())
@@ -12236,6 +12305,11 @@ function compilerBodyMemoryBuildPassEscapePhase(arena: CompilerBodyArena, abiPla
             let resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: calleeNodeID))
             if resolutionRow < 0 { return 10000 + nodeRow }
             let targetID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+            if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) == compilerBodyResolutionMemberRuntimeBuiltin() {
+                let receiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: calleeNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
+                if receiverNodeID < 0
+                    || compilerBodyMemoryAppendFact(arena: arena, phase: phase, kind: compilerBodyMemoryFactArgumentPass(), sourceNodeID: calleeNodeID, subjectKind: compilerBodyMemorySubjectNode(), subjectID: receiverNodeID, auxID: targetID) < 0 { return 11000 + nodeRow }
+            }
             state ordinal: Int(0)
             let argumentCount: Int(compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeRow))
             while ordinal < argumentCount {
@@ -12802,13 +12876,28 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         let resolutionTargetKind: Int(compilerIntTableValue(table: arena.resolutions, row: callResolutionRow, column: compilerBodyResolutionTargetKindColumn()))
         if resolutionTargetKind == compilerBodyResolutionBuiltin() { callTargetKind: compilerBodyMIROperationTargetBuiltin() }
         if resolutionTargetKind == compilerBodyResolutionRuntimeBuiltin() { callTargetKind: compilerBodyMIROperationTargetRuntimeBuiltin() }
+        if resolutionTargetKind == compilerBodyResolutionMemberRuntimeBuiltin() { callTargetKind: compilerBodyMIROperationTargetRuntimeBuiltin() }
         if resolutionTargetKind == compilerBodyResolutionConstruct() { callTargetKind: compilerBodyMIROperationTargetConstruct() }
         let callTypeKind: Int(compilerIntTableValue(table: arena.resolutions, row: callResolutionRow, column: compilerBodyResolutionTypeKindColumn()))
         let callTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: callResolutionRow, column: compilerBodyResolutionTypeIDColumn()))
         let callValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueCall(), typeKind: callTypeKind, typeID: compilerBodyMIRNominalTypeID(typeKind: callTypeKind, typeID: callTypeID), sourceNodeID: nodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: nodeID))
-        let argumentValues: IntBuffer(intBufferCreate(capacity: compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID)))
-        state ordinal: Int(0)
         let argumentCount: Int(compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID))
+        state callOperandCount: Int(argumentCount)
+        if resolutionTargetKind == compilerBodyResolutionMemberRuntimeBuiltin() { callOperandCount: callOperandCount + 1 }
+        let argumentValues: IntBuffer(intBufferCreate(capacity: callOperandCount))
+        if resolutionTargetKind == compilerBodyResolutionMemberRuntimeBuiltin() {
+            let memberCallReceiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: calleeNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
+            if memberCallReceiverNodeID < 0 {
+                intBufferDestroy(buffer: argumentValues)
+                return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
+            }
+            let memberCallReceiverValue: CompilerBodyMIRValueResult(compilerBodyMIRBuildExpression(arena: arena, nodeID: memberCallReceiverNodeID, blockID: blockID))
+            if !memberCallReceiverValue.isValid || intBufferAppend(buffer: argumentValues, value: memberCallReceiverValue.valueID) != 0 {
+                intBufferDestroy(buffer: argumentValues)
+                return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
+            }
+        }
+        state ordinal: Int(0)
         while ordinal < argumentCount {
             let argumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleArgument(), ordinal: ordinal))
             let argumentValueNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: argumentNodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0))
@@ -12822,7 +12911,7 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         let callOperationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
         let callFirstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
         ordinal: 0
-        while ordinal < argumentCount {
+        while ordinal < callOperandCount {
             state valueOrdinal: Int(ordinal)
             if resolutionTargetKind == compilerBodyResolutionConstruct() {
                 valueOrdinal: compilerBodyArenaConstructArgumentOrdinalForMemberOrdinal(arena: arena, applicationNodeID: nodeID, constructSyntaxID: targetID, memberOrdinal: ordinal)
@@ -12840,7 +12929,7 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         intBufferDestroy(buffer: argumentValues)
         state callOperationKind: Int(compilerBodyMIROperationDirectCall())
         if resolutionTargetKind == compilerBodyResolutionConstruct() { callOperationKind: compilerBodyMIROperationConstruct() }
-        if callValueID < 0 || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: callOperationKind, resultValueID: callValueID, sourceNodeID: nodeID, firstOperand: callFirstOperand, operandCount: argumentCount, targetKind: callTargetKind, targetID: targetID) != callOperationID { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
+        if callValueID < 0 || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: callOperationKind, resultValueID: callValueID, sourceNodeID: nodeID, firstOperand: callFirstOperand, operandCount: callOperandCount, targetKind: callTargetKind, targetID: targetID) != callOperationID { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
         return CompilerBodyMIRValueResult(valueID: callValueID, isValid: true)
     }
     if kind == compilerSyntaxKindPrefixNot() || kind == compilerSyntaxKindPrefixNegate() {
@@ -13227,6 +13316,21 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
             if validationTargetKind == compilerBodyMIROperationTargetBuiltin() && validationTargetID != compilerBodyBuiltinString() { return 311002 }
             if validationTargetKind == compilerBodyMIROperationTargetRuntimeBuiltin() && (validationTargetID <= compilerBodyRuntimeBuiltinNone() || validationTargetID > compilerBodyRuntimeBuiltinCount()) { return 311003 }
             if validationTargetKind != compilerBodyMIROperationTargetFunction() && validationTargetKind != compilerBodyMIROperationTargetBuiltin() && validationTargetKind != compilerBodyMIROperationTargetRuntimeBuiltin() { return 311004 }
+            if validationTargetKind == compilerBodyMIROperationTargetRuntimeBuiltin() {
+                let runtimeOperandCount: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()))
+                if runtimeOperandCount != compilerBodyRuntimeBuiltinParameterCount(id: validationTargetID) { return 311009 }
+                state runtimeOperandOrdinal: Int(0)
+                while runtimeOperandOrdinal < runtimeOperandCount {
+                    let runtimeOperandValueID: Int(compilerBodyMIROperationOperandValueID(arena: arena, operationID: operationRow, ordinal: runtimeOperandOrdinal))
+                    if runtimeOperandValueID < 0 || runtimeOperandValueID >= valueCount { return 311010 }
+                    let runtimeOperandTypeKind: Int(compilerIntTableValue(table: arena.mirValues, row: runtimeOperandValueID, column: compilerBodyMIRValueTypeColumn()))
+                    let runtimeExpectedType: String(compilerBodyRuntimeBuiltinParameterType(id: validationTargetID, ordinal: runtimeOperandOrdinal))
+                    if (runtimeExpectedType == String("i32") && runtimeOperandTypeKind != compilerBodyTypeInt())
+                        || (runtimeExpectedType == String("i1") && runtimeOperandTypeKind != compilerBodyTypeBool())
+                        || (runtimeExpectedType == String("ptr") && runtimeOperandTypeKind != compilerBodyTypeString() && runtimeOperandTypeKind != compilerBodyTypeConstruct()) { return 311011 }
+                    runtimeOperandOrdinal: runtimeOperandOrdinal + 1
+                }
+            }
             let callResultTypeKind: Int(compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()))
             state callReturnABI: Int(compilerFunctionReturnABINone())
             if validationTargetKind == compilerBodyMIROperationTargetFunction() { callReturnABI: compilerModuleABIPlanReturnMode(plan: abiPlan, tables: arena.tables, index: arena.declarationIndex, functionRow: validationTargetID) }
@@ -13614,7 +13718,7 @@ function compilerBodyLLVMBranchTarget(arena: CompilerBodyArena, blockID: Int): I
     return compilerBodyLLVMFirstCFGTarget(arena: arena, blockID: blockID, role: compilerBodyCFGEdgeBackedge())
 }
 
-function compilerBodyLLVMOperationOperandValueID(arena: CompilerBodyArena, operationID: Int, ordinal: Int): Int {
+function compilerBodyMIROperationOperandValueID(arena: CompilerBodyArena, operationID: Int, ordinal: Int): Int {
     state operandRow: Int(0)
     while operandRow < compilerIntTableRowCount(table: arena.mirOperands) {
         if compilerIntTableValue(table: arena.mirOperands, row: operandRow, column: compilerBodyMIROperandOperationColumn()) == operationID
@@ -13622,6 +13726,10 @@ function compilerBodyLLVMOperationOperandValueID(arena: CompilerBodyArena, opera
         operandRow: operandRow + 1
     }
     return 0 - 1
+}
+
+function compilerBodyLLVMOperationOperandValueID(arena: CompilerBodyArena, operationID: Int, ordinal: Int): Int {
+    return compilerBodyMIROperationOperandValueID(arena: arena, operationID: operationID, ordinal: ordinal)
 }
 
 function compilerBodyLLVMFirstCFGPredecessor(arena: CompilerBodyArena, blockID: Int, role: Int): Int {

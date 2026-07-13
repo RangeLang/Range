@@ -313,6 +313,38 @@ struct RangeScriptTests {
         #expect(result.stdout.contains("ret i32 0"))
     }
 
+    @Test("Native compiler lowers typed member applications through ordinary LLVM")
+    func nativeCompilerLowersTypedMemberApplicationsThroughOrdinaryLLVM() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let result = try runTypedSyntaxFixture(
+            source: """
+            @main {
+                let source: String("range")
+                let value: String(source.substring(start: 0, end: 1))
+                if value.character(index: 0) == String("r") {
+                    return 0
+                }
+                return 1
+            }
+
+            """,
+            name: "OrdinaryMemberApplications.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("call ptr @stringSubstring(ptr"))
+        #expect(result.stdout.contains("call ptr @stringCharacterAt(ptr"))
+        #expect(!result.stdout.contains("@substring"))
+        #expect(!result.stdout.contains("@character"))
+        #expect(!result.stdout.contains("RANGE_LOWERING_PLACEHOLDER"))
+    }
+
     @Test("Native compiler parses compiler-core statement AST")
     func nativeCompilerParsesCompilerCoreStatementAST() throws {
         let directory = FileManager.default.temporaryDirectory
