@@ -1058,14 +1058,15 @@ write_macro_generated_function_bundle() {
         'compilerSourceFile\trole=core\tpath=Core/Registrable.range' \
         'macro registrable(): Construct { target, diagnostics in' \
         '    @expand {' \
-        '        function globalFunction(): Int {' \
-        '            return 3' \
+        '        function globalFunction(input: Int): Int {' \
+        '            let adjusted: Int(input + 2)' \
+        '            return adjusted + 1' \
         '        }' \
         '    }' \
         '    @expand {' \
         '        extension #(target.declaration.self) {' \
-        '            function memberFunction(): Int {' \
-        '                return 7' \
+        '            function memberFunction(delta: Int): Int {' \
+        '                return delta + 3' \
         '            }' \
         '        }' \
         '    }' \
@@ -1098,7 +1099,7 @@ write_macro_generated_function_bundle() {
         '    let user: User(User(seed: 0))' >> "$output"
     if [[ "$kind" == positive ]]; then
         /usr/bin/printf '%b\n' \
-            '    return globalFunction() + user.memberFunction()' >> "$output"
+            '    return globalFunction(input: 4) + user.memberFunction(delta: 0)' >> "$output"
     elif [[ "$kind" == bare ]]; then
         /usr/bin/printf '%b\n' \
             '    return memberFunction()' >> "$output"
@@ -1110,6 +1111,220 @@ write_macro_generated_function_bundle() {
             '    return 0' >> "$output"
     fi
     /usr/bin/printf '%b\n' '}' >> "$output"
+}
+
+write_macro_registrable_bundle() {
+    local output="$1"
+    local kind="${2:-positive}"
+    local header="${3-compilerMacroSnapshot}"
+    local order="${4:-normal}"
+
+    : > "$output"
+    if [[ -n "$header" ]]; then
+        /usr/bin/printf '%s\n' "$header" > "$output"
+    fi
+    if [[ "$order" == reordered ]]; then
+        /usr/bin/printf '%b\n' \
+            'compilerSourceFile\trole=foundation\tpath=Foundation/UnrelatedRegistrable.range' \
+            'macro unrelatedRegistrable(): Construct { target, diagnostics in' \
+            '    @expand {' \
+            '        function unrelatedRegistrableFunction(): Int {' \
+            '            return 11' \
+            '        }' \
+            '    }' \
+            '}' \
+            '' \
+            'construct UnrelatedRegistrable {}' >> "$output"
+    fi
+    /usr/bin/printf '%b\n' \
+        'compilerSourceFile\trole=foundation\tpath=Foundation/Macros/Registrable.range' >> "$output"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Range/Foundation/Macros/Registrable.range" >> "$output"
+    if [[ -n "$(/usr/bin/tail -c 1 "$REPO_ROOT/RangeCompiler/Range/Foundation/Macros/Registrable.range")" ]]; then
+        /usr/bin/printf '\n' >> "$output"
+    fi
+    /usr/bin/printf '%b\n' \
+        'compilerSourceFile\trole=project\tpath=Project/RegistrableUse.range' \
+        '' >> "$output"
+    if [[ "$kind" == generated-field-collision ]]; then
+        /usr/bin/printf '%b\n' '@registrable' '@registrable' >> "$output"
+    else
+        /usr/bin/printf '%b\n' '@registrable' >> "$output"
+    fi
+    /usr/bin/printf '%b\n' \
+        'construct User {' \
+        '    let name: Int' >> "$output"
+    if [[ "$kind" == authored-field-collision ]]; then
+        /usr/bin/printf '%b\n' '    let registrationSeed: Int' >> "$output"
+    fi
+    if [[ "$kind" == immutable-field-mutation ]]; then
+        /usr/bin/printf '%b\n' \
+            '    function mutate(): Int {' \
+            '        self.registrationSeed: 4' \
+            '        return 0' \
+            '    }' >> "$output"
+    fi
+    /usr/bin/printf '%b\n' \
+        '}' \
+        '' \
+        '@main {' \
+        '    let user: User(User(name: 1, registrationSeed: 3, registrationCount: 2))' >> "$output"
+    if [[ "$kind" == positive ]]; then
+        /usr/bin/printf '%b\n' \
+            '    user.register(delta: 1)' \
+            '    return user.register(delta: 1)' >> "$output"
+    elif [[ "$kind" == immutable-field-mutation ]]; then
+        /usr/bin/printf '%b\n' '    return user.mutate()' >> "$output"
+    else
+        /usr/bin/printf '%b\n' '    return 0' >> "$output"
+    fi
+    /usr/bin/printf '%b\n' '}' >> "$output"
+}
+
+write_macro_registrable_root_storage_bundle() {
+    local output="$1"
+    /usr/bin/printf '%b\n' \
+        'compilerMacroSnapshot' \
+        'compilerSourceFile\trole=core\tpath=Core/RootStorage.range' \
+        'macro rootStorage(): Construct { target, diagnostics in' \
+        '    @expand {' \
+        '        let rootValue: Int' \
+        '    }' \
+        '}' \
+        'compilerSourceFile\trole=project\tpath=Project/RootStorageUse.range' \
+        '@rootStorage' \
+        'construct User {}' \
+        '' \
+        '@main {' \
+        '    return 0' \
+        '}' > "$output"
+}
+
+write_macro_registrable_malformed_splice_bundle() {
+    local output="$1"
+    /usr/bin/printf '%b\n' \
+        'compilerMacroSnapshot' \
+        'compilerSourceFile\trole=core\tpath=Core/MalformedMemberSplice.range' \
+        'macro malformedMember(): Construct { target, diagnostics in' \
+        '    @expand {' \
+        '        extension #(target.declaration.bad) {' \
+        '            let registrationSeed: Int' \
+        '        }' \
+        '    }' \
+        '}' \
+        'compilerSourceFile\trole=project\tpath=Project/MalformedMemberSpliceUse.range' \
+        '@malformedMember' \
+        'construct User {}' \
+        '' \
+        '@main {' \
+        '    return 0' \
+        '}' > "$output"
+}
+
+audit_macro_registrable() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local snapshot_bundle="$WORK_ROOT/$stage_label.macro.registrable.snapshot.range"
+    local snapshot_output="$WORK_ROOT/$stage_label.macro.registrable.snapshot.out"
+    local snapshot_error="$WORK_ROOT/$stage_label.macro.registrable.snapshot.err"
+    local reordered_bundle="$WORK_ROOT/$stage_label.macro.registrable.reordered.range"
+    local reordered_output="$WORK_ROOT/$stage_label.macro.registrable.reordered.out"
+    local reordered_error="$WORK_ROOT/$stage_label.macro.registrable.reordered.err"
+    local snapshot_projection="$WORK_ROOT/$stage_label.macro.registrable.snapshot.projection"
+    local reordered_projection="$WORK_ROOT/$stage_label.macro.registrable.reordered.projection"
+
+    write_macro_registrable_bundle "$snapshot_bundle" positive compilerMacroSnapshot normal
+    run_capture "$executable" "$snapshot_bundle" "$snapshot_output" "$snapshot_error"
+    require_successful_output "$stage_label actual registrable snapshot" "$snapshot_output" "$snapshot_error"
+    [[ "$(/usr/bin/grep -F 'macroGraphGeneratedMember' "$snapshot_output" | /usr/bin/wc -l | /usr/bin/tr -d ' ')" -eq 2 ]] || fail "$stage_label actual registrable did not emit exactly two generated members"
+    /usr/bin/grep -Fq $'macroGraphGeneratedMember\trow=0\tkind=member\townerSyntaxID=' "$snapshot_output" || fail "$stage_label generated member row 0 was not target-owned"
+    /usr/bin/grep -Fq $'name=registrationSeed\tmemberKind=let\ttype=Int' "$snapshot_output" || fail "$stage_label generated immutable registrationSeed was not rendered"
+    /usr/bin/grep -Fq $'name=registrationCount\tmemberKind=state\ttype=Int' "$snapshot_output" || fail "$stage_label generated mutable registrationCount was not rendered"
+    /usr/bin/grep -Fq $'macroGraphGeneratedFunction\trow=0\tkind=function\townerSyntaxID=' "$snapshot_output" || fail "$stage_label generated register function was not rendered"
+    /usr/bin/grep -Fq $'name=register\treturnType=Int' "$snapshot_output" || fail "$stage_label generated register function type was not rendered"
+    /usr/bin/grep -E 'macroGraphGeneratedMember|macroGraphGeneratedFunction' "$snapshot_output" \
+        | /usr/bin/sed -E 's/\t(row|ownerSyntaxID|macroDeclarationRow|applicationRow)=[^[:space:]]+//g' > "$snapshot_projection"
+
+    write_macro_registrable_bundle "$reordered_bundle" positive compilerMacroSnapshot reordered
+    run_capture "$executable" "$reordered_bundle" "$reordered_output" "$reordered_error"
+    require_successful_output "$stage_label reordered actual registrable snapshot" "$reordered_output" "$reordered_error"
+    /usr/bin/grep -E 'macroGraphGeneratedMember|macroGraphGeneratedFunction' "$reordered_output" \
+        | /usr/bin/sed -E 's/\t(row|ownerSyntaxID|macroDeclarationRow|applicationRow)=[^[:space:]]+//g' > "$reordered_projection"
+    /usr/bin/cmp -s "$snapshot_projection" "$reordered_projection" || fail "$stage_label actual registrable stable identities changed under unrelated source insertion"
+
+    local native_bundle="$WORK_ROOT/$stage_label.macro.registrable.native.range"
+    local native_output="$WORK_ROOT/$stage_label.macro.registrable.native.ll"
+    local native_error="$WORK_ROOT/$stage_label.macro.registrable.native.err"
+    local native_executable="$stage_directory/Registrable"
+    local native_run_output="$WORK_ROOT/$stage_label.macro.registrable.run.out"
+    local native_run_error="$WORK_ROOT/$stage_label.macro.registrable.run.err"
+    write_macro_registrable_bundle "$native_bundle" positive "" normal
+    run_capture "$executable" "$native_bundle" "$native_output" "$native_error"
+    require_successful_output "$stage_label actual registrable native emission" "$native_output" "$native_error"
+    /usr/bin/grep -Fq 'rangeConstruct' "$native_output" && fail "$stage_label actual registrable static aggregate path called rangeConstruct"
+    /usr/bin/grep -E -q 'call.*@(malloc|calloc|realloc|free)' "$native_output" && fail "$stage_label actual registrable static aggregate path called an allocator"
+    /bin/mkdir -p "$stage_directory"
+    /bin/cp "$native_output" "$stage_directory/Registrable.ll"
+    validate_llvm "$stage_directory/Registrable.ll"
+    link_llvm "$stage_directory/Registrable.ll" "$native_executable"
+    if "$native_executable" > "$native_run_output" 2> "$native_run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label actual registrable exited $RUN_STATUS"
+    [[ ! -s "$native_run_output" && ! -s "$native_run_error" ]] || fail "$stage_label actual registrable wrote output"
+
+    local collision_kind collision_bundle collision_output collision_error
+    local negative_bundle negative_output negative_error
+    for collision_kind in authored-field-collision generated-field-collision; do
+        collision_bundle="$WORK_ROOT/$stage_label.macro.registrable.$collision_kind.range"
+        collision_output="$WORK_ROOT/$stage_label.macro.registrable.$collision_kind.out"
+        collision_error="$WORK_ROOT/$stage_label.macro.registrable.$collision_kind.err"
+        write_macro_registrable_bundle "$collision_bundle" "$collision_kind" "" normal
+        run_capture "$executable" "$collision_bundle" "$collision_output" "$collision_error"
+        [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label $collision_kind exited $RUN_STATUS"
+        [[ ! -s "$collision_error" ]] || fail "$stage_label $collision_kind wrote stderr"
+        /usr/bin/grep -Fq 'diagnosticKind=generatedMemberCollision' "$collision_output" || fail "$stage_label $collision_kind missed generated-member collision diagnostic"
+        if /usr/bin/grep -Fq 'define ' "$collision_output" || /usr/bin/grep -Fq 'call ' "$collision_output"; then
+            fail "$stage_label $collision_kind emitted LLVM before rejection"
+        fi
+    done
+
+    negative_bundle="$WORK_ROOT/$stage_label.macro.registrable.immutable-field-mutation.range"
+    negative_output="$WORK_ROOT/$stage_label.macro.registrable.immutable-field-mutation.out"
+    negative_error="$WORK_ROOT/$stage_label.macro.registrable.immutable-field-mutation.err"
+    write_macro_registrable_bundle "$negative_bundle" immutable-field-mutation "" normal
+    run_capture "$executable" "$negative_bundle" "$negative_output" "$negative_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label generated let mutation exited $RUN_STATUS"
+    [[ ! -s "$negative_error" ]] || fail "$stage_label generated let mutation wrote stderr"
+    /usr/bin/grep -Fq 'function=mutate' "$negative_output" || fail "$stage_label generated let mutation did not identify the rejecting member function"
+    if /usr/bin/grep -Fq 'define ' "$negative_output" || /usr/bin/grep -Fq 'call ' "$negative_output"; then
+        fail "$stage_label generated let mutation emitted LLVM before rejection"
+    fi
+
+    negative_bundle="$WORK_ROOT/$stage_label.macro.registrable.root-storage.range"
+    negative_output="$WORK_ROOT/$stage_label.macro.registrable.root-storage.out"
+    negative_error="$WORK_ROOT/$stage_label.macro.registrable.root-storage.err"
+    write_macro_registrable_root_storage_bundle "$negative_bundle"
+    run_capture "$executable" "$negative_bundle" "$negative_output" "$negative_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label root generated storage exited $RUN_STATUS"
+    [[ ! -s "$negative_error" ]] || fail "$stage_label root generated storage wrote stderr"
+    if /usr/bin/grep -Fq 'define ' "$negative_output" || /usr/bin/grep -Fq 'call ' "$negative_output"; then
+        fail "$stage_label root generated storage emitted LLVM before rejection"
+    fi
+
+    negative_bundle="$WORK_ROOT/$stage_label.macro.registrable.malformed-splice.range"
+    negative_output="$WORK_ROOT/$stage_label.macro.registrable.malformed-splice.out"
+    negative_error="$WORK_ROOT/$stage_label.macro.registrable.malformed-splice.err"
+    write_macro_registrable_malformed_splice_bundle "$negative_bundle"
+    run_capture "$executable" "$negative_bundle" "$negative_output" "$negative_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label malformed generated member splice exited $RUN_STATUS"
+    [[ ! -s "$negative_error" ]] || fail "$stage_label malformed generated member splice wrote stderr"
+    if /usr/bin/grep -Fq 'define ' "$negative_output" || /usr/bin/grep -Fq 'call ' "$negative_output"; then
+        fail "$stage_label malformed generated member splice emitted LLVM before rejection"
+    fi
+    echo "$stage_label actual registrable macro: pass (Foundation source, let/state members, state mutation, deterministic identities, static aggregate emission, transactional collisions and rejection matrix)"
 }
 
 write_macro_expand_outside_bundle() {
@@ -1732,6 +1947,7 @@ audit_stage() {
     audit_macro_execution "$stage_label" "$executable"
     audit_macro_native_integration "$stage_label" "$executable" "$stage_directory"
     audit_macro_generated_function "$stage_label" "$executable" "$stage_directory"
+    audit_macro_registrable "$stage_label" "$executable" "$stage_directory"
     audit_macro_expansion_commit "$stage_label" "$executable" "$stage_directory"
     audit_smoke "$stage_label" "$executable" "$stage_directory"
     audit_mixed_abi "$stage_label" "$executable"
@@ -1881,8 +2097,16 @@ main() {
         || fail "Stage 2 and Stage 3 committed macro expansion executables differ"
     echo "Stage 2/Stage 3 committed macro expansion: byte-identical LLVM/executable"
 
+    /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.registrable.native.ll" "$WORK_ROOT/Stage3.macro.registrable.native.ll" \
+        || fail "Stage 2 and Stage 3 actual registrable LLVM differs"
+    /usr/bin/cmp -s "$stage2_directory/Registrable.ll" "$stage3_directory/Registrable.ll" \
+        || fail "Stage 2 and Stage 3 actual registrable artifacts differ"
+    /usr/bin/cmp -s "$stage2_directory/Registrable" "$stage3_directory/Registrable" \
+        || fail "Stage 2 and Stage 3 actual registrable executables differ"
+    echo "Stage 2/Stage 3 actual registrable macro: byte-identical LLVM/executable"
+
     local macro_snapshot_suffix
-    for macro_snapshot_suffix in positive.first.out positive.reordered.out generated.snapshot.out generated.snapshot.repeat.out generated.reordered.out generated.native.first.ll generated.native.repeat.ll generated.bare.out generated.user-global.out generated.root-collision.out generated.member-collision.out generated.malformed-extension.out generated.outside.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out execution-positive.out execution-positive.repeat.out execution-query.out execution-query.repeat.out execution-query-reordered.out execution-query-zero.out execution-member-present.out execution-member-present.repeat.out execution-member-present-reordered.out execution-member-missing.out execution-member-missing.repeat.out execution-member-path.out execution-member-path.repeat.out execution-member-invalid.out execution-member-invalid.repeat.out execution-member-invalid-type.out execution-member-invalid-type.repeat.out execution-member-nonconstruct.out execution-member-nonconstruct.repeat.out execution-member-native.first.ll execution-member-native.repeat.ll execution-member-missing-native.out execution-expansion.out execution-expansion.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-query-invalid.out execution-expansion-duplicate.out execution-target-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
+    for macro_snapshot_suffix in positive.first.out positive.reordered.out generated.snapshot.out generated.snapshot.repeat.out generated.reordered.out generated.native.first.ll generated.native.repeat.ll generated.bare.out generated.user-global.out generated.root-collision.out generated.member-collision.out generated.malformed-extension.out generated.outside.out registrable.snapshot.out registrable.reordered.out registrable.native.ll registrable.authored-field-collision.out registrable.generated-field-collision.out registrable.root-storage.out registrable.malformed-splice.out registrable.immutable-field-mutation.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out execution-positive.out execution-positive.repeat.out execution-query.out execution-query.repeat.out execution-query-reordered.out execution-query-zero.out execution-member-present.out execution-member-present.repeat.out execution-member-present-reordered.out execution-member-missing.out execution-member-missing.repeat.out execution-member-path.out execution-member-path.repeat.out execution-member-invalid.out execution-member-invalid.repeat.out execution-member-invalid-type.out execution-member-invalid-type.repeat.out execution-member-nonconstruct.out execution-member-native.first.ll execution-member-native.repeat.ll execution-member-missing-native.out execution-expansion.out execution-expansion.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-query-invalid.out execution-expansion-duplicate.out execution-target-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
         /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.$macro_snapshot_suffix" "$WORK_ROOT/Stage3.macro.$macro_snapshot_suffix" \
             || fail "Stage 2 and Stage 3 macro snapshot differs: $macro_snapshot_suffix"
     done

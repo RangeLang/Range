@@ -146,17 +146,34 @@ emit_llvm() {
         project_bundle "$input" "$bundle"
         compiler_input="$bundle"
     fi
-    trap '/bin/rm -f "$temporary" "$object"' RETURN
-    "$compiler" "$compiler_input" > "$temporary"
+    local compiler_exit_code clang_exit_code
+    if "$compiler" "$compiler_input" > "$temporary"; then
+        compiler_exit_code=0
+    else
+        compiler_exit_code=$?
+    fi
     if [[ -n "$bundle" ]]; then /bin/rm -f "$bundle"; fi
+    if [[ "$compiler_exit_code" -ne 0 ]]; then
+        if /usr/bin/head -1 "$temporary" | /usr/bin/grep -q '^compilerError'; then
+            /bin/cat "$temporary" >&2
+        fi
+        /bin/rm -f "$temporary" "$object"
+        return "$compiler_exit_code"
+    fi
     if /usr/bin/head -1 "$temporary" | /usr/bin/grep -q '^compilerError'; then
         /bin/cat "$temporary" >&2
+        /bin/rm -f "$temporary" "$object"
         return 65
     fi
-    clang -Wno-override-module -x ir -c "$temporary" -o "$object"
+    if clang -Wno-override-module -x ir -c "$temporary" -o "$object"; then
+        clang_exit_code=0
+    else
+        clang_exit_code=$?
+        /bin/rm -f "$temporary" "$object"
+        return "$clang_exit_code"
+    fi
     /bin/mv "$temporary" "$output"
     /bin/rm -f "$object"
-    trap - RETURN
 }
 
 compile_executable() {

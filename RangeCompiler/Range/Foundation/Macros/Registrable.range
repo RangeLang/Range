@@ -1,0 +1,12 @@
+macro registrable(): Construct { target, diagnostics in
+    @expand {
+        extension #(target.declaration.self) {
+            let registrationSeed: Int
+            state registrationCount: Int
+            function register(delta: Int): Int {
+                self.registrationCount: self.registrationCount + delta
+                return self.registrationSeed + self.registrationCount
+            }
+        }
+    }
+}

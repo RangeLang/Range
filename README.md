@@ -1,8 +1,14 @@
 # Range
 
-Range currently runs `.range` projects through the `SwiftBootstrap` compiler
-host, which emits LLVM IR, links it with `clang`, and launches the native
-executable.
+Range's normal `run`, `emit-llvm`, and `compile-executable` commands now use
+the checked-in native seed compiler to emit LLVM IR, link it with `clang`, and
+launch the native executable. The native self-hosting compiler and macro
+candidate/seed gates are green, including the actual Foundation `Registrable`
+macro. The complete LLVM example/run manifest still uses the retained
+SwiftBootstrap path: the native seed's current bounded language slice does not
+yet cover the manifest's print/Text, arrays, enums/switch, generics, optionals,
+and file-I/O programs. Swift compiler/package/test deletion is therefore
+blocked until that parity is implemented.
 
 ## Download
 
@@ -38,18 +44,14 @@ Check representative examples by linking and running the emitted LLVM:
 scripts/range check-llvm-runs
 ```
 
-`scripts/range check` delegates the run manifest to `SwiftBootstrap`, which
-validates manifest coverage, emits LLVM, links with `clang`, launches each
-executable, and checks exit/stdout expectations. The emit-only example corpus
-check also runs through `SwiftBootstrap`. `scripts/range run` delegates to
-`range run`, which writes `.range/Build/llvm/Main.ll` through `SwiftBootstrap`,
-links it, and launches the executable.
-Swift remains the current compiler host; generated Swift package workspaces are
-no longer the active backend path.
+`scripts/range check` still delegates the run manifest to `SwiftBootstrap`,
+which validates manifest coverage, emits LLVM, links with `clang`, launches
+each executable, and checks exit/stdout expectations. The emit-only example
+corpus check also remains on that retained path. `scripts/range run` is native
+by default and writes `.range/Build/llvm/Main.ll` through the checked-in seed.
 
-`SwiftBootstrap` is the stage-0 compiler target: it exists to compile Range
-source through the current Swift-hosted pipeline until the Range-authored
-compiler can compile itself.
+`SwiftBootstrap` remains only as the retained compatibility/checking host while
+the Range-authored compiler grows beyond its current bounded native slice.
 
 The first self-hosting lane lives at `RangeCompiler/Range/Programs/Compiler`.
 It is intentionally tiny right now: `scripts/range check-bootstrap-compiler`
