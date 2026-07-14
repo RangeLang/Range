@@ -1397,10 +1397,10 @@ byte-identical 2,476,499-byte LLVM artifacts and SHA-256
 
 #### Opaque compiler-handle checkpoint
 
-Typed declaration capture now preserves leading `@language` provenance and
+Typed declaration capture now preserves leading `@builtin` provenance and
 accepts signature-only ABI functions without fabricating Range bodies. The
 first owned handle is the real Core `IntBuffer`: classification requires a
-validated `@language` zero-field `IntBuffer` declaration plus exact
+validated `@builtin` zero-field `IntBuffer` declaration plus exact
 `intBufferCreate`, `intBufferDestroy`, and optional shared-read signatures.
 Ordinary empty constructs are never inferred to be opaque.
 

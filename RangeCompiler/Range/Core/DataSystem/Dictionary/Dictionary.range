@@ -1,5 +1,5 @@
-@language
 @literal
+@builtin
 construct Dictionary<Key, Value> {
     state storage: DictionaryStorage<Key, Value>()
 

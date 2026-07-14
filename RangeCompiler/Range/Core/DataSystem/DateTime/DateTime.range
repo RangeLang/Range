@@ -1,4 +1,4 @@
-@language
+@builtin
 construct DateTime {
     let storage: DateTimeStorage
 

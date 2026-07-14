@@ -637,7 +637,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return
         }
 
-        if attribute.isLanguageBoundary {
+        if attribute.isBuiltinBoundary {
             throw SemanticValidationError(
                 "@\(attribute.name) can only be used in RangeCore. Remove @\(attribute.name) from \(declarationName) in \(lastPathComponent(of: filePath))."
             )

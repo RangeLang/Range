@@ -1,4 +1,4 @@
-@language
+@builtin
 construct Int<let bits: IntLiteral, let signedness: Signedness = .signed> {
     let storage: IntStorage
 

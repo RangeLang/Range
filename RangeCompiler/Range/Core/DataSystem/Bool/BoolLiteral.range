@@ -1,5 +1,5 @@
-@language
 @literal
+@builtin
 construct BoolLiteral { }
 
 extension BoolLiteral {

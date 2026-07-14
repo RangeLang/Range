@@ -1932,8 +1932,8 @@ struct RangeScriptTests {
         #expect(result.stdout.contains("memoryDecision\trow=5\tvalues=11,"))
     }
 
-    @Test("Typed syntax preserves language ABI provenance and signature-only functions")
-    func typedSyntaxPreservesLanguageABIProvenance() throws {
+    @Test("Typed syntax preserves builtin ABI provenance and signature-only functions")
+    func typedSyntaxPreservesBuiltinABIProvenance() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -1942,18 +1942,18 @@ struct RangeScriptTests {
         let result = try runTypedSyntaxFixture(
             source: """
             compilerTypedSyntax
-            @language
+            @builtin
             construct IntBuffer {}
-            @language
+            @builtin
             function intBufferCreate(capacity: Int): IntBuffer
-            @language
+            @builtin
             function intBufferDestroy(buffer: IntBuffer): Int
             @main {
                 return 0
             }
 
             """,
-            name: "LanguageABIProvenance.range",
+            name: "BuiltinABIProvenance.range",
             directory: directory
         )
 
@@ -1962,9 +1962,37 @@ struct RangeScriptTests {
         #expect(result.stderr.isEmpty)
         #expect(result.stdout.hasPrefix("typedSyntax\tvalid=true"))
         #expect(result.stdout.contains("declarationCount=3"))
-        #expect(result.stdout.components(separatedBy: "languageABI=1").count == 4)
+        #expect(result.stdout.components(separatedBy: "builtinABI=1").count == 4)
         #expect(result.stdout.contains("functionCount=2"))
-        #expect(result.stdout.contains("bodyStart=113\tbodyEnd=113"))
+        #expect(result.stdout.contains("bodyStart=111\tbodyEnd=111"))
+    }
+
+    @Test("Legacy language marker does not grant builtin ABI provenance")
+    func legacyLanguageMarkerDoesNotGrantBuiltinABIProvenance() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let legacyMarker = "@" + "language"
+
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerTypedSyntax
+            \(legacyMarker)
+            function legacyExternal(): Int
+            @main {
+                return 0
+            }
+
+            """,
+            name: "LegacyLanguageABIProvenance.range",
+            directory: directory
+        )
+
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 65)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout == "compilerError\tkind=invalidTypedSyntaxSnapshot\n\n")
     }
 
     @Test("MemoryGraph owns and explicitly consumes an opaque IntBuffer handle")
@@ -2080,11 +2108,11 @@ struct RangeScriptTests {
         let result = try runTypedSyntaxFixture(
             source: """
             compilerMemoryGraph
-            @language
+            @builtin
             construct IntBuffer {}
-            @language
+            @builtin
             function intBufferCreate(capacity: Int): IntBuffer
-            @language
+            @builtin
             function intBufferDestroy(buffer: Int): Int
             @main {
                 let buffer: IntBuffer(intBufferCreate(capacity: 4))
@@ -3159,10 +3187,10 @@ struct RangeScriptTests {
             return source
         }
 
-        @language
+        @builtin
         function firstExternal(value: Int, enabled: Bool): String
 
-        @language
+        @builtin
         function secondExternal(): Int
         """.write(to: source, atomically: true, encoding: .utf8)
 
@@ -4444,16 +4472,16 @@ private func runTypedSyntaxFixture(
 
 private func opaqueIntBufferFixture(body: String, includeCount: Bool = false) -> String {
     let countDeclaration = includeCount ? """
-        @language
+        @builtin
         function intBufferCount(buffer: IntBuffer): Int
         """ : ""
     return """
     compilerMemoryGraph
-    @language
+    @builtin
     construct IntBuffer {}
-    @language
+    @builtin
     function intBufferCreate(capacity: Int): IntBuffer
-    @language
+    @builtin
     function intBufferDestroy(buffer: IntBuffer): Int
     \(countDeclaration)
     @main {

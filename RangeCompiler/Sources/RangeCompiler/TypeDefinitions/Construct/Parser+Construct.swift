@@ -192,8 +192,8 @@ extension Parser {
         _ attribute: AttributeApplication?,
         macros: [MacroApplication]
     ) -> Bool {
-        attribute?.isLanguageBoundary == true
-            || macros.contains { $0.name == "language" || $0.name == "syntax" }
+        attribute?.isBuiltinBoundary == true
+            || macros.contains { $0.name == "syntax" }
     }
 
     mutating func parseConstructHeader() throws

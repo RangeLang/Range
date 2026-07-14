@@ -1,38 +1,38 @@
 infix operator ==: ComparisonPrecedence
 infix operator !=: ComparisonPrecedence
 
-@language
+@builtin
 function ==(lhs: Int, rhs: Float): Bool
 
-@language
+@builtin
 function ==(lhs: Float, rhs: Int): Bool
 
-@language
+@builtin
 function ==<Wrapped>(lhs: Wrapped?, rhs: NilLiteral): Bool
 
-@language
+@builtin
 function ==<Wrapped>(lhs: NilLiteral, rhs: Wrapped?): Bool
 
-@language
+@builtin
 function !=(lhs: Int, rhs: Int): Bool
 
-@language
+@builtin
 function !=(lhs: Float, rhs: Float): Bool
 
-@language
+@builtin
 function !=(lhs: Int, rhs: Float): Bool
 
-@language
+@builtin
 function !=(lhs: Float, rhs: Int): Bool
 
-@language
+@builtin
 function !=(lhs: String, rhs: String): Bool
 
-@language
+@builtin
 function !=(lhs: Bool, rhs: Bool): Bool
 
-@language
+@builtin
 function !=<Wrapped>(lhs: Wrapped?, rhs: NilLiteral): Bool
 
-@language
+@builtin
 function !=<Wrapped>(lhs: NilLiteral, rhs: Wrapped?): Bool

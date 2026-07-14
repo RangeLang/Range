@@ -1430,7 +1430,7 @@ private struct SyntaxProjectionAccumulator {
 
     private mutating func addConstruct(_ declaration: ConstructDeclaration, parentID: String) {
         let constructID = "\(parentID)/construct:\(declaration.name)"
-        let label = declaration.isCore ? "@language \(declaration.name)" : declaration.name
+        let label = declaration.isCore ? "@builtin \(declaration.name)" : declaration.name
         let entity = SemanticGraphEntity(id: constructID, kind: .construct, label: label)
         addEntity(entity)
         addRelation(from: parentID, to: constructID, kind: .contains)
@@ -1476,7 +1476,7 @@ private struct SyntaxProjectionAccumulator {
 
     private mutating func addProtocol(_ declaration: ProtocolDeclaration, parentID: String) {
         let protocolID = "\(parentID)/protocol:\(declaration.name)"
-        let label = declaration.isCore ? "@language \(declaration.name)" : declaration.name
+        let label = declaration.isCore ? "@builtin \(declaration.name)" : declaration.name
         let entity = SemanticGraphEntity(id: protocolID, kind: .protocolDefinition, label: label)
         addEntity(entity)
         addRelation(from: parentID, to: protocolID, kind: .contains)
@@ -1694,7 +1694,7 @@ private struct SyntaxProjectionAccumulator {
 
         for nested in nestedConstructs {
             let nestedID = "\(ownerID)/construct:\(nested.name)"
-            let nestedLabel = nested.isCore ? "@language \(nested.name)" : nested.name
+            let nestedLabel = nested.isCore ? "@builtin \(nested.name)" : nested.name
             let nestedEntity = SemanticGraphEntity(
                 id: nestedID,
                 kind: .construct,

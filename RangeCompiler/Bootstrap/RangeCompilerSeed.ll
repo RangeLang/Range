@@ -218,7 +218,7 @@
 @.str.997 = private unnamed_addr constant [9 x i8] c"bodyEnd=\00"
 @.str.998 = private unnamed_addr constant [13 x i8] c"fingerprint=\00"
 @.str.999 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.1000 = private unnamed_addr constant [13 x i8] c"languageABI=\00"
+@.str.1000 = private unnamed_addr constant [12 x i8] c"builtinABI=\00"
 @.str.1089 = private unnamed_addr constant [7 x i8] c"member\00"
 @.str.1090 = private unnamed_addr constant [5 x i8] c"row=\00"
 @.str.1091 = private unnamed_addr constant [10 x i8] c"syntaxID=\00"
@@ -450,7 +450,7 @@
 @.str.6434 = private unnamed_addr constant [4 x i8] c"eof\00"
 @.str.6435 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.6446 = private unnamed_addr constant [15 x i8] c"macroAttribute\00"
-@.str.6450 = private unnamed_addr constant [10 x i8] c"@language\00"
+@.str.6450 = private unnamed_addr constant [9 x i8] c"@builtin\00"
 @.str.6456 = private unnamed_addr constant [15 x i8] c"macroAttribute\00"
 @.str.6460 = private unnamed_addr constant [6 x i8] c"@main\00"
 @.str.6466 = private unnamed_addr constant [15 x i8] c"macroAttribute\00"
@@ -1129,7 +1129,7 @@
 @.str.28328 = private unnamed_addr constant [2 x i8] c"_\00"
 @.str.28375 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.28538 = private unnamed_addr constant [15 x i8] c"macroAttribute\00"
-@.str.28541 = private unnamed_addr constant [10 x i8] c"@language\00"
+@.str.28541 = private unnamed_addr constant [9 x i8] c"@builtin\00"
 @.str.28545 = private unnamed_addr constant [6 x i8] c"@main\00"
 @.str.28567 = private unnamed_addr constant [6 x i8] c"comma\00"
 @.str.28790 = private unnamed_addr constant [2 x i8] c";\00"
@@ -1499,7 +1499,7 @@
 @.str.31944 = private unnamed_addr constant [11 x i8] c"rightBrace\00"
 @.str.32040 = private unnamed_addr constant [6 x i8] c"comma\00"
 @.str.32224 = private unnamed_addr constant [15 x i8] c"macroAttribute\00"
-@.str.32227 = private unnamed_addr constant [10 x i8] c"@language\00"
+@.str.32227 = private unnamed_addr constant [9 x i8] c"@builtin\00"
 @.str.32231 = private unnamed_addr constant [6 x i8] c"@main\00"
 @.str.32245 = private unnamed_addr constant [9 x i8] c"function\00"
 @.str.32373 = private unnamed_addr constant [1 x i8] c"\00"
@@ -5227,7 +5227,7 @@ bb5:
   %r1052 = call ptr @stringFromInt(i32 %r980)
   %r1053 = call ptr @stringConcat(ptr %r1051, ptr %r1052)
   %r1054 = call ptr @stringConcat(ptr %r1053, ptr %r863)
-  %r1055 = call ptr @stringConcat(ptr %r1054, ptr getelementptr inbounds ([13 x i8], ptr @.str.1000, i32 0, i32 0))
+  %r1055 = call ptr @stringConcat(ptr %r1054, ptr getelementptr inbounds ([12 x i8], ptr @.str.1000, i32 0, i32 0))
   %r1056 = call ptr @stringFromInt(i32 %r982)
   %r1057 = call ptr @stringConcat(ptr %r1055, ptr %r1056)
   %r1058 = call ptr @stringConcat(ptr %r1057, ptr %r864)
@@ -13351,7 +13351,7 @@ bb16:
   %r6447 = call i32 @stringEqual(ptr %r6445, ptr getelementptr inbounds ([15 x i8], ptr @.str.6446, i32 0, i32 0))
   %r6448 = icmp ne i32 %r6447, 0
   %r6449 = extractvalue %Range.RangeLexedToken %r6442, 3
-  %r6451 = call i32 @stringEqual(ptr %r6449, ptr getelementptr inbounds ([10 x i8], ptr @.str.6450, i32 0, i32 0))
+  %r6451 = call i32 @stringEqual(ptr %r6449, ptr getelementptr inbounds ([9 x i8], ptr @.str.6450, i32 0, i32 0))
   %r6452 = icmp ne i32 %r6451, 0
   %r6453 = and i1 %r6448, %r6452
   br i1 %r6453, label %bb18, label %bb19
@@ -29506,7 +29506,7 @@ bb7:
   %r16739 = extractvalue %Range.CompilerMacroApplicationParts %r16709, 4
   ret i32 %r16739
 }
-define void @compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(ptr %returnDestination, ptr %source, %Range.CompilerSyntaxTables %tables, i32 %declarationOrdinal, %Range.RangeLexedToken %token, i1 %captureBodies, i1 %isLanguage, i32 %fileEnd) {
+define void @compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(ptr %returnDestination, ptr %source, %Range.CompilerSyntaxTables %tables, i32 %declarationOrdinal, %Range.RangeLexedToken %token, i1 %captureBodies, i1 %isBuiltin, i32 %fileEnd) {
 entry:
   %storage1 = alloca %Range.CompilerTokenCursor
   %storage2 = alloca %Range.Optional.RangeLexedToken
@@ -29595,7 +29595,7 @@ bb2:
   %r16797 = and i1 %r16792, %r16796
   br i1 %r16797, label %bb14, label %bb15
 bb14:
-  call void @compilerTypedSyntaxCaptureConstructWithPolicy(ptr %returnDestination, ptr %source, %Range.CompilerSyntaxTables %tables, i32 %declarationOrdinal, %Range.RangeLexedToken %token, i1 %isLanguage)
+  call void @compilerTypedSyntaxCaptureConstructWithPolicy(ptr %returnDestination, ptr %source, %Range.CompilerSyntaxTables %tables, i32 %declarationOrdinal, %Range.RangeLexedToken %token, i1 %isBuiltin)
   %r16798 = load %Range.CompilerTypedDeclarationCaptureStep, ptr %returnDestination
   store %Range.CompilerTypedDeclarationCaptureStep %r16798, ptr %returnDestination
   ret void
@@ -29610,7 +29610,7 @@ bb15:
   br i1 %r16807, label %bb16, label %bb17
 bb16:
   %r16808 = sub i32 0, 1
-  call void @compilerTypedSyntaxCaptureFunctionWithPolicy(ptr %returnDestination, ptr %source, %Range.CompilerSyntaxTables %tables, i32 %declarationOrdinal, i32 %r16808, %Range.RangeLexedToken %token, i1 %captureBodies, i1 %isLanguage, i32 %fileEnd)
+  call void @compilerTypedSyntaxCaptureFunctionWithPolicy(ptr %returnDestination, ptr %source, %Range.CompilerSyntaxTables %tables, i32 %declarationOrdinal, i32 %r16808, %Range.RangeLexedToken %token, i1 %captureBodies, i1 %isBuiltin, i32 %fileEnd)
   %r16809 = load %Range.CompilerTypedDeclarationCaptureStep, ptr %returnDestination
   store %Range.CompilerTypedDeclarationCaptureStep %r16809, ptr %returnDestination
   ret void
@@ -41606,7 +41606,7 @@ bb30:
   store %Range.CompilerTypedDeclarationCaptureStep %r23656, ptr %returnDestination
   ret void
 }
-define void @compilerTypedSyntaxCaptureConstructWithPolicy(ptr %returnDestination, ptr %source, %Range.CompilerSyntaxTables %tables, i32 %declarationOrdinal, %Range.RangeLexedToken %keyword, i1 %isLanguage) {
+define void @compilerTypedSyntaxCaptureConstructWithPolicy(ptr %returnDestination, ptr %source, %Range.CompilerSyntaxTables %tables, i32 %declarationOrdinal, %Range.RangeLexedToken %keyword, i1 %isBuiltin) {
 entry:
   %storage1 = alloca %Range.Optional.CompilerConstructDeclarationParts
   %storage2 = alloca %Range.RangeLexedToken
@@ -41693,7 +41693,7 @@ bb7:
   call void @compilerSyntaxDeclarationBaseFingerprint(ptr %storage5, %Range.CompilerSyntaxTables %tables, i32 %r23686, i32 %r23709, ptr %r23711)
   %r23712 = load %Range.CompilerFingerprint, ptr %storage5
   store %Range.CompilerFingerprint %r23712, ptr %storage5
-  br i1 %isLanguage, label %bb8, label %bb9
+  br i1 %isBuiltin, label %bb8, label %bb9
 bb8:
   br label %bb9
 bb9:
@@ -41729,7 +41729,7 @@ bb11:
   %r23736 = extractvalue %Range.CompilerTypedMemberCapture %r23734, 0
   call void @compilerFingerprintAppendInt(ptr %storage7, %Range.CompilerFingerprint %r23735, i32 %r23736)
   %r23737 = load %Range.CompilerFingerprint, ptr %storage7
-  br i1 %isLanguage, label %bb12, label %bb13
+  br i1 %isBuiltin, label %bb12, label %bb13
 bb12:
   call void @compilerFingerprintAppendInt(ptr %storage8, %Range.CompilerFingerprint %r23737, i32 1)
   %r23738 = load %Range.CompilerFingerprint, ptr %storage8
@@ -41765,7 +41765,7 @@ bb15:
   store %Range.CompilerTypedDeclarationCaptureStep %r23761, ptr %returnDestination
   ret void
 }
-define void @compilerTypedSyntaxCaptureFunctionWithPolicy(ptr %returnDestination, ptr %source, %Range.CompilerSyntaxTables %tables, i32 %declarationOrdinal, i32 %parentSyntaxID, %Range.RangeLexedToken %keyword, i1 %captureBody, i1 %isLanguage, i32 %fileEnd) {
+define void @compilerTypedSyntaxCaptureFunctionWithPolicy(ptr %returnDestination, ptr %source, %Range.CompilerSyntaxTables %tables, i32 %declarationOrdinal, i32 %parentSyntaxID, %Range.RangeLexedToken %keyword, i1 %captureBody, i1 %isBuiltin, i32 %fileEnd) {
 entry:
   %storage1 = alloca %Range.Optional.CompilerFunctionDeclarationParts
   %storage2 = alloca %Range.RangeLexedToken
@@ -41781,9 +41781,9 @@ entry:
   call void @compilerCoreParseFunctionDeclarationParts(ptr %storage1, ptr %source, %Range.RangeLexedToken %keyword)
   %r23762 = load %Range.Optional.CompilerFunctionDeclarationParts, ptr %storage1
   store %Range.Optional.CompilerFunctionDeclarationParts %r23762, ptr %storage1
-  br i1 %isLanguage, label %bb1, label %bb2
+  br i1 %isBuiltin, label %bb1, label %bb2
 bb1:
-  call void @compilerCoreParseLanguageFunctionDeclarationParts(ptr %storage8, ptr %source, %Range.RangeLexedToken %keyword, i32 %fileEnd)
+  call void @compilerCoreParseBuiltinFunctionDeclarationParts(ptr %storage8, ptr %source, %Range.RangeLexedToken %keyword, i32 %fileEnd)
   %r23763 = load %Range.Optional.CompilerFunctionDeclarationParts, ptr %storage8
   br label %bb2
 bb2:
@@ -41904,14 +41904,14 @@ bb9:
   %r23856 = extractvalue %Range.CompilerTypeReference %r23855, 0
   call void @compilerFingerprintAppendText(ptr %storage10, %Range.CompilerFingerprint %r23854, i32 30, ptr %r23856)
   %r23857 = load %Range.CompilerFingerprint, ptr %storage10
-  br i1 %isLanguage, label %bb10, label %bb11
+  br i1 %isBuiltin, label %bb10, label %bb11
 bb10:
   call void @compilerFingerprintAppendInt(ptr %storage11, %Range.CompilerFingerprint %r23857, i32 1)
   %r23858 = load %Range.CompilerFingerprint, ptr %storage11
   br label %bb11
 bb11:
   %r23859 = phi %Range.CompilerFingerprint [%r23857, %bb9], [%r23858, %bb10]
-  br i1 %isLanguage, label %bb12, label %bb13
+  br i1 %isBuiltin, label %bb12, label %bb13
 bb12:
   br label %bb13
 bb13:
@@ -41960,7 +41960,7 @@ bb14:
   store %Range.CompilerTypedDeclarationCaptureStep %r23899, ptr %returnDestination
   ret void
 bb15:
-  %r23900 = xor i1 %isLanguage, true
+  %r23900 = xor i1 %isBuiltin, true
   %r23901 = and i1 %captureBody, %r23900
   br i1 %r23901, label %bb16, label %bb17
 bb16:
@@ -49686,7 +49686,7 @@ bb10:
   br i1 %r28539, label %bb11, label %bb12
 bb11:
   %r28540 = extractvalue %Range.RangeLexedToken %r28533, 3
-  %r28542 = call i32 @stringEqual(ptr %r28540, ptr getelementptr inbounds ([10 x i8], ptr @.str.28541, i32 0, i32 0))
+  %r28542 = call i32 @stringEqual(ptr %r28540, ptr getelementptr inbounds ([9 x i8], ptr @.str.28541, i32 0, i32 0))
   %r28543 = icmp eq i32 %r28542, 0
   %r28544 = extractvalue %Range.RangeLexedToken %r28533, 3
   %r28546 = call i32 @stringEqual(ptr %r28544, ptr getelementptr inbounds ([6 x i8], ptr @.str.28545, i32 0, i32 0))
@@ -49967,7 +49967,7 @@ bb4:
   %r28712 = call i32 @intBufferAppend(ptr %r28711, i32 %ownerSyntaxID)
   ret i32 %r28712
 }
-define i32 @compilerSyntaxAppendDeclaration(%Range.CompilerSyntaxTables %tables, i32 %syntaxID, i32 %fileID, i32 %kindTag, i32 %parentSyntaxID, i32 %ordinal, i32 %declarationStart, i32 %declarationEnd, i32 %nameStart, i32 %nameEnd, i32 %bodyStart, i32 %bodyEnd, %Range.CompilerFingerprint %fingerprint, i32 %isLanguage) {
+define i32 @compilerSyntaxAppendDeclaration(%Range.CompilerSyntaxTables %tables, i32 %syntaxID, i32 %fileID, i32 %kindTag, i32 %parentSyntaxID, i32 %ordinal, i32 %declarationStart, i32 %declarationEnd, i32 %nameStart, i32 %nameEnd, i32 %bodyStart, i32 %bodyEnd, %Range.CompilerFingerprint %fingerprint, i32 %isBuiltin) {
 entry:
   %r28713 = call i1 @compilerSyntaxDeclarationRangesAreValid(%Range.CompilerSyntaxTables %tables, i32 %fileID, i32 %declarationStart, i32 %declarationEnd, i32 %nameStart, i32 %nameEnd, i32 %bodyStart, i32 %bodyEnd)
   %r28714 = xor i1 %r28713, true
@@ -50096,7 +50096,7 @@ bb27:
   ret i32 %r28782
 bb28:
   %r28783 = extractvalue %Range.CompilerSyntaxTables %tables, 2
-  %r28784 = call i32 @compilerSyntaxTableAppend(%Range.CompilerSyntaxTables %tables, %Range.CompilerIntTable %r28783, i32 %isLanguage)
+  %r28784 = call i32 @compilerSyntaxTableAppend(%Range.CompilerSyntaxTables %tables, %Range.CompilerIntTable %r28783, i32 %isBuiltin)
   ret i32 %r28784
 }
 define ptr @compilerCoreNameListNameAt(ptr %names, i32 %start) {
@@ -55506,7 +55506,7 @@ bb10:
   br i1 %r32225, label %bb11, label %bb12
 bb11:
   %r32226 = extractvalue %Range.RangeLexedToken %r32219, 3
-  %r32228 = call i32 @stringEqual(ptr %r32226, ptr getelementptr inbounds ([10 x i8], ptr @.str.32227, i32 0, i32 0))
+  %r32228 = call i32 @stringEqual(ptr %r32226, ptr getelementptr inbounds ([9 x i8], ptr @.str.32227, i32 0, i32 0))
   %r32229 = icmp eq i32 %r32228, 0
   %r32230 = extractvalue %Range.RangeLexedToken %r32219, 3
   %r32232 = call i32 @stringEqual(ptr %r32230, ptr getelementptr inbounds ([6 x i8], ptr @.str.32231, i32 0, i32 0))
@@ -55672,7 +55672,7 @@ bb3:
   store %Range.CompilerTypedMemberCapture %r32341, ptr %returnDestination
   ret void
 }
-define void @compilerCoreParseLanguageFunctionDeclarationParts(ptr %returnDestination, ptr %source, %Range.RangeLexedToken %keyword, i32 %fileEnd) {
+define void @compilerCoreParseBuiltinFunctionDeclarationParts(ptr %returnDestination, ptr %source, %Range.RangeLexedToken %keyword, i32 %fileEnd) {
 entry:
   %storage1 = alloca %Range.Optional.RangeLexedToken
   %storage2 = alloca %Range.CompilerTokenCursor

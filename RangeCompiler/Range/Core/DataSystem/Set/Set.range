@@ -1,5 +1,5 @@
-@language
 @literal
+@builtin
 construct Set<Element> {
     state storage: SetStorage<Element>()
 

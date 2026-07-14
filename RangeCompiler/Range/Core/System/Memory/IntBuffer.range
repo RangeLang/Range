@@ -1,20 +1,20 @@
-@language
+@builtin
 construct IntBuffer {}
 
-@language
+@builtin
 function intBufferCreate(capacity: Int): IntBuffer
 
-@language
+@builtin
 function intBufferAppend(buffer: IntBuffer, value: Int): Int
 
-@language
+@builtin
 function intBufferCount(buffer: IntBuffer): Int
 
-@language
+@builtin
 function intBufferElement(buffer: IntBuffer, index: Int): Int
 
-@language
+@builtin
 function intBufferSet(buffer: IntBuffer, index: Int, value: Int): Int
 
-@language
+@builtin
 function intBufferDestroy(buffer: IntBuffer): Int

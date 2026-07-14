@@ -1,4 +1,4 @@
-@language
+@builtin
 construct Hasher {
     state storage: HasherStorage()
 

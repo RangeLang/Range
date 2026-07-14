@@ -14,8 +14,8 @@ public struct ProtocolDeclaration {
     public let callables: [CallableDeclaration]
 
     public var isCore: Bool {
-        attribute?.isLanguageBoundary == true
-            || macros.contains { $0.name == "language" || $0.name == "syntax" }
+        attribute?.isBuiltinBoundary == true
+            || macros.contains { $0.name == "syntax" }
     }
 
     public var isPackaging: Bool {

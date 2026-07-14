@@ -309,6 +309,20 @@ audit_mixed_abi() {
     echo "$stage_label mixed aggregate ABI rejection: pass (exit 65, pre-emission)"
 }
 
+audit_builtin_marker() {
+    local stage_label="$1"
+    local executable="$2"
+    local output="$WORK_ROOT/$stage_label.builtin.legacy.out"
+    local error="$WORK_ROOT/$stage_label.builtin.legacy.err"
+
+    run_capture "$executable" "$LEGACY_LANGUAGE_SOURCE" "$output" "$error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label legacy language marker exited $RUN_STATUS"
+    [[ ! -s "$error" ]] || fail "$stage_label legacy language marker wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidTypedSyntaxSnapshot' "$output" \
+        || fail "$stage_label legacy language marker granted builtin provenance"
+    echo "$stage_label builtin marker: pass (legacy spelling rejected)"
+}
+
 write_role_bundle() {
     local output="$1"
     local directive="$2"
@@ -1943,6 +1957,7 @@ audit_stage() {
     audit_inventory "$stage_label" "$executable"
     audit_role_markers "$stage_label" "$executable"
     audit_canonical_core "$stage_label" "$executable" "$stage_directory"
+    audit_builtin_marker "$stage_label" "$executable"
     audit_macro_linking "$stage_label" "$executable"
     audit_macro_execution "$stage_label" "$executable"
     audit_macro_native_integration "$stage_label" "$executable" "$stage_directory"
@@ -2037,6 +2052,16 @@ main() {
         '    return value.first' \
         '}' > "$MIXED_ABI_SOURCE"
 
+    LEGACY_LANGUAGE_SOURCE="$WORK_ROOT/LegacyLanguageMarker.range"
+    local legacy_language_marker="@""language"
+    /usr/bin/printf '%s\n' \
+        'compilerTypedSyntax' \
+        "$legacy_language_marker" \
+        'function legacyExternal(): Int' \
+        '@main {' \
+        '    return 0' \
+        '}' > "$LEGACY_LANGUAGE_SOURCE"
+
     local seed seed_executable
     seed="$REPO_ROOT/$(manifest_value seed.path)"
     seed_executable="$WORK_ROOT/RangeCompilerSeed"
@@ -2111,6 +2136,10 @@ main() {
             || fail "Stage 2 and Stage 3 macro snapshot differs: $macro_snapshot_suffix"
     done
     echo "Stage 2/Stage 3 focused macro snapshots: byte-identical"
+
+    /usr/bin/cmp -s "$WORK_ROOT/Stage2.builtin.legacy.out" "$WORK_ROOT/Stage3.builtin.legacy.out" \
+        || fail "Stage 2 and Stage 3 legacy builtin-marker rejection differs"
+    echo "Stage 2/Stage 3 builtin marker rejection: byte-identical"
 
     echo "Range compiler candidate check succeeded."
     printf 'compiler_directory=%s\n' "$compiler_directory"

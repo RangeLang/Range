@@ -1,2 +1,2 @@
-@language
+@builtin
 enum Never {}

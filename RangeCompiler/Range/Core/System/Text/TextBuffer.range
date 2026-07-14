@@ -1,20 +1,20 @@
-@language
+@builtin
 construct TextBuffer {}
 
-@language
+@builtin
 function textBufferCreate(capacity: Int): TextBuffer
 
-@language
+@builtin
 function textBufferAppend(buffer: TextBuffer, text: String): Int
 
-@language
+@builtin
 function textBufferAppendInt(buffer: TextBuffer, value: Int): Int
 
-@language
+@builtin
 function textBufferAppendCharacter(buffer: TextBuffer, source: String, index: Int): Int
 
-@language
+@builtin
 function textBufferMaterialize(buffer: TextBuffer): String
 
-@language
+@builtin
 function textBufferDestroy(buffer: TextBuffer): Int

@@ -5,7 +5,7 @@ enum RangeSyntax {
         case main = "main"
         case background = "background"
         case `defer` = "defer"
-        case core = "core"
+        case builtin = "builtin"
         case expand = "expand"
     }
 

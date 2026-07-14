@@ -1919,7 +1919,7 @@ function compilerBodySyntaxAppendEdge(sink: CompilerBodySyntaxSink, ownerSyntaxI
     return compilerSyntaxTableAppend(tables: sink.tables, table: sink.tables.bodyEdges, value: ordinal)
 }
 
-function compilerSyntaxAppendDeclaration(tables: CompilerSyntaxTables, syntaxID: Int, fileID: Int, kindTag: Int, parentSyntaxID: Int, ordinal: Int, declarationStart: Int, declarationEnd: Int, nameStart: Int, nameEnd: Int, bodyStart: Int, bodyEnd: Int, fingerprint: CompilerFingerprint, isLanguage: Int): Int {
+function compilerSyntaxAppendDeclaration(tables: CompilerSyntaxTables, syntaxID: Int, fileID: Int, kindTag: Int, parentSyntaxID: Int, ordinal: Int, declarationStart: Int, declarationEnd: Int, nameStart: Int, nameEnd: Int, bodyStart: Int, bodyEnd: Int, fingerprint: CompilerFingerprint, isBuiltin: Int): Int {
     if !compilerSyntaxDeclarationRangesAreValid(tables: tables, fileID: fileID, declarationStart: declarationStart, declarationEnd: declarationEnd, nameStart: nameStart, nameEnd: nameEnd, bodyStart: bodyStart, bodyEnd: bodyEnd) {
         compilerSyntaxTablesPoison(tables: tables)
         return 0 - 1
@@ -1937,7 +1937,7 @@ function compilerSyntaxAppendDeclaration(tables: CompilerSyntaxTables, syntaxID:
     if compilerSyntaxTableAppend(tables: tables, table: tables.declarations, value: compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: bodyEnd)) != 0 { return 0 - 1 }
     if compilerSyntaxTableAppend(tables: tables, table: tables.declarations, value: fingerprint.first) != 0 { return 0 - 1 }
     if compilerSyntaxTableAppend(tables: tables, table: tables.declarations, value: fingerprint.second) != 0 { return 0 - 1 }
-    return compilerSyntaxTableAppend(tables: tables, table: tables.declarations, value: isLanguage)
+    return compilerSyntaxTableAppend(tables: tables, table: tables.declarations, value: isBuiltin)
 }
 
 function compilerSyntaxAppendMember(tables: CompilerSyntaxTables, syntaxID: Int, fileID: Int, parentSyntaxID: Int, ordinal: Int, memberStart: Int, memberEnd: Int, nameStart: Int, nameEnd: Int, typeStart: Int, typeEnd: Int, fingerprint: CompilerFingerprint, memberKind: Int): Int {
@@ -2478,13 +2478,13 @@ function compilerTypedSyntaxCaptureWithPolicy(source: String, tables: CompilerSy
     state fileID: Int(0)
     state sourceIndex: Int(0)
     state declarationOrdinal: Int(0)
-    state pendingLanguageDeclaration: Bool(false)
+    state pendingBuiltinDeclaration: Bool(false)
     let fileCount: Int(compilerSourceStoreFileCount(store: tables.sourceStore))
     while fileID < fileCount {
         let fileStart: Int(compilerSourceStoreFileContentStart(store: tables.sourceStore, fileID: fileID))
         let fileEnd: Int(compilerSourceStoreFileContentEnd(store: tables.sourceStore, fileID: fileID))
         sourceIndex: fileStart
-        pendingLanguageDeclaration: false
+        pendingBuiltinDeclaration: false
         while sourceIndex < fileEnd {
             let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: sourceIndex))
             if maybeToken == nil {
@@ -2494,8 +2494,8 @@ function compilerTypedSyntaxCaptureWithPolicy(source: String, tables: CompilerSy
                 let token: RangeLexedToken(maybeToken ?? fallbackToken)
                 if token.start >= fileEnd {
                     sourceIndex: fileEnd
-                } else if token.kind == String("macroAttribute") && token.text == String("@language") {
-                    pendingLanguageDeclaration: true
+                } else if token.kind == String("macroAttribute") && token.text == String("@builtin") {
+                    pendingBuiltinDeclaration: true
                     sourceIndex: token.end
                 } else if token.kind == String("macroAttribute") && token.text == String("@main") {
                     sourceIndex: token.end
@@ -2503,11 +2503,11 @@ function compilerTypedSyntaxCaptureWithPolicy(source: String, tables: CompilerSy
                     let applicationEnd: Int(compilerTypedSyntaxCaptureMacroApplication(source: source, tables: tables, macroToken: token))
                     sourceIndex: applicationEnd
                 } else {
-                    let step: CompilerTypedDeclarationCaptureStep(compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, token: token, captureBodies: captureBodies, isLanguage: pendingLanguageDeclaration, fileEnd: fileEnd))
+                    let step: CompilerTypedDeclarationCaptureStep(compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, token: token, captureBodies: captureBodies, isBuiltin: pendingBuiltinDeclaration, fileEnd: fileEnd))
                     if step.captured {
                         declarationOrdinal: declarationOrdinal + 1
                     }
-                    pendingLanguageDeclaration: false
+                    pendingBuiltinDeclaration: false
                     sourceIndex: step.nextIndex
                 }
             }
@@ -2560,7 +2560,7 @@ function compilerTypedSyntaxCaptureMain(source: String, tables: CompilerSyntaxTa
 }
 
 function compilerTypedSyntaxCaptureTopLevelToken(source: String, tables: CompilerSyntaxTables, declarationOrdinal: Int, token: RangeLexedToken): CompilerTypedDeclarationCaptureStep {
-    return compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, token: token, captureBodies: true, isLanguage: false, fileEnd: stringLength(value: source))
+    return compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, token: token, captureBodies: true, isBuiltin: false, fileEnd: stringLength(value: source))
 }
 
 function compilerMacroIdentityForMalformed(tables: CompilerSyntaxTables, fileID: Int, startLocal: Int, endLocal: Int, tag: Int): CompilerFingerprint {
@@ -2727,7 +2727,7 @@ function compilerTypedSyntaxCaptureMacroParameters(source: String, tables: Compi
     return CompilerMacroParameterCapture(count: ordinal, fingerprint: fingerprint, isValid: valid)
 }
 
-function compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(source: String, tables: CompilerSyntaxTables, declarationOrdinal: Int, token: RangeLexedToken, captureBodies: Bool, isLanguage: Bool, fileEnd: Int): CompilerTypedDeclarationCaptureStep {
+function compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(source: String, tables: CompilerSyntaxTables, declarationOrdinal: Int, token: RangeLexedToken, captureBodies: Bool, isBuiltin: Bool, fileEnd: Int): CompilerTypedDeclarationCaptureStep {
     if token.kind == String("keyword") && (token.text == String("open") || token.text == String("closed")) {
         let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: token.end))
         let maybeMacro: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
@@ -2743,10 +2743,10 @@ function compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(source: String, table
         }
     }
     if token.kind == String("keyword") && token.text == String("construct") {
-        return compilerTypedSyntaxCaptureConstructWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, keyword: token, isLanguage: isLanguage)
+        return compilerTypedSyntaxCaptureConstructWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, keyword: token, isBuiltin: isBuiltin)
     }
     if token.kind == String("keyword") && token.text == String("function") {
-        return compilerTypedSyntaxCaptureFunctionWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, parentSyntaxID: 0 - 1, keyword: token, captureBody: captureBodies, isLanguage: isLanguage, fileEnd: fileEnd)
+        return compilerTypedSyntaxCaptureFunctionWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, parentSyntaxID: 0 - 1, keyword: token, captureBody: captureBodies, isBuiltin: isBuiltin, fileEnd: fileEnd)
     }
     if token.kind == String("keyword") && token.text == String("macro") {
         return compilerTypedSyntaxCaptureMacroWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, visibility: compilerSyntaxMacroVisibilityDefault(), declarationStart: token.start, keyword: token)
@@ -2755,10 +2755,10 @@ function compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(source: String, table
 }
 
 function compilerTypedSyntaxCaptureConstruct(source: String, tables: CompilerSyntaxTables, declarationOrdinal: Int, keyword: RangeLexedToken): CompilerTypedDeclarationCaptureStep {
-    return compilerTypedSyntaxCaptureConstructWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, keyword: keyword, isLanguage: false)
+    return compilerTypedSyntaxCaptureConstructWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, keyword: keyword, isBuiltin: false)
 }
 
-function compilerTypedSyntaxCaptureConstructWithPolicy(source: String, tables: CompilerSyntaxTables, declarationOrdinal: Int, keyword: RangeLexedToken, isLanguage: Bool): CompilerTypedDeclarationCaptureStep {
+function compilerTypedSyntaxCaptureConstructWithPolicy(source: String, tables: CompilerSyntaxTables, declarationOrdinal: Int, keyword: RangeLexedToken, isBuiltin: Bool): CompilerTypedDeclarationCaptureStep {
     let maybeParts: Optional<CompilerConstructDeclarationParts>(compilerCoreParseConstructDeclarationParts(source: source, keyword: keyword))
     if maybeParts == nil {
         compilerSyntaxTablesPoison(tables: tables)
@@ -2778,12 +2778,12 @@ function compilerTypedSyntaxCaptureConstructWithPolicy(source: String, tables: C
     let declarationRow: Int(compilerIntTableRowCount(table: tables.declarations))
     let syntaxID: Int(compilerSyntaxAllocate(tables: tables, kindTag: compilerSyntaxKindConstruct(), facetRow: declarationRow))
     state fingerprint: CompilerFingerprint(compilerSyntaxDeclarationBaseFingerprint(tables: tables, fileID: fileID, kindTag: compilerSyntaxKindConstruct(), name: parts.nameToken.text))
-    state constructLanguagePolicy: Int(0)
-    if isLanguage { constructLanguagePolicy: 1 }
-    if compilerSyntaxAppendDeclaration(tables: tables, syntaxID: syntaxID, fileID: fileID, kindTag: compilerSyntaxKindConstruct(), parentSyntaxID: 0 - 1, ordinal: declarationRow, declarationStart: keyword.start, declarationEnd: parts.bodyRange.next, nameStart: parts.nameToken.start, nameEnd: parts.nameToken.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, fingerprint: fingerprint, isLanguage: constructLanguagePolicy) != 0 { compilerSyntaxTablesPoison(tables: tables) }
+    state constructBuiltinPolicy: Int(0)
+    if isBuiltin { constructBuiltinPolicy: 1 }
+    if compilerSyntaxAppendDeclaration(tables: tables, syntaxID: syntaxID, fileID: fileID, kindTag: compilerSyntaxKindConstruct(), parentSyntaxID: 0 - 1, ordinal: declarationRow, declarationStart: keyword.start, declarationEnd: parts.bodyRange.next, nameStart: parts.nameToken.start, nameEnd: parts.nameToken.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, fingerprint: fingerprint, isBuiltin: constructBuiltinPolicy) != 0 { compilerSyntaxTablesPoison(tables: tables) }
     let memberCapture: CompilerTypedMemberCapture(compilerTypedSyntaxCaptureMembers(source: source, tables: tables, fileID: fileID, parentSyntaxID: syntaxID, start: parts.bodyRange.start, end: parts.bodyRange.end, baseFingerprint: fingerprint))
     fingerprint: compilerFingerprintAppendInt(fingerprint: memberCapture.fingerprint, value: memberCapture.count)
-    if isLanguage { fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: 1) }
+    if isBuiltin { fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: 1) }
     if intBufferSet(buffer: tables.declarations.values, index: declarationRow * compilerSyntaxDeclarationColumnCount() + 11, value: fingerprint.first) != 0
         || intBufferSet(buffer: tables.declarations.values, index: declarationRow * compilerSyntaxDeclarationColumnCount() + 12, value: fingerprint.second) != 0 { compilerSyntaxTablesPoison(tables: tables) }
     return CompilerTypedDeclarationCaptureStep(captured: true, nextIndex: parts.bodyRange.next)
@@ -2807,7 +2807,7 @@ function compilerTypedSyntaxCaptureMembers(source: String, tables: CompilerSynta
         }
         let macroAttributeHandled: Bool(compilerCoreTokenKindEquals(token: token, kind: String("macroAttribute")))
         if macroAttributeHandled {
-            if token.text != String("@language") && token.text != String("@main") {
+            if token.text != String("@builtin") && token.text != String("@main") {
                 let nextIndex: Int(compilerTypedSyntaxCaptureMacroApplication(source: source, tables: tables, macroToken: token))
                 cursor: CompilerTokenCursor(source: source, index: nextIndex)
             } else {
@@ -2815,7 +2815,7 @@ function compilerTypedSyntaxCaptureMembers(source: String, tables: CompilerSynta
             }
         }
         if !macroAttributeHandled && token.text == String("function") {
-        let functionStep: CompilerTypedDeclarationCaptureStep(compilerTypedSyntaxCaptureFunctionWithPolicy(source: source, tables: tables, declarationOrdinal: functionOrdinal, parentSyntaxID: parentSyntaxID, keyword: token, captureBody: true, isLanguage: false, fileEnd: end))
+        let functionStep: CompilerTypedDeclarationCaptureStep(compilerTypedSyntaxCaptureFunctionWithPolicy(source: source, tables: tables, declarationOrdinal: functionOrdinal, parentSyntaxID: parentSyntaxID, keyword: token, captureBody: true, isBuiltin: false, fileEnd: end))
         if !functionStep.captured {
             compilerSyntaxTablesPoison(tables: tables)
             return CompilerTypedMemberCapture(count: memberOrdinal, fingerprint: declarationFingerprint)
@@ -2851,10 +2851,10 @@ function compilerTypedSyntaxCaptureMembers(source: String, tables: CompilerSynta
 }
 
 function compilerTypedSyntaxCaptureFunction(source: String, tables: CompilerSyntaxTables, declarationOrdinal: Int, keyword: RangeLexedToken): CompilerTypedDeclarationCaptureStep {
-    return compilerTypedSyntaxCaptureFunctionWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, parentSyntaxID: 0 - 1, keyword: keyword, captureBody: true, isLanguage: false, fileEnd: stringLength(value: source))
+    return compilerTypedSyntaxCaptureFunctionWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, parentSyntaxID: 0 - 1, keyword: keyword, captureBody: true, isBuiltin: false, fileEnd: stringLength(value: source))
 }
 
-function compilerCoreParseLanguageFunctionDeclarationParts(source: String, keyword: RangeLexedToken, fileEnd: Int): Optional<CompilerFunctionDeclarationParts> {
+function compilerCoreParseBuiltinFunctionDeclarationParts(source: String, keyword: RangeLexedToken, fileEnd: Int): Optional<CompilerFunctionDeclarationParts> {
     let maybeName: Optional<RangeLexedToken>(compilerCoreParseDeclarationNameAfterKeyword(source: source, keyword: keyword))
     if maybeName == nil { return nil }
     let fallbackCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: keyword.end))
@@ -2872,9 +2872,9 @@ function compilerCoreParseLanguageFunctionDeclarationParts(source: String, keywo
     return CompilerFunctionDeclarationParts(nameToken: nameToken, parameterRange: parameterRange, returnType: returnType, bodyRange: emptyBody)
 }
 
-function compilerTypedSyntaxCaptureFunctionWithPolicy(source: String, tables: CompilerSyntaxTables, declarationOrdinal: Int, parentSyntaxID: Int, keyword: RangeLexedToken, captureBody: Bool, isLanguage: Bool, fileEnd: Int): CompilerTypedDeclarationCaptureStep {
+function compilerTypedSyntaxCaptureFunctionWithPolicy(source: String, tables: CompilerSyntaxTables, declarationOrdinal: Int, parentSyntaxID: Int, keyword: RangeLexedToken, captureBody: Bool, isBuiltin: Bool, fileEnd: Int): CompilerTypedDeclarationCaptureStep {
     state maybeParts: Optional<CompilerFunctionDeclarationParts>(compilerCoreParseFunctionDeclarationParts(source: source, keyword: keyword))
-    if isLanguage { maybeParts: compilerCoreParseLanguageFunctionDeclarationParts(source: source, keyword: keyword, fileEnd: fileEnd) }
+    if isBuiltin { maybeParts: compilerCoreParseBuiltinFunctionDeclarationParts(source: source, keyword: keyword, fileEnd: fileEnd) }
     if maybeParts == nil {
         compilerSyntaxTablesPoison(tables: tables)
         return CompilerTypedDeclarationCaptureStep(captured: false, nextIndex: keyword.end)
@@ -2900,16 +2900,16 @@ function compilerTypedSyntaxCaptureFunctionWithPolicy(source: String, tables: Co
     let parameterCapture: CompilerTypedParameterCapture(compilerTypedSyntaxCaptureParameters(source: source, tables: tables, fileID: fileID, functionID: functionRow, start: parts.parameterRange.start, end: parts.parameterRange.end, baseFingerprint: signature))
     signature: compilerFingerprintAppendInt(fingerprint: parameterCapture.fingerprint, value: parameterCapture.count)
     signature: compilerFingerprintAppendText(fingerprint: signature, tag: 30, text: parts.returnType.text)
-    if isLanguage { signature: compilerFingerprintAppendInt(fingerprint: signature, value: 1) }
-    state functionLanguagePolicy: Int(0)
-    if isLanguage { functionLanguagePolicy: 1 }
+    if isBuiltin { signature: compilerFingerprintAppendInt(fingerprint: signature, value: 1) }
+    state functionBuiltinPolicy: Int(0)
+    if isBuiltin { functionBuiltinPolicy: 1 }
     if compilerSyntaxAppendFunction(tables: tables, syntaxID: syntaxID, fileID: fileID, firstParameterRow: firstParameterRow, parameterCount: parameterCapture.count, parameterStart: parts.parameterRange.start, parameterEnd: parts.parameterRange.end, returnTypeStart: parts.returnType.start, returnTypeEnd: parts.returnType.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, signature: signature) != 0
         || compilerSyntaxAppendFunctionOwner(tables: tables, ownerSyntaxID: parentSyntaxID) != 0
-        || compilerSyntaxAppendDeclaration(tables: tables, syntaxID: syntaxID, fileID: fileID, kindTag: compilerSyntaxKindFunction(), parentSyntaxID: 0 - 1, ordinal: declarationTableOrdinal, declarationStart: keyword.start, declarationEnd: parts.bodyRange.next, nameStart: parts.nameToken.start, nameEnd: parts.nameToken.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, fingerprint: signature, isLanguage: functionLanguagePolicy) != 0 {
+        || compilerSyntaxAppendDeclaration(tables: tables, syntaxID: syntaxID, fileID: fileID, kindTag: compilerSyntaxKindFunction(), parentSyntaxID: 0 - 1, ordinal: declarationTableOrdinal, declarationStart: keyword.start, declarationEnd: parts.bodyRange.next, nameStart: parts.nameToken.start, nameEnd: parts.nameToken.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, fingerprint: signature, isBuiltin: functionBuiltinPolicy) != 0 {
         compilerSyntaxTablesPoison(tables: tables)
         return CompilerTypedDeclarationCaptureStep(captured: true, nextIndex: parts.bodyRange.next)
     }
-    if captureBody && !isLanguage {
+    if captureBody && !isBuiltin {
         if compilerTypedSyntaxCaptureBody(source: source, tables: tables, fileID: fileID, ownerSyntaxID: syntaxID, start: parts.bodyRange.start, end: parts.bodyRange.end) != 0 {
             compilerSyntaxTablesPoison(tables: tables)
         }
@@ -2934,7 +2934,7 @@ function compilerTypedSyntaxCaptureParameters(source: String, tables: CompilerSy
         }
         let macroAttributeHandled: Bool(compilerCoreTokenKindEquals(token: token, kind: String("macroAttribute")))
         if macroAttributeHandled {
-            if token.text != String("@language") && token.text != String("@main") {
+            if token.text != String("@builtin") && token.text != String("@main") {
                 let nextIndex: Int(compilerTypedSyntaxCaptureMacroApplication(source: source, tables: tables, macroToken: token))
                 cursor: CompilerTokenCursor(source: source, index: nextIndex)
             } else {
@@ -3048,8 +3048,8 @@ function compilerSyntaxDeclarationsAreValid(tables: CompilerSyntaxTables): Bool 
         if compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 0) != kindTag {
             return false
         }
-        let declarationLanguagePolicy: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 13))
-        if declarationLanguagePolicy != 0 && declarationLanguagePolicy != 1 { return false }
+        let declarationBuiltinPolicy: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 13))
+        if declarationBuiltinPolicy != 0 && declarationBuiltinPolicy != 1 { return false }
         state previousRow: Int(0)
         while previousRow < row {
             state sameFirst: Bool(false)
@@ -4816,7 +4816,7 @@ function compilerGraphDeltaCommitGeneratedFunction(tables: CompilerSyntaxTables,
         || intBufferCount(buffer: tables.failures) != 0
         || compilerSyntaxAppendFunction(tables: tables, syntaxID: syntaxID, fileID: fileID, firstParameterRow: parameterRow, parameterCount: parameterCapture.count, parameterStart: parameterGlobalStart, parameterEnd: parameterGlobalEnd, returnTypeStart: returnTypeGlobalStart, returnTypeEnd: returnTypeGlobalEnd, bodyStart: bodyGlobalStart, bodyEnd: bodyGlobalEnd, signature: signature) != 0
         || compilerSyntaxAppendFunctionOwner(tables: tables, ownerSyntaxID: ownerSyntaxID) != 0
-        || compilerSyntaxAppendDeclaration(tables: tables, syntaxID: syntaxID, fileID: fileID, kindTag: generatedSyntaxKind, parentSyntaxID: 0 - 1, ordinal: declarationRow, declarationStart: nameGlobalStart, declarationEnd: bodyGlobalEnd, nameStart: nameGlobalStart, nameEnd: nameGlobalEnd, bodyStart: bodyGlobalStart, bodyEnd: bodyGlobalEnd, fingerprint: signature, isLanguage: 0) != 0
+        || compilerSyntaxAppendDeclaration(tables: tables, syntaxID: syntaxID, fileID: fileID, kindTag: generatedSyntaxKind, parentSyntaxID: 0 - 1, ordinal: declarationRow, declarationStart: nameGlobalStart, declarationEnd: bodyGlobalEnd, nameStart: nameGlobalStart, nameEnd: nameGlobalEnd, bodyStart: bodyGlobalStart, bodyEnd: bodyGlobalEnd, fingerprint: signature, isBuiltin: 0) != 0
         || compilerTypedSyntaxCaptureBody(source: source, tables: tables, fileID: fileID, ownerSyntaxID: syntaxID, start: bodyGlobalStart, end: bodyGlobalEnd) != 0 {
         compilerSyntaxTablesPoison(tables: tables)
         return 0 - 1
@@ -8701,9 +8701,9 @@ function compilerTypedSyntaxRenderSnapshot(tables: CompilerSyntaxTables): String
         let declarationBodyEnd: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 10))
         let declarationFingerprintFirst: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 11))
         let declarationFingerprintSecond: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 12))
-        let declarationLanguageABI: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 13))
+        let declarationBuiltinABI: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 13))
         let declarationName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: declarationFileID, localStart: declarationNameStart, localEnd: declarationNameEnd))
-        textBufferAppend(buffer: outputBuffer, text: "declaration\(tab)row=\(row)\(tab)syntaxID=\(declarationSyntaxID)\(tab)fileID=\(declarationFileID)\(tab)kind=\(compilerSyntaxKindName(kindTag: declarationKindTag))\(tab)ordinal=\(declarationOrdinal)\(tab)start=\(declarationStart)\(tab)end=\(declarationEnd)\(tab)name=\(declarationName)\(tab)nameStart=\(declarationNameStart)\(tab)nameEnd=\(declarationNameEnd)\(tab)bodyStart=\(declarationBodyStart)\(tab)bodyEnd=\(declarationBodyEnd)\(tab)fingerprint=\(declarationFingerprintFirst):\(declarationFingerprintSecond)\(tab)languageABI=\(declarationLanguageABI)\(newline)")
+        textBufferAppend(buffer: outputBuffer, text: "declaration\(tab)row=\(row)\(tab)syntaxID=\(declarationSyntaxID)\(tab)fileID=\(declarationFileID)\(tab)kind=\(compilerSyntaxKindName(kindTag: declarationKindTag))\(tab)ordinal=\(declarationOrdinal)\(tab)start=\(declarationStart)\(tab)end=\(declarationEnd)\(tab)name=\(declarationName)\(tab)nameStart=\(declarationNameStart)\(tab)nameEnd=\(declarationNameEnd)\(tab)bodyStart=\(declarationBodyStart)\(tab)bodyEnd=\(declarationBodyEnd)\(tab)fingerprint=\(declarationFingerprintFirst):\(declarationFingerprintSecond)\(tab)builtinABI=\(declarationBuiltinABI)\(newline)")
         row: row + 1
     }
 
@@ -15412,7 +15412,7 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
         state returnTypeKind: Int(compilerBodyTypeUnknown())
         state returnTypeID: Int(0 - 1)
         state declarationFunctionID: Int(0 - 1)
-        state declarationLanguageABI: Int(0)
+        state declarationBuiltinABI: Int(0)
         if calleeKind == compilerSyntaxKindMemberRead() {
             let memberCallReceiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: calleeNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
             if memberCallReceiverNodeID < 0 || compilerBodyArenaResolveExpression(arena: arena, index: index, nodeID: memberCallReceiverNodeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
@@ -15477,7 +15477,7 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
                 returnTypeID: compilerBodyArenaTypeIDForSpan(arena: arena, fileID: returnFileID, start: returnStart, end: returnEnd)
                 if returnTypeKind == compilerBodyTypeUnknown() || returnTypeID < 0 { return 0 - 1 }
                 if compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 13) == 1 {
-                    declarationLanguageABI: 1
+                    declarationBuiltinABI: 1
                     let runtimeBuiltinID: Int(compilerBodyRuntimeBuiltinID(name: calleeName))
                     if runtimeBuiltinID == compilerBodyRuntimeBuiltinNone()
                         || compilerBodyRuntimeBuiltinReturnType(id: runtimeBuiltinID) == String("")
@@ -15506,7 +15506,7 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
                     || (expectedType == String("i1") && builtinActualTypeKind != compilerBodyTypeBool())
                     || (expectedType == String("ptr") && builtinActualTypeKind != compilerBodyTypeString() && builtinActualTypeKind != compilerBodyTypeConstruct()) { return 0 - 1 }
             }
-            if targetKind == compilerBodyResolutionFunction() || declarationLanguageABI == 1 {
+            if targetKind == compilerBodyResolutionFunction() || declarationBuiltinABI == 1 {
                 let firstParameterRow: Int(compilerIntTableValue(table: arena.tables.functions, row: declarationFunctionID, column: 2))
                 let parameterRow: Int(firstParameterRow + argumentOrdinal)
                 if parameterRow < 0 || parameterRow >= compilerIntTableRowCount(table: arena.tables.parameters) { return 0 - 1 }

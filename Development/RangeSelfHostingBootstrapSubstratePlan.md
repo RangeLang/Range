@@ -146,7 +146,7 @@ lower. In particular:
 An illustrative ABI is:
 
 ```range
-@language
+@builtin
 construct TextBuffer {}
 
 function textBufferCreate(capacity: Int): TextBuffer

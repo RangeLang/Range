@@ -1,4 +1,4 @@
-@language
+@builtin
 construct DateStorage {
     function parse(iso8601String: String): Result<Self, DecodingError>
 }

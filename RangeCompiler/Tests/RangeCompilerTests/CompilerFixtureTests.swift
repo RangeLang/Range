@@ -1059,6 +1059,33 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         }
     }
 
+    @Test("Builtin marker is a first-class attribute with no legacy alias")
+    func builtinMarkerIsFirstClassWithoutLegacyAlias() throws {
+        var builtinParser = try Parser(
+            source: """
+            @literal
+            @builtin
+            construct Value {}
+            """
+        )
+        let builtin = try builtinParser.parseConstructDeclaration()
+        #expect(builtin.attribute?.name == "builtin")
+        #expect(builtin.macros.map(\.name) == ["literal"])
+        #expect(builtin.isCore)
+
+        let legacyMarker = "@" + "language"
+        var legacyParser = try Parser(
+            source: """
+            \(legacyMarker)
+            construct LegacyValue {}
+            """
+        )
+        let legacy = try legacyParser.parseConstructDeclaration()
+        #expect(legacy.attribute == nil)
+        #expect(legacy.macros.map(\.name) == ["language"])
+        #expect(!legacy.isCore)
+    }
+
     @Test("Project macros infer across project files")
     func projectMacrosInferAcrossProjectFiles() throws {
         var inputs = try rangeCoreInputs()
@@ -1183,7 +1210,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         let syntax = program.programGraph.syntax
 
         let constructSyntax = try #require(
-            syntax.first { $0.identity.label == "@language Construct" }
+            syntax.first { $0.identity.label == "@builtin Construct" }
         )
         #expect(constructSyntax.declarations.map(\.label) == ["Declaration"])
         #expect(constructSyntax.applications.map(\.label) == ["Application"])

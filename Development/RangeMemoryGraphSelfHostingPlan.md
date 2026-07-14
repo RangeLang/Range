@@ -111,7 +111,7 @@ region, lifetime, transfer, and destruction decisions.
   2,476,499-byte compiler LLVM artifacts and SHA-256
   `2f32401f8a74151448893c4c7406c74c9300faaab204ab4987aa6063fd266be8`.
 - Opaque compiler runtime handles are now proven first through the real Core
-  `IntBuffer` ABI. Typed syntax preserves `@language` provenance and captures
+  `IntBuffer` ABI. Typed syntax preserves `@builtin` provenance and captures
   signature-only ABI functions. Opaque classification requires that provenance,
   the zero-field IntBuffer declaration, and exact factory/destructor/shared-read
   signatures; ordinary empty constructs remain invalid. MemoryGraph requires

@@ -1,29 +1,29 @@
-@language
+@builtin
 function stringHasPrefix(source: String, start: Int, prefix: String): Bool
 
-@language
+@builtin
 function stringTransientRegionMark(): Int
 
-@language
+@builtin
 function stringTransientRegionReset(mark: Int): Int
 
-@language
+@builtin
 function stringFindFrom(source: String, start: Int, needle: String): Int
 
-@language
+@builtin
 function stringFindFirstOf(source: String, start: Int, characters: String): Int
 
-@language
+@builtin
 function stringViewFrom(source: String, start: Int): String
 
-@language
+@builtin
 function stringSliceUnchecked(source: String, start: Int, end: Int): String
 
-@language
+@builtin
 function stringCharacterAt(source: String, index: Int): String
 
-@language
+@builtin
 function stringByteAt(source: String, index: Int): Int
 
-@language
+@builtin
 function stringFindByteOf(source: String, start: Int, first: Int, second: Int, third: Int): Int

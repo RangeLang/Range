@@ -1,14 +1,14 @@
-@language
+@builtin
 function compilerMetricsReset(): Int
 
-@language
+@builtin
 function compilerMetricsSetEnabled(enabled: Bool): Int
 
-@language
+@builtin
 function compilerMetricsFunctionBegin(functionID: Int, name: String): Int
 
-@language
+@builtin
 function compilerMetricsFunctionEnd(legacyParses: Int, recordBytes: Int): Int
 
-@language
+@builtin
 function compilerMetricsReport(): String

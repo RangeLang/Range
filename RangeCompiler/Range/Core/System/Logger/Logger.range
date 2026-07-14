@@ -1,4 +1,4 @@
-@language
+@builtin
 construct Logger {
     function log(_ message: String)
     function debug(_ message: String)

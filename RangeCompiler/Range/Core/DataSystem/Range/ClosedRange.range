@@ -1,6 +1,6 @@
-@language
 @equatable
 @hashable
+@builtin
 construct ClosedRange<Bound> {
     let lowerBound: Bound
     let upperBound: Bound

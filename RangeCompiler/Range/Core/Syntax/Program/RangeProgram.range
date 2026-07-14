@@ -1,9 +1,9 @@
-@language
+@builtin
 construct RangeProgram {
     let graph: RangeGraph
 }
 
-@language
+@builtin
 construct RangeGraph {
     let files: [FileTreeNode]
     let sources: [ProgramSourceFile]
@@ -14,65 +14,65 @@ construct RangeGraph {
     state syntax: [@syntax]
 }
 
-@language
+@builtin
 construct ProgramSourceFile {
     let path: String
     let text: String
 }
 
-@language
+@builtin
 construct ProgramLexedSource {
     let path: String
     let tokens: [LexicalToken]
 }
 
-@language
+@builtin
 construct ProgramArtifact {
     let path: String
     let text: String
 }
 
-@language
+@builtin
 construct RangeGraphTopology {
     let nodes: [RangeGraphNode]
     let relationships: [RangeGraphRelationship]
 }
 
-@language
+@builtin
 construct RangeGraphNode {
     let identity: RangeGraphIdentity
     let sourcePath: String
     let labels: [String]
 }
 
-@language
+@builtin
 construct RangeGraphRelationship {
     let origin: RangeGraphIdentity
     let destination: RangeGraphIdentity
     let kind: String
 }
 
-@language
+@builtin
 construct GraphSyntax {
     let identity: RangeGraphIdentity
     let declarations: [GraphEntry]
     let applications: [GraphEntry]
 }
 
-@language
+@builtin
 enum GraphRole {
     case declaration
     case application
 }
 
-@language
+@builtin
 construct RangeGraphIdentity {
     let id: String
     let kind: String
     let name: String
 }
 
-@language
+@builtin
 construct GraphEntry {
     let identity: RangeGraphIdentity
 }

@@ -1,10 +1,10 @@
-@language
+@builtin
 enum ThreadError {
     case invalid
     case unavailable
 }
 
-@language
+@builtin
 construct ThreadHandle {
     let raw: Int
 }
