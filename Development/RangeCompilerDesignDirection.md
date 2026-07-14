@@ -85,9 +85,12 @@ before following older checklist items.
 7. Macros and annotations are compile-time values and phase-scoped graph
    capabilities. `@graph` may grant a read-only graph query view; `@self` may
    grant access to the authored target syntax.
-8. Protocols are not a separate future compiler mechanism. Their durable
-   meaning is a macro-backed set of graph-validated requirements plus carried
-   behavior. A `protocol` spelling may remain Foundation sugar.
+8. Protocol declarations and construct conformance syntax are retired from
+   the target Range language. They remain Swift-hosted compatibility surface
+   only while migration proceeds. Carried behavior is proved by successful
+   macro emission followed by ordinary generated-declaration validation and
+   use; a second protocol/conformance validator is not required to re-prove
+   the emitted member.
 9. Do **not** migrate to “everything is a macro” yet. Test that model inside
    the Range-authored compiler and Foundation first. Preserve explicit
    typed syntax nodes while the experiment is evaluated.
@@ -334,29 +337,31 @@ Compile-time macro execution must be:
 Host file and project I/O belongs to the driver and `SourceStore`, not inside
 the compile-time runtime.
 
-## Protocols Become Requirement Macros
+## Protocol Surface Is Retired From The Target Language
 
-The future language model should not maintain protocols and macros as two
-independent mechanisms.
+The target language does not maintain protocols and macros as two independent
+behavior mechanisms. Protocol declarations and construct conformance lists
+are retired target syntax. The Swift-hosted compiler may continue to parse
+and validate them as compatibility support during migration, but Range-authored
+compiler policy must not add a protocol declaration table, conformance list,
+requirement collector, `satisfiesRequirement` validator, witness table,
+existential, or dynamic dispatch path.
 
-A protocol is fundamentally:
+The replacement is a behavior-carrying macro annotation. When a macro emits a
+typed declaration and that declaration passes the normal generated-declaration
+validation, declaration/member lookup, semantic, MemoryGraph, ABI, typed IR,
+and LLVM paths, the emitted behavior is proved by the same pipeline as authored
+behavior. Macro validation remains appropriate for prerequisites that the macro
+does not generate; it must not redundantly validate a retired protocol surface.
 
-- a named collection of graph requirements;
-- a validator over a target graph surface;
-- optional carried macro behavior;
-- explicit derived `satisfiesRequirement` facts.
-
-Therefore:
-
-- represent protocol meaning through a requirement macro value;
-- allow `protocol` syntax to remain as Foundation-provided sugar if useful;
-- validate requirements against declaration/application graph facts;
-- record requirement satisfaction and carried behavior as explicit edges;
-- keep runtime dispatch or witness representation as a separate lowering
-  question, not proof that protocols need a separate front-end engine.
-
-Existing Swift-hosted protocol machinery is migration compatibility, not the
-target architecture. Do not add a second Range-authored protocol subsystem.
+Requirement-style macros may still be explored later for graph facts that are
+not carried behavior, but they must extend the typed query/delta model rather
+than recreate protocol syntax or a parallel protocol engine. A historical
+protocol model was fundamentally a named collection of graph requirements, a
+validator over a target graph surface, optional carried macro behavior, and
+explicit derived `satisfiesRequirement` facts. That model is retained only as
+migration context. Existing Swift-hosted protocol machinery is compatibility
+support, not the target architecture.
 
 ## “Everything Is A Macro” Is An Experiment, Not A Commitment
 
@@ -2770,6 +2775,67 @@ requirement enumeration, arrays, closures, `where` clauses, member
 enumeration, runtime macro behavior, or protocol-specific validator. A future
 requirement-macro slice must extend these selective typed queries and CFG/delta
 semantics rather than introduce a separate protocol engine.
+
+### Native typed generated-function emission checkpoint
+
+The canonical native deferred-declaration surface is the contextual
+`@expand` operation inside a macro executable body:
+
+```range
+macro registrable(): Construct { target, diagnostics in
+    @expand {
+        function create(): Int {
+            return 7
+        }
+    }
+}
+```
+
+`@expand` is compiler-known and is rejected outside a macro body. Its block is
+captured at macro-declaration parse time as typed deferred function templates;
+it is never rendered to source or reparsed. Execution instantiates the
+templates into the attached construct's pending `CompilerGraphDelta`. The
+bounded implementation supports zero parameters, an `Int` return, and the
+existing scalar `return integer` body shape. Template ordinals are lexical and
+generated identities derive from macro application identity, target identity,
+ordinal, and structural template data rather than source-table rows or
+absolute offsets.
+
+Generated records carry their function kind, owner construct, source ranges,
+signature/body template, macro declaration/application/target provenance, and
+stable identity. Validation is transactional: duplicate generated names and
+authored/generated collisions reject before commitment with the focused
+`generatedFunctionCollision` diagnostic, and no partial delta commits. A
+successful delta is materialized as an ordinary typed function declaration and
+member owner in the expanded declaration view. Lookup, semantic analysis,
+MemoryGraph, ABI planning, typed MIR, and LLVM lowering therefore use the same
+paths as authored functions. The post-commit overlay validator is idempotent:
+it ignores only the already-materialized generated row whose owner/name and
+declaration fingerprint match that delta stable identity, while a different
+same-owner/name row remains a collision.
+
+The focused candidate gate proves two data-driven generated members, absence
+from authored construct syntax, ordinary member calls, native LLVM
+validation/linking, executable exit `7`, repeated byte identity, stable
+identity/provenance under unrelated source insertion, collision rejection
+before LLVM, and rejection of `@expand` outside a macro. Stage 2 and Stage 3
+focused snapshots/artifacts and the complete compiler fixed point are required
+to remain byte-identical. This slice does not add generic generated functions,
+arbitrary types or bodies, generated constructs, replacement expansion,
+recursive or multi-round macro scheduling, source rewriting, or protocol
+syntax/validation.
+
+The final accepted command, `/usr/bin/time -l bash
+scripts/check-range-compiler-candidate`, passed in `96.20 s` real time
+(`90.84 s` user, `2.74 s` system) with `102,236,160` bytes maximum RSS and
+`swift_invocation=none`. The four-file inventory, Stage 2/Stage 3 fixed point,
+focused snapshots, LLVM validation/linking, executable exit checks, collision
+transactionality, and outside-macro rejection all passed. Stage 2 and Stage 3
+compiler LLVM are byte-identical at SHA-256
+`96c969b6184792c4a29ae53386f40edf83a915143527704721512d6425ac635e` and
+`3,696,725` bytes; their linked executables are byte-identical at SHA-256
+`2fb43c4e80aea4b4ddbd2a363254953760eb372002273f8924b589ce9061e1e7` and
+`2,257,504` bytes.
 
 ### Explicit deferrals
 

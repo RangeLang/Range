@@ -916,7 +916,7 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MalformedHeader.range' \
-                'macro Broken(): Construct -> Void { target, diagnostics in' \
+                'macro Broken(): Construct -> Void { target in' \
                 '    return diagnostics.information("bad")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MalformedHeaderUse.range' \
@@ -1029,6 +1029,189 @@ write_macro_expansion_commit_bundle() {
         '@main {' \
         '    return 7' \
         '}' > "$output"
+}
+
+write_macro_generated_function_bundle() {
+    local output="$1"
+    local kind="${2:-positive}"
+    local header="${3-compilerMacroSnapshot}"
+    local order="${4:-normal}"
+
+    : > "$output"
+    if [[ -n "$header" ]]; then
+        /usr/bin/printf '%s\n' "$header" > "$output"
+    fi
+    if [[ "$order" == reordered ]]; then
+        /usr/bin/printf '%b\n' \
+            'compilerSourceFile\trole=foundation\tpath=Foundation/UnrelatedGenerated.range' \
+            'construct UnrelatedGenerated {}' >> "$output"
+    fi
+    /usr/bin/printf '%b\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Registrable.range' \
+        'macro registrable(): Construct { target, diagnostics in' \
+        '    @expand {' \
+        '        function create(): Int {' \
+        '            return 7' \
+        '        }' \
+        '    }' \
+        '    @expand {' \
+        '        function alternate(): Int {' \
+        '            return 11' \
+        '        }' \
+        '    }' \
+        '}' >> "$output"
+    /usr/bin/printf '%b\n' \
+        'compilerSourceFile\trole=project\tpath=Project/RegistrableUse.range' >> "$output"
+    /usr/bin/printf '%b\n' \
+        '@registrable' \
+        'construct User {' >> "$output"
+    /usr/bin/printf '%b\n' \
+        '    let seed: Int' >> "$output"
+    if [[ "$kind" == collision ]]; then
+        /usr/bin/printf '%b\n' \
+            '    function create(): Int {' \
+            '        return 99' \
+            '    }' >> "$output"
+    fi
+    /usr/bin/printf '%b\n' \
+        '}' \
+        '' \
+        '@main {' \
+        '    let user: User(User(seed: 0))' >> "$output"
+    if [[ "$kind" == positive ]]; then
+        /usr/bin/printf '%b\n' \
+            '    let alternate: Int(user.alternate())' \
+            '    return user.create()' >> "$output"
+    elif [[ "$kind" == bare ]]; then
+        /usr/bin/printf '%b\n' \
+            '    return create()' >> "$output"
+    else
+        /usr/bin/printf '%b\n' \
+            '    return 0' >> "$output"
+    fi
+    /usr/bin/printf '%b\n' '}' >> "$output"
+}
+
+write_macro_expand_outside_bundle() {
+    local output="$1"
+    local header="${2:-compilerNativeSourceSetLLVMText}"
+
+    /usr/bin/printf '%b\n' \
+        "$header" \
+        'compilerSourceFile\trole=project\tpath=Project/ExpandOutside.range' \
+        'function outside(): Int {' \
+        '    @expand {' \
+        '        function create(): Int {' \
+        '            return 7' \
+        '        }' \
+        '    }' \
+        '    return 0' \
+        '}' \
+        '' \
+        '@main {' \
+        '    return outside()' > "$output"
+}
+
+audit_macro_generated_function() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local snapshot_bundle="$WORK_ROOT/$stage_label.macro.generated.snapshot.range"
+    local snapshot_output="$WORK_ROOT/$stage_label.macro.generated.snapshot.out"
+    local snapshot_repeat="$WORK_ROOT/$stage_label.macro.generated.snapshot.repeat.out"
+    local snapshot_error="$WORK_ROOT/$stage_label.macro.generated.snapshot.err"
+    local snapshot_repeat_error="$WORK_ROOT/$stage_label.macro.generated.snapshot.repeat.err"
+    local reordered_bundle="$WORK_ROOT/$stage_label.macro.generated.reordered.range"
+    local reordered_output="$WORK_ROOT/$stage_label.macro.generated.reordered.out"
+    local reordered_error="$WORK_ROOT/$stage_label.macro.generated.reordered.err"
+    local snapshot_projection="$WORK_ROOT/$stage_label.macro.generated.snapshot.projection"
+    local reordered_projection="$WORK_ROOT/$stage_label.macro.generated.reordered.projection"
+
+    write_macro_generated_function_bundle "$snapshot_bundle" positive compilerMacroSnapshot normal
+    run_capture "$executable" "$snapshot_bundle" "$snapshot_output" "$snapshot_error"
+    require_successful_output "$stage_label generated function snapshot" "$snapshot_output" "$snapshot_error"
+    run_capture "$executable" "$snapshot_bundle" "$snapshot_repeat" "$snapshot_repeat_error"
+    require_successful_output "$stage_label repeated generated function snapshot" "$snapshot_repeat" "$snapshot_repeat_error"
+    /usr/bin/cmp -s "$snapshot_output" "$snapshot_repeat" || fail "$stage_label generated function snapshot was not deterministic"
+    local generated_function_count
+    generated_function_count="$(/usr/bin/grep -F 'macroGraphGeneratedFunction' "$snapshot_output" | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
+    [[ "$generated_function_count" -eq 2 ]] || fail "$stage_label each @expand block did not emit exactly one generated function set"
+    /usr/bin/grep -Fq $'macroGraphGeneratedFunction\trow=0\tkind=function\townerSyntaxID=' "$snapshot_output" || fail "$stage_label missing generated create function row"
+    /usr/bin/grep -Fq $'macroGraphGeneratedFunction\trow=1\tkind=function\townerSyntaxID=' "$snapshot_output" || fail "$stage_label missing generated alternate function row"
+    /usr/bin/grep -Fq $'name=create\treturnType=Int\tmacroDeclarationRow=' "$snapshot_output" || fail "$stage_label generated create function shape changed"
+    /usr/bin/grep -Fq $'name=alternate\treturnType=Int\tmacroDeclarationRow=' "$snapshot_output" || fail "$stage_label generated alternate function shape changed"
+    /usr/bin/grep -F 'macroGraphGeneratedFunction' "$snapshot_output" \
+        | /usr/bin/sed -E 's/\t(row|ownerSyntaxID|macroDeclarationRow|applicationRow)=[^[:space:]]+//g' > "$snapshot_projection"
+    [[ -s "$snapshot_projection" ]] || fail "$stage_label generated function snapshot omitted stable projection"
+
+    write_macro_generated_function_bundle "$reordered_bundle" positive compilerMacroSnapshot reordered
+    run_capture "$executable" "$reordered_bundle" "$reordered_output" "$reordered_error"
+    require_successful_output "$stage_label reordered generated function snapshot" "$reordered_output" "$reordered_error"
+    /usr/bin/grep -F 'macroGraphGeneratedFunction' "$reordered_output" \
+        | /usr/bin/sed -E 's/\t(row|ownerSyntaxID|macroDeclarationRow|applicationRow)=[^[:space:]]+//g' > "$reordered_projection"
+    /usr/bin/cmp -s "$snapshot_projection" "$reordered_projection" || fail "$stage_label generated function stable identity/provenance changed under unrelated source insertion"
+
+    local native_bundle="$WORK_ROOT/$stage_label.macro.generated.native.range"
+    local native_first="$WORK_ROOT/$stage_label.macro.generated.native.first.ll"
+    local native_second="$WORK_ROOT/$stage_label.macro.generated.native.repeat.ll"
+    local native_first_error="$WORK_ROOT/$stage_label.macro.generated.native.first.err"
+    local native_second_error="$WORK_ROOT/$stage_label.macro.generated.native.repeat.err"
+    local native_llvm="$stage_directory/GeneratedFunction.ll"
+    local native_executable="$stage_directory/GeneratedFunction"
+    local native_run_output="$WORK_ROOT/$stage_label.macro.generated.native.run.out"
+    local native_run_error="$WORK_ROOT/$stage_label.macro.generated.native.run.err"
+    write_macro_generated_function_bundle "$native_bundle" positive "" normal
+    run_capture "$executable" "$native_bundle" "$native_first" "$native_first_error"
+    require_successful_output "$stage_label native generated function" "$native_first" "$native_first_error"
+    run_capture "$executable" "$native_bundle" "$native_second" "$native_second_error"
+    require_successful_output "$stage_label repeated native generated function" "$native_second" "$native_second_error"
+    /usr/bin/cmp -s "$native_first" "$native_second" || fail "$stage_label native generated function LLVM was not deterministic"
+    /bin/mkdir -p "$stage_directory"
+    /bin/cp "$native_first" "$native_llvm"
+    validate_llvm "$native_llvm"
+    link_llvm "$native_llvm" "$native_executable"
+    if "$native_executable" > "$native_run_output" 2> "$native_run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label native generated function exited $RUN_STATUS"
+    [[ ! -s "$native_run_output" && ! -s "$native_run_error" ]] || fail "$stage_label native generated function wrote output"
+
+    local bare_bundle="$WORK_ROOT/$stage_label.macro.generated.bare.range"
+    local bare_output="$WORK_ROOT/$stage_label.macro.generated.bare.out"
+    local bare_error="$WORK_ROOT/$stage_label.macro.generated.bare.err"
+    write_macro_generated_function_bundle "$bare_bundle" bare "" normal
+    run_capture "$executable" "$bare_bundle" "$bare_output" "$bare_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label bare generated member call exited $RUN_STATUS"
+    [[ ! -s "$bare_error" ]] || fail "$stage_label bare generated member call wrote stderr"
+    if /usr/bin/grep -Fq 'define ' "$bare_output" || /usr/bin/grep -Fq 'call ' "$bare_output"; then
+        fail "$stage_label bare generated member call emitted LLVM before rejection"
+    fi
+
+    local collision_bundle="$WORK_ROOT/$stage_label.macro.generated.collision.range"
+    local collision_output="$WORK_ROOT/$stage_label.macro.generated.collision.out"
+    local collision_error="$WORK_ROOT/$stage_label.macro.generated.collision.err"
+    write_macro_generated_function_bundle "$collision_bundle" collision "" normal
+    run_capture "$executable" "$collision_bundle" "$collision_output" "$collision_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label generated/authored collision exited $RUN_STATUS"
+    [[ ! -s "$collision_error" ]] || fail "$stage_label generated/authored collision wrote stderr"
+    /usr/bin/grep -Fq 'diagnosticKind=generatedFunctionCollision' "$collision_output" || fail "$stage_label generated/authored collision missed focused diagnostic"
+    if /usr/bin/grep -Fq 'define ' "$collision_output" || /usr/bin/grep -Fq 'call ' "$collision_output"; then
+        fail "$stage_label generated/authored collision emitted LLVM before rejection"
+    fi
+
+    local outside_bundle="$WORK_ROOT/$stage_label.macro.generated.outside.range"
+    local outside_output="$WORK_ROOT/$stage_label.macro.generated.outside.out"
+    local outside_error="$WORK_ROOT/$stage_label.macro.generated.outside.err"
+    write_macro_expand_outside_bundle "$outside_bundle"
+    run_capture "$executable" "$outside_bundle" "$outside_output" "$outside_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label outside-macro @expand exited $RUN_STATUS"
+    [[ ! -s "$outside_error" ]] || fail "$stage_label outside-macro @expand wrote stderr"
+    if /usr/bin/grep -Fq 'define ' "$outside_output" || /usr/bin/grep -Fq 'call ' "$outside_output"; then
+        fail "$stage_label outside-macro @expand emitted LLVM before rejection"
+    fi
+    echo "$stage_label native generated function emission: pass (typed @expand member, ordinary call, deterministic identities, collision transactionality, outside-macro rejection)"
 }
 
 audit_macro_execution() {
@@ -1472,6 +1655,7 @@ audit_stage() {
     audit_macro_linking "$stage_label" "$executable"
     audit_macro_execution "$stage_label" "$executable"
     audit_macro_native_integration "$stage_label" "$executable" "$stage_directory"
+    audit_macro_generated_function "$stage_label" "$executable" "$stage_directory"
     audit_macro_expansion_commit "$stage_label" "$executable" "$stage_directory"
     audit_smoke "$stage_label" "$executable" "$stage_directory"
     audit_mixed_abi "$stage_label" "$executable"
@@ -1485,6 +1669,16 @@ report_artifact() {
     printf '%s_bytes=%s\n' "$label" "$(bytes "$path")"
 }
 
+audit_no_temporary_debug_probes() {
+    local source="$REPO_ROOT/RangeCompiler/Range/Programs/Compiler/CompilerCore.range"
+    local marker
+    for marker in debugMacro debugIndexState compilerBodyArenaDebug expansionFailureMarker 5101 5102 5103; do
+        if rg -n -F "$marker" "$source" >/dev/null; then
+            fail "temporary compiler debug probe remains: $marker"
+        fi
+    done
+}
+
 main() {
     [[ "$#" -le 1 ]] || { usage; exit 64; }
     local compiler_input="${1:-$DEFAULT_COMPILER_DIR}"
@@ -1493,6 +1687,7 @@ main() {
     compiler_directory="$(cd "$compiler_input" && pwd)"
 
     verify_manifest
+    audit_no_temporary_debug_probes
 
     WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compiler-candidate.XXXXXX")"
     trap '/bin/rm -rf "$WORK_ROOT"' EXIT
@@ -1611,7 +1806,7 @@ main() {
     echo "Stage 2/Stage 3 committed macro expansion: byte-identical LLVM/executable"
 
     local macro_snapshot_suffix
-    for macro_snapshot_suffix in positive.first.out positive.reordered.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out execution-positive.out execution-positive.repeat.out execution-query.out execution-query.repeat.out execution-query-reordered.out execution-query-zero.out execution-member-present.out execution-member-present.repeat.out execution-member-present-reordered.out execution-member-missing.out execution-member-missing.repeat.out execution-member-path.out execution-member-path.repeat.out execution-member-invalid.out execution-member-invalid.repeat.out execution-member-invalid-type.out execution-member-invalid-type.repeat.out execution-member-nonconstruct.out execution-member-nonconstruct.repeat.out execution-member-native.first.ll execution-member-native.repeat.ll execution-member-missing-native.out execution-expansion.out execution-expansion.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-query-invalid.out execution-expansion-duplicate.out execution-target-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
+    for macro_snapshot_suffix in positive.first.out positive.reordered.out generated.snapshot.out generated.snapshot.repeat.out generated.reordered.out generated.native.first.ll generated.native.repeat.ll generated.bare.out generated.collision.out generated.outside.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out execution-positive.out execution-positive.repeat.out execution-query.out execution-query.repeat.out execution-query-reordered.out execution-query-zero.out execution-member-present.out execution-member-present.repeat.out execution-member-present-reordered.out execution-member-missing.out execution-member-missing.repeat.out execution-member-path.out execution-member-path.repeat.out execution-member-invalid.out execution-member-invalid.repeat.out execution-member-invalid-type.out execution-member-invalid-type.repeat.out execution-member-nonconstruct.out execution-member-nonconstruct.repeat.out execution-member-native.first.ll execution-member-native.repeat.ll execution-member-missing-native.out execution-expansion.out execution-expansion.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-query-invalid.out execution-expansion-duplicate.out execution-target-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
         /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.$macro_snapshot_suffix" "$WORK_ROOT/Stage3.macro.$macro_snapshot_suffix" \
             || fail "Stage 2 and Stage 3 macro snapshot differs: $macro_snapshot_suffix"
     done
