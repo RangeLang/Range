@@ -723,8 +723,7 @@ public struct SwiftBootstrapCompiler {
             .appendingPathComponent("Runtime", isDirectory: true)
         return [
             runtimeRoot.appendingPathComponent("RangeCompilerMetrics.c"),
-            runtimeRoot.appendingPathComponent("RangeTextBuffer.c"),
-            runtimeRoot.appendingPathComponent("RangeIntBuffer.c"),
+            runtimeRoot.appendingPathComponent("RangeRawBuffer.c"),
             runtimeRoot.appendingPathComponent("RangeString.c"),
         ]
     }

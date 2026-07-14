@@ -49,6 +49,7 @@ verify_manifest() {
     [[ "$(manifest_value formatVersion)" == "1" ]] || fail "unsupported seed manifest format"
     [[ "$(manifest_value target.platform)" == "macOS" ]] || fail "unsupported seed target platform"
     [[ "$(manifest_value target.pointerBits)" == "64" ]] || fail "unsupported seed pointer width"
+    [[ "$(manifest_value runtimeABI)" == "2" ]] || fail "unsupported native runtime ABI"
     [[ "$(uname -m)" == "$(manifest_value target.architecture)" ]] || fail "seed target architecture mismatch"
 
     local seed_relative seed_expected seed_path seed_actual seed_bytes expected_bytes
@@ -67,21 +68,28 @@ verify_manifest() {
     expected_clang="$(manifest_value producer.clang)"
     [[ "$clang_identity" == "$expected_clang"* ]] || fail "seed verifier clang mismatch: $clang_identity"
 
-    local index
-    for index in 0 1 2 3 4; do
+    local index compiler_count runtime_count
+    compiler_count="$(manifest_value compilerSources)"
+    for ((index = 0; index < compiler_count; index += 1)); do
+        verify_manifest_file "compilerSources.$index" "compiler input $index"
+    done
+    runtime_count="$(manifest_value runtimeSources)"
+    for ((index = 0; index < runtime_count; index += 1)); do
         verify_manifest_file "runtimeSources.$index" "runtime input $index"
     done
 }
 
 runtime_inputs() {
-    local index
-    for index in 0 1 2 3 4; do
+    local index runtime_count
+    runtime_count="$(manifest_value runtimeSources)"
+    for ((index = 0; index < runtime_count; index += 1)); do
         /usr/bin/printf '%s\n' "$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")"
     done
 }
 
 SOURCE_FILES=()
 SOURCE_RELATIVE_PATHS=()
+SOURCE_ROLES=()
 
 discover_sources() {
     local directory="$1"
@@ -94,6 +102,12 @@ discover_sources() {
     directory="$(cd "$directory" && pwd)"
     SOURCE_FILES=()
     SOURCE_RELATIVE_PATHS=()
+    SOURCE_ROLES=()
+
+    [[ -f "$CORE_SOURCE_PATH" ]] || fail "missing compiler Core source: $CORE_SOURCE_PATH"
+    SOURCE_FILES+=("$CORE_SOURCE_PATH")
+    SOURCE_RELATIVE_PATHS+=("${CORE_SOURCE_PATH#"$REPO_ROOT/"}")
+    SOURCE_ROLES+=("core")
 
     /usr/bin/find "$directory" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print0 > "$raw_list"
     : > "$sorted_list"
@@ -109,6 +123,7 @@ discover_sources() {
         [[ -n "$absolute" ]] || continue
         SOURCE_FILES+=("$absolute")
         SOURCE_RELATIVE_PATHS+=("${absolute#"$directory/"}")
+        SOURCE_ROLES+=("project")
     done < <(LC_ALL=C /usr/bin/sort "$sorted_list")
 
     [[ "${#SOURCE_FILES[@]}" -gt 0 ]] || fail "no .range source files found in: $directory"
@@ -121,7 +136,7 @@ write_source_bundle() {
     /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$output"
     for index in "${!SOURCE_FILES[@]}"; do
         source="${SOURCE_FILES[$index]}"
-        /usr/bin/printf 'compilerSourceFile\\t%s\n' "${SOURCE_RELATIVE_PATHS[$index]}" >> "$output"
+        /usr/bin/printf 'compilerSourceFile\\trole=%s\\tpath=%s\n' "${SOURCE_ROLES[$index]}" "${SOURCE_RELATIVE_PATHS[$index]}" >> "$output"
         /bin/cat "$source" >> "$output"
         if [[ -n "$(/usr/bin/tail -c 1 "$source")" ]]; then
             /usr/bin/printf '\n' >> "$output"
@@ -135,7 +150,7 @@ write_inventory_bundle() {
 
     /usr/bin/printf '%s\n' 'compilerSourceInventory' > "$output"
     for index in "${!SOURCE_FILES[@]}"; do
-        /usr/bin/printf 'compilerSourceFile\\t%s\n' "${SOURCE_RELATIVE_PATHS[$index]}" >> "$output"
+        /usr/bin/printf 'compilerSourceFile\\trole=%s\\tpath=%s\n' "${SOURCE_ROLES[$index]}" "${SOURCE_RELATIVE_PATHS[$index]}" >> "$output"
     done
 }
 
@@ -145,12 +160,11 @@ write_expected_inventory() {
 
     /usr/bin/printf 'sourceInventory\\tprogram\\n' > "$output"
     for index in "${!SOURCE_FILES[@]}"; do
-        /usr/bin/printf 'sourceFile\\tindex=%s\\trole=project\\tpath=%s\\n' "$index" "${SOURCE_RELATIVE_PATHS[$index]}" >> "$output"
+        /usr/bin/printf 'sourceFile\\tindex=%s\\trole=%s\\tpath=%s\\n' "$index" "${SOURCE_ROLES[$index]}" "${SOURCE_RELATIVE_PATHS[$index]}" >> "$output"
     done
     /usr/bin/printf 'sourceFileCount\\t%s\\n' "${#SOURCE_FILES[@]}" >> "$output"
     /usr/bin/printf '\n' >> "$output"
 }
-
 run_capture() {
     local executable="$1"
     local input="$2"
@@ -370,7 +384,7 @@ write_core_bundle() {
     else
         /usr/bin/printf '%s' '' > "$output"
     fi
-    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=RangeCompiler/Range/Core/System/Memory/IntBuffer.range' >> "$output"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=RangeCompiler/Range/Core/System/Memory/RawBuffer.range' >> "$output"
     /bin/cat "$CORE_SOURCE_PATH" >> "$output"
     if [[ -n "$(/usr/bin/tail -c 1 "$CORE_SOURCE_PATH")" ]]; then
         /usr/bin/printf '\n' >> "$output"
@@ -379,8 +393,8 @@ write_core_bundle() {
         'compilerSourceFile\trole=project\tpath=CoreUse.range' \
         'function MainTextDecoy(): Int { return stringLength(value: " @main ") }' \
         '@main {' \
-        '    let buffer: IntBuffer(intBufferCreate(capacity: 0))' \
-        '    return intBufferDestroy(buffer: buffer) + 7' \
+        '    let buffer: RawBuffer(rawBufferCreate(capacity: 0, stride: 4))' \
+        '    return rawBufferDestroy(buffer: buffer) + 7' \
         '}' >> "$output"
 }
 
@@ -480,7 +494,7 @@ audit_canonical_core() {
     write_core_bundle "$identity_bundle" compilerSourceIdentity
     run_capture "$executable" "$identity_bundle" "$identity_output" "$identity_error"
     require_successful_output "$stage_label canonical Core identity" "$identity_output" "$identity_error"
-    /usr/bin/grep -Fq $'sourceFile\tid=0\trole=core\tpath=RangeCompiler/Range/Core/System/Memory/IntBuffer.range' "$identity_output" \
+    /usr/bin/grep -Fq $'sourceFile\tid=0\trole=core\tpath=RangeCompiler/Range/Core/System/Memory/RawBuffer.range' "$identity_output" \
         || fail "$stage_label canonical Core was not stored as role=core"
     /usr/bin/grep -Fq $'sourceFile\tid=1\trole=project\tpath=CoreUse.range' "$identity_output" \
         || fail "$stage_label canonical Core project file was not stored as role=project"
@@ -489,10 +503,10 @@ audit_canonical_core() {
     emit_candidate_llvm "$executable" "$core_bundle" "$core_output" "$stage_label.canonical-core"
     for marker in \
         'define i32 @main() {' \
-        'declare ptr @intBufferCreate(i32)' \
-        'declare i32 @intBufferDestroy(ptr)' \
-        'call ptr @intBufferCreate(i32 0)' \
-        'call i32 @intBufferDestroy(ptr'; do
+        'declare ptr @rawBufferCreate(i32, i32)' \
+        'declare i32 @rawBufferDestroy(ptr)' \
+        'call ptr @rawBufferCreate(i32 0, i32 4)' \
+        'call i32 @rawBufferDestroy(ptr'; do
         /usr/bin/grep -Fq "$marker" "$core_output" || fail "$stage_label canonical Core LLVM missing: $marker"
     done
     validate_llvm "$core_output"
@@ -504,7 +518,7 @@ audit_canonical_core() {
     fi
     [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label canonical Core executable exited $RUN_STATUS"
     [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label canonical Core executable wrote output"
-    echo "$stage_label canonical Core: pass (ordinary @main token scan ignores decoy string, actual IntBuffer.range role=core, validate/link, exit 7)"
+    echo "$stage_label canonical Core: pass (ordinary @main token scan ignores decoy string, actual RawBuffer.range role=core, validate/link, exit 7)"
 }
 
 write_macro_positive_bundle() {
@@ -1986,6 +2000,22 @@ audit_no_temporary_debug_probes() {
     done
 }
 
+audit_raw_buffer_substrate() {
+    local raw="$REPO_ROOT/RangeCompiler/Runtime/RangeRawBuffer.c"
+    [[ -f "$raw" ]] || fail "missing shared RawBuffer runtime substrate"
+    rg -n -F 'typedef struct RangeRawBuffer' "$raw" >/dev/null \
+        || fail "RawBuffer runtime does not own its storage record"
+    rg -n -F 'realloc(' "$raw" >/dev/null \
+        || fail "RawBuffer runtime does not own growth"
+    for symbol in rawBufferCreate rawBufferAppendInt rawBufferCount rawBufferLoadInt rawBufferStoreInt rawBufferAppendText rawBufferAppendTextInt rawBufferAppendTextCharacter rawBufferMaterializeText rawBufferDestroy; do
+        rg -n -F "$symbol" "$raw" >/dev/null || fail "RawBuffer runtime is missing $symbol"
+    done
+    for typed in RangeIntBuffer.c RangeTextBuffer.c; do
+        [[ ! -e "$REPO_ROOT/RangeCompiler/Runtime/$typed" ]] \
+            || fail "$typed remains after the RawBuffer cutover"
+    done
+}
+
 main() {
     [[ "$#" -le 1 ]] || { usage; exit 64; }
     local compiler_input="${1:-$DEFAULT_COMPILER_DIR}"
@@ -1995,10 +2025,11 @@ main() {
 
     verify_manifest
     audit_no_temporary_debug_probes
+    audit_raw_buffer_substrate
 
     WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compiler-candidate.XXXXXX")"
     trap '/bin/rm -rf "$WORK_ROOT"' EXIT
-    CORE_SOURCE_PATH="$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/IntBuffer.range"
+    CORE_SOURCE_PATH="$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/RawBuffer.range"
     [[ -f "$CORE_SOURCE_PATH" ]] || fail "missing canonical Core proof input: $CORE_SOURCE_PATH"
 
     RUNTIME_INPUTS=()

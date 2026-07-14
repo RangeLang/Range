@@ -16,22 +16,6 @@ public struct LLVMEmissionError: LocalizedError {
 public struct LLVMModuleEmitter {
     public init() {}
 
-    private static let textBufferRuntimeFunctionNames: Set<String> = [
-        "textBufferCreate",
-        "textBufferAppend",
-        "textBufferAppendInt",
-        "textBufferAppendCharacter",
-        "textBufferMaterialize",
-        "textBufferDestroy",
-    ]
-    private static let intBufferRuntimeFunctionNames: Set<String> = [
-        "intBufferCreate",
-        "intBufferAppend",
-        "intBufferCount",
-        "intBufferElement",
-        "intBufferSet",
-        "intBufferDestroy",
-    ]
     private static let stringRuntimeFunctionNames: Set<String> = [
         "stringTransientRegionMark",
         "stringTransientRegionReset",
@@ -51,9 +35,7 @@ public struct LLVMModuleEmitter {
         "compilerMetricsFunctionEnd",
         "compilerMetricsReport",
     ]
-    private static let coreRuntimeFunctionNames = textBufferRuntimeFunctionNames
-        .union(intBufferRuntimeFunctionNames)
-        .union(stringRuntimeFunctionNames)
+    private static let coreRuntimeFunctionNames = stringRuntimeFunctionNames
         .union(compilerMetricsRuntimeFunctionNames)
 
     public func emit(program: CompiledProgram) throws -> String {
@@ -1638,10 +1620,6 @@ public struct LLVMModuleEmitter {
             return LLVMType(ir: "i1", array: nil, nominalName: nil)
         case "String":
             return LLVMType(ir: "ptr", array: nil, nominalName: nil)
-        case "TextBuffer":
-            return LLVMType(ir: "ptr", array: nil, nominalName: "TextBuffer")
-        case "IntBuffer":
-            return LLVMType(ir: "ptr", array: nil, nominalName: "IntBuffer")
         case "Void":
             return LLVMType(ir: "void", array: nil, nominalName: nil)
         default:
@@ -1799,8 +1777,6 @@ public struct LLVMModuleEmitter {
         private(set) var usesRead = false
         private(set) var usesCommandLineArguments = false
         private(set) var usesStrstr = false
-        private(set) var usesTextBuffer = false
-        private(set) var usesIntBuffer = false
         private(set) var usesStringRuntime = false
         private(set) var usesCompilerMetrics = false
 
@@ -1878,14 +1854,6 @@ public struct LLVMModuleEmitter {
 
         func markUsesStrstr() {
             usesStrstr = true
-        }
-
-        func markUsesTextBuffer() {
-            usesTextBuffer = true
-        }
-
-        func markUsesIntBuffer() {
-            usesIntBuffer = true
         }
 
         func markUsesStringRuntime() {
@@ -1978,22 +1946,6 @@ public struct LLVMModuleEmitter {
             if usesCommandLineArguments {
                 lines.append("declare ptr @_NSGetArgc()")
                 lines.append("declare ptr @_NSGetArgv()")
-            }
-            if usesTextBuffer {
-                lines.append("declare ptr @textBufferCreate(i32)")
-                lines.append("declare i32 @textBufferAppend(ptr, ptr)")
-                lines.append("declare i32 @textBufferAppendInt(ptr, i32)")
-                lines.append("declare i32 @textBufferAppendCharacter(ptr, ptr, i32)")
-                lines.append("declare ptr @textBufferMaterialize(ptr)")
-                lines.append("declare i32 @textBufferDestroy(ptr)")
-            }
-            if usesIntBuffer {
-                lines.append("declare ptr @intBufferCreate(i32)")
-                lines.append("declare i32 @intBufferAppend(ptr, i32)")
-                lines.append("declare i32 @intBufferCount(ptr)")
-                lines.append("declare i32 @intBufferElement(ptr, i32)")
-                lines.append("declare i32 @intBufferSet(ptr, i32, i32)")
-                lines.append("declare i32 @intBufferDestroy(ptr)")
             }
             if usesStringRuntime {
                 lines.append("declare ptr @stringTransientAllocate(i64)")
@@ -3989,10 +3941,6 @@ public struct LLVMModuleEmitter {
                 return LLVMType(ir: "i1", array: nil)
             case "String":
                 return LLVMType(ir: "ptr", array: nil)
-            case "TextBuffer":
-                return LLVMType(ir: "ptr", array: nil, nominalName: "TextBuffer")
-            case "IntBuffer":
-                return LLVMType(ir: "ptr", array: nil, nominalName: "IntBuffer")
             case "Void":
                 return LLVMType(ir: "void", array: nil)
             default:
@@ -5644,12 +5592,6 @@ public struct LLVMModuleEmitter {
             let resolvedName = substitutedCallName(name)
             guard let signature = signatures[resolvedName] else {
                 throw LLVMEmissionError("Unknown LLVM function '\(resolvedName)'.")
-            }
-            if LLVMModuleEmitter.textBufferRuntimeFunctionNames.contains(resolvedName) {
-                runtime.markUsesTextBuffer()
-            }
-            if LLVMModuleEmitter.intBufferRuntimeFunctionNames.contains(resolvedName) {
-                runtime.markUsesIntBuffer()
             }
             if LLVMModuleEmitter.stringRuntimeFunctionNames.contains(resolvedName) {
                 runtime.markUsesStringRuntime()

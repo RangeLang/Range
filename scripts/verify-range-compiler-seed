@@ -42,10 +42,12 @@ if [[ "$(uname -m)" != "$(manifest_value target.architecture)" ]]; then
 fi
 
 verify_file seed
-for index in 0 1 2 3; do
+compiler_source_count="$(manifest_value compilerSources)"
+for ((index = 0; index < compiler_source_count; index += 1)); do
     verify_file "compilerSources.$index"
 done
-for index in 0 1 2 3 4; do
+runtime_source_count="$(manifest_value runtimeSources)"
+for ((index = 0; index < runtime_source_count; index += 1)); do
     verify_file "runtimeSources.$index"
 done
 
@@ -73,17 +75,20 @@ bundle="$build_root/RangeCompilerSourceSet.range"
 stage3="$build_root/RangeCompilerStage3.ll"
 
 runtime_inputs=()
-for index in 0 1 2 3 4; do
+for ((index = 0; index < runtime_source_count; index += 1)); do
     runtime_inputs+=("$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")")
 done
 
 clang -Wno-override-module -x ir "$seed" -x c "${runtime_inputs[@]}" -o "$seed_executable"
 
 /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$bundle"
-for index in 0 1 2 3; do
+for ((index = 0; index < compiler_source_count; index += 1)); do
     source_relative="$(manifest_value "compilerSources.$index.path")"
+    source_role="$(manifest_value "compilerSources.$index.role")"
     source_path="$REPO_ROOT/$source_relative"
-    /usr/bin/printf 'compilerSourceFile\\t%s\n' "$(basename "$source_path")" >> "$bundle"
+    source_marker_path="$(basename "$source_path")"
+    if [[ "$source_role" == "core" ]]; then source_marker_path="$source_relative"; fi
+    /usr/bin/printf 'compilerSourceFile\\trole=%s\\tpath=%s\n' "$source_role" "$source_marker_path" >> "$bundle"
     /bin/cat "$source_path" >> "$bundle"
     if [[ -n "$(/usr/bin/tail -c 1 "$source_path")" ]]; then
         /usr/bin/printf '\n' >> "$bundle"

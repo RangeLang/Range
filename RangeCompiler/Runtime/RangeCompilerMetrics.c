@@ -16,12 +16,12 @@ typedef struct RangeCompilerFunctionMetrics {
     uint64_t stringSubstringCalls;
     uint64_t stringSubstringSourceBytes;
     uint64_t stringSubstringResultBytes;
-    uint64_t textBufferAppendCalls;
-    uint64_t textBufferAppendBytes;
-    uint64_t textBufferMaterializeCalls;
-    uint64_t textBufferMaterializeBytes;
-    uint64_t textBufferReallocations;
-    uint64_t textBufferReallocationBytes;
+    uint64_t rawBufferAppendCalls;
+    uint64_t rawBufferAppendBytes;
+    uint64_t rawBufferMaterializeCalls;
+    uint64_t rawBufferMaterializeBytes;
+    uint64_t rawBufferReallocations;
+    uint64_t rawBufferReallocationBytes;
 } RangeCompilerFunctionMetrics;
 
 typedef struct RangeCompilerMetrics {
@@ -35,12 +35,12 @@ typedef struct RangeCompilerMetrics {
     uint64_t constructFields;
     uint64_t constructNameBytes;
     uint64_t constructLookupProbes;
-    uint64_t textBufferAppendCalls;
-    uint64_t textBufferAppendBytes;
-    uint64_t textBufferMaterializeCalls;
-    uint64_t textBufferMaterializeBytes;
-    uint64_t textBufferReallocations;
-    uint64_t textBufferReallocationBytes;
+    uint64_t rawBufferAppendCalls;
+    uint64_t rawBufferAppendBytes;
+    uint64_t rawBufferMaterializeCalls;
+    uint64_t rawBufferMaterializeBytes;
+    uint64_t rawBufferReallocations;
+    uint64_t rawBufferReallocationBytes;
     RangeCompilerFunctionMetrics *functions;
     size_t functionCount;
     size_t functionCapacity;
@@ -98,12 +98,12 @@ int32_t compilerMetricsFunctionBegin(int32_t functionID, char *name) {
     metrics.baseline.stringSubstringCalls = metrics.stringSubstringCalls;
     metrics.baseline.stringSubstringSourceBytes = metrics.stringSubstringSourceBytes;
     metrics.baseline.stringSubstringResultBytes = metrics.stringSubstringResultBytes;
-    metrics.baseline.textBufferAppendCalls = metrics.textBufferAppendCalls;
-    metrics.baseline.textBufferAppendBytes = metrics.textBufferAppendBytes;
-    metrics.baseline.textBufferMaterializeCalls = metrics.textBufferMaterializeCalls;
-    metrics.baseline.textBufferMaterializeBytes = metrics.textBufferMaterializeBytes;
-    metrics.baseline.textBufferReallocations = metrics.textBufferReallocations;
-    metrics.baseline.textBufferReallocationBytes = metrics.textBufferReallocationBytes;
+    metrics.baseline.rawBufferAppendCalls = metrics.rawBufferAppendCalls;
+    metrics.baseline.rawBufferAppendBytes = metrics.rawBufferAppendBytes;
+    metrics.baseline.rawBufferMaterializeCalls = metrics.rawBufferMaterializeCalls;
+    metrics.baseline.rawBufferMaterializeBytes = metrics.rawBufferMaterializeBytes;
+    metrics.baseline.rawBufferReallocations = metrics.rawBufferReallocations;
+    metrics.baseline.rawBufferReallocationBytes = metrics.rawBufferReallocationBytes;
     return 0;
 }
 
@@ -117,12 +117,12 @@ int32_t compilerMetricsFunctionEnd(int32_t legacyParses, int32_t recordBytes) {
     function->stringSubstringCalls = delta(metrics.stringSubstringCalls, metrics.baseline.stringSubstringCalls);
     function->stringSubstringSourceBytes = delta(metrics.stringSubstringSourceBytes, metrics.baseline.stringSubstringSourceBytes);
     function->stringSubstringResultBytes = delta(metrics.stringSubstringResultBytes, metrics.baseline.stringSubstringResultBytes);
-    function->textBufferAppendCalls = delta(metrics.textBufferAppendCalls, metrics.baseline.textBufferAppendCalls);
-    function->textBufferAppendBytes = delta(metrics.textBufferAppendBytes, metrics.baseline.textBufferAppendBytes);
-    function->textBufferMaterializeCalls = delta(metrics.textBufferMaterializeCalls, metrics.baseline.textBufferMaterializeCalls);
-    function->textBufferMaterializeBytes = delta(metrics.textBufferMaterializeBytes, metrics.baseline.textBufferMaterializeBytes);
-    function->textBufferReallocations = delta(metrics.textBufferReallocations, metrics.baseline.textBufferReallocations);
-    function->textBufferReallocationBytes = delta(metrics.textBufferReallocationBytes, metrics.baseline.textBufferReallocationBytes);
+    function->rawBufferAppendCalls = delta(metrics.rawBufferAppendCalls, metrics.baseline.rawBufferAppendCalls);
+    function->rawBufferAppendBytes = delta(metrics.rawBufferAppendBytes, metrics.baseline.rawBufferAppendBytes);
+    function->rawBufferMaterializeCalls = delta(metrics.rawBufferMaterializeCalls, metrics.baseline.rawBufferMaterializeCalls);
+    function->rawBufferMaterializeBytes = delta(metrics.rawBufferMaterializeBytes, metrics.baseline.rawBufferMaterializeBytes);
+    function->rawBufferReallocations = delta(metrics.rawBufferReallocations, metrics.baseline.rawBufferReallocations);
+    function->rawBufferReallocationBytes = delta(metrics.rawBufferReallocationBytes, metrics.baseline.rawBufferReallocationBytes);
     metrics.activeFunction = NULL;
     return 0;
 }
@@ -156,22 +156,22 @@ void compilerMetricsObserveConstructLookupProbe(void) {
     if (metrics.enabled) metrics.constructLookupProbes += 1;
 }
 
-void compilerMetricsObserveTextBufferAppend(size_t bytes) {
+void compilerMetricsObserveRawBufferAppend(size_t bytes) {
     if (!metrics.enabled) return;
-    metrics.textBufferAppendCalls += 1;
-    metrics.textBufferAppendBytes += bytes;
+    metrics.rawBufferAppendCalls += 1;
+    metrics.rawBufferAppendBytes += bytes;
 }
 
-void compilerMetricsObserveTextBufferMaterialize(size_t bytes) {
+void compilerMetricsObserveRawBufferMaterialize(size_t bytes) {
     if (!metrics.enabled) return;
-    metrics.textBufferMaterializeCalls += 1;
-    metrics.textBufferMaterializeBytes += bytes;
+    metrics.rawBufferMaterializeCalls += 1;
+    metrics.rawBufferMaterializeBytes += bytes;
 }
 
-void compilerMetricsObserveTextBufferReallocation(size_t liveBytes) {
+void compilerMetricsObserveRawBufferReallocation(size_t liveBytes) {
     if (!metrics.enabled) return;
-    metrics.textBufferReallocations += 1;
-    metrics.textBufferReallocationBytes += liveBytes;
+    metrics.rawBufferReallocations += 1;
+    metrics.rawBufferReallocationBytes += liveBytes;
 }
 
 char *compilerMetricsReport(void) {
@@ -185,9 +185,9 @@ char *compilerMetricsReport(void) {
         "compilerCostMetrics\tenabled=%d\tstringConcatCalls=%llu\tstringConcatBytes=%llu"
         "\tstringSubstringCalls=%llu\tstringSubstringSourceBytes=%llu\tstringSubstringResultBytes=%llu"
         "\tconstructObjects=%llu\tconstructFields=%llu\tconstructNameBytes=%llu\tconstructGetProbes=%llu"
-        "\ttextBufferAppendCalls=%llu\ttextBufferAppendBytes=%llu"
-        "\ttextBufferMaterializeCalls=%llu\ttextBufferMaterializeBytes=%llu"
-        "\ttextBufferReallocations=%llu\ttextBufferReallocationBytes=%llu\n",
+        "\trawBufferAppendCalls=%llu\trawBufferAppendBytes=%llu"
+        "\trawBufferMaterializeCalls=%llu\trawBufferMaterializeBytes=%llu"
+        "\trawBufferReallocations=%llu\trawBufferReallocationBytes=%llu\n",
         metrics.enabled ? 1 : 0,
         (unsigned long long)metrics.stringConcatCalls, (unsigned long long)metrics.stringConcatBytes,
         (unsigned long long)metrics.stringSubstringCalls,
@@ -195,32 +195,32 @@ char *compilerMetricsReport(void) {
         (unsigned long long)metrics.stringSubstringResultBytes,
         (unsigned long long)metrics.constructObjects, (unsigned long long)metrics.constructFields,
         (unsigned long long)metrics.constructNameBytes, (unsigned long long)metrics.constructLookupProbes,
-        (unsigned long long)metrics.textBufferAppendCalls, (unsigned long long)metrics.textBufferAppendBytes,
-        (unsigned long long)metrics.textBufferMaterializeCalls,
-        (unsigned long long)metrics.textBufferMaterializeBytes,
-        (unsigned long long)metrics.textBufferReallocations,
-        (unsigned long long)metrics.textBufferReallocationBytes);
+        (unsigned long long)metrics.rawBufferAppendCalls, (unsigned long long)metrics.rawBufferAppendBytes,
+        (unsigned long long)metrics.rawBufferMaterializeCalls,
+        (unsigned long long)metrics.rawBufferMaterializeBytes,
+        (unsigned long long)metrics.rawBufferReallocations,
+        (unsigned long long)metrics.rawBufferReallocationBytes);
     for (size_t index = 0; index < metrics.functionCount && used < capacity; index += 1) {
         RangeCompilerFunctionMetrics *function = &metrics.functions[index];
         int written = snprintf(report + used, capacity - used,
             "compilerCostFunction\tfunctionID=%d\tname=%s\tlegacyParses=%llu\trecordBytes=%llu"
             "\tstringConcatCalls=%llu\tstringConcatBytes=%llu"
             "\tstringSubstringCalls=%llu\tstringSubstringSourceBytes=%llu\tstringSubstringResultBytes=%llu"
-            "\ttextBufferAppendCalls=%llu\ttextBufferAppendBytes=%llu"
-            "\ttextBufferMaterializeCalls=%llu\ttextBufferMaterializeBytes=%llu"
-            "\ttextBufferReallocations=%llu\ttextBufferReallocationBytes=%llu\n",
+            "\trawBufferAppendCalls=%llu\trawBufferAppendBytes=%llu"
+            "\trawBufferMaterializeCalls=%llu\trawBufferMaterializeBytes=%llu"
+            "\trawBufferReallocations=%llu\trawBufferReallocationBytes=%llu\n",
             function->functionID, function->name,
             (unsigned long long)function->legacyParses, (unsigned long long)function->recordBytes,
             (unsigned long long)function->stringConcatCalls, (unsigned long long)function->stringConcatBytes,
             (unsigned long long)function->stringSubstringCalls,
             (unsigned long long)function->stringSubstringSourceBytes,
             (unsigned long long)function->stringSubstringResultBytes,
-            (unsigned long long)function->textBufferAppendCalls,
-            (unsigned long long)function->textBufferAppendBytes,
-            (unsigned long long)function->textBufferMaterializeCalls,
-            (unsigned long long)function->textBufferMaterializeBytes,
-            (unsigned long long)function->textBufferReallocations,
-            (unsigned long long)function->textBufferReallocationBytes);
+            (unsigned long long)function->rawBufferAppendCalls,
+            (unsigned long long)function->rawBufferAppendBytes,
+            (unsigned long long)function->rawBufferMaterializeCalls,
+            (unsigned long long)function->rawBufferMaterializeBytes,
+            (unsigned long long)function->rawBufferReallocations,
+            (unsigned long long)function->rawBufferReallocationBytes);
         if (written < 0 || (size_t)written >= capacity - used) break;
         used += (size_t)written;
     }

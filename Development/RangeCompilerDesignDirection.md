@@ -1703,9 +1703,9 @@ records are finished; those remain subsequent deletion milestones.
 The Darwin compiler-host/runtime C previously embedded in
 `SwiftBootstrap.stage2RuntimeSupportSource()` now lives once in the checked-in
 `RangeCompiler/Runtime/RangeCompilerHost.c`.  Stage 2 linking consumes that
-file directly alongside `RangeString.c`, `RangeTextBuffer.c`, and
-`RangeIntBuffer.c`; Swift no longer materializes a generated `RangeRuntime.c`
-copy.  The source separates host/process and legacy dynamic-construct support
+file directly alongside `RangeString.c`, `RangeRawBuffer.c`,
+`RangeTextBuffer.c`, and `RangeIntBuffer.c`; Swift no longer materializes a
+generated `RangeRuntime.c` copy.  The source separates host/process and legacy dynamic-construct support
 from compiler policy, and it can be consumed unchanged by the forthcoming
 native seed driver.
 
@@ -2856,6 +2856,88 @@ byte-identical at SHA-256
 `3,758,231` bytes; their linked executables are byte-identical at SHA-256
 `4b77cd7719a3bc233b603cdb0dceb80436140fcd3aee7d74fb56246e9f973255` and
 `2,274,640` bytes.
+
+### Shared byte-storage substrate checkpoint
+
+`RangeCompiler/Runtime/RangeRawBuffer.c` is now the sole runtime owner of the
+buffer allocation record, byte count/capacity, geometric growth, byte append,
+and destruction. `RangeIntBuffer.c` and `RangeTextBuffer.c` are typed views over
+that storage. They retain only their distinct policy: Int element width and
+indexed access for the former; trailing-NUL maintenance, materialization, and
+text metrics for the latter. Their existing compiler-visible `intBuffer*` and
+`textBuffer*` symbols and the negative-capacity null-sentinel contract remain
+unchanged. The old duplicate typed allocation records and reserve/reallocation
+loops are gone.
+
+This checkpoint intentionally does not expose a second compiler-visible
+`RawBuffer` handle yet. A public Range wrapper belongs after opaque storage
+classification is derived from general builtin storage policy rather than the
+current IntBuffer-specific MemoryGraph proof. Generic `Array<Element>` can then
+provide its element layout/copy/destruction rules as a typed view without
+making RawBuffer understand Range types or introducing a parallel ownership
+model.
+
+Runtime provenance is no longer coupled to a five-source inventory: the native
+driver, seed verifier, and candidate gate iterate the manifest's actual runtime
+source count. The native seed executable cache is keyed by both the seed and
+the complete manifest, preventing runtime-only changes from reusing a stale
+linked compiler. A focused C regression proves RawBuffer growth and byte
+contents, Int append/count/index/set/destruction, Text growth/materialization,
+and both null sentinels; the existing text metrics regression remains exact.
+
+The accepted seed verification reproduced the checked-in LLVM exactly at
+SHA-256 `4fa86bd0120fff38a6e1722f8dd0498edac89427de31b79c63cb0c120a552766`
+and `3,984,520` bytes while linked to the shared substrate. The complete
+`/usr/bin/time -l scripts/check-range-compiler-candidate` gate passed in
+`202.80 s` real time (`193.43 s` user, `5.53 s` system) at `112,263,168` bytes
+maximum RSS with `swift_invocation=none`. Stage 2 and Stage 3 LLVM remain
+byte-identical to the seed; their linked executables are byte-identical at
+SHA-256 `1b9964e7496560a1615055b32cd1cd3d52957dcdff74b923bc7e9c374febccb2`
+and `2,492,912` bytes.
+
+### Declaration-driven RawBuffer ABI cutover checkpoint
+
+The typed-view checkpoint above is historical and has now been superseded.
+`IntBuffer`, `TextBuffer`, their Range declarations, their C files, their
+runtime builtin IDs, and their LLVM symbols have been removed atomically. The
+compiler now uses one compiler-visible `RawBuffer` storage identity and one C
+runtime owner. Allocation is explicit as
+`rawBufferCreate(capacity:stride:)`: integer tables use stride `4`, text
+builders use stride `1`, and count/capacity are logical elements rather than
+implicitly reinterpreted byte counts. The C boundary exposes only raw storage
+operations; future `Buffer<Element>` and `Array<Element>` policy remains
+Range-authored above it.
+
+`RangeCompiler/Range/Core/System/Memory/RawBuffer.range` is now part of the
+frozen compiler source set with `role=core`. It declares
+`@builtin(.storage)`, `.create`, `.read`, `.write`, and `.destroy` policies.
+Typed syntax preserves those policies; SemanticGraph derives parameter
+effects; MemoryGraph assigns storage and shared versus unique access; and the
+body compiler recognizes opaque storage from the declaration policy rather
+than a type-name list. Plain `@builtin` remains the general runtime/foreign
+marker and does not silently acquire storage ownership semantics.
+
+The seed manifest now records five compiler sources with explicit roles and
+runtime ABI version `2`. Seed verification iterates the manifest source count
+instead of assuming four project files. The native runtime inventory contains
+only `RangeCompilerHost.c`, `RangeString.c`, `RangeRawBuffer.c`, and
+`RangeCompilerMetrics.c`; metrics use RawBuffer terminology. The legacy Swift
+LLVM emitter's IntBuffer/TextBuffer special cases were deleted rather than
+porting the new model into a second compiler.
+
+The accepted RawBuffer fixed point has byte-identical Stage 2 and Stage 3 LLVM
+at SHA-256
+`60d9d01d0bda6eb104e355eeb3b365c1130eec548a3921f56f38cbbfe8502929`
+and `3,992,587` bytes. Their executables are byte-identical at SHA-256
+`14f1b9eeca50411ec9b597c642aaef550d40fb5129661ac2b712e5817ee2ee59`
+and `2,492,848` bytes. The five-file inventory, role checks, canonical Core
+execution, macro suites, aggregate smoke, mixed-ABI rejection, LLVM
+validation/linking, and focused Stage 2/Stage 3 artifacts passed with
+`swift_invocation=none`. The checked-in seed contains no IntBuffer/TextBuffer
+type or function symbols. The accepted full gate completed in `142.01 s` real
+time (`133.58 s` user, `4.20 s` system) with `184,991,744` bytes maximum RSS;
+the focused RawBuffer ownership/lowering suite completes in about `1.4 s` once
+the Swift test bundle is built.
 
 ### Explicit deferrals
 

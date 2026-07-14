@@ -2,32 +2,41 @@
   "formatVersion": 1,
   "seed": {
     "path": "RangeCompiler/Bootstrap/RangeCompilerSeed.ll",
-    "bytes": 3984520,
-    "sha256": "4fa86bd0120fff38a6e1722f8dd0498edac89427de31b79c63cb0c120a552766"
+    "bytes": 3992587,
+    "sha256": "60d9d01d0bda6eb104e355eeb3b365c1130eec548a3921f56f38cbbfe8502929"
   },
   "expectedStage3LLVM": {
-    "bytes": 3984520,
-    "sha256": "4fa86bd0120fff38a6e1722f8dd0498edac89427de31b79c63cb0c120a552766"
+    "bytes": 3992587,
+    "sha256": "60d9d01d0bda6eb104e355eeb3b365c1130eec548a3921f56f38cbbfe8502929"
   },
   "compilerSources": [
     {
+      "path": "RangeCompiler/Range/Core/System/Memory/RawBuffer.range",
+      "role": "core",
+      "sha256": "cd8af86b951d45fbba7f8f9c4a152ff5951b9078a21dca9a5e205b76131127fe"
+    },
+    {
       "path": "RangeCompiler/Range/Programs/Compiler/Compiler.range",
+      "role": "project",
       "sha256": "e58b153285b5575dc8c4aae1387116e14fdeee62a7c5d614ffa66bd1475c7dcb"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerCore.range",
-      "sha256": "ec92ab31822f4ca74e31153c1230fb9c54733f8285d57196bf75604f81c00c92"
+      "role": "project",
+      "sha256": "a7b39674b353adf4b587779f85830d01641fa38e7479f8b4a711c6dcd54be041"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Lexer.range",
+      "role": "project",
       "sha256": "6a0676e90250117d06a87739e948f7c81b846129411f5337e138bb93b2ccce9f"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Main.range",
+      "role": "project",
       "sha256": "80635cc417d917ba2993ac91fec87723bff3ff74c6841cbf79e470a8887715b1"
     }
   ],
-  "runtimeABI": 1,
+  "runtimeABI": 2,
   "runtimeSources": [
     {
       "path": "RangeCompiler/Runtime/RangeCompilerHost.c",
@@ -38,16 +47,12 @@
       "sha256": "e245e90ef6d97b7ed5070c612448e1eca7b9b383292fec2528d8dc889076b129"
     },
     {
-      "path": "RangeCompiler/Runtime/RangeTextBuffer.c",
-      "sha256": "cb59d4a3549d73c8346d92b842969ee959f8113acbab03cec447b0b26b93ab2d"
-    },
-    {
-      "path": "RangeCompiler/Runtime/RangeIntBuffer.c",
-      "sha256": "f217a4d24181575ab362999f6f0bc5e641e04ee0a55d190789a84ac096f0ff43"
+      "path": "RangeCompiler/Runtime/RangeRawBuffer.c",
+      "sha256": "f63e39fd8080a820069fa8c37b6d2e463a0515fce02cb7656732306d54c82f7a"
     },
     {
       "path": "RangeCompiler/Runtime/RangeCompilerMetrics.c",
-      "sha256": "2371a7f69c4f5d597425686cd83bba83851e04dd1bb8a2b6bb040237d1757307"
+      "sha256": "7e5202cbcae7e8c45da09ca8fff24b49efdd1606b4844c2a102123d25ef974c8"
     }
   ],
   "target": {

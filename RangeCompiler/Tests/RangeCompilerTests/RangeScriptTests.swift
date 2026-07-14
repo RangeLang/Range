@@ -110,28 +110,6 @@ struct RangeScriptTests {
         #expect(result.stderr.isEmpty)
     }
 
-    @Test("Bootstrap compiler check scans Range compiler sources")
-    func bootstrapCompilerCheckBuildsAndRunsRangeCompilerProgram() throws {
-        let result = try runRangeScript(arguments: ["check-bootstrap-compiler"], timeout: 120)
-
-        #expect(result.timedOut == false)
-        #expect(result.exitCode == 0)
-        #expect(result.stdout.contains("Bootstrap compiler check succeeded:"))
-        #expect(result.stdout.contains("/Programs/Compiler/.range/Build/llvm/Compiler"))
-        #expect(result.stderr.isEmpty)
-    }
-
-    @Test("Stage 1 compiler check inventories parses validates and lowers Range compiler source set")
-    func stage1CompilerCheckInventoriesParsesValidatesAndLowersRangeCompilerSourceSet() throws {
-        let result = try runRangeScript(arguments: ["check-stage1-compiler"], timeout: 180)
-
-        #expect(result.timedOut == false)
-        #expect(result.exitCode == 0)
-        #expect(result.stdout.contains("Stage 1 compiler source-set check succeeded:"))
-        #expect(result.stdout.contains("/Programs/Compiler/.range/Build/llvm/Compiler"))
-        #expect(result.stderr.isEmpty)
-    }
-
     @Test("Ordinary reachability discovery uses typed body edges only")
     func ordinaryReachabilityDiscoveryUsesTypedBodyEdgesOnly() throws {
         let root = try repositoryRoot()
@@ -152,105 +130,28 @@ struct RangeScriptTests {
         #expect(!discovery.contains("parseCompilerExpression"))
     }
 
-    @Test("Stage 2 compiler check emits candidate LLVM from Stage 1")
-    func stage2CompilerCheckEmitsCandidateLLVMFromStage1() throws {
-        let result = try runRangeScript(arguments: ["check-stage2-compiler"], timeout: 720)
+    @Test("Stage 2 compiler check verifies the checked-in native fixed point")
+    func stage2CompilerCheckVerifiesCheckedInNativeFixedPoint() throws {
+        let result = try runRangeScript(arguments: ["check-stage2-compiler"], timeout: 180)
 
         #expect(result.timedOut == false)
         #expect(result.exitCode == 0)
-        #expect(result.stdout.contains("Stage 2 compiler candidate LLVM emitted:"))
-        #expect(result.stdout.contains("/Programs/Compiler/.range/Build/stage2/RangeCompiler.ll"))
-        #expect(result.stdout.contains("Stage 2 compiler candidate linked:"))
-        #expect(result.stdout.contains("/Programs/Compiler/.range/Build/stage2/RangeCompiler"))
-        #expect(result.stdout.contains("Linked Stage 2 compiler inventory check succeeded:"))
-        #expect(result.stdout.contains("Linked Stage 2 compiler normal compile check succeeded:"))
-        #expect(result.stdout.contains("Stage 3 compiler candidate LLVM emitted:"))
-        #expect(result.stdout.contains("/Programs/Compiler/.range/Build/stage3/RangeCompiler.ll"))
-        #expect(result.stdout.contains("Stage 3 compiler candidate linked:"))
-        #expect(result.stdout.contains("/Programs/Compiler/.range/Build/stage3/RangeCompiler"))
-        #expect(result.stdout.contains("Linked Stage 2 compiler self-rebuild check succeeded:"))
         #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("Range compiler seed verified."))
 
-        let candidate = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/.range/Build/stage2/RangeCompiler.ll")
-        let executable = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/.range/Build/stage2/RangeCompiler")
-        let runtimeSupport = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/.range/Build/stage2/RangeRuntime.c")
-        let smokeLLVM = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/.range/Build/stage2/Smoke.ll")
-        let smokeExecutable = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/.range/Build/stage2/Smoke")
-        let stage3Candidate = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/.range/Build/stage3/RangeCompiler.ll")
-        let stage3Executable = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler/.range/Build/stage3/RangeCompiler")
-        #expect(FileManager.default.fileExists(atPath: executable.path))
-        #expect(FileManager.default.fileExists(atPath: runtimeSupport.path))
-        #expect(FileManager.default.fileExists(atPath: smokeExecutable.path))
-        #expect(FileManager.default.fileExists(atPath: stage3Candidate.path))
-        #expect(FileManager.default.fileExists(atPath: stage3Executable.path))
-        let llvmText = try String(contentsOf: candidate, encoding: .utf8)
-        #expect(llvmText.contains("define ptr @compileRangeNativeSource(ptr %source)"))
-        #expect(llvmText.contains("define ptr @compileRangeNativeSource(ptr %source) {\nentry:"))
-        #expect(llvmText.contains("define i32 @main()"))
-        #expect(llvmText.contains("call ptr @compileRangeNativeSource(ptr"))
-        #expect(llvmText.contains("define ptr @compilerSourceSetBodyFunctionNames()"))
-        #expect(llvmText.contains("define ptr @compilerSourceSetBodyFunctionNamesInventory()"))
-        #expect(llvmText.contains("define i1 @compilerSourceRequestsSourceSetBodyFunctionNames(ptr %source)"))
-        #expect(llvmText.contains("define ptr @compilerNativeSourceSetLLVMText(ptr %source)"))
-        #expect(llvmText.contains("call ptr @compilerSourceSetProgramForLLVM(ptr"))
-        #expect(llvmText.contains("define ptr @compilerSourceSetProgramForLLVM(ptr %source)"))
-        #expect(llvmText.contains("define ptr @parseCompilerProgramForLLVMNamedBodies(ptr %source, ptr %bodyFunctionNames)"))
-        #expect(llvmText.contains("define ptr @compilerCoreMainParsedBlock(ptr %program)"))
-        #expect(llvmText.contains("define ptr @compilerCoreParseStatements(ptr %program, ptr %block)"))
-        #expect(llvmText.contains("define ptr @parseCompilerStatementWithToken(ptr %program, ptr %cursor, ptr %maybeToken, i32 %bodyEnd)"))
-        #expect(llvmText.contains("define ptr @parseCompilerIdentifierStatementWithTarget(ptr %cursor, ptr %token"))
-        #expect(llvmText.contains("define ptr @parseCompilerAssignmentStatement(ptr %token"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerBlockWithLocals(ptr %context, ptr %parsedBlock"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerBlockWithControl(ptr %context, ptr %parsedBlock"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLoweredBlockRenderedBlocks(ptr %block)"))
-        #expect(llvmText.contains("call ptr @compilerCoreLLVMLoweredBlockRenderedBlocks(ptr"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectLinearRecordBlockWithRecord(ptr %context, ptr %parsedBlock"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectLinearRecordBlockWithIf(ptr %context, ptr %parsedBlock"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectIfStatementRecord(ptr %context, ptr %parsedBlock"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectIfStatementRecordWithElse(ptr %context"))
-        #expect(llvmText.contains("define ptr @compilerCoreRenderedDirectIfElseStatementRecord(ptr %context"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerDirectIfStatementRecordWithAfter(ptr %context"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerLinearStatementRecord(ptr %context, ptr %statementRecord"))
-        #expect(llvmText.contains("define ptr @compilerCoreLLVMLowerLinearStatementRecordReturn(ptr %context"))
-        #expect(llvmText.contains("define ptr @compilerCoreRenderedDirectReturnBlock(ptr %context, ptr %parsedBlock"))
-        #expect(llvmText.contains("define i1 @compilerCoreCanLowerLocalType(ptr %context, ptr %typeName)"))
-        #expect(llvmText.contains("define i32 @main() {\nentry:\n  %r0 = call i32 @commandLineArgumentCount()"))
-        #expect(llvmText.contains("br i1 %r1, label %if0, label %after0"))
-        #expect(llvmText.contains("after0:\n"))
-        #expect(llvmText.contains("call ptr @commandLineArgument(i32 0)"))
-        #expect(llvmText.contains("call ptr @readFile(ptr"))
-        #expect(llvmText.contains("call ptr @compileRangeNativeSource(ptr"))
-        #expect(!llvmText.contains("define ptr @compilerCoreMainParsedBlock(ptr %program) {\nentry:\n  ret ptr null"))
-        #expect(!llvmText.contains("define ptr @parseCompilerStatementWithToken(ptr %program, ptr %cursor, ptr %maybeToken, i32 %bodyEnd) {\nentry:\n  ret ptr null"))
-        #expect(!llvmText.contains("define ptr @compilerCoreLLVMLowerBlockWithControl(ptr %context, ptr %parsedBlock, ptr %initialLocalValues, i32 %initialTemporaryIndex, ptr %expectedReturnType, ptr %initialBlockLabel, ptr %fallthroughLabel, i32 %initialBranchIndex) {\nentry:\n  ret ptr null"))
-        #expect(!llvmText.contains("define ptr @compilerCoreLLVMLowerLinearStatementRecord(ptr %context, ptr %statementRecord, ptr %localValues, i32 %temporaryIndex, ptr %expectedReturnType) {\nentry:\n  ret ptr null"))
-        #expect(!llvmText.contains("define i32 @main() {\nentry:\n  ret i32 64\n}"))
-        #expect(!llvmText.contains("add i1 %"))
-        #expect(!llvmText.contains("stringEqual(ptr null"))
-        #expect(!llvmText.contains("@character"))
-        #expect(!llvmText.contains("@CompilerLLVMBasicBlock"))
-
-        let smokeLLVMText = try String(contentsOf: smokeLLVM, encoding: .utf8)
-        #expect(smokeLLVMText.contains("define i32 @main() {\nentry:"))
-        #expect(smokeLLVMText.contains("%storage0 = alloca"))
-        #expect(smokeLLVMText.contains("ret i32 %value"))
-        #expect(!smokeLLVMText.contains("\\n"))
-
-        let stage3LLVMText = try String(contentsOf: stage3Candidate, encoding: .utf8)
-        #expect(stage3LLVMText.contains("define ptr @compileRangeNativeSource(ptr %source)"))
-        #expect(stage3LLVMText.contains("define ptr @parseCompilerAssignmentStatement(ptr %token"))
-        #expect(stage3LLVMText.contains("define ptr @compilerCoreRenderedDirectIfElseStatementRecord(ptr %context"))
-        #expect(stage3LLVMText.contains("define i32 @main()"))
-        #expect(stage3LLVMText.contains("call ptr @compileRangeNativeSource(ptr"))
-        #expect(!stage3LLVMText.contains("stringEqual(ptr null"))
-        #expect(!stage3LLVMText.contains("add i1 %"))
+        let manifestURL = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler/Bootstrap/RangeCompilerSeed.json")
+        let manifestObject = try JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL))
+        guard let manifest = manifestObject as? [String: Any],
+            let seed = manifest["seed"] as? [String: Any],
+            let expectedSHA = seed["sha256"] as? String,
+            let expectedBytes = seed["bytes"] as? Int
+        else {
+            #expect(Bool(false))
+            return
+        }
+        #expect(result.stdout.contains("sha256=\(expectedSHA)"))
+        #expect(result.stdout.contains("bytes=\(expectedBytes)"))
     }
 
     @Test("Native compiler lexer matches Swift bootstrap lexer corpus")
@@ -1174,23 +1075,30 @@ struct RangeScriptTests {
         #expect(result.stdout.contains("ret i32 %r0"))
     }
 
-    @Test("Native compiler lowers the shared TextBuffer ABI")
-    func nativeCompilerLowersSharedTextBufferABI() throws {
+    @Test("Native compiler lowers RawBuffer text operations")
+    func nativeCompilerLowersRawBufferTextOperations() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
 
-        let source = directory.appendingPathComponent("CompilerTextBufferLLVM.range")
+        let root = try repositoryRoot()
+        let rawBufferSource = try String(
+            contentsOf: root.appendingPathComponent("RangeCompiler/Range/Core/System/Memory/RawBuffer.range"),
+            encoding: .utf8
+        )
+        let source = directory.appendingPathComponent("CompilerRawBufferLLVM.range")
         try """
         compilerLLVMText
 
+        \(rawBufferSource)
+
         function buildText(): String {
-            let buffer: TextBuffer(textBufferCreate(capacity: 2))
-            textBufferAppend(buffer: buffer, text: String("range"))
-            textBufferAppendInt(buffer: buffer, value: 56)
-            let text: String(textBufferMaterialize(buffer: buffer))
-            textBufferDestroy(buffer: buffer)
+            let buffer: RawBuffer(rawBufferCreate(capacity: 2, stride: 1))
+            rawBufferAppendText(buffer: buffer, text: String("range"))
+            rawBufferAppendTextInt(buffer: buffer, value: 56)
+            let text: String(rawBufferMaterializeText(buffer: buffer))
+            rawBufferDestroy(buffer: buffer)
             return text
         }
 
@@ -1202,46 +1110,48 @@ struct RangeScriptTests {
         }
         """.write(to: source, atomically: true, encoding: .utf8)
 
-        let compiler = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
-        let result = try runRangeScript(
-            arguments: ["run", compiler.path, "--", source.path],
-            timeout: 120
-        )
+        let result = try runNativeCompiler(source: source)
 
         #expect(result.timedOut == false)
         #expect(result.exitCode == 0)
         #expect(result.stderr.isEmpty)
-        #expect(result.stdout.contains("declare ptr @textBufferCreate(i32)"))
-        #expect(result.stdout.contains("declare i32 @textBufferAppend(ptr, ptr)"))
-        #expect(result.stdout.contains("declare i32 @textBufferAppendInt(ptr, i32)"))
-        #expect(result.stdout.contains("declare ptr @textBufferMaterialize(ptr)"))
-        #expect(result.stdout.contains("declare i32 @textBufferDestroy(ptr)"))
-        #expect(result.stdout.contains("call ptr @textBufferCreate(i32 2)"))
-        #expect(result.stdout.contains("call i32 @textBufferAppend(ptr"))
-        #expect(result.stdout.contains("call i32 @textBufferAppendInt(ptr"))
-        #expect(result.stdout.contains("call ptr @textBufferMaterialize(ptr"))
-        #expect(result.stdout.contains("call i32 @textBufferDestroy(ptr"))
+        #expect(result.stdout.contains("declare ptr @rawBufferCreate(i32, i32)"))
+        #expect(result.stdout.contains("declare i32 @rawBufferAppendText(ptr, ptr)"))
+        #expect(result.stdout.contains("declare i32 @rawBufferAppendTextInt(ptr, i32)"))
+        #expect(result.stdout.contains("declare ptr @rawBufferMaterializeText(ptr)"))
+        #expect(result.stdout.contains("declare i32 @rawBufferDestroy(ptr)"))
+        #expect(result.stdout.contains("call ptr @rawBufferCreate(i32 2, i32 1)"))
+        #expect(result.stdout.contains("call i32 @rawBufferAppendText(ptr"))
+        #expect(result.stdout.contains("call i32 @rawBufferAppendTextInt(ptr"))
+        #expect(result.stdout.contains("call ptr @rawBufferMaterializeText(ptr"))
+        #expect(result.stdout.contains("call i32 @rawBufferDestroy(ptr"))
     }
 
-    @Test("Native compiler lowers the shared IntBuffer ABI")
-    func nativeCompilerLowersSharedIntBufferABI() throws {
+    @Test("Native compiler lowers RawBuffer Int operations")
+    func nativeCompilerLowersRawBufferIntOperations() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
 
-        let source = directory.appendingPathComponent("CompilerIntBufferLLVM.range")
+        let root = try repositoryRoot()
+        let rawBufferSource = try String(
+            contentsOf: root.appendingPathComponent("RangeCompiler/Range/Core/System/Memory/RawBuffer.range"),
+            encoding: .utf8
+        )
+        let source = directory.appendingPathComponent("CompilerRawBufferLLVM.range")
         try """
         compilerLLVMText
 
+        \(rawBufferSource)
+
         function bufferedValue(): Int {
-            let buffer: IntBuffer(intBufferCreate(capacity: 1))
-            intBufferAppend(buffer: buffer, value: 7)
-            intBufferAppend(buffer: buffer, value: 11)
-            let count: Int(intBufferCount(buffer: buffer))
-            let value: Int(intBufferElement(buffer: buffer, index: 1))
-            intBufferDestroy(buffer: buffer)
+            let buffer: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+            rawBufferAppendInt(buffer: buffer, value: 7)
+            rawBufferAppendInt(buffer: buffer, value: 11)
+            let count: Int(rawBufferCount(buffer: buffer))
+            let value: Int(rawBufferLoadInt(buffer: buffer, index: 1))
+            rawBufferDestroy(buffer: buffer)
             return count + value
         }
 
@@ -1250,27 +1160,22 @@ struct RangeScriptTests {
         }
         """.write(to: source, atomically: true, encoding: .utf8)
 
-        let compiler = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
-        let result = try runRangeScript(
-            arguments: ["run", compiler.path, "--", source.path],
-            timeout: 120
-        )
+        let result = try runNativeCompiler(source: source)
 
         #expect(result.timedOut == false)
         #expect(result.exitCode == 0)
         #expect(result.stderr.isEmpty)
-        #expect(result.stdout.contains("declare ptr @intBufferCreate(i32)"))
-        #expect(result.stdout.contains("declare i32 @intBufferAppend(ptr, i32)"))
-        #expect(result.stdout.contains("declare i32 @intBufferCount(ptr)"))
-        #expect(result.stdout.contains("declare i32 @intBufferElement(ptr, i32)"))
-        #expect(result.stdout.contains("declare i32 @intBufferSet(ptr, i32, i32)"))
-        #expect(result.stdout.contains("declare i32 @intBufferDestroy(ptr)"))
-        #expect(result.stdout.contains("call ptr @intBufferCreate(i32 1)"))
-        #expect(result.stdout.contains("call i32 @intBufferAppend(ptr"))
-        #expect(result.stdout.contains("call i32 @intBufferCount(ptr"))
-        #expect(result.stdout.contains("call i32 @intBufferElement(ptr"))
-        #expect(result.stdout.contains("call i32 @intBufferDestroy(ptr"))
+        #expect(result.stdout.contains("declare ptr @rawBufferCreate(i32, i32)"))
+        #expect(result.stdout.contains("declare i32 @rawBufferAppendInt(ptr, i32)"))
+        #expect(result.stdout.contains("declare i32 @rawBufferCount(ptr)"))
+        #expect(result.stdout.contains("declare i32 @rawBufferLoadInt(ptr, i32)"))
+        #expect(result.stdout.contains("declare i32 @rawBufferStoreInt(ptr, i32, i32)"))
+        #expect(result.stdout.contains("declare i32 @rawBufferDestroy(ptr)"))
+        #expect(result.stdout.contains("call ptr @rawBufferCreate(i32 1, i32 4)"))
+        #expect(result.stdout.contains("call i32 @rawBufferAppendInt(ptr"))
+        #expect(result.stdout.contains("call i32 @rawBufferCount(ptr"))
+        #expect(result.stdout.contains("call i32 @rawBufferLoadInt(ptr"))
+        #expect(result.stdout.contains("call i32 @rawBufferDestroy(ptr"))
     }
 
     @Test("Native compiler lowers the shared String search ABI")
@@ -1942,12 +1847,12 @@ struct RangeScriptTests {
         let result = try runTypedSyntaxFixture(
             source: """
             compilerTypedSyntax
-            @builtin
-            construct IntBuffer {}
-            @builtin
-            function intBufferCreate(capacity: Int): IntBuffer
-            @builtin
-            function intBufferDestroy(buffer: IntBuffer): Int
+            @builtin(.storage)
+            construct RawBuffer {}
+            @builtin(.create)
+            function rawBufferCreate(capacity: Int, stride: Int): RawBuffer
+            @builtin(.destroy)
+            function rawBufferDestroy(buffer: RawBuffer): Int
             @main {
                 return 0
             }
@@ -1962,9 +1867,21 @@ struct RangeScriptTests {
         #expect(result.stderr.isEmpty)
         #expect(result.stdout.hasPrefix("typedSyntax\tvalid=true"))
         #expect(result.stdout.contains("declarationCount=3"))
-        #expect(result.stdout.components(separatedBy: "builtinABI=1").count == 4)
+        #expect(result.stdout.components(separatedBy: "builtinABI=2").count == 2)
+        #expect(result.stdout.components(separatedBy: "builtinABI=3").count == 2)
+        #expect(result.stdout.components(separatedBy: "builtinABI=6").count == 2)
         #expect(result.stdout.contains("functionCount=2"))
-        #expect(result.stdout.contains("bodyStart=111\tbodyEnd=111"))
+        let signatureOnlyFunctions = result.stdout.split(separator: "\n").filter {
+            $0.hasPrefix("function\t")
+        }
+        #expect(signatureOnlyFunctions.count == 2)
+        for function in signatureOnlyFunctions {
+            let columns = function.split(separator: "\t")
+            let bodyStart = columns.first { $0.hasPrefix("bodyStart=") }?.dropFirst(10)
+            let bodyEnd = columns.first { $0.hasPrefix("bodyEnd=") }?.dropFirst(8)
+            #expect(bodyStart != nil)
+            #expect(bodyStart == bodyEnd)
+        }
     }
 
     @Test("Legacy language marker does not grant builtin ABI provenance")
@@ -1995,86 +1912,86 @@ struct RangeScriptTests {
         #expect(result.stdout == "compilerError\tkind=invalidTypedSyntaxSnapshot\n\n")
     }
 
-    @Test("MemoryGraph owns and explicitly consumes an opaque IntBuffer handle")
-    func memoryGraphProvesOpaqueIntBufferOwnership() throws {
+    @Test("MemoryGraph owns and explicitly consumes an opaque RawBuffer handle")
+    func memoryGraphProvesOpaqueRawBufferOwnership() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let result = try runTypedSyntaxFixture(
-            source: opaqueIntBufferFixture(body: """
-                let buffer: IntBuffer(intBufferCreate(capacity: 4))
-                return intBufferDestroy(buffer: buffer)
+            source: opaqueRawBufferFixture(body: """
+                let buffer: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
+                return rawBufferDestroy(buffer: buffer)
             """),
-            name: "OpaqueIntBufferOwnership.range",
+            name: "OpaqueRawBufferOwnership.range",
             directory: directory
         )
         #expect(result.timedOut == false)
         #expect(result.exitCode == 0)
         #expect(result.stderr.isEmpty)
         #expect(result.stdout.hasPrefix("memoryGraph\tvalid=true\tlayoutCount=0\tstorageCount=1\tdecisionCount=5\n"))
-        #expect(result.stdout.contains("memoryStorage\trow=0\tvalues=0,11,0,6,1,0"))
-        #expect(result.stdout.contains("memoryDecision\trow=1\tvalues=3,8,0,0,1,11"))
-        #expect(result.stdout.contains("memoryDecision\trow=2\tvalues=5,11,0,0,0,11"))
-        #expect(result.stdout.contains("memoryDecision\trow=3\tvalues=7,13,0,0,1,11"))
+        #expect(result.stdout.contains("memoryStorage\trow=0\tvalues=0,14,0,7,1,0"))
+        #expect(result.stdout.contains("memoryDecision\trow=1\tvalues=3,9,0,0,1,14"))
+        #expect(result.stdout.contains("memoryDecision\trow=2\tvalues=5,14,0,0,0,14"))
+        #expect(result.stdout.contains("memoryDecision\trow=3\tvalues=7,16,0,0,1,14"))
     }
 
-    @Test("Typed IR cites opaque IntBuffer initialization and consume decisions")
-    func typedIRCarriesOpaqueIntBufferOwnership() throws {
+    @Test("Typed IR cites opaque RawBuffer initialization and consume decisions")
+    func typedIRCarriesOpaqueRawBufferOwnership() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let source = opaqueIntBufferFixture(body: """
-            let buffer: IntBuffer(intBufferCreate(capacity: 4))
-            return intBufferDestroy(buffer: buffer)
+        let source = opaqueRawBufferFixture(body: """
+            let buffer: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
+            return rawBufferDestroy(buffer: buffer)
         """).replacingOccurrences(of: "compilerMemoryGraph", with: "compilerTypedIR")
-        let result = try runTypedSyntaxFixture(source: source, name: "OpaqueIntBufferTypedIR.range", directory: directory)
+        let result = try runTypedSyntaxFixture(source: source, name: "OpaqueRawBufferTypedIR.range", directory: directory)
         #expect(result.timedOut == false)
         #expect(result.exitCode == 0)
         #expect(result.stderr.isEmpty)
         #expect(result.stdout.hasPrefix("typedIR\tvalid=true\tfunctionCount=1"))
-        #expect(result.stdout.contains("operationCount=7"))
-        #expect(result.stdout.contains("typedIROperation\trow=0\tvalues=8,6,13,0,0,1,11,1"))
-        #expect(result.stdout.contains("typedIROperation\trow=5\tvalues=13,6,6,0,0,11,3,3"))
+        #expect(result.stdout.contains("operationCount=8"))
+        #expect(result.stdout.contains("typedIROperation\trow=0\tvalues=9,7,13,0,0,1,14,1"))
+        #expect(result.stdout.contains("typedIROperation\trow=6\tvalues=16,7,6,0,0,14,4,3"))
     }
 
     @Test("MemoryGraph rejects an opaque handle without explicit destruction")
-    func memoryGraphRejectsOpaqueIntBufferMissingDestroy() throws {
-        let result = try runOpaqueIntBufferFailureFixture(body: """
-            let buffer: IntBuffer(intBufferCreate(capacity: 4))
+    func memoryGraphRejectsOpaqueRawBufferMissingDestroy() throws {
+        let result = try runOpaqueRawBufferFailureFixture(body: """
+            let buffer: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
             return 0
-        """, name: "OpaqueIntBufferMissingDestroy.range")
+        """, name: "OpaqueRawBufferMissingDestroy.range")
         #expect(result.exitCode == 65)
         #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
     }
 
     @Test("MemoryGraph rejects opaque handle double destruction")
-    func memoryGraphRejectsOpaqueIntBufferDoubleDestroy() throws {
-        let result = try runOpaqueIntBufferFailureFixture(body: """
-            let buffer: IntBuffer(intBufferCreate(capacity: 4))
-            let first: Int(intBufferDestroy(buffer: buffer))
-            return intBufferDestroy(buffer: buffer)
-        """, name: "OpaqueIntBufferDoubleDestroy.range")
+    func memoryGraphRejectsOpaqueRawBufferDoubleDestroy() throws {
+        let result = try runOpaqueRawBufferFailureFixture(body: """
+            let buffer: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
+            let first: Int(rawBufferDestroy(buffer: buffer))
+            return rawBufferDestroy(buffer: buffer)
+        """, name: "OpaqueRawBufferDoubleDestroy.range")
         #expect(result.exitCode == 65)
         #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
     }
 
     @Test("MemoryGraph rejects opaque handle use after destruction")
-    func memoryGraphRejectsOpaqueIntBufferUseAfterDestroy() throws {
-        let result = try runOpaqueIntBufferFailureFixture(body: """
-            let buffer: IntBuffer(intBufferCreate(capacity: 4))
-            let status: Int(intBufferDestroy(buffer: buffer))
-            return intBufferCount(buffer: buffer)
-        """, name: "OpaqueIntBufferUseAfterDestroy.range", includeCount: true)
+    func memoryGraphRejectsOpaqueRawBufferUseAfterDestroy() throws {
+        let result = try runOpaqueRawBufferFailureFixture(body: """
+            let buffer: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
+            let status: Int(rawBufferDestroy(buffer: buffer))
+            return rawBufferCount(buffer: buffer)
+        """, name: "OpaqueRawBufferUseAfterDestroy.range", includeCount: true)
         #expect(result.exitCode == 65)
         #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
     }
 
     @Test("MemoryGraph rejects returning an opaque handle without transfer")
-    func memoryGraphRejectsOpaqueIntBufferReturnWithoutTransfer() throws {
-        let result = try runOpaqueIntBufferFailureFixture(body: """
-            let buffer: IntBuffer(intBufferCreate(capacity: 4))
+    func memoryGraphRejectsOpaqueRawBufferReturnWithoutTransfer() throws {
+        let result = try runOpaqueRawBufferFailureFixture(body: """
+            let buffer: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
             return buffer
-        """, name: "OpaqueIntBufferReturn.range")
+        """, name: "OpaqueRawBufferReturn.range")
         #expect(result.exitCode == 65)
         #expect(result.stdout == "compilerError\tkind=invalidMemoryGraph\n\n")
     }
@@ -2101,26 +2018,26 @@ struct RangeScriptTests {
     }
 
     @Test("MemoryGraph rejects malformed opaque destructor ABI")
-    func memoryGraphRejectsMalformedIntBufferDestructorABI() throws {
+    func memoryGraphRejectsMalformedRawBufferDestructorABI() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let result = try runTypedSyntaxFixture(
             source: """
             compilerMemoryGraph
-            @builtin
-            construct IntBuffer {}
-            @builtin
-            function intBufferCreate(capacity: Int): IntBuffer
-            @builtin
-            function intBufferDestroy(buffer: Int): Int
+            @builtin(.storage)
+            construct RawBuffer {}
+            @builtin(.create)
+            function rawBufferCreate(capacity: Int, stride: Int): RawBuffer
+            @builtin(.destroy)
+            function rawBufferDestroy(buffer: Int): Int
             @main {
-                let buffer: IntBuffer(intBufferCreate(capacity: 4))
-                return intBufferDestroy(buffer: buffer)
+                let buffer: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
+                return rawBufferDestroy(buffer: buffer)
             }
 
             """,
-            name: "MalformedIntBufferDestructorABI.range",
+            name: "MalformedRawBufferDestructorABI.range",
             directory: directory
         )
         #expect(result.timedOut == false)
@@ -3305,10 +3222,16 @@ struct RangeScriptTests {
         let fixture = """
         compilerNativeBodyLLVMDualStats
         compilerDualTransitionFunctionID_0_
-        function appendValue(buffer: IntBuffer): Int {
-            intBufferAppend(buffer: buffer, value: 7)
-            return intBufferCount(buffer: buffer)
+        function appendValue(buffer: RawBuffer): Int {
+            rawBufferAppendInt(buffer: buffer, value: 7)
+            return rawBufferCount(buffer: buffer)
         }
+        @builtin(.storage)
+        construct RawBuffer {}
+        @builtin(.write)
+        function rawBufferAppendInt(buffer: RawBuffer, value: Int): Int
+        @builtin(.read)
+        function rawBufferCount(buffer: RawBuffer): Int
 
         """
         let result = try runTypedSyntaxFixture(
@@ -4001,8 +3924,8 @@ struct RangeScriptTests {
         #expect(enabled.stderr.isEmpty)
         #expect(enabled.stdout.contains("phase=cost"))
         #expect(enabled.stdout.contains("compilerCostMetrics\tenabled=0"))
-        #expect(metricValue(named: "textBufferAppendCalls", in: enabled.stdout) > 0)
-        #expect(metricValue(named: "textBufferAppendBytes", in: enabled.stdout) > 0)
+        #expect(metricValue(named: "rawBufferAppendCalls", in: enabled.stdout) > 0)
+        #expect(metricValue(named: "rawBufferAppendBytes", in: enabled.stdout) > 0)
         let typedLine = enabled.stdout.split(separator: "\n").first {
             $0.contains("compilerCostFunction") && $0.contains("name=compilerSourceFileTableColumnCount")
         }
@@ -4065,10 +3988,10 @@ struct RangeScriptTests {
         void *rangeConstructCreate(char *name);
         void *rangeConstructSetInt(void *object, char *name, int32_t value);
         int32_t rangeConstructGetInt(void *object, char *name);
-        void *textBufferCreate(int32_t capacity);
-        int32_t textBufferAppend(void *buffer, char *text);
-        char *textBufferMaterialize(void *buffer);
-        int32_t textBufferDestroy(void *buffer);
+        void *rawBufferCreate(int32_t capacity, int32_t stride);
+        int32_t rawBufferAppendText(void *buffer, char *text);
+        char *rawBufferMaterializeText(void *buffer);
+        int32_t rawBufferDestroy(void *buffer);
         int main(void) {
             compilerMetricsReset();
             compilerMetricsSetEnabled(true);
@@ -4077,19 +4000,19 @@ struct RangeScriptTests {
             void *object = rangeConstructCreate("Probe");
             rangeConstructSetInt(object, "value", 7);
             rangeConstructGetInt(object, "value");
-            void *buffer = textBufferCreate(1);
-            textBufferAppend(buffer, "hello");
-            textBufferMaterialize(buffer);
-            textBufferDestroy(buffer);
+            void *buffer = rawBufferCreate(1, 1);
+            rawBufferAppendText(buffer, "hello");
+            rawBufferMaterializeText(buffer);
+            rawBufferDestroy(buffer);
             compilerMetricsSetEnabled(false);
             stringConcat("ignored", "work");
             void *ignoredObject = rangeConstructCreate("Ignored");
             rangeConstructSetInt(ignoredObject, "field", 1);
             rangeConstructGetInt(ignoredObject, "field");
-            void *ignoredBuffer = textBufferCreate(1);
-            textBufferAppend(ignoredBuffer, "ignored");
-            textBufferMaterialize(ignoredBuffer);
-            textBufferDestroy(ignoredBuffer);
+            void *ignoredBuffer = rawBufferCreate(1, 1);
+            rawBufferAppendText(ignoredBuffer, "ignored");
+            rawBufferMaterializeText(ignoredBuffer);
+            rawBufferDestroy(ignoredBuffer);
             puts(compilerMetricsReport());
             return 0;
         }
@@ -4102,7 +4025,7 @@ struct RangeScriptTests {
                 runtime.appendingPathComponent("RangeCompilerHost.c").path,
                 runtime.appendingPathComponent("RangeCompilerMetrics.c").path,
                 runtime.appendingPathComponent("RangeString.c").path,
-                runtime.appendingPathComponent("RangeTextBuffer.c").path,
+                runtime.appendingPathComponent("RangeRawBuffer.c").path,
                 "-o", executable.path,
             ]
         )
@@ -4120,12 +4043,72 @@ struct RangeScriptTests {
         #expect(metricValue(named: "constructFields", in: enabled.stdout) == 1)
         #expect(metricValue(named: "constructNameBytes", in: enabled.stdout) == 10)
         #expect(metricValue(named: "constructGetProbes", in: enabled.stdout) == 1)
-        #expect(metricValue(named: "textBufferAppendCalls", in: enabled.stdout) == 1)
-        #expect(metricValue(named: "textBufferAppendBytes", in: enabled.stdout) == 5)
-        #expect(metricValue(named: "textBufferMaterializeCalls", in: enabled.stdout) == 1)
-        #expect(metricValue(named: "textBufferMaterializeBytes", in: enabled.stdout) == 5)
-        #expect(metricValue(named: "textBufferReallocations", in: enabled.stdout) == 1)
-        #expect(metricValue(named: "textBufferReallocationBytes", in: enabled.stdout) == 0)
+        #expect(metricValue(named: "rawBufferAppendCalls", in: enabled.stdout) == 1)
+        #expect(metricValue(named: "rawBufferAppendBytes", in: enabled.stdout) == 5)
+        #expect(metricValue(named: "rawBufferMaterializeCalls", in: enabled.stdout) == 1)
+        #expect(metricValue(named: "rawBufferMaterializeBytes", in: enabled.stdout) == 5)
+        #expect(metricValue(named: "rawBufferReallocations", in: enabled.stdout) == 1)
+        #expect(metricValue(named: "rawBufferReallocationBytes", in: enabled.stdout) == 0)
+    }
+
+    @Test("RawBuffer storage backs Int and text operations")
+    func rawBufferStorageBacksIntAndTextOperations() throws {
+        let root = try repositoryRoot()
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let harness = directory.appendingPathComponent("RawBufferViewsHarness.c")
+        let executable = directory.appendingPathComponent("RawBufferViewsHarness")
+        try """
+        #include <stdint.h>
+        #include <string.h>
+        void *rawBufferCreate(int32_t capacity, int32_t stride);
+        int32_t rawBufferAppendInt(void *buffer, int32_t value);
+        int32_t rawBufferCount(void *buffer);
+        int32_t rawBufferLoadInt(void *buffer, int32_t index);
+        int32_t rawBufferStoreInt(void *buffer, int32_t index, int32_t value);
+        int32_t rawBufferAppendText(void *buffer, char *text);
+        int32_t rawBufferAppendTextInt(void *buffer, int32_t value);
+        char *rawBufferMaterializeText(void *buffer);
+        int32_t rawBufferDestroy(void *buffer);
+        int main(void) {
+            void *ints = rawBufferCreate(1, 4);
+            if (!ints || rawBufferAppendInt(ints, 7) != 0 || rawBufferAppendInt(ints, 11) != 0
+                || rawBufferCount(ints) != 2 || rawBufferLoadInt(ints, 0) != 7
+                || rawBufferStoreInt(ints, 1, 13) != 0 || rawBufferLoadInt(ints, 1) != 13
+                || rawBufferDestroy(ints) != 0 || rawBufferCreate(-1, 4) != NULL) {
+                return 1;
+            }
+
+            void *text = rawBufferCreate(2, 1);
+            if (!text || rawBufferAppendText(text, "range") != 0
+                || rawBufferAppendTextInt(text, 56) != 0
+                || strcmp(rawBufferMaterializeText(text), "range56") != 0
+                || rawBufferDestroy(text) != 0 || rawBufferCreate(1, 0) != NULL) {
+                return 2;
+            }
+            return 0;
+        }
+        """.write(to: harness, atomically: true, encoding: .utf8)
+        let runtime = root.appendingPathComponent("RangeCompiler/Runtime")
+        let compile = try runCapturedProcess(
+            executable: "/usr/bin/clang",
+            arguments: [
+                "-std=c11", "-Wall", "-Wextra", "-Werror",
+                harness.path,
+                runtime.appendingPathComponent("RangeCompilerMetrics.c").path,
+                runtime.appendingPathComponent("RangeString.c").path,
+                runtime.appendingPathComponent("RangeRawBuffer.c").path,
+                "-o", executable.path,
+            ]
+        )
+        #expect(compile.exitCode == 0)
+        #expect(compile.stderr.isEmpty)
+        let run = try runCapturedProcess(executable: executable.path, arguments: [])
+        #expect(run.exitCode == 0)
+        #expect(run.stdout.isEmpty)
+        #expect(run.stderr.isEmpty)
     }
 
     @Test("Native compiler emits compiler-core LLVM from AST")
@@ -4470,19 +4453,26 @@ private func runTypedSyntaxFixture(
     return try runFixtureExecutable(executable: executable, source: sourceURL, timeout: timeout)
 }
 
-private func opaqueIntBufferFixture(body: String, includeCount: Bool = false) -> String {
+private func runNativeCompiler(source: URL, timeout: TimeInterval = 120) throws -> ScriptResult {
+    let compiler = try repositoryRoot()
+        .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
+    let executable = try TypedSyntaxCompilerCache.shared.executable(for: compiler)
+    return try runFixtureExecutable(executable: executable, source: source, timeout: timeout)
+}
+
+private func opaqueRawBufferFixture(body: String, includeCount: Bool = false) -> String {
     let countDeclaration = includeCount ? """
-        @builtin
-        function intBufferCount(buffer: IntBuffer): Int
+        @builtin(.read)
+        function rawBufferCount(buffer: RawBuffer): Int
         """ : ""
     return """
     compilerMemoryGraph
-    @builtin
-    construct IntBuffer {}
-    @builtin
-    function intBufferCreate(capacity: Int): IntBuffer
-    @builtin
-    function intBufferDestroy(buffer: IntBuffer): Int
+    @builtin(.storage)
+    construct RawBuffer {}
+    @builtin(.create)
+    function rawBufferCreate(capacity: Int, stride: Int): RawBuffer
+    @builtin(.destroy)
+    function rawBufferDestroy(buffer: RawBuffer): Int
     \(countDeclaration)
     @main {
     \(body)
@@ -4491,12 +4481,12 @@ private func opaqueIntBufferFixture(body: String, includeCount: Bool = false) ->
     """
 }
 
-private func runOpaqueIntBufferFailureFixture(body: String, name: String, includeCount: Bool = false) throws -> ScriptResult {
+private func runOpaqueRawBufferFailureFixture(body: String, name: String, includeCount: Bool = false) throws -> ScriptResult {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
     let result = try runTypedSyntaxFixture(
-        source: opaqueIntBufferFixture(body: body, includeCount: includeCount),
+        source: opaqueRawBufferFixture(body: body, includeCount: includeCount),
         name: name,
         directory: directory
     )
@@ -4534,7 +4524,7 @@ private final class TypedSyntaxCompilerCache: @unchecked Sendable {
         }
         let fingerprint = try typedSyntaxCompilerFingerprint(
             files: sourceFiles + toolInputs,
-            context: "typed-fixture-cache-v2\n\(ProcessInfo.processInfo.operatingSystemVersionString)\n\(clangVersion.stdout)\n\(clangVersion.stderr)"
+            context: "typed-fixture-native-seed-v3\n\(ProcessInfo.processInfo.operatingSystemVersionString)\n\(clangVersion.stdout)\n\(clangVersion.stderr)"
         )
 
         lock.lock()
@@ -4566,21 +4556,30 @@ private final class TypedSyntaxCompilerCache: @unchecked Sendable {
             defer { try? FileManager.default.removeItem(at: buildRoot) }
             let mirroredCompiler = buildRoot.appendingPathComponent("Compiler", isDirectory: true)
             try FileManager.default.createDirectory(at: mirroredCompiler, withIntermediateDirectories: true)
-            for sourceFile in sourceFiles {
-                try FileManager.default.copyItem(
-                    at: sourceFile,
-                    to: mirroredCompiler.appendingPathComponent(sourceFile.lastPathComponent)
-                )
-            }
-            let build = try runRangeScript(
-                arguments: ["compile-executable", mirroredCompiler.path],
-                timeout: 180
-            )
-            guard !build.timedOut, build.exitCode == 0, build.stderr.isEmpty else {
-                throw RangeScriptTestError.typedFixtureCompilerFailed(build.stdout, build.stderr)
-            }
             let builtExecutable = mirroredCompiler
                 .appendingPathComponent(".range/Build/llvm/Compiler")
+            try FileManager.default.createDirectory(
+                at: builtExecutable.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            let runtime = root.appendingPathComponent("RangeCompiler/Runtime", isDirectory: true)
+            let build = try runCapturedProcess(
+                executable: "/usr/bin/env",
+                arguments: [
+                    "clang", "-Wno-override-module",
+                    "-x", "ir",
+                    root.appendingPathComponent("RangeCompiler/Bootstrap/RangeCompilerSeed.ll").path,
+                    "-x", "c",
+                    runtime.appendingPathComponent("RangeCompilerHost.c").path,
+                    runtime.appendingPathComponent("RangeString.c").path,
+                    runtime.appendingPathComponent("RangeRawBuffer.c").path,
+                    runtime.appendingPathComponent("RangeCompilerMetrics.c").path,
+                    "-o", builtExecutable.path,
+                ]
+            )
+            guard build.exitCode == 0, build.stderr.isEmpty else {
+                throw RangeScriptTestError.typedFixtureCompilerFailed(build.stdout, build.stderr)
+            }
             guard FileManager.default.isExecutableFile(atPath: builtExecutable.path) else {
                 throw RangeScriptTestError.typedFixtureCompilerMissing(builtExecutable.path)
             }
@@ -4601,33 +4600,15 @@ private final class TypedSyntaxCompilerCache: @unchecked Sendable {
 }
 
 private func typedSyntaxCompilerToolInputs(root: URL) throws -> [URL] {
-    var inputs = [
-        root.appendingPathComponent("scripts/range"),
-        root.appendingPathComponent("RangeCompiler/Package.swift"),
+    let inputs = [
+        root.appendingPathComponent("RangeCompiler/Bootstrap/RangeCompilerSeed.json"),
+        root.appendingPathComponent("RangeCompiler/Bootstrap/RangeCompilerSeed.ll"),
         root.appendingPathComponent("RangeCompiler/Runtime/RangeCompilerHost.c"),
         root.appendingPathComponent("RangeCompiler/Runtime/RangeCompilerMetrics.c"),
-        root.appendingPathComponent("RangeCompiler/Runtime/RangeTextBuffer.c"),
-        root.appendingPathComponent("RangeCompiler/Runtime/RangeIntBuffer.c"),
+        root.appendingPathComponent("RangeCompiler/Runtime/RangeRawBuffer.c"),
         root.appendingPathComponent("RangeCompiler/Runtime/RangeString.c"),
+        root.appendingPathComponent("RangeCompiler/Range/Core/System/Memory/RawBuffer.range"),
     ]
-    let coreSources = root.appendingPathComponent("RangeCompiler/Range/Core", isDirectory: true)
-    let coreEnumerator = FileManager.default.enumerator(
-        at: coreSources,
-        includingPropertiesForKeys: [.isRegularFileKey],
-        options: [.skipsHiddenFiles]
-    )
-    while let file = coreEnumerator?.nextObject() as? URL {
-        if file.pathExtension == "range" { inputs.append(file) }
-    }
-    let sources = root.appendingPathComponent("RangeCompiler/Sources", isDirectory: true)
-    let enumerator = FileManager.default.enumerator(
-        at: sources,
-        includingPropertiesForKeys: [.isRegularFileKey],
-        options: [.skipsHiddenFiles]
-    )
-    while let file = enumerator?.nextObject() as? URL {
-        if file.pathExtension == "swift" { inputs.append(file) }
-    }
     return inputs.sorted { $0.path < $1.path }
 }
 

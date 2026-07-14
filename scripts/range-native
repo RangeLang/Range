@@ -52,35 +52,36 @@ verify_manifest_inputs() {
         exit 1
     fi
     verify_manifest_file seed
-    for index in 0 1 2 3 4; do
+    local index runtime_count
+    runtime_count="$(manifest_value runtimeSources)"
+    for ((index = 0; index < runtime_count; index += 1)); do
         verify_manifest_file "runtimeSources.$index"
     done
 }
 
 runtime_inputs() {
-    local index
-    for index in 0 1 2 3 4; do
+    local index runtime_count
+    runtime_count="$(manifest_value runtimeSources)"
+    for ((index = 0; index < runtime_count; index += 1)); do
         /usr/bin/printf '%s\n' "$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")"
     done
 }
 
 ensure_seed_compiler() {
     verify_manifest_inputs
-    local seed_hash cache_root executable seed
+    local seed_hash manifest_hash cache_root executable seed runtime
     local -a runtimes
     seed_hash="$(manifest_value seed.sha256)"
-    cache_root="$REPO_ROOT/.range/NativeSeed/$seed_hash"
+    manifest_hash="$(sha256 "$MANIFEST")"
+    cache_root="$REPO_ROOT/.range/NativeSeed/$seed_hash-$manifest_hash"
     executable="$cache_root/RangeCompiler"
     seed="$REPO_ROOT/$(manifest_value seed.path)"
     if [[ ! -x "$executable" ]]; then
         /bin/mkdir -p "$cache_root"
-        runtimes=(
-            "$REPO_ROOT/$(manifest_value runtimeSources.0.path)"
-            "$REPO_ROOT/$(manifest_value runtimeSources.1.path)"
-            "$REPO_ROOT/$(manifest_value runtimeSources.2.path)"
-            "$REPO_ROOT/$(manifest_value runtimeSources.3.path)"
-            "$REPO_ROOT/$(manifest_value runtimeSources.4.path)"
-        )
+        runtimes=()
+        while IFS= read -r runtime; do
+            runtimes+=("$runtime")
+        done < <(runtime_inputs)
         clang -Wno-override-module -x ir "$seed" -x c "${runtimes[@]}" -o "$executable.tmp"
         /bin/mv "$executable.tmp" "$executable"
     fi
@@ -195,13 +196,10 @@ compile_executable() {
     executable="$build_root/$executable_name"
     /bin/mkdir -p "$build_root"
     emit_llvm "$input" "$llvm"
-    runtimes=(
-        "$REPO_ROOT/$(manifest_value runtimeSources.0.path)"
-        "$REPO_ROOT/$(manifest_value runtimeSources.1.path)"
-        "$REPO_ROOT/$(manifest_value runtimeSources.2.path)"
-        "$REPO_ROOT/$(manifest_value runtimeSources.3.path)"
-        "$REPO_ROOT/$(manifest_value runtimeSources.4.path)"
-    )
+    runtimes=()
+    while IFS= read -r runtime; do
+        runtimes+=("$runtime")
+    done < <(runtime_inputs)
     clang -Wno-override-module "$llvm" "${runtimes[@]}" -o "$executable.tmp"
     /bin/mv "$executable.tmp" "$executable"
     /usr/bin/printf '%s\n' "$executable"

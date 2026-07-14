@@ -50,18 +50,14 @@ each executable, and checks exit/stdout expectations. The emit-only example
 corpus check also remains on that retained path. `scripts/range run` is native
 by default and writes `.range/Build/llvm/Main.ll` through the checked-in seed.
 
-`SwiftBootstrap` remains only as the retained compatibility/checking host while
-the Range-authored compiler grows beyond its current bounded native slice.
+`SwiftBootstrap` remains only for the legacy example corpus; it is no longer a
+build stage for the Range-authored compiler. Native compiler regressions link
+the checked-in seed directly, so new compiler syntax and runtime ABI work does
+not need a duplicate Swift implementation.
 
-The first self-hosting lane lives at `RangeCompiler/Range/Programs/Compiler`.
-It is intentionally tiny right now: `scripts/range check-bootstrap-compiler`
-compiles that Range-authored compiler program through `SwiftBootstrap`, links it
-with `clang`, and runs the native `Compiler` binary against a Range source file
-so the binary calls its Range-authored lexer library and prints a deterministic
-token stream. The lexer is a small direct port of the Swift bootstrap lexer path.
-The test suite compares the native lexer stream against the Swift bootstrap
-lexer for the compiler entrypoint. The binary also parses the first tiny AST
-checkpoints: an `@main` block summary and top-level function declaration
-summaries with body bounds. The `@main` block also lowers to a compiler `main`
-function summary, and a direct `return <integer>` in that body emits the first
-Range-authored LLVM text checkpoint.
+The self-hosting compiler lives at `RangeCompiler/Range/Programs/Compiler`.
+Run `scripts/range check-compiler-candidate` for the full Stage 2/3 fixed-point
+gate, or `scripts/range check-stage2-compiler` to verify the checked-in seed and
+its frozen source/runtime manifest. The compiler now uses the core-declared
+`RawBuffer` storage ABI for both integer tables and text assembly; the former
+`IntBuffer` and `TextBuffer` compiler/runtime models have been removed.

@@ -1,0 +1,32 @@
+@builtin(.storage)
+construct RawBuffer {}
+
+@builtin(.create)
+function rawBufferCreate(capacity: Int, stride: Int): RawBuffer
+
+@builtin(.write)
+function rawBufferAppendInt(buffer: RawBuffer, value: Int): Int
+
+@builtin(.read)
+function rawBufferCount(buffer: RawBuffer): Int
+
+@builtin(.read)
+function rawBufferLoadInt(buffer: RawBuffer, index: Int): Int
+
+@builtin(.write)
+function rawBufferStoreInt(buffer: RawBuffer, index: Int, value: Int): Int
+
+@builtin(.write)
+function rawBufferAppendText(buffer: RawBuffer, text: String): Int
+
+@builtin(.write)
+function rawBufferAppendTextInt(buffer: RawBuffer, value: Int): Int
+
+@builtin(.write)
+function rawBufferAppendTextCharacter(buffer: RawBuffer, source: String, index: Int): Int
+
+@builtin(.read)
+function rawBufferMaterializeText(buffer: RawBuffer): String
+
+@builtin(.destroy)
+function rawBufferDestroy(buffer: RawBuffer): Int
