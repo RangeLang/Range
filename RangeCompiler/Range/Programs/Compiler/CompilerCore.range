@@ -884,7 +884,7 @@ function compilerSyntaxMacroInvocationColumnCount(): Int { return 33 }
 function compilerSyntaxMacroCapabilityHandleColumnCount(): Int { return 8 }
 function compilerSyntaxMacroExecutionEventColumnCount(): Int { return 12 }
 function compilerSyntaxMacroReadDependencyColumnCount(): Int { return 18 }
-function compilerSyntaxMacroExpansionTemplateColumnCount(): Int { return 19 }
+function compilerSyntaxMacroExpansionTemplateColumnCount(): Int { return 26 }
 
 function compilerMacroCapabilityTarget(): Int { return 1 }
 function compilerMacroCapabilityDiagnostics(): Int { return 2 }
@@ -924,6 +924,10 @@ function compilerMacroGraphOperationDeclarationCount(): Int { return 1 }
 function compilerMacroTargetOperationOmit(): Int { return 1 }
 function compilerMacroTargetOperationMemberCount(): Int { return 2 }
 function compilerMacroTargetOperationExpand(): Int { return 3 }
+
+function compilerMacroExpansionTemplatePlacementRoot(): Int { return 0 }
+function compilerMacroExpansionTemplatePlacementMember(): Int { return 1 }
+function compilerMacroExpansionTemplateKindExtension(): Int { return 2 }
 
 function compilerMacroCapabilityHeaderValid(): Int { return 0 }
 function compilerMacroCapabilityHeaderMalformed(): Int { return 1 }
@@ -2185,11 +2189,14 @@ function compilerSyntaxAppendMacroApplication(tables: CompilerSyntaxTables, file
     return compilerSyntaxTableAppend(tables: tables, table: tables.macroApplications, value: identity.second)
 }
 
-function compilerSyntaxAppendMacroExpansionTemplate(tables: CompilerSyntaxTables, macroDeclarationRow: Int, fileID: Int, expansionStart: Int, expansionEnd: Int, declarationStart: Int, declarationEnd: Int, nameStart: Int, nameEnd: Int, parameterStart: Int, parameterEnd: Int, returnTypeStart: Int, returnTypeEnd: Int, bodyStart: Int, bodyEnd: Int, ordinal: Int, fingerprint: CompilerFingerprint): Int {
+function compilerSyntaxAppendMacroExpansionTemplate(tables: CompilerSyntaxTables, macroDeclarationRow: Int, fileID: Int, expansionStart: Int, expansionEnd: Int, declarationStart: Int, declarationEnd: Int, nameStart: Int, nameEnd: Int, parameterStart: Int, parameterEnd: Int, returnTypeStart: Int, returnTypeEnd: Int, bodyStart: Int, bodyEnd: Int, ordinal: Int, fingerprint: CompilerFingerprint, kindTag: Int, placement: Int, lexicalParent: Int, lexicalParentOrdinal: Int, targetSpliceStart: Int, targetSpliceEnd: Int, targetSpliceFingerprint: CompilerFingerprint): Int {
     if macroDeclarationRow < 0 || macroDeclarationRow >= compilerIntTableRowCount(table: tables.macroDeclarations)
         || !compilerSyntaxGlobalRangeIsValid(tables: tables, fileID: fileID, start: expansionStart, end: expansionEnd)
         || !compilerSyntaxDeclarationRangesAreValid(tables: tables, fileID: fileID, declarationStart: declarationStart, declarationEnd: declarationEnd, nameStart: nameStart, nameEnd: nameEnd, bodyStart: bodyStart, bodyEnd: bodyEnd)
-        || !compilerSyntaxFunctionRangesAreValid(tables: tables, fileID: fileID, parameterStart: parameterStart, parameterEnd: parameterEnd, returnTypeStart: returnTypeStart, returnTypeEnd: returnTypeEnd, bodyStart: bodyStart, bodyEnd: bodyEnd) {
+        || !compilerSyntaxFunctionRangesAreValid(tables: tables, fileID: fileID, parameterStart: parameterStart, parameterEnd: parameterEnd, returnTypeStart: returnTypeStart, returnTypeEnd: returnTypeEnd, bodyStart: bodyStart, bodyEnd: bodyEnd)
+        || (kindTag != compilerGraphGeneratedKindFunction() && kindTag != compilerMacroExpansionTemplateKindExtension())
+        || (placement != compilerMacroExpansionTemplatePlacementRoot() && placement != compilerMacroExpansionTemplatePlacementMember())
+        || !compilerSyntaxOptionalGlobalRangeIsValid(tables: tables, fileID: fileID, start: targetSpliceStart, end: targetSpliceEnd) {
         return 0 - 1
     }
     let row: Int(compilerIntTableRowCount(table: tables.macroExpansionTemplates))
@@ -2211,8 +2218,67 @@ function compilerSyntaxAppendMacroExpansionTemplate(tables: CompilerSyntaxTables
         || compilerSyntaxTableAppend(tables: tables, table: tables.macroExpansionTemplates, value: ordinal) != 0
         || compilerSyntaxTableAppend(tables: tables, table: tables.macroExpansionTemplates, value: fingerprint.first) != 0
         || compilerSyntaxTableAppend(tables: tables, table: tables.macroExpansionTemplates, value: fingerprint.second) != 0
-        || compilerSyntaxTableAppend(tables: tables, table: tables.macroExpansionTemplates, value: compilerGraphGeneratedKindFunction()) != 0 { return 0 - 1 }
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroExpansionTemplates, value: kindTag) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroExpansionTemplates, value: placement) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroExpansionTemplates, value: lexicalParent) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroExpansionTemplates, value: targetSpliceStart) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroExpansionTemplates, value: targetSpliceEnd) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroExpansionTemplates, value: targetSpliceFingerprint.first) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroExpansionTemplates, value: targetSpliceFingerprint.second) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroExpansionTemplates, value: lexicalParentOrdinal) != 0 { return 0 - 1 }
     return row
+}
+
+function compilerMacroExpansionTargetSplice(source: String, start: Int): Optional<CompilerSourceRange> {
+    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    let maybeHash: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeHash == nil { return nil }
+    let hashFallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let hash: RangeLexedToken(maybeHash ?? hashFallback)
+    if hash.kind != String("hash") { return nil }
+    cursor: compilerCursorAdvance(cursor: cursor, token: hash)
+    let maybeLeftParen: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeLeftParen == nil { return nil }
+    let leftParenFallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let leftParen: RangeLexedToken(maybeLeftParen ?? leftParenFallback)
+    if leftParen.kind != String("leftParen") { return nil }
+    cursor: compilerCursorAdvance(cursor: cursor, token: leftParen)
+    let maybeTarget: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeTarget == nil { return nil }
+    let targetFallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let target: RangeLexedToken(maybeTarget ?? targetFallback)
+    if target.kind != String("identifier") || target.text != String("target") { return nil }
+    cursor: compilerCursorAdvance(cursor: cursor, token: target)
+    let maybeDot1: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeDot1 == nil { return nil }
+    let dot1Fallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let dot1: RangeLexedToken(maybeDot1 ?? dot1Fallback)
+    if dot1.kind != String("dot") { return nil }
+    cursor: compilerCursorAdvance(cursor: cursor, token: dot1)
+    let maybeDeclaration: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeDeclaration == nil { return nil }
+    let declarationFallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let declaration: RangeLexedToken(maybeDeclaration ?? declarationFallback)
+    if declaration.kind != String("identifier") || declaration.text != String("declaration") { return nil }
+    cursor: compilerCursorAdvance(cursor: cursor, token: declaration)
+    let maybeDot2: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeDot2 == nil { return nil }
+    let dot2Fallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let dot2: RangeLexedToken(maybeDot2 ?? dot2Fallback)
+    if dot2.kind != String("dot") { return nil }
+    cursor: compilerCursorAdvance(cursor: cursor, token: dot2)
+    let maybeSelf: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeSelf == nil { return nil }
+    let selfFallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let selfToken: RangeLexedToken(maybeSelf ?? selfFallback)
+    if selfToken.kind != String("identifier") || selfToken.text != String("self") { return nil }
+    cursor: compilerCursorAdvance(cursor: cursor, token: selfToken)
+    let maybeRightParen: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeRightParen == nil { return nil }
+    let rightParenFallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let rightParen: RangeLexedToken(maybeRightParen ?? rightParenFallback)
+    if rightParen.kind != String("rightParen") { return nil }
+    return CompilerSourceRange(start: hash.start, end: rightParen.start, next: rightParen.end)
 }
 
 function compilerTypedSyntaxCaptureMacroExpansionTemplates(source: String, tables: CompilerSyntaxTables, macroDeclarationRow: Int, fileID: Int, start: Int, end: Int): Int {
@@ -2246,9 +2312,9 @@ function compilerTypedSyntaxCaptureMacroExpansionTemplates(source: String, table
                 if maybeFunctionToken == nil { return 0 - 1 }
                 let functionFallback: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: source, index: functionCursor)))
                 let functionToken: RangeLexedToken(maybeFunctionToken ?? functionFallback)
-                if functionToken.start >= expansion.end { functionCursor: expansion.end } else if functionToken.text != String("function") {
-                    return 0 - 1
-                } else {
+                if functionToken.start >= expansion.end {
+                    functionCursor: expansion.end
+                } else if functionToken.text == String("function") {
                     let maybeParts: Optional<CompilerFunctionDeclarationParts>(compilerCoreParseFunctionDeclarationParts(source: source, keyword: functionToken))
                     if maybeParts == nil { return 0 - 1 }
                     let partsFallback: CompilerFunctionDeclarationParts(CompilerFunctionDeclarationParts(nameToken: functionToken, parameterRange: CompilerSourceRange(start: functionToken.end, end: functionToken.end, next: functionToken.end), returnType: CompilerTypeReference(text: String(""), start: functionToken.end, end: functionToken.end), bodyRange: CompilerSourceRange(start: functionToken.end, end: functionToken.end, next: functionToken.end)))
@@ -2258,10 +2324,53 @@ function compilerTypedSyntaxCaptureMacroExpansionTemplates(source: String, table
                     let parameterFingerprint: CompilerFingerprint(compilerFingerprintAppendRange(fingerprint: templateFingerprintBase, tag: 81, source: source, start: parts.parameterRange.start, end: parts.parameterRange.end))
                     let returnFingerprint: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: parameterFingerprint, tag: 82, text: parts.returnType.text))
                     let structuralFingerprint: CompilerFingerprint(compilerFingerprintAppendRange(fingerprint: returnFingerprint, tag: 83, source: source, start: parts.bodyRange.start, end: parts.bodyRange.end))
-                    if compilerSyntaxAppendMacroExpansionTemplate(tables: tables, macroDeclarationRow: macroDeclarationRow, fileID: fileID, expansionStart: token.start, expansionEnd: expansion.next, declarationStart: functionToken.start, declarationEnd: parts.bodyRange.next, nameStart: parts.nameToken.start, nameEnd: parts.nameToken.end, parameterStart: parts.parameterRange.start, parameterEnd: parts.parameterRange.end, returnTypeStart: parts.returnType.start, returnTypeEnd: parts.returnType.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, ordinal: templateOrdinal, fingerprint: structuralFingerprint) < 0 { return 0 - 1 }
+                    let invalidRange: CompilerSourceRange(CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1))
+                    let invalidFingerprint: CompilerFingerprint(CompilerFingerprint(first: 0, second: 0))
+                    if compilerSyntaxAppendMacroExpansionTemplate(tables: tables, macroDeclarationRow: macroDeclarationRow, fileID: fileID, expansionStart: token.start, expansionEnd: expansion.next, declarationStart: functionToken.start, declarationEnd: parts.bodyRange.next, nameStart: parts.nameToken.start, nameEnd: parts.nameToken.end, parameterStart: parts.parameterRange.start, parameterEnd: parts.parameterRange.end, returnTypeStart: parts.returnType.start, returnTypeEnd: parts.returnType.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, ordinal: templateOrdinal, fingerprint: structuralFingerprint, kindTag: compilerGraphGeneratedKindFunction(), placement: compilerMacroExpansionTemplatePlacementRoot(), lexicalParent: 0 - 1, lexicalParentOrdinal: 0 - 1, targetSpliceStart: invalidRange.start, targetSpliceEnd: invalidRange.end, targetSpliceFingerprint: invalidFingerprint) < 0 { return 0 - 1 }
                     templateOrdinal: templateOrdinal + 1
                     captured: captured + 1
                     functionCursor: parts.bodyRange.next
+                } else if functionToken.text == String("extension") {
+                    let maybeTargetSplice: Optional<CompilerSourceRange>(compilerMacroExpansionTargetSplice(source: source, start: functionToken.end))
+                    if maybeTargetSplice == nil { return 0 - 1 }
+                    let targetSpliceFallback: CompilerSourceRange(CompilerSourceRange(start: functionToken.end, end: functionToken.end, next: functionToken.end))
+                    let targetSplice: CompilerSourceRange(maybeTargetSplice ?? targetSpliceFallback)
+                    let maybeExtensionBody: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: source, index: targetSplice.next), leftKind: String("leftBrace"), rightKind: String("rightBrace")))
+                    if maybeExtensionBody == nil { return 0 - 1 }
+                    let extensionBodyFallback: CompilerSourceRange(CompilerSourceRange(start: targetSplice.next, end: targetSplice.next, next: targetSplice.next))
+                    let extensionBody: CompilerSourceRange(maybeExtensionBody ?? extensionBodyFallback)
+                    let targetSpliceFingerprint: CompilerFingerprint(compilerFingerprintAppendRange(fingerprint: compilerFingerprintInitial(), tag: 84, source: source, start: targetSplice.start, end: targetSplice.end))
+                    let extensionRow: Int(compilerSyntaxAppendMacroExpansionTemplate(tables: tables, macroDeclarationRow: macroDeclarationRow, fileID: fileID, expansionStart: token.start, expansionEnd: expansion.next, declarationStart: functionToken.start, declarationEnd: extensionBody.next, nameStart: functionToken.start, nameEnd: functionToken.end, parameterStart: targetSplice.start, parameterEnd: targetSplice.end, returnTypeStart: extensionBody.start, returnTypeEnd: extensionBody.start, bodyStart: extensionBody.start, bodyEnd: extensionBody.end, ordinal: templateOrdinal, fingerprint: targetSpliceFingerprint, kindTag: compilerMacroExpansionTemplateKindExtension(), placement: compilerMacroExpansionTemplatePlacementMember(), lexicalParent: 0 - 1, lexicalParentOrdinal: 0 - 1, targetSpliceStart: targetSplice.start, targetSpliceEnd: targetSplice.end, targetSpliceFingerprint: targetSpliceFingerprint))
+                    if extensionRow < 0 { return 0 - 1 }
+                    templateOrdinal: templateOrdinal + 1
+                    state memberCursor: Int(extensionBody.start)
+                    while memberCursor < extensionBody.end {
+                        let maybeMemberFunction: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: memberCursor))
+                        if maybeMemberFunction == nil { return 0 - 1 }
+                        let memberFallback: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: source, index: memberCursor)))
+                        let memberToken: RangeLexedToken(maybeMemberFunction ?? memberFallback)
+                        if memberToken.start >= extensionBody.end { memberCursor: extensionBody.end } else if memberToken.text != String("function") {
+                            return 0 - 1
+                        } else {
+                            let maybeMemberParts: Optional<CompilerFunctionDeclarationParts>(compilerCoreParseFunctionDeclarationParts(source: source, keyword: memberToken))
+                            if maybeMemberParts == nil { return 0 - 1 }
+                            let memberPartsFallback: CompilerFunctionDeclarationParts(CompilerFunctionDeclarationParts(nameToken: memberToken, parameterRange: CompilerSourceRange(start: memberToken.end, end: memberToken.end, next: memberToken.end), returnType: CompilerTypeReference(text: String(""), start: memberToken.end, end: memberToken.end), bodyRange: CompilerSourceRange(start: memberToken.end, end: memberToken.end, next: memberToken.end)))
+                            let memberParts: CompilerFunctionDeclarationParts(maybeMemberParts ?? memberPartsFallback)
+                            if memberParts.bodyRange.next > extensionBody.end { return 0 - 1 }
+                            let memberFingerprintBase: CompilerFingerprint(compilerSyntaxDeclarationBaseFingerprint(tables: tables, fileID: fileID, kindTag: compilerSyntaxKindFunction(), name: memberParts.nameToken.text))
+                            let memberParameterFingerprint: CompilerFingerprint(compilerFingerprintAppendRange(fingerprint: memberFingerprintBase, tag: 81, source: source, start: memberParts.parameterRange.start, end: memberParts.parameterRange.end))
+                            let memberReturnFingerprint: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: memberParameterFingerprint, tag: 82, text: memberParts.returnType.text))
+                            let memberStructuralFingerprint: CompilerFingerprint(compilerFingerprintAppendRange(fingerprint: memberReturnFingerprint, tag: 83, source: source, start: memberParts.bodyRange.start, end: memberParts.bodyRange.end))
+                            let extensionOrdinal: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: extensionRow, column: 15))
+                            if compilerSyntaxAppendMacroExpansionTemplate(tables: tables, macroDeclarationRow: macroDeclarationRow, fileID: fileID, expansionStart: token.start, expansionEnd: expansion.next, declarationStart: memberToken.start, declarationEnd: memberParts.bodyRange.next, nameStart: memberParts.nameToken.start, nameEnd: memberParts.nameToken.end, parameterStart: memberParts.parameterRange.start, parameterEnd: memberParts.parameterRange.end, returnTypeStart: memberParts.returnType.start, returnTypeEnd: memberParts.returnType.end, bodyStart: memberParts.bodyRange.start, bodyEnd: memberParts.bodyRange.end, ordinal: templateOrdinal, fingerprint: memberStructuralFingerprint, kindTag: compilerGraphGeneratedKindFunction(), placement: compilerMacroExpansionTemplatePlacementMember(), lexicalParent: extensionRow, lexicalParentOrdinal: extensionOrdinal, targetSpliceStart: targetSplice.start, targetSpliceEnd: targetSplice.end, targetSpliceFingerprint: targetSpliceFingerprint) < 0 { return 0 - 1 }
+                            templateOrdinal: templateOrdinal + 1
+                            captured: captured + 1
+                            memberCursor: memberParts.bodyRange.next
+                        }
+                    }
+                    functionCursor: extensionBody.next
+                } else {
+                    return 0 - 1
                 }
             }
             cursor: expansion.next
@@ -3479,10 +3588,19 @@ function compilerMacroExpansionTemplatesAreStructurallyValid(tables: CompilerSyn
         let macroRow: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 1))
         let fileID: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 2))
         let ordinal: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 15))
+        let kindTag: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 18))
+        let placement: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 19))
+        let lexicalParent: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 20))
+        let targetSpliceStart: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 21))
+        let targetSpliceEnd: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 22))
+        let targetSpliceFingerprintFirst: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 23))
+        let targetSpliceFingerprintSecond: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 24))
+        let lexicalParentOrdinal: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 25))
         if compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 0) != row
             || macroRow < 0 || macroRow >= compilerIntTableRowCount(table: tables.macroDeclarations)
             || fileID < 0 || fileID >= compilerSourceStoreFileCount(store: tables.sourceStore)
-            || compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 18) != compilerGraphGeneratedKindFunction()
+            || (kindTag != compilerGraphGeneratedKindFunction() && kindTag != compilerMacroExpansionTemplateKindExtension())
+            || (placement != compilerMacroExpansionTemplatePlacementRoot() && placement != compilerMacroExpansionTemplatePlacementMember())
             || ordinal != compilerMacroExpansionTemplatePriorCount(tables: tables, row: row, macroDeclarationRow: macroRow)
             || !compilerMacroLocalRangeIsValid(tables: tables, fileID: fileID, start: compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 3), end: compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 4), optional: false)
             || !compilerMacroLocalRangeIsValid(tables: tables, fileID: fileID, start: compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 5), end: compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 6), optional: false)
@@ -3490,7 +3608,38 @@ function compilerMacroExpansionTemplatesAreStructurallyValid(tables: CompilerSyn
             || !compilerMacroLocalRangeIsValid(tables: tables, fileID: fileID, start: compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 9), end: compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 10), optional: false)
             || !compilerMacroLocalRangeIsValid(tables: tables, fileID: fileID, start: compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 11), end: compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 12), optional: false)
             || !compilerMacroLocalRangeIsValid(tables: tables, fileID: fileID, start: compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 13), end: compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 14), optional: false)
-            || (compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 16) == 0 && compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 17) == 0) { return false }
+            || (compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 16) == 0 && compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 17) == 0) {
+            return false
+        }
+        if kindTag == compilerMacroExpansionTemplateKindExtension() {
+            if placement != compilerMacroExpansionTemplatePlacementMember()
+                || lexicalParent != 0 - 1
+                || lexicalParentOrdinal != 0 - 1
+                || !compilerMacroLocalRangeIsValid(tables: tables, fileID: fileID, start: targetSpliceStart, end: targetSpliceEnd, optional: false)
+                || (targetSpliceFingerprintFirst == 0 && targetSpliceFingerprintSecond == 0) {
+                return false
+            }
+            let targetSpliceGlobalStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: targetSpliceStart))
+            let maybeTargetSplice: Optional<CompilerSourceRange>(compilerMacroExpansionTargetSplice(source: tables.sourceStore.source, start: targetSpliceGlobalStart))
+            if maybeTargetSplice == nil { return false }
+            let targetSpliceFallback: CompilerSourceRange(CompilerSourceRange(start: targetSpliceGlobalStart, end: targetSpliceGlobalStart, next: targetSpliceGlobalStart))
+            let targetSplice: CompilerSourceRange(maybeTargetSplice ?? targetSpliceFallback)
+            if compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: targetSplice.start) != targetSpliceStart
+                || compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: targetSplice.end) != targetSpliceEnd { return false }
+        } else if placement == compilerMacroExpansionTemplatePlacementRoot() {
+            if lexicalParent != 0 - 1 || targetSpliceStart != 0 - 1 || targetSpliceEnd != 0 - 1
+                || targetSpliceFingerprintFirst != 0 || targetSpliceFingerprintSecond != 0
+                || lexicalParentOrdinal != 0 - 1 { return false }
+        } else {
+            if lexicalParent < 0 || lexicalParent >= row
+                || compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 18) != compilerMacroExpansionTemplateKindExtension()
+                || compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 1) != macroRow
+                || lexicalParentOrdinal != compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 15)
+                || targetSpliceStart != compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 21)
+                || targetSpliceEnd != compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 22)
+                || targetSpliceFingerprintFirst != compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 23)
+                || targetSpliceFingerprintSecond != compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 24) { return false }
+        }
         row: row + 1
     }
     return true
@@ -4091,11 +4240,51 @@ function compilerMacroExpansionTemplateMatchesOperation(arena: CompilerBodyArena
         && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 5) == compilerIntTableValue(table: arena.tables.macroExpansionTemplates, row: templateRow, column: 4)
 }
 
+function compilerMacroExpansionTemplateRowForOrdinal(tables: CompilerSyntaxTables, macroDeclarationRow: Int, ordinal: Int): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.macroExpansionTemplates) {
+        if compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 1) == macroDeclarationRow
+            && compilerIntTableValue(table: tables.macroExpansionTemplates, row: row, column: 15) == ordinal { return row }
+        row: row + 1
+    }
+    return 0 - 1
+}
+
+function compilerMacroExpansionTemplateParentFingerprint(tables: CompilerSyntaxTables, extensionRow: Int): CompilerFingerprint {
+    state fingerprint: CompilerFingerprint(compilerFingerprintInitial())
+    fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: 860)
+    fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: compilerIntTableValue(table: tables.macroExpansionTemplates, row: extensionRow, column: 16))
+    fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: compilerIntTableValue(table: tables.macroExpansionTemplates, row: extensionRow, column: 17))
+    fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: 861)
+    fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: compilerIntTableValue(table: tables.macroExpansionTemplates, row: extensionRow, column: 23))
+    return compilerFingerprintAppendInt(fingerprint: fingerprint, value: compilerIntTableValue(table: tables.macroExpansionTemplates, row: extensionRow, column: 24))
+}
+
 function compilerMacroGraphDeltaAppendGeneratedFunction(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, templateRow: Int, ownerTargetSyntaxID: Int, applicationRow: Int, applicationIdentity: CompilerFingerprint, targetIdentity: CompilerFingerprint): Int {
     let templateCount: Int(compilerIntTableRowCount(table: tables.macroExpansionTemplates))
     if templateRow < 0 || templateRow >= templateCount || ownerTargetSyntaxID < 0 || ownerTargetSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
         || compilerIntTableValue(table: tables.syntaxIndex, row: ownerTargetSyntaxID, column: 0) != compilerSyntaxKindConstruct()
         || applicationRow < 0 || applicationRow >= compilerIntTableRowCount(table: tables.macroApplications) { return 0 - 1 }
+    let kindTag: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 18))
+    let placement: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 19))
+    let lexicalParent: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 20))
+    let lexicalParentOrdinal: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 25))
+    if kindTag != compilerGraphGeneratedKindFunction() { return 0 - 1 }
+    state ownerSyntaxID: Int(0 - 1)
+    state parentFingerprint: CompilerFingerprint(CompilerFingerprint(first: 0, second: 0))
+    if placement == compilerMacroExpansionTemplatePlacementMember() {
+        if lexicalParent < 0 || lexicalParent >= templateRow
+            || compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 18) != compilerMacroExpansionTemplateKindExtension()
+            || lexicalParentOrdinal != compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 15)
+            || compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 21) != compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 21)
+            || compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 22) != compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 22)
+            || compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 23) != compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 23)
+            || compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 24) != compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 24) { return 0 - 1 }
+        parentFingerprint: compilerMacroExpansionTemplateParentFingerprint(tables: tables, extensionRow: lexicalParent)
+        ownerSyntaxID: ownerTargetSyntaxID
+    } else if placement != compilerMacroExpansionTemplatePlacementRoot() || lexicalParent != 0 - 1 || lexicalParentOrdinal != 0 - 1 {
+        return 0 - 1
+    }
     let templateFileID: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 2))
     let nameStart: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 7))
     let nameEnd: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 8))
@@ -4110,10 +4299,16 @@ function compilerMacroGraphDeltaAppendGeneratedFunction(tables: CompilerSyntaxTa
     stable: compilerFingerprintAppendText(fingerprint: stable, tag: 83, text: name)
     stable: compilerFingerprintAppendInt(fingerprint: stable, value: compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 16))
     stable: compilerFingerprintAppendInt(fingerprint: stable, value: compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 17))
+    stable: compilerFingerprintAppendInt(fingerprint: stable, value: placement)
+    stable: compilerFingerprintAppendInt(fingerprint: stable, value: lexicalParentOrdinal)
+    stable: compilerFingerprintAppendInt(fingerprint: stable, value: parentFingerprint.first)
+    stable: compilerFingerprintAppendInt(fingerprint: stable, value: parentFingerprint.second)
+    stable: compilerFingerprintAppendInt(fingerprint: stable, value: compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 23))
+    stable: compilerFingerprintAppendInt(fingerprint: stable, value: compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 24))
     let row: Int(compilerIntTableRowCount(table: delta.generatedFunctions))
     if compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: row) != 0
         || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 18)) != 0
-        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: ownerTargetSyntaxID) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: ownerSyntaxID) != 0
         || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: templateFileID) != 0
         || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: nameStart) != 0
         || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: nameEnd) != 0
@@ -4131,7 +4326,11 @@ function compilerMacroGraphDeltaAppendGeneratedFunction(tables: CompilerSyntaxTa
         || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: targetIdentity.first) != 0
         || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: targetIdentity.second) != 0
         || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: stable.first) != 0
-        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: stable.second) != 0 { return 0 - 1 }
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: stable.second) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: placement) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: lexicalParentOrdinal) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: parentFingerprint.first) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedFunctions, value: parentFingerprint.second) != 0 { return 0 - 1 }
     return row
 }
 
@@ -4243,6 +4442,26 @@ function compilerMacroGraphDeltaHasGeneratedFunctionCollision(tables: CompilerSy
     return false
 }
 
+function compilerMacroGraphDeltaGeneratedFunctionPlacementIsValid(tables: CompilerSyntaxTables, owner: Int, placement: Int, lexicalParentOrdinal: Int, parentFingerprintFirst: Int, parentFingerprintSecond: Int, templateRow: Int): Bool {
+    if templateRow < 0 || compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 18) != compilerGraphGeneratedKindFunction()
+        || compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 19) != placement
+        || compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 25) != lexicalParentOrdinal { return false }
+    if placement == compilerMacroExpansionTemplatePlacementRoot() {
+        return owner == 0 - 1 && lexicalParentOrdinal == 0 - 1 && parentFingerprintFirst == 0 && parentFingerprintSecond == 0
+    }
+    if placement != compilerMacroExpansionTemplatePlacementMember()
+        || owner < 0 || owner >= compilerIntTableRowCount(table: tables.syntaxIndex)
+        || compilerIntTableValue(table: tables.syntaxIndex, row: owner, column: 0) != compilerSyntaxKindConstruct()
+        || lexicalParentOrdinal < 0
+        || (parentFingerprintFirst == 0 && parentFingerprintSecond == 0) { return false }
+    let lexicalParent: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 20))
+    if lexicalParent < 0 || lexicalParent >= templateRow
+        || compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 18) != compilerMacroExpansionTemplateKindExtension()
+        || compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 15) != lexicalParentOrdinal { return false }
+    let expectedParentFingerprint: CompilerFingerprint(compilerMacroExpansionTemplateParentFingerprint(tables: tables, extensionRow: lexicalParent))
+    return expectedParentFingerprint.first == parentFingerprintFirst && expectedParentFingerprint.second == parentFingerprintSecond
+}
+
 function compilerMacroGraphDeltaGeneratedFunctionsAreValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Bool {
     if !compilerIntTableIsComplete(table: delta.generatedFunctions) { return false }
     state row: Int(0)
@@ -4250,10 +4469,17 @@ function compilerMacroGraphDeltaGeneratedFunctionsAreValid(tables: CompilerSynta
         let owner: Int(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 2))
         let fileID: Int(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 3))
         let name: String(compilerMacroGraphDeltaGeneratedFunctionName(tables: tables, delta: delta, row: row))
+        let placement: Int(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 21))
+        let lexicalParentOrdinal: Int(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 22))
+        let parentFingerprintFirst: Int(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 23))
+        let parentFingerprintSecond: Int(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 24))
+        let macroDeclarationRow: Int(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 12))
+        let templateOrdinal: Int(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 14))
+        let templateRow: Int(compilerMacroExpansionTemplateRowForOrdinal(tables: tables, macroDeclarationRow: macroDeclarationRow, ordinal: templateOrdinal))
         if compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 0) != row
             || compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 1) != compilerGraphGeneratedKindFunction()
-            || owner < 0 || owner >= compilerIntTableRowCount(table: tables.syntaxIndex)
-            || compilerIntTableValue(table: tables.syntaxIndex, row: owner, column: 0) != compilerSyntaxKindConstruct()
+            || (placement != compilerMacroExpansionTemplatePlacementRoot() && placement != compilerMacroExpansionTemplatePlacementMember())
+            || !compilerMacroGraphDeltaGeneratedFunctionPlacementIsValid(tables: tables, owner: owner, placement: placement, lexicalParentOrdinal: lexicalParentOrdinal, parentFingerprintFirst: parentFingerprintFirst, parentFingerprintSecond: parentFingerprintSecond, templateRow: templateRow)
             || fileID < 0 || fileID >= compilerSourceStoreFileCount(store: tables.sourceStore)
             || name == String("")
             || !compilerMacroLocalRangeIsValid(tables: tables, fileID: fileID, start: compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 4), end: compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 5), optional: false)
@@ -4547,6 +4773,7 @@ function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDec
                                                         state templateCount: Int(0)
                                                         while templateRow < compilerIntTableRowCount(table: tables.macroExpansionTemplates) {
                                                             if compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 1) == declarationRow
+                                                                && compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 18) == compilerGraphGeneratedKindFunction()
                                                                 && compilerMacroExpansionTemplateMatchesOperation(arena: arena, operationRow: operationRow, templateRow: templateRow) {
                                                                 let applicationIdentity: CompilerFingerprint(compilerMacroExecutionApplicationIdentity(tables: tables, applicationRow: applicationRow))
                                                                 let targetIdentity: CompilerFingerprint(compilerMacroExecutionTargetIdentity(tables: tables, targetSyntaxID: expansionTargetSyntaxID))
@@ -4883,7 +5110,7 @@ function compilerSyntaxKindName(kindTag: Int): String {
 
 function compilerGraphNodeColumnCount(): Int { return 8 }
 function compilerGraphFactColumnCount(): Int { return 5 }
-function compilerGraphGeneratedFunctionColumnCount(): Int { return 21 }
+function compilerGraphGeneratedFunctionColumnCount(): Int { return 25 }
 function compilerGraphGeneratedKindFunction(): Int { return 1 }
 function compilerGraphFactOwns(): Int { return 1 }
 function compilerGraphFactAppliesTo(): Int { return 2 }
@@ -8447,7 +8674,7 @@ function compilerMacroRenderGraphDelta(tables: CompilerSyntaxTables, delta: Comp
     row: 0
     while row < compilerIntTableRowCount(table: delta.generatedFunctions) {
         let name: String(compilerMacroGraphDeltaGeneratedFunctionName(tables: tables, delta: delta, row: row))
-        textBufferAppend(buffer: outputBuffer, text: "macroGraphGeneratedFunction\(tab)row=\(row)\(tab)kind=function\(tab)ownerSyntaxID=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 2))\(tab)name=\(name)\(tab)returnType=\(compilerTypedSyntaxLocalText(tables: tables, fileID: compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 3), localStart: compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 8), localEnd: compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 9)))\(tab)macroDeclarationRow=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 12))\(tab)applicationRow=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 13))\(tab)ordinal=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 14))\(tab)applicationIdentity=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 15)):\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 16))\(tab)targetIdentity=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 17)):\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 18))\(tab)stableIdentity=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 19)):\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 20))\(newline)")
+        textBufferAppend(buffer: outputBuffer, text: "macroGraphGeneratedFunction\(tab)row=\(row)\(tab)kind=function\(tab)ownerSyntaxID=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 2))\(tab)placement=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 21))\(tab)lexicalParentOrdinal=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 22))\(tab)parentFingerprint=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 23)):\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 24))\(tab)name=\(name)\(tab)returnType=\(compilerTypedSyntaxLocalText(tables: tables, fileID: compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 3), localStart: compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 8), localEnd: compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 9)))\(tab)macroDeclarationRow=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 12))\(tab)applicationRow=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 13))\(tab)ordinal=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 14))\(tab)applicationIdentity=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 15)):\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 16))\(tab)targetIdentity=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 17)):\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 18))\(tab)stableIdentity=\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 19)):\(compilerIntTableValue(table: delta.generatedFunctions, row: row, column: 20))\(newline)")
         row: row + 1
     }
     return compilerCoreTextBufferMaterializeAndDestroy(buffer: outputBuffer)

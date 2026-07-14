@@ -2784,58 +2784,78 @@ The canonical native deferred-declaration surface is the contextual
 ```range
 macro registrable(): Construct { target, diagnostics in
     @expand {
-        function create(): Int {
-            return 7
+        function globalFunction(): Int {
+            return 3
+        }
+    }
+    @expand {
+        extension #(target.declaration.self) {
+            function memberFunction(): Int {
+                return 7
+            }
         }
     }
 }
 ```
 
 `@expand` is compiler-known and is rejected outside a macro body. Its block is
-captured at macro-declaration parse time as typed deferred function templates;
-it is never rendered to source or reparsed. Execution instantiates the
-templates into the attached construct's pending `CompilerGraphDelta`. The
-bounded implementation supports zero parameters, an `Int` return, and the
-existing scalar `return integer` body shape. Template ordinals are lexical and
-generated identities derive from macro application identity, target identity,
-ordinal, and structural template data rather than source-table rows or
-absolute offsets.
+captured at macro-declaration parse time as one placement-aware typed template
+table; it is never rendered to source or reparsed. A root `function` has normal
+module-level placement. Only an explicit
+`extension #(target.declaration.self) { function ... }` carries target-owned
+placement; the typed splice is validated once and resolved against the reached
+macro target during execution. Extension rows own their nested function rows,
+so lexical placement is preserved instead of inferred from the application
+target. The bounded implementation supports zero parameters, an `Int` return,
+and the existing scalar `return integer` body shape. Template ordinals are
+lexical and generated identities derive from macro application identity, target
+identity, placement, macro-local lexical-parent ordinal, stable extension-parent
+fingerprint, ordinal, and structural template data rather than transient
+source-table rows or absolute offsets. Raw template-table parent rows are
+internal links only.
 
-Generated records carry their function kind, owner construct, source ranges,
-signature/body template, macro declaration/application/target provenance, and
-stable identity. Validation is transactional: duplicate generated names and
-authored/generated collisions reject before commitment with the focused
+Generated records carry placement, macro-local lexical parent ordinal, stable
+extension-parent fingerprint, owner namespace, source
+ranges, signature/body template, macro declaration/application/target
+provenance, and stable identity. Validation is transactional across both the
+module namespace and each target-member namespace: duplicate generated names
+and authored/generated collisions reject before commitment with the focused
 `generatedFunctionCollision` diagnostic, and no partial delta commits. A
-successful delta is materialized as an ordinary typed function declaration and
-member owner in the expanded declaration view. Lookup, semantic analysis,
-MemoryGraph, ABI planning, typed MIR, and LLVM lowering therefore use the same
-paths as authored functions. The post-commit overlay validator is idempotent:
-it ignores only the already-materialized generated row whose owner/name and
+successful root row is materialized with `functionOwners=-1`; an extension
+child is materialized with the resolved construct owner. Both become ordinary
+typed function declarations and flow through top-level/member lookup,
+semantics, MemoryGraph, ABI planning, typed MIR, and LLVM lowering. The
+post-commit overlay validator is idempotent for both placements: it ignores
+only the already-materialized generated row whose placement, owner/name, and
 declaration fingerprint match that delta stable identity, while a different
-same-owner/name row remains a collision.
+same-namespace row remains a collision.
 
-The focused candidate gate proves two data-driven generated members, absence
-from authored construct syntax, ordinary member calls, native LLVM
-validation/linking, executable exit `7`, repeated byte identity, stable
-identity/provenance under unrelated source insertion, collision rejection
-before LLVM, and rejection of `@expand` outside a macro. Stage 2 and Stage 3
-focused snapshots/artifacts and the complete compiler fixed point are required
-to remain byte-identical. This slice does not add generic generated functions,
+The focused candidate gate proves the canonical mixed-placement program with
+module-level `globalFunction()` plus target-owned `user.memberFunction()` and
+exit `10`; snapshots prove owner `-1` versus the extension target owner; bare
+member and `user.globalFunction()` calls reject with exit `65`; malformed
+extension target/splice syntax rejects before LLVM; root and member
+authored/generated collisions are transactional; two `@expand` blocks emit
+only their own templates; and repeated/unrelated reorder identities remain
+deterministic. Native LLVM validation/linking, Stage 2/Stage 3 focused
+snapshots/artifacts, and the complete compiler fixed point remain required to
+be byte-identical. This slice does not add generic generated functions,
 arbitrary types or bodies, generated constructs, replacement expansion,
 recursive or multi-round macro scheduling, source rewriting, or protocol
 syntax/validation.
 
-The final accepted command, `/usr/bin/time -l bash
-scripts/check-range-compiler-candidate`, passed in `96.20 s` real time
-(`90.84 s` user, `2.74 s` system) with `102,236,160` bytes maximum RSS and
+The final accepted command, `/usr/bin/time -l
+scripts/check-range-compiler-candidate`, passed in `102.26 s` real time
+(`95.15 s` user, `3.52 s` system) with `104,611,840` bytes maximum RSS and
 `swift_invocation=none`. The four-file inventory, Stage 2/Stage 3 fixed point,
-focused snapshots, LLVM validation/linking, executable exit checks, collision
-transactionality, and outside-macro rejection all passed. Stage 2 and Stage 3
-compiler LLVM are byte-identical at SHA-256
-`96c969b6184792c4a29ae53386f40edf83a915143527704721512d6425ac635e` and
-`3,696,725` bytes; their linked executables are byte-identical at SHA-256
-`2fb43c4e80aea4b4ddbd2a363254953760eb372002273f8924b589ce9061e1e7` and
-`2,257,504` bytes.
+focused mixed-placement snapshots, LLVM validation/linking, executable exit
+checks, root/member collision transactionality, malformed-splice rejection,
+and outside-macro rejection all passed. Stage 2 and Stage 3 compiler LLVM are
+byte-identical at SHA-256
+`31601a7fd56c6c72031a1cb209347eded6a337815c2111a981a96dbb5969fe51` and
+`3,758,231` bytes; their linked executables are byte-identical at SHA-256
+`4b77cd7719a3bc233b603cdb0dceb80436140fcd3aee7d74fb56246e9f973255` and
+`2,274,640` bytes.
 
 ### Explicit deferrals
 
