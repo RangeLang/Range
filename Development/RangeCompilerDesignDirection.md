@@ -2684,6 +2684,93 @@ Foundation `@graph`, the authored `Project` macro, general compile-time
 control flow, runtime calls, and full Foundation execution remain outside this
 slice.
 
+### Native target member-count and typed CFG checkpoint
+
+The target capability now has the frozen read-only surface
+`target.memberCount("memberName") -> Int`. It counts direct authored member
+declarations with that name on a construct application target. The lookup uses
+the immutable pre-expansion declaration/member snapshot, so in-flight
+`GraphDelta` state and macro invocation order cannot change the answer. It does
+not enumerate members, mutate source or declarations, allocate storage, or
+stage a delta. The ordinary `@main` finder walks `lexNextRangeToken` through
+`compilerCursorPeek` and accepts only an exact `macroAttribute` token, so string
+contents cannot shadow the real entry attribute. The current lexer has no
+comment token. Non-construct targets and malformed calls—including wrong
+arity and non-`String` names—are rejected as the focused
+`macroGraphQueryInvalid` diagnostic with exit `65` before ordinary LLVM
+emission.
+
+The valid target-query MIR contract is exactly one receiver plus one `String`
+name argument. Malformed surface calls are carried as an explicit invalid
+target-query resolution so MIR validation still checks the typed shape and maps
+that failure to the focused query diagnostic rather than generic
+`macroBodyInvalid`.
+
+Each executed member query records one exact read-dependency row, including a
+zero result. The `macroReadDependency` table has 18 columns in this order:
+`row`, `invocationRow`, `operation`, `kindTag`, `fileID`, `kindStart`,
+`kindEnd`, `nameStart`, `nameEnd`, `observedCount`,
+`applicationIdentity.first`, `applicationIdentity.second`,
+`targetIdentity.first`, `targetIdentity.second`, `queryIdentity.first`,
+`queryIdentity.second`, `observation.first`, and `observation.second`. The
+renderer exposes those four fingerprint pairs explicitly. Application identity
+is derived from the source-file path/role, authored application text, and
+same-file occurrence of that text; target identity is derived from the target
+declaration's source-file path/role, kind, authored declaration text, and
+same-file occurrence. No absolute source offset, transient syntax ID, or parser
+row ordinal is part of that identity. The focused gate compares the complete
+dependency rows—not only the aggregate digest—after inserting an unrelated
+source file, and repeated executions are byte-identical. The canonical
+aggregate digest retains operation, kind, count, and observation semantics while
+excluding invocation-local identity; the exact row and execution digest include
+all explicit identity columns. The aggregate digest therefore does not make an
+unstable row identity acceptable.
+
+Macro evaluation now follows the retained typed CFG/MIR from its canonical
+entry block. Only reachable blocks execute. Typed boolean conditions select
+the recorded true/false successors, `return` terminates the current path, and
+diagnostics, queries, denied operations, and graph deltas in an untaken path do
+not execute. Fuel is consumed by actually executed MIR operations and
+terminators, bounding cycles and malformed CFGs without a fallback linear
+scan. The minimal scalar support is sufficient for a member-count comparison
+to select a diagnostic error path or a success path. The focused negative
+fixture also applies the query from a `Function`-target macro and verifies that
+runtime target-kind enforcement rejects it before dependency recording or LLVM
+emission.
+
+The focused candidate gate proves present-member success and positive exact
+dependency recording, missing-member zero dependency and pre-emission exit
+`65`, an untaken denied target operation, malformed-query rejection, repeated
+output/dependency/LLVM determinism, zero-argument and non-`String` malformed
+query rejection, non-construct target-kind rejection, ordinary LLVM
+validation/linking with conventional exit `7`, and byte-identical Stage 2/Stage
+3 results. Existing
+`declarationCount` positive/zero, omission commit/rollback, capability-denial,
+fuel, macro-linking, aggregate ABI, and fixed-point checks remain part of the
+same gate.
+
+The final bounded command, `/usr/bin/time -l scripts/range
+check-compiler-candidate`, passed in `87.54 s` real time (`83.57 s` user,
+`2.20 s` system) with `93,372,416` bytes maximum RSS and
+`swift_invocation=none`. The four-file inventory passed. Stage 2 and Stage 3
+compiler LLVM are byte-identical at SHA-256
+`5896a802f4bf44c5cb2e7ec06782e9615314639b41e8a64ab290f38fe4c77cae` and
+`3,541,481` bytes; their linked executables are byte-identical at SHA-256
+`ce998274af1f814962f7179fbd6e65e79f70556ec8e76cd8d9524771d6425680` and
+`2,073,328` bytes. The present-member native LLVM is byte-identical at
+SHA-256 `34c7fac1433e82a488f305be3a185674c5403a1dbacd0818665c546bd5212ca5`
+and `1,215` bytes; its linked executable is byte-identical at SHA-256
+`7103dfbf8ac592bc655ea8a8508b3efbd11171f63bd241f05ceaea34307dae94` and
+`38,344` bytes. Stage 2/Stage 3 focused snapshots and the candidate fixed
+point all passed.
+
+This is a validation substrate, not protocol support. It adds no protocols,
+conformance checking, witness tables, generated declarations or behavior,
+requirement enumeration, arrays, closures, `where` clauses, member
+enumeration, runtime macro behavior, or protocol-specific validator. A future
+requirement-macro slice must extend these selective typed queries and CFG/delta
+semantics rather than introduce a separate protocol engine.
+
 ### Explicit deferrals
 
 Do not add compiler concurrency before one-function memory is bounded and
