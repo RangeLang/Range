@@ -2,12 +2,12 @@
   "formatVersion": 1,
   "seed": {
     "path": "RangeCompiler/Bootstrap/RangeCompilerSeed.ll",
-    "bytes": 4095592,
-    "sha256": "4fa0603b8e4594ac2da507c3cf1d6f78e13843a3673753d55d1210224aab829d"
+    "bytes": 4137928,
+    "sha256": "aa77948c3a8b6f3e8cbb75d563aee64b4ff07ce0fe4305441c6a58df134b5a25"
   },
   "expectedStage3LLVM": {
-    "bytes": 4095592,
-    "sha256": "4fa0603b8e4594ac2da507c3cf1d6f78e13843a3673753d55d1210224aab829d"
+    "bytes": 4137928,
+    "sha256": "aa77948c3a8b6f3e8cbb75d563aee64b4ff07ce0fe4305441c6a58df134b5a25"
   },
   "compilerSources": [
     {
@@ -23,7 +23,7 @@
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerCore.range",
       "role": "project",
-      "sha256": "49304526838cd7826cfca94ccfebf5b2a121616c616eb491558a169cf0ea8a74"
+      "sha256": "3a4d088cfe03e86ffcf0e6d40f72e82de44a1fd56733f5f9348cc0452aea8cd5"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Lexer.range",

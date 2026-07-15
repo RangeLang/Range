@@ -3065,19 +3065,30 @@ unique access. No generic arity, element spelling, layout guess, `Array`/
 This keeps an empty nominal such as `Box<Int>` from silently becoming a
 collection.
 
-This slice deliberately stops before claiming an executable collection:
-`Array<Element>` and `ArrayStorage<Element>` are not connected to RawBuffer;
-MemoryGraph has no generic collection storage/lifetime proof; typed IR/LLVM
-does not emit collection `create`, `count`, `load`, `store`, or `destroy`
-calls; and no Array-specific runtime or second storage representation was
-added. The six-column BodyArena TypeID ABI remains unchanged because changing
-that frozen table would move specialization identity into a transient
-representation; the accepted identity is carried by declaration fingerprints
-and the SemanticGraph specialization table.
+The corrected collection boundary is now ordinary Range code rather than a
+compiler-known buffer capability. `Array<Element>` owns exactly one
+`state storage: RawBuffer` field, is initialized from the handle produced by
+`.create`, and forwards count, append/read, write, and destroy through the
+existing declaration-driven
+`@builtin(.storage/.create/.read/.write/.destroy)` leaves. RawBuffer remains
+the only physical allocation and runtime ABI; there is no Array allocator,
+Array-specific compiler dispatch, or second storage representation. The
+bounded candidate proof is executable for direct `Int` elements and rejects
+missing, double, after-destroy, and after-move use at reachability stage 43
+before LLVM. General element layouts, copy/move/destruction policy, and
+control-flow ownership beyond the acyclic settled CFG subset remain deferred.
+The dirty seed/manifest are an intermediate bootstrap artifact for this
+unaccepted source state; no Stage 3 fixed-point acceptance or seed rollover
+was run at this checkpoint.
 
-The exact next blocker is a canonical typed-buffer capability rule authored in
-Range that maps a resolved nominal element layout to the existing RawBuffer
-capability symbols. That rule must justify shared reads, unique writes, one
-owned opaque handle, and exactly one explicit destroy through MemoryGraph
-before typed IR can emit calls. Append, generalized element
-layouts/destruction, and higher-order collection operations remain deferred.
+The shared semantic category is `Operation`, but it is not one universal
+opcode. Abstract type operations produce set/relation facts for membership,
+application, substitution, compatibility, capability, layout, and closure;
+concrete mathematical/logical operations produce value operations; and
+concrete memory operations produce MemoryGraph create/read/write/move/consume
+facts. Abstract versus concrete is a semantic-domain distinction, not a
+compile-time/runtime split: either kind may later be evaluated away or
+retained. Boolean operators remain eager, so CFG constructs alone decide
+whether an effectful operation executes; `&&` and `||` never provide effect
+sequencing. The next slice is broader owned-field/effect coverage and
+supported element layouts, not a second collection model.

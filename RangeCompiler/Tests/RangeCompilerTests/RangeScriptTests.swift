@@ -1178,6 +1178,143 @@ struct RangeScriptTests {
         #expect(result.stdout.contains("call i32 @rawBufferDestroy(ptr"))
     }
 
+    @Test("Native compiler lowers ordinary Array through declaration-driven RawBuffer")
+    func nativeCompilerLowersOrdinaryArrayThroughRawBuffer() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let source = arrayRawBufferFixture(body: """
+            let storage: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
+            let values: Array<Int>(Array(storage: storage))
+            let appended: Int(values.append(element: 7))
+            let count: Int(values.count())
+            let item: Int(values.element(index: 0))
+            let updated: Int(values.update(element: 13, index: 0))
+            let result: Int(values.element(index: 0))
+            let destroyed: Int(values.destroy())
+            return result
+            """)
+        let first = try runTypedSyntaxFixture(
+            source: source,
+            name: "ArrayRawBufferPositive.range",
+            directory: directory
+        )
+        let second = try runTypedSyntaxFixture(
+            source: source,
+            name: "ArrayRawBufferPositive.range",
+            directory: directory
+        )
+
+        #expect(first.timedOut == false)
+        #expect(second.timedOut == false)
+        #expect(first.exitCode == 0)
+        #expect(second.exitCode == 0)
+        #expect(first.stderr.isEmpty)
+        #expect(second.stderr.isEmpty)
+        #expect(first.stdout == second.stdout)
+        let firstHash = SHA256.hash(data: Data(first.stdout.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+        let secondHash = SHA256.hash(data: Data(second.stdout.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+        #expect(firstHash == secondHash)
+        #expect(firstHash == "aff85b4f574bb675833ba639afc43deafceac95b12865634419e94c6e503d5b2")
+        for forbidden in ["rangeConstruct", "ArrayStorage", "arrayCreate", "arrayDestroy", "malloc", "calloc"] {
+            #expect(!first.stdout.contains(forbidden), "unexpected forbidden symbol \(forbidden)")
+        }
+        #expect(first.stdout.contains("@rawBufferCreate"))
+        #expect(first.stdout.contains("@rawBufferCount"))
+        #expect(first.stdout.contains("@rawBufferLoadInt"))
+        #expect(first.stdout.contains("@rawBufferStoreInt"))
+        #expect(first.stdout.contains("@rawBufferDestroy"))
+
+        let root = try repositoryRoot()
+        let llvm = directory.appendingPathComponent("ArrayRawBufferPositive.ll")
+        let executable = directory.appendingPathComponent("ArrayRawBufferPositive")
+        try first.stdout.write(to: llvm, atomically: true, encoding: .utf8)
+        let runtime = root.appendingPathComponent("RangeCompiler/Runtime", isDirectory: true)
+        let clangResult = try runCapturedProcess(
+            executable: "/usr/bin/env",
+            arguments: [
+                "clang", "-Wno-override-module", "-x", "ir", llvm.path, "-x", "c",
+                runtime.appendingPathComponent("RangeCompilerHost.c").path,
+                runtime.appendingPathComponent("RangeString.c").path,
+                runtime.appendingPathComponent("RangeRawBuffer.c").path,
+                runtime.appendingPathComponent("RangeCompilerMetrics.c").path,
+                "-o", executable.path,
+            ]
+        )
+        #expect(clangResult.exitCode == 0)
+        #expect(clangResult.stderr.isEmpty)
+        let executableResult = try runCapturedProcess(executable: executable.path, arguments: [])
+        #expect(executableResult.exitCode == 13)
+        #expect(executableResult.stdout.isEmpty)
+        #expect(executableResult.stderr.isEmpty)
+    }
+
+    @Test("Native compiler rejects ordinary Array ownership violations before LLVM")
+    func nativeCompilerRejectsOrdinaryArrayOwnershipViolations() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let cases: [(String, String)] = [
+            (
+                "MissingDestroy",
+                """
+                let storage: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
+                let values: Array<Int>(Array(storage: storage))
+                return values.count()
+                """
+            ),
+            (
+                "DoubleDestroy",
+                """
+                let storage: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
+                let values: Array<Int>(Array(storage: storage))
+                let first: Int(values.destroy())
+                return values.destroy()
+                """
+            ),
+            (
+                "UseAfterDestroy",
+                """
+                let storage: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
+                let values: Array<Int>(Array(storage: storage))
+                let destroyed: Int(values.destroy())
+                return values.element(index: 0)
+                """
+            ),
+            (
+                "SourceAfterMove",
+                """
+                let storage: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
+                let values: Array<Int>(Array(storage: storage))
+                let afterMove: Int(rawBufferCount(buffer: storage))
+                let destroyed: Int(values.destroy())
+                return afterMove
+                """
+            ),
+        ]
+
+        for (name, body) in cases {
+            let result = try runTypedSyntaxFixture(
+                source: arrayRawBufferFixture(body: body),
+                name: "ArrayRawBuffer\(name).range",
+                directory: directory
+            )
+            #expect(result.timedOut == false)
+            #expect(result.exitCode == 65)
+            #expect(result.stderr.isEmpty)
+            #expect(result.stdout == "compilerError\tkind=invalidFunctionReachability\tstage=43\n")
+            #expect(!result.stdout.contains("define "))
+        }
+    }
+
     @Test("Native compiler lowers the shared String search ABI")
     func nativeCompilerLowersSharedStringSearchABI() throws {
         let directory = FileManager.default.temporaryDirectory
@@ -1726,6 +1863,69 @@ struct RangeScriptTests {
         #expect(arityMismatchResult.stdout.contains("compilerError\tkind=invalidSemanticGraph"))
     }
 
+    @Test("Native semantic resolver preserves ordinary and nested nominal identity")
+    func nativeCompilerResolvesOrdinaryAndNestedNominalIdentity() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let ordinary = try runTypedSyntaxFixture(
+            source: """
+            compilerSemantics
+            construct Box {
+                let value: Int
+            }
+            function identity(value: Box): Box {
+                return value
+            }
+            @main {
+                return 0
+            }
+
+            """,
+            name: "OrdinaryNominalIdentity.range",
+            directory: directory
+        )
+        #expect(ordinary.exitCode == 0)
+        #expect(ordinary.stderr.isEmpty)
+        #expect(ordinary.stdout.contains("semanticGraph\tvalid=true"))
+        #expect(ordinary.stdout.contains("typedTable\tname=semanticSpecialization\tversion=1\tcolumns=5\trows=0"))
+
+        let nestedSource = """
+        compilerSemantics
+        construct Wide {
+            let left: Int
+            let right: Int
+        }
+        construct Box<Element> {}
+        function identity(value: Box<Box<Wide>>): Box<Box<Wide>> {
+            return value
+        }
+        @main {
+            return 0
+        }
+
+        """
+        let nestedFirst = try runTypedSyntaxFixture(
+            source: nestedSource,
+            name: "NestedNominalIdentityFirst.range",
+            directory: directory
+        )
+        let nestedSecond = try runTypedSyntaxFixture(
+            source: nestedSource,
+            name: "NestedNominalIdentitySecond.range",
+            directory: directory
+        )
+        #expect(nestedFirst.exitCode == 0)
+        #expect(nestedSecond.exitCode == 0)
+        #expect(nestedFirst.stderr.isEmpty)
+        #expect(nestedSecond.stderr.isEmpty)
+        #expect(nestedFirst.stdout == nestedSecond.stdout)
+        #expect(nestedFirst.stdout.contains("semanticGraph\tvalid=true"))
+        #expect(nestedFirst.stdout.contains("typedTable\tname=semanticSpecialization\tversion=1\tcolumns=5\trows=2"))
+    }
+
     @Test("Typed declaration fingerprint survives unrelated declaration reorder")
     func typedDeclarationFingerprintSurvivesUnrelatedDeclarationReorder() throws {
         let directory = FileManager.default.temporaryDirectory
@@ -2092,6 +2292,40 @@ struct RangeScriptTests {
         #expect(result.stdout.contains("memoryDecision\trow=1\tvalues=3,9,0,0,1,14"))
         #expect(result.stdout.contains("memoryDecision\trow=2\tvalues=5,14,0,0,0,14"))
         #expect(result.stdout.contains("memoryDecision\trow=3\tvalues=7,16,0,0,1,14"))
+    }
+
+    @Test("MemoryGraph owns an opaque RawBuffer handle in a function region")
+    func memoryGraphProvesOpaqueRawBufferFunctionOwnership() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let result = try runTypedSyntaxFixture(
+            source: """
+            compilerMemoryGraph
+            @builtin(.storage)
+            construct RawBuffer {}
+            @builtin(.create)
+            function rawBufferCreate(capacity: Int, stride: Int): RawBuffer
+            @builtin(.destroy)
+            function rawBufferDestroy(buffer: RawBuffer): Int
+            function make(): Int {
+                let buffer: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
+                return rawBufferDestroy(buffer: buffer)
+            }
+            @main {
+                return make()
+            }
+
+            """,
+            name: "OpaqueRawBufferFunctionOwnership.range",
+            directory: directory
+        )
+        #expect(result.timedOut == false)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.hasPrefix("memoryGraph\tvalid=true\tlayoutCount=0\tstorageCount=1\tdecisionCount=5\n"))
+        #expect(result.stdout.contains("memoryStorage\trow=0\tvalues=0,13,0,6,1,0"))
+        #expect(result.stdout.contains("memoryDecision\trow=3\tvalues=7,15,0,0,1,13"))
     }
 
     @Test("Typed IR cites opaque RawBuffer initialization and consume decisions")
@@ -4633,6 +4867,60 @@ private func opaqueRawBufferFixture(body: String, includeCount: Bool = false) ->
     @builtin(.destroy)
     function rawBufferDestroy(buffer: RawBuffer): Int
     \(countDeclaration)
+    @main {
+    \(body)
+    }
+
+    """
+}
+
+private func arrayRawBufferFixture(body: String) -> String {
+    """
+    @builtin(.storage)
+    construct RawBuffer {}
+
+    @builtin(.create)
+    function rawBufferCreate(capacity: Int, stride: Int): RawBuffer
+
+    @builtin(.read)
+    function rawBufferCount(buffer: RawBuffer): Int
+
+    @builtin(.write)
+    function rawBufferAppendInt(buffer: RawBuffer, value: Int): Int
+
+    @builtin(.read)
+    function rawBufferLoadInt(buffer: RawBuffer, index: Int): Int
+
+    @builtin(.write)
+    function rawBufferStoreInt(buffer: RawBuffer, index: Int, value: Int): Int
+
+    @builtin(.destroy)
+    function rawBufferDestroy(buffer: RawBuffer): Int
+
+    construct Array<Element> {
+        state storage: RawBuffer
+
+        function append(element: Element): Int {
+            return rawBufferAppendInt(buffer: self.storage, value: element)
+        }
+
+        function count(): Int {
+            return rawBufferCount(buffer: self.storage)
+        }
+
+        function element(index: Int): Element {
+            return rawBufferLoadInt(buffer: self.storage, index: index)
+        }
+
+        function update(element: Element, index: Int): Int {
+            return rawBufferStoreInt(buffer: self.storage, index: index, value: element)
+        }
+
+        function destroy(): Int {
+            return rawBufferDestroy(buffer: self.storage)
+        }
+    }
+
     @main {
     \(body)
     }
