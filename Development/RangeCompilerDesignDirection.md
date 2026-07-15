@@ -3041,3 +3041,43 @@ lower only after semantic settlement. The changes in this document are the
 addition of Plotter, macro values as graph gates, protocols as requirement
 macros, the explicit performance/storage model, and the measured self-hosting
 migration path.
+
+### Native generic identity and indexed-access proof boundary (2026-07-15)
+
+The accepted bounded slice adds declaration-side generic identity to the
+native typed pipeline. Construct and function declarations now retain generic
+parameter owner, ordinal, type kind, source ranges, and stable fingerprints.
+Those parameters contribute to declaration/function fingerprints. Typed
+postfix indexing is represented by a normal `Index` node with receiver/index
+edges, including indexed assignment targets. SemanticGraph records a concrete
+nominal specialization only from resolved declaration identity, arity, and
+structural argument identities; equivalent formatting produces the same
+specialization fingerprint. File-local source spans remain local when those
+facts are resolved, including declarations in later bundled files.
+If the known generic nominal has an angle-argument clause but any argument
+identity is unresolved, the semantic graph rejects it; bare generic parameter
+names remain deferred until generic-function semantics are implemented.
+
+Index syntax is intentionally not a semantic capability yet. SemanticGraph
+rejects every index expression deterministically before it can claim shared or
+unique access. No generic arity, element spelling, layout guess, `Array`/
+`Buffer` name, or function-name convention is sufficient to admit indexing.
+This keeps an empty nominal such as `Box<Int>` from silently becoming a
+collection.
+
+This slice deliberately stops before claiming an executable collection:
+`Array<Element>` and `ArrayStorage<Element>` are not connected to RawBuffer;
+MemoryGraph has no generic collection storage/lifetime proof; typed IR/LLVM
+does not emit collection `create`, `count`, `load`, `store`, or `destroy`
+calls; and no Array-specific runtime or second storage representation was
+added. The six-column BodyArena TypeID ABI remains unchanged because changing
+that frozen table would move specialization identity into a transient
+representation; the accepted identity is carried by declaration fingerprints
+and the SemanticGraph specialization table.
+
+The exact next blocker is a canonical typed-buffer capability rule authored in
+Range that maps a resolved nominal element layout to the existing RawBuffer
+capability symbols. That rule must justify shared reads, unique writes, one
+owned opaque handle, and exactly one explicit destroy through MemoryGraph
+before typed IR can emit calls. Append, generalized element
+layouts/destruction, and higher-order collection operations remain deferred.

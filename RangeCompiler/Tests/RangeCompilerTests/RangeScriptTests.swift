@@ -1567,6 +1567,165 @@ struct RangeScriptTests {
         #expect(signatureEditFingerprint != baseFingerprint)
     }
 
+    @Test("Native compiler preserves generic identity and rejects unsupported indexing")
+    func nativeCompilerPreservesGenericIdentityAndRejectsUnsupportedIndexing() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let genericSource = """
+        compilerTypedSyntax
+        construct Box<Element> {}
+
+        function identity<Value>(value: Value): Value {
+            return value
+        }
+
+        """
+        let typedFirst = try runTypedSyntaxFixture(
+            source: genericSource,
+            name: "GenericIdentityFirst.range",
+            directory: directory
+        )
+        let typedSecond = try runTypedSyntaxFixture(
+            source: genericSource,
+            name: "GenericIdentitySecond.range",
+            directory: directory
+        )
+        #expect(typedFirst.exitCode == 0)
+        #expect(typedSecond.exitCode == 0)
+        #expect(typedFirst.stderr.isEmpty)
+        #expect(typedSecond.stderr.isEmpty)
+        #expect(typedFirst.stdout == typedSecond.stdout)
+        #expect(typedFirst.stdout.contains("genericParameterCount=2"))
+        #expect(typedFirst.stdout.contains("genericParameter\trow=0\townerSyntaxID=0\townerKind=construct\tordinal=0"))
+        #expect(typedFirst.stdout.contains("genericParameter\trow=1\townerSyntaxID=1\townerKind=function\tordinal=0"))
+        #expect(typedFirst.stdout.contains("typedTable\tname=genericParameterTable\tversion=1\tcolumns=11\trows=2"))
+
+        let typedIndexResult = try runTypedSyntaxFixture(
+            source: """
+            compilerTypedSyntax
+            construct Box<Element> {}
+
+            function read(buffer: Box<Int>, index: Int): Int {
+                return buffer[index]
+            }
+
+            function write(buffer: Box<Int>, index: Int, value: Int): Int {
+                buffer[index]: value
+                return value
+            }
+
+            """,
+            name: "GenericIndexTypedSyntax.range",
+            directory: directory
+        )
+        #expect(typedIndexResult.exitCode == 0)
+        #expect(typedIndexResult.stderr.isEmpty)
+        #expect(typedIndexResult.stdout.contains("kind=index"))
+        #expect(typedIndexResult.stdout.contains("kind=assignment"))
+        let indexEdgeRows = typedIndexResult.stdout.split(separator: "\n").filter { line in
+            guard line.hasPrefix("bodyEdge\t"),
+                let valuesField = line.split(separator: "\t").first(where: { $0.hasPrefix("values=") })
+            else {
+                return false
+            }
+            let values = valuesField.dropFirst("values=".count).split(separator: ",")
+            return values.count == 4 && (values[2] == "7" || values[2] == "22")
+        }
+        #expect(indexEdgeRows.count >= 4)
+
+        func semanticSpecializationFixture(typeName: String) -> String {
+            """
+            compilerSemantics
+            compilerSourceFile\\tGeneric.range
+            construct Box<Element> {}
+            compilerSourceFile\\tMain.range
+            function read(buffer: \(typeName), index: Int): Int {
+                return 1
+            }
+
+            """
+        }
+
+        let semanticConcrete = try runTypedSyntaxFixture(
+            source: semanticSpecializationFixture(typeName: "Box<Int>"),
+            name: "GenericSpecializationConcrete.range",
+            directory: directory
+        )
+        let semanticWhitespace = try runTypedSyntaxFixture(
+            source: semanticSpecializationFixture(typeName: "Box< Int >"),
+            name: "GenericSpecializationWhitespace.range",
+            directory: directory
+        )
+        #expect(semanticConcrete.exitCode == 0)
+        #expect(semanticWhitespace.exitCode == 0)
+        #expect(semanticConcrete.stderr.isEmpty)
+        #expect(semanticWhitespace.stderr.isEmpty)
+        #expect(semanticConcrete.stdout.contains("semanticGraph\tvalid=true"))
+        #expect(semanticWhitespace.stdout.contains("semanticGraph\tvalid=true"))
+        #expect(semanticConcrete.stdout.contains("typedTable\tname=semanticSpecialization\tversion=1\tcolumns=5\trows=1"))
+        #expect(semanticWhitespace.stdout.contains("typedTable\tname=semanticSpecialization\tversion=1\tcolumns=5\trows=1"))
+        let concreteSpecializationRow = semanticConcrete.stdout.split(separator: "\n").first { $0.hasPrefix("semanticSpecialization\trow=0\t") }
+        let whitespaceSpecializationRow = semanticWhitespace.stdout.split(separator: "\n").first { $0.hasPrefix("semanticSpecialization\trow=0\t") }
+        #expect(concreteSpecializationRow == whitespaceSpecializationRow)
+
+        let unresolvedArgumentResult = try runTypedSyntaxFixture(
+            source: semanticSpecializationFixture(typeName: "Box<Missing>"),
+            name: "GenericSpecializationUnresolvedArgument.range",
+            directory: directory
+        )
+        #expect(unresolvedArgumentResult.exitCode == 65)
+        #expect(unresolvedArgumentResult.stderr.isEmpty)
+        #expect(unresolvedArgumentResult.stdout.contains("compilerError\tkind=invalidSemanticGraph"))
+
+        let nestedUnresolvedArgumentResult = try runTypedSyntaxFixture(
+            source: semanticSpecializationFixture(typeName: "Box<Box<Missing>>"),
+            name: "GenericSpecializationNestedUnresolvedArgument.range",
+            directory: directory
+        )
+        #expect(nestedUnresolvedArgumentResult.exitCode == 65)
+        #expect(nestedUnresolvedArgumentResult.stderr.isEmpty)
+        #expect(nestedUnresolvedArgumentResult.stdout.contains("compilerError\tkind=invalidSemanticGraph"))
+
+        let rejectedIndexSource = semanticSpecializationFixture(typeName: "Box<Int>")
+            .replacingOccurrences(of: "return 1", with: "return buffer[index]")
+        let rejectedIndexFirst = try runTypedSyntaxFixture(
+            source: rejectedIndexSource,
+            name: "GenericIndexRejectedFirst.range",
+            directory: directory
+        )
+        let rejectedIndexSecond = try runTypedSyntaxFixture(
+            source: rejectedIndexSource,
+            name: "GenericIndexRejectedSecond.range",
+            directory: directory
+        )
+        #expect(rejectedIndexFirst.exitCode == 65)
+        #expect(rejectedIndexSecond.exitCode == 65)
+        #expect(rejectedIndexFirst.stderr.isEmpty)
+        #expect(rejectedIndexSecond.stderr.isEmpty)
+        #expect(rejectedIndexFirst.stdout == rejectedIndexSecond.stdout)
+        #expect(rejectedIndexFirst.stdout.contains("compilerError\tkind=invalidSemanticGraph"))
+
+        let arityMismatchResult = try runTypedSyntaxFixture(
+            source: """
+            compilerSemantics
+            construct Box<Element> {}
+
+            function invalid(value: Box<Int, Int>): Int {
+                return 1
+            }
+
+            """,
+            name: "GenericArityMismatch.range",
+            directory: directory
+        )
+        #expect(arityMismatchResult.exitCode == 65)
+        #expect(arityMismatchResult.stderr.isEmpty)
+        #expect(arityMismatchResult.stdout.contains("compilerError\tkind=invalidSemanticGraph"))
+    }
+
     @Test("Typed declaration fingerprint survives unrelated declaration reorder")
     func typedDeclarationFingerprintSurvivesUnrelatedDeclarationReorder() throws {
         let directory = FileManager.default.temporaryDirectory
