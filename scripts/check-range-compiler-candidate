@@ -315,7 +315,7 @@ audit_storage_switches() {
     local stage_directory="$3"
     local kind source expected first second first_error second_error llvm linked run_output run_error
 
-    for kind in integer string bool state member; do
+    for kind in integer string bool state member enum enum-state enum-function; do
         expected=0
         source="$SWITCH_INTEGER_SOURCE"
         if [[ "$kind" == string ]]; then
@@ -330,6 +330,15 @@ audit_storage_switches() {
         elif [[ "$kind" == member ]]; then
             source="$SWITCH_MEMBER_SOURCE"
             expected=7
+        elif [[ "$kind" == enum ]]; then
+            source="$SWITCH_ENUM_SOURCE"
+            expected=3
+        elif [[ "$kind" == enum-state ]]; then
+            source="$SWITCH_ENUM_STATE_SOURCE"
+            expected=3
+        elif [[ "$kind" == enum-function ]]; then
+            source="$SWITCH_ENUM_FUNCTION_SOURCE"
+            expected=2
         else
             expected=20
         fi
@@ -357,13 +366,25 @@ audit_storage_switches() {
         fi
         [[ "$RUN_STATUS" -eq "$expected" ]] || fail "$stage_label $kind storage switch exited $RUN_STATUS"
         [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label $kind storage switch wrote output"
+        if [[ "$kind" == enum || "$kind" == enum-state || "$kind" == enum-function ]]; then
+            /usr/bin/grep -Fq 'icmp eq i32' "$llvm" || fail "$stage_label enum switch did not lower through scalar tag comparisons"
+            if /usr/bin/grep -Eq 'rangeConstruct|malloc|calloc|realloc' "$llvm"; then
+                fail "$stage_label enum switch introduced dynamic record or allocator calls"
+            fi
+        fi
     done
 
     local negative_kind negative_source negative_output negative_error
-    for negative_kind in nonstorage mismatch; do
+    for negative_kind in nonstorage mismatch enum-missing enum-duplicate enum-unknown; do
         negative_source="$SWITCH_NONSTORAGE_SOURCE"
         if [[ "$negative_kind" == mismatch ]]; then
             negative_source="$SWITCH_MISMATCH_SOURCE"
+        elif [[ "$negative_kind" == enum-missing ]]; then
+            negative_source="$SWITCH_ENUM_MISSING_SOURCE"
+        elif [[ "$negative_kind" == enum-duplicate ]]; then
+            negative_source="$SWITCH_ENUM_DUPLICATE_SOURCE"
+        elif [[ "$negative_kind" == enum-unknown ]]; then
+            negative_source="$SWITCH_ENUM_UNKNOWN_SOURCE"
         fi
         negative_output="$WORK_ROOT/$stage_label.switch.$negative_kind.out"
         negative_error="$WORK_ROOT/$stage_label.switch.$negative_kind.err"
@@ -376,7 +397,96 @@ audit_storage_switches() {
             fail "$stage_label $negative_kind switch rejection emitted LLVM"
         fi
     done
-    echo "$stage_label storage switch: pass (let/state/member, Int/String/Bool, deterministic, typed rejection matrix)"
+    local enum_declaration_output="$WORK_ROOT/$stage_label.enum.duplicate-declaration.out"
+    local enum_declaration_error="$WORK_ROOT/$stage_label.enum.duplicate-declaration.err"
+    run_capture "$executable" "$ENUM_DUPLICATE_DECLARATION_SOURCE" "$enum_declaration_output" "$enum_declaration_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label duplicate enum declaration rejection exited $RUN_STATUS"
+    [[ ! -s "$enum_declaration_error" ]] || fail "$stage_label duplicate enum declaration rejection wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidTypedDeclarations' "$enum_declaration_output" \
+        || fail "$stage_label duplicate enum declaration missed the typed declaration diagnostic"
+    if /usr/bin/grep -Fq 'define ' "$enum_declaration_output"; then
+        fail "$stage_label duplicate enum declaration emitted LLVM"
+    fi
+    echo "$stage_label storage switch: pass (let/state/member, Int/String/Bool/enum, enum state and call boundaries, exhaustive tags, deterministic, typed rejection matrix)"
+}
+
+audit_recursive_enum_declarations() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local first="$WORK_ROOT/$stage_label.recursive-enum.first.ll"
+    local second="$WORK_ROOT/$stage_label.recursive-enum.repeat.ll"
+    local first_error="$WORK_ROOT/$stage_label.recursive-enum.first.err"
+    local second_error="$WORK_ROOT/$stage_label.recursive-enum.repeat.err"
+    local linked="$stage_directory/RecursiveEnumDeclaration"
+    local run_output="$WORK_ROOT/$stage_label.recursive-enum.run.out"
+    local run_error="$WORK_ROOT/$stage_label.recursive-enum.run.err"
+
+    run_capture "$executable" "$RECURSIVE_ENUM_SOURCE" "$first" "$first_error"
+    require_successful_output "$stage_label recursive enum declaration" "$first" "$first_error"
+    run_capture "$executable" "$RECURSIVE_ENUM_SOURCE" "$second" "$second_error"
+    require_successful_output "$stage_label repeated recursive enum declaration" "$second" "$second_error"
+    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label recursive enum declaration was not deterministic"
+    validate_llvm "$first"
+    link_llvm "$first" "$linked"
+    if "$linked" > "$run_output" 2> "$run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label recursive enum declaration executable exited $RUN_STATUS"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label recursive enum declaration executable wrote output"
+
+    local snapshot="$WORK_ROOT/$stage_label.recursive-enum.snapshot"
+    local snapshot_error="$WORK_ROOT/$stage_label.recursive-enum.snapshot.err"
+    run_capture "$executable" "$RECURSIVE_ENUM_SNAPSHOT_SOURCE" "$snapshot" "$snapshot_error"
+    [[ "$RUN_STATUS" -eq 0 ]] || fail "$stage_label recursive enum typed snapshot exited $RUN_STATUS"
+    [[ ! -s "$snapshot_error" ]] || fail "$stage_label recursive enum typed snapshot wrote stderr"
+    /usr/bin/grep -Fq $'kind=casePayload\tstorage=binding' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted binding payload policy"
+    /usr/bin/grep -Fq $'kind=casePayload\tstorage=indirect' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted indirect payload policy"
+    /usr/bin/grep -Fq $'kind=casePayload\tstorage=direct' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted direct payload policy"
+    /usr/bin/grep -Eq $'name=value.*type=BindingList.*kind=casePayload\tstorage=binding\ttypeTargetKind=declaration\ttypeTargetID=0' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the BindingList payload type ID edge"
+    /usr/bin/grep -Eq $'name=value.*type=IndirectList.*kind=casePayload\tstorage=indirect\ttypeTargetKind=declaration\ttypeTargetID=4' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the IndirectList payload type ID edge"
+    /usr/bin/grep -Eq $'name=value.*type=Int.*kind=casePayload\tstorage=direct\ttypeTargetKind=builtin\ttypeTargetID=1' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the Int payload builtin type ID"
+
+    local negative_kind negative_source negative_output negative_error
+    for negative_kind in direct-self direct-mutual unknown duplicate-payload; do
+        negative_source="$RECURSIVE_ENUM_DIRECT_SELF_SOURCE"
+        if [[ "$negative_kind" == direct-mutual ]]; then
+            negative_source="$RECURSIVE_ENUM_DIRECT_MUTUAL_SOURCE"
+        elif [[ "$negative_kind" == unknown ]]; then
+            negative_source="$RECURSIVE_ENUM_UNKNOWN_TYPE_SOURCE"
+        elif [[ "$negative_kind" == duplicate-payload ]]; then
+            negative_source="$RECURSIVE_ENUM_DUPLICATE_PAYLOAD_SOURCE"
+        fi
+        negative_output="$WORK_ROOT/$stage_label.recursive-enum.$negative_kind.out"
+        negative_error="$WORK_ROOT/$stage_label.recursive-enum.$negative_kind.err"
+        run_capture "$executable" "$negative_source" "$negative_output" "$negative_error"
+        [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label recursive enum $negative_kind rejection exited $RUN_STATUS"
+        [[ ! -s "$negative_error" ]] || fail "$stage_label recursive enum $negative_kind rejection wrote stderr"
+        /usr/bin/grep -Fq $'compilerError\tkind=invalidTypedDeclarations' "$negative_output" \
+            || fail "$stage_label recursive enum $negative_kind missed the typed declaration diagnostic"
+        if /usr/bin/grep -Fq 'define ' "$negative_output"; then
+            fail "$stage_label recursive enum $negative_kind emitted LLVM"
+        fi
+    done
+    local body_use_output="$WORK_ROOT/$stage_label.recursive-enum.body-use.out"
+    local body_use_error="$WORK_ROOT/$stage_label.recursive-enum.body-use.err"
+    run_capture "$executable" "$RECURSIVE_ENUM_BODY_USE_SOURCE" "$body_use_output" "$body_use_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label recursive enum body-use gate exited $RUN_STATUS"
+    [[ ! -s "$body_use_error" ]] || fail "$stage_label recursive enum body-use gate wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$body_use_output" \
+        || fail "$stage_label recursive enum body-use gate missed the pre-emission diagnostic"
+    if /usr/bin/grep -Fq 'define ' "$body_use_output"; then
+        fail "$stage_label recursive enum body-use gate emitted LLVM"
+    fi
+    echo "$stage_label recursive enums: pass (ID-linked payload types, payload graph policies, binding/indirect cycle breaks, direct-cycle rejection, executable-use gate, deterministic declaration proof)"
 }
 
 audit_placement_symbol_guard() {
@@ -4153,6 +4263,7 @@ audit_stage() {
     audit_body_syntax_split "$stage_label" "$executable" "$stage_directory"
     audit_smoke "$stage_label" "$executable" "$stage_directory"
     audit_storage_switches "$stage_label" "$executable" "$stage_directory"
+    audit_recursive_enum_declarations "$stage_label" "$executable" "$stage_directory"
     audit_placement_symbol_guard "$stage_label" "$executable" "$stage_directory"
     audit_mixed_abi "$stage_label" "$executable"
 }
@@ -4322,6 +4433,44 @@ main() {
     SWITCH_BOOL_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnBoolSwitch.range"
     SWITCH_STATE_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnStateIntegerSwitch.range"
     SWITCH_MEMBER_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnMemberIntegerSwitch.range"
+    SWITCH_ENUM_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnEnumSwitch.range"
+    SWITCH_ENUM_FUNCTION_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnEnumFunctionSwitch.range"
+    RECURSIVE_ENUM_SOURCE="$WORK_ROOT/RecursiveEnumDeclaration.range"
+    /usr/bin/printf '%s\n' \
+        'enum BindingList {' \
+        '    case end' \
+        '    case next(binding value: BindingList)' \
+        '}' \
+        'enum IndirectList {' \
+        '    case end' \
+        '    case next(indirect value: IndirectList)' \
+        '}' \
+        'enum Expression {' \
+        '    case integer(value: Int)' \
+        '}' \
+        '@main {' \
+        '    return 7' \
+        '}' > "$RECURSIVE_ENUM_SOURCE"
+    SWITCH_ENUM_STATE_SOURCE="$WORK_ROOT/SwitchEnumState.range"
+    /usr/bin/printf '%s\n' \
+        'enum TrafficLight {' \
+        '    case red' \
+        '    case yellow' \
+        '    case green' \
+        '}' \
+        '' \
+        '@main {' \
+        '    state light: TrafficLight(.red)' \
+        '    light: .green' \
+        '    switch light {' \
+        '    case .red:' \
+        '        return 1' \
+        '    case .yellow:' \
+        '        return 2' \
+        '    case .green:' \
+        '        return 3' \
+        '    }' \
+        '}' > "$SWITCH_ENUM_STATE_SOURCE"
     SWITCH_NONSTORAGE_SOURCE="$WORK_ROOT/SwitchNonstorageNegative.range"
     /usr/bin/printf '%s\n' \
         '@main {' \
@@ -4343,6 +4492,134 @@ main() {
         '        return 0' \
         '    }' \
         '}' > "$SWITCH_MISMATCH_SOURCE"
+    SWITCH_ENUM_MISSING_SOURCE="$WORK_ROOT/SwitchEnumMissingNegative.range"
+    /usr/bin/printf '%s\n' \
+        'enum TrafficLight {' \
+        '    case red' \
+        '    case yellow' \
+        '    case green' \
+        '}' \
+        '' \
+        '@main {' \
+        '    let light: TrafficLight(.green)' \
+        '    switch light {' \
+        '    case .red:' \
+        '        return 1' \
+        '    case .green:' \
+        '        return 3' \
+        '    }' \
+        '}' > "$SWITCH_ENUM_MISSING_SOURCE"
+    SWITCH_ENUM_DUPLICATE_SOURCE="$WORK_ROOT/SwitchEnumDuplicateNegative.range"
+    /usr/bin/printf '%s\n' \
+        'enum TrafficLight {' \
+        '    case red' \
+        '    case yellow' \
+        '    case green' \
+        '}' \
+        '' \
+        '@main {' \
+        '    let light: TrafficLight(.green)' \
+        '    switch light {' \
+        '    case .red:' \
+        '        return 1' \
+        '    case .red:' \
+        '        return 2' \
+        '    case .yellow:' \
+        '        return 3' \
+        '    case .green:' \
+        '        return 4' \
+        '    }' \
+        '}' > "$SWITCH_ENUM_DUPLICATE_SOURCE"
+    SWITCH_ENUM_UNKNOWN_SOURCE="$WORK_ROOT/SwitchEnumUnknownNegative.range"
+    /usr/bin/printf '%s\n' \
+        'enum TrafficLight {' \
+        '    case red' \
+        '    case yellow' \
+        '    case green' \
+        '}' \
+        '' \
+        '@main {' \
+        '    let light: TrafficLight(.green)' \
+        '    switch light {' \
+        '    case .red:' \
+        '        return 1' \
+        '    case .yellow:' \
+        '        return 2' \
+        '    case .blue:' \
+        '        return 3' \
+        '    }' \
+        '}' > "$SWITCH_ENUM_UNKNOWN_SOURCE"
+    ENUM_DUPLICATE_DECLARATION_SOURCE="$WORK_ROOT/EnumDuplicateDeclarationNegative.range"
+    /usr/bin/printf '%s\n' \
+        'enum TrafficLight {' \
+        '    case red' \
+        '    case red' \
+        '}' \
+        '' \
+        '@main {' \
+        '    return 0' \
+        '}' > "$ENUM_DUPLICATE_DECLARATION_SOURCE"
+    RECURSIVE_ENUM_SNAPSHOT_SOURCE="$WORK_ROOT/RecursiveEnumSnapshot.range"
+    /usr/bin/printf '%s\n' \
+        'compilerTypedSyntax' \
+        'enum BindingList {' \
+        '    case end' \
+        '    case next(binding value: BindingList)' \
+        '}' \
+        'enum IndirectList {' \
+        '    case end' \
+        '    case next(indirect value: IndirectList)' \
+        '}' \
+        'enum Expression {' \
+        '    case integer(value: Int)' \
+        '}' > "$RECURSIVE_ENUM_SNAPSHOT_SOURCE"
+    RECURSIVE_ENUM_DIRECT_SELF_SOURCE="$WORK_ROOT/RecursiveEnumDirectSelfNegative.range"
+    /usr/bin/printf '%s\n' \
+        'enum List {' \
+        '    case end' \
+        '    case next(value: List)' \
+        '}' \
+        '@main {' \
+        '    return 0' \
+        '}' > "$RECURSIVE_ENUM_DIRECT_SELF_SOURCE"
+    RECURSIVE_ENUM_DIRECT_MUTUAL_SOURCE="$WORK_ROOT/RecursiveEnumDirectMutualNegative.range"
+    /usr/bin/printf '%s\n' \
+        'enum First {' \
+        '    case second(value: Second)' \
+        '}' \
+        'enum Second {' \
+        '    case first(value: First)' \
+        '}' \
+        '@main {' \
+        '    return 0' \
+        '}' > "$RECURSIVE_ENUM_DIRECT_MUTUAL_SOURCE"
+    RECURSIVE_ENUM_UNKNOWN_TYPE_SOURCE="$WORK_ROOT/RecursiveEnumUnknownTypeNegative.range"
+    /usr/bin/printf '%s\n' \
+        'enum List {' \
+        '    case end' \
+        '    case next(binding value: Missing)' \
+        '}' \
+        '@main {' \
+        '    return 0' \
+        '}' > "$RECURSIVE_ENUM_UNKNOWN_TYPE_SOURCE"
+    RECURSIVE_ENUM_DUPLICATE_PAYLOAD_SOURCE="$WORK_ROOT/RecursiveEnumDuplicatePayloadNegative.range"
+    /usr/bin/printf '%s\n' \
+        'enum Pair {' \
+        '    case values(first: Int, first: Int)' \
+        '}' \
+        '@main {' \
+        '    return 0' \
+        '}' > "$RECURSIVE_ENUM_DUPLICATE_PAYLOAD_SOURCE"
+    RECURSIVE_ENUM_BODY_USE_SOURCE="$WORK_ROOT/RecursiveEnumBodyUseNegative.range"
+    /usr/bin/printf '%s\n' \
+        'enum List {' \
+        '    case end' \
+        '    case next(binding value: List)' \
+        '}' \
+        '@main {' \
+        '    let value: List(.end)' \
+        '    return 0' \
+        '}' > "$RECURSIVE_ENUM_BODY_USE_SOURCE"
 
     PLACEMENT_GUARD_SOURCE="$WORK_ROOT/PlacementSymbolGuard.range"
     /usr/bin/printf '%s\n' \

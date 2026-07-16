@@ -4,12 +4,21 @@ enum TrafficLight {
     case green
 }
 
-function signal(): TrafficLight {
-    return .yellow
+function signal(light: TrafficLight): TrafficLight {
+    switch light {
+    case .red:
+        return TrafficLight(.red)
+    case .yellow:
+        return TrafficLight(.yellow)
+    case .green:
+        return TrafficLight(.green)
+    }
 }
 
 @main {
-    switch signal() {
+    let requested: TrafficLight(.yellow)
+    let result: TrafficLight(signal(light: requested))
+    switch result {
     case .red:
         return 1
     case .yellow:
