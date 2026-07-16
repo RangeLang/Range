@@ -10,6 +10,11 @@ RANGE_DRIVER="${RANGE_DRIVER:-native}"
 usage() {
     cat >&2 <<'USAGE'
 Usage:
+  scripts/range compiler next
+  scripts/range compiler compile INPUT
+  scripts/range compiler check INPUT
+  scripts/range compiler emit-llvm INPUT OUTPUT
+  scripts/range PROJECT [ARGS...]
   scripts/range compile INPUT
   scripts/range check [INPUT]
   scripts/range run INPUT [-- ARGS...]
@@ -59,6 +64,23 @@ fi
 shift
 
 case "$command" in
+    compiler)
+        compiler_command="${1:-}"
+        if [[ -z "$compiler_command" ]]; then
+            usage
+            exit 1
+        fi
+        shift
+        case "$compiler_command" in
+            next)
+                if [[ $# -ne 0 ]]; then usage; exit 1; fi
+                "$REPO_ROOT/scripts/range-native" compiler-next
+                ;;
+            *)
+                "$REPO_ROOT/scripts/range-native" compiler-command "$compiler_command" "$@"
+                ;;
+        esac
+        ;;
     compile)
         if [[ $# -ne 1 ]]; then
             usage
@@ -164,7 +186,6 @@ case "$command" in
         fi
         ;;
     *)
-        usage
-        exit 1
+        "$REPO_ROOT/scripts/range-native" project-run "$command" "$@"
         ;;
 esac

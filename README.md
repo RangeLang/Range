@@ -29,6 +29,29 @@ scripts/range compile path/to/Main.range
 scripts/range check path/to/Main.range
 ```
 
+Projects can own a command line by declaring a `commandLine` source in their
+`Project.range`. The Compiler project exposes its Range-authored CLI under its
+project namespace:
+
+```sh
+scripts/range compiler compile path/to/Main.range
+scripts/range compiler check path/to/Main.range
+scripts/range compiler emit-llvm path/to/Main.range Main.ll
+```
+
+The command-line target is ordinary Range code, so another project can define
+its own argument vocabulary and run it as `scripts/range ProjectName ...`.
+
+Build one content-addressed compiler candidate from the accepted previous seed:
+
+```sh
+scripts/range compiler next
+```
+
+`next` validates and links the candidate under `.range/Compiler/Next`, reports
+whether its LLVM already matches the accepted fixed point, and never promotes
+the checked-in seed.
+
 Run the active LLVM executable gate:
 
 ```sh

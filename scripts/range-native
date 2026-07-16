@@ -11,6 +11,9 @@ Usage:
   scripts/range-native compile INPUT
   scripts/range-native check INPUT
   scripts/range-native emit-llvm INPUT OUTPUT
+  scripts/range-native project-run PROJECT [ARGS...]
+  scripts/range-native compiler-command COMMAND [ARGS...]
+  scripts/range-native compiler-next
   scripts/range-native compile-executable INPUT
   scripts/range-native run INPUT [-- ARGS...]
 
@@ -67,6 +70,98 @@ runtime_inputs() {
     for ((index = 0; index < runtime_count; index += 1)); do
         /usr/bin/printf '%s\n' "$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")"
     done
+}
+
+compiler_project_file() {
+    local project candidate
+    candidate=""
+    while IFS= read -r project; do
+        if /usr/bin/grep -Eq '^[[:space:]]*@compiler[[:space:]]*$' "$project"; then
+            if [[ -n "$candidate" ]]; then
+                echo "Multiple @compiler projects are declared: $candidate and $project" >&2
+                return 65
+            fi
+            candidate="$project"
+        fi
+    done < <(/usr/bin/find "$REPO_ROOT" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name Project.range -print | LC_ALL=C /usr/bin/sort)
+    if [[ -z "$candidate" ]]; then
+        echo "No @compiler project is declared." >&2
+        return 66
+    fi
+    /usr/bin/printf '%s\n' "$candidate"
+}
+
+project_command_line_source() {
+    local project project_root declaration relative source canonical
+    project="$1"
+    project_root="$(cd "$(dirname "$project")" && pwd)"
+    declaration="$(/usr/bin/sed -n 's/^[[:space:]]*let[[:space:]]*commandLine:[[:space:]]*"\([^"]*\)"[[:space:]]*$/\1/p' "$project")"
+    if [[ -z "$declaration" || "$declaration" == *$'\n'* ]]; then
+        echo "The project must declare exactly one commandLine source." >&2
+        return 65
+    fi
+    relative="$(dirname "${project#"$REPO_ROOT/"}")/$declaration"
+    source="$REPO_ROOT/$relative"
+    if [[ ! -f "$source" && ! -d "$source" ]]; then
+        echo "Missing project commandLine source: $relative" >&2
+        return 66
+    fi
+    if [[ -d "$source" ]]; then
+        canonical="$(cd "$source" && pwd)"
+    else
+        canonical="$(cd "$(dirname "$source")" && pwd)/$(basename "$source")"
+    fi
+    if [[ "$canonical" != "$project_root" && "$canonical" != "$project_root/"* ]]; then
+        echo "Project commandLine source escapes its project root: $relative" >&2
+        return 65
+    fi
+    /usr/bin/printf '%s\n' "$canonical"
+}
+
+normalize_project_identity() {
+    /usr/bin/printf '%s' "$1" | /usr/bin/tr '[:upper:]' '[:lower:]' | /usr/bin/tr -cd '[:alnum:]'
+}
+
+project_file_for_name() {
+    local query project title construct directory role_alias candidate matched
+    query="$(normalize_project_identity "$1")"
+    candidate=""
+    while IFS= read -r project; do
+        if ! /usr/bin/grep -Eq '^[[:space:]]*let[[:space:]]*commandLine:' "$project"; then
+            continue
+        fi
+        title="$(/usr/bin/sed -n 's/.*let[[:space:]]*name:[[:space:]]*Title("\([^"]*\)").*/\1/p' "$project" | /usr/bin/head -1)"
+        construct="$(/usr/bin/sed -n 's/^[[:space:]]*construct[[:space:]]*\([^[:space:]{]*\).*/\1/p' "$project" | /usr/bin/head -1)"
+        directory="$(basename "$(dirname "$project")")"
+        role_alias=""
+        if /usr/bin/grep -Eq '^[[:space:]]*@compiler[[:space:]]*$' "$project"; then role_alias="compiler"; fi
+        matched=false
+        if [[ -n "$title" && "$(normalize_project_identity "$title")" == "$query" ]]; then matched=true; fi
+        if [[ -n "$construct" && "$(normalize_project_identity "$construct")" == "$query" ]]; then matched=true; fi
+        if [[ "$(normalize_project_identity "$directory")" == "$query" ]]; then matched=true; fi
+        if [[ -n "$role_alias" && "$role_alias" == "$query" ]]; then matched=true; fi
+        if [[ "$matched" == true ]]; then
+            if [[ -n "$candidate" ]]; then
+                echo "Project command-line name is ambiguous: $1" >&2
+                return 65
+            fi
+            candidate="$project"
+        fi
+    done < <(/usr/bin/find "$REPO_ROOT" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name Project.range -print | LC_ALL=C /usr/bin/sort)
+    if [[ -z "$candidate" ]]; then
+        echo "Unknown Range project command line: $1" >&2
+        return 64
+    fi
+    /usr/bin/printf '%s\n' "$candidate"
+}
+
+compiler_project_command() {
+    local compiler project command_line_source
+    project="$(compiler_project_file)"
+    command_line_source="$(project_command_line_source "$project")"
+    if [[ ! -d "$command_line_source" && ! -f "$command_line_source" ]]; then return 66; fi
+    compiler="$(ensure_seed_compiler)"
+    "$compiler" "$@"
 }
 
 ensure_seed_compiler() {
@@ -200,6 +295,167 @@ emit_llvm() {
     /bin/rm -f "$object" "$diagnostic"
 }
 
+compiler_next() {
+    local compiler compiler_project command_line_source compiler_directory project_source project_relative core_source core_relative
+    local runtime source_key cache_root bundle llvm executable metadata temporary
+    local compiler_exit_code fixed_point llvm_hash llvm_bytes executable_hash
+    local cached_project cached_command cached_previous cached_source cached_llvm cached_bytes
+    local cached_fixed_point cached_executable cached_executable_path expected_fixed_point
+    local -a core_sources project_sources runtimes
+
+    compiler="$(ensure_seed_compiler)"
+    compiler_project="$(compiler_project_file)"
+    command_line_source="$(project_command_line_source "$compiler_project")"
+    compiler_directory=""
+    core_sources=()
+    project_sources=()
+    runtimes=()
+
+    local compiler_source_count index role relative
+    compiler_source_count="$(manifest_value compilerSources)"
+    for ((index = 0; index < compiler_source_count; index += 1)); do
+        role="$(manifest_value "compilerSources.$index.role")"
+        relative="$(manifest_value "compilerSources.$index.path")"
+        if [[ "$role" == "core" ]]; then
+            core_sources+=("$REPO_ROOT/$relative")
+        elif [[ -z "$compiler_directory" ]]; then
+            compiler_directory="$(dirname "$REPO_ROOT/$relative")"
+        elif [[ "$(dirname "$REPO_ROOT/$relative")" != "$compiler_directory" ]]; then
+            echo "Compiler project sources span multiple directories; project command metadata must make this explicit." >&2
+            return 65
+        fi
+    done
+    if [[ -z "$compiler_directory" || ! -d "$compiler_directory" ]]; then
+        echo "Unable to resolve the Compiler project source directory." >&2
+        return 66
+    fi
+    if [[ "$(cd "$command_line_source" && pwd)" != "$(cd "$compiler_directory" && pwd)" ]]; then
+        echo "The @compiler project commandLine source differs from the manifested compiler source directory." >&2
+        return 65
+    fi
+
+    while IFS= read -r project_source; do
+        project_sources+=("$project_source")
+    done < <(/usr/bin/find "$compiler_directory" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print | LC_ALL=C /usr/bin/sort)
+    if [[ "${#project_sources[@]}" -eq 0 ]]; then
+        echo "The Compiler project has no Range sources." >&2
+        return 66
+    fi
+
+    while IFS= read -r runtime; do
+        runtimes+=("$runtime")
+    done < <(runtime_inputs)
+
+    source_key="$({
+        /usr/bin/printf 'previous=%s\n' "$(manifest_value seed.sha256)"
+        for core_source in "${core_sources[@]}"; do
+            core_relative="${core_source#"$REPO_ROOT/"}"
+            /usr/bin/printf 'core\t%s\t%s\n' "$core_relative" "$(sha256 "$core_source")"
+        done
+        for project_source in "${project_sources[@]}"; do
+            project_relative="${project_source#"$compiler_directory/"}"
+            /usr/bin/printf 'project\t%s\t%s\n' "$project_relative" "$(sha256 "$project_source")"
+        done
+        for runtime in "${runtimes[@]}"; do
+            /usr/bin/printf 'runtime\t%s\t%s\n' "${runtime#"$REPO_ROOT/"}" "$(sha256 "$runtime")"
+        done
+        clang --version | /usr/bin/head -1
+    } | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
+
+    cache_root="$REPO_ROOT/.range/Compiler/Next/$source_key"
+    bundle="$cache_root/CompilerSourceSet.range"
+    llvm="$cache_root/RangeCompiler.ll"
+    executable="$cache_root/RangeCompiler"
+    metadata="$cache_root/Next.txt"
+    if [[ -x "$executable" && -f "$bundle" && -f "$llvm" && -f "$metadata" ]]; then
+        cached_project="$(/usr/bin/sed -n 's/^project=//p' "$metadata")"
+        cached_command="$(/usr/bin/sed -n 's/^command=//p' "$metadata")"
+        cached_previous="$(/usr/bin/sed -n 's/^previous=//p' "$metadata")"
+        cached_source="$(/usr/bin/sed -n 's/^source=//p' "$metadata")"
+        cached_llvm="$(/usr/bin/sed -n 's/^llvm=//p' "$metadata")"
+        cached_bytes="$(/usr/bin/sed -n 's/^bytes=//p' "$metadata")"
+        cached_fixed_point="$(/usr/bin/sed -n 's/^fixedPoint=//p' "$metadata")"
+        cached_executable="$(/usr/bin/sed -n 's/^executableHash=//p' "$metadata")"
+        cached_executable_path="$(/usr/bin/sed -n 's/^executable=//p' "$metadata")"
+        expected_fixed_point=false
+        if /usr/bin/cmp -s "$REPO_ROOT/$(manifest_value seed.path)" "$llvm"; then expected_fixed_point=true; fi
+        if [[ "$cached_project" == "compiler"
+            && "$cached_command" == "next"
+            && "$cached_previous" == "$(manifest_value seed.sha256)"
+            && "$cached_source" == "$source_key"
+            && "$cached_llvm" == "$(sha256 "$llvm")"
+            && "$cached_bytes" == "$(/usr/bin/stat -f %z "$llvm")"
+            && "$cached_fixed_point" == "$expected_fixed_point"
+            && -n "$cached_executable"
+            && "$cached_executable" == "$(sha256 "$executable")"
+            && "$cached_executable_path" == "$executable" ]]; then
+            /bin/cat "$metadata"
+            return 0
+        fi
+    fi
+
+    /bin/mkdir -p "$cache_root"
+    temporary="$cache_root/.build.$$"
+    /bin/mkdir -p "$temporary"
+    /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$temporary/CompilerSourceSet.range"
+    for core_source in "${core_sources[@]}"; do
+        core_relative="${core_source#"$REPO_ROOT/"}"
+        /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=%s\n' "$core_relative" >> "$temporary/CompilerSourceSet.range"
+        /bin/cat "$core_source" >> "$temporary/CompilerSourceSet.range"
+        /usr/bin/printf '\n' >> "$temporary/CompilerSourceSet.range"
+    done
+    for project_source in "${project_sources[@]}"; do
+        project_relative="${project_source#"$compiler_directory/"}"
+        /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "$project_relative" >> "$temporary/CompilerSourceSet.range"
+        /bin/cat "$project_source" >> "$temporary/CompilerSourceSet.range"
+        /usr/bin/printf '\n' >> "$temporary/CompilerSourceSet.range"
+    done
+
+    if "$compiler" emit-llvm "$temporary/CompilerSourceSet.range" "$temporary/RangeCompiler.ll"; then
+        compiler_exit_code=0
+    else
+        compiler_exit_code=$?
+    fi
+    if [[ "$compiler_exit_code" -ne 0 ]]; then
+        /bin/rm -rf "$temporary"
+        return "$compiler_exit_code"
+    fi
+    if ! clang -Wno-override-module -x ir -c "$temporary/RangeCompiler.ll" -o /dev/null; then
+        /bin/rm -rf "$temporary"
+        return 65
+    fi
+    if ! clang -Wno-override-module "$temporary/RangeCompiler.ll" "${runtimes[@]}" -o "$temporary/RangeCompiler"; then
+        /bin/rm -rf "$temporary"
+        return 65
+    fi
+
+    fixed_point=false
+    if /usr/bin/cmp -s "$REPO_ROOT/$(manifest_value seed.path)" "$temporary/RangeCompiler.ll"; then
+        fixed_point=true
+    fi
+    llvm_hash="$(sha256 "$temporary/RangeCompiler.ll")"
+    llvm_bytes="$(/usr/bin/stat -f %z "$temporary/RangeCompiler.ll")"
+    executable_hash="$(sha256 "$temporary/RangeCompiler")"
+    {
+        /usr/bin/printf 'project=compiler\n'
+        /usr/bin/printf 'command=next\n'
+        /usr/bin/printf 'previous=%s\n' "$(manifest_value seed.sha256)"
+        /usr/bin/printf 'source=%s\n' "$source_key"
+        /usr/bin/printf 'llvm=%s\n' "$llvm_hash"
+        /usr/bin/printf 'bytes=%s\n' "$llvm_bytes"
+        /usr/bin/printf 'fixedPoint=%s\n' "$fixed_point"
+        /usr/bin/printf 'executableHash=%s\n' "$executable_hash"
+        /usr/bin/printf 'executable=%s\n' "$executable"
+    } > "$temporary/Next.txt"
+
+    /bin/mv "$temporary/CompilerSourceSet.range" "$bundle"
+    /bin/mv "$temporary/RangeCompiler.ll" "$llvm"
+    /bin/mv "$temporary/RangeCompiler" "$executable"
+    /bin/mv "$temporary/Next.txt" "$metadata"
+    /bin/rmdir "$temporary"
+    /bin/cat "$metadata"
+}
+
 compile_executable() {
     local input="$1"
     local source_dir executable_name build_root llvm executable
@@ -228,6 +484,21 @@ compile_executable() {
     /usr/bin/printf '%s\n' "$executable"
 }
 
+run_project_command_line() {
+    local name project compiler_project source executable
+    name="$1"
+    shift
+    project="$(project_file_for_name "$name")"
+    compiler_project="$(compiler_project_file)"
+    if [[ "$project" == "$compiler_project" ]]; then
+        compiler_project_command "$@"
+        return
+    fi
+    source="$(project_command_line_source "$project")"
+    executable="$(compile_executable "$source")"
+    "$executable" "$@"
+}
+
 command="${1:-}"
 if [[ -z "$command" ]]; then
     usage
@@ -243,6 +514,20 @@ case "$command" in
     emit-llvm)
         if [[ $# -ne 2 ]]; then usage; exit 1; fi
         emit_llvm "$1" "$2"
+        ;;
+    compiler-next)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        compiler_next
+        ;;
+    compiler-command)
+        if [[ $# -lt 1 ]]; then usage; exit 1; fi
+        compiler_project_command "$@"
+        ;;
+    project-run)
+        if [[ $# -lt 1 ]]; then usage; exit 1; fi
+        project_name="$1"
+        shift
+        run_project_command_line "$project_name" "$@"
         ;;
     compile-executable)
         if [[ $# -ne 1 ]]; then usage; exit 1; fi

@@ -3217,3 +3217,43 @@ seed compiled the focused `ReturnInteger.range` fixture through the normal
 warm `scripts/range-native emit-llvm` path in 0.22 seconds at 29,212,672 bytes
 maximum RSS. Full compiler latency and ordinary small-program usability must
 therefore remain separate performance claims.
+
+### Project command lines and compiler `next` (2026-07-17)
+
+`range` is now a workspace/project router above project-owned executable
+command lines. A project opts in by declaring one `commandLine` source in its
+`Project.range`; that source owns argument parsing through ordinary Range
+`@main` code. Project resolution considers the declared title, construct name,
+directory name, and semantic role aliases such as the unique `@compiler`.
+Only the declared command-line target is compiled. Recursively treating an
+entire project directory as one program is forbidden because project trees may
+contain multiple programs and mains.
+
+`Testing/ProjectCommands/CommandFixture` is the non-Compiler regression proof:
+its metadata points to one `Main.range`, its Range-authored command line returns
+`7` for `seven` and `64` for an unknown command, and both paths are silent.
+
+The Compiler project declares `Range/Programs/Compiler` as its command-line
+target. `range compiler compile`, `check`, and `emit-llvm` therefore forward
+arguments directly to the accepted Compiler executable; their parsing remains
+owned by `Main.range`, not duplicated in the workspace router. The old
+top-level forms remain compatibility aliases.
+
+`range compiler next` is a lifecycle operation of the unique `@compiler`
+project rather than a command executed by the not-yet-built compiler. It
+resolves the accepted seed, discovers the current compiler source family,
+hashes the previous seed plus source paths/content, runtime inputs, and Clang
+identity, then emits, validates, and links exactly one candidate under
+`.range/Compiler/Next/<source-key>`. Metadata records both lineage and artifact
+identity. A completed unchanged build is reused; partial directories never
+qualify as cache hits. `next` does not rewrite the seed or manifest. Verification
+and acceptance remain separate explicit lifecycle operations.
+
+The first real invocation used accepted seed
+`e3e04960ac56b8073f36b3679ff6beee076c06e803b183b8952c818f793da844`,
+produced the same fixed-point LLVM hash and 5,408,599 bytes, linked successfully,
+and took 413.55 seconds with 133,316,608 bytes maximum RSS. After adding
+lineage, LLVM, byte-count, and executable-hash revalidation, the unchanged
+cache hit returned in 0.65 seconds with 19,972,096 bytes maximum RSS. The cached
+executable compiled and emitted the focused fixture, whose linked program
+exited `7`.
