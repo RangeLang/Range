@@ -3178,3 +3178,42 @@ its `CompilerGraphDelta` ownership must remain outside a payload enum until
 MemoryGraph models owned enum payload paths. A safe first migration is its
 status domain; parse, CFG, and MIR result enums follow only after their larger
 call sites can switch exhaustively without duplicating accessors.
+
+### Range-authored CLI transport slice (2026-07-17)
+
+The compiler program entrypoint now owns command parsing in Range. It accepts
+`compile <input.range>`, `check <input.range>`, and
+`emit-llvm <input.range> <output.ll>`. All three commands call the same
+`compileRangeSource` pipeline used by the bootstrap compiler transport;
+there is no second command-specific parser or emitter. `emit-llvm` commits the
+successful LLVM text through an atomic `writeFile` host primitive and returns
+the compiler diagnostic status or the host write status. The candidate audit
+requires the `compile` output and the emitted file to match the existing
+single-input compiler transport byte for byte, requires `check` to remain
+silent on success, and checks deterministic usage and write-failure exits.
+
+The promoted checked-in seed contains this Range-authored entrypoint, and
+`scripts/range-native` now exposes its `compile` and `check` commands and
+invokes its `emit-llvm` command for file emission. The top-level
+`scripts/range` surface forwards `compile <input>` and `check <input>` to those
+native commands while retaining bare `scripts/range check` as the repository
+gate. The one-input
+transport remains temporarily for the candidate harness, but it is a bootstrap
+compatibility protocol rather than a second CLI implementation. It can be
+deleted once those calls use `compile` or `emit-llvm`. Directory source
+discovery, Clang linking, and child-process execution remain explicit
+host-driver boundaries; they have not been falsely claimed as Range-owned in
+this slice. A subsequent native process/filesystem capability should move
+`compile-executable` and `run` into Range without embedding shell behavior in
+the compiler.
+
+The rollover reached a byte-identical fixed point at
+`e3e04960ac56b8073f36b3679ff6beee076c06e803b183b8952c818f793da844`
+(5,408,599 LLVM bytes). The two final full-source emissions took 387 and 390
+seconds with maximum resident sets of 153,124,864 and 129,646,592 bytes. This
+is deterministic and memory-bounded, but the roughly six-and-a-half-minute
+compiler rebuild remains an optimization target. In contrast, the promoted
+seed compiled the focused `ReturnInteger.range` fixture through the normal
+warm `scripts/range-native emit-llvm` path in 0.22 seconds at 29,212,672 bytes
+maximum RSS. Full compiler latency and ordinary small-program usability must
+therefore remain separate performance claims.

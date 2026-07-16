@@ -11408,15 +11408,6 @@ function compilerSourceSetProgramSource(source: String): String {
     return output
 }
 
-function compilerNativeMainSource(): String {
-    let slashPair: String("\\")
-    let slash: String(slashPair.substring(start: 0, end: 1))
-    let marker: String("compilerSourceFile\(slash)t")
-    let atSign: String("@")
-    let mainAttribute: String("\(atSign)main")
-    return "\(marker)NativeMain.range\n\(mainAttribute) {\n    if commandLineArgumentCount() != 1 {\n        print(value: String(\"usage: Compiler <input.range>\"))\n        return 64\n    }\n\n    let argument: Optional<String>(commandLineArgument(index: 0))\n    let path: String(argument ?? String(\"\"))\n    let source: String(readFile(path: path))\n    let output: String(compileRangeNativeSource(source: source))\n    print(value: output)\n    return compilerNativeOutputExitCode(output: output)\n}\n"
-}
-
 function compilerNativeDiagnostic(kind: String): String {
     return "compilerError\(compilerCoreTabCharacter())kind=\(kind)\(compilerCoreNewlineCharacter())"
 }
@@ -13480,6 +13471,15 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
     let program: CompilerProgram(compilerNativeSourceSetProgramForLLVM(source: source))
     let context: CompilerLLVMLoweringContext(CompilerLLVMLoweringContext(program: program, tables: $tables, declarationIndex: $declarationIndex))
     let reachability: CompilerReachableLLVMState(compilerReachableLLVMStateCreate(context: context))
+    let output: String(compilerCoreLLVMNativeEntryTextForReachability(reachability: reachability))
+    compilerReachableLLVMStateDestroy(reachability: reachability)
+    compilerDeclarationIndexDestroy(index: declarationIndex)
+    compilerGraphDeltaDestroy(delta: execution.graphDelta)
+    compilerSyntaxTablesDestroy(tables: tables)
+    return output
+}
+
+function compilerCoreLLVMNativeEntryTextForReachability(reachability: CompilerReachableLLVMState): String {
     state output: String("compilerError\tkind=invalidEntryReachability")
     let seedStatus: Int(compilerReachableLLVMStateSeedEntryRoots(reachability: reachability))
     state buildStatus: Int(0 - 1)
@@ -13506,7 +13506,7 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
     }
     if seedStatus == 0 && buildStatus == 0 {
         let abiPlan: CompilerModuleABIPlan(compilerReachableLLVMStateABIPlan(reachability: reachability))
-        let entryLowering: CompilerTypedBodyLowering(compilerCoreLLVMLowerEntryTyped(context: context, reachability: reachability, initialTemporaryIndex: rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLVMNextTemporary()), abiPlan: abiPlan))
+        let entryLowering: CompilerTypedBodyLowering(compilerCoreLLVMLowerEntryTyped(context: reachability.context, reachability: reachability, initialTemporaryIndex: rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLVMNextTemporary()), abiPlan: abiPlan))
         if !entryLowering.isValid {
             output: "compilerError\tkind=invalidEntryLowering\tstage=\(entryLowering.failureStage)"
         } else {
@@ -13514,10 +13514,6 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
             output: compilerReachableLLVMStateRenderModule(reachability: reachability, usage: String(""), extraGlobals: entryLowering.renderedGlobals, extraRuntimeRequirements: entryLowering.runtimeRequirements, mainText: mainText)
         }
     }
-    compilerReachableLLVMStateDestroy(reachability: reachability)
-    compilerDeclarationIndexDestroy(index: declarationIndex)
-    compilerGraphDeltaDestroy(delta: execution.graphDelta)
-    compilerSyntaxTablesDestroy(tables: tables)
     return output
 }
 
@@ -13529,8 +13525,7 @@ function compilerCoreLLVMNativeEntryTextForProgram(program: CompilerProgram, dec
     }
     let context: CompilerLLVMLoweringContext(CompilerLLVMLoweringContext(program: program, tables: $declarationTables, declarationIndex: $declarationIndex))
     let reachability: CompilerReachableLLVMState(compilerReachableLLVMStateCreate(context: context))
-    let buildStatus: Int(compilerReachableLLVMStateBuild(reachability: reachability))
-    let output: String(compilerReachableLLVMStateRender(reachability: reachability))
+    let output: String(compilerCoreLLVMNativeEntryTextForReachability(reachability: reachability))
     compilerReachableLLVMStateDestroy(reachability: reachability)
     compilerDeclarationIndexDestroy(index: declarationIndex)
     return output
@@ -13685,7 +13680,7 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
         }
         return String("compilerError\tkind=emptyIndirectABIActivation")
     }
-    return compilerReachableLLVMStateRenderModule(reachability: reachability, usage: compilerCoreNativeMainUsageGlobalLLVMText(), extraGlobals: String(""), extraRuntimeRequirements: 0, mainText: compilerCoreNativeMainLLVMText())
+    return String("compilerError\tkind=missingTypedEntryLowering")
 }
 
 function compilerReachableLLVMStateRenderModule(reachability: CompilerReachableLLVMState, usage: String, extraGlobals: String, extraRuntimeRequirements: Int, mainText: String): String {
@@ -13788,34 +13783,6 @@ function compilerCoreLLVMNativeEntryTextFromParts(usage: String, globals: String
     rawBufferAppendText(buffer: outputBuffer, text: declarations)
     rawBufferAppendText(buffer: outputBuffer, text: main)
     return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
-}
-
-function compilerCoreNativeMainUsageGlobalLLVMText(): String {
-    return String("")
-}
-
-function compilerCoreNativeMainLLVMText(): String {
-    let newlineValue: String("
-")
-    let newline: String(newlineValue.substring(start: 0, end: 1))
-    let atSign: String("@")
-    state output: String("")
-    output: "define i32 \(atSign)main() {\(newline)"
-    output: "\(output)entry:\(newline)"
-    output: "\(output)  %r0 = call i32 \(atSign)commandLineArgumentCount()\(newline)"
-    output: "\(output)  %r1 = icmp ne i32 %r0, 1\(newline)"
-    output: "\(output)  br i1 %r1, label %if0, label %after0\(newline)"
-    output: "\(output)if0:\(newline)"
-    output: "\(output)  ret i32 64\(newline)"
-    output: "\(output)after0:\(newline)"
-    output: "\(output)  %r3 = call ptr \(atSign)commandLineArgument(i32 0)\(newline)"
-    output: "\(output)  %r4 = call ptr \(atSign)readFile(ptr %r3)\(newline)"
-    output: "\(output)  %r5 = call ptr \(atSign)compileRangeNativeSource(ptr %r4)\(newline)"
-    output: "\(output)  %r6 = call i32 \(atSign)puts(ptr %r5)\(newline)"
-    output: "\(output)  %r7 = call i32 \(atSign)compilerNativeOutputExitCode(ptr %r5)\(newline)"
-    output: "\(output)  ret i32 %r7\(newline)"
-    output: "\(output)}\(newline)"
-    return output
 }
 
 function compilerCoreLLVMEntryTextForLoweredBlock(program: CompilerProgram, loweredBlock: CompilerLLVMLoweredBlock, reachableFunctions: String): String {
@@ -15449,18 +15416,6 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
     return 0
 }
 
-function compilerReachableLLVMStateBuild(reachability: CompilerReachableLLVMState): Int {
-    if !reachability.selection.isValid { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 91001) }
-    let seedStatus: Int(compilerFunctionReachabilitySeedRoots(tables: reachability.context.tables, index: reachability.context.declarationIndex, selection: reachability.selection, worklist: reachability.worklist, rootNames: String("compileRangeNativeSource;compilerNativeOutputExitCode;")))
-    if seedStatus != 0 {
-        let compileRangeNativeSourceRow: Int(compilerDeclarationIndexLookup(tables: reachability.context.tables, index: reachability.context.declarationIndex, name: String("compileRangeNativeSource"), kindTag: compilerSyntaxKindFunction()))
-        let compilerNativeOutputExitCodeRow: Int(compilerDeclarationIndexLookup(tables: reachability.context.tables, index: reachability.context.declarationIndex, name: String("compilerNativeOutputExitCode"), kindTag: compilerSyntaxKindFunction()))
-        return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 91000 + (compileRangeNativeSourceRow + 2) * 10 + (compilerNativeOutputExitCodeRow + 2))
-    }
-    if compilerReachableLLVMStateNormalizeSeedWorklist(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 91002) }
-    return compilerReachableLLVMStateBuildSelected(reachability: reachability)
-}
-
 function compilerReachableLLVMStateHelpers(reachability: CompilerReachableLLVMState): CompilerTypedLLVMHelpers {
     let telemetry: CompilerBodyTelemetry(CompilerBodyTelemetry(
         supportedCount: rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLMSupported()),
@@ -15614,7 +15569,8 @@ function compilerBodyRuntimeBuiltinCompilerMetricsFunctionBegin(): Int { return 
 function compilerBodyRuntimeBuiltinCompilerMetricsFunctionEnd(): Int { return 31 }
 function compilerBodyRuntimeBuiltinCompilerMetricsReport(): Int { return 32 }
 function compilerBodyRuntimeBuiltinPrint(): Int { return 33 }
-function compilerBodyRuntimeBuiltinCount(): Int { return 33 }
+function compilerBodyRuntimeBuiltinWriteFile(): Int { return 34 }
+function compilerBodyRuntimeBuiltinCount(): Int { return 34 }
 
 function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("stringTransientRegionMark") { return compilerBodyRuntimeBuiltinStringTransientRegionMark() }
@@ -15650,6 +15606,7 @@ function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("compilerMetricsFunctionEnd") { return compilerBodyRuntimeBuiltinCompilerMetricsFunctionEnd() }
     if name == String("compilerMetricsReport") { return compilerBodyRuntimeBuiltinCompilerMetricsReport() }
     if name == String("print") || name == String("puts") { return compilerBodyRuntimeBuiltinPrint() }
+    if name == String("writeFile") { return compilerBodyRuntimeBuiltinWriteFile() }
     return compilerBodyRuntimeBuiltinNone()
 }
 
@@ -15687,6 +15644,7 @@ function compilerBodyRuntimeBuiltinName(id: Int): String {
     if id == compilerBodyRuntimeBuiltinCompilerMetricsFunctionEnd() { return String("compilerMetricsFunctionEnd") }
     if id == compilerBodyRuntimeBuiltinCompilerMetricsReport() { return String("compilerMetricsReport") }
     if id == compilerBodyRuntimeBuiltinPrint() { return String("puts") }
+    if id == compilerBodyRuntimeBuiltinWriteFile() { return String("writeFile") }
     return String("")
 }
 
@@ -28012,7 +27970,7 @@ function compilerCoreRawBufferConcat(left: String, right: String): String {
 }
 
 function compilerCoreRenderLLVMRuntimeDeclarations(records: String, renderedFunctions: String): String {
-    let baseDeclarations: String("declare i32 @puts(ptr)\ndeclare i32 @stringLength(ptr)\ndeclare i32 @stringIndexOf(ptr, ptr, i32)\ndeclare i32 @stringEqual(ptr, ptr)\ndeclare i32 @stringCompare(ptr, ptr)\ndeclare i1 @stringHasPrefix(ptr, i32, ptr)\ndeclare i32 @stringFindFrom(ptr, i32, ptr)\ndeclare i32 @stringFindFirstOf(ptr, i32, ptr)\ndeclare ptr @stringViewFrom(ptr, i32)\ndeclare ptr @stringSliceUnchecked(ptr, i32, i32)\ndeclare ptr @stringCharacterAt(ptr, i32)\ndeclare i32 @stringByteAt(ptr, i32)\ndeclare i32 @stringFindByteOf(ptr, i32, i32, i32, i32)\ndeclare i32 @stringTransientRegionMark()\ndeclare i32 @stringTransientRegionReset(i32)\ndeclare ptr @commandLineArgument(i32)\ndeclare i32 @commandLineArgumentCount()\ndeclare ptr @readFile(ptr)\ndeclare ptr @stringCharacter(ptr, i32)\ndeclare ptr @stringSubstring(ptr, i32, i32)\ndeclare ptr @stringConcat(ptr, ptr)\ndeclare ptr @stringFromInt(i32)\ndeclare ptr @stringFromBool(i1)\ndeclare ptr @rawBufferCreate(i32, i32)\ndeclare i32 @rawBufferAppendInt(ptr, i32)\ndeclare i32 @rawBufferCount(ptr)\ndeclare i32 @rawBufferLoadInt(ptr, i32)\ndeclare i32 @rawBufferStoreInt(ptr, i32, i32)\ndeclare i32 @rawBufferAppendText(ptr, ptr)\ndeclare i32 @rawBufferAppendTextInt(ptr, i32)\ndeclare i32 @rawBufferAppendTextCharacter(ptr, ptr, i32)\ndeclare ptr @rawBufferMaterializeText(ptr)\ndeclare i32 @rawBufferDestroy(ptr)\n")
+    let baseDeclarations: String("declare i32 @puts(ptr)\ndeclare i32 @stringLength(ptr)\ndeclare i32 @stringIndexOf(ptr, ptr, i32)\ndeclare i32 @stringEqual(ptr, ptr)\ndeclare i32 @stringCompare(ptr, ptr)\ndeclare i1 @stringHasPrefix(ptr, i32, ptr)\ndeclare i32 @stringFindFrom(ptr, i32, ptr)\ndeclare i32 @stringFindFirstOf(ptr, i32, ptr)\ndeclare ptr @stringViewFrom(ptr, i32)\ndeclare ptr @stringSliceUnchecked(ptr, i32, i32)\ndeclare ptr @stringCharacterAt(ptr, i32)\ndeclare i32 @stringByteAt(ptr, i32)\ndeclare i32 @stringFindByteOf(ptr, i32, i32, i32, i32)\ndeclare i32 @stringTransientRegionMark()\ndeclare i32 @stringTransientRegionReset(i32)\ndeclare ptr @commandLineArgument(i32)\ndeclare i32 @commandLineArgumentCount()\ndeclare ptr @readFile(ptr)\ndeclare i32 @writeFile(ptr, ptr)\ndeclare ptr @stringCharacter(ptr, i32)\ndeclare ptr @stringSubstring(ptr, i32, i32)\ndeclare ptr @stringConcat(ptr, ptr)\ndeclare ptr @stringFromInt(i32)\ndeclare ptr @stringFromBool(i1)\ndeclare ptr @rawBufferCreate(i32, i32)\ndeclare i32 @rawBufferAppendInt(ptr, i32)\ndeclare i32 @rawBufferCount(ptr)\ndeclare i32 @rawBufferLoadInt(ptr, i32)\ndeclare i32 @rawBufferStoreInt(ptr, i32, i32)\ndeclare i32 @rawBufferAppendText(ptr, ptr)\ndeclare i32 @rawBufferAppendTextInt(ptr, i32)\ndeclare i32 @rawBufferAppendTextCharacter(ptr, ptr, i32)\ndeclare ptr @rawBufferMaterializeText(ptr)\ndeclare i32 @rawBufferDestroy(ptr)\n")
     let dynamicConstructDeclarations: String(compilerCoreRenderLLVMDynamicConstructDeclarations(records: records, renderedFunctions: renderedFunctions))
     let metricsDeclarations: String(compilerCoreLLVMRuntimeMetricsDeclarations(records: records, renderedFunctions: renderedFunctions))
     return "\(baseDeclarations)\(dynamicConstructDeclarations)\(metricsDeclarations)\n"

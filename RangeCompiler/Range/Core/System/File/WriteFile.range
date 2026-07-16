@@ -1,1 +1,1 @@
-function writeFile(path: String, text: String): Void
+function writeFile(path: String, text: String): Int

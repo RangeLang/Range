@@ -8,6 +8,8 @@ MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
 usage() {
     cat >&2 <<'USAGE'
 Usage:
+  scripts/range-native compile INPUT
+  scripts/range-native check INPUT
   scripts/range-native emit-llvm INPUT OUTPUT
   scripts/range-native compile-executable INPUT
   scripts/range-native run INPUT [-- ARGS...]
@@ -126,10 +128,32 @@ project_bundle() {
     fi
 }
 
+range_compiler_command() {
+    local command="$1"
+    local input="$2"
+    local compiler compiler_input bundle command_exit_code
+    require_source_input "$input"
+    compiler="$(ensure_seed_compiler)"
+    compiler_input="$input"
+    bundle=""
+    if [[ -d "$input" ]]; then
+        bundle="${TMPDIR:-/tmp}/range-project-bundle.$$.range"
+        project_bundle "$input" "$bundle"
+        compiler_input="$bundle"
+    fi
+    if "$compiler" "$command" "$compiler_input"; then
+        command_exit_code=0
+    else
+        command_exit_code=$?
+    fi
+    if [[ -n "$bundle" ]]; then /bin/rm -f "$bundle"; fi
+    return "$command_exit_code"
+}
+
 emit_llvm() {
     local input="$1"
     local output="$2"
-    local compiler output_dir temporary object compiler_input bundle
+    local compiler output_dir temporary object diagnostic compiler_input bundle
     require_source_input "$input"
     compiler="$(ensure_seed_compiler)"
     output_dir="$(cd "$(dirname "$output")" 2>/dev/null && pwd || true)"
@@ -140,6 +164,7 @@ emit_llvm() {
     output="$output_dir/$(basename "$output")"
     temporary="$output.tmp.$$"
     object="$output.o.$$"
+    diagnostic="$output.diagnostic.$$"
     compiler_input="$input"
     bundle=""
     if [[ -d "$input" ]]; then
@@ -148,33 +173,31 @@ emit_llvm() {
         compiler_input="$bundle"
     fi
     local compiler_exit_code clang_exit_code
-    if "$compiler" "$compiler_input" > "$temporary"; then
+    if "$compiler" emit-llvm "$compiler_input" "$temporary" > "$diagnostic"; then
         compiler_exit_code=0
     else
         compiler_exit_code=$?
     fi
     if [[ -n "$bundle" ]]; then /bin/rm -f "$bundle"; fi
     if [[ "$compiler_exit_code" -ne 0 ]]; then
-        if /usr/bin/head -1 "$temporary" | /usr/bin/grep -q '^compilerError'; then
-            /bin/cat "$temporary" >&2
-        fi
-        /bin/rm -f "$temporary" "$object"
+        if [[ -s "$diagnostic" ]]; then /bin/cat "$diagnostic" >&2; fi
+        /bin/rm -f "$temporary" "$object" "$diagnostic"
         return "$compiler_exit_code"
     fi
-    if /usr/bin/head -1 "$temporary" | /usr/bin/grep -q '^compilerError'; then
-        /bin/cat "$temporary" >&2
-        /bin/rm -f "$temporary" "$object"
+    if [[ -s "$diagnostic" ]]; then
+        /bin/cat "$diagnostic" >&2
+        /bin/rm -f "$temporary" "$object" "$diagnostic"
         return 65
     fi
     if clang -Wno-override-module -x ir -c "$temporary" -o "$object"; then
         clang_exit_code=0
     else
         clang_exit_code=$?
-        /bin/rm -f "$temporary" "$object"
+        /bin/rm -f "$temporary" "$object" "$diagnostic"
         return "$clang_exit_code"
     fi
     /bin/mv "$temporary" "$output"
-    /bin/rm -f "$object"
+    /bin/rm -f "$object" "$diagnostic"
 }
 
 compile_executable() {
@@ -213,6 +236,10 @@ fi
 shift
 
 case "$command" in
+    compile|check)
+        if [[ $# -ne 1 ]]; then usage; exit 1; fi
+        range_compiler_command "$command" "$1"
+        ;;
     emit-llvm)
         if [[ $# -ne 2 ]]; then usage; exit 1; fi
         emit_llvm "$1" "$2"

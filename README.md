@@ -1,6 +1,7 @@
 # Range
 
-Range's normal `run`, `emit-llvm`, and `compile-executable` commands now use
+Range's normal `compile`, source `check`, `run`, `emit-llvm`, and
+`compile-executable` commands now use
 the checked-in native seed compiler to emit LLVM IR, link it with `clang`, and
 launch the native executable. The native self-hosting compiler and macro
 candidate/seed gates are green, including the actual Foundation `Registrable`
@@ -19,6 +20,14 @@ scripts/range run path/to/Main.range
 ```
 
 ## Start
+
+Compile a Range file to LLVM on standard output, or type-check it without
+emitting output:
+
+```sh
+scripts/range compile path/to/Main.range
+scripts/range check path/to/Main.range
+```
 
 Run the active LLVM executable gate:
 

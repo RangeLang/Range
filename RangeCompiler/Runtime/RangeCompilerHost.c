@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <crt_externs.h>
 
 void *stringTransientAllocate(size_t size);
@@ -52,6 +53,46 @@ char *readFile(char *path) {
     buffer[readCount] = 0;
     fclose(file);
     return buffer;
+}
+
+int32_t writeFile(char *path, char *text) {
+    if (!path || !text) {
+        return 73;
+    }
+    size_t pathLength = strlen(path);
+    static const char temporarySuffix[] = ".tmp.XXXXXX";
+    char *temporaryPath = malloc(pathLength + sizeof(temporarySuffix));
+    if (!temporaryPath) {
+        return 73;
+    }
+    snprintf(temporaryPath, pathLength + sizeof(temporarySuffix), "%s%s", path, temporarySuffix);
+    int temporaryDescriptor = mkstemp(temporaryPath);
+    if (temporaryDescriptor < 0) {
+        free(temporaryPath);
+        return 73;
+    }
+    FILE *file = fdopen(temporaryDescriptor, "wb");
+    if (!file) {
+        close(temporaryDescriptor);
+        remove(temporaryPath);
+        free(temporaryPath);
+        return 73;
+    }
+    size_t length = strlen(text);
+    size_t written = fwrite(text, 1, length, file);
+    int closeStatus = fclose(file);
+    if (written != length || closeStatus != 0) {
+        remove(temporaryPath);
+        free(temporaryPath);
+        return 74;
+    }
+    if (rename(temporaryPath, path) != 0) {
+        remove(temporaryPath);
+        free(temporaryPath);
+        return 73;
+    }
+    free(temporaryPath);
+    return 0;
 }
 
 int32_t stringLength(char *value) {

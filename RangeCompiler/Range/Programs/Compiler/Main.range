@@ -1,12 +1,54 @@
 @main {
-    if commandLineArgumentCount() != 1 {
-        print(value: String("usage: Compiler <input.range>"))
-        return 64
+    let argumentCount: Int(commandLineArgumentCount())
+    if argumentCount == 1 {
+        return rangeCompilerCLICompile(input: commandLineArgument(index: 0), printOutput: true)
     }
+    if argumentCount == 2 {
+        let command: String(commandLineArgument(index: 0))
+        let input: String(commandLineArgument(index: 1))
+        if command == String("compile") {
+            return rangeCompilerCLICompile(input: input, printOutput: true)
+        }
+        if command == String("check") {
+            return rangeCompilerCLICompile(input: input, printOutput: false)
+        }
+    }
+    if argumentCount == 3 {
+        let command: String(commandLineArgument(index: 0))
+        if command == String("emit-llvm") {
+            return rangeCompilerCLIEmitLLVM(input: commandLineArgument(index: 1), outputPath: commandLineArgument(index: 2))
+        }
+    }
+    print(value: rangeCompilerCLIUsage())
+    return 64
+}
 
-    let path: String(commandLineArgument(index: 0))
-    let source: String(readFile(path: path))
+function rangeCompilerCLIUsage(): String {
+    return "usage:\n  range compile <input.range>\n  range check <input.range>\n  range emit-llvm <input.range> <output.ll>"
+}
+
+function rangeCompilerCLICompile(input: String, printOutput: Bool): Int {
+    let source: String(readFile(path: input))
     let output: String(compileRangeSource(source: source))
-    print(value: output)
-    return compilerNativeOutputExitCode(output: output)
+    let exitCode: Int(compilerNativeOutputExitCode(output: output))
+    if printOutput || exitCode != 0 {
+        print(value: output)
+    }
+    return exitCode
+}
+
+function rangeCompilerCLIEmitLLVM(input: String, outputPath: String): Int {
+    let source: String(readFile(path: input))
+    let output: String(compileRangeSource(source: source))
+    let exitCode: Int(compilerNativeOutputExitCode(output: output))
+    if exitCode != 0 {
+        print(value: output)
+        return exitCode
+    }
+    let writeStatus: Int(writeFile(path: outputPath, text: "\(output)\n"))
+    if writeStatus != 0 {
+        print(value: "range: unable to write \(outputPath)")
+        return writeStatus
+    }
+    return 0
 }
