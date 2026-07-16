@@ -38,6 +38,7 @@ ReturnArrayRemoveLastMember.range	0	-	-	-
 ReturnEnumSwitch.range	3	-	-	-
 ReturnEnumFunctionSwitch.range	2	-	-	-
 ReturnAssociatedEnumPayload.range	7	-	-	-
+ReturnAssociatedEnumFunctionBoundary.range	7	-	-	-
 ReturnRecursiveBindingEnumSwitch.range	7	-	-	-
 ReturnAssociatedStringEnumPayload.range	5	-	-	-
 ReturnEnumArrayPayload.range	6	-	-	-

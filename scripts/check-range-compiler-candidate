@@ -513,6 +513,52 @@ audit_recursive_enum_declarations() {
     echo "$stage_label recursive enums: pass (ID-linked payload types, payload graph policies, binding/indirect cycle breaks, direct-cycle rejection, allocator-free native binding construction/switch, deterministic declaration proof)"
 }
 
+audit_native_payload_enum_abi() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local first="$WORK_ROOT/$stage_label.native-payload-enum-abi.first.ll"
+    local second="$WORK_ROOT/$stage_label.native-payload-enum-abi.repeat.ll"
+    local first_error="$WORK_ROOT/$stage_label.native-payload-enum-abi.first.err"
+    local second_error="$WORK_ROOT/$stage_label.native-payload-enum-abi.repeat.err"
+    local linked="$stage_directory/AssociatedEnumFunctionBoundary"
+    local run_output="$WORK_ROOT/$stage_label.native-payload-enum-abi.run.out"
+    local run_error="$WORK_ROOT/$stage_label.native-payload-enum-abi.run.err"
+
+    run_capture "$executable" "$NATIVE_PAYLOAD_ENUM_ABI_SOURCE" "$first" "$first_error"
+    require_successful_output "$stage_label native payload enum ABI" "$first" "$first_error"
+    run_capture "$executable" "$NATIVE_PAYLOAD_ENUM_ABI_SOURCE" "$second" "$second_error"
+    require_successful_output "$stage_label repeated native payload enum ABI" "$second" "$second_error"
+    /usr/bin/cmp -s "$first" "$second" \
+        || fail "$stage_label native payload enum ABI was not deterministic"
+    /usr/bin/grep -Fq '%Range.CompilerStep = type { i32, i32 }' "$first" \
+        || fail "$stage_label native payload enum ABI omitted the aggregate enum layout"
+    /usr/bin/grep -Fq 'define void @makeStep(ptr %returnDestination, i32 %value)' "$first" \
+        || fail "$stage_label native payload enum ABI did not use an indirect aggregate return"
+    /usr/bin/grep -Eq 'call void @makeStep\(ptr %storage[0-9]+, i32 7\)' "$first" \
+        || fail "$stage_label native payload enum ABI caller did not provide enum return storage"
+    /usr/bin/grep -Fq 'define i32 @readStep(%Range.CompilerStep %step)' "$first" \
+        || fail "$stage_label native payload enum ABI did not preserve the enum parameter type"
+    /usr/bin/grep -Eq 'call i32 @readStep\(%Range\.CompilerStep %r[0-9]+\)' "$first" \
+        || fail "$stage_label native payload enum ABI call did not preserve the enum parameter type"
+    for forbidden in rangeConstruct malloc calloc realloc free; do
+        if /usr/bin/grep -Fq "$forbidden" "$first"; then
+            fail "$stage_label native payload enum ABI emitted forbidden dynamic/allocator symbol: $forbidden"
+        fi
+    done
+    validate_llvm "$first"
+    link_llvm "$first" "$linked"
+    if "$linked" > "$run_output" 2> "$run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label native payload enum ABI executable exited $RUN_STATUS"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] \
+        || fail "$stage_label native payload enum ABI executable wrote output"
+    echo "$stage_label native payload enum ABI: pass (frozen indirect return, native by-value parameter, deterministic, allocator-free)"
+}
+
 audit_placement_symbol_guard() {
     local stage_label="$1"
     local executable="$2"
@@ -4288,6 +4334,7 @@ audit_stage() {
     audit_smoke "$stage_label" "$executable" "$stage_directory"
     audit_storage_switches "$stage_label" "$executable" "$stage_directory"
     audit_recursive_enum_declarations "$stage_label" "$executable" "$stage_directory"
+    audit_native_payload_enum_abi "$stage_label" "$executable" "$stage_directory"
     audit_placement_symbol_guard "$stage_label" "$executable" "$stage_directory"
     audit_mixed_abi "$stage_label" "$executable"
 }
@@ -4635,6 +4682,7 @@ main() {
         '    return 0' \
         '}' > "$RECURSIVE_ENUM_DUPLICATE_PAYLOAD_SOURCE"
     RECURSIVE_ENUM_BODY_USE_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnRecursiveBindingEnumSwitch.range"
+    NATIVE_PAYLOAD_ENUM_ABI_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnAssociatedEnumFunctionBoundary.range"
 
     PLACEMENT_GUARD_SOURCE="$WORK_ROOT/PlacementSymbolGuard.range"
     /usr/bin/printf '%s\n' \

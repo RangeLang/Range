@@ -1610,7 +1610,7 @@ function compilerBodyArenaAppendFunctionEdges(arena: CompilerBodyArena, edgeOwne
 }
 
 function compilerBodyArenaResultTypeIsRepresentationSensitive(arena: CompilerBodyArena, typeKind: Int, typeID: Int): Bool {
-    if typeKind != compilerBodyTypeConstruct()
+    if (typeKind != compilerBodyTypeConstruct() && typeKind != compilerBodyTypeEnum())
         || typeID < 0 || typeID >= compilerIntTableRowCount(table: arena.typeInstances) { return false }
     return compilerBodyArenaFunctionSignatureABICategory(arena: arena, typeID: typeID, typeKind: typeKind) == compilerBodyFunctionSignatureABICategoryNone()
 }
@@ -1619,11 +1619,13 @@ function compilerBodyArenaMarkRepresentationSensitiveTargets(arena: CompilerBody
     state resolutionRow: Int(0)
     while resolutionRow < compilerIntTableRowCount(table: arena.resolutions) {
         if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) == compilerBodyResolutionFunction()
-            && compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) == compilerBodyTypeConstruct() {
+            && (compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) == compilerBodyTypeConstruct()
+                || compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) == compilerBodyTypeEnum()) {
             let targetFunctionRow: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+            let resultTypeKind: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()))
             let resultTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeIDColumn()))
             if targetFunctionRow < 0 || targetFunctionRow >= rawBufferCount(buffer: sensitiveFunctions) { return 0 - 1 }
-            if compilerBodyArenaResultTypeIsRepresentationSensitive(arena: arena, typeKind: compilerBodyTypeConstruct(), typeID: resultTypeID) {
+            if compilerBodyArenaResultTypeIsRepresentationSensitive(arena: arena, typeKind: resultTypeKind, typeID: resultTypeID) {
                 if rawBufferStoreInt(buffer: sensitiveFunctions, index: targetFunctionRow, value: 1) != 0 { return 0 - 1 }
             }
         }
@@ -1654,9 +1656,10 @@ function compilerBodyMIRMarkRepresentationSensitiveTargets(arena: CompilerBodyAr
             let resultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
             if targetFunctionRow < 0 || targetFunctionRow >= rawBufferCount(buffer: sensitiveFunctions)
                 || resultValueID < 0 || resultValueID >= compilerIntTableRowCount(table: arena.mirValues) { return 0 - 1 }
-            if compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeConstruct() {
+            let resultTypeKind: Int(compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()))
+            if resultTypeKind == compilerBodyTypeConstruct() || resultTypeKind == compilerBodyTypeEnum() {
                 let resultTypeID: Int(compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeIDColumn()))
-                if compilerBodyArenaResultTypeIsRepresentationSensitive(arena: arena, typeKind: compilerBodyTypeConstruct(), typeID: resultTypeID) {
+                if compilerBodyArenaResultTypeIsRepresentationSensitive(arena: arena, typeKind: resultTypeKind, typeID: resultTypeID) {
                     if rawBufferStoreInt(buffer: sensitiveFunctions, index: targetFunctionRow, value: 1) != 0 { return 0 - 1 }
                 }
             }
@@ -14062,6 +14065,9 @@ function compilerCoreLLVMNativeABITypeName(tables: CompilerSyntaxTables, index: 
     let declarationRow: Int(compilerDeclarationIndexLookup(tables: tables, index: index, name: nominalName, kindTag: compilerSyntaxKindConstruct()))
     let nominalTypeName: String(compilerNominalLLVMTypeName(tables: tables, declarationRow: declarationRow))
     if nominalTypeName != String("") { return nominalTypeName }
+    let enumDeclarationRow: Int(compilerDeclarationIndexLookup(tables: tables, index: index, name: nominalName, kindTag: compilerSyntaxKindEnum()))
+    let enumTypeName: String(compilerEnumLLVMTypeName(tables: tables, declarationRow: enumDeclarationRow))
+    if enumTypeName != String("") { return enumTypeName }
     return compilerCoreLLVMTypeNameForRangeType(typeName: typeName)
 }
 
@@ -16237,6 +16243,8 @@ function compilerFunctionReturnABI(tables: CompilerSyntaxTables, index: Compiler
     let nominalName: String(compilerBodyArenaTypeOuterName(typeName: returnType))
     let declarationRow: Int(compilerDeclarationIndexLookup(tables: tables, index: index, name: nominalName, kindTag: compilerSyntaxKindConstruct()))
     if compilerNominalLLVMTypeName(tables: tables, declarationRow: declarationRow) != String("") { return compilerFunctionReturnABIIndirect() }
+    let enumDeclarationRow: Int(compilerDeclarationIndexLookup(tables: tables, index: index, name: nominalName, kindTag: compilerSyntaxKindEnum()))
+    if compilerEnumLLVMTypeName(tables: tables, declarationRow: enumDeclarationRow) != String("") { return compilerFunctionReturnABIIndirect() }
     return compilerFunctionReturnABINone()
 }
 
@@ -16265,6 +16273,8 @@ function compilerFunctionHasAggregateParameterABI(tables: CompilerSyntaxTables, 
             let nominalName: String(compilerBodyArenaTypeOuterName(typeName: typeName))
             let declarationRow: Int(compilerDeclarationIndexLookup(tables: tables, index: index, name: nominalName, kindTag: compilerSyntaxKindConstruct()))
             if compilerNominalLLVMTypeName(tables: tables, declarationRow: declarationRow) != String("") { return true }
+            let enumDeclarationRow: Int(compilerDeclarationIndexLookup(tables: tables, index: index, name: nominalName, kindTag: compilerSyntaxKindEnum()))
+            if compilerEnumLLVMTypeName(tables: tables, declarationRow: enumDeclarationRow) != String("") { return true }
         }
         ordinal: ordinal + 1
     }
@@ -20411,7 +20421,8 @@ function compilerBodyMemoryBuildPlacementForCall(arena: CompilerBodyArena, callN
     let resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: calleeNodeID))
     if calleeNodeID < 0 || resolutionRow < 0 { return 0 - 1 }
     if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionFunction()
-        || compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) != compilerBodyTypeConstruct() { return 0 }
+        || (compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) != compilerBodyTypeConstruct()
+            && compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) != compilerBodyTypeEnum()) { return 0 }
     let targetFunctionID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
     if compilerModuleABIPlanReturnMode(plan: abiPlan, tables: arena.tables, index: arena.declarationIndex, functionRow: targetFunctionID) != compilerFunctionReturnABIIndirect() { return 0 }
     let callTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeIDColumn()))
@@ -20534,7 +20545,8 @@ function compilerBodyMemoryBuildPassEscapePhase(arena: CompilerBodyArena, abiPla
                 ordinal: ordinal + 1
             }
             if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) == compilerBodyResolutionFunction()
-                && compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) == compilerBodyTypeConstruct()
+                && (compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) == compilerBodyTypeConstruct()
+                    || compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) == compilerBodyTypeEnum())
                 && compilerModuleABIPlanReturnMode(plan: abiPlan, tables: arena.tables, index: arena.declarationIndex, functionRow: targetID) == compilerFunctionReturnABIIndirect() {
                 let storageID: Int(compilerBodyStorageForCall(arena: arena, callNodeID: nodeRow))
                 if storageID < 0 { return 30000 + nodeRow }
@@ -25461,7 +25473,9 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                 && compilerFunctionHasRepresentationSensitiveABI(tables: arena.tables, index: arena.declarationIndex, functionRow: validationTargetID)
                 && (!compilerBodyArenaOwnerIsParticipant(arena: arena, plan: abiPlan)
                     || !compilerModuleABIPlanIsParticipant(plan: abiPlan, functionRow: validationTargetID)) { return 311008 }
-            if validationTargetKind == compilerBodyMIROperationTargetFunction() && callResultTypeKind == compilerBodyTypeConstruct() && callReturnABI == compilerFunctionReturnABIIndirect() {
+            if validationTargetKind == compilerBodyMIROperationTargetFunction()
+                && (callResultTypeKind == compilerBodyTypeConstruct() || callResultTypeKind == compilerBodyTypeEnum())
+                && callReturnABI == compilerFunctionReturnABIIndirect() {
                 if validationStorageID < 0 || validationStorageID >= compilerIntTableRowCount(table: arena.storages) { return 311005 }
                 let callSourceNodeID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationSourceColumn()))
                 let callStoragePlacement: Int(compilerIntTableValue(table: arena.storages, row: validationStorageID, column: compilerBodyStoragePlacementColumn()))
@@ -25729,7 +25743,9 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
             state returnValueTypeKind: Int(compilerBodyTypeUnknown())
             if returnValueNodeID >= 0 { returnValueTypeKind: compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: returnValueNodeID) }
             state returnValueTypeID: Int(0 - 1)
-            if returnValueTypeKind == compilerBodyTypeConstruct() { returnValueTypeID: compilerBodyArenaExpressionTypeID(arena: arena, nodeID: returnValueNodeID) }
+            if returnValueTypeKind == compilerBodyTypeConstruct() || returnValueTypeKind == compilerBodyTypeEnum() {
+                returnValueTypeID: compilerBodyArenaExpressionTypeID(arena: arena, nodeID: returnValueNodeID)
+            }
             state returnTrackedStatus: Int(0)
             if returnValueTypeKind == compilerBodyTypeConstruct() { returnTrackedStatus: compilerBodyArenaTypeTrackedStorageStatus(arena: arena, typeID: returnValueTypeID) }
             state expectedTransferCount: Int(0)
@@ -26096,7 +26112,12 @@ function compilerBodyLLVMCallTargetInstanceIsValid(emitter: CompilerBodyLLVMEmit
 }
 
 function compilerBodyArenaSpecializedLLVMTypeName(arena: CompilerBodyArena, typeKind: Int, typeID: Int, fileID: Int, start: Int, end: Int): String {
-    if typeKind == compilerBodyTypeInt() || typeKind == compilerBodyTypeBool() || typeKind == compilerBodyTypeString() || typeKind == compilerBodyTypeEnum() { return compilerBodyLLVMTypeName(typeKind: typeKind) }
+    if typeKind == compilerBodyTypeInt() || typeKind == compilerBodyTypeBool() || typeKind == compilerBodyTypeString() { return compilerBodyLLVMTypeName(typeKind: typeKind) }
+    if typeKind == compilerBodyTypeEnum() {
+        let enumTypeName: String(compilerBodyLLVMNominalTypeNameForTypeID(arena: arena, typeID: typeID))
+        if enumTypeName != String("") { return enumTypeName }
+        return compilerBodyLLVMTypeName(typeKind: typeKind)
+    }
     if typeKind == compilerBodyTypeConstruct() && typeID >= 0 && typeID < compilerIntTableRowCount(table: arena.typeInstances) {
         let specializedTypeName: String(compilerBodyArenaTypeNameForTypeID(arena: arena, typeID: typeID))
         if specializedTypeName != String("") && compilerBodyRuntimeABITypeIsOpaque(tables: arena.tables, typeName: specializedTypeName) { return String("ptr") }

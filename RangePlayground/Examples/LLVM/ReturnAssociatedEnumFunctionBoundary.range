@@ -1,0 +1,23 @@
+enum CompilerStep {
+    case value(value: Int)
+    case end
+}
+
+function makeStep(value: Int): CompilerStep {
+    let step: CompilerStep(.value(value: value))
+    return step
+}
+
+function readStep(step: CompilerStep): Int {
+    switch step {
+    case .value(let value):
+        return value
+    case .end:
+        return 0
+    }
+}
+
+@main {
+    let step: CompilerStep(makeStep(value: 7))
+    return readStep(step: step)
+}

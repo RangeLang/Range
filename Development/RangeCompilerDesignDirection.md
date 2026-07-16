@@ -3132,3 +3132,49 @@ test, but the existing Array positive/negative cases still fail before the
 new source reaches a green executable proof; no unverified Buffer-specific
 test was retained. A green `Buffer<Int>` execution matrix therefore remains
 behind the same bootstrap/provenance blocker.
+
+### Native payload-enum function ABI checkpoint (2026-07-17)
+
+Payload enums now participate in the same frozen native ABI contract as
+nominal constructs. Representation-sensitive discovery, fixed-point
+participation, parameter classification, caller placement, return-transfer
+facts, MIR validation, planned signatures, and LLVM emission all recognize a
+native enum layout by resolved type identity. There is no enum-name special
+case and no dynamic-record bridge.
+
+The ordinary fixture
+`RangePlayground/Examples/LLVM/ReturnAssociatedEnumFunctionBoundary.range`
+proves both directions of the boundary. `makeStep` returns
+`CompilerStep` through caller-owned storage with the LLVM signature
+`void (ptr, i32)`. `readStep` receives the same
+`%Range.CompilerStep = type { i32, i32 }` value directly and switches over its
+payload. The executable exits `7`; repeated emission is byte-identical; the
+focused compile completes below the timer resolution at about 5.5 MB maximum
+RSS; and the emitted module contains no `rangeConstruct*` or allocator call.
+
+The complete bridge, Stage 2, Stage 3, and audit gate passed. Stage 2 and
+Stage 3 LLVM share SHA-256
+`b134c81815384848de3e865756963a5f3d81a59f7bfd74a044fa07d9b3e0a0ea`;
+their executables share SHA-256
+`740deb62d7f8e47b5708bc9ee39c7ab19bad9319c049ad4dd39937624e0e2dde`.
+The full bridge-inclusive gate took `1036.55 s` and peaked at
+`362,184,704` bytes RSS. That timing is not a usable full-compiler target:
+the accepted claim here is deterministic bounded memory and native enum ABI
+correctness, not full-build speed.
+
+The checked-in seed still predates the binding-reference syntax needed when
+the expanded native ABI component reaches compiler functions containing
+`$binding` construction arguments. The successful gate therefore used the
+existing one-shot bootstrap bridge: an old-syntax Phase 1 snapshot transported
+the final source, while only the final source reached the Stage 2/3 fixed
+point. This is a seed-rollover boundary, not a second maintained compiler
+model.
+
+No compiler-internal `{ value, isValid }` result record has been replaced by
+an enum yet. The next canonical use should follow the seed rollover and
+replace one small real state surface rather than adding a parallel proof type.
+`CompilerMacroExecutionResult` has the smallest current result surface, but
+its `CompilerGraphDelta` ownership must remain outside a payload enum until
+MemoryGraph models owned enum payload paths. A safe first migration is its
+status domain; parse, CFG, and MIR result enums follow only after their larger
+call sites can switch exhaustively without duplicating accessors.
