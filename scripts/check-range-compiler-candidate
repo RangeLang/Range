@@ -476,17 +476,41 @@ audit_recursive_enum_declarations() {
             fail "$stage_label recursive enum $negative_kind emitted LLVM"
         fi
     done
-    local body_use_output="$WORK_ROOT/$stage_label.recursive-enum.body-use.out"
-    local body_use_error="$WORK_ROOT/$stage_label.recursive-enum.body-use.err"
-    run_capture "$executable" "$RECURSIVE_ENUM_BODY_USE_SOURCE" "$body_use_output" "$body_use_error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label recursive enum body-use gate exited $RUN_STATUS"
-    [[ ! -s "$body_use_error" ]] || fail "$stage_label recursive enum body-use gate wrote stderr"
-    /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$body_use_output" \
-        || fail "$stage_label recursive enum body-use gate missed the pre-emission diagnostic"
-    if /usr/bin/grep -Fq 'define ' "$body_use_output"; then
-        fail "$stage_label recursive enum body-use gate emitted LLVM"
+    local body_use_first="$WORK_ROOT/$stage_label.recursive-enum.body-use.first.ll"
+    local body_use_second="$WORK_ROOT/$stage_label.recursive-enum.body-use.repeat.ll"
+    local body_use_first_error="$WORK_ROOT/$stage_label.recursive-enum.body-use.first.err"
+    local body_use_second_error="$WORK_ROOT/$stage_label.recursive-enum.body-use.repeat.err"
+    local body_use_linked="$stage_directory/RecursiveBindingEnumSwitch"
+    local body_use_run_output="$WORK_ROOT/$stage_label.recursive-enum.body-use.run.out"
+    local body_use_run_error="$WORK_ROOT/$stage_label.recursive-enum.body-use.run.err"
+    run_capture "$executable" "$RECURSIVE_ENUM_BODY_USE_SOURCE" "$body_use_first" "$body_use_first_error"
+    require_successful_output "$stage_label recursive binding enum switch" "$body_use_first" "$body_use_first_error"
+    run_capture "$executable" "$RECURSIVE_ENUM_BODY_USE_SOURCE" "$body_use_second" "$body_use_second_error"
+    require_successful_output "$stage_label repeated recursive binding enum switch" "$body_use_second" "$body_use_second_error"
+    /usr/bin/cmp -s "$body_use_first" "$body_use_second" \
+        || fail "$stage_label recursive binding enum switch was not deterministic"
+    /usr/bin/grep -Fq '%Range.List = type { i32, ptr }' "$body_use_first" \
+        || fail "$stage_label recursive binding enum switch omitted native tag/pointer layout"
+    /usr/bin/grep -Eq 'insertvalue %Range\.List .* ptr %storage[0-9]+, 1' "$body_use_first" \
+        || fail "$stage_label recursive binding enum switch omitted the ID-selected binding address"
+    /usr/bin/grep -Eq 'extractvalue %Range\.List .* 1' "$body_use_first" \
+        || fail "$stage_label recursive binding enum switch omitted payload extraction"
+    for forbidden in rangeConstruct malloc calloc realloc free; do
+        if /usr/bin/grep -Fq "$forbidden" "$body_use_first"; then
+            fail "$stage_label recursive binding enum switch emitted forbidden dynamic/allocator symbol: $forbidden"
+        fi
+    done
+    validate_llvm "$body_use_first"
+    link_llvm "$body_use_first" "$body_use_linked"
+    if "$body_use_linked" > "$body_use_run_output" 2> "$body_use_run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
     fi
-    echo "$stage_label recursive enums: pass (ID-linked payload types, payload graph policies, binding/indirect cycle breaks, direct-cycle rejection, executable-use gate, deterministic declaration proof)"
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label recursive binding enum switch executable exited $RUN_STATUS"
+    [[ ! -s "$body_use_run_output" && ! -s "$body_use_run_error" ]] \
+        || fail "$stage_label recursive binding enum switch executable wrote output"
+    echo "$stage_label recursive enums: pass (ID-linked payload types, payload graph policies, binding/indirect cycle breaks, direct-cycle rejection, allocator-free native binding construction/switch, deterministic declaration proof)"
 }
 
 audit_placement_symbol_guard() {
@@ -4610,16 +4634,7 @@ main() {
         '@main {' \
         '    return 0' \
         '}' > "$RECURSIVE_ENUM_DUPLICATE_PAYLOAD_SOURCE"
-    RECURSIVE_ENUM_BODY_USE_SOURCE="$WORK_ROOT/RecursiveEnumBodyUseNegative.range"
-    /usr/bin/printf '%s\n' \
-        'enum List {' \
-        '    case end' \
-        '    case next(binding value: List)' \
-        '}' \
-        '@main {' \
-        '    let value: List(.end)' \
-        '    return 0' \
-        '}' > "$RECURSIVE_ENUM_BODY_USE_SOURCE"
+    RECURSIVE_ENUM_BODY_USE_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnRecursiveBindingEnumSwitch.range"
 
     PLACEMENT_GUARD_SOURCE="$WORK_ROOT/PlacementSymbolGuard.range"
     /usr/bin/printf '%s\n' \

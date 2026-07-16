@@ -1,0 +1,20 @@
+enum List {
+    case end
+    case next(binding value: List)
+}
+
+@main {
+    let tail: List(.end)
+    let list: List(.next(value: $tail))
+    switch list {
+    case .end:
+        return 1
+    case .next(let value):
+        switch value {
+        case .end:
+            return 7
+        case .next(let ignored):
+            return 2
+        }
+    }
+}
