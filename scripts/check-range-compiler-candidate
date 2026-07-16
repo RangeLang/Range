@@ -309,6 +309,76 @@ audit_smoke() {
     echo "$stage_label deterministic aggregate smoke: pass (exit 7)"
 }
 
+audit_storage_switches() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local kind source expected first second first_error second_error llvm linked run_output run_error
+
+    for kind in integer string bool state member; do
+        expected=0
+        source="$SWITCH_INTEGER_SOURCE"
+        if [[ "$kind" == string ]]; then
+            source="$SWITCH_STRING_SOURCE"
+            expected=2
+        elif [[ "$kind" == bool ]]; then
+            source="$SWITCH_BOOL_SOURCE"
+            expected=7
+        elif [[ "$kind" == state ]]; then
+            source="$SWITCH_STATE_SOURCE"
+            expected=7
+        elif [[ "$kind" == member ]]; then
+            source="$SWITCH_MEMBER_SOURCE"
+            expected=7
+        else
+            expected=20
+        fi
+        first="$WORK_ROOT/$stage_label.switch.$kind.first.ll"
+        second="$WORK_ROOT/$stage_label.switch.$kind.repeat.ll"
+        first_error="$WORK_ROOT/$stage_label.switch.$kind.first.err"
+        second_error="$WORK_ROOT/$stage_label.switch.$kind.repeat.err"
+        llvm="$stage_directory/Switch-$kind.ll"
+        linked="$stage_directory/Switch-$kind"
+        run_output="$WORK_ROOT/$stage_label.switch.$kind.run.out"
+        run_error="$WORK_ROOT/$stage_label.switch.$kind.run.err"
+
+        run_capture "$executable" "$source" "$first" "$first_error"
+        require_successful_output "$stage_label $kind storage switch" "$first" "$first_error"
+        run_capture "$executable" "$source" "$second" "$second_error"
+        require_successful_output "$stage_label repeated $kind storage switch" "$second" "$second_error"
+        /usr/bin/cmp -s "$first" "$second" || fail "$stage_label $kind storage switch was not deterministic"
+        /bin/cp "$first" "$llvm"
+        validate_llvm "$llvm"
+        link_llvm "$llvm" "$linked"
+        if "$linked" > "$run_output" 2> "$run_error"; then
+            RUN_STATUS=0
+        else
+            RUN_STATUS=$?
+        fi
+        [[ "$RUN_STATUS" -eq "$expected" ]] || fail "$stage_label $kind storage switch exited $RUN_STATUS"
+        [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label $kind storage switch wrote output"
+    done
+
+    local negative_kind negative_source negative_output negative_error
+    for negative_kind in nonstorage mismatch; do
+        negative_source="$SWITCH_NONSTORAGE_SOURCE"
+        if [[ "$negative_kind" == mismatch ]]; then
+            negative_source="$SWITCH_MISMATCH_SOURCE"
+        fi
+        negative_output="$WORK_ROOT/$stage_label.switch.$negative_kind.out"
+        negative_error="$WORK_ROOT/$stage_label.switch.$negative_kind.err"
+        run_capture "$executable" "$negative_source" "$negative_output" "$negative_error"
+        [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label $negative_kind switch rejection exited $RUN_STATUS"
+        [[ ! -s "$negative_error" ]] || fail "$stage_label $negative_kind switch rejection wrote stderr"
+        /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$negative_output" \
+            || fail "$stage_label $negative_kind switch rejection missed the semantic diagnostic"
+        if /usr/bin/grep -Fq 'define ' "$negative_output"; then
+            fail "$stage_label $negative_kind switch rejection emitted LLVM"
+        fi
+    done
+    echo "$stage_label storage switch: pass (let/state/member, Int/String/Bool, deterministic, typed rejection matrix)"
+}
+
 audit_placement_symbol_guard() {
     local stage_label="$1"
     local executable="$2"
@@ -4082,6 +4152,7 @@ audit_stage() {
     audit_macro_expansion_commit "$stage_label" "$executable" "$stage_directory"
     audit_body_syntax_split "$stage_label" "$executable" "$stage_directory"
     audit_smoke "$stage_label" "$executable" "$stage_directory"
+    audit_storage_switches "$stage_label" "$executable" "$stage_directory"
     audit_placement_symbol_guard "$stage_label" "$executable" "$stage_directory"
     audit_mixed_abi "$stage_label" "$executable"
 }
@@ -4245,6 +4316,33 @@ main() {
         '    second: NativeSmokePair(first: 3, second: 6)' \
         '    return first.first + second.second' \
         '}' > "$SMOKE_SOURCE"
+
+    SWITCH_INTEGER_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnIntegerSwitch.range"
+    SWITCH_STRING_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnStringSwitch.range"
+    SWITCH_BOOL_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnBoolSwitch.range"
+    SWITCH_STATE_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnStateIntegerSwitch.range"
+    SWITCH_MEMBER_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnMemberIntegerSwitch.range"
+    SWITCH_NONSTORAGE_SOURCE="$WORK_ROOT/SwitchNonstorageNegative.range"
+    /usr/bin/printf '%s\n' \
+        '@main {' \
+        '    switch 1 + 1 {' \
+        '    case 2:' \
+        '        return 7' \
+        '    default:' \
+        '        return 0' \
+        '    }' \
+        '}' > "$SWITCH_NONSTORAGE_SOURCE"
+    SWITCH_MISMATCH_SOURCE="$WORK_ROOT/SwitchMismatchNegative.range"
+    /usr/bin/printf '%s\n' \
+        '@main {' \
+        '    let value: Int(2)' \
+        '    switch value {' \
+        '    case "2":' \
+        '        return 7' \
+        '    default:' \
+        '        return 0' \
+        '    }' \
+        '}' > "$SWITCH_MISMATCH_SOURCE"
 
     PLACEMENT_GUARD_SOURCE="$WORK_ROOT/PlacementSymbolGuard.range"
     /usr/bin/printf '%s\n' \

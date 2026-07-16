@@ -1092,7 +1092,9 @@ function compilerSyntaxKindStringSegment(): Int { return 36 }
 function compilerSyntaxKindDivision(): Int { return 37 }
 function compilerSyntaxKindRemainder(): Int { return 38 }
 function compilerSyntaxKindIndex(): Int { return 39 }
-function compilerSyntaxKindLastBody(): Int { return compilerSyntaxKindIndex() }
+function compilerSyntaxKindSwitch(): Int { return 40 }
+function compilerSyntaxKindSwitchCase(): Int { return 41 }
+function compilerSyntaxKindLastBody(): Int { return compilerSyntaxKindSwitchCase() }
 
 function compilerSyntaxLocalKindLet(): Int { return 1 }
 function compilerSyntaxLocalKindState(): Int { return 2 }
@@ -1120,6 +1122,10 @@ function compilerSyntaxRoleOperand(): Int { return 19 }
 function compilerSyntaxRoleWhileBody(): Int { return 20 }
 function compilerSyntaxRoleInterpolationPart(): Int { return 21 }
 function compilerSyntaxRoleIndex(): Int { return 22 }
+function compilerSyntaxRoleSwitchSubject(): Int { return 23 }
+function compilerSyntaxRoleSwitchCase(): Int { return 24 }
+function compilerSyntaxRoleSwitchPattern(): Int { return 25 }
+function compilerSyntaxRoleSwitchBody(): Int { return 26 }
 
 function compilerSyntaxTablesCreate(source: String): CompilerSyntaxTables {
     return CompilerSyntaxTables(
@@ -3157,32 +3163,66 @@ function compilerTypedSyntaxCaptureWithPolicy(source: String, tables: CompilerSy
     return 0
 }
 
+function compilerTypedSyntaxSwitchNextIndex(source: String, start: Int, end: Int): Int {
+    state cursor: Int(start)
+    let fallback: RangeLexedToken(RangeLexedToken(kind: String("eof"), start: start, end: start, text: String("")))
+    while cursor < end {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: cursor))
+        if maybeToken == nil { return 0 - 1 }
+        let token: RangeLexedToken(maybeToken ?? fallback)
+        if token.start >= end { return 0 - 1 }
+        if token.kind == String("leftBrace") {
+            let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: source, index: token.start), leftKind: String("leftBrace"), rightKind: String("rightBrace")))
+            if maybeRange == nil { return 0 - 1 }
+            let rangeFallback: CompilerSourceRange(CompilerSourceRange(start: token.end, end: token.end, next: token.end))
+            let range: CompilerSourceRange(maybeRange ?? rangeFallback)
+            if range.next > end { return 0 - 1 }
+            return range.next
+        }
+        cursor: token.end
+    }
+    return 0 - 1
+}
+
 function compilerTypedSyntaxCaptureBody(source: String, tables: CompilerSyntaxTables, fileID: Int, ownerSyntaxID: Int, start: Int, end: Int): Int {
     let emptyDeclarations: CompilerParsedDeclarations(CompilerParsedDeclarations(records: String(""), declarationSummary: String(""), functionSummary: String(""), count: 0))
     let program: CompilerProgram(compilerCoreProgramWithoutMain(source: source, parsedDeclarations: emptyDeclarations))
     state sourceIndex: Int(start)
     state statementOrdinal: Int(0)
     while sourceIndex < end {
-        let context: CompilerBodySyntaxCaptureContext(CompilerBodySyntaxCaptureContext(fileID: fileID, ownerSyntaxID: ownerSyntaxID, statementOrdinal: statementOrdinal))
-        let maybeStatement: Optional<CompilerStatement>(parseCompilerStatement(program: program, start: sourceIndex, bodyEnd: end))
-        if maybeStatement == nil {
-            let remainingStart: Int(compilerCoreFirstNonWhitespaceIndex(source: source, start: sourceIndex, end: end))
-            if remainingStart >= end { return 0 }
-            compilerSyntaxTablesPoison(tables: tables)
-            return 0 - 1
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: sourceIndex))
+        let fallbackToken: RangeLexedToken(RangeLexedToken(kind: String("eof"), start: sourceIndex, end: sourceIndex, text: String("")))
+        let token: RangeLexedToken(maybeToken ?? fallbackToken)
+        if maybeToken != nil && token.kind == String("keyword") && token.text == String("switch") {
+            let nextIndex: Int(compilerTypedSyntaxSwitchNextIndex(source: source, start: token.end, end: end))
+            if nextIndex <= sourceIndex {
+                compilerSyntaxTablesPoison(tables: tables)
+                return 0 - 1
+            }
+            sourceIndex: nextIndex
+            statementOrdinal: statementOrdinal + 1
+        } else {
+            let context: CompilerBodySyntaxCaptureContext(CompilerBodySyntaxCaptureContext(fileID: fileID, ownerSyntaxID: ownerSyntaxID, statementOrdinal: statementOrdinal))
+            let maybeStatement: Optional<CompilerStatement>(parseCompilerStatement(program: program, start: sourceIndex, bodyEnd: end))
+            if maybeStatement == nil {
+                let remainingStart: Int(compilerCoreFirstNonWhitespaceIndex(source: source, start: sourceIndex, end: end))
+                if remainingStart >= end { return 0 }
+                compilerSyntaxTablesPoison(tables: tables)
+                return 0 - 1
+            }
+            let missingStatement: CompilerStatement(compilerCoreMissingStatement(start: sourceIndex, end: sourceIndex))
+            let statement: CompilerStatement(maybeStatement ?? missingStatement)
+            if compilerBodySyntaxCaptureStatement(source: source, tables: tables, statement: statement, context: context) != 0 {
+                compilerSyntaxTablesPoison(tables: tables)
+                return 0 - 1
+            }
+            if statement.end <= sourceIndex || statement.end > end {
+                compilerSyntaxTablesPoison(tables: tables)
+                return 0 - 1
+            }
+            sourceIndex: statement.end
+            statementOrdinal: statementOrdinal + 1
         }
-        let missingStatement: CompilerStatement(compilerCoreMissingStatement(start: sourceIndex, end: sourceIndex))
-        let statement: CompilerStatement(maybeStatement ?? missingStatement)
-        if compilerBodySyntaxCaptureStatement(source: source, tables: tables, statement: statement, context: context) != 0 {
-            compilerSyntaxTablesPoison(tables: tables)
-            return 0 - 1
-        }
-        if statement.end <= sourceIndex || statement.end > end {
-            compilerSyntaxTablesPoison(tables: tables)
-            return 0 - 1
-        }
-        sourceIndex: statement.end
-        statementOrdinal: statementOrdinal + 1
     }
     return 0
 }
@@ -15412,6 +15452,7 @@ function compilerBodyCFGScheduleOptionalTag(): Int { return 2 }
 function compilerBodyCFGScheduleOptionalPayload(): Int { return 3 }
 function compilerBodyCFGScheduleOptionalJoin(): Int { return 4 }
 function compilerBodyCFGScheduleStatementCommit(): Int { return 5 }
+function compilerBodyCFGScheduleSwitchMatch(): Int { return 6 }
 
 function compilerBodyStorageColumnCount(): Int { return 6 }
 function compilerBodyStorageIDColumn(): Int { return 0 }
@@ -15998,6 +16039,7 @@ function compilerBodyArenaStatementKind(token: RangeLexedToken): Int {
     if token.text == String("let") || token.text == String("state") { return compilerSyntaxKindLocalBinding() }
     if token.text == String("if") { return compilerSyntaxKindIf() }
     if token.text == String("while") { return compilerSyntaxKindWhile() }
+    if token.text == String("switch") { return compilerSyntaxKindSwitch() }
     return 0 - 1
 }
 
@@ -16544,6 +16586,103 @@ function compilerBodyArenaParseWhileStatement(arena: CompilerBodyArena, keyword:
     return compilerBodyParseSuccess(nodeID: whileNodeID, nextIndex: range.next)
 }
 
+function compilerBodyArenaSwitchClauseEnd(arena: CompilerBodyArena, start: Int, limit: Int): Int {
+    state cursor: Int(start)
+    state braceDepth: Int(0)
+    state parenthesisDepth: Int(0)
+    state bracketDepth: Int(0)
+    let fallback: RangeLexedToken(RangeLexedToken(kind: String("eof"), start: start, end: start, text: String("")))
+    while cursor < limit {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
+        if maybeToken == nil { return limit }
+        let token: RangeLexedToken(maybeToken ?? fallback)
+        if token.start >= limit { return limit }
+        if braceDepth == 0 && parenthesisDepth == 0 && bracketDepth == 0
+            && token.kind == String("keyword") && (token.text == String("case") || token.text == String("default")) { return token.start }
+        if token.kind == String("leftBrace") { braceDepth: braceDepth + 1 }
+        if token.kind == String("rightBrace") {
+            if braceDepth <= 0 { return token.start }
+            braceDepth: braceDepth - 1
+        }
+        if token.kind == String("leftParen") { parenthesisDepth: parenthesisDepth + 1 }
+        if token.kind == String("rightParen") {
+            if parenthesisDepth <= 0 { return token.start }
+            parenthesisDepth: parenthesisDepth - 1
+        }
+        if token.kind == String("leftBracket") { bracketDepth: bracketDepth + 1 }
+        if token.kind == String("rightBracket") {
+            if bracketDepth <= 0 { return token.start }
+            bracketDepth: bracketDepth - 1
+        }
+        cursor: token.end
+    }
+    return limit
+}
+
+function compilerBodyArenaParseSwitchStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
+    let subject: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: keyword.end, limit: limit, minimumPrecedence: 0))
+    if !subject.isValid { return subject }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: String("eof"), start: subject.nextIndex, end: subject.nextIndex, text: String("")))
+    let maybeLeftBrace: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: subject.nextIndex))
+    if maybeLeftBrace == nil { return compilerBodyParseFailure(index: subject.nextIndex) }
+    let leftBrace: RangeLexedToken(maybeLeftBrace ?? fallback)
+    if leftBrace.kind != String("leftBrace") { return compilerBodyParseFailure(index: subject.nextIndex) }
+    let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: leftBrace.start), leftKind: String("leftBrace"), rightKind: String("rightBrace")))
+    if maybeRange == nil { return compilerBodyParseFailure(index: leftBrace.start) }
+    let rangeFallback: CompilerSourceRange(CompilerSourceRange(start: leftBrace.end, end: leftBrace.end, next: leftBrace.end))
+    let range: CompilerSourceRange(maybeRange ?? rangeFallback)
+    let switchNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindSwitch(), ordinal: ordinal, start: keyword.start, end: range.next, firstStart: keyword.start, firstEnd: keyword.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if switchNodeID < 0 { return compilerBodyParseFailure(index: keyword.start) }
+    if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: switchNodeID, childNodeID: subject.nodeID, role: compilerSyntaxRoleSwitchSubject(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: keyword.start) }
+    state cursor: Int(range.start)
+    state caseOrdinal: Int(0)
+    state defaultCount: Int(0)
+    while cursor < range.end {
+        let maybeCaseToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
+        if maybeCaseToken == nil { return compilerBodyParseFailure(index: cursor) }
+        let caseToken: RangeLexedToken(maybeCaseToken ?? fallback)
+        if caseToken.start >= range.end {
+            cursor: range.end
+        } else {
+            if caseToken.kind != String("keyword") || (caseToken.text != String("case") && caseToken.text != String("default")) { return compilerBodyParseFailure(index: caseToken.start) }
+            let isDefault: Bool(caseToken.text == String("default"))
+            state patternNodeID: Int(0 - 1)
+            state colonSearchStart: Int(caseToken.end)
+            if !isDefault {
+                let pattern: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: caseToken.end, limit: range.end, minimumPrecedence: 0))
+                if !pattern.isValid { return pattern }
+                patternNodeID: pattern.nodeID
+                colonSearchStart: pattern.nextIndex
+            } else {
+                defaultCount: defaultCount + 1
+                if defaultCount > 1 { return compilerBodyParseFailure(index: caseToken.start) }
+            }
+            let maybeColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: colonSearchStart))
+            if maybeColon == nil { return compilerBodyParseFailure(index: colonSearchStart) }
+            let colon: RangeLexedToken(maybeColon ?? fallback)
+            if colon.kind != String("colon") { return compilerBodyParseFailure(index: colonSearchStart) }
+            let clauseEnd: Int(compilerBodyArenaSwitchClauseEnd(arena: arena, start: colon.end, limit: range.end))
+            if clauseEnd < colon.end { return compilerBodyParseFailure(index: colon.end) }
+            state defaultAux: Int(0)
+            if isDefault { defaultAux: 1 }
+            let caseNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindSwitchCase(), ordinal: caseOrdinal, start: caseToken.start, end: clauseEnd, firstStart: caseToken.start, firstEnd: caseToken.end, secondStart: colon.start, secondEnd: colon.end, aux: defaultAux))
+            let regionNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindLexicalRegion(), ordinal: caseOrdinal, start: colon.end, end: clauseEnd, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+            if caseNodeID < 0 || regionNodeID < 0 { return compilerBodyParseFailure(index: caseToken.start) }
+            if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: switchNodeID, childNodeID: caseNodeID, role: compilerSyntaxRoleSwitchCase(), ordinal: caseOrdinal) != 0 { return compilerBodyParseFailure(index: caseToken.start) }
+            if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: caseNodeID, childNodeID: regionNodeID, role: compilerSyntaxRoleSwitchBody(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: caseToken.start) }
+            if !isDefault {
+                if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: caseNodeID, childNodeID: patternNodeID, role: compilerSyntaxRoleSwitchPattern(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: caseToken.start) }
+            }
+            let parsedRegion: CompilerBodyParseResult(compilerBodyArenaParseRegionInto(arena: arena, regionNodeID: regionNodeID, start: colon.end, limit: clauseEnd))
+            if !parsedRegion.isValid { return parsedRegion }
+            cursor: clauseEnd
+            caseOrdinal: caseOrdinal + 1
+        }
+    }
+    if caseOrdinal == 0 || defaultCount != 1 { return compilerBodyParseFailure(index: range.start) }
+    return compilerBodyParseSuccess(nodeID: switchNodeID, nextIndex: range.next)
+}
+
 function compilerBodyArenaParsedPostfixIsApplication(arena: CompilerBodyArena, nodeID: Int, start: Int, end: Int): Bool {
     return compilerIntTableValue(table: arena.nodes, row: nodeID, column: 1) == compilerSyntaxKindApplication()
 }
@@ -16609,6 +16748,7 @@ function compilerBodyArenaParseStatement(arena: CompilerBodyArena, start: Int, l
     if statementKind == compilerSyntaxKindLocalBinding() { return compilerBodyArenaParseLetStatement(arena: arena, keyword: keyword, limit: limit, ordinal: ordinal) }
     if statementKind == compilerSyntaxKindIf() { return compilerBodyArenaParseIfStatement(arena: arena, keyword: keyword, limit: limit, ordinal: ordinal) }
     if statementKind == compilerSyntaxKindWhile() { return compilerBodyArenaParseWhileStatement(arena: arena, keyword: keyword, limit: limit, ordinal: ordinal) }
+    if statementKind == compilerSyntaxKindSwitch() { return compilerBodyArenaParseSwitchStatement(arena: arena, keyword: keyword, limit: limit, ordinal: ordinal) }
     if keyword.kind == String("identifier") { return compilerBodyArenaParseAssignmentStatement(arena: arena, start: start, limit: limit, ordinal: ordinal) }
     return compilerBodyParseFailure(index: start)
 }
@@ -17634,6 +17774,13 @@ function compilerBodyArenaLexicalParentRegion(arena: CompilerBodyArena, regionNo
             if role == compilerSyntaxRoleThenRegion() || role == compilerSyntaxRoleElseRegion() || role == compilerSyntaxRoleWhileBody() {
                 ownerStatementNodeID: compilerIntTableValue(table: arena.edges, row: edgeRow, column: 0)
                 ownerCount: ownerCount + 1
+            } else if role == compilerSyntaxRoleSwitchBody() {
+                let caseNodeID: Int(compilerIntTableValue(table: arena.edges, row: edgeRow, column: 0))
+                let switchNodeID: Int(compilerBodyArenaSwitchOwnerForCase(arena: arena, caseNodeID: caseNodeID))
+                if switchNodeID >= 0 {
+                    ownerStatementNodeID: switchNodeID
+                    ownerCount: ownerCount + 1
+                }
             }
         }
         edgeRow: edgeRow + 1
@@ -18248,6 +18395,42 @@ function compilerBodyArenaSeedParameterSymbols(arena: CompilerBodyArena): Int {
     return 0
 }
 
+function compilerBodyArenaSwitchOwnerForCase(arena: CompilerBodyArena, caseNodeID: Int): Int {
+    state edgeRow: Int(0)
+    while edgeRow < compilerIntTableRowCount(table: arena.edges) {
+        if compilerIntTableValue(table: arena.edges, row: edgeRow, column: 1) == caseNodeID
+            && compilerIntTableValue(table: arena.edges, row: edgeRow, column: 2) == compilerSyntaxRoleSwitchCase() { return compilerIntTableValue(table: arena.edges, row: edgeRow, column: 0) }
+        edgeRow: edgeRow + 1
+    }
+    return 0 - 1
+}
+
+function compilerBodyArenaSwitchSubjectIsStorage(arena: CompilerBodyArena, subjectNodeID: Int): Bool {
+    state storageNodeID: Int(subjectNodeID)
+    state kind: Int(0 - 1)
+    if storageNodeID >= 0 && storageNodeID < compilerIntTableRowCount(table: arena.nodes) {
+        kind: compilerIntTableValue(table: arena.nodes, row: storageNodeID, column: 1)
+    }
+    if kind == compilerSyntaxKindGrouping() {
+        storageNodeID: compilerBodyArenaChild(arena: arena, ownerNodeID: storageNodeID, role: compilerSyntaxRoleGroupedValue(), ordinal: 0)
+        if storageNodeID >= 0 && storageNodeID < compilerIntTableRowCount(table: arena.nodes) {
+            kind: compilerIntTableValue(table: arena.nodes, row: storageNodeID, column: 1)
+        } else {
+            kind: 0 - 1
+        }
+    }
+    if kind != compilerSyntaxKindIdentifier() && kind != compilerSyntaxKindBindingReference() && kind != compilerSyntaxKindMemberRead() { return false }
+    let resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: storageNodeID))
+    if resolutionRow < 0 { return false }
+    let targetKind: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()))
+    return targetKind == compilerBodyResolutionLocalSymbol() || targetKind == compilerBodyResolutionMember()
+}
+
+function compilerBodyArenaSwitchTypeHasMatcher(arena: CompilerBodyArena, typeKind: Int, typeID: Int): Bool {
+    if typeKind == compilerBodyTypeInt() || typeKind == compilerBodyTypeBool() || typeKind == compilerBodyTypeString() { return true }
+    return false
+}
+
 function compilerBodyArenaBuildRegionSymbols(arena: CompilerBodyArena, index: CompilerDeclarationIndex, regionNodeID: Int): Int {
     state ordinal: Int(0)
     state keepScanning: Bool(true)
@@ -18275,6 +18458,36 @@ function compilerBodyArenaBuildRegionSymbols(arena: CompilerBodyArena, index: Co
                 if whileConditionNodeID < 0 || whileBodyRegionNodeID < 0
                     || compilerBodyArenaResolveExpression(arena: arena, index: index, nodeID: whileConditionNodeID, regionNodeID: regionNodeID) != 0
                     || compilerBodyArenaBuildRegionSymbols(arena: arena, index: index, regionNodeID: whileBodyRegionNodeID) != 0 { return 0 - 1 }
+            } else if kind == compilerSyntaxKindSwitch() {
+                let subjectNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleSwitchSubject(), ordinal: 0))
+                if subjectNodeID < 0 { return 0 - 1 }
+                if compilerBodyArenaResolveExpression(arena: arena, index: index, nodeID: subjectNodeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
+                if !compilerBodyArenaSwitchSubjectIsStorage(arena: arena, subjectNodeID: subjectNodeID) { return 0 - 1 }
+                let subjectTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: subjectNodeID))
+                let subjectTypeID: Int(compilerBodyArenaExpressionTypeID(arena: arena, nodeID: subjectNodeID))
+                if !compilerBodyArenaSwitchTypeHasMatcher(arena: arena, typeKind: subjectTypeKind, typeID: subjectTypeID) { return 0 - 1 }
+                state caseOrdinal: Int(0)
+                state keepResolvingCases: Bool(true)
+                while keepResolvingCases {
+                    let caseNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleSwitchCase(), ordinal: caseOrdinal))
+                    if caseNodeID < 0 {
+                        keepResolvingCases: false
+                    } else {
+                        let caseRegionNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: caseNodeID, role: compilerSyntaxRoleSwitchBody(), ordinal: 0))
+                        if caseRegionNodeID < 0 { return 0 - 1 }
+                        if compilerIntTableValue(table: arena.nodes, row: caseNodeID, column: 10) == 0 {
+                            let patternNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: caseNodeID, role: compilerSyntaxRoleSwitchPattern(), ordinal: 0))
+                            if patternNodeID < 0 { return 0 - 1 }
+                            if compilerBodyArenaResolveExpression(arena: arena, index: index, nodeID: patternNodeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
+                            let patternTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: patternNodeID))
+                            let patternTypeID: Int(compilerBodyArenaExpressionTypeID(arena: arena, nodeID: patternNodeID))
+                            if patternTypeKind != subjectTypeKind || (subjectTypeKind == compilerBodyTypeConstruct() && patternTypeID != subjectTypeID) { return 0 - 1 }
+                        }
+                        if compilerBodyArenaBuildRegionSymbols(arena: arena, index: index, regionNodeID: caseRegionNodeID) != 0 { return 0 - 1 }
+                        caseOrdinal: caseOrdinal + 1
+                    }
+                }
+                if caseOrdinal == 0 { return 0 - 1 }
             } else if kind == compilerSyntaxKindAssignment() {
                 let targetNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleAssignmentTarget(), ordinal: 0))
                 let valueNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleAssignedValue(), ordinal: 0))
@@ -18463,9 +18676,118 @@ function compilerBodyArenaStatementExpression(arena: CompilerBodyArena, statemen
     if kind == compilerSyntaxKindLocalBinding() { return compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleInitializer(), ordinal: 0) }
     if kind == compilerSyntaxKindAssignment() { return compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleAssignedValue(), ordinal: 0) }
     if kind == compilerSyntaxKindIf() || kind == compilerSyntaxKindWhile() { return compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleCondition(), ordinal: 0) }
+    if kind == compilerSyntaxKindSwitch() { return compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleSwitchSubject(), ordinal: 0) }
     if kind == compilerSyntaxKindReturn() { return compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleReturnValue(), ordinal: 0) }
     if kind == compilerSyntaxKindApplication() { return statementNodeID }
     return 0 - 1
+}
+
+function compilerBodyArenaBuildCFGSwitch(arena: CompilerBodyArena, regionNodeID: Int, switchNodeID: Int, initialBlockID: Int, continuationStatementOrdinal: Int): CompilerBodyCFGResult {
+    state caseCount: Int(0)
+    state patternCount: Int(0)
+    state defaultCaseNodeID: Int(0 - 1)
+    state keepCounting: Bool(true)
+    while keepCounting {
+        let caseNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: switchNodeID, role: compilerSyntaxRoleSwitchCase(), ordinal: caseCount))
+        if caseNodeID < 0 {
+            keepCounting: false
+        } else {
+            if compilerIntTableValue(table: arena.nodes, row: caseNodeID, column: 10) == 1 {
+                if defaultCaseNodeID >= 0 { return CompilerBodyCFGResult(blockID: initialBlockID, isTerminated: false, isValid: false) }
+                defaultCaseNodeID: caseNodeID
+            } else {
+                patternCount: patternCount + 1
+            }
+            caseCount: caseCount + 1
+        }
+    }
+    if caseCount == 0 || defaultCaseNodeID < 0 { return CompilerBodyCFGResult(blockID: initialBlockID, isTerminated: false, isValid: false) }
+    let openBodyBlocks: RawBuffer(rawBufferCreate(capacity: caseCount, stride: 4))
+    state testBlockID: Int(initialBlockID)
+    state caseOrdinal: Int(0)
+    state processedPatterns: Int(0)
+    state valid: Bool(true)
+    while valid && caseOrdinal < caseCount {
+        let caseNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: switchNodeID, role: compilerSyntaxRoleSwitchCase(), ordinal: caseOrdinal))
+        if compilerIntTableValue(table: arena.nodes, row: caseNodeID, column: 10) == 0 {
+            let patternNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: caseNodeID, role: compilerSyntaxRoleSwitchPattern(), ordinal: 0))
+            let caseRegionNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: caseNodeID, role: compilerSyntaxRoleSwitchBody(), ordinal: 0))
+            let patternResult: CompilerBodyCFGResult(compilerBodyArenaBuildCFGExpression(arena: arena, nodeID: patternNodeID, entryBlockID: testBlockID))
+            if patternNodeID < 0 || caseRegionNodeID < 0 || !patternResult.isValid {
+                valid: false
+            } else {
+                testBlockID: patternResult.blockID
+                if compilerBodyArenaCFGScheduleAppend(arena: arena, blockID: testBlockID, nodeID: caseNodeID, action: compilerBodyCFGScheduleSwitchMatch()) < 0
+                    || compilerBodyArenaCFGSetBlock(arena: arena, blockID: testBlockID, statementCount: 0, terminatorKind: compilerBodyCFGTerminatorCondition(), terminatorSourceNodeID: caseNodeID) != 0 { valid: false }
+                let bodyBlockID: Int(compilerBodyArenaCFGAppendBlock(arena: arena, regionNodeID: caseRegionNodeID, firstStatementOrdinal: 0))
+                state falseBlockID: Int(0 - 1)
+                if processedPatterns + 1 == patternCount {
+                    let defaultRegionNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: defaultCaseNodeID, role: compilerSyntaxRoleSwitchBody(), ordinal: 0))
+                    falseBlockID: compilerBodyArenaCFGAppendBlock(arena: arena, regionNodeID: defaultRegionNodeID, firstStatementOrdinal: 0)
+                } else {
+                    falseBlockID: compilerBodyArenaCFGAppendBlock(arena: arena, regionNodeID: regionNodeID, firstStatementOrdinal: continuationStatementOrdinal - 1)
+                }
+                if bodyBlockID < 0 || falseBlockID < 0
+                    || compilerBodyArenaCFGAppendEdge(arena: arena, fromBlockID: testBlockID, toBlockID: bodyBlockID, role: compilerBodyCFGEdgeTrue(), ordinal: 0) != 0
+                    || compilerBodyArenaCFGAppendEdge(arena: arena, fromBlockID: testBlockID, toBlockID: falseBlockID, role: compilerBodyCFGEdgeFalse(), ordinal: 1) != 0 {
+                    valid: false
+                } else {
+                    let bodyResult: CompilerBodyCFGResult(compilerBodyArenaBuildCFGRegion(arena: arena, regionNodeID: caseRegionNodeID, initialBlockID: bodyBlockID))
+                    if !bodyResult.isValid {
+                        valid: false
+                    } else if !bodyResult.isTerminated {
+                        if rawBufferAppendInt(buffer: openBodyBlocks, value: bodyResult.blockID) != 0 { valid: false }
+                    }
+                    testBlockID: falseBlockID
+                    processedPatterns: processedPatterns + 1
+                }
+            }
+        }
+        caseOrdinal: caseOrdinal + 1
+    }
+    if valid {
+        let defaultRegionNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: defaultCaseNodeID, role: compilerSyntaxRoleSwitchBody(), ordinal: 0))
+        if defaultRegionNodeID < 0 {
+            valid: false
+        } else {
+            state defaultBlockID: Int(testBlockID)
+            if patternCount == 0 {
+                defaultBlockID: compilerBodyArenaCFGAppendBlock(arena: arena, regionNodeID: defaultRegionNodeID, firstStatementOrdinal: 0)
+                if defaultBlockID < 0
+                    || compilerBodyArenaCFGSetBlock(arena: arena, blockID: initialBlockID, statementCount: 0, terminatorKind: compilerBodyCFGTerminatorFallthrough(), terminatorSourceNodeID: switchNodeID) != 0
+                    || compilerBodyArenaCFGAppendEdge(arena: arena, fromBlockID: initialBlockID, toBlockID: defaultBlockID, role: compilerBodyCFGEdgeFallthrough(), ordinal: 0) != 0 { valid: false }
+            }
+            let defaultResult: CompilerBodyCFGResult(compilerBodyArenaBuildCFGRegion(arena: arena, regionNodeID: defaultRegionNodeID, initialBlockID: defaultBlockID))
+            if defaultBlockID < 0 || !defaultResult.isValid {
+                valid: false
+            } else if !defaultResult.isTerminated {
+                if rawBufferAppendInt(buffer: openBodyBlocks, value: defaultResult.blockID) != 0 { valid: false }
+            }
+        }
+    }
+    state resultBlockID: Int(initialBlockID)
+    state resultTerminated: Bool(false)
+    if valid {
+        if rawBufferCount(buffer: openBodyBlocks) == 0 {
+            resultTerminated: true
+        } else {
+            let continuationBlockID: Int(compilerBodyArenaCFGAppendBlock(arena: arena, regionNodeID: regionNodeID, firstStatementOrdinal: continuationStatementOrdinal))
+            if continuationBlockID < 0 {
+                valid: false
+            } else {
+                state openOrdinal: Int(0)
+                while valid && openOrdinal < rawBufferCount(buffer: openBodyBlocks) {
+                    let openBlockID: Int(rawBufferLoadInt(buffer: openBodyBlocks, index: openOrdinal))
+                    if compilerBodyArenaCFGSetBlock(arena: arena, blockID: openBlockID, statementCount: 0, terminatorKind: compilerBodyCFGTerminatorFallthrough(), terminatorSourceNodeID: switchNodeID) != 0
+                        || compilerBodyArenaCFGAppendEdge(arena: arena, fromBlockID: openBlockID, toBlockID: continuationBlockID, role: compilerBodyCFGEdgeFallthrough(), ordinal: 0) != 0 { valid: false }
+                    openOrdinal: openOrdinal + 1
+                }
+                resultBlockID: continuationBlockID
+            }
+        }
+    }
+    if rawBufferDestroy(buffer: openBodyBlocks) != 0 { valid: false }
+    return CompilerBodyCFGResult(blockID: resultBlockID, isTerminated: resultTerminated, isValid: valid)
 }
 
 function compilerBodyArenaBuildCFGRegion(arena: CompilerBodyArena, regionNodeID: Int, initialBlockID: Int): CompilerBodyCFGResult {
@@ -18495,7 +18817,12 @@ function compilerBodyArenaBuildCFGRegion(arena: CompilerBodyArena, regionNodeID:
                 if compilerBodyArenaCFGSetBlock(arena: arena, blockID: currentBlockID, statementCount: 0, terminatorKind: compilerBodyCFGTerminatorReturn(), terminatorSourceNodeID: statementNodeID) != 0 { return CompilerBodyCFGResult(blockID: currentBlockID, isTerminated: false, isValid: false) }
                 return CompilerBodyCFGResult(blockID: currentBlockID, isTerminated: true, isValid: true)
             }
-            if kind == compilerSyntaxKindIf() {
+            if kind == compilerSyntaxKindSwitch() {
+                let switchResult: CompilerBodyCFGResult(compilerBodyArenaBuildCFGSwitch(arena: arena, regionNodeID: regionNodeID, switchNodeID: statementNodeID, initialBlockID: currentBlockID, continuationStatementOrdinal: ordinal + 1))
+                if !switchResult.isValid { return switchResult }
+                if switchResult.isTerminated { return switchResult }
+                currentBlockID: switchResult.blockID
+            } else if kind == compilerSyntaxKindIf() {
                 if compilerBodyArenaCFGSetBlock(arena: arena, blockID: currentBlockID, statementCount: 0, terminatorKind: compilerBodyCFGTerminatorCondition(), terminatorSourceNodeID: statementNodeID) != 0 { return CompilerBodyCFGResult(blockID: currentBlockID, isTerminated: false, isValid: false) }
                 let thenRegionNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleThenRegion(), ordinal: 0))
                 if thenRegionNodeID < 0 { return CompilerBodyCFGResult(blockID: currentBlockID, isTerminated: false, isValid: false) }
@@ -18720,7 +19047,7 @@ function compilerBodyArenaCFGIsValid(arena: CompilerBodyArena): Bool {
         if compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleIDColumn()) != scheduleRow
             || scheduleBlockID < 0 || scheduleBlockID >= blockCount
             || scheduleNodeID < 0 || scheduleNodeID >= compilerIntTableRowCount(table: arena.nodes)
-            || scheduleAction < compilerBodyCFGScheduleEvaluateNode() || scheduleAction > compilerBodyCFGScheduleStatementCommit()
+            || scheduleAction < compilerBodyCFGScheduleEvaluateNode() || scheduleAction > compilerBodyCFGScheduleSwitchMatch()
             || compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleOrdinalColumn()) != expectedScheduleOrdinal {
             scheduleValidationStatus: 0 - 1
         } else if rawBufferStoreInt(buffer: expectedScheduleOrdinals, index: scheduleBlockID, value: expectedScheduleOrdinal + 1) != 0 {
@@ -23649,6 +23976,28 @@ function compilerBodyMIRCommitScheduledStatement(arena: CompilerBodyArena, state
     return expressionValue
 }
 
+function compilerBodyMIRBuildScheduledSwitchMatch(arena: CompilerBodyArena, caseNodeID: Int, blockID: Int): CompilerBodyMIRValueResult {
+    let switchNodeID: Int(compilerBodyArenaSwitchOwnerForCase(arena: arena, caseNodeID: caseNodeID))
+    let subjectNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: switchNodeID, role: compilerSyntaxRoleSwitchSubject(), ordinal: 0))
+    let patternNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: caseNodeID, role: compilerSyntaxRoleSwitchPattern(), ordinal: 0))
+    let subjectValueID: Int(compilerBodyMIRExpressionValue(arena: arena, nodeID: switchNodeID, action: compilerBodyCFGScheduleStatementCommit()))
+    let patternValue: CompilerBodyMIRValueResult(compilerBodyMIRBuildExpression(arena: arena, nodeID: patternNodeID, blockID: blockID))
+    if switchNodeID < 0 || subjectNodeID < 0 || patternNodeID < 0 || subjectValueID < 0 || !patternValue.isValid { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
+    let subjectTypeKind: Int(compilerIntTableValue(table: arena.mirValues, row: subjectValueID, column: compilerBodyMIRValueTypeColumn()))
+    let patternTypeKind: Int(compilerIntTableValue(table: arena.mirValues, row: patternValue.valueID, column: compilerBodyMIRValueTypeColumn()))
+    let subjectTypeID: Int(compilerIntTableValue(table: arena.mirValues, row: subjectValueID, column: compilerBodyMIRValueTypeIDColumn()))
+    let patternTypeID: Int(compilerIntTableValue(table: arena.mirValues, row: patternValue.valueID, column: compilerBodyMIRValueTypeIDColumn()))
+    if subjectTypeKind != patternTypeKind || (subjectTypeKind == compilerBodyTypeConstruct() && subjectTypeID != patternTypeID) { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
+    let resultValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueBinary(), typeKind: compilerBodyTypeBool(), typeID: 0 - 1, sourceNodeID: caseNodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: caseNodeID))
+    let operationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
+    let firstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
+    if resultValueID < 0
+        || compilerBodyMIRAppendOperand(arena: arena, operationID: operationID, ordinal: 0, valueID: subjectValueID, role: compilerBodyMIROperandLeft()) != 0
+        || compilerBodyMIRAppendOperand(arena: arena, operationID: operationID, ordinal: 1, valueID: patternValue.valueID, role: compilerBodyMIROperandRight()) != 0
+        || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: compilerBodyMIROperationEqual(), resultValueID: resultValueID, sourceNodeID: caseNodeID, firstOperand: firstOperand, operandCount: 2, targetKind: compilerBodyMIROperationTargetNone(), targetID: 0 - 1) != operationID { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
+    return CompilerBodyMIRValueResult(valueID: resultValueID, isValid: true)
+}
+
 function compilerBodyMIRExecuteScheduleAction(arena: CompilerBodyArena, scheduleRow: Int): Int {
     let blockID: Int(compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleBlockColumn()))
     let nodeID: Int(compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleNodeColumn()))
@@ -23659,6 +24008,7 @@ function compilerBodyMIRExecuteScheduleAction(arena: CompilerBodyArena, schedule
     if action == compilerBodyCFGScheduleOptionalPayload() { result: compilerBodyMIRBuildScheduledOptionalPayload(arena: arena, nodeID: nodeID, blockID: blockID) }
     if action == compilerBodyCFGScheduleOptionalJoin() { result: compilerBodyMIRBuildScheduledOptionalJoin(arena: arena, nodeID: nodeID, blockID: blockID) }
     if action == compilerBodyCFGScheduleStatementCommit() { result: compilerBodyMIRCommitScheduledStatement(arena: arena, statementNodeID: nodeID, blockID: blockID) }
+    if action == compilerBodyCFGScheduleSwitchMatch() { result: compilerBodyMIRBuildScheduledSwitchMatch(arena: arena, caseNodeID: nodeID, blockID: blockID) }
     if !result.isValid { return 0 - 1 }
     if compilerBodyMIRAppendExpressionValue(arena: arena, nodeID: nodeID, action: action, valueID: result.valueID, blockID: blockID) < 0 { return 0 - 1 }
     return 0
@@ -23747,6 +24097,7 @@ function compilerBodyMIRBuildWithScheduleIndex(arena: CompilerBodyArena, schedul
             terminatorOperandCount: 1
             terminatorValueID: compilerBodyMIRExpressionValue(arena: arena, nodeID: terminatorSourceNodeID, action: compilerBodyCFGScheduleOptionalTag())
             if terminatorValueID < 0 { terminatorValueID: compilerBodyMIRExpressionValue(arena: arena, nodeID: terminatorSourceNodeID, action: compilerBodyCFGScheduleStatementCommit()) }
+            if terminatorValueID < 0 { terminatorValueID: compilerBodyMIRExpressionValue(arena: arena, nodeID: terminatorSourceNodeID, action: compilerBodyCFGScheduleSwitchMatch()) }
         }
         if cfgTerminatorKind == compilerBodyCFGTerminatorReturn() {
             mirTerminatorKind: compilerBodyMIROperationReturn()
@@ -23796,7 +24147,7 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
         let expressionResultValueID: Int(compilerIntTableValue(table: arena.mirExpressionValues, row: expressionValueRow, column: compilerBodyMIRExpressionValueValueColumn()))
         let expressionBlockID: Int(compilerIntTableValue(table: arena.mirExpressionValues, row: expressionValueRow, column: compilerBodyMIRExpressionValueBlockColumn()))
         if expressionNodeID < 0 || expressionNodeID >= compilerIntTableRowCount(table: arena.nodes)
-            || expressionAction < compilerBodyCFGScheduleEvaluateNode() || expressionAction > compilerBodyCFGScheduleStatementCommit()
+            || expressionAction < compilerBodyCFGScheduleEvaluateNode() || expressionAction > compilerBodyCFGScheduleSwitchMatch()
             || expressionResultValueID < 0 || expressionResultValueID >= valueCount
             || expressionBlockID < 0 || expressionBlockID >= compilerIntTableRowCount(table: arena.mirBlocks) { return 2 }
         state matchingScheduleCount: Int(0)
@@ -25412,7 +25763,7 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
         if compilerIntTableValue(table: arena.nodes, row: nodeRow, column: 0) != nodeRow
             || compilerIntTableValue(table: arena.nodes, row: nodeRow, column: 2) != arena.fileID
             || kind < compilerSyntaxKindEntry()
-            || kind > compilerSyntaxKindRemainder() { return false }
+            || kind > compilerSyntaxKindLastBody() { return false }
         nodeRow: nodeRow + 1
     }
     state edgeRow: Int(0)
@@ -25422,7 +25773,7 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
         let role: Int(compilerIntTableValue(table: arena.edges, row: edgeRow, column: 2))
         if ownerNodeID < 0 || ownerNodeID >= nodeCount
             || childNodeID < 0 || childNodeID >= nodeCount
-            || role < compilerSyntaxRoleStatement() || role > compilerSyntaxRoleInterpolationPart() { return false }
+            || role < compilerSyntaxRoleStatement() || role > compilerSyntaxRoleSwitchBody() { return false }
         edgeRow: edgeRow + 1
     }
     return true

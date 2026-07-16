@@ -1,0 +1,11 @@
+@main {
+    let enabled: Bool(true)
+    switch enabled {
+    case false:
+        return 1
+    case true:
+        return 7
+    default:
+        return 0
+    }
+}

@@ -1,0 +1,15 @@
+construct SwitchStorage {
+    let value: Int
+}
+
+@main {
+    let storage: SwitchStorage(SwitchStorage(value: 2))
+    switch storage.value {
+    case 1:
+        return 1
+    case 2:
+        return 7
+    default:
+        return 0
+    }
+}

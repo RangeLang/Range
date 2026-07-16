@@ -1,0 +1,12 @@
+@main {
+    state value: Int(1)
+    value: 2
+    switch value {
+    case 1:
+        return 1
+    case 2:
+        return 7
+    default:
+        return 0
+    }
+}
