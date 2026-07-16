@@ -4,8 +4,7 @@
         return 64
     }
 
-    let argument: Optional<String>(commandLineArgument(index: 0))
-    let path: String(argument ?? String(""))
+    let path: String(commandLineArgument(index: 0))
     let source: String(readFile(path: path))
     let output: String(compileRangeSource(source: source))
     print(value: output)

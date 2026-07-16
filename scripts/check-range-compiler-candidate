@@ -7,11 +7,17 @@ MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
 DEFAULT_COMPILER_DIR="$REPO_ROOT/RangeCompiler/Range/Programs/Compiler"
 
 usage() {
-    cat >&2 <<'USAGE'
+    cat <<'USAGE'
 Usage:
   scripts/check-range-compiler-candidate [DIR]
+  scripts/check-range-compiler-candidate --bootstrap-bridge-source PHASE1_DIR FINAL_DIR
+  scripts/check-range-compiler-candidate --help
 
 DIR defaults to RangeCompiler/Range/Programs/Compiler.
+
+The bootstrap bridge mode uses the manifested seed to compile an immutable
+old-syntax Phase1 source bundle, audits that one-shot bridge, and uses it only
+to produce the final Stage 2 candidate. It never modifies or accepts the seed.
 USAGE
 }
 
@@ -68,11 +74,9 @@ verify_manifest() {
     expected_clang="$(manifest_value producer.clang)"
     [[ "$clang_identity" == "$expected_clang"* ]] || fail "seed verifier clang mismatch: $clang_identity"
 
-    local index compiler_count runtime_count
-    compiler_count="$(manifest_value compilerSources)"
-    for ((index = 0; index < compiler_count; index += 1)); do
-        verify_manifest_file "compilerSources.$index" "compiler input $index"
-    done
+    # compilerSources hashes describe the accepted seed's provenance.
+    # Candidate sources are discovered below and may differ until rollover.
+    local index runtime_count
     runtime_count="$(manifest_value runtimeSources)"
     for ((index = 0; index < runtime_count; index += 1)); do
         verify_manifest_file "runtimeSources.$index" "runtime input $index"
@@ -106,7 +110,7 @@ discover_sources() {
 
     [[ -f "$CORE_SOURCE_PATH" ]] || fail "missing compiler Core source: $CORE_SOURCE_PATH"
     SOURCE_FILES+=("$CORE_SOURCE_PATH")
-    SOURCE_RELATIVE_PATHS+=("${CORE_SOURCE_PATH#"$REPO_ROOT/"}")
+    SOURCE_RELATIVE_PATHS+=("$CORE_SOURCE_MARKER_PATH")
     SOURCE_ROLES+=("core")
 
     /usr/bin/find "$directory" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print0 > "$raw_list"
@@ -305,6 +309,71 @@ audit_smoke() {
     echo "$stage_label deterministic aggregate smoke: pass (exit 7)"
 }
 
+audit_placement_symbol_guard() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local first="$WORK_ROOT/$stage_label.placement-symbol-guard.first.ll"
+    local second="$WORK_ROOT/$stage_label.placement-symbol-guard.repeat.ll"
+    local first_error="$WORK_ROOT/$stage_label.placement-symbol-guard.first.err"
+    local second_error="$WORK_ROOT/$stage_label.placement-symbol-guard.repeat.err"
+    local llvm="$stage_directory/PlacementSymbolGuard.ll"
+    local linked="$stage_directory/PlacementSymbolGuard"
+    local run_output="$WORK_ROOT/$stage_label.placement-symbol-guard.run.out"
+    local run_error="$WORK_ROOT/$stage_label.placement-symbol-guard.run.err"
+
+    run_capture "$executable" "$PLACEMENT_GUARD_SOURCE" "$first" "$first_error"
+    require_successful_output "$stage_label placement symbol guard" "$first" "$first_error"
+    run_capture "$executable" "$PLACEMENT_GUARD_SOURCE" "$second" "$second_error"
+    require_successful_output "$stage_label repeated placement symbol guard" "$second" "$second_error"
+    /usr/bin/cmp -s "$first" "$second" \
+        || fail "$stage_label placement symbol guard LLVM was not deterministic"
+
+    for marker in \
+        '%Range.PlacementGuardPair = type { i32, i32 }' \
+        'define void @placementGuardAggregate(ptr %returnDestination' \
+        'call void @placementGuardAggregate('; do
+        /usr/bin/grep -Fq "$marker" "$first" \
+            || fail "$stage_label placement symbol guard omitted native marker: $marker"
+    done
+    for forbidden in rangeConstruct malloc calloc realloc free; do
+        if /usr/bin/grep -Fq "$forbidden" "$first"; then
+            fail "$stage_label placement symbol guard emitted forbidden dynamic/allocator symbol: $forbidden"
+        fi
+    done
+
+    /bin/mkdir -p "$stage_directory"
+    /bin/cp "$first" "$llvm"
+    validate_llvm "$llvm"
+    link_llvm "$llvm" "$linked"
+    if "$linked" > "$run_output" 2> "$run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label placement symbol guard executable exited $RUN_STATUS"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] \
+        || fail "$stage_label placement symbol guard executable wrote output"
+    echo "$stage_label placement symbol guard: pass (parameter declaration rows cannot become placement node IDs)"
+}
+
+compare_placement_symbol_guard_stages() {
+    local left_label="$1"
+    local left_directory="$2"
+    local right_label="$3"
+    local right_directory="$4"
+
+    /usr/bin/cmp -s "$WORK_ROOT/$left_label.placement-symbol-guard.first.ll" "$WORK_ROOT/$right_label.placement-symbol-guard.first.ll" \
+        || fail "$left_label and $right_label placement symbol guard LLVM differs"
+    /usr/bin/cmp -s "$WORK_ROOT/$left_label.placement-symbol-guard.repeat.ll" "$WORK_ROOT/$right_label.placement-symbol-guard.repeat.ll" \
+        || fail "$left_label and $right_label repeated placement symbol guard LLVM differs"
+    /usr/bin/cmp -s "$left_directory/PlacementSymbolGuard.ll" "$right_directory/PlacementSymbolGuard.ll" \
+        || fail "$left_label and $right_label placement symbol guard artifacts differ"
+    /usr/bin/cmp -s "$left_directory/PlacementSymbolGuard" "$right_directory/PlacementSymbolGuard" \
+        || fail "$left_label and $right_label placement symbol guard executables differ"
+    echo "$left_label/$right_label placement symbol guard: byte-identical LLVM/executable"
+}
+
 audit_mixed_abi() {
     local stage_label="$1"
     local executable="$2"
@@ -321,6 +390,146 @@ audit_mixed_abi() {
         fail "$stage_label mixed aggregate ABI check emitted LLVM before rejection"
     fi
     echo "$stage_label mixed aggregate ABI rejection: pass (exit 65, pre-emission)"
+}
+
+body_syntax_typed_kind_count() {
+    local output="$1"
+    local kind="$2"
+
+    /usr/bin/awk -F '\t' -v expected="kind=$kind" '
+        $1 == "syntax" {
+            for (column = 2; column <= NF; column += 1) {
+                if ($column == expected) { count += 1 }
+            }
+        }
+        END { print count + 0 }
+    ' "$output"
+}
+
+body_syntax_typed_edge_role_count() {
+    local output="$1"
+    local role="$2"
+
+    /usr/bin/awk -F '[=,\t]' -v expected="$role" '
+        $1 == "bodyEdge" && $7 == expected { count += 1 }
+        END { print count + 0 }
+    ' "$output"
+}
+
+audit_body_syntax_split() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local typed_bundle="$WORK_ROOT/$stage_label.body-syntax.typed.range"
+    local typed_first="$WORK_ROOT/$stage_label.body-syntax.typed.first.out"
+    local typed_second="$WORK_ROOT/$stage_label.body-syntax.typed.repeat.out"
+    local typed_first_error="$WORK_ROOT/$stage_label.body-syntax.typed.first.err"
+    local typed_second_error="$WORK_ROOT/$stage_label.body-syntax.typed.repeat.err"
+    local detached_bundle="$WORK_ROOT/$stage_label.body-syntax.detached.range"
+    local detached_first="$WORK_ROOT/$stage_label.body-syntax.detached.first.ll"
+    local detached_second="$WORK_ROOT/$stage_label.body-syntax.detached.repeat.ll"
+    local detached_first_error="$WORK_ROOT/$stage_label.body-syntax.detached.first.err"
+    local detached_second_error="$WORK_ROOT/$stage_label.body-syntax.detached.repeat.err"
+    local detached_llvm="$stage_directory/BodySyntaxDetachedOffset.ll"
+    local detached_executable="$stage_directory/BodySyntaxDetachedOffset"
+    local detached_run_output="$WORK_ROOT/$stage_label.body-syntax.detached.run.out"
+    local detached_run_error="$WORK_ROOT/$stage_label.body-syntax.detached.run.err"
+
+    write_body_syntax_typed_replay_bundle "$typed_bundle"
+    run_capture "$executable" "$typed_bundle" "$typed_first" "$typed_first_error"
+    require_successful_output "$stage_label typed body syntax" "$typed_first" "$typed_first_error"
+    run_capture "$executable" "$typed_bundle" "$typed_second" "$typed_second_error"
+    require_successful_output "$stage_label repeated typed body syntax" "$typed_second" "$typed_second_error"
+    /usr/bin/cmp -s "$typed_first" "$typed_second" || fail "$stage_label typed body syntax was not deterministic"
+
+    /usr/bin/grep -Fq $'bodyNodeCount=13\tbodyEdgeCount=12' "$typed_first" \
+        || fail "$stage_label typed body syntax changed its canonical node/edge counts"
+    /usr/bin/grep -Fq $'typedTable\tname=bodyNode\tversion=1\tcolumns=11\trows=13' "$typed_first" \
+        || fail "$stage_label typed body syntax omitted its canonical body-node table"
+    /usr/bin/grep -Fq $'typedTable\tname=bodyEdge\tversion=1\tcolumns=4\trows=12' "$typed_first" \
+        || fail "$stage_label typed body syntax omitted its canonical body-edge table"
+
+    local specification kind expected actual
+    for specification in \
+        entry:1 \
+        local:1 \
+        return:2 \
+        identifier:4 \
+        application:1 \
+        integerLiteral:1 \
+        addition:1 \
+        argument:1 \
+        mainAnnotation:1; do
+        kind="${specification%%:*}"
+        expected="${specification#*:}"
+        actual="$(body_syntax_typed_kind_count "$typed_first" "$kind")"
+        [[ "$actual" -eq "$expected" ]] \
+            || fail "$stage_label typed body syntax emitted $actual $kind nodes; expected $expected"
+    done
+
+    for specification in 1:3 2:1 3:2 4:1 5:1 6:1 8:1 9:1 12:1; do
+        kind="${specification%%:*}"
+        expected="${specification#*:}"
+        actual="$(body_syntax_typed_edge_role_count "$typed_first" "$kind")"
+        [[ "$actual" -eq "$expected" ]] \
+            || fail "$stage_label typed body syntax emitted $actual role-$kind edges; expected $expected"
+    done
+
+    write_body_syntax_detached_interpolation_bundle "$detached_bundle"
+    run_capture "$executable" "$detached_bundle" "$detached_first" "$detached_first_error"
+    require_successful_output "$stage_label detached interpolation" "$detached_first" "$detached_first_error"
+    run_capture "$executable" "$detached_bundle" "$detached_second" "$detached_second_error"
+    require_successful_output "$stage_label repeated detached interpolation" "$detached_second" "$detached_second_error"
+    /usr/bin/cmp -s "$detached_first" "$detached_second" || fail "$stage_label detached interpolation LLVM was not deterministic"
+    for marker in \
+        'define i32 @detachedInterpolationValue' \
+        'define ptr @detachedInterpolationText' \
+        'call i32 @detachedInterpolationValue' \
+        'call ptr @stringFromInt' \
+        'call ptr @stringConcat' \
+        'call i32 @stringEqual'; do
+        /usr/bin/grep -Fq "$marker" "$detached_first" \
+            || fail "$stage_label detached interpolation omitted LLVM marker: $marker"
+    done
+    if /usr/bin/grep -Fq 'RANGE_LOWERING_PLACEHOLDER' "$detached_first"; then
+        fail "$stage_label detached interpolation used a lowering placeholder"
+    fi
+
+    /bin/mkdir -p "$stage_directory"
+    /bin/cp "$detached_first" "$detached_llvm"
+    validate_llvm "$detached_llvm"
+    link_llvm "$detached_llvm" "$detached_executable"
+    if "$detached_executable" > "$detached_run_output" 2> "$detached_run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label detached interpolation executable exited $RUN_STATUS"
+    [[ ! -s "$detached_run_output" && ! -s "$detached_run_error" ]] \
+        || fail "$stage_label detached interpolation executable wrote output"
+    echo "$stage_label body syntax replay: pass (typed nodes+edges exact; detached offset validate/link, exit 7, deterministic)"
+}
+
+compare_body_syntax_split_stages() {
+    local left_label="$1"
+    local left_directory="$2"
+    local right_label="$3"
+    local right_directory="$4"
+    local suffix
+
+    for suffix in \
+        typed.first.out \
+        typed.repeat.out \
+        detached.first.ll \
+        detached.repeat.ll; do
+        /usr/bin/cmp -s "$WORK_ROOT/$left_label.body-syntax.$suffix" "$WORK_ROOT/$right_label.body-syntax.$suffix" \
+            || fail "$left_label and $right_label body syntax output differs: $suffix"
+    done
+    /usr/bin/cmp -s "$left_directory/BodySyntaxDetachedOffset.ll" "$right_directory/BodySyntaxDetachedOffset.ll" \
+        || fail "$left_label and $right_label detached interpolation artifacts differ"
+    /usr/bin/cmp -s "$left_directory/BodySyntaxDetachedOffset" "$right_directory/BodySyntaxDetachedOffset" \
+        || fail "$left_label and $right_label detached interpolation executables differ"
+    echo "$left_label/$right_label body syntax replay: byte-identical typed snapshots/LLVM/executable"
 }
 
 audit_builtin_marker() {
@@ -396,6 +605,1180 @@ write_core_bundle() {
         '    let buffer: RawBuffer(rawBufferCreate(capacity: 0, stride: 4))' \
         '    return rawBufferDestroy(buffer: buffer) + 7' \
         '}' >> "$output"
+}
+
+write_body_syntax_typed_replay_bundle() {
+    local output="$1"
+
+    /usr/bin/printf '%s\n' 'compilerTypedSyntax' > "$output"
+    /bin/cat >> "$output" <<'RANGE'
+function bodySyntaxParityValue(value: Int): Int {
+    let doubled: Int(value + value)
+    return doubled
+}
+
+@main {
+    return bodySyntaxParityValue(value: 7)
+}
+RANGE
+}
+
+write_body_syntax_detached_interpolation_bundle() {
+    local output="$1"
+
+    /bin/cat > "$output" <<'RANGE'
+function detachedInterpolationValue(): Int {
+    return 6
+}
+
+function detachedInterpolationText(): String {
+    return "detached-offset-prefix \(detachedInterpolationValue() + 1)"
+}
+
+@main {
+    let rendered: String(detachedInterpolationText())
+    if rendered == "detached-offset-prefix 7" {
+        return 7
+    }
+    return 1
+}
+RANGE
+}
+
+write_binding_reference_bundle() {
+    local output="$1"
+    local kind="$2"
+
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=RangeCompiler/Range/Core/System/Memory/RawBuffer.range' > "$output"
+    /bin/cat "$CORE_SOURCE_PATH" >> "$output"
+    if [[ -n "$(/usr/bin/tail -c 1 "$CORE_SOURCE_PATH")" ]]; then
+        /usr/bin/printf '\n' >> "$output"
+    fi
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=project\tpath=BindingReference.range' >> "$output"
+
+    case "$kind" in
+        local)
+            /bin/cat >> "$output" <<'RANGE'
+construct LocalBufferView {
+    binding storage: RawBuffer
+}
+
+function bindingReadCount(buffer: RawBuffer): Int {
+    return rawBufferCount(buffer: buffer)
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: source, value: 7)
+    let view: LocalBufferView(LocalBufferView(storage: $source))
+    let count: Int(bindingReadCount(buffer: view.storage))
+    let value: Int(rawBufferLoadInt(buffer: source, index: 0))
+    rawBufferDestroy(buffer: source)
+    return value + count - 1
+}
+RANGE
+            ;;
+        member)
+            /bin/cat >> "$output" <<'RANGE'
+construct BufferHolder {
+    let storage: RawBuffer
+}
+
+construct MemberBufferView {
+    binding storage: RawBuffer
+}
+
+function bindingReadFirst(buffer: RawBuffer): Int {
+    return rawBufferLoadInt(buffer: buffer, index: 0)
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: source, value: 7)
+    let holder: BufferHolder(BufferHolder(storage: source))
+    let view: MemberBufferView(MemberBufferView(storage: $holder.storage))
+    let value: Int(bindingReadFirst(buffer: view.storage))
+    rawBufferDestroy(buffer: holder.storage)
+    return value
+}
+RANGE
+            ;;
+        missing-dollar)
+            /bin/cat >> "$output" <<'RANGE'
+construct MissingDollarView {
+    binding storage: RawBuffer
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let view: MissingDollarView(MissingDollarView(storage: source))
+    return 0
+}
+RANGE
+            ;;
+        alias-destroy)
+            /bin/cat >> "$output" <<'RANGE'
+construct DestroyAliasView {
+    binding storage: RawBuffer
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let view: DestroyAliasView(DestroyAliasView(storage: $source))
+    rawBufferDestroy(buffer: view.storage)
+    return 0
+}
+RANGE
+            ;;
+        direct-destroy)
+            /bin/cat >> "$output" <<'RANGE'
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferDestroy(buffer: $source)
+    return 0
+}
+RANGE
+            ;;
+        helper-destroy)
+            /bin/cat >> "$output" <<'RANGE'
+function destroyThroughHelper(buffer: RawBuffer): Int {
+    return rawBufferDestroy(buffer: buffer)
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    destroyThroughHelper(buffer: $source)
+    return 0
+}
+RANGE
+            ;;
+        nested-wrapper)
+            /bin/cat >> "$output" <<'RANGE'
+construct NestedBufferView {
+    binding storage: RawBuffer
+}
+
+construct BufferViewWrapper {
+    let view: NestedBufferView
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let view: NestedBufferView(NestedBufferView(storage: $source))
+    let wrapper: BufferViewWrapper(BufferViewWrapper(view: view))
+    return 0
+}
+RANGE
+            ;;
+        binding-return)
+            /bin/cat >> "$output" <<'RANGE'
+construct ReturnedBufferView {
+    binding storage: RawBuffer
+}
+
+function returnBufferView(buffer: RawBuffer): ReturnedBufferView {
+    let view: ReturnedBufferView(ReturnedBufferView(storage: $buffer))
+    return view
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: source, value: 7)
+    let view: ReturnedBufferView(returnBufferView(buffer: source))
+    let value: Int(rawBufferLoadInt(buffer: view.storage, index: 0))
+    rawBufferDestroy(buffer: source)
+    return value
+}
+RANGE
+            ;;
+        multi-alias-return)
+            /bin/cat >> "$output" <<'RANGE'
+construct BoundaryBufferOwners {
+    let first: RawBuffer
+    let second: RawBuffer
+}
+
+construct BoundaryBufferView {
+    binding first: RawBuffer
+    binding second: RawBuffer
+}
+
+function returnBoundaryBufferView(owners: BoundaryBufferOwners): BoundaryBufferView {
+    let view: BoundaryBufferView(BoundaryBufferView(first: $owners.first, second: $owners.second))
+    return view
+}
+
+@main {
+    let first: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: first, value: 3)
+    let second: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: second, value: 4)
+    let owners: BoundaryBufferOwners(BoundaryBufferOwners(first: first, second: second))
+    let view: BoundaryBufferView(returnBoundaryBufferView(owners: owners))
+    let firstValue: Int(rawBufferLoadInt(buffer: view.first, index: 0))
+    let secondValue: Int(rawBufferLoadInt(buffer: view.second, index: 0))
+    rawBufferDestroy(buffer: owners.first)
+    rawBufferDestroy(buffer: owners.second)
+    return firstValue + secondValue
+}
+RANGE
+            ;;
+        local-alias-escape)
+            /bin/cat >> "$output" <<'RANGE'
+construct EscapedLocalBufferView {
+    binding storage: RawBuffer
+}
+
+function escapeLocalBufferView(): EscapedLocalBufferView {
+    let local: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let view: EscapedLocalBufferView(EscapedLocalBufferView(storage: $local))
+    return view
+}
+
+@main {
+    let view: EscapedLocalBufferView(escapeLocalBufferView())
+    return 0
+}
+RANGE
+            ;;
+        branch-same)
+            /bin/cat >> "$output" <<'RANGE'
+construct SameBranchBufferView {
+    binding storage: RawBuffer
+}
+
+function chooseSameBufferView(buffer: RawBuffer, flag: Bool): SameBranchBufferView {
+    let first: SameBranchBufferView(SameBranchBufferView(storage: $buffer))
+    let second: SameBranchBufferView(SameBranchBufferView(storage: $buffer))
+    if flag {
+        return first
+    } else {
+        return second
+    }
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: source, value: 7)
+    let view: SameBranchBufferView(chooseSameBufferView(buffer: source, flag: true))
+    let value: Int(rawBufferLoadInt(buffer: view.storage, index: 0))
+    rawBufferDestroy(buffer: source)
+    return value
+}
+RANGE
+            ;;
+        branch-different)
+            /bin/cat >> "$output" <<'RANGE'
+construct DifferentBranchBufferView {
+    binding storage: RawBuffer
+}
+
+function chooseDifferentBufferView(left: RawBuffer, right: RawBuffer, flag: Bool): DifferentBranchBufferView {
+    let first: DifferentBranchBufferView(DifferentBranchBufferView(storage: $left))
+    let second: DifferentBranchBufferView(DifferentBranchBufferView(storage: $right))
+    if flag {
+        return first
+    } else {
+        return second
+    }
+}
+
+@main {
+    let left: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let right: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let view: DifferentBranchBufferView(chooseDifferentBufferView(left: left, right: right, flag: true))
+    return 0
+}
+RANGE
+            ;;
+        alias-forward)
+            /bin/cat >> "$output" <<'RANGE'
+construct ForwardedBufferView {
+    binding storage: RawBuffer
+}
+
+function baseBufferView(buffer: RawBuffer): ForwardedBufferView {
+    let view: ForwardedBufferView(ForwardedBufferView(storage: $buffer))
+    return view
+}
+
+function forwardBufferView(buffer: RawBuffer): ForwardedBufferView {
+    let view: ForwardedBufferView(baseBufferView(buffer: buffer))
+    return view
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: source, value: 7)
+    let view: ForwardedBufferView(forwardBufferView(buffer: source))
+    let value: Int(rawBufferLoadInt(buffer: view.storage, index: 0))
+    rawBufferDestroy(buffer: source)
+    return value
+}
+RANGE
+            ;;
+        mixed-return)
+            /bin/cat >> "$output" <<'RANGE'
+construct MixedBufferView {
+    let owned: RawBuffer
+    binding borrowed: RawBuffer
+}
+
+function makeMixedBufferView(buffer: RawBuffer): MixedBufferView {
+    let owned: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: owned, value: 3)
+    let view: MixedBufferView(MixedBufferView(owned: owned, borrowed: $buffer))
+    return view
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: source, value: 4)
+    let view: MixedBufferView(makeMixedBufferView(buffer: source))
+    let ownedValue: Int(rawBufferLoadInt(buffer: view.owned, index: 0))
+    let borrowedValue: Int(rawBufferLoadInt(buffer: view.borrowed, index: 0))
+    rawBufferDestroy(buffer: view.owned)
+    rawBufferDestroy(buffer: source)
+    return ownedValue + borrowedValue
+}
+RANGE
+            ;;
+        multi-mixed-return)
+            /bin/cat >> "$output" <<'RANGE'
+construct ArenaEmitterAliasOwners {
+    let first: RawBuffer
+    let second: RawBuffer
+}
+
+construct ArenaEmitterResult {
+    let firstOwned: RawBuffer
+    let secondOwned: RawBuffer
+    binding firstAlias: RawBuffer
+    binding secondAlias: RawBuffer
+}
+
+function makeArenaEmitterResult(owners: ArenaEmitterAliasOwners): ArenaEmitterResult {
+    let firstOwned: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: firstOwned, value: 1)
+    let secondOwned: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: secondOwned, value: 2)
+    let result: ArenaEmitterResult(ArenaEmitterResult(firstOwned: firstOwned, secondOwned: secondOwned, firstAlias: $owners.first, secondAlias: $owners.second))
+    return result
+}
+
+@main {
+    let firstAlias: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: firstAlias, value: 1)
+    let secondAlias: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: secondAlias, value: 3)
+    let owners: ArenaEmitterAliasOwners(ArenaEmitterAliasOwners(first: firstAlias, second: secondAlias))
+    let result: ArenaEmitterResult(makeArenaEmitterResult(owners: owners))
+    let firstOwnedValue: Int(rawBufferLoadInt(buffer: result.firstOwned, index: 0))
+    let secondOwnedValue: Int(rawBufferLoadInt(buffer: result.secondOwned, index: 0))
+    let firstAliasValue: Int(rawBufferLoadInt(buffer: result.firstAlias, index: 0))
+    let secondAliasValue: Int(rawBufferLoadInt(buffer: result.secondAlias, index: 0))
+    rawBufferDestroy(buffer: result.firstOwned)
+    rawBufferDestroy(buffer: result.secondOwned)
+    rawBufferDestroy(buffer: owners.first)
+    rawBufferDestroy(buffer: owners.second)
+    return firstOwnedValue + secondOwnedValue + firstAliasValue + secondAliasValue
+}
+RANGE
+            ;;
+        consumed-owner-return)
+            /bin/cat >> "$output" <<'RANGE'
+construct ConsumedOwnerBufferView {
+    binding storage: RawBuffer
+}
+
+function returnConsumedOwnerView(buffer: RawBuffer): ConsumedOwnerBufferView {
+    let view: ConsumedOwnerBufferView(ConsumedOwnerBufferView(storage: $buffer))
+    rawBufferDestroy(buffer: buffer)
+    return view
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let view: ConsumedOwnerBufferView(returnConsumedOwnerView(buffer: source))
+    return 0
+}
+RANGE
+            ;;
+        use-after-returned-alias)
+            /bin/cat >> "$output" <<'RANGE'
+construct UsedAfterOwnerBufferView {
+    binding storage: RawBuffer
+}
+
+function returnUsedAfterOwnerView(buffer: RawBuffer): UsedAfterOwnerBufferView {
+    let view: UsedAfterOwnerBufferView(UsedAfterOwnerBufferView(storage: $buffer))
+    return view
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let view: UsedAfterOwnerBufferView(returnUsedAfterOwnerView(buffer: source))
+    rawBufferDestroy(buffer: source)
+    return rawBufferCount(buffer: view.storage)
+}
+RANGE
+            ;;
+        recursive-return)
+            /bin/cat >> "$output" <<'RANGE'
+construct RecursiveBufferView {
+    binding storage: RawBuffer
+}
+
+function recursiveBufferView(buffer: RawBuffer): RecursiveBufferView {
+    let view: RecursiveBufferView(recursiveBufferView(buffer: buffer))
+    return view
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let view: RecursiveBufferView(recursiveBufferView(buffer: source))
+    return 0
+}
+RANGE
+            ;;
+        nested-binding)
+            /bin/cat >> "$output" <<'RANGE'
+construct NestedLeafBufferView {
+    binding storage: RawBuffer
+}
+
+construct NestedDirectBufferView {
+    binding leaf: NestedLeafBufferView
+}
+
+function returnNestedBufferView(leaf: NestedLeafBufferView): NestedDirectBufferView {
+    let nested: NestedDirectBufferView(NestedDirectBufferView(leaf: $leaf))
+    return nested
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: source, value: 7)
+    let leaf: NestedLeafBufferView(NestedLeafBufferView(storage: $source))
+    let nested: NestedDirectBufferView(returnNestedBufferView(leaf: leaf))
+    let value: Int(rawBufferLoadInt(buffer: nested.leaf.storage, index: 0))
+    rawBufferDestroy(buffer: source)
+    return value
+}
+RANGE
+            ;;
+        alias-move)
+            /bin/cat >> "$output" <<'RANGE'
+construct MoveAliasView {
+    binding storage: RawBuffer
+}
+
+construct OwnedBuffer {
+    let storage: RawBuffer
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let view: MoveAliasView(MoveAliasView(storage: $source))
+    let moved: OwnedBuffer(OwnedBuffer(storage: view.storage))
+    return 0
+}
+RANGE
+            ;;
+        *)
+            fail "unknown binding-reference fixture: $kind"
+            ;;
+    esac
+}
+
+write_root_value_bundle() {
+    local output="$1"
+    local kind="$2"
+
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=RangeCompiler/Range/Core/System/Memory/RawBuffer.range' > "$output"
+    /bin/cat "$CORE_SOURCE_PATH" >> "$output"
+    if [[ -n "$(/usr/bin/tail -c 1 "$CORE_SOURCE_PATH")" ]]; then
+        /usr/bin/printf '\n' >> "$output"
+    fi
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=project\tpath=RootValue.range' >> "$output"
+
+    case "$kind" in
+        opaque-return)
+            /bin/cat >> "$output" <<'RANGE'
+function makeRootBuffer(): RawBuffer {
+    return rawBufferCreate(capacity: 1, stride: 4)
+}
+
+@main {
+    let buffer: RawBuffer(makeRootBuffer())
+    rawBufferAppendInt(buffer: buffer, value: 7)
+    let value: Int(rawBufferLoadInt(buffer: buffer, index: 0))
+    rawBufferDestroy(buffer: buffer)
+    return value
+}
+RANGE
+            ;;
+        boundary-forward-direct)
+            /bin/cat >> "$output" <<'RANGE'
+function forwardRootBuffer(buffer: RawBuffer): RawBuffer {
+    return buffer
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: source, value: 7)
+    let forwarded: RawBuffer(forwardRootBuffer(buffer: source))
+    let value: Int(rawBufferLoadInt(buffer: forwarded, index: 0))
+    rawBufferDestroy(buffer: forwarded)
+    return value
+}
+RANGE
+            ;;
+        boundary-forward-transitive)
+            /bin/cat >> "$output" <<'RANGE'
+function baseForwardRootBuffer(buffer: RawBuffer): RawBuffer {
+    return buffer
+}
+
+function forwardRootBufferTransitively(buffer: RawBuffer): RawBuffer {
+    let forwarded: RawBuffer(baseForwardRootBuffer(buffer: buffer))
+    return forwarded
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: source, value: 7)
+    let forwarded: RawBuffer(forwardRootBufferTransitively(buffer: source))
+    let value: Int(rawBufferLoadInt(buffer: forwarded, index: 0))
+    rawBufferDestroy(buffer: forwarded)
+    return value
+}
+RANGE
+            ;;
+        boundary-forward-two-owned-inputs)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootBoundaryForwardPair {
+    let first: RawBuffer
+    let second: RawBuffer
+}
+
+function forwardRootBufferPair(first: RawBuffer, second: RawBuffer): RootBoundaryForwardPair {
+    return RootBoundaryForwardPair(first: first, second: second)
+}
+
+@main {
+    let first: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: first, value: 3)
+    let second: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: second, value: 4)
+    let result: RootBoundaryForwardPair(forwardRootBufferPair(first: first, second: second))
+    let firstValue: Int(rawBufferLoadInt(buffer: result.first, index: 0))
+    let secondValue: Int(rawBufferLoadInt(buffer: result.second, index: 0))
+    rawBufferDestroy(buffer: result.first)
+    rawBufferDestroy(buffer: result.second)
+    return firstValue + secondValue
+}
+RANGE
+            ;;
+        boundary-forward-mixed)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootBoundaryForwardMixedResult {
+    let forwarded: RawBuffer
+    binding borrowed: RawBuffer
+    let created: RawBuffer
+}
+
+function makeRootBoundaryForwardMixedResult(forwardedSource: RawBuffer, borrowedSource: RawBuffer): RootBoundaryForwardMixedResult {
+    let created: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: created, value: 3)
+    let result: RootBoundaryForwardMixedResult(RootBoundaryForwardMixedResult(forwarded: forwardedSource, borrowed: $borrowedSource, created: created))
+    return result
+}
+
+@main {
+    let forwardedSource: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: forwardedSource, value: 2)
+    let borrowedSource: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: borrowedSource, value: 2)
+    let result: RootBoundaryForwardMixedResult(makeRootBoundaryForwardMixedResult(forwardedSource: forwardedSource, borrowedSource: borrowedSource))
+    let forwardedValue: Int(rawBufferLoadInt(buffer: result.forwarded, index: 0))
+    let borrowedValue: Int(rawBufferLoadInt(buffer: result.borrowed, index: 0))
+    let createdValue: Int(rawBufferLoadInt(buffer: result.created, index: 0))
+    rawBufferDestroy(buffer: result.forwarded)
+    rawBufferDestroy(buffer: result.created)
+    rawBufferDestroy(buffer: borrowedSource)
+    return forwardedValue + borrowedValue + createdValue
+}
+RANGE
+            ;;
+        direct-holder)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootDirectHolder {
+    let storage: RawBuffer
+}
+
+function makeRootDirectHolder(): RootDirectHolder {
+    return RootDirectHolder(storage: rawBufferCreate(capacity: 1, stride: 4))
+}
+
+@main {
+    let holder: RootDirectHolder(makeRootDirectHolder())
+    rawBufferAppendInt(buffer: holder.storage, value: 7)
+    let value: Int(rawBufferLoadInt(buffer: holder.storage, index: 0))
+    rawBufferDestroy(buffer: holder.storage)
+    return value
+}
+RANGE
+            ;;
+        nested-inline)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootNestedInner {
+    let storage: RawBuffer
+}
+
+construct RootNestedOuter {
+    let inner: RootNestedInner
+}
+
+function makeRootNestedOuter(): RootNestedOuter {
+    return RootNestedOuter(inner: RootNestedInner(storage: rawBufferCreate(capacity: 1, stride: 4)))
+}
+
+@main {
+    let outer: RootNestedOuter(makeRootNestedOuter())
+    rawBufferAppendInt(buffer: outer.inner.storage, value: 7)
+    let value: Int(rawBufferLoadInt(buffer: outer.inner.storage, index: 0))
+    rawBufferDestroy(buffer: outer.inner.storage)
+    return value
+}
+RANGE
+            ;;
+        inline-local-return)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootLocalHolder {
+    let storage: RawBuffer
+}
+
+function makeRootLocalHolder(): RootLocalHolder {
+    let holder: RootLocalHolder(RootLocalHolder(storage: rawBufferCreate(capacity: 1, stride: 4)))
+    return holder
+}
+
+@main {
+    let holder: RootLocalHolder(makeRootLocalHolder())
+    rawBufferAppendInt(buffer: holder.storage, value: 7)
+    let value: Int(rawBufferLoadInt(buffer: holder.storage, index: 0))
+    rawBufferDestroy(buffer: holder.storage)
+    return value
+}
+RANGE
+            ;;
+        two-owned-leaves)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootTwinHolder {
+    let first: RawBuffer
+    let second: RawBuffer
+}
+
+function makeRootTwinHolder(): RootTwinHolder {
+    return RootTwinHolder(first: rawBufferCreate(capacity: 1, stride: 4), second: rawBufferCreate(capacity: 1, stride: 4))
+}
+
+@main {
+    let holder: RootTwinHolder(makeRootTwinHolder())
+    rawBufferAppendInt(buffer: holder.first, value: 3)
+    rawBufferAppendInt(buffer: holder.second, value: 4)
+    let firstValue: Int(rawBufferLoadInt(buffer: holder.first, index: 0))
+    let secondValue: Int(rawBufferLoadInt(buffer: holder.second, index: 0))
+    rawBufferDestroy(buffer: holder.first)
+    rawBufferDestroy(buffer: holder.second)
+    return firstValue + secondValue
+}
+RANGE
+            ;;
+        partial-sibling)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootPartialOwner {
+    let first: RawBuffer
+    let second: RawBuffer
+}
+
+@main {
+    let first: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let second: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let owner: RootPartialOwner(RootPartialOwner(first: first, second: second))
+    rawBufferDestroy(buffer: owner.first)
+    rawBufferAppendInt(buffer: owner.second, value: 7)
+    let value: Int(rawBufferLoadInt(buffer: owner.second, index: 0))
+    rawBufferDestroy(buffer: owner.second)
+    return value
+}
+RANGE
+            ;;
+        loop-invariant)
+            /bin/cat >> "$output" <<'RANGE'
+@main {
+    let buffer: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    state index: Int(0)
+    while index < 1 {
+        let count: Int(rawBufferCount(buffer: buffer))
+        rawBufferAppendInt(buffer: buffer, value: 7 + count)
+        index: index + 1
+    }
+    let value: Int(rawBufferLoadInt(buffer: buffer, index: 0))
+    rawBufferDestroy(buffer: buffer)
+    return value
+}
+RANGE
+            ;;
+        absent-early-return)
+            /bin/cat >> "$output" <<'RANGE'
+function absentEarlyReturn(flag: Bool): Int {
+    if flag {
+        return 7
+    }
+    let later: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferDestroy(buffer: later)
+    return 7
+}
+
+@main {
+    return absentEarlyReturn(flag: true)
+}
+RANGE
+            ;;
+        absent-branch-scope)
+            /bin/cat >> "$output" <<'RANGE'
+construct AbsentBranchAliasView {
+    binding storage: RawBuffer
+}
+
+function absentBranchScope(buffer: RawBuffer, flag: Bool): Int {
+    state result: Int(7)
+    if flag {
+        let branchOwner: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+        rawBufferAppendInt(buffer: branchOwner, value: 7)
+        result: rawBufferLoadInt(buffer: branchOwner, index: 0)
+        rawBufferDestroy(buffer: branchOwner)
+    } else {
+        let branchAlias: AbsentBranchAliasView(AbsentBranchAliasView(storage: $buffer))
+        result: rawBufferLoadInt(buffer: branchAlias.storage, index: 0)
+    }
+    return result
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: source, value: 7)
+    let ownedBranch: Int(absentBranchScope(buffer: source, flag: true))
+    let aliasBranch: Int(absentBranchScope(buffer: source, flag: false))
+    rawBufferDestroy(buffer: source)
+    return ownedBranch + aliasBranch - 7
+}
+RANGE
+            ;;
+        absent-loop-reevaluation)
+            /bin/cat >> "$output" <<'RANGE'
+function absentLoopReevaluation(): Int {
+    state index: Int(0)
+    state total: Int(0)
+    while index < 2 {
+        let iteration: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+        rawBufferAppendInt(buffer: iteration, value: 3 + index)
+        total: total + rawBufferLoadInt(buffer: iteration, index: 0)
+        rawBufferDestroy(buffer: iteration)
+        index: index + 1
+    }
+    return total
+}
+
+@main {
+    return absentLoopReevaluation()
+}
+RANGE
+            ;;
+        absent-returned-alias)
+            /bin/cat >> "$output" <<'RANGE'
+construct AbsentReturnedAliasView {
+    binding storage: RawBuffer
+}
+
+function absentChooseAlias(buffer: RawBuffer, flag: Bool): AbsentReturnedAliasView {
+    if flag {
+        let first: AbsentReturnedAliasView(AbsentReturnedAliasView(storage: $buffer))
+        return first
+    } else {
+        let second: AbsentReturnedAliasView(AbsentReturnedAliasView(storage: $buffer))
+        return second
+    }
+}
+
+function absentForwardAlias(buffer: RawBuffer): AbsentReturnedAliasView {
+    let forwarded: AbsentReturnedAliasView(absentChooseAlias(buffer: buffer, flag: true))
+    return forwarded
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: source, value: 7)
+    let view: AbsentReturnedAliasView(absentForwardAlias(buffer: source))
+    let value: Int(rawBufferLoadInt(buffer: view.storage, index: 0))
+    rawBufferDestroy(buffer: source)
+    return value
+}
+RANGE
+            ;;
+        boundary-consume)
+            /bin/cat >> "$output" <<'RANGE'
+function destroyRootBufferInCallee(buffer: RawBuffer): Int {
+    rawBufferDestroy(buffer: buffer)
+    return 7
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    return destroyRootBufferInCallee(buffer: source)
+}
+RANGE
+            ;;
+        boundary-consume-source-destroy)
+            /bin/cat >> "$output" <<'RANGE'
+function destroyRootBufferInCallee(buffer: RawBuffer): Int {
+    rawBufferDestroy(buffer: buffer)
+    return 7
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let value: Int(destroyRootBufferInCallee(buffer: source))
+    rawBufferDestroy(buffer: source)
+    return value
+}
+RANGE
+            ;;
+        boundary-forward-direct-source-use)
+            /bin/cat >> "$output" <<'RANGE'
+function forwardRootBufferForSourceUse(buffer: RawBuffer): RawBuffer {
+    return buffer
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let forwarded: RawBuffer(forwardRootBufferForSourceUse(buffer: source))
+    rawBufferCount(buffer: source)
+    rawBufferDestroy(buffer: forwarded)
+    return 0
+}
+RANGE
+            ;;
+        boundary-forward-transitive-source-use)
+            /bin/cat >> "$output" <<'RANGE'
+function baseForwardRootBufferForSourceUse(buffer: RawBuffer): RawBuffer {
+    return buffer
+}
+
+function transitivelyForwardRootBufferForSourceUse(buffer: RawBuffer): RawBuffer {
+    let forwarded: RawBuffer(baseForwardRootBufferForSourceUse(buffer: buffer))
+    return forwarded
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let forwarded: RawBuffer(transitivelyForwardRootBufferForSourceUse(buffer: source))
+    rawBufferCount(buffer: source)
+    rawBufferDestroy(buffer: forwarded)
+    return 0
+}
+RANGE
+            ;;
+        boundary-forward-destroy)
+            /bin/cat >> "$output" <<'RANGE'
+function baseForwardRootBufferForDestroy(buffer: RawBuffer): RawBuffer {
+    return buffer
+}
+
+function destroyForwardOnlyRootBuffer(buffer: RawBuffer): Int {
+    let forwarded: RawBuffer(baseForwardRootBufferForDestroy(buffer: buffer))
+    return rawBufferDestroy(buffer: forwarded)
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    return destroyForwardOnlyRootBuffer(buffer: source)
+}
+RANGE
+            ;;
+        boundary-forward-alias-actual)
+            /bin/cat >> "$output" <<'RANGE'
+function forwardRootBufferFromOwnedActual(buffer: RawBuffer): RawBuffer {
+    return buffer
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let forwarded: RawBuffer(forwardRootBufferFromOwnedActual(buffer: $source))
+    rawBufferDestroy(buffer: forwarded)
+    rawBufferDestroy(buffer: source)
+    return 0
+}
+RANGE
+            ;;
+        boundary-forward-branch-ordinal)
+            /bin/cat >> "$output" <<'RANGE'
+function chooseForwardedRootBuffer(left: RawBuffer, right: RawBuffer, flag: Bool): RawBuffer {
+    if flag {
+        return left
+    } else {
+        return right
+    }
+}
+
+@main {
+    let left: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let right: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let forwarded: RawBuffer(chooseForwardedRootBuffer(left: left, right: right, flag: true))
+    rawBufferDestroy(buffer: forwarded)
+    rawBufferDestroy(buffer: right)
+    return 0
+}
+RANGE
+            ;;
+        boundary-forward-branch-mode)
+            /bin/cat >> "$output" <<'RANGE'
+function chooseForwardedOrLocalRootBuffer(buffer: RawBuffer, flag: Bool): RawBuffer {
+    let local: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    if flag {
+        rawBufferDestroy(buffer: local)
+        return buffer
+    } else {
+        return local
+    }
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let result: RawBuffer(chooseForwardedOrLocalRootBuffer(buffer: source, flag: true))
+    rawBufferDestroy(buffer: result)
+    return 0
+}
+RANGE
+            ;;
+        boundary-forward-duplicate)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootBoundaryForwardDuplicate {
+    let first: RawBuffer
+    let second: RawBuffer
+}
+
+function duplicateBoundaryForwardRootBuffer(buffer: RawBuffer): RootBoundaryForwardDuplicate {
+    return RootBoundaryForwardDuplicate(first: buffer, second: buffer)
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let result: RootBoundaryForwardDuplicate(duplicateBoundaryForwardRootBuffer(buffer: source))
+    rawBufferDestroy(buffer: result.first)
+    rawBufferDestroy(buffer: result.second)
+    return 0
+}
+RANGE
+            ;;
+        boundary-forward-alias-conflict)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootBoundaryForwardAliasConflict {
+    binding borrowed: RawBuffer
+    let forwarded: RawBuffer
+}
+
+function makeRootBoundaryForwardAliasConflict(buffer: RawBuffer): RootBoundaryForwardAliasConflict {
+    return RootBoundaryForwardAliasConflict(borrowed: $buffer, forwarded: buffer)
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    rawBufferAppendInt(buffer: source, value: 7)
+    let result: RootBoundaryForwardAliasConflict(makeRootBoundaryForwardAliasConflict(buffer: source))
+    let value: Int(rawBufferLoadInt(buffer: result.borrowed, index: 0))
+    rawBufferDestroy(buffer: result.forwarded)
+    return value
+}
+RANGE
+            ;;
+        discarded-create)
+            /bin/cat >> "$output" <<'RANGE'
+@main {
+    rawBufferCreate(capacity: 1, stride: 4)
+    return 0
+}
+RANGE
+            ;;
+        duplicate-move)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootDuplicateHolder {
+    let first: RawBuffer
+    let second: RawBuffer
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let holder: RootDuplicateHolder(RootDuplicateHolder(first: source, second: source))
+    return 0
+}
+RANGE
+            ;;
+        missing-destroy)
+            /bin/cat >> "$output" <<'RANGE'
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    return 0
+}
+RANGE
+            ;;
+        use-after-move)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootMovedHolder {
+    let storage: RawBuffer
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let holder: RootMovedHolder(RootMovedHolder(storage: source))
+    rawBufferAppendInt(buffer: source, value: 7)
+    rawBufferDestroy(buffer: holder.storage)
+    return 0
+}
+RANGE
+            ;;
+        binding-as-ownership)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootOwnedHolder {
+    let storage: RawBuffer
+}
+
+@main {
+    let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let holder: RootOwnedHolder(RootOwnedHolder(storage: $source))
+    rawBufferDestroy(buffer: source)
+    return 0
+}
+RANGE
+            ;;
+        partial-whole-move)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootPartialMoveOwner {
+    let first: RawBuffer
+    let second: RawBuffer
+}
+
+@main {
+    let first: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let second: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let owner: RootPartialMoveOwner(RootPartialMoveOwner(first: first, second: second))
+    rawBufferDestroy(buffer: owner.first)
+    let moved: RootPartialMoveOwner(owner)
+    rawBufferDestroy(buffer: moved.second)
+    return 0
+}
+RANGE
+            ;;
+        partial-double-destroy)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootPartialDoubleDestroyOwner {
+    let first: RawBuffer
+    let second: RawBuffer
+}
+
+@main {
+    let first: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let second: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let owner: RootPartialDoubleDestroyOwner(RootPartialDoubleDestroyOwner(first: first, second: second))
+    rawBufferDestroy(buffer: owner.first)
+    rawBufferDestroy(buffer: owner.first)
+    rawBufferDestroy(buffer: owner.second)
+    return 0
+}
+RANGE
+            ;;
+        partial-use-after-destroy)
+            /bin/cat >> "$output" <<'RANGE'
+construct RootPartialUseAfterDestroyOwner {
+    let first: RawBuffer
+    let second: RawBuffer
+}
+
+@main {
+    let first: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let second: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let owner: RootPartialUseAfterDestroyOwner(RootPartialUseAfterDestroyOwner(first: first, second: second))
+    rawBufferDestroy(buffer: owner.first)
+    rawBufferCount(buffer: owner.first)
+    rawBufferDestroy(buffer: owner.second)
+    return 0
+}
+RANGE
+            ;;
+        absent-branch-live-exit)
+            /bin/cat >> "$output" <<'RANGE'
+@main {
+    if true {
+        let branchOwner: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    }
+    return 0
+}
+RANGE
+            ;;
+        absent-conditional-live)
+            /bin/cat >> "$output" <<'RANGE'
+function rejectAbsentOrLiveTerminal(flag: Bool): Int {
+    if flag {
+        return 0
+    }
+    let later: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    return 0
+}
+
+@main {
+    return rejectAbsentOrLiveTerminal(flag: true)
+}
+RANGE
+            ;;
+        absent-loop-live)
+            /bin/cat >> "$output" <<'RANGE'
+@main {
+    state index: Int(0)
+    while index < 2 {
+        let loopOwner: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+        index: index + 1
+    }
+    return 0
+}
+RANGE
+            ;;
+        loop-ownership-change)
+            /bin/cat >> "$output" <<'RANGE'
+function rejectOwnershipChangingBackedge(): RawBuffer {
+    let loopBuffer: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let returnedBuffer: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    state index: Int(0)
+    while index < 1 {
+        rawBufferDestroy(buffer: loopBuffer)
+        index: index + 1
+    }
+    rawBufferDestroy(buffer: loopBuffer)
+    return returnedBuffer
+}
+
+@main {
+    let returnedBuffer: RawBuffer(rejectOwnershipChangingBackedge())
+    rawBufferDestroy(buffer: returnedBuffer)
+    return 0
+}
+RANGE
+            ;;
+        *)
+            fail "unknown RootValue fixture: $kind"
+            ;;
+    esac
 }
 
 assert_role_identity() {
@@ -519,6 +1902,723 @@ audit_canonical_core() {
     [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label canonical Core executable exited $RUN_STATUS"
     [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label canonical Core executable wrote output"
     echo "$stage_label canonical Core: pass (ordinary @main token scan ignores decoy string, actual RawBuffer.range role=core, validate/link, exit 7)"
+}
+
+audit_binding_reference_positive() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local kind="$4"
+    local artifact definition_marker call_marker expected_destroy_count
+
+    case "$kind" in
+        local)
+            artifact=BindingLocal
+            definition_marker='define i32 @bindingReadCount('
+            call_marker='call i32 @bindingReadCount('
+            expected_destroy_count=1
+            ;;
+        member)
+            artifact=BindingMember
+            definition_marker='define i32 @bindingReadFirst('
+            call_marker='call i32 @bindingReadFirst('
+            expected_destroy_count=1
+            ;;
+        binding-return)
+            artifact=BindingReturn
+            definition_marker='define void @returnBufferView(ptr %returnDestination'
+            call_marker='call void @returnBufferView('
+            expected_destroy_count=1
+            ;;
+        multi-alias-return)
+            artifact=BindingMultiAlias
+            definition_marker='define void @returnBoundaryBufferView(ptr %returnDestination'
+            call_marker='call void @returnBoundaryBufferView('
+            expected_destroy_count=2
+            ;;
+        branch-same)
+            artifact=BindingBranchSame
+            definition_marker='define void @chooseSameBufferView(ptr %returnDestination'
+            call_marker='call void @chooseSameBufferView('
+            expected_destroy_count=1
+            ;;
+        alias-forward)
+            artifact=BindingForward
+            definition_marker='define void @forwardBufferView(ptr %returnDestination'
+            call_marker='call void @forwardBufferView('
+            expected_destroy_count=1
+            ;;
+        mixed-return)
+            artifact=BindingMixedReturn
+            definition_marker='define void @makeMixedBufferView(ptr %returnDestination'
+            call_marker='call void @makeMixedBufferView('
+            expected_destroy_count=2
+            ;;
+        multi-mixed-return)
+            artifact=BindingMultiMixedReturn
+            definition_marker='define void @makeArenaEmitterResult(ptr %returnDestination'
+            call_marker='call void @makeArenaEmitterResult('
+            expected_destroy_count=4
+            ;;
+        nested-binding)
+            artifact=BindingNested
+            definition_marker='define void @returnNestedBufferView(ptr %returnDestination'
+            call_marker='call void @returnNestedBufferView('
+            expected_destroy_count=1
+            ;;
+        *)
+            fail "unknown positive binding-reference audit: $kind"
+            ;;
+    esac
+
+    local bundle="$WORK_ROOT/$stage_label.binding.$kind.range"
+    local first="$WORK_ROOT/$stage_label.binding.$kind.first.ll"
+    local second="$WORK_ROOT/$stage_label.binding.$kind.repeat.ll"
+    local first_error="$WORK_ROOT/$stage_label.binding.$kind.first.err"
+    local second_error="$WORK_ROOT/$stage_label.binding.$kind.repeat.err"
+    local llvm="$stage_directory/$artifact.ll"
+    local linked="$stage_directory/$artifact"
+    local run_output="$WORK_ROOT/$stage_label.binding.$kind.run.out"
+    local run_error="$WORK_ROOT/$stage_label.binding.$kind.run.err"
+
+    write_binding_reference_bundle "$bundle" "$kind"
+    run_capture "$executable" "$bundle" "$first" "$first_error"
+    require_successful_output "$stage_label binding $kind" "$first" "$first_error"
+    run_capture "$executable" "$bundle" "$second" "$second_error"
+    require_successful_output "$stage_label repeated binding $kind" "$second" "$second_error"
+    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label binding $kind LLVM was not deterministic"
+
+    /usr/bin/grep -Fq "$definition_marker" "$first" \
+        || fail "$stage_label binding $kind omitted native definition: $definition_marker"
+    /usr/bin/grep -Fq "$call_marker" "$first" \
+        || fail "$stage_label binding $kind omitted native call: $call_marker"
+    local actual_destroy_count
+    actual_destroy_count="$(/usr/bin/grep -F -c 'call i32 @rawBufferDestroy(ptr' "$first" || true)"
+    [[ "$actual_destroy_count" -eq "$expected_destroy_count" ]] \
+        || fail "$stage_label binding $kind emitted $actual_destroy_count owner destructions; expected $expected_destroy_count"
+    if [[ "$kind" == local ]]; then
+        /usr/bin/grep -Fq '%Range.LocalBufferView = type { ptr }' "$first" \
+            || fail "$stage_label local binding omitted its native pointer slot"
+        /usr/bin/grep -Fq 'insertvalue %Range.LocalBufferView poison, ptr' "$first" \
+            || fail "$stage_label local binding omitted native pointer insertion"
+        /usr/bin/grep -Fq 'extractvalue %Range.LocalBufferView' "$first" \
+            || fail "$stage_label local binding omitted native pointer extraction"
+    fi
+    if [[ "$kind" == binding-return ]]; then
+        /usr/bin/grep -Fq '%Range.ReturnedBufferView = type { ptr }' "$first" \
+            || fail "$stage_label binding return omitted its native pointer slot"
+        /usr/bin/grep -Fq 'insertvalue %Range.ReturnedBufferView poison, ptr' "$first" \
+            || fail "$stage_label binding return omitted native alias insertion"
+        /usr/bin/grep -Fq 'extractvalue %Range.ReturnedBufferView' "$first" \
+            || fail "$stage_label binding return omitted native alias extraction"
+    fi
+    if [[ "$kind" == multi-alias-return ]]; then
+        /usr/bin/grep -Fq '%Range.BoundaryBufferOwners = type { ptr, ptr }' "$first" \
+            || fail "$stage_label multi-alias return omitted its boundary owner layout"
+        /usr/bin/grep -Fq '%Range.BoundaryBufferView = type { ptr, ptr }' "$first" \
+            || fail "$stage_label multi-alias return omitted its two-alias layout"
+    fi
+    if [[ "$kind" == alias-forward ]]; then
+        /usr/bin/grep -Fq 'define void @baseBufferView(ptr %returnDestination' "$first" \
+            || fail "$stage_label alias forwarding omitted its base definition"
+        /usr/bin/grep -Fq 'call void @baseBufferView(' "$first" \
+            || fail "$stage_label alias forwarding omitted its transitive call"
+    fi
+    if [[ "$kind" == mixed-return ]]; then
+        /usr/bin/grep -Fq '%Range.MixedBufferView = type { ptr, ptr }' "$first" \
+            || fail "$stage_label mixed binding return omitted its owned/alias pointer layout"
+    fi
+    if [[ "$kind" == multi-mixed-return ]]; then
+        /usr/bin/grep -Fq '%Range.ArenaEmitterAliasOwners = type { ptr, ptr }' "$first" \
+            || fail "$stage_label multi-mixed return omitted its boundary owner layout"
+        /usr/bin/grep -Fq '%Range.ArenaEmitterResult = type { ptr, ptr, ptr, ptr }' "$first" \
+            || fail "$stage_label multi-mixed return omitted its four-leaf layout"
+    fi
+    if [[ "$kind" == nested-binding ]]; then
+        /usr/bin/grep -Fq '%Range.NestedLeafBufferView = type { ptr }' "$first" \
+            || fail "$stage_label nested binding omitted its leaf pointer layout"
+        /usr/bin/grep -Fq '%Range.NestedDirectBufferView = type { %Range.NestedLeafBufferView }' "$first" \
+            || fail "$stage_label nested binding omitted its explicit binding subtree layout"
+    fi
+    local forbidden
+    for forbidden in rangeConstruct malloc calloc realloc free; do
+        if /usr/bin/grep -Fq "$forbidden" "$first"; then
+            fail "$stage_label binding $kind emitted forbidden dynamic/allocator symbol: $forbidden"
+        fi
+    done
+
+    /bin/mkdir -p "$stage_directory"
+    /bin/cp "$first" "$llvm"
+    validate_llvm "$llvm"
+    link_llvm "$llvm" "$linked"
+    if "$linked" > "$run_output" 2> "$run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label binding $kind executable exited $RUN_STATUS"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label binding $kind executable wrote output"
+    echo "$stage_label binding $kind: pass (ordinary native LLVM, helper effect, validate/link, exit 7, deterministic)"
+}
+
+audit_binding_reference_negative() {
+    local stage_label="$1"
+    local executable="$2"
+    local kind="$3"
+    local bundle="$WORK_ROOT/$stage_label.binding.$kind.range"
+    local first="$WORK_ROOT/$stage_label.binding.$kind.first.out"
+    local second="$WORK_ROOT/$stage_label.binding.$kind.repeat.out"
+    local first_error="$WORK_ROOT/$stage_label.binding.$kind.first.err"
+    local second_error="$WORK_ROOT/$stage_label.binding.$kind.repeat.err"
+
+    write_binding_reference_bundle "$bundle" "$kind"
+    run_capture "$executable" "$bundle" "$first" "$first_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label binding $kind exited $RUN_STATUS"
+    [[ ! -s "$first_error" ]] || fail "$stage_label binding $kind wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\t' "$first" || fail "$stage_label binding $kind omitted compilerError"
+    if [[ "$kind" == recursive-return ]]; then
+        /usr/bin/grep -Fq 'kind=invalidOwnedReturnSummary' "$first" \
+            || fail "$stage_label recursive binding return omitted invalidOwnedReturnSummary"
+        /usr/bin/grep -Fq 'failureKind=unresolved' "$first" \
+            || fail "$stage_label recursive binding return omitted unresolved failure kind"
+    fi
+    if /usr/bin/grep -Fq 'define ' "$first" || /usr/bin/grep -Fq 'call ' "$first"; then
+        fail "$stage_label binding $kind emitted LLVM before rejection"
+    fi
+
+    run_capture "$executable" "$bundle" "$second" "$second_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label repeated binding $kind exited $RUN_STATUS"
+    [[ ! -s "$second_error" ]] || fail "$stage_label repeated binding $kind wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\t' "$second" || fail "$stage_label repeated binding $kind omitted compilerError"
+    if [[ "$kind" == recursive-return ]]; then
+        /usr/bin/grep -Fq 'kind=invalidOwnedReturnSummary' "$second" \
+            || fail "$stage_label repeated recursive binding return omitted invalidOwnedReturnSummary"
+        /usr/bin/grep -Fq 'failureKind=unresolved' "$second" \
+            || fail "$stage_label repeated recursive binding return omitted unresolved failure kind"
+    fi
+    if /usr/bin/grep -Fq 'define ' "$second" || /usr/bin/grep -Fq 'call ' "$second"; then
+        fail "$stage_label repeated binding $kind emitted LLVM before rejection"
+    fi
+    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label binding $kind diagnostic was not deterministic"
+    echo "$stage_label binding $kind: pass (deterministic pre-emission rejection)"
+}
+
+audit_binding_references() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+
+    audit_binding_reference_positive "$stage_label" "$executable" "$stage_directory" local
+    audit_binding_reference_positive "$stage_label" "$executable" "$stage_directory" member
+    audit_binding_reference_positive "$stage_label" "$executable" "$stage_directory" binding-return
+    audit_binding_reference_positive "$stage_label" "$executable" "$stage_directory" multi-alias-return
+    audit_binding_reference_negative "$stage_label" "$executable" local-alias-escape
+    audit_binding_reference_positive "$stage_label" "$executable" "$stage_directory" branch-same
+    audit_binding_reference_negative "$stage_label" "$executable" branch-different
+    audit_binding_reference_positive "$stage_label" "$executable" "$stage_directory" alias-forward
+    audit_binding_reference_positive "$stage_label" "$executable" "$stage_directory" mixed-return
+    audit_binding_reference_positive "$stage_label" "$executable" "$stage_directory" multi-mixed-return
+    audit_binding_reference_negative "$stage_label" "$executable" consumed-owner-return
+    audit_binding_reference_negative "$stage_label" "$executable" use-after-returned-alias
+    audit_binding_reference_negative "$stage_label" "$executable" recursive-return
+    audit_binding_reference_positive "$stage_label" "$executable" "$stage_directory" nested-binding
+    audit_binding_reference_negative "$stage_label" "$executable" nested-wrapper
+    audit_binding_reference_negative "$stage_label" "$executable" missing-dollar
+    audit_binding_reference_negative "$stage_label" "$executable" alias-destroy
+    audit_binding_reference_negative "$stage_label" "$executable" direct-destroy
+    audit_binding_reference_negative "$stage_label" "$executable" helper-destroy
+    audit_binding_reference_negative "$stage_label" "$executable" alias-move
+    echo "$stage_label binding references: pass (local/member aliases, alias returns/forwarding/mixed transfer, branch provenance, owner lifetime, fail-closed topology)"
+}
+
+compare_binding_reference_stages() {
+    local left_label="$1"
+    local left_directory="$2"
+    local right_label="$3"
+    local right_directory="$4"
+    local specification kind artifact
+
+    for specification in \
+        local:BindingLocal \
+        member:BindingMember \
+        binding-return:BindingReturn \
+        multi-alias-return:BindingMultiAlias \
+        branch-same:BindingBranchSame \
+        alias-forward:BindingForward \
+        mixed-return:BindingMixedReturn \
+        multi-mixed-return:BindingMultiMixedReturn \
+        nested-binding:BindingNested; do
+        kind="${specification%%:*}"
+        artifact="${specification#*:}"
+        /usr/bin/cmp -s "$WORK_ROOT/$left_label.binding.$kind.first.ll" "$WORK_ROOT/$right_label.binding.$kind.first.ll" \
+            || fail "$left_label and $right_label binding $kind LLVM differs"
+        /usr/bin/cmp -s "$WORK_ROOT/$left_label.binding.$kind.repeat.ll" "$WORK_ROOT/$right_label.binding.$kind.repeat.ll" \
+            || fail "$left_label and $right_label repeated binding $kind LLVM differs"
+        /usr/bin/cmp -s "$left_directory/$artifact.ll" "$right_directory/$artifact.ll" \
+            || fail "$left_label and $right_label binding $kind artifacts differ"
+        /usr/bin/cmp -s "$left_directory/$artifact" "$right_directory/$artifact" \
+            || fail "$left_label and $right_label binding $kind executables differ"
+    done
+
+    for kind in \
+        local-alias-escape \
+        branch-different \
+        consumed-owner-return \
+        use-after-returned-alias \
+        recursive-return \
+        nested-wrapper \
+        missing-dollar \
+        alias-destroy \
+        direct-destroy \
+        helper-destroy \
+        alias-move; do
+        /usr/bin/cmp -s "$WORK_ROOT/$left_label.binding.$kind.first.out" "$WORK_ROOT/$right_label.binding.$kind.first.out" \
+            || fail "$left_label and $right_label binding $kind diagnostics differ"
+        /usr/bin/cmp -s "$WORK_ROOT/$left_label.binding.$kind.repeat.out" "$WORK_ROOT/$right_label.binding.$kind.repeat.out" \
+            || fail "$left_label and $right_label repeated binding $kind diagnostics differ"
+    done
+    echo "$left_label/$right_label binding references: byte-identical LLVM/executables/diagnostics"
+}
+
+audit_root_value_positive() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local kind="$4"
+    local artifact definition_marker call_marker expected_create_count expected_destroy_count
+
+    case "$kind" in
+        opaque-return)
+            artifact=RootValueOpaqueReturn
+            definition_marker='define ptr @makeRootBuffer()'
+            call_marker='call ptr @makeRootBuffer()'
+            expected_create_count=1
+            expected_destroy_count=1
+            ;;
+        boundary-forward-direct)
+            artifact=RootValueBoundaryForwardDirect
+            definition_marker='define ptr @forwardRootBuffer(ptr'
+            call_marker='call ptr @forwardRootBuffer(ptr'
+            expected_create_count=1
+            expected_destroy_count=1
+            ;;
+        boundary-forward-transitive)
+            artifact=RootValueBoundaryForwardTransitive
+            definition_marker='define ptr @forwardRootBufferTransitively(ptr'
+            call_marker='call ptr @forwardRootBufferTransitively(ptr'
+            expected_create_count=1
+            expected_destroy_count=1
+            ;;
+        boundary-forward-two-owned-inputs)
+            artifact=RootValueBoundaryForwardPair
+            definition_marker='define void @forwardRootBufferPair(ptr %returnDestination'
+            call_marker='call void @forwardRootBufferPair('
+            expected_create_count=2
+            expected_destroy_count=2
+            ;;
+        boundary-forward-mixed)
+            artifact=RootValueBoundaryForwardMixed
+            definition_marker='define void @makeRootBoundaryForwardMixedResult(ptr %returnDestination'
+            call_marker='call void @makeRootBoundaryForwardMixedResult('
+            expected_create_count=3
+            expected_destroy_count=3
+            ;;
+        direct-holder)
+            artifact=RootValueDirectHolder
+            definition_marker='define void @makeRootDirectHolder(ptr %returnDestination'
+            call_marker='call void @makeRootDirectHolder('
+            expected_create_count=1
+            expected_destroy_count=1
+            ;;
+        nested-inline)
+            artifact=RootValueNestedInline
+            definition_marker='define void @makeRootNestedOuter(ptr %returnDestination'
+            call_marker='call void @makeRootNestedOuter('
+            expected_create_count=1
+            expected_destroy_count=1
+            ;;
+        inline-local-return)
+            artifact=RootValueInlineLocalReturn
+            definition_marker='define void @makeRootLocalHolder(ptr %returnDestination'
+            call_marker='call void @makeRootLocalHolder('
+            expected_create_count=1
+            expected_destroy_count=1
+            ;;
+        two-owned-leaves)
+            artifact=RootValueTwoOwnedLeaves
+            definition_marker='define void @makeRootTwinHolder(ptr %returnDestination'
+            call_marker='call void @makeRootTwinHolder('
+            expected_create_count=2
+            expected_destroy_count=2
+            ;;
+        partial-sibling)
+            artifact=RootValuePartialSibling
+            definition_marker='define i32 @main()'
+            call_marker='call i32 @rawBufferAppendInt('
+            expected_create_count=2
+            expected_destroy_count=2
+            ;;
+        loop-invariant)
+            artifact=RootValueLoopInvariant
+            definition_marker='define i32 @main()'
+            call_marker='call i32 @rawBufferAppendInt('
+            expected_create_count=1
+            expected_destroy_count=1
+            ;;
+        absent-early-return)
+            artifact=RootValueAbsentEarlyReturn
+            definition_marker='define i32 @absentEarlyReturn(i1'
+            call_marker='call i32 @absentEarlyReturn(i1'
+            expected_create_count=1
+            expected_destroy_count=1
+            ;;
+        absent-branch-scope)
+            artifact=RootValueAbsentBranchScope
+            definition_marker='define i32 @absentBranchScope(ptr'
+            call_marker='call i32 @absentBranchScope(ptr'
+            expected_create_count=2
+            expected_destroy_count=2
+            ;;
+        absent-loop-reevaluation)
+            artifact=RootValueAbsentLoopReevaluation
+            definition_marker='define i32 @absentLoopReevaluation()'
+            call_marker='call i32 @absentLoopReevaluation()'
+            expected_create_count=1
+            expected_destroy_count=1
+            ;;
+        absent-returned-alias)
+            artifact=RootValueAbsentReturnedAlias
+            definition_marker='define void @absentForwardAlias(ptr %returnDestination'
+            call_marker='call void @absentForwardAlias('
+            expected_create_count=1
+            expected_destroy_count=1
+            ;;
+        boundary-consume)
+            artifact=RootValueBoundaryConsume
+            definition_marker='define i32 @destroyRootBufferInCallee(ptr'
+            call_marker='call i32 @destroyRootBufferInCallee(ptr'
+            expected_create_count=1
+            expected_destroy_count=1
+            ;;
+        *)
+            fail "unknown positive RootValue audit: $kind"
+            ;;
+    esac
+
+    local bundle="$WORK_ROOT/$stage_label.root-value.$kind.range"
+    local first="$WORK_ROOT/$stage_label.root-value.$kind.first.ll"
+    local second="$WORK_ROOT/$stage_label.root-value.$kind.repeat.ll"
+    local first_error="$WORK_ROOT/$stage_label.root-value.$kind.first.err"
+    local second_error="$WORK_ROOT/$stage_label.root-value.$kind.repeat.err"
+    local llvm="$stage_directory/$artifact.ll"
+    local linked="$stage_directory/$artifact"
+    local run_output="$WORK_ROOT/$stage_label.root-value.$kind.run.out"
+    local run_error="$WORK_ROOT/$stage_label.root-value.$kind.run.err"
+
+    write_root_value_bundle "$bundle" "$kind"
+    run_capture "$executable" "$bundle" "$first" "$first_error"
+    require_successful_output "$stage_label RootValue $kind" "$first" "$first_error"
+    run_capture "$executable" "$bundle" "$second" "$second_error"
+    require_successful_output "$stage_label repeated RootValue $kind" "$second" "$second_error"
+    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label RootValue $kind LLVM was not deterministic"
+
+    /usr/bin/grep -Fq "$definition_marker" "$first" \
+        || fail "$stage_label RootValue $kind omitted native definition: $definition_marker"
+    /usr/bin/grep -Fq "$call_marker" "$first" \
+        || fail "$stage_label RootValue $kind omitted native call: $call_marker"
+    if [[ "$kind" == loop-invariant ]]; then
+        /usr/bin/grep -Fq 'call i32 @rawBufferCount(ptr' "$first" \
+            || fail "$stage_label RootValue loop invariant omitted its shared read"
+    fi
+    if [[ "$kind" == absent-branch-scope ]]; then
+        /usr/bin/grep -Fq '%Range.AbsentBranchAliasView = type { ptr }' "$first" \
+            || fail "$stage_label Absent branch scope omitted its alias layout"
+    fi
+    if [[ "$kind" == absent-returned-alias ]]; then
+        /usr/bin/grep -Fq '%Range.AbsentReturnedAliasView = type { ptr }' "$first" \
+            || fail "$stage_label Absent returned alias omitted its pointer layout"
+        /usr/bin/grep -Fq 'define void @absentChooseAlias(ptr %returnDestination' "$first" \
+            || fail "$stage_label Absent returned alias omitted its branch-local producer"
+        /usr/bin/grep -Fq 'call void @absentChooseAlias(' "$first" \
+            || fail "$stage_label Absent returned alias omitted its transitive forward call"
+    fi
+    if [[ "$kind" == boundary-forward-transitive ]]; then
+        /usr/bin/grep -Fq 'define ptr @baseForwardRootBuffer(ptr' "$first" \
+            || fail "$stage_label transitive boundary forward omitted its base definition"
+        /usr/bin/grep -Fq 'call ptr @baseForwardRootBuffer(ptr' "$first" \
+            || fail "$stage_label transitive boundary forward omitted its base call"
+    fi
+    if [[ "$kind" == boundary-consume ]]; then
+        local consume_definition_count consume_call_count
+        consume_definition_count="$(/usr/bin/grep -F -c 'define i32 @destroyRootBufferInCallee(ptr' "$first" || true)"
+        consume_call_count="$(/usr/bin/grep -F -c 'call i32 @destroyRootBufferInCallee(ptr' "$first" || true)"
+        [[ "$consume_definition_count" -eq 1 ]] \
+            || fail "$stage_label RootValue boundary consume emitted $consume_definition_count helper definitions; expected 1"
+        [[ "$consume_call_count" -eq 1 ]] \
+            || fail "$stage_label RootValue boundary consume emitted $consume_call_count helper calls; expected 1"
+    fi
+    local actual_create_count actual_destroy_count
+    actual_create_count="$(/usr/bin/grep -F -c 'call ptr @rawBufferCreate(' "$first" || true)"
+    actual_destroy_count="$(/usr/bin/grep -F -c 'call i32 @rawBufferDestroy(ptr' "$first" || true)"
+    [[ "$actual_create_count" -eq "$expected_create_count" ]] \
+        || fail "$stage_label RootValue $kind emitted $actual_create_count creates; expected $expected_create_count"
+    [[ "$actual_destroy_count" -eq "$expected_destroy_count" ]] \
+        || fail "$stage_label RootValue $kind emitted $actual_destroy_count destructions; expected $expected_destroy_count"
+
+    if [[ "$kind" == direct-holder ]]; then
+        /usr/bin/grep -Fq '%Range.RootDirectHolder = type { ptr }' "$first" \
+            || fail "$stage_label direct RootValue holder omitted its pointer layout"
+    fi
+    if [[ "$kind" == nested-inline ]]; then
+        /usr/bin/grep -Fq '%Range.RootNestedInner = type { ptr }' "$first" \
+            || fail "$stage_label nested RootValue omitted its inner layout"
+        /usr/bin/grep -Fq '%Range.RootNestedOuter = type { %Range.RootNestedInner }' "$first" \
+            || fail "$stage_label nested RootValue omitted its outer layout"
+    fi
+    if [[ "$kind" == inline-local-return ]]; then
+        /usr/bin/grep -Fq '%Range.RootLocalHolder = type { ptr }' "$first" \
+            || fail "$stage_label local RootValue return omitted its pointer layout"
+    fi
+    if [[ "$kind" == two-owned-leaves ]]; then
+        /usr/bin/grep -Fq '%Range.RootTwinHolder = type { ptr, ptr }' "$first" \
+            || fail "$stage_label two-leaf RootValue return omitted its exact layout"
+    fi
+    if [[ "$kind" == partial-sibling ]]; then
+        /usr/bin/grep -Fq '%Range.RootPartialOwner = type { ptr, ptr }' "$first" \
+            || fail "$stage_label partial aggregate omitted its exact two-leaf layout"
+    fi
+    if [[ "$kind" == boundary-forward-mixed ]]; then
+        /usr/bin/grep -Fq '%Range.RootBoundaryForwardMixedResult = type { ptr, ptr, ptr }' "$first" \
+            || fail "$stage_label mixed boundary forward omitted its forward/alias/local layout"
+    fi
+    if [[ "$kind" == boundary-forward-two-owned-inputs ]]; then
+        /usr/bin/grep -Fq '%Range.RootBoundaryForwardPair = type { ptr, ptr }' "$first" \
+            || fail "$stage_label two-input boundary forward omitted its exact pair layout"
+    fi
+    local forbidden
+    for forbidden in rangeConstruct malloc calloc realloc free; do
+        if /usr/bin/grep -Fq "$forbidden" "$first"; then
+            fail "$stage_label RootValue $kind emitted forbidden dynamic/allocator symbol: $forbidden"
+        fi
+    done
+
+    /bin/mkdir -p "$stage_directory"
+    /bin/cp "$first" "$llvm"
+    validate_llvm "$llvm"
+    link_llvm "$llvm" "$linked"
+    if "$linked" > "$run_output" 2> "$run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label RootValue $kind executable exited $RUN_STATUS"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label RootValue $kind executable wrote output"
+    echo "$stage_label RootValue $kind: pass (deterministic native ownership, validate/link, exit 7)"
+}
+
+audit_root_value_negative() {
+    local stage_label="$1"
+    local executable="$2"
+    local kind="$3"
+    local bundle="$WORK_ROOT/$stage_label.root-value.$kind.range"
+    local first="$WORK_ROOT/$stage_label.root-value.$kind.first.out"
+    local second="$WORK_ROOT/$stage_label.root-value.$kind.repeat.out"
+    local first_error="$WORK_ROOT/$stage_label.root-value.$kind.first.err"
+    local second_error="$WORK_ROOT/$stage_label.root-value.$kind.repeat.err"
+
+    write_root_value_bundle "$bundle" "$kind"
+    run_capture "$executable" "$bundle" "$first" "$first_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label RootValue $kind exited $RUN_STATUS"
+    [[ ! -s "$first_error" ]] || fail "$stage_label RootValue $kind wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\t' "$first" || fail "$stage_label RootValue $kind omitted compilerError"
+    if [[ "$kind" == loop-ownership-change ]]; then
+        /usr/bin/grep -Fq 'kind=invalidOwnedReturnSummary' "$first" \
+            || fail "$stage_label RootValue ownership-changing loop omitted invalidOwnedReturnSummary"
+        /usr/bin/grep -Fq 'failureKind=proof' "$first" \
+            || fail "$stage_label RootValue ownership-changing loop was not rejected by ownership proof"
+        /usr/bin/grep -Fq 'detail=6' "$first" \
+            || fail "$stage_label RootValue ownership-changing loop omitted proof detail 6"
+    fi
+    if [[ "$kind" == absent-branch-live-exit ]]; then
+        /usr/bin/grep -Fq 'kind=invalidEntryOwnedPaths' "$first" \
+            || fail "$stage_label RootValue $kind omitted its entry ownership diagnostic"
+        /usr/bin/grep -Fq 'detail=6011' "$first" \
+            || fail "$stage_label RootValue $kind omitted entry edge-projection detail 6011"
+    fi
+    if [[ "$kind" == absent-conditional-live ]]; then
+        /usr/bin/grep -Fq 'kind=invalidFunctionReachability' "$first" \
+            || fail "$stage_label RootValue $kind omitted its function ownership diagnostic"
+        /usr/bin/grep -Fq 'function=rejectAbsentOrLiveTerminal' "$first" \
+            || fail "$stage_label RootValue $kind omitted its failing function identity"
+        /usr/bin/grep -Fq 'ownedPathStage=14' "$first" \
+            || fail "$stage_label RootValue $kind omitted terminal ownership stage 14"
+    fi
+    if [[ "$kind" == absent-loop-live ]]; then
+        /usr/bin/grep -Fq 'kind=invalidEntryOwnedPaths' "$first" \
+            || fail "$stage_label RootValue $kind omitted its entry ownership diagnostic"
+        /usr/bin/grep -Fq 'detail=6016' "$first" \
+            || fail "$stage_label RootValue $kind omitted backedge ownership detail 6016"
+    fi
+    if /usr/bin/grep -Fq 'define ' "$first" || /usr/bin/grep -Fq 'call ' "$first"; then
+        fail "$stage_label RootValue $kind emitted LLVM before rejection"
+    fi
+
+    run_capture "$executable" "$bundle" "$second" "$second_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label repeated RootValue $kind exited $RUN_STATUS"
+    [[ ! -s "$second_error" ]] || fail "$stage_label repeated RootValue $kind wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\t' "$second" || fail "$stage_label repeated RootValue $kind omitted compilerError"
+    if [[ "$kind" == loop-ownership-change ]]; then
+        /usr/bin/grep -Fq 'kind=invalidOwnedReturnSummary' "$second" \
+            || fail "$stage_label repeated RootValue ownership-changing loop omitted invalidOwnedReturnSummary"
+        /usr/bin/grep -Fq 'failureKind=proof' "$second" \
+            || fail "$stage_label repeated RootValue ownership-changing loop was not rejected by ownership proof"
+        /usr/bin/grep -Fq 'detail=6' "$second" \
+            || fail "$stage_label repeated RootValue ownership-changing loop omitted proof detail 6"
+    fi
+    if [[ "$kind" == absent-branch-live-exit ]]; then
+        /usr/bin/grep -Fq 'kind=invalidEntryOwnedPaths' "$second" \
+            || fail "$stage_label repeated RootValue $kind omitted its entry ownership diagnostic"
+        /usr/bin/grep -Fq 'detail=6011' "$second" \
+            || fail "$stage_label repeated RootValue $kind omitted entry edge-projection detail 6011"
+    fi
+    if [[ "$kind" == absent-conditional-live ]]; then
+        /usr/bin/grep -Fq 'kind=invalidFunctionReachability' "$second" \
+            || fail "$stage_label repeated RootValue $kind omitted its function ownership diagnostic"
+        /usr/bin/grep -Fq 'function=rejectAbsentOrLiveTerminal' "$second" \
+            || fail "$stage_label repeated RootValue $kind omitted its failing function identity"
+        /usr/bin/grep -Fq 'ownedPathStage=14' "$second" \
+            || fail "$stage_label repeated RootValue $kind omitted terminal ownership stage 14"
+    fi
+    if [[ "$kind" == absent-loop-live ]]; then
+        /usr/bin/grep -Fq 'kind=invalidEntryOwnedPaths' "$second" \
+            || fail "$stage_label repeated RootValue $kind omitted its entry ownership diagnostic"
+        /usr/bin/grep -Fq 'detail=6016' "$second" \
+            || fail "$stage_label repeated RootValue $kind omitted backedge ownership detail 6016"
+    fi
+    if /usr/bin/grep -Fq 'define ' "$second" || /usr/bin/grep -Fq 'call ' "$second"; then
+        fail "$stage_label repeated RootValue $kind emitted LLVM before rejection"
+    fi
+    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label RootValue $kind diagnostic was not deterministic"
+    echo "$stage_label RootValue $kind: pass (deterministic pre-emission rejection)"
+}
+
+audit_root_values() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" opaque-return
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" boundary-forward-direct
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" boundary-forward-transitive
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" boundary-forward-two-owned-inputs
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" boundary-forward-mixed
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" direct-holder
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" nested-inline
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" inline-local-return
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" two-owned-leaves
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" partial-sibling
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" loop-invariant
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" absent-early-return
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" absent-branch-scope
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" absent-loop-reevaluation
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" absent-returned-alias
+    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" boundary-consume
+    # Lexical scope makes a projected-Absent symbol unnameable. Legal loop
+    # reactivation and live loop re-entry therefore cover activation exactness;
+    # duplicate-move and partial-double-destroy cover the spellable repeated
+    # move/destroy transitions before a symbol leaves its activation region.
+    # A tracked Optional fallback/join is also intentionally absent here: the
+    # ordinary source surface cannot yet supply a reachable Optional-owned
+    # boundary value without failing earlier at nil/injection ownership. Do not
+    # disguise that gap with a retyped builtin, special root, or proof directive.
+    audit_root_value_negative "$stage_label" "$executable" discarded-create
+    audit_root_value_negative "$stage_label" "$executable" duplicate-move
+    audit_root_value_negative "$stage_label" "$executable" missing-destroy
+    audit_root_value_negative "$stage_label" "$executable" use-after-move
+    audit_root_value_negative "$stage_label" "$executable" binding-as-ownership
+    audit_root_value_negative "$stage_label" "$executable" partial-whole-move
+    audit_root_value_negative "$stage_label" "$executable" partial-double-destroy
+    audit_root_value_negative "$stage_label" "$executable" partial-use-after-destroy
+    audit_root_value_negative "$stage_label" "$executable" absent-branch-live-exit
+    audit_root_value_negative "$stage_label" "$executable" absent-conditional-live
+    audit_root_value_negative "$stage_label" "$executable" absent-loop-live
+    audit_root_value_negative "$stage_label" "$executable" loop-ownership-change
+    audit_root_value_negative "$stage_label" "$executable" boundary-consume-source-destroy
+    audit_root_value_negative "$stage_label" "$executable" boundary-forward-direct-source-use
+    audit_root_value_negative "$stage_label" "$executable" boundary-forward-transitive-source-use
+    audit_root_value_negative "$stage_label" "$executable" boundary-forward-destroy
+    audit_root_value_negative "$stage_label" "$executable" boundary-forward-alias-actual
+    audit_root_value_negative "$stage_label" "$executable" boundary-forward-branch-ordinal
+    audit_root_value_negative "$stage_label" "$executable" boundary-forward-branch-mode
+    audit_root_value_negative "$stage_label" "$executable" boundary-forward-duplicate
+    audit_root_value_negative "$stage_label" "$executable" boundary-forward-alias-conflict
+    echo "$stage_label RootValue ownership: pass (opaque/direct/nested/local/forwarded/mixed returns, boundary consume, partial siblings, explicit Absent activation/scope/re-evaluation, branch provenance, loop invariance, fail-closed lifecycle)"
+}
+
+compare_root_value_stages() {
+    local left_label="$1"
+    local left_directory="$2"
+    local right_label="$3"
+    local right_directory="$4"
+    local specification kind artifact
+
+    for specification in \
+        opaque-return:RootValueOpaqueReturn \
+        boundary-forward-direct:RootValueBoundaryForwardDirect \
+        boundary-forward-transitive:RootValueBoundaryForwardTransitive \
+        boundary-forward-two-owned-inputs:RootValueBoundaryForwardPair \
+        boundary-forward-mixed:RootValueBoundaryForwardMixed \
+        direct-holder:RootValueDirectHolder \
+        nested-inline:RootValueNestedInline \
+        inline-local-return:RootValueInlineLocalReturn \
+        two-owned-leaves:RootValueTwoOwnedLeaves \
+        partial-sibling:RootValuePartialSibling \
+        loop-invariant:RootValueLoopInvariant \
+        absent-early-return:RootValueAbsentEarlyReturn \
+        absent-branch-scope:RootValueAbsentBranchScope \
+        absent-loop-reevaluation:RootValueAbsentLoopReevaluation \
+        absent-returned-alias:RootValueAbsentReturnedAlias \
+        boundary-consume:RootValueBoundaryConsume; do
+        kind="${specification%%:*}"
+        artifact="${specification#*:}"
+        /usr/bin/cmp -s "$WORK_ROOT/$left_label.root-value.$kind.first.ll" "$WORK_ROOT/$right_label.root-value.$kind.first.ll" \
+            || fail "$left_label and $right_label RootValue $kind LLVM differs"
+        /usr/bin/cmp -s "$WORK_ROOT/$left_label.root-value.$kind.repeat.ll" "$WORK_ROOT/$right_label.root-value.$kind.repeat.ll" \
+            || fail "$left_label and $right_label repeated RootValue $kind LLVM differs"
+        /usr/bin/cmp -s "$left_directory/$artifact.ll" "$right_directory/$artifact.ll" \
+            || fail "$left_label and $right_label RootValue $kind artifacts differ"
+        /usr/bin/cmp -s "$left_directory/$artifact" "$right_directory/$artifact" \
+            || fail "$left_label and $right_label RootValue $kind executables differ"
+    done
+
+    for kind in \
+        discarded-create \
+        duplicate-move \
+        missing-destroy \
+        use-after-move \
+        binding-as-ownership \
+        partial-whole-move \
+        partial-double-destroy \
+        partial-use-after-destroy \
+        absent-branch-live-exit \
+        absent-conditional-live \
+        absent-loop-live \
+        loop-ownership-change \
+        boundary-consume-source-destroy \
+        boundary-forward-direct-source-use \
+        boundary-forward-transitive-source-use \
+        boundary-forward-destroy \
+        boundary-forward-alias-actual \
+        boundary-forward-branch-ordinal \
+        boundary-forward-branch-mode \
+        boundary-forward-duplicate \
+        boundary-forward-alias-conflict; do
+        /usr/bin/cmp -s "$WORK_ROOT/$left_label.root-value.$kind.first.out" "$WORK_ROOT/$right_label.root-value.$kind.first.out" \
+            || fail "$left_label and $right_label RootValue $kind diagnostics differ"
+        /usr/bin/cmp -s "$WORK_ROOT/$left_label.root-value.$kind.repeat.out" "$WORK_ROOT/$right_label.root-value.$kind.repeat.out" \
+            || fail "$left_label and $right_label repeated RootValue $kind diagnostics differ"
+    done
+    echo "$left_label/$right_label RootValue ownership: byte-identical LLVM/executables/diagnostics"
 }
 
 write_macro_positive_bundle() {
@@ -1971,6 +4071,8 @@ audit_stage() {
     audit_inventory "$stage_label" "$executable"
     audit_role_markers "$stage_label" "$executable"
     audit_canonical_core "$stage_label" "$executable" "$stage_directory"
+    audit_binding_references "$stage_label" "$executable" "$stage_directory"
+    audit_root_values "$stage_label" "$executable" "$stage_directory"
     audit_builtin_marker "$stage_label" "$executable"
     audit_macro_linking "$stage_label" "$executable"
     audit_macro_execution "$stage_label" "$executable"
@@ -1978,7 +4080,9 @@ audit_stage() {
     audit_macro_generated_function "$stage_label" "$executable" "$stage_directory"
     audit_macro_registrable "$stage_label" "$executable" "$stage_directory"
     audit_macro_expansion_commit "$stage_label" "$executable" "$stage_directory"
+    audit_body_syntax_split "$stage_label" "$executable" "$stage_directory"
     audit_smoke "$stage_label" "$executable" "$stage_directory"
+    audit_placement_symbol_guard "$stage_label" "$executable" "$stage_directory"
     audit_mixed_abi "$stage_label" "$executable"
 }
 
@@ -1990,12 +4094,39 @@ report_artifact() {
     printf '%s_bytes=%s\n' "$label" "$(bytes "$path")"
 }
 
+report_ephemeral_artifact() {
+    local label="$1"
+    local path="$2"
+    printf '%s_sha256=%s\n' "$label" "$(sha256 "$path")"
+    printf '%s_bytes=%s\n' "$label" "$(bytes "$path")"
+}
+
 audit_no_temporary_debug_probes() {
-    local source="$REPO_ROOT/RangeCompiler/Range/Programs/Compiler/CompilerCore.range"
+    local source="$1"
+    local label="$2"
+    [[ -f "$source" ]] || fail "missing $label CompilerCore source: $source"
     local marker
     for marker in debugMacro debugIndexState compilerBodyArenaDebug expansionFailureMarker debugTemplate debugBodyNode debugGenerated debugFailureCount debugTableFailure 200000000 300000000 301000000 5101 5102 5103; do
         if rg -n -F "$marker" "$source" >/dev/null; then
-            fail "temporary compiler debug probe remains: $marker"
+            fail "temporary $label debug probe remains: $marker"
+        fi
+    done
+}
+
+audit_no_body_syntax_sink() {
+    local source="$1"
+    local label="$2"
+    local marker
+
+    [[ -f "$source" ]] || fail "missing $label CompilerCore source"
+    for marker in \
+        compilerBodySyntaxSinkDisabled \
+        CompilerBodySyntaxSink \
+        compilerBodySyntaxSink \
+        WithSink \
+        'rawBufferCreate(capacity: 0 - 1, stride: 4)'; do
+        if rg -n -F "$marker" "$source" >/dev/null; then
+            fail "$label retains body-syntax sink or adapter symbol: $marker"
         fi
     done
 }
@@ -2017,25 +4148,73 @@ audit_raw_buffer_substrate() {
 }
 
 main() {
-    [[ "$#" -le 1 ]] || { usage; exit 64; }
-    local compiler_input="${1:-$DEFAULT_COMPILER_DIR}"
+    local compiler_input="$DEFAULT_COMPILER_DIR"
+    local bootstrap_bridge_input=""
+    if [[ "$#" -eq 1 && ( "$1" == "--help" || "$1" == "-h" ) ]]; then
+        usage
+        return 0
+    fi
+    if [[ "$#" -eq 0 ]]; then
+        :
+    elif [[ "$#" -eq 1 && "$1" != -* ]]; then
+        compiler_input="$1"
+    elif [[ "$#" -eq 3 && "$1" == "--bootstrap-bridge-source" ]]; then
+        bootstrap_bridge_input="$2"
+        compiler_input="$3"
+    else
+        usage >&2
+        exit 64
+    fi
+
     [[ -d "$compiler_input" ]] || fail "missing compiler directory: $compiler_input"
     local compiler_directory
     compiler_directory="$(cd "$compiler_input" && pwd)"
+    local bootstrap_bridge_source_directory=""
+    if [[ -n "$bootstrap_bridge_input" ]]; then
+        [[ -d "$bootstrap_bridge_input" ]] || fail "missing bootstrap bridge source directory: $bootstrap_bridge_input"
+        bootstrap_bridge_source_directory="$(cd "$bootstrap_bridge_input" && pwd)"
+        [[ "$bootstrap_bridge_source_directory" != "$compiler_directory" ]] \
+            || fail "bootstrap bridge source and final compiler directories must be distinct immutable snapshots"
+    fi
 
     verify_manifest
-    audit_no_temporary_debug_probes
+    audit_no_temporary_debug_probes "$compiler_directory/CompilerCore.range" "final compiler"
+    audit_no_body_syntax_sink "$compiler_directory/CompilerCore.range" "final compiler"
+    if [[ -n "$bootstrap_bridge_source_directory" ]]; then
+        audit_no_temporary_debug_probes "$bootstrap_bridge_source_directory/CompilerCore.range" "bootstrap bridge"
+        audit_no_body_syntax_sink "$bootstrap_bridge_source_directory/CompilerCore.range" "bootstrap bridge"
+    fi
     audit_raw_buffer_substrate
 
     WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compiler-candidate.XXXXXX")"
-    trap '/bin/rm -rf "$WORK_ROOT"' EXIT
-    CORE_SOURCE_PATH="$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/RawBuffer.range"
-    [[ -f "$CORE_SOURCE_PATH" ]] || fail "missing canonical Core proof input: $CORE_SOURCE_PATH"
+    if [[ "${RANGE_KEEP_CANDIDATE_WORK_ROOT:-0}" == "1" ]]; then
+        echo "candidate work root: $WORK_ROOT"
+    else
+        trap '/bin/rm -rf "$WORK_ROOT"' EXIT
+    fi
+    local canonical_core_source_path="$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/RawBuffer.range"
+    [[ -f "$canonical_core_source_path" ]] || fail "missing canonical Core proof input: $canonical_core_source_path"
+    CORE_SOURCE_MARKER_PATH="${canonical_core_source_path#"$REPO_ROOT/"}"
+    CORE_SOURCE_PATH="$WORK_ROOT/RawBuffer.range"
+    /bin/cp "$canonical_core_source_path" "$CORE_SOURCE_PATH"
 
     RUNTIME_INPUTS=()
     while IFS= read -r runtime; do
         RUNTIME_INPUTS+=("$runtime")
     done < <(runtime_inputs)
+
+    local bootstrap_bridge_source_bundle=""
+    local bootstrap_bridge_source_inventory_count=0
+    local -a bootstrap_bridge_source_relative_paths=()
+    if [[ -n "$bootstrap_bridge_source_directory" ]]; then
+        local bootstrap_bridge_discovery_root="$WORK_ROOT/bootstrap-bridge-source-discovery"
+        /bin/mkdir -p "$bootstrap_bridge_discovery_root"
+        discover_sources "$bootstrap_bridge_source_directory" "$bootstrap_bridge_discovery_root"
+        bootstrap_bridge_source_bundle="$WORK_ROOT/BootstrapBridgeSourceSet.range"
+        write_source_bundle "$bootstrap_bridge_source_bundle"
+        bootstrap_bridge_source_inventory_count="${#SOURCE_FILES[@]}"
+        bootstrap_bridge_source_relative_paths=("${SOURCE_RELATIVE_PATHS[@]}")
+    fi
 
     discover_sources "$compiler_directory" "$WORK_ROOT"
     SOURCE_BUNDLE="$WORK_ROOT/RangeCompilerSourceSet.range"
@@ -2066,6 +4245,27 @@ main() {
         '    second: NativeSmokePair(first: 3, second: 6)' \
         '    return first.first + second.second' \
         '}' > "$SMOKE_SOURCE"
+
+    PLACEMENT_GUARD_SOURCE="$WORK_ROOT/PlacementSymbolGuard.range"
+    /usr/bin/printf '%s\n' \
+        'construct PlacementGuardPair {' \
+        '    let first: Int' \
+        '    let second: Int' \
+        '}' \
+        '' \
+        'function placementGuardPadding(a: Int, b: Int, c: Int, d: Int, e: Int, f: Int, g: Int): Int {' \
+        '    return 0' \
+        '}' \
+        '' \
+        'function placementGuardAggregate(value: Int): PlacementGuardPair {' \
+        '    let result: PlacementGuardPair(PlacementGuardPair(first: value, second: 7))' \
+        '    return result' \
+        '}' \
+        '' \
+        '@main {' \
+        '    let result: PlacementGuardPair(placementGuardAggregate(value: 0))' \
+        '    return result.second' \
+        '}' > "$PLACEMENT_GUARD_SOURCE"
 
     MIXED_ABI_SOURCE="$WORK_ROOT/MixedABINegative.range"
     /usr/bin/printf '%s\n' \
@@ -2099,6 +4299,34 @@ main() {
     clang -Wno-override-module -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
     echo "bootstrap seed link: pass"
 
+    local stage2_producer="$seed_executable"
+    local bootstrap_bridge_artifact_directory=""
+    local bootstrap_bridge_first_llvm=""
+    local bootstrap_bridge_second_llvm=""
+    local bootstrap_bridge_executable=""
+    if [[ -n "$bootstrap_bridge_source_directory" ]]; then
+        bootstrap_bridge_artifact_directory="$WORK_ROOT/bootstrap-bridge"
+        bootstrap_bridge_first_llvm="$bootstrap_bridge_artifact_directory/RangeCompilerBridge.first.ll"
+        bootstrap_bridge_second_llvm="$bootstrap_bridge_artifact_directory/RangeCompilerBridge.second.ll"
+        bootstrap_bridge_executable="$bootstrap_bridge_artifact_directory/RangeCompilerBridge"
+        /bin/mkdir -p "$bootstrap_bridge_artifact_directory"
+
+        emit_candidate_llvm "$seed_executable" "$bootstrap_bridge_source_bundle" "$bootstrap_bridge_first_llvm" bootstrap-bridge-first
+        emit_candidate_llvm "$seed_executable" "$bootstrap_bridge_source_bundle" "$bootstrap_bridge_second_llvm" bootstrap-bridge-second
+        /usr/bin/cmp -s "$bootstrap_bridge_first_llvm" "$bootstrap_bridge_second_llvm" \
+            || fail "bootstrap bridge LLVM was not deterministic"
+        validate_llvm "$bootstrap_bridge_first_llvm"
+        validate_llvm "$bootstrap_bridge_second_llvm"
+        link_llvm "$bootstrap_bridge_first_llvm" "$bootstrap_bridge_executable"
+        echo "bootstrap bridge deterministic validate/link: pass"
+
+        audit_binding_references BootstrapBridge "$bootstrap_bridge_executable" "$bootstrap_bridge_artifact_directory"
+        audit_root_values BootstrapBridge "$bootstrap_bridge_executable" "$bootstrap_bridge_artifact_directory"
+        audit_placement_symbol_guard BootstrapBridge "$bootstrap_bridge_executable" "$bootstrap_bridge_artifact_directory"
+        stage2_producer="$bootstrap_bridge_executable"
+        echo "bootstrap bridge ownership capability: pass (binding aliases, RootValue, placement guard, one-shot producer only)"
+    fi
+
     local build_root stage2_directory stage3_directory
     local stage2_llvm stage2_executable stage3_llvm stage3_executable
     build_root="$compiler_directory/.range/Build"
@@ -2109,7 +4337,9 @@ main() {
     stage3_llvm="$stage3_directory/RangeCompiler.ll"
     stage3_executable="$stage3_directory/RangeCompiler"
 
-    emit_candidate_llvm "$seed_executable" "$SOURCE_BUNDLE" "$stage2_llvm" stage2
+    /bin/rm -rf "$stage2_directory" "$stage3_directory"
+
+    emit_candidate_llvm "$stage2_producer" "$SOURCE_BUNDLE" "$stage2_llvm" stage2
     validate_llvm "$stage2_llvm"
     link_llvm "$stage2_llvm" "$stage2_executable"
     echo "Stage 2 candidate validate/link: pass"
@@ -2122,6 +4352,16 @@ main() {
     /usr/bin/cmp -s "$stage2_executable" "$stage3_executable" || fail "Stage 2 and Stage 3 executables are not byte-identical"
     echo "Stage 3 candidate validate/link and fixed point: pass"
     audit_stage Stage3 "$stage3_executable" "$stage3_directory"
+
+    compare_binding_reference_stages Stage2 "$stage2_directory" Stage3 "$stage3_directory"
+    compare_root_value_stages Stage2 "$stage2_directory" Stage3 "$stage3_directory"
+    compare_body_syntax_split_stages Stage2 "$stage2_directory" Stage3 "$stage3_directory"
+    compare_placement_symbol_guard_stages Stage2 "$stage2_directory" Stage3 "$stage3_directory"
+    if [[ -n "$bootstrap_bridge_source_directory" ]]; then
+        compare_binding_reference_stages BootstrapBridge "$bootstrap_bridge_artifact_directory" Stage2 "$stage2_directory"
+        compare_root_value_stages BootstrapBridge "$bootstrap_bridge_artifact_directory" Stage2 "$stage2_directory"
+        compare_placement_symbol_guard_stages BootstrapBridge "$bootstrap_bridge_artifact_directory" Stage2 "$stage2_directory"
+    fi
 
     /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.execution-native.first.ll" "$WORK_ROOT/Stage3.macro.execution-native.first.ll" \
         || fail "Stage 2 and Stage 3 native macro integration LLVM differs"
@@ -2174,6 +4414,20 @@ main() {
 
     echo "Range compiler candidate check succeeded."
     printf 'compiler_directory=%s\n' "$compiler_directory"
+    if [[ -n "$bootstrap_bridge_source_directory" ]]; then
+        printf 'bootstrap_bridge_source_directory=%s\n' "$bootstrap_bridge_source_directory"
+        printf 'bootstrap_bridge_source_inventory_count=%s\n' "$bootstrap_bridge_source_inventory_count"
+        local bootstrap_bridge_source_index
+        for bootstrap_bridge_source_index in "${!bootstrap_bridge_source_relative_paths[@]}"; do
+            printf 'bootstrap_bridge_source_inventory_path_%s=%s\n' "$bootstrap_bridge_source_index" "${bootstrap_bridge_source_relative_paths[$bootstrap_bridge_source_index]}"
+        done
+        report_ephemeral_artifact bootstrap_bridge_source_bundle "$bootstrap_bridge_source_bundle"
+        report_ephemeral_artifact bootstrap_bridge_first_llvm "$bootstrap_bridge_first_llvm"
+        report_ephemeral_artifact bootstrap_bridge_second_llvm "$bootstrap_bridge_second_llvm"
+        report_ephemeral_artifact bootstrap_bridge_executable "$bootstrap_bridge_executable"
+        echo "bootstrap_bridge_artifacts=ephemeral-cleaned-on-exit"
+        echo "bootstrap_bridge_fixed_point=not-claimed"
+    fi
     printf 'source_inventory_count=%s\n' "${#SOURCE_FILES[@]}"
     local index
     for index in "${!SOURCE_RELATIVE_PATHS[@]}"; do

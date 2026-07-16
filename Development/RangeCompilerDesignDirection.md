@@ -3065,21 +3065,13 @@ unique access. No generic arity, element spelling, layout guess, `Array`/
 This keeps an empty nominal such as `Box<Int>` from silently becoming a
 collection.
 
-The corrected collection boundary is now ordinary Range code rather than a
-compiler-known buffer capability. `Array<Element>` owns exactly one
-`state storage: RawBuffer` field, is initialized from the handle produced by
-`.create`, and forwards count, append/read, write, and destroy through the
-existing declaration-driven
-`@builtin(.storage/.create/.read/.write/.destroy)` leaves. RawBuffer remains
-the only physical allocation and runtime ABI; there is no Array allocator,
-Array-specific compiler dispatch, or second storage representation. The
-bounded candidate proof is executable for direct `Int` elements and rejects
-missing, double, after-destroy, and after-move use at reachability stage 43
-before LLVM. General element layouts, copy/move/destruction policy, and
-control-flow ownership beyond the acyclic settled CFG subset remain deferred.
-The dirty seed/manifest are an intermediate bootstrap artifact for this
-unaccepted source state; no Stage 3 fixed-point acceptance or seed rollover
-was run at this checkpoint.
+An earlier bounded candidate used an ordinary `Array<Element>` fixture that
+directly owned one RawBuffer. That fixture is historical evidence, not the
+current canonical Array API: `Array.range` still preserves its complete
+ArrayStorage-backed public surface. The current nested Buffer prerequisite
+and its exact acceptance boundary are recorded below; no Array allocator,
+Array-specific compiler dispatch, or second storage representation is
+authorized.
 
 The shared semantic category is `Operation`, but it is not one universal
 opcode. Abstract type operations produce set/relation facts for membership,
@@ -3092,3 +3084,51 @@ retained. Boolean operators remain eager, so CFG constructs alone decide
 whether an effectful operation executes; `&&` and `||` never provide effect
 sequencing. The next slice is broader owned-field/effect coverage and
 supported element layouts, not a second collection model.
+
+### Nested Buffer ownership prerequisite checkpoint (2026-07-15)
+
+The current source checkpoint adds one ordinary Range declaration at
+`RangeCompiler/Range/Core/System/Memory/Buffer.range`. `Buffer<Element>` owns
+one `RawBuffer` field and forwards count, append, read, write, and destroy to
+the existing declaration-driven RawBuffer leaves. RawBuffer remains the only
+physical allocation identity. `Array.range`, `ArrayStorage.range`, their
+annotations, methods, and encoding extension are unchanged; Array has not
+been destructively migrated to Buffer in this bounded slice.
+
+The typed compiler facts now include a parent-linked owned-path table for
+aggregate descendants, an explicit empty relative effect path (`-1`) for
+direct opaque roots, and a distinct function-instance effect-path table. The
+tables are populated during collection and consumed during ordinary-call
+fixed-point propagation and validation. Direct runtime effects are exported
+only from receiver/parameter roots. A local opaque RawBuffer is omitted from
+an external summary only when its let/state initializer is structurally the
+RawBuffer `.create` builtin; the local path is still validated inside its
+function. Local aggregate roots returned or populated by ordinary functions
+remain fail-closed because move-origin/provenance remapping is not implemented.
+Owned-path traversal is iterative/parent-linked with visited/depth guards, so
+the rule is not capped at two member rows and recursive nominal shapes do not
+recurse indefinitely.
+
+This checkpoint intentionally keeps the trusted `rawBuffer*Int` ABI. It does
+not yet admit a structural element-layout contract table or generalized slot
+selection: `Int` is the only executable element layout. The permanent next
+compiler blocker is generic layout admission/slot ABI, followed by broader
+aggregate-return provenance transfer for local owned aggregates.
+
+The clean source probe after diagnostic cleanup compiled Stage 2 from the
+checked-in seed successfully: `4,537,535` bytes, SHA-256
+`0e41c4352a643a44d089dd506243ef619fd18589dcbe4c7b81135780c279e2af`, `78.82 s`
+real time, and `216,252,416` bytes maximum RSS. LLVM validation and linking
+passed. The fresh Stage 3 run then failed closed with the normal 56-byte
+diagnostic `compilerError\tkind=invalidFunctionReachability\tstage=13` in
+`39.15 s` at `24,805,376` bytes maximum RSS. The clean Stage 3 output hash is
+`225c8e615ea7df76c0b6e3721c55e869f1b6ce41a9a3709d6c21d1e3e5ba581d`.
+Stage 13 is the permanent effect-collection path-missing blocker for a direct
+RawBuffer field reached through a locally returned aggregate; no temporary
+CFG/binding/debug table remains. The authoritative candidate gate and seed
+rollover were therefore not run, and the seed plus manifest remain unchanged.
+The focused seed-backed RangeScript run passed the direct RawBuffer Int leaf
+test, but the existing Array positive/negative cases still fail before the
+new source reaches a green executable proof; no unverified Buffer-specific
+test was retained. A green `Buffer<Int>` execution matrix therefore remains
+behind the same bootstrap/provenance blocker.
