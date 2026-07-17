@@ -1,0 +1,27 @@
+enum NativeTokenKindProbeKind {
+    case eof
+    case keyword
+}
+
+construct NativeTokenKindProbeToken {
+    let kind: NativeTokenKindProbeKind
+    let text: String
+}
+
+function nativeTokenKindProbeCreate(kind: NativeTokenKindProbeKind): NativeTokenKindProbeToken {
+    return NativeTokenKindProbeToken(kind: kind, text: String("function"))
+}
+
+function nativeTokenKindProbeRead(token: NativeTokenKindProbeToken): NativeTokenKindProbeKind {
+    return token.kind
+}
+
+@main {
+    let token: NativeTokenKindProbeToken(nativeTokenKindProbeCreate(kind: .keyword))
+    let eofToken: NativeTokenKindProbeToken(NativeTokenKindProbeToken(kind: .eof, text: String("")))
+    let eofKind: NativeTokenKindProbeKind(nativeTokenKindProbeRead(token: eofToken))
+    if token.kind == .keyword && token.kind != eofKind {
+        return 7
+    }
+    return 0
+}

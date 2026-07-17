@@ -130,6 +130,7 @@ ReturnGenericConstructField.range	15	-	-	-
 ReturnGenericConstructFunctionField.range	16	-	-	-
 ReturnGenericFunctionResultPayload.range	14	-	-	-
 ReturnInterpolatedStringLength.range	7	-	-	-
+ReturnNativeTokenKindABI.range	7	-	-	-
 ReturnNestedArrayIndex.range	3	-	-	-
 ReturnNestedFunctionCall.range	7	-	-	-
 ReturnNestedGenericIdentity.range	12	-	-	-
