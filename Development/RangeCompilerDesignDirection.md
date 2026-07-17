@@ -3323,3 +3323,62 @@ snapshots and stable runtime projections. An ordinary no-directive program
 carrying the same array declaration must emit deterministic LLVM, validate,
 link, and exit `7`; this proves that the array contract participates in normal
 compilation without claiming ordinary user-code indexing or removal lowering.
+
+### Native read-only `Array<Element>` checkpoint (2026-07-17)
+
+Ordinary Range bodies now have one generic native Array path. Array literals,
+`count`, and integer indexing are typed through the general body arena, CFG,
+MemoryGraph, MIR, and LLVM pipeline. The compiler interns `Array<Element>` as a
+structural generic instance, so `Array<Int>` and `Array<NumberToken>` share the
+same language rule while retaining distinct element type IDs. `Array` is a
+compiler-known builtin type when a small standalone program has no Core
+declaration; when the canonical `@builtin Array<Element>` declaration is
+present, that declaration supplies the same identity and ABI. No element type
+or fixture name selects this path.
+
+The frozen value representation is `%Range.Array = type { ptr, i32 }`. A
+literal currently receives element-typed lexical stack backing, stores each
+element through a typed GEP, and produces the pointer/count value. `count`
+extracts the count field. Indexing extracts both fields, proves the index with
+an unsigned `icmp ult`, branches to `llvm.trap` on failure, and otherwise uses
+an element-typed GEP and load. This is direct native lowering: it does not call
+`IntBuffer`, `TextBuffer`, RawBuffer allocation, `rangeConstruct*`, or a boxed
+record bridge. The Array layout and trap declaration are emitted on demand
+from actual generated-function use; modules that do not use native Arrays do
+not receive either unused declaration.
+
+MemoryGraph classifies Array by recursively inspecting its generic element
+type. Destruction-free element families such as `Int` and the current
+Int-payload enums therefore need no opaque-resource path. An Array whose
+element contains owned opaque storage is still recognized as ownership-bearing
+and remains unsupported until dynamic element ownership paths, transfer, and
+destruction are modeled. The current literal backing is lexical and read-only;
+it may be borrowed by a synchronous read-only function argument, but returning
+it is rejected during semantic resolution before LLVM because that would let
+the backing pointer outlive its stack region. Mutation, growth, heap placement,
+long-lived argument capture, slicing, and owned element arrays are deliberately
+outside this checkpoint.
+
+The focused candidate gate covers inferred `Array<Int>` indexing, `count`, and
+an explicitly typed `Array<NumberToken>` whose indexed value feeds an
+exhaustive payload-enum switch. Repeated emissions are byte-identical, LLVM
+validates and links, and the executables exit `2`, `3`, and `6`. A separate
+out-of-bounds program reaches the emitted trap and terminates without output.
+Another focused negative makes the returning function reachable and requires
+the lexical Array escape to be rejected before LLVM emission.
+On the measured candidate these focused compilations completed in at most
+`0.41 s` with approximately `5.9 MB` maximum RSS. The final canonical seed build
+completed in `600.06 s` with `145,653,760` bytes maximum RSS; that is bounded
+but remains far too slow for the desired compiler-development loop.
+The permanent Stage 2/3 audit now requires the representation, typed stack
+backing, deterministic emissions, local and borrowed-argument execution,
+executable bounds trap, pre-LLVM return-escape rejection, exact argument ABI,
+and absence of allocator/dynamic-record calls.
+
+The cached seed candidate then reproduced itself through `range compiler
+progression` in `517.33 s` with `172,244,992` bytes maximum RSS. Previous and
+current LLVM are both 5,635,033 bytes with SHA-256
+`6f3a06659fc9de52e76a3adf1693f2c3d3279356c81de3f8fca0a76edafc9871`;
+the linked executables are both 4,249,280 bytes with SHA-256
+`9b25df558e29d9f71856ca61e8d7c5e31f14931c69de2cbbdb01780d62979f81`.
+Both fixed-point checks are therefore byte-identical, not merely equal-sized.

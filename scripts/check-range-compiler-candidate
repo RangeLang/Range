@@ -323,6 +323,116 @@ audit_smoke() {
     echo "$stage_label deterministic aggregate smoke: pass (exit 7)"
 }
 
+audit_native_arrays() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local kind source expected first second first_error second_error llvm linked run_output run_error
+
+    for kind in index count enum-payload argument; do
+        source="$ARRAY_INDEX_SOURCE"
+        expected=2
+        if [[ "$kind" == count ]]; then
+            source="$ARRAY_COUNT_SOURCE"
+            expected=3
+        elif [[ "$kind" == enum-payload ]]; then
+            source="$ARRAY_ENUM_PAYLOAD_SOURCE"
+            expected=6
+        elif [[ "$kind" == argument ]]; then
+            source="$ARRAY_ARGUMENT_SOURCE"
+            expected=2
+        fi
+        first="$WORK_ROOT/$stage_label.array.$kind.first.ll"
+        second="$WORK_ROOT/$stage_label.array.$kind.repeat.ll"
+        first_error="$WORK_ROOT/$stage_label.array.$kind.first.err"
+        second_error="$WORK_ROOT/$stage_label.array.$kind.repeat.err"
+        llvm="$stage_directory/Array-$kind.ll"
+        linked="$stage_directory/Array-$kind"
+        run_output="$WORK_ROOT/$stage_label.array.$kind.run.out"
+        run_error="$WORK_ROOT/$stage_label.array.$kind.run.err"
+
+        run_capture "$executable" "$source" "$first" "$first_error"
+        require_successful_output "$stage_label native Array $kind" "$first" "$first_error"
+        run_capture "$executable" "$source" "$second" "$second_error"
+        require_successful_output "$stage_label repeated native Array $kind" "$second" "$second_error"
+        /usr/bin/cmp -s "$first" "$second" || fail "$stage_label native Array $kind was not deterministic"
+        /usr/bin/grep -Fq '%Range.Array = type { ptr, i32 }' "$first" \
+            || fail "$stage_label native Array $kind omitted the generic pointer/count layout"
+        /usr/bin/grep -Eq 'alloca (i32|%Range\.NumberToken), i32 [1-9][0-9]*' "$first" \
+            || fail "$stage_label native Array $kind omitted typed lexical backing storage"
+        if /usr/bin/grep -Eq 'call .*@(rangeConstruct|rawBufferCreate|malloc|calloc|realloc)' "$first"; then
+            fail "$stage_label native Array $kind introduced dynamic-record or allocator calls"
+        fi
+        if [[ "$kind" == count ]]; then
+            /usr/bin/grep -Eq 'extractvalue %Range\.Array .* 1' "$first" \
+                || fail "$stage_label native Array count did not read the native count field"
+        else
+            /usr/bin/grep -Fq 'icmp ult i32' "$first" \
+                || fail "$stage_label native Array $kind omitted the unsigned bounds proof"
+            /usr/bin/grep -Fq 'call void @llvm.trap()' "$first" \
+                || fail "$stage_label native Array $kind omitted the out-of-bounds trap"
+            /usr/bin/grep -Fq 'getelementptr inbounds' "$first" \
+                || fail "$stage_label native Array $kind omitted typed element addressing"
+        fi
+        if [[ "$kind" == enum-payload ]]; then
+            /usr/bin/grep -Fq 'alloca %Range.NumberToken' "$first" \
+                || fail "$stage_label native enum Array did not specialize backing storage to its element layout"
+        fi
+        if [[ "$kind" == argument ]]; then
+            /usr/bin/grep -Fq 'define i32 @selected(%Range.Array' "$first" \
+                || fail "$stage_label native Array argument omitted its frozen parameter signature"
+            /usr/bin/grep -Fq 'call i32 @selected(%Range.Array' "$first" \
+                || fail "$stage_label native Array argument call disagreed with its frozen parameter signature"
+        fi
+
+        /bin/cp "$first" "$llvm"
+        validate_llvm "$llvm"
+        link_llvm "$llvm" "$linked"
+        if "$linked" > "$run_output" 2> "$run_error"; then
+            RUN_STATUS=0
+        else
+            RUN_STATUS=$?
+        fi
+        [[ "$RUN_STATUS" -eq "$expected" ]] || fail "$stage_label native Array $kind exited $RUN_STATUS"
+        [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label native Array $kind wrote output"
+    done
+
+    local oob_first="$WORK_ROOT/$stage_label.array.out-of-bounds.first.ll"
+    local oob_second="$WORK_ROOT/$stage_label.array.out-of-bounds.repeat.ll"
+    local oob_error="$WORK_ROOT/$stage_label.array.out-of-bounds.err"
+    local oob_linked="$stage_directory/Array-out-of-bounds"
+    local oob_run_output="$WORK_ROOT/$stage_label.array.out-of-bounds.run.out"
+    local oob_run_error="$WORK_ROOT/$stage_label.array.out-of-bounds.run.err"
+    run_capture "$executable" "$ARRAY_OUT_OF_BOUNDS_SOURCE" "$oob_first" "$oob_error"
+    require_successful_output "$stage_label native Array out-of-bounds" "$oob_first" "$oob_error"
+    run_capture "$executable" "$ARRAY_OUT_OF_BOUNDS_SOURCE" "$oob_second" "$oob_error"
+    require_successful_output "$stage_label repeated native Array out-of-bounds" "$oob_second" "$oob_error"
+    /usr/bin/cmp -s "$oob_first" "$oob_second" || fail "$stage_label native Array out-of-bounds was not deterministic"
+    /usr/bin/grep -Fq 'icmp ult i32' "$oob_first" || fail "$stage_label native Array out-of-bounds omitted its bounds comparison"
+    /usr/bin/grep -Fq 'call void @llvm.trap()' "$oob_first" || fail "$stage_label native Array out-of-bounds omitted its trap"
+    validate_llvm "$oob_first"
+    link_llvm "$oob_first" "$oob_linked"
+    if "$oob_linked" > "$oob_run_output" 2> "$oob_run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -ne 0 ]] || fail "$stage_label native Array out-of-bounds unexpectedly succeeded"
+    [[ ! -s "$oob_run_output" && ! -s "$oob_run_error" ]] || fail "$stage_label native Array out-of-bounds wrote output"
+
+    local escape_output="$WORK_ROOT/$stage_label.array.return-escape.out"
+    local escape_error="$WORK_ROOT/$stage_label.array.return-escape.err"
+    run_capture "$executable" "$ARRAY_RETURN_ESCAPE_SOURCE" "$escape_output" "$escape_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label native Array return escape exited $RUN_STATUS"
+    [[ ! -s "$escape_error" ]] || fail "$stage_label native Array return escape wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidFunctionDiscovery\tfunctionRow=0\tfunction=escaped\tfailureCode=2' "$escape_output" \
+        || fail "$stage_label native Array return escape missed the semantic diagnostic"
+    if /usr/bin/grep -Fq 'define ' "$escape_output"; then
+        fail "$stage_label native Array return escape emitted LLVM"
+    fi
+    echo "$stage_label native Array: pass (generic pointer/count value, typed lexical storage, count/index, enum payload, executable bounds trap, return-escape rejection, deterministic)"
+}
+
 audit_storage_switches() {
     local stage_label="$1"
     local executable="$2"
@@ -4499,6 +4609,7 @@ audit_stage() {
     audit_macro_family_memory "$stage_label" "$executable" "$stage_directory"
     audit_body_syntax_split "$stage_label" "$executable" "$stage_directory"
     audit_smoke "$stage_label" "$executable" "$stage_directory"
+    audit_native_arrays "$stage_label" "$executable" "$stage_directory"
     audit_range_cli "$stage_label" "$executable"
     audit_storage_switches "$stage_label" "$executable" "$stage_directory"
     audit_recursive_enum_declarations "$stage_label" "$executable" "$stage_directory"
@@ -4674,6 +4785,42 @@ main() {
     SWITCH_MEMBER_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnMemberIntegerSwitch.range"
     SWITCH_ENUM_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnEnumSwitch.range"
     SWITCH_ENUM_FUNCTION_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnEnumFunctionSwitch.range"
+    ARRAY_INDEX_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnArrayIndex.range"
+    ARRAY_COUNT_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnArrayCount.range"
+    ARRAY_ENUM_PAYLOAD_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnEnumArrayPayload.range"
+    ARRAY_ARGUMENT_SOURCE="$WORK_ROOT/ArrayArgument.range"
+    /usr/bin/printf '%s\n' \
+        '@builtin' \
+        'construct Array<Element> {}' \
+        '' \
+        'function selected(numbers: Array<Int>): Int {' \
+        '    return numbers[1]' \
+        '}' \
+        '' \
+        '@main {' \
+        '    let numbers: [1, 2, 3]' \
+        '    return selected(numbers: numbers)' \
+        '}' > "$ARRAY_ARGUMENT_SOURCE"
+    ARRAY_OUT_OF_BOUNDS_SOURCE="$WORK_ROOT/ArrayOutOfBounds.range"
+    /usr/bin/printf '%s\n' \
+        '@main {' \
+        '    let numbers: [1, 2, 3]' \
+        '    return numbers[3]' \
+        '}' > "$ARRAY_OUT_OF_BOUNDS_SOURCE"
+    ARRAY_RETURN_ESCAPE_SOURCE="$WORK_ROOT/ArrayReturnEscape.range"
+    /usr/bin/printf '%s\n' \
+        '@builtin' \
+        'construct Array<Element> {}' \
+        '' \
+        'function escaped(): Array<Int> {' \
+        '    let numbers: [1, 2, 3]' \
+        '    return numbers' \
+        '}' \
+        '' \
+        '@main {' \
+        '    let numbers: Array<Int>(escaped())' \
+        '    return numbers[0]' \
+        '}' > "$ARRAY_RETURN_ESCAPE_SOURCE"
     RECURSIVE_ENUM_SOURCE="$WORK_ROOT/RecursiveEnumDeclaration.range"
     /usr/bin/printf '%s\n' \
         'enum BindingList {' \
