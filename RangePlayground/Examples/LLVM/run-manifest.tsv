@@ -21,6 +21,8 @@ ReturnConstructParameter.range	5	-	-	-
 ReturnConstructedInteger.range	9	-	-	-
 ReturnArrayCount.range	3	-	-	-
 ReturnArrayIndex.range	2	-	-	-
+ReturnArrayStateIndexedAssignment.range	7	-	-	-
+ReturnEnumArrayStateIndexedAssignment.range	7	-	-	-
 ReturnArrayFromFunction.range	3	-	-	-
 ReturnArrayParameter.range	2	-	-	-
 ReturnArrayAppendMember.range	0	-	-	-

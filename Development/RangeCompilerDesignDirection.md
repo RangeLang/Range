@@ -3382,3 +3382,58 @@ current LLVM are both 5,635,033 bytes with SHA-256
 the linked executables are both 4,249,280 bytes with SHA-256
 `9b25df558e29d9f71856ca61e8d7c5e31f14931c69de2cbbdb01780d62979f81`.
 Both fixed-point checks are therefore byte-identical, not merely equal-sized.
+
+### Native indexed `Array<Element>` mutation checkpoint (2026-07-17)
+
+The native Array path now admits indexed mutation when the Array value is
+owned by a local `state` declaration. The existing postfix assignment syntax
+parses `numbers[index]: value`; semantic resolution requires the receiver to
+resolve to `state Array<Element>` and requires the assigned value to be exactly
+`Element`. The identical operation through `let` is rejected at semantic stage
+2 before LLVM emission. This is a general element-type rule rather than an
+Int, enum, declaration-name, or fixture special case.
+
+MemoryGraph records the indexed target as `Access(write, unique)` against the
+owning state symbol. MIR may create `ArrayStore` only when that exact fact is
+present. MIR validation rechecks the Array receiver, Int index, element value,
+result type, mutable symbol, and unique-write evidence. LLVM lowering reuses
+the existing `%Range.Array = type { ptr, i32 }` value: it extracts pointer and
+count, performs the same unsigned bounds branch used by reads, traps on
+failure, computes an element-typed GEP, and stores the value. The operation
+does not allocate, box, replace the Array value, or introduce another storage
+representation.
+
+Permanent positive coverage mutates `Array<Int>` and
+`Array<MutableNumberToken>` and reads the replacement back; both executables
+exit `7`, and the enum case proves that the store carries a native aggregate
+element rather than only an i32. Permanent negative coverage requires a `let`
+mutation to exit `65` with `invalidEntryReachability stage=2` and no LLVM
+definition. A separate runtime negative writes at `index == count`, reaches
+`llvm.trap`, exits nonzero without output, and proves that the store cannot
+bypass the bounds contract. Candidate audits also require deterministic
+emission, typed backing and store instructions, and the continued absence of
+allocator or dynamic-record calls.
+
+This checkpoint does not yet claim mutation through construct members,
+bindings, slices, or nested projections; it proves the direct local-state
+owner first. Growth, removal, heap placement, escaping backing storage, and
+owned opaque element destruction remain later MemoryGraph operations rather
+than hidden behavior inside `ArrayStore`.
+
+The seed built the mutation-capable candidate in `447.50 s` with
+`173,637,632` bytes maximum RSS. The candidate then reproduced itself through
+`range compiler progression` in `444.23 s` with `152,158,208` bytes maximum
+RSS. Previous and current LLVM are both 5,667,115 bytes with SHA-256
+`090dff56368889e1f1cd0b5a5d2f08121020e05c9469ae6435f054ecb3770bf2`;
+the linked executables are both 4,299,168 bytes with SHA-256
+`18e7f1d4b1ef6df81f4606e6a781947ac05f36ae5589b5c5b4b94fb88c8c7b8c`.
+Both artifact fixed-point checks are byte-identical.
+
+The complete candidate gate then passed in `1,227.63 s` with `175,177,728`
+bytes maximum RSS and `swift_invocation=none`. Stage 2 and Stage 3 LLVM are
+byte-identical at the same 5,667,115-byte hash above. Their gate-linked
+executables are both 4,299,168 bytes with SHA-256
+`59fd557227df244b45a1d13791a6fa8d3bf32ce407ac2ccd4b2036e7e9df159f`.
+Both generations passed the indexed Int/enum mutation executions, typed-store
+audits, executable read/write bounds traps, and pre-emission immutable
+rejection.

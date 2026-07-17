@@ -329,7 +329,7 @@ audit_native_arrays() {
     local stage_directory="$3"
     local kind source expected first second first_error second_error llvm linked run_output run_error
 
-    for kind in index count enum-payload argument; do
+    for kind in index count enum-payload argument mutation-int mutation-enum; do
         source="$ARRAY_INDEX_SOURCE"
         expected=2
         if [[ "$kind" == count ]]; then
@@ -341,6 +341,12 @@ audit_native_arrays() {
         elif [[ "$kind" == argument ]]; then
             source="$ARRAY_ARGUMENT_SOURCE"
             expected=2
+        elif [[ "$kind" == mutation-int ]]; then
+            source="$ARRAY_MUTATION_SOURCE"
+            expected=7
+        elif [[ "$kind" == mutation-enum ]]; then
+            source="$ARRAY_ENUM_MUTATION_SOURCE"
+            expected=7
         fi
         first="$WORK_ROOT/$stage_label.array.$kind.first.ll"
         second="$WORK_ROOT/$stage_label.array.$kind.repeat.ll"
@@ -358,7 +364,7 @@ audit_native_arrays() {
         /usr/bin/cmp -s "$first" "$second" || fail "$stage_label native Array $kind was not deterministic"
         /usr/bin/grep -Fq '%Range.Array = type { ptr, i32 }' "$first" \
             || fail "$stage_label native Array $kind omitted the generic pointer/count layout"
-        /usr/bin/grep -Eq 'alloca (i32|%Range\.NumberToken), i32 [1-9][0-9]*' "$first" \
+        /usr/bin/grep -Eq 'alloca (i32|%Range\.(NumberToken|MutableNumberToken)), i32 [1-9][0-9]*' "$first" \
             || fail "$stage_label native Array $kind omitted typed lexical backing storage"
         if /usr/bin/grep -Eq 'call .*@(rangeConstruct|rawBufferCreate|malloc|calloc|realloc)' "$first"; then
             fail "$stage_label native Array $kind introduced dynamic-record or allocator calls"
@@ -374,9 +380,15 @@ audit_native_arrays() {
             /usr/bin/grep -Fq 'getelementptr inbounds' "$first" \
                 || fail "$stage_label native Array $kind omitted typed element addressing"
         fi
-        if [[ "$kind" == enum-payload ]]; then
-            /usr/bin/grep -Fq 'alloca %Range.NumberToken' "$first" \
+        if [[ "$kind" == enum-payload || "$kind" == mutation-enum ]]; then
+            /usr/bin/grep -Eq 'alloca %Range\.(NumberToken|MutableNumberToken)' "$first" \
                 || fail "$stage_label native enum Array did not specialize backing storage to its element layout"
+        fi
+        if [[ "$kind" == mutation-int || "$kind" == mutation-enum ]]; then
+            /usr/bin/grep -Fq 'array.store.' "$first" \
+                || fail "$stage_label native Array $kind omitted the indexed store operation"
+            /usr/bin/grep -Eq 'store (i32|%Range\.MutableNumberToken) .*ptr %array\.store\.' "$first" \
+                || fail "$stage_label native Array $kind omitted its typed element store"
         fi
         if [[ "$kind" == argument ]]; then
             /usr/bin/grep -Fq 'define i32 @selected(%Range.Array' "$first" \
@@ -420,6 +432,36 @@ audit_native_arrays() {
     [[ "$RUN_STATUS" -ne 0 ]] || fail "$stage_label native Array out-of-bounds unexpectedly succeeded"
     [[ ! -s "$oob_run_output" && ! -s "$oob_run_error" ]] || fail "$stage_label native Array out-of-bounds wrote output"
 
+    local write_oob_llvm="$WORK_ROOT/$stage_label.array.write-out-of-bounds.ll"
+    local write_oob_error="$WORK_ROOT/$stage_label.array.write-out-of-bounds.err"
+    local write_oob_linked="$stage_directory/Array-write-out-of-bounds"
+    local write_oob_run_output="$WORK_ROOT/$stage_label.array.write-out-of-bounds.run.out"
+    local write_oob_run_error="$WORK_ROOT/$stage_label.array.write-out-of-bounds.run.err"
+    run_capture "$executable" "$ARRAY_WRITE_OUT_OF_BOUNDS_SOURCE" "$write_oob_llvm" "$write_oob_error"
+    require_successful_output "$stage_label native Array write out-of-bounds" "$write_oob_llvm" "$write_oob_error"
+    /usr/bin/grep -Fq 'array.store.' "$write_oob_llvm" || fail "$stage_label native Array write out-of-bounds omitted its indexed store"
+    /usr/bin/grep -Fq 'call void @llvm.trap()' "$write_oob_llvm" || fail "$stage_label native Array write out-of-bounds omitted its trap"
+    validate_llvm "$write_oob_llvm"
+    link_llvm "$write_oob_llvm" "$write_oob_linked"
+    if "$write_oob_linked" > "$write_oob_run_output" 2> "$write_oob_run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -ne 0 ]] || fail "$stage_label native Array write out-of-bounds unexpectedly succeeded"
+    [[ ! -s "$write_oob_run_output" && ! -s "$write_oob_run_error" ]] || fail "$stage_label native Array write out-of-bounds wrote output"
+
+    local immutable_output="$WORK_ROOT/$stage_label.array.immutable-write.out"
+    local immutable_error="$WORK_ROOT/$stage_label.array.immutable-write.err"
+    run_capture "$executable" "$ARRAY_IMMUTABLE_MUTATION_SOURCE" "$immutable_output" "$immutable_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label immutable Array mutation exited $RUN_STATUS"
+    [[ ! -s "$immutable_error" ]] || fail "$stage_label immutable Array mutation wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$immutable_output" \
+        || fail "$stage_label immutable Array mutation missed the semantic diagnostic"
+    if /usr/bin/grep -Fq 'define ' "$immutable_output"; then
+        fail "$stage_label immutable Array mutation emitted LLVM"
+    fi
+
     local escape_output="$WORK_ROOT/$stage_label.array.return-escape.out"
     local escape_error="$WORK_ROOT/$stage_label.array.return-escape.err"
     run_capture "$executable" "$ARRAY_RETURN_ESCAPE_SOURCE" "$escape_output" "$escape_error"
@@ -430,7 +472,7 @@ audit_native_arrays() {
     if /usr/bin/grep -Fq 'define ' "$escape_output"; then
         fail "$stage_label native Array return escape emitted LLVM"
     fi
-    echo "$stage_label native Array: pass (generic pointer/count value, typed lexical storage, count/index, enum payload, executable bounds trap, return-escape rejection, deterministic)"
+    echo "$stage_label native Array: pass (generic pointer/count value, typed lexical storage, count/index/store, enum payload mutation, executable read/write bounds traps, immutable and return-escape rejection, deterministic)"
 }
 
 audit_storage_switches() {
@@ -4788,6 +4830,10 @@ main() {
     ARRAY_INDEX_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnArrayIndex.range"
     ARRAY_COUNT_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnArrayCount.range"
     ARRAY_ENUM_PAYLOAD_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnEnumArrayPayload.range"
+    ARRAY_MUTATION_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnArrayStateIndexedAssignment.range"
+    ARRAY_ENUM_MUTATION_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnEnumArrayStateIndexedAssignment.range"
+    ARRAY_IMMUTABLE_MUTATION_SOURCE="$REPO_ROOT/Testing/CompileFail/Collections/ImmutableArrayIndexedAssignment.range"
+    ARRAY_WRITE_OUT_OF_BOUNDS_SOURCE="$REPO_ROOT/Testing/SelfHosting/ArrayWriteOutOfBounds.range"
     ARRAY_ARGUMENT_SOURCE="$WORK_ROOT/ArrayArgument.range"
     /usr/bin/printf '%s\n' \
         '@builtin' \

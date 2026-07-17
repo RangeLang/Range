@@ -16994,7 +16994,8 @@ function compilerBodyMIROperationEnumPayload(): Int { return 43 }
 function compilerBodyMIROperationArrayLiteral(): Int { return 44 }
 function compilerBodyMIROperationArrayIndex(): Int { return 45 }
 function compilerBodyMIROperationArrayCount(): Int { return 46 }
-function compilerBodyMIROperationLast(): Int { return compilerBodyMIROperationArrayCount() }
+function compilerBodyMIROperationArrayStore(): Int { return 47 }
+function compilerBodyMIROperationLast(): Int { return compilerBodyMIROperationArrayStore() }
 
 function compilerBodyMIROperandColumnCount(): Int { return 4 }
 function compilerBodyMIROperandOperationColumn(): Int { return 0 }
@@ -20021,6 +20022,31 @@ function compilerBodyArenaSwitchTypeHasMatcher(arena: CompilerBodyArena, typeKin
     return false
 }
 
+function compilerBodyArenaExpressionTypesMatch(arena: CompilerBodyArena, leftNodeID: Int, rightNodeID: Int): Bool {
+    let leftTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: leftNodeID))
+    let rightTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: rightNodeID))
+    if leftTypeKind != rightTypeKind { return false }
+    if leftTypeKind == compilerBodyTypeConstruct() || leftTypeKind == compilerBodyTypeEnum() {
+        return compilerBodyArenaExpressionTypeID(arena: arena, nodeID: leftNodeID) == compilerBodyArenaExpressionTypeID(arena: arena, nodeID: rightNodeID)
+    }
+    return leftTypeKind != compilerBodyTypeUnknown()
+}
+
+function compilerBodyArenaMutableArraySymbolForTarget(arena: CompilerBodyArena, targetNodeID: Int): Int {
+    if targetNodeID < 0 || targetNodeID >= compilerIntTableRowCount(table: arena.nodes)
+        || compilerIntTableValue(table: arena.nodes, row: targetNodeID, column: 1) != compilerSyntaxKindIndex() { return 0 - 1 }
+    let receiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: targetNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
+    if receiverNodeID < 0 || compilerIntTableValue(table: arena.nodes, row: receiverNodeID, column: 1) != compilerSyntaxKindIdentifier() { return 0 - 1 }
+    let receiverResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: receiverNodeID))
+    if receiverResolutionRow < 0
+        || compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionLocalSymbol() { return 0 - 1 }
+    let symbolID: Int(compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+    if symbolID < 0 || symbolID >= compilerIntTableRowCount(table: arena.symbols)
+        || compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolKindColumn()) != compilerBodySymbolState()
+        || !compilerBodyArenaTypeIDIsArray(arena: arena, typeID: compilerBodyArenaSymbolTypeID(arena: arena, symbolID: symbolID)) { return 0 - 1 }
+    return symbolID
+}
+
 function compilerBodyArenaEnumCaseCount(arena: CompilerBodyArena, enumSyntaxID: Int): Int {
     state count: Int(0)
     state row: Int(0)
@@ -20213,6 +20239,9 @@ function compilerBodyArenaBuildRegionSymbols(arena: CompilerBodyArena, index: Co
                 let targetKind: Int(compilerIntTableValue(table: arena.nodes, row: targetNodeID, column: 1))
                 if targetKind == compilerSyntaxKindIdentifier() {
                     writableSymbolID: compilerBodyArenaSymbolForIdentifier(arena: arena, identifierNodeID: targetNodeID)
+                } else if targetKind == compilerSyntaxKindIndex() {
+                    writableSymbolID: compilerBodyArenaMutableArraySymbolForTarget(arena: arena, targetNodeID: targetNodeID)
+                    if writableSymbolID < 0 || !compilerBodyArenaExpressionTypesMatch(arena: arena, leftNodeID: targetNodeID, rightNodeID: valueNodeID) { return 0 - 1 }
                 } else if targetKind == compilerSyntaxKindMemberRead() {
                     let receiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: targetNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
                     let memberResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: targetNodeID))
@@ -21264,6 +21293,13 @@ function compilerBodyMemoryBuildAccessPhase(arena: CompilerBodyArena): Int {
                 memberAccessKind: compilerBodyMemoryFactMemberWrite()
             }
             if compilerBodyMemoryAppendFact(arena: arena, phase: phase, kind: memberAccessKind, sourceNodeID: sourceNodeID, subjectKind: compilerBodyMemorySubjectNode(), subjectID: sourceNodeID, auxID: compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn())) < 0 { return 0 - 1 }
+        }
+        if targetKind == compilerBodyResolutionOperator()
+            && compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()) == compilerSyntaxKindIndex()
+            && compilerBodyArenaNodeIsAssignmentTarget(arena: arena, nodeID: sourceNodeID) {
+            let mutableArraySymbolID: Int(compilerBodyArenaMutableArraySymbolForTarget(arena: arena, targetNodeID: sourceNodeID))
+            if mutableArraySymbolID < 0
+                || compilerBodyMemoryAppendFact(arena: arena, phase: phase, kind: compilerBodyMemoryFactWriteUnique(), sourceNodeID: sourceNodeID, subjectKind: compilerBodyMemorySubjectSymbol(), subjectID: mutableArraySymbolID, auxID: compilerBodyArenaSymbolTypeKind(arena: arena, symbolID: mutableArraySymbolID)) < 0 { return 0 - 1 }
         }
         resolutionRow: resolutionRow + 1
     }
@@ -25948,6 +25984,36 @@ function compilerBodyMIRCommitMemberAssignment(arena: CompilerBodyArena, stateme
     return resultValueID
 }
 
+function compilerBodyMIRCommitArrayAssignment(arena: CompilerBodyArena, statementNodeID: Int, blockID: Int, assignedValueID: Int): Int {
+    let targetNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleAssignmentTarget(), ordinal: 0))
+    let resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: targetNodeID))
+    let mutableArraySymbolID: Int(compilerBodyArenaMutableArraySymbolForTarget(arena: arena, targetNodeID: targetNodeID))
+    if targetNodeID < 0 || resolutionRow < 0 || mutableArraySymbolID < 0
+        || compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionOperator()
+        || compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()) != compilerSyntaxKindIndex()
+        || !compilerBodyMemoryHasFact(arena: arena, kind: compilerBodyMemoryFactWriteUnique(), sourceNodeID: targetNodeID, subjectID: mutableArraySymbolID) { return 0 - 1 }
+    let receiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: targetNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
+    let indexNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: targetNodeID, role: compilerSyntaxRoleIndex(), ordinal: 0))
+    if receiverNodeID < 0 || indexNodeID < 0 { return 0 - 1 }
+    let receiverValue: CompilerBodyMIRValueResult(compilerBodyMIRBuildExpression(arena: arena, nodeID: receiverNodeID, blockID: blockID))
+    let indexValue: CompilerBodyMIRValueResult(compilerBodyMIRBuildExpression(arena: arena, nodeID: indexNodeID, blockID: blockID))
+    let elementTypeKind: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()))
+    let elementTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeIDColumn()))
+    if !receiverValue.isValid || !indexValue.isValid || assignedValueID < 0 || assignedValueID >= compilerIntTableRowCount(table: arena.mirValues)
+        || compilerIntTableValue(table: arena.mirValues, row: assignedValueID, column: compilerBodyMIRValueTypeColumn()) != elementTypeKind
+        || ((elementTypeKind == compilerBodyTypeConstruct() || elementTypeKind == compilerBodyTypeEnum())
+            && compilerIntTableValue(table: arena.mirValues, row: assignedValueID, column: compilerBodyMIRValueTypeIDColumn()) != elementTypeID) { return 0 - 1 }
+    let resultValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueLocal(), typeKind: elementTypeKind, typeID: compilerBodyMIRNominalTypeID(typeKind: elementTypeKind, typeID: elementTypeID), sourceNodeID: statementNodeID, provenanceKind: compilerBodyMemorySubjectSymbol(), provenanceID: mutableArraySymbolID))
+    let operationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
+    let firstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
+    if resultValueID < 0
+        || compilerBodyMIRAppendOperand(arena: arena, operationID: operationID, ordinal: 0, valueID: receiverValue.valueID, role: compilerBodyMIROperandArgument()) != 0
+        || compilerBodyMIRAppendOperand(arena: arena, operationID: operationID, ordinal: 1, valueID: indexValue.valueID, role: compilerBodyMIROperandArgument()) != 0
+        || compilerBodyMIRAppendOperand(arena: arena, operationID: operationID, ordinal: 2, valueID: assignedValueID, role: compilerBodyMIROperandArgument()) != 0
+        || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: compilerBodyMIROperationArrayStore(), resultValueID: resultValueID, sourceNodeID: statementNodeID, firstOperand: firstOperand, operandCount: 3, targetKind: compilerBodyMIROperationTargetNone(), targetID: 0 - 1) != operationID { return 0 - 1 }
+    return resultValueID
+}
+
 function compilerBodyMIRCommitScheduledStatement(arena: CompilerBodyArena, statementNodeID: Int, blockID: Int): CompilerBodyMIRValueResult {
     let statementKind: Int(compilerIntTableValue(table: arena.nodes, row: statementNodeID, column: 1))
     let expressionNodeID: Int(compilerBodyArenaStatementExpression(arena: arena, statementNodeID: statementNodeID))
@@ -25974,6 +26040,10 @@ function compilerBodyMIRCommitScheduledStatement(arena: CompilerBodyArena, state
         if targetNodeID < 0 || resolutionRow < 0 { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
         let assignmentTargetKind: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()))
         let assignmentSymbolID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+        if assignmentTargetKind == compilerBodyResolutionOperator() && assignmentSymbolID == compilerSyntaxKindIndex() {
+            let arrayAssignmentValueID: Int(compilerBodyMIRCommitArrayAssignment(arena: arena, statementNodeID: statementNodeID, blockID: blockID, assignedValueID: expressionValue.valueID))
+            return CompilerBodyMIRValueResult(valueID: arrayAssignmentValueID, isValid: arrayAssignmentValueID >= 0)
+        }
         if assignmentTargetKind == compilerBodyResolutionMember() {
             let memberAssignmentValueID: Int(compilerBodyMIRCommitMemberAssignment(arena: arena, statementNodeID: statementNodeID, blockID: blockID, assignedValueID: expressionValue.valueID))
             return CompilerBodyMIRValueResult(valueID: memberAssignmentValueID, isValid: memberAssignmentValueID >= 0)
@@ -26466,6 +26536,30 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                         && compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeIDColumn()) != indexedElementTypeID) { return 300000 + operationRow * 100 + operationKind }
             } else if compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()) != 1
                 || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeInt() { return 300000 + operationRow * 100 + operationKind }
+        }
+        if operationKind == compilerBodyMIROperationArrayStore() {
+            let arrayValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
+            let indexValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 1))
+            let assignedValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 2))
+            let assignmentNodeID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationSourceColumn()))
+            let targetNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: assignmentNodeID, role: compilerSyntaxRoleAssignmentTarget(), ordinal: 0))
+            let mutableArraySymbolID: Int(compilerBodyArenaMutableArraySymbolForTarget(arena: arena, targetNodeID: targetNodeID))
+            if validationTargetKind != compilerBodyMIROperationTargetNone() || validationTargetID != 0 - 1 || validationStorageID != 0 - 1
+                || compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()) != 3
+                || arrayValueID < 0 || arrayValueID >= valueCount || indexValueID < 0 || indexValueID >= valueCount
+                || assignedValueID < 0 || assignedValueID >= valueCount || mutableArraySymbolID < 0
+                || compilerIntTableValue(table: arena.mirValues, row: arrayValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeConstruct()
+                || !compilerBodyArenaTypeIDIsArray(arena: arena, typeID: compilerIntTableValue(table: arena.mirValues, row: arrayValueID, column: compilerBodyMIRValueTypeIDColumn()))
+                || compilerIntTableValue(table: arena.mirValues, row: indexValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeInt()
+                || !compilerBodyMemoryHasFact(arena: arena, kind: compilerBodyMemoryFactWriteUnique(), sourceNodeID: targetNodeID, subjectID: mutableArraySymbolID) { return 300000 + operationRow * 100 + operationKind }
+            let elementTypeID: Int(compilerBodyArenaTypeArgumentValueForTypeID(arena: arena, typeID: compilerIntTableValue(table: arena.mirValues, row: arrayValueID, column: compilerBodyMIRValueTypeIDColumn()), ordinal: 0))
+            let elementTypeKind: Int(compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: elementTypeID))
+            if elementTypeID < 0 || elementTypeKind == compilerBodyTypeUnknown()
+                || compilerIntTableValue(table: arena.mirValues, row: assignedValueID, column: compilerBodyMIRValueTypeColumn()) != elementTypeKind
+                || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != elementTypeKind
+                || ((elementTypeKind == compilerBodyTypeConstruct() || elementTypeKind == compilerBodyTypeEnum())
+                    && (compilerIntTableValue(table: arena.mirValues, row: assignedValueID, column: compilerBodyMIRValueTypeIDColumn()) != elementTypeID
+                        || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeIDColumn()) != elementTypeID)) { return 300000 + operationRow * 100 + operationKind }
         }
         if operationKind == compilerBodyMIROperationMemberAssign() {
             let receiverValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
@@ -27386,6 +27480,9 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
         && compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationTargetKindColumn()) == compilerBodyMIROperationTargetBuiltin() {
         return compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueAlias(), number: 0 - 1, aux: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0))
     }
+    if operationKind == compilerBodyMIROperationArrayStore() {
+        return compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueAlias(), number: 0 - 1, aux: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 2))
+    }
     let plannedTemporary: Int(rawBufferLoadInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary()))
     if operationKind == compilerBodyMIROperationMemberAssign() {
         let receiverValueID: Int(compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0))
@@ -27656,6 +27753,20 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
             || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  call void @llvm.trap()\n  unreachable\narray.index.\(operationID).valid:\n") != 0
             || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %array.index.\(operationID).slot = getelementptr inbounds \(elementTypeName), ptr %array.index.\(operationID).storage, i32 \(indexValue.text)\n") != 0
             || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(resultTemporary) = load \(elementTypeName), ptr %array.index.\(operationID).slot\n") != 0 { return 0 - 1 }
+        return 0
+    }
+    if operationKind == compilerBodyMIROperationArrayStore() {
+        let arrayValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0)))
+        let indexValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 1)))
+        let assignedValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 2)))
+        if arrayValue.text == String("") || indexValue.typeName != String("i32") || assignedValue.text == String("") || assignedValue.typeName == String("") { return 0 - 1 }
+        if rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %array.store.\(operationID).storage = extractvalue \(arrayValue.typeName) \(arrayValue.text), 0\n") != 0
+            || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %array.store.\(operationID).count = extractvalue \(arrayValue.typeName) \(arrayValue.text), 1\n") != 0
+            || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %array.store.\(operationID).inbounds = icmp ult i32 \(indexValue.text), %array.store.\(operationID).count\n") != 0
+            || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  br i1 %array.store.\(operationID).inbounds, label %array.store.\(operationID).valid, label %array.store.\(operationID).invalid\narray.store.\(operationID).invalid:\n") != 0
+            || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  call void @llvm.trap()\n  unreachable\narray.store.\(operationID).valid:\n") != 0
+            || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %array.store.\(operationID).slot = getelementptr inbounds \(assignedValue.typeName), ptr %array.store.\(operationID).storage, i32 \(indexValue.text)\n") != 0
+            || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  store \(assignedValue.typeName) \(assignedValue.text), ptr %array.store.\(operationID).slot\n") != 0 { return 0 - 1 }
         return 0
     }
     if operationKind == compilerBodyMIROperationArrayCount() {

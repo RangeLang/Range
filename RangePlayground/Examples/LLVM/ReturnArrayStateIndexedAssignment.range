@@ -1,0 +1,5 @@
+@main {
+    state numbers: [1, 2, 3]
+    numbers[1]: 7
+    return numbers[1]
+}
