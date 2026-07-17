@@ -14,6 +14,7 @@ Usage:
   scripts/range-native project-run PROJECT [ARGS...]
   scripts/range-native compiler-command COMMAND [ARGS...]
   scripts/range-native compiler-next
+  scripts/range-native compiler-progression
   scripts/range-native compile-executable INPUT
   scripts/range-native run INPUT [-- ARGS...]
 
@@ -456,6 +457,187 @@ compiler_next() {
     /bin/cat "$metadata"
 }
 
+compiler_progression() {
+    local next_metadata source_key seed_llvm seed_executable previous_llvm previous_executable bundle
+    local progression_key cache_root current_llvm current_executable metadata temporary diagnostic
+    local seed_llvm_hash seed_llvm_bytes seed_executable_hash seed_executable_bytes
+    local previous_llvm_hash previous_llvm_bytes previous_executable_hash previous_executable_bytes
+    local current_llvm_hash current_llvm_bytes current_executable_hash current_executable_bytes
+    local seed_to_previous_llvm_bytes previous_to_current_llvm_bytes
+    local seed_to_previous_executable_bytes previous_to_current_executable_bytes
+    local llvm_fixed_point executable_fixed_point fixed_point compiler_exit_code
+    local cached_source cached_seed_llvm cached_previous_llvm cached_current_llvm
+    local cached_current_llvm_hash cached_current_llvm_bytes cached_current_executable_hash cached_current_executable_bytes
+    local cached_llvm_fixed_point cached_executable_fixed_point cached_fixed_point
+    local runtime
+    local -a runtimes
+
+    # First the accepted seed builds `previous`; then `previous` builds
+    # `current` from the exact source bundle retained by compiler-next.
+    next_metadata="$(compiler_next)"
+    source_key="$(/usr/bin/printf '%s\n' "$next_metadata" | /usr/bin/sed -n 's/^source=//p')"
+    previous_executable="$(/usr/bin/printf '%s\n' "$next_metadata" | /usr/bin/sed -n 's/^executable=//p')"
+    if [[ -z "$source_key" || -z "$previous_executable" || ! -x "$previous_executable" ]]; then
+        echo "Compiler progression could not resolve the previous compiler candidate." >&2
+        return 65
+    fi
+
+    previous_llvm="$(dirname "$previous_executable")/RangeCompiler.ll"
+    bundle="$(dirname "$previous_executable")/CompilerSourceSet.range"
+    seed_llvm="$REPO_ROOT/$(manifest_value seed.path)"
+    seed_executable="$(ensure_seed_compiler)"
+    if [[ ! -f "$previous_llvm" || ! -f "$bundle" ]]; then
+        echo "Compiler progression candidate is incomplete." >&2
+        return 65
+    fi
+
+    runtimes=()
+    while IFS= read -r runtime; do
+        runtimes+=("$runtime")
+    done < <(runtime_inputs)
+
+    seed_llvm_hash="$(sha256 "$seed_llvm")"
+    seed_llvm_bytes="$(/usr/bin/stat -f %z "$seed_llvm")"
+    seed_executable_hash="$(sha256 "$seed_executable")"
+    seed_executable_bytes="$(/usr/bin/stat -f %z "$seed_executable")"
+    previous_llvm_hash="$(sha256 "$previous_llvm")"
+    previous_llvm_bytes="$(/usr/bin/stat -f %z "$previous_llvm")"
+    previous_executable_hash="$(sha256 "$previous_executable")"
+    previous_executable_bytes="$(/usr/bin/stat -f %z "$previous_executable")"
+
+    progression_key="$({
+        /usr/bin/printf 'source=%s\n' "$source_key"
+        /usr/bin/printf 'previousLLVM=%s\n' "$previous_llvm_hash"
+        /usr/bin/printf 'previousExecutable=%s\n' "$previous_executable_hash"
+        /usr/bin/printf 'bundle=%s\n' "$(sha256 "$bundle")"
+        for runtime in "${runtimes[@]}"; do
+            /usr/bin/printf 'runtime\t%s\t%s\n' "${runtime#"$REPO_ROOT/"}" "$(sha256 "$runtime")"
+        done
+        clang --version | /usr/bin/head -1
+    } | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
+
+    cache_root="$REPO_ROOT/.range/Compiler/Progression/$progression_key"
+    current_llvm="$cache_root/RangeCompiler.ll"
+    current_executable="$cache_root/RangeCompiler"
+    metadata="$cache_root/Progression.txt"
+
+    if [[ -x "$current_executable" && -f "$current_llvm" && -f "$metadata" ]]; then
+        cached_source="$(/usr/bin/sed -n 's/^source=//p' "$metadata")"
+        cached_seed_llvm="$(/usr/bin/sed -n 's/^seedLLVMHash=//p' "$metadata")"
+        cached_previous_llvm="$(/usr/bin/sed -n 's/^previousLLVMHash=//p' "$metadata")"
+        cached_current_llvm="$(/usr/bin/sed -n 's/^currentLLVM=//p' "$metadata")"
+        cached_current_llvm_hash="$(/usr/bin/sed -n 's/^currentLLVMHash=//p' "$metadata")"
+        cached_current_llvm_bytes="$(/usr/bin/sed -n 's/^currentLLVMBytes=//p' "$metadata")"
+        cached_current_executable_hash="$(/usr/bin/sed -n 's/^currentExecutableHash=//p' "$metadata")"
+        cached_current_executable_bytes="$(/usr/bin/sed -n 's/^currentExecutableBytes=//p' "$metadata")"
+        cached_llvm_fixed_point="$(/usr/bin/sed -n 's/^llvmFixedPoint=//p' "$metadata")"
+        cached_executable_fixed_point="$(/usr/bin/sed -n 's/^executableFixedPoint=//p' "$metadata")"
+        cached_fixed_point="$(/usr/bin/sed -n 's/^fixedPoint=//p' "$metadata")"
+        llvm_fixed_point=false
+        executable_fixed_point=false
+        if /usr/bin/cmp -s "$previous_llvm" "$current_llvm"; then llvm_fixed_point=true; fi
+        if /usr/bin/cmp -s "$previous_executable" "$current_executable"; then executable_fixed_point=true; fi
+        fixed_point=false
+        if [[ "$llvm_fixed_point" == true && "$executable_fixed_point" == true ]]; then fixed_point=true; fi
+        if [[ "$cached_source" == "$source_key"
+            && "$cached_seed_llvm" == "$seed_llvm_hash"
+            && "$cached_previous_llvm" == "$previous_llvm_hash"
+            && "$cached_current_llvm" == "$current_llvm"
+            && "$cached_current_llvm_hash" == "$(sha256 "$current_llvm")"
+            && "$cached_current_llvm_bytes" == "$(/usr/bin/stat -f %z "$current_llvm")"
+            && "$cached_current_executable_hash" == "$(sha256 "$current_executable")"
+            && "$cached_current_executable_bytes" == "$(/usr/bin/stat -f %z "$current_executable")"
+            && "$cached_llvm_fixed_point" == "$llvm_fixed_point"
+            && "$cached_executable_fixed_point" == "$executable_fixed_point"
+            && "$cached_fixed_point" == "$fixed_point" ]]; then
+            /bin/cat "$metadata"
+            if [[ "$fixed_point" != true ]]; then return 65; fi
+            return 0
+        fi
+    fi
+
+    /bin/mkdir -p "$cache_root"
+    temporary="$cache_root/.build.$$"
+    diagnostic="$temporary/diagnostic.txt"
+    /bin/mkdir -p "$temporary"
+    if "$previous_executable" emit-llvm "$bundle" "$temporary/RangeCompiler.ll" > "$diagnostic"; then
+        compiler_exit_code=0
+    else
+        compiler_exit_code=$?
+    fi
+    if [[ "$compiler_exit_code" -ne 0 || -s "$diagnostic" ]]; then
+        if [[ -s "$diagnostic" ]]; then /bin/cat "$diagnostic" >&2; fi
+        /bin/rm -rf "$temporary"
+        if [[ "$compiler_exit_code" -eq 0 ]]; then return 65; fi
+        return "$compiler_exit_code"
+    fi
+    if ! clang -Wno-override-module -x ir -c "$temporary/RangeCompiler.ll" -o /dev/null; then
+        /bin/rm -rf "$temporary"
+        return 65
+    fi
+    if ! clang -Wno-override-module "$temporary/RangeCompiler.ll" "${runtimes[@]}" -o "$temporary/RangeCompiler"; then
+        /bin/rm -rf "$temporary"
+        return 65
+    fi
+
+    current_llvm_hash="$(sha256 "$temporary/RangeCompiler.ll")"
+    current_llvm_bytes="$(/usr/bin/stat -f %z "$temporary/RangeCompiler.ll")"
+    current_executable_hash="$(sha256 "$temporary/RangeCompiler")"
+    current_executable_bytes="$(/usr/bin/stat -f %z "$temporary/RangeCompiler")"
+    seed_to_previous_llvm_bytes=$((previous_llvm_bytes - seed_llvm_bytes))
+    previous_to_current_llvm_bytes=$((current_llvm_bytes - previous_llvm_bytes))
+    seed_to_previous_executable_bytes=$((previous_executable_bytes - seed_executable_bytes))
+    previous_to_current_executable_bytes=$((current_executable_bytes - previous_executable_bytes))
+    llvm_fixed_point=false
+    executable_fixed_point=false
+    if /usr/bin/cmp -s "$previous_llvm" "$temporary/RangeCompiler.ll"; then llvm_fixed_point=true; fi
+    if /usr/bin/cmp -s "$previous_executable" "$temporary/RangeCompiler"; then executable_fixed_point=true; fi
+    fixed_point=false
+    if [[ "$llvm_fixed_point" == true && "$executable_fixed_point" == true ]]; then fixed_point=true; fi
+
+    {
+        /usr/bin/printf 'project=compiler\n'
+        /usr/bin/printf 'test=progression\n'
+        /usr/bin/printf 'source=%s\n' "$source_key"
+        /usr/bin/printf 'seedLLVM=%s\n' "$seed_llvm"
+        /usr/bin/printf 'seedLLVMHash=%s\n' "$seed_llvm_hash"
+        /usr/bin/printf 'seedLLVMBytes=%s\n' "$seed_llvm_bytes"
+        /usr/bin/printf 'seedExecutable=%s\n' "$seed_executable"
+        /usr/bin/printf 'seedExecutableHash=%s\n' "$seed_executable_hash"
+        /usr/bin/printf 'seedExecutableBytes=%s\n' "$seed_executable_bytes"
+        /usr/bin/printf 'previousLLVM=%s\n' "$previous_llvm"
+        /usr/bin/printf 'previousLLVMHash=%s\n' "$previous_llvm_hash"
+        /usr/bin/printf 'previousLLVMBytes=%s\n' "$previous_llvm_bytes"
+        /usr/bin/printf 'previousExecutable=%s\n' "$previous_executable"
+        /usr/bin/printf 'previousExecutableHash=%s\n' "$previous_executable_hash"
+        /usr/bin/printf 'previousExecutableBytes=%s\n' "$previous_executable_bytes"
+        /usr/bin/printf 'currentLLVM=%s\n' "$current_llvm"
+        /usr/bin/printf 'currentLLVMHash=%s\n' "$current_llvm_hash"
+        /usr/bin/printf 'currentLLVMBytes=%s\n' "$current_llvm_bytes"
+        /usr/bin/printf 'currentExecutable=%s\n' "$current_executable"
+        /usr/bin/printf 'currentExecutableHash=%s\n' "$current_executable_hash"
+        /usr/bin/printf 'currentExecutableBytes=%s\n' "$current_executable_bytes"
+        /usr/bin/printf 'seedToPreviousLLVMBytes=%+d\n' "$seed_to_previous_llvm_bytes"
+        /usr/bin/printf 'previousToCurrentLLVMBytes=%+d\n' "$previous_to_current_llvm_bytes"
+        /usr/bin/printf 'seedToPreviousExecutableBytes=%+d\n' "$seed_to_previous_executable_bytes"
+        /usr/bin/printf 'previousToCurrentExecutableBytes=%+d\n' "$previous_to_current_executable_bytes"
+        /usr/bin/printf 'llvmFixedPoint=%s\n' "$llvm_fixed_point"
+        /usr/bin/printf 'executableFixedPoint=%s\n' "$executable_fixed_point"
+        /usr/bin/printf 'fixedPoint=%s\n' "$fixed_point"
+    } > "$temporary/Progression.txt"
+
+    /bin/mv "$temporary/RangeCompiler.ll" "$current_llvm"
+    /bin/mv "$temporary/RangeCompiler" "$current_executable"
+    /bin/mv "$temporary/Progression.txt" "$metadata"
+    /bin/rm -f "$diagnostic"
+    /bin/rmdir "$temporary"
+    /bin/cat "$metadata"
+    if [[ "$fixed_point" != true ]]; then
+        echo "Compiler progression failed: previous and current artifacts differ." >&2
+        return 65
+    fi
+}
+
 compile_executable() {
     local input="$1"
     local source_dir executable_name build_root llvm executable
@@ -518,6 +700,10 @@ case "$command" in
     compiler-next)
         if [[ $# -ne 0 ]]; then usage; exit 1; fi
         compiler_next
+        ;;
+    compiler-progression)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        compiler_progression
         ;;
     compiler-command)
         if [[ $# -lt 1 ]]; then usage; exit 1; fi

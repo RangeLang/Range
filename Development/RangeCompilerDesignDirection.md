@@ -3249,6 +3249,25 @@ identity. A completed unchanged build is reused; partial directories never
 qualify as cache hits. `next` does not rewrite the seed or manifest. Verification
 and acceptance remain separate explicit lifecycle operations.
 
+`range compiler progression` is the corresponding Compiler-project regression
+gate. It orchestrates two explicit transitions over one frozen source bundle:
+the accepted seed builds the artifact named `previous`, and `previous` builds
+the artifact named `current`. The report preserves LLVM and linked-executable
+identities, byte counts, and signed size deltas across
+`seed -> previous -> current`. Equal byte length is never treated as proof of
+equivalence: both `previous`/`current` LLVM and executables must also compare
+byte-for-byte. The current step is cached by source, previous-artifact,
+runtime, and Clang identity, while every cache hit revalidates hashes, sizes,
+and fixed-point comparisons before it can pass.
+
+The first live progression completed in `402.47 s` with `212,025,344` bytes
+maximum RSS. The accepted seed LLVM was `5,408,599` bytes; `previous` grew by
+`102,066` bytes to `5,510,665`, while `current` changed by `0` bytes. The linked
+seed executable was `4,029,984` bytes; `previous` grew by `68,528` bytes to
+`4,098,512`, while `current` again changed by `0` bytes. LLVM and executable
+hashes matched across the final transition. A fully revalidated cache hit
+completed in `1.08 s` with `19,939,328` bytes maximum RSS.
+
 The first real invocation used accepted seed
 `e3e04960ac56b8073f36b3679ff6beee076c06e803b183b8952c818f793da844`,
 produced the same fixed-point LLVM hash and 5,408,599 bytes, linked successfully,
@@ -3257,3 +3276,50 @@ lineage, LLVM, byte-count, and executable-hash revalidation, the unchanged
 cache hit returned in 0.65 seconds with 19,972,096 bytes maximum RSS. The cached
 executable compiled and emitted the focused fixture, whose linked program
 exited `7`.
+
+### Native macro arrays and runtime-representation tracking (2026-07-17)
+
+Typed member syntax now preserves a macro application as an array element
+type, so `state components: [@component]` denotes one statically resolved
+macro array rather than an erased heterogeneous object array. The array is
+resolved through the ordinary macro declaration/application graph. An unknown
+macro, an ambiguous macro declaration, or an application whose target does not
+match the declaration's accepted surface poisons MemoryGraph and is rejected
+before LLVM emission. The rule is general across construct, function, member,
+and parameter targets; `component` is only a fixture name.
+
+MemoryGraph owns six related ID tables: the array declaration, array members,
+runtime representations, storage partitions, runtime values, and
+representation changes. Every array value references both its macro
+application ID and target syntax ID, carries stable application/target
+identities as provenance, and has an explicit slot and present state. Because
+the stored value is an ID handle, each macro array needs one homogeneous
+ID-reference partition rather than one boxed record or one buffer per concrete
+target type. `let` array storage is immutable and `state` array storage is
+mutable through the ordinary storage-policy rule.
+
+Value order and the aggregate representation fingerprint are derived from
+stable target identity. Macro application rows and source syntax IDs remain
+provenance only. Reordering `Transform` and `Sprite` declarations therefore
+changes transient provenance but produces the same array identity, partition
+identity, storage identity, value slots, representation fingerprint, and
+ordered representation-change projection. A target participates at most once
+in a given macro array, matching the conformee interpretation rather than
+silently duplicating a handle.
+
+Creating an array produces one explicit `partitionAdded` change. Every member
+then produces a `valueInserted` change with its value ID and the before/after
+representation fingerprints. Representation shape and membership evolution
+are therefore facts owned by MemoryGraph instead of state inferred later by
+LLVM lowering. `valueRemoved` remains reserved until omission/removal is wired
+to the same transition model; no removal support is claimed in this slice.
+
+The permanent Stage 2/3 audit covers typed preservation of `[@component]`, two
+ID-backed conforming targets, one ID-array representation, one partition, two
+runtime values, three tracked changes, deterministic repeated output,
+reorder-stable layout, a second member-target macro array, and pre-emission
+rejection of `[@missing]`. Stage 2 and Stage 3 must produce byte-identical
+snapshots and stable runtime projections. An ordinary no-directive program
+carrying the same array declaration must emit deterministic LLVM, validate,
+link, and exit `7`; this proves that the array contract participates in normal
+compilation without claiming ordinary user-code indexing or removal lowering.

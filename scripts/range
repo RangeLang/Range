@@ -11,6 +11,7 @@ usage() {
     cat >&2 <<'USAGE'
 Usage:
   scripts/range compiler next
+  scripts/range compiler progression
   scripts/range compiler compile INPUT
   scripts/range compiler check INPUT
   scripts/range compiler emit-llvm INPUT OUTPUT
@@ -75,6 +76,10 @@ case "$command" in
             next)
                 if [[ $# -ne 0 ]]; then usage; exit 1; fi
                 "$REPO_ROOT/scripts/range-native" compiler-next
+                ;;
+            progression)
+                if [[ $# -ne 0 ]]; then usage; exit 1; fi
+                "$REPO_ROOT/scripts/range-native" compiler-progression
                 ;;
             *)
                 "$REPO_ROOT/scripts/range-native" compiler-command "$compiler_command" "$@"

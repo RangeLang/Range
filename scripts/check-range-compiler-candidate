@@ -4327,6 +4327,114 @@ audit_macro_expansion_commit() {
     echo "$stage_label committed macro expansion: pass (immutable omission overlay removes construct/member layouts, validate/link, exit 7, deterministic)"
 }
 
+macro_family_runtime_projection() {
+    local input="$1"
+    local output="$2"
+
+    /usr/bin/awk '
+        /^memoryMacroFamily\t/ || /^memoryRuntimeRepresentation\t/ { print; next }
+        /^memoryRuntimePartition\t/ {
+            split($0, fields, "values=")
+            split(fields[2], value, ",")
+            print "partition=" value[1] "," value[2] "," value[3] "," value[5] "," value[6] "," value[7] "," value[8] "," value[9]
+            next
+        }
+        /^memoryRuntimeValue\t/ {
+            split($0, fields, "values=")
+            split(fields[2], value, ",")
+            print "value=" value[1] "," value[2] "," value[3] "," value[4] "," value[9] "," value[10] "," value[11] "," value[12]
+            next
+        }
+        /^memoryRepresentationChange\t/ {
+            split($0, fields, "values=")
+            split(fields[2], value, ",")
+            print "change=" value[1] "," value[2] "," value[3] "," value[4] "," value[5] "," value[8] "," value[9] "," value[10] "," value[11] "," value[12]
+        }
+    ' "$input" > "$output"
+}
+
+audit_macro_family_memory() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local fixture_root="$REPO_ROOT/Testing/SelfHosting/MacroFamilyMemory"
+    local positive="$WORK_ROOT/$stage_label.macro-family.positive.out"
+    local positive_repeat="$WORK_ROOT/$stage_label.macro-family.positive.repeat.out"
+    local reordered="$WORK_ROOT/$stage_label.macro-family.reordered.out"
+    local unknown="$WORK_ROOT/$stage_label.macro-family.unknown.out"
+    local typed="$WORK_ROOT/$stage_label.macro-family.typed.out"
+    local general="$WORK_ROOT/$stage_label.macro-family.general.out"
+    local ordinary="$WORK_ROOT/$stage_label.macro-family.ordinary.first.ll"
+    local ordinary_repeat="$WORK_ROOT/$stage_label.macro-family.ordinary.repeat.ll"
+    local ordinary_error="$WORK_ROOT/$stage_label.macro-family.ordinary.err"
+    local ordinary_llvm="$stage_directory/MacroFamily.ll"
+    local ordinary_executable="$stage_directory/MacroFamily"
+    local ordinary_run_output="$WORK_ROOT/$stage_label.macro-family.ordinary.run.out"
+    local ordinary_run_error="$WORK_ROOT/$stage_label.macro-family.ordinary.run.err"
+    local error="$WORK_ROOT/$stage_label.macro-family.err"
+    local positive_projection="$WORK_ROOT/$stage_label.macro-family.positive.runtime"
+    local reordered_projection="$WORK_ROOT/$stage_label.macro-family.reordered.runtime"
+
+    run_capture "$executable" "$fixture_root/Positive.range" "$positive" "$error"
+    require_successful_output "$stage_label macro-family MemoryGraph" "$positive" "$error"
+    run_capture "$executable" "$fixture_root/Positive.range" "$positive_repeat" "$error"
+    require_successful_output "$stage_label repeated macro-family MemoryGraph" "$positive_repeat" "$error"
+    /usr/bin/cmp -s "$positive" "$positive_repeat" || fail "$stage_label macro-family MemoryGraph was not deterministic"
+    /usr/bin/grep -Fq $'macroFamilyMemory\tvalid=true\tfamilyCount=1\tmemberCount=2\trepresentationCount=1\tpartitionCount=1\tvalueCount=2\tchangeCount=3' "$positive" \
+        || fail "$stage_label macro array omitted its ID-reference representation"
+
+    run_capture "$executable" "$fixture_root/Reordered.range" "$reordered" "$error"
+    require_successful_output "$stage_label reordered macro-family MemoryGraph" "$reordered" "$error"
+    macro_family_runtime_projection "$positive" "$positive_projection"
+    macro_family_runtime_projection "$reordered" "$reordered_projection"
+    /usr/bin/cmp -s "$positive_projection" "$reordered_projection" \
+        || fail "$stage_label macro-family runtime representation changed with source order"
+
+    run_capture "$executable" "$fixture_root/UnknownFamily.range" "$unknown" "$error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label unknown macro family exited $RUN_STATUS"
+    [[ ! -s "$error" ]] || fail "$stage_label unknown macro family wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidMacroFamilyMemoryGraph' "$unknown" \
+        || fail "$stage_label unknown macro family missed its diagnostic"
+    /usr/bin/grep -Fq $'macroFamilyMemory\tvalid=false' "$unknown" \
+        || fail "$stage_label unknown macro family reported a valid graph"
+    if /usr/bin/grep -Fq 'define ' "$unknown" || /usr/bin/grep -Fq 'call ' "$unknown"; then
+        fail "$stage_label unknown macro family emitted LLVM before rejection"
+    fi
+
+    run_capture "$executable" "$fixture_root/TypedSyntax.range" "$typed" "$error"
+    require_successful_output "$stage_label macro-family typed syntax" "$typed" "$error"
+    /usr/bin/grep -Fq $'name=components\tnameStart=134\tnameEnd=144\ttype=[@component]' "$typed" \
+        || fail "$stage_label typed syntax did not preserve the macro-family element type"
+    /usr/bin/grep -Fq $'type=[@component]\ttypeStart=146\ttypeEnd=158\tkind=state' "$typed" \
+        || fail "$stage_label typed syntax did not preserve mutable family storage"
+
+    run_capture "$executable" "$fixture_root/GeneralTargets.range" "$general" "$error"
+    require_successful_output "$stage_label general macro-array targets" "$general" "$error"
+    /usr/bin/grep -Fq $'macroFamilyMemory\tvalid=true\tfamilyCount=2\tmemberCount=2\trepresentationCount=2\tpartitionCount=2\tvalueCount=2\tchangeCount=4' "$general" \
+        || fail "$stage_label macro arrays did not include construct and member targets"
+    [[ "$(/usr/bin/grep -Ec '^memoryRepresentationChange[[:space:]]' "$general")" -eq 4 ]] \
+        || fail "$stage_label macro arrays emitted the wrong change count"
+
+    run_capture "$executable" "$fixture_root/Ordinary.range" "$ordinary" "$ordinary_error"
+    require_successful_output "$stage_label ordinary macro-family compilation" "$ordinary" "$ordinary_error"
+    run_capture "$executable" "$fixture_root/Ordinary.range" "$ordinary_repeat" "$ordinary_error"
+    require_successful_output "$stage_label repeated ordinary macro-family compilation" "$ordinary_repeat" "$ordinary_error"
+    /usr/bin/cmp -s "$ordinary" "$ordinary_repeat" || fail "$stage_label ordinary macro-family LLVM was not deterministic"
+    /bin/mkdir -p "$stage_directory"
+    /bin/cp "$ordinary" "$ordinary_llvm"
+    validate_llvm "$ordinary_llvm"
+    link_llvm "$ordinary_llvm" "$ordinary_executable"
+    if "$ordinary_executable" > "$ordinary_run_output" 2> "$ordinary_run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label ordinary macro-family executable exited $RUN_STATUS"
+    [[ ! -s "$ordinary_run_output" && ! -s "$ordinary_run_error" ]] || fail "$stage_label ordinary macro-family executable wrote output"
+
+    echo "$stage_label macro arrays: pass (application/target IDs, general target kinds, one ID partition per family, inserted-value changes, reorder-stable layout, ordinary LLVM exit 7)"
+}
+
 audit_range_cli() {
     local stage_label="$1"
     local executable="$2"
@@ -4388,6 +4496,7 @@ audit_stage() {
     audit_macro_generated_function "$stage_label" "$executable" "$stage_directory"
     audit_macro_registrable "$stage_label" "$executable" "$stage_directory"
     audit_macro_expansion_commit "$stage_label" "$executable" "$stage_directory"
+    audit_macro_family_memory "$stage_label" "$executable" "$stage_directory"
     audit_body_syntax_split "$stage_label" "$executable" "$stage_directory"
     audit_smoke "$stage_label" "$executable" "$stage_directory"
     audit_range_cli "$stage_label" "$executable"
@@ -4904,6 +5013,17 @@ main() {
             || fail "Stage 2 and Stage 3 macro snapshot differs: $macro_snapshot_suffix"
     done
     echo "Stage 2/Stage 3 focused macro snapshots: byte-identical"
+
+    local macro_family_suffix
+    for macro_family_suffix in positive.out positive.repeat.out reordered.out unknown.out typed.out general.out positive.runtime reordered.runtime ordinary.first.ll ordinary.repeat.ll; do
+        /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro-family.$macro_family_suffix" "$WORK_ROOT/Stage3.macro-family.$macro_family_suffix" \
+            || fail "Stage 2 and Stage 3 macro-family MemoryGraph differs: $macro_family_suffix"
+    done
+    /usr/bin/cmp -s "$stage2_directory/MacroFamily.ll" "$stage3_directory/MacroFamily.ll" \
+        || fail "Stage 2 and Stage 3 macro-family LLVM artifacts differ"
+    /usr/bin/cmp -s "$stage2_directory/MacroFamily" "$stage3_directory/MacroFamily" \
+        || fail "Stage 2 and Stage 3 macro-family executables differ"
+    echo "Stage 2/Stage 3 macro-family MemoryGraph: byte-identical"
 
     /usr/bin/cmp -s "$WORK_ROOT/Stage2.builtin.legacy.out" "$WORK_ROOT/Stage3.builtin.legacy.out" \
         || fail "Stage 2 and Stage 3 legacy builtin-marker rejection differs"

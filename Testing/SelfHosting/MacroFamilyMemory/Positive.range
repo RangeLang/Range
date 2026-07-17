@@ -1,0 +1,15 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/Component.range
+macro component(): Construct -> Void {}
+compilerSourceFile\trole=project\tpath=Project/Components.range
+@component
+construct Transform {
+    let x: Int
+}
+@component
+construct Sprite {
+    let texture: String
+}
+construct Scene {
+    state components: [@component]
+}

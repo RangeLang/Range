@@ -7,6 +7,12 @@ This folder holds `.range` source files used by compiler regression tests.
 
 These are compiler fixtures, not the future Range-native testing library.
 
+Compiler bootstrap progression is intentionally not represented as a source
+fixture. `scripts/range compiler progression` is the Compiler-project-specific
+artifact gate: the accepted seed builds `previous`, `previous` builds `current`
+from the same frozen source bundle, and the command reports byte-size deltas
+while requiring byte-identical LLVM and linked executables at the final step.
+
 ## Adding Fixtures
 
 Create new compiler fixtures in this folder, not inline inside Swift test files.

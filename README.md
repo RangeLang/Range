@@ -52,6 +52,19 @@ scripts/range compiler next
 whether its LLVM already matches the accepted fixed point, and never promotes
 the checked-in seed.
 
+Exercise the complete compiler-specific bootstrap progression:
+
+```sh
+scripts/range compiler progression
+```
+
+`progression` uses the accepted seed to build `previous`, then uses `previous`
+to build `current` from the exact same compiler source bundle. It reports the
+LLVM and linked-executable byte sizes and signed deltas for
+`seed -> previous -> current`. Size is diagnostic; the gate succeeds only when
+the `previous` and `current` LLVM and executable artifacts are byte-identical.
+Completed results are content-addressed under `.range/Compiler/Progression`.
+
 Run the active LLVM executable gate:
 
 ```sh

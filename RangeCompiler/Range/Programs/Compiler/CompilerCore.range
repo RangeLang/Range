@@ -407,6 +407,12 @@ construct CompilerMemoryGraph {
     let layouts: CompilerIntTable
     let storages: CompilerIntTable
     let decisions: CompilerIntTable
+    let macroFamilies: CompilerIntTable
+    let macroFamilyMembers: CompilerIntTable
+    let runtimeRepresentations: CompilerIntTable
+    let runtimePartitions: CompilerIntTable
+    let runtimeValues: CompilerIntTable
+    let representationChanges: CompilerIntTable
     let failures: RawBuffer
 }
 
@@ -8218,6 +8224,12 @@ function compilerSemanticSummary(source: String): String {
 function compilerMemoryLayoutColumnCount(): Int { return 4 }
 function compilerMemoryStorageColumnCount(): Int { return 6 }
 function compilerMemoryDecisionColumnCount(): Int { return 6 }
+function compilerMemoryMacroFamilyColumnCount(): Int { return 10 }
+function compilerMemoryMacroFamilyMemberColumnCount(): Int { return 10 }
+function compilerMemoryRuntimeRepresentationColumnCount(): Int { return 9 }
+function compilerMemoryRuntimePartitionColumnCount(): Int { return 9 }
+function compilerMemoryRuntimeValueColumnCount(): Int { return 12 }
+function compilerMemoryRepresentationChangeColumnCount(): Int { return 12 }
 function compilerMemoryDecisionLayout(): Int { return 1 }
 function compilerMemoryDecisionPlacement(): Int { return 2 }
 function compilerMemoryDecisionInitialize(): Int { return 3 }
@@ -8242,12 +8254,23 @@ function compilerMemoryAccessSharedAlias(): Int { return 3 }
 function compilerMemoryAccessUniqueAlias(): Int { return 4 }
 function compilerMemoryStorageImmutable(): Int { return 1 }
 function compilerMemoryStorageMutable(): Int { return 2 }
+function compilerMemoryRuntimeRepresentationIDArray(): Int { return 1 }
+function compilerMemoryRuntimeValuePresent(): Int { return 1 }
+function compilerMemoryRepresentationChangePartitionAdded(): Int { return 1 }
+function compilerMemoryRepresentationChangeValueInserted(): Int { return 2 }
+function compilerMemoryRepresentationChangeValueRemoved(): Int { return 3 }
 
 function compilerMemoryGraphCreate(): CompilerMemoryGraph {
     return CompilerMemoryGraph(
         layouts: compilerIntTableCreate(columnCount: compilerMemoryLayoutColumnCount(), estimatedRowCount: 32),
         storages: compilerIntTableCreate(columnCount: compilerMemoryStorageColumnCount(), estimatedRowCount: 64),
         decisions: compilerIntTableCreate(columnCount: compilerMemoryDecisionColumnCount(), estimatedRowCount: 128),
+        macroFamilies: compilerIntTableCreate(columnCount: compilerMemoryMacroFamilyColumnCount(), estimatedRowCount: 8),
+        macroFamilyMembers: compilerIntTableCreate(columnCount: compilerMemoryMacroFamilyMemberColumnCount(), estimatedRowCount: 32),
+        runtimeRepresentations: compilerIntTableCreate(columnCount: compilerMemoryRuntimeRepresentationColumnCount(), estimatedRowCount: 8),
+        runtimePartitions: compilerIntTableCreate(columnCount: compilerMemoryRuntimePartitionColumnCount(), estimatedRowCount: 32),
+        runtimeValues: compilerIntTableCreate(columnCount: compilerMemoryRuntimeValueColumnCount(), estimatedRowCount: 64),
+        representationChanges: compilerIntTableCreate(columnCount: compilerMemoryRepresentationChangeColumnCount(), estimatedRowCount: 32),
         failures: rawBufferCreate(capacity: 1, stride: 4)
     )
 }
@@ -8257,6 +8280,12 @@ function compilerMemoryGraphDestroy(memory: CompilerMemoryGraph): Int {
     if compilerIntTableDestroy(table: memory.layouts) != 0 { memoryDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: memory.storages) != 0 { memoryDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: memory.decisions) != 0 { memoryDestroyStatus: 0 - 1 }
+    if compilerIntTableDestroy(table: memory.macroFamilies) != 0 { memoryDestroyStatus: 0 - 1 }
+    if compilerIntTableDestroy(table: memory.macroFamilyMembers) != 0 { memoryDestroyStatus: 0 - 1 }
+    if compilerIntTableDestroy(table: memory.runtimeRepresentations) != 0 { memoryDestroyStatus: 0 - 1 }
+    if compilerIntTableDestroy(table: memory.runtimePartitions) != 0 { memoryDestroyStatus: 0 - 1 }
+    if compilerIntTableDestroy(table: memory.runtimeValues) != 0 { memoryDestroyStatus: 0 - 1 }
+    if compilerIntTableDestroy(table: memory.representationChanges) != 0 { memoryDestroyStatus: 0 - 1 }
     if rawBufferDestroy(buffer: memory.failures) != 0 { memoryDestroyStatus: 0 - 1 }
     return memoryDestroyStatus
 }
@@ -8308,6 +8337,415 @@ function compilerMemoryAppendDecision(memory: CompilerMemoryGraph, decisionKind:
     if compilerMemoryAppend(memory: memory, table: memory.decisions, value: typeNodeID) != 0 { return 0 - 1 }
     if compilerMemoryAppend(memory: memory, table: memory.decisions, value: value) != 0 { return 0 - 1 }
     return compilerMemoryAppend(memory: memory, table: memory.decisions, value: originNodeID)
+}
+
+function compilerMemoryMacroFamilyTypeName(tables: CompilerSyntaxTables, memberRow: Int): String {
+    if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: tables.members) { return String("") }
+    let fileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
+    let localStart: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 8))
+    let localEnd: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 9))
+    let start: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: localStart))
+    let end: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: localEnd))
+    if start < 0 || end <= start { return String("") }
+    let firstMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: start))
+    if firstMaybe == nil { return String("") }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: String("eof"), start: start, end: start, text: String("")))
+    let first: RangeLexedToken(firstMaybe ?? fallback)
+    let macroMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: first.end))
+    if first.kind != String("leftBracket") || macroMaybe == nil { return String("") }
+    let macroToken: RangeLexedToken(macroMaybe ?? fallback)
+    let rightMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: macroToken.end))
+    if macroToken.kind != String("macroAttribute") || stringLength(value: macroToken.text) <= 1 || rightMaybe == nil { return String("") }
+    let right: RangeLexedToken(rightMaybe ?? fallback)
+    if right.kind != String("rightBracket") || right.end != end { return String("") }
+    return macroToken.text.substring(start: 1, end: stringLength(value: macroToken.text))
+}
+
+function compilerMemoryMacroDeclarationForFamilyName(tables: CompilerSyntaxTables, name: String): Int {
+    state match: Int(0 - 1)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.macroDeclarations) {
+        let fileID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 1))
+        let candidate: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 4), localEnd: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 5)))
+        if candidate == name {
+            if match >= 0 { return 0 - 1 }
+            match: row
+        }
+        row: row + 1
+    }
+    return match
+}
+
+function compilerMemoryFingerprintPrecedes(left: CompilerFingerprint, right: CompilerFingerprint): Bool {
+    if left.first < right.first { return true }
+    if left.first > right.first { return false }
+    return left.second < right.second
+}
+
+function compilerMemoryMacroArrayHasTarget(memory: CompilerMemoryGraph, familyID: Int, targetSyntaxID: Int): Bool {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: memory.macroFamilyMembers) {
+        if compilerIntTableValue(table: memory.macroFamilyMembers, row: row, column: 1) == familyID
+            && compilerIntTableValue(table: memory.macroFamilyMembers, row: row, column: 5) == targetSyntaxID { return true }
+        row: row + 1
+    }
+    return false
+}
+
+function compilerMemoryMacroArrayTargetIdentity(tables: CompilerSyntaxTables, targetSyntaxID: Int): CompilerFingerprint {
+    if targetSyntaxID < 0 || targetSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex) { return compilerFingerprintInitial() }
+    let kind: Int(compilerIntTableValue(table: tables.syntaxIndex, row: targetSyntaxID, column: 0))
+    let row: Int(compilerIntTableValue(table: tables.syntaxIndex, row: targetSyntaxID, column: 1))
+    if kind == compilerSyntaxKindMember() && row >= 0 && row < compilerIntTableRowCount(table: tables.members) {
+        return CompilerFingerprint(first: compilerIntTableValue(table: tables.members, row: row, column: 10), second: compilerIntTableValue(table: tables.members, row: row, column: 11))
+    }
+    if kind == compilerSyntaxKindParameter() && row >= 0 && row < compilerIntTableRowCount(table: tables.parameters) {
+        return CompilerFingerprint(first: compilerIntTableValue(table: tables.parameters, row: row, column: 10), second: compilerIntTableValue(table: tables.parameters, row: row, column: 11))
+    }
+    return compilerMacroExecutionTargetIdentity(tables: tables, targetSyntaxID: targetSyntaxID)
+}
+
+function compilerMemoryMacroFamilyNextApplication(tables: CompilerSyntaxTables, memory: CompilerMemoryGraph, familyID: Int, macroDeclarationRow: Int): Int {
+    state selected: Int(0 - 1)
+    state selectedTargetIdentity: CompilerFingerprint(CompilerFingerprint(first: 0, second: 0))
+    state selectedApplicationIdentity: CompilerFingerprint(CompilerFingerprint(first: 0, second: 0))
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.macroApplications) {
+        let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: row, column: 12))
+        if compilerMacroExecutionResolvedDeclaration(tables: tables, applicationRow: row) == macroDeclarationRow
+            && !compilerMemoryMacroArrayHasTarget(memory: memory, familyID: familyID, targetSyntaxID: targetSyntaxID) {
+            let targetIdentity: CompilerFingerprint(compilerMemoryMacroArrayTargetIdentity(tables: tables, targetSyntaxID: targetSyntaxID))
+            let applicationIdentity: CompilerFingerprint(compilerMacroExecutionApplicationIdentity(tables: tables, applicationRow: row))
+            if selected < 0 || compilerMemoryFingerprintPrecedes(left: targetIdentity, right: selectedTargetIdentity)
+                || (targetIdentity.first == selectedTargetIdentity.first && targetIdentity.second == selectedTargetIdentity.second
+                    && compilerMemoryFingerprintPrecedes(left: applicationIdentity, right: selectedApplicationIdentity)) {
+                selected: row
+                selectedTargetIdentity: targetIdentity
+                selectedApplicationIdentity: applicationIdentity
+            }
+        }
+        row: row + 1
+    }
+    return selected
+}
+
+function compilerMemoryAppendMacroFamily(memory: CompilerMemoryGraph, ownerMemberSyntaxID: Int, macroDeclarationRow: Int, macroIdentity: CompilerFingerprint, familyIdentity: CompilerFingerprint, representationID: Int, storagePolicy: Int): Int {
+    let familyID: Int(compilerIntTableRowCount(table: memory.macroFamilies))
+    if compilerMemoryAppend(memory: memory, table: memory.macroFamilies, value: familyID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilies, value: ownerMemberSyntaxID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilies, value: macroDeclarationRow) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilies, value: macroIdentity.first) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilies, value: macroIdentity.second) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilies, value: familyIdentity.first) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilies, value: familyIdentity.second) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilies, value: representationID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilies, value: storagePolicy) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilies, value: 0) != 0 { return 0 - 1 }
+    return familyID
+}
+
+function compilerMemoryAppendRuntimeRepresentation(memory: CompilerMemoryGraph, familyID: Int, storagePolicy: Int, identity: CompilerFingerprint): Int {
+    let representationID: Int(compilerIntTableRowCount(table: memory.runtimeRepresentations))
+    if compilerMemoryAppend(memory: memory, table: memory.runtimeRepresentations, value: representationID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeRepresentations, value: familyID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeRepresentations, value: compilerMemoryRuntimeRepresentationIDArray()) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeRepresentations, value: storagePolicy) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeRepresentations, value: 0) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeRepresentations, value: identity.first) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeRepresentations, value: identity.second) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeRepresentations, value: 0) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeRepresentations, value: 0) != 0 { return 0 - 1 }
+    return representationID
+}
+
+function compilerMemoryAppendMacroFamilyMember(memory: CompilerMemoryGraph, familyID: Int, applicationRow: Int, applicationIdentity: CompilerFingerprint, targetSyntaxID: Int, targetIdentity: CompilerFingerprint, valueID: Int, ordinal: Int): Int {
+    let memberID: Int(compilerIntTableRowCount(table: memory.macroFamilyMembers))
+    if compilerMemoryAppend(memory: memory, table: memory.macroFamilyMembers, value: memberID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilyMembers, value: familyID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilyMembers, value: applicationRow) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilyMembers, value: applicationIdentity.first) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilyMembers, value: applicationIdentity.second) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilyMembers, value: targetSyntaxID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilyMembers, value: targetIdentity.first) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilyMembers, value: targetIdentity.second) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilyMembers, value: valueID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.macroFamilyMembers, value: ordinal) != 0 { return 0 - 1 }
+    return memberID
+}
+
+function compilerMemoryAppendRuntimePartition(memory: CompilerMemoryGraph, representationID: Int, familyID: Int, ownerMemberSyntaxID: Int, partitionIdentity: CompilerFingerprint, storageIdentity: CompilerFingerprint): Int {
+    let partitionID: Int(compilerIntTableRowCount(table: memory.runtimePartitions))
+    if compilerMemoryAppend(memory: memory, table: memory.runtimePartitions, value: partitionID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimePartitions, value: representationID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimePartitions, value: familyID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimePartitions, value: ownerMemberSyntaxID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimePartitions, value: partitionIdentity.first) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimePartitions, value: partitionIdentity.second) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimePartitions, value: storageIdentity.first) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimePartitions, value: storageIdentity.second) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimePartitions, value: 0) != 0 { return 0 - 1 }
+    return partitionID
+}
+
+function compilerMemoryAppendRuntimeValue(memory: CompilerMemoryGraph, representationID: Int, partitionID: Int, familyMemberID: Int, applicationRow: Int, targetSyntaxID: Int, applicationIdentity: CompilerFingerprint, targetIdentity: CompilerFingerprint, slot: Int): Int {
+    let valueID: Int(compilerIntTableRowCount(table: memory.runtimeValues))
+    if compilerMemoryAppend(memory: memory, table: memory.runtimeValues, value: valueID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeValues, value: representationID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeValues, value: partitionID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeValues, value: familyMemberID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeValues, value: applicationRow) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeValues, value: targetSyntaxID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeValues, value: applicationIdentity.first) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeValues, value: applicationIdentity.second) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeValues, value: targetIdentity.first) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeValues, value: targetIdentity.second) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeValues, value: slot) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.runtimeValues, value: compilerMemoryRuntimeValuePresent()) != 0 { return 0 - 1 }
+    return valueID
+}
+
+function compilerMemoryAppendRepresentationChange(memory: CompilerMemoryGraph, representationID: Int, changeKind: Int, partitionID: Int, valueID: Int, applicationRow: Int, targetSyntaxID: Int, before: CompilerFingerprint, after: CompilerFingerprint, ordinal: Int): Int {
+    let changeID: Int(compilerIntTableRowCount(table: memory.representationChanges))
+    if compilerMemoryAppend(memory: memory, table: memory.representationChanges, value: changeID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.representationChanges, value: representationID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.representationChanges, value: changeKind) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.representationChanges, value: partitionID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.representationChanges, value: valueID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.representationChanges, value: applicationRow) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.representationChanges, value: targetSyntaxID) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.representationChanges, value: before.first) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.representationChanges, value: before.second) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.representationChanges, value: after.first) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.representationChanges, value: after.second) != 0
+        || compilerMemoryAppend(memory: memory, table: memory.representationChanges, value: ordinal) != 0 { return 0 - 1 }
+    return changeID
+}
+
+function compilerMemoryBuildMacroFamilyForMember(tables: CompilerSyntaxTables, memory: CompilerMemoryGraph, memberRow: Int, name: String): Int {
+    let macroDeclarationRow: Int(compilerMemoryMacroDeclarationForFamilyName(tables: tables, name: name))
+    let memberKind: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 12))
+    if macroDeclarationRow < 0 || (memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState()) {
+        compilerMemoryGraphPoison(memory: memory)
+        return 0 - 1
+    }
+    state storagePolicy: Int(compilerMemoryStorageImmutable())
+    if memberKind == compilerSyntaxMemberKindState() { storagePolicy: compilerMemoryStorageMutable() }
+    let macroIdentity: CompilerFingerprint(CompilerFingerprint(first: compilerIntTableValue(table: tables.macroDeclarations, row: macroDeclarationRow, column: 20), second: compilerIntTableValue(table: tables.macroDeclarations, row: macroDeclarationRow, column: 21)))
+    state familyIdentity: CompilerFingerprint(compilerFingerprintInitial())
+    familyIdentity: compilerFingerprintAppendInt(fingerprint: familyIdentity, value: 730)
+    familyIdentity: compilerFingerprintAppendInt(fingerprint: familyIdentity, value: compilerIntTableValue(table: tables.members, row: memberRow, column: 10))
+    familyIdentity: compilerFingerprintAppendInt(fingerprint: familyIdentity, value: compilerIntTableValue(table: tables.members, row: memberRow, column: 11))
+    familyIdentity: compilerFingerprintAppendInt(fingerprint: familyIdentity, value: macroIdentity.first)
+    familyIdentity: compilerFingerprintAppendInt(fingerprint: familyIdentity, value: macroIdentity.second)
+    let representationID: Int(compilerIntTableRowCount(table: memory.runtimeRepresentations))
+    let ownerMemberSyntaxID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 0))
+    let familyID: Int(compilerMemoryAppendMacroFamily(memory: memory, ownerMemberSyntaxID: ownerMemberSyntaxID, macroDeclarationRow: macroDeclarationRow, macroIdentity: macroIdentity, familyIdentity: familyIdentity, representationID: representationID, storagePolicy: storagePolicy))
+    state representationIdentity: CompilerFingerprint(familyIdentity)
+    representationIdentity: compilerFingerprintAppendInt(fingerprint: representationIdentity, value: 731)
+    representationIdentity: compilerFingerprintAppendInt(fingerprint: representationIdentity, value: compilerMemoryRuntimeRepresentationIDArray())
+    representationIdentity: compilerFingerprintAppendInt(fingerprint: representationIdentity, value: storagePolicy)
+    if familyID < 0 { return 0 - 1 }
+    if compilerMemoryAppendRuntimeRepresentation(memory: memory, familyID: familyID, storagePolicy: storagePolicy, identity: representationIdentity) != representationID { return 0 - 1 }
+    state representationFingerprint: CompilerFingerprint(representationIdentity)
+    let partitionID: Int(compilerIntTableRowCount(table: memory.runtimePartitions))
+    state partitionIdentity: CompilerFingerprint(representationIdentity)
+    partitionIdentity: compilerFingerprintAppendInt(fingerprint: partitionIdentity, value: 732)
+    state storageIdentity: CompilerFingerprint(partitionIdentity)
+    storageIdentity: compilerFingerprintAppendInt(fingerprint: storageIdentity, value: 733)
+    let beforePartition: CompilerFingerprint(representationFingerprint)
+    representationFingerprint: compilerFingerprintAppendInt(fingerprint: representationFingerprint, value: partitionIdentity.first)
+    representationFingerprint: compilerFingerprintAppendInt(fingerprint: representationFingerprint, value: partitionIdentity.second)
+    if compilerMemoryAppendRuntimePartition(memory: memory, representationID: representationID, familyID: familyID, ownerMemberSyntaxID: ownerMemberSyntaxID, partitionIdentity: partitionIdentity, storageIdentity: storageIdentity) != partitionID { return 0 - 1 }
+    if compilerMemoryAppendRepresentationChange(memory: memory, representationID: representationID, changeKind: compilerMemoryRepresentationChangePartitionAdded(), partitionID: partitionID, valueID: 0 - 1, applicationRow: 0 - 1, targetSyntaxID: 0 - 1, before: beforePartition, after: representationFingerprint, ordinal: 0) < 0 { return 0 - 1 }
+    state ordinal: Int(0)
+    state applicationRow: Int(compilerMemoryMacroFamilyNextApplication(tables: tables, memory: memory, familyID: familyID, macroDeclarationRow: macroDeclarationRow))
+    while applicationRow >= 0 {
+        let applicationIdentity: CompilerFingerprint(compilerMacroExecutionApplicationIdentity(tables: tables, applicationRow: applicationRow))
+        let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12))
+        let targetIdentity: CompilerFingerprint(compilerMemoryMacroArrayTargetIdentity(tables: tables, targetSyntaxID: targetSyntaxID))
+        let familyMemberID: Int(compilerIntTableRowCount(table: memory.macroFamilyMembers))
+        let valueID: Int(compilerIntTableRowCount(table: memory.runtimeValues))
+        let before: CompilerFingerprint(representationFingerprint)
+        representationFingerprint: compilerFingerprintAppendInt(fingerprint: representationFingerprint, value: targetIdentity.first)
+        representationFingerprint: compilerFingerprintAppendInt(fingerprint: representationFingerprint, value: targetIdentity.second)
+        if compilerMemoryAppendMacroFamilyMember(memory: memory, familyID: familyID, applicationRow: applicationRow, applicationIdentity: applicationIdentity, targetSyntaxID: targetSyntaxID, targetIdentity: targetIdentity, valueID: valueID, ordinal: ordinal) != familyMemberID { return 0 - 1 }
+        if compilerMemoryAppendRuntimeValue(memory: memory, representationID: representationID, partitionID: partitionID, familyMemberID: familyMemberID, applicationRow: applicationRow, targetSyntaxID: targetSyntaxID, applicationIdentity: applicationIdentity, targetIdentity: targetIdentity, slot: ordinal) != valueID { return 0 - 1 }
+        if compilerMemoryAppendRepresentationChange(memory: memory, representationID: representationID, changeKind: compilerMemoryRepresentationChangeValueInserted(), partitionID: partitionID, valueID: valueID, applicationRow: applicationRow, targetSyntaxID: targetSyntaxID, before: before, after: representationFingerprint, ordinal: ordinal + 1) < 0 { return 0 - 1 }
+        ordinal: ordinal + 1
+        applicationRow: compilerMemoryMacroFamilyNextApplication(tables: tables, memory: memory, familyID: familyID, macroDeclarationRow: macroDeclarationRow)
+    }
+    let familyBase: Int(familyID * compilerMemoryMacroFamilyColumnCount())
+    let representationBase: Int(representationID * compilerMemoryRuntimeRepresentationColumnCount())
+    let partitionBase: Int(partitionID * compilerMemoryRuntimePartitionColumnCount())
+    if rawBufferStoreInt(buffer: memory.macroFamilies.values, index: familyBase + 9, value: ordinal) != 0
+        || rawBufferStoreInt(buffer: memory.runtimeRepresentations.values, index: representationBase + 4, value: 1) != 0
+        || rawBufferStoreInt(buffer: memory.runtimeRepresentations.values, index: representationBase + 5, value: representationFingerprint.first) != 0
+        || rawBufferStoreInt(buffer: memory.runtimeRepresentations.values, index: representationBase + 6, value: representationFingerprint.second) != 0
+        || rawBufferStoreInt(buffer: memory.runtimeRepresentations.values, index: representationBase + 7, value: ordinal + 1) != 0
+        || rawBufferStoreInt(buffer: memory.runtimeRepresentations.values, index: representationBase + 8, value: ordinal) != 0
+        || rawBufferStoreInt(buffer: memory.runtimePartitions.values, index: partitionBase + 8, value: ordinal) != 0 { return 0 - 1 }
+    return familyID
+}
+
+function compilerMemoryBuildMacroFamilyRepresentations(tables: CompilerSyntaxTables, memory: CompilerMemoryGraph): Int {
+    if compilerIntTableRowCount(table: memory.macroFamilies) != 0
+        || compilerIntTableRowCount(table: memory.macroFamilyMembers) != 0
+        || compilerIntTableRowCount(table: memory.runtimeRepresentations) != 0
+        || compilerIntTableRowCount(table: memory.runtimePartitions) != 0
+        || compilerIntTableRowCount(table: memory.runtimeValues) != 0
+        || compilerIntTableRowCount(table: memory.representationChanges) != 0 { return 0 - 1 }
+    state memberRow: Int(0)
+    while memberRow < compilerIntTableRowCount(table: tables.members) {
+        let name: String(compilerMemoryMacroFamilyTypeName(tables: tables, memberRow: memberRow))
+        if name != String("") {
+            if compilerMemoryBuildMacroFamilyForMember(tables: tables, memory: memory, memberRow: memberRow, name: name) < 0 { return 0 - 1 }
+        }
+        memberRow: memberRow + 1
+    }
+    return 0
+}
+
+function compilerMemoryCountRowsWithValue(table: CompilerIntTable, column: Int, value: Int): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: table) {
+        if compilerIntTableValue(table: table, row: row, column: column) == value { count: count + 1 }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerMemoryPriorRowCountWithValue(table: CompilerIntTable, endRow: Int, column: Int, value: Int): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < endRow {
+        if compilerIntTableValue(table: table, row: row, column: column) == value { count: count + 1 }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerMemoryMacroFamilyRepresentationsAreValid(tables: CompilerSyntaxTables, memory: CompilerMemoryGraph): Bool {
+    if !compilerIntTableIsComplete(table: memory.macroFamilies)
+        || !compilerIntTableIsComplete(table: memory.macroFamilyMembers)
+        || !compilerIntTableIsComplete(table: memory.runtimeRepresentations)
+        || !compilerIntTableIsComplete(table: memory.runtimePartitions)
+        || !compilerIntTableIsComplete(table: memory.runtimeValues)
+        || !compilerIntTableIsComplete(table: memory.representationChanges)
+        || rawBufferCount(buffer: memory.failures) != 0 { return false }
+    let familyCount: Int(compilerIntTableRowCount(table: memory.macroFamilies))
+    let memberCount: Int(compilerIntTableRowCount(table: memory.macroFamilyMembers))
+    let representationCount: Int(compilerIntTableRowCount(table: memory.runtimeRepresentations))
+    let partitionCount: Int(compilerIntTableRowCount(table: memory.runtimePartitions))
+    let valueCount: Int(compilerIntTableRowCount(table: memory.runtimeValues))
+    let changeCount: Int(compilerIntTableRowCount(table: memory.representationChanges))
+    if familyCount != representationCount || familyCount != partitionCount || memberCount != valueCount || changeCount != partitionCount + valueCount { return false }
+    state row: Int(0)
+    while row < familyCount {
+        let ownerSyntaxID: Int(compilerIntTableValue(table: memory.macroFamilies, row: row, column: 1))
+        let macroDeclarationRow: Int(compilerIntTableValue(table: memory.macroFamilies, row: row, column: 2))
+        let representationID: Int(compilerIntTableValue(table: memory.macroFamilies, row: row, column: 7))
+        let storagePolicy: Int(compilerIntTableValue(table: memory.macroFamilies, row: row, column: 8))
+        if compilerIntTableValue(table: memory.macroFamilies, row: row, column: 0) != row
+            || ownerSyntaxID < 0 || ownerSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
+            || compilerIntTableValue(table: tables.syntaxIndex, row: ownerSyntaxID, column: 0) != compilerSyntaxKindMember()
+            || macroDeclarationRow < 0 || macroDeclarationRow >= compilerIntTableRowCount(table: tables.macroDeclarations)
+            || representationID != row
+            || (storagePolicy != compilerMemoryStorageImmutable() && storagePolicy != compilerMemoryStorageMutable())
+            || compilerIntTableValue(table: memory.macroFamilies, row: row, column: 9) != compilerMemoryCountRowsWithValue(table: memory.macroFamilyMembers, column: 1, value: row)
+            || (compilerIntTableValue(table: memory.macroFamilies, row: row, column: 3) == 0 && compilerIntTableValue(table: memory.macroFamilies, row: row, column: 4) == 0)
+            || (compilerIntTableValue(table: memory.macroFamilies, row: row, column: 5) == 0 && compilerIntTableValue(table: memory.macroFamilies, row: row, column: 6) == 0) { return false }
+        row: row + 1
+    }
+    row: 0
+    while row < memberCount {
+        let familyID: Int(compilerIntTableValue(table: memory.macroFamilyMembers, row: row, column: 1))
+        let applicationRow: Int(compilerIntTableValue(table: memory.macroFamilyMembers, row: row, column: 2))
+        let targetSyntaxID: Int(compilerIntTableValue(table: memory.macroFamilyMembers, row: row, column: 5))
+        let valueID: Int(compilerIntTableValue(table: memory.macroFamilyMembers, row: row, column: 8))
+        let targetKind: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 13))
+        if compilerIntTableValue(table: memory.macroFamilyMembers, row: row, column: 0) != row
+            || familyID < 0 || familyID >= familyCount
+            || applicationRow < 0 || applicationRow >= compilerIntTableRowCount(table: tables.macroApplications)
+            || targetSyntaxID < 0 || targetSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
+            || compilerIntTableValue(table: tables.syntaxIndex, row: targetSyntaxID, column: 0) != targetKind
+            || valueID != row
+            || compilerMacroExecutionResolvedDeclaration(tables: tables, applicationRow: applicationRow) != compilerIntTableValue(table: memory.macroFamilies, row: familyID, column: 2)
+            || !compilerMacroTargetKindAccepts(surfaceKind: compilerIntTableValue(table: tables.macroDeclarations, row: compilerIntTableValue(table: memory.macroFamilies, row: familyID, column: 2), column: 17), targetKind: targetKind)
+            || (compilerIntTableValue(table: memory.macroFamilyMembers, row: row, column: 3) == 0 && compilerIntTableValue(table: memory.macroFamilyMembers, row: row, column: 4) == 0)
+            || (compilerIntTableValue(table: memory.macroFamilyMembers, row: row, column: 6) == 0 && compilerIntTableValue(table: memory.macroFamilyMembers, row: row, column: 7) == 0) { return false }
+        row: row + 1
+    }
+    row: 0
+    while row < representationCount {
+        if compilerIntTableValue(table: memory.runtimeRepresentations, row: row, column: 0) != row
+            || compilerIntTableValue(table: memory.runtimeRepresentations, row: row, column: 1) != row
+            || compilerIntTableValue(table: memory.runtimeRepresentations, row: row, column: 2) != compilerMemoryRuntimeRepresentationIDArray()
+            || compilerIntTableValue(table: memory.runtimeRepresentations, row: row, column: 4) != compilerMemoryCountRowsWithValue(table: memory.runtimePartitions, column: 1, value: row)
+            || compilerIntTableValue(table: memory.runtimeRepresentations, row: row, column: 7) != compilerMemoryCountRowsWithValue(table: memory.representationChanges, column: 1, value: row)
+            || compilerIntTableValue(table: memory.runtimeRepresentations, row: row, column: 8) != compilerMemoryCountRowsWithValue(table: memory.runtimeValues, column: 1, value: row)
+            || (compilerIntTableValue(table: memory.runtimeRepresentations, row: row, column: 5) == 0 && compilerIntTableValue(table: memory.runtimeRepresentations, row: row, column: 6) == 0) { return false }
+        row: row + 1
+    }
+    row: 0
+    while row < partitionCount {
+        if compilerIntTableValue(table: memory.runtimePartitions, row: row, column: 0) != row
+            || compilerIntTableValue(table: memory.runtimePartitions, row: row, column: 1) < 0
+            || compilerIntTableValue(table: memory.runtimePartitions, row: row, column: 1) >= representationCount
+            || compilerIntTableValue(table: memory.runtimePartitions, row: row, column: 2) != row
+            || compilerIntTableValue(table: memory.runtimePartitions, row: row, column: 3) != compilerIntTableValue(table: memory.macroFamilies, row: row, column: 1)
+            || compilerIntTableValue(table: memory.runtimePartitions, row: row, column: 8) != compilerMemoryCountRowsWithValue(table: memory.runtimeValues, column: 2, value: row)
+            || (compilerIntTableValue(table: memory.runtimePartitions, row: row, column: 4) == 0 && compilerIntTableValue(table: memory.runtimePartitions, row: row, column: 5) == 0)
+            || (compilerIntTableValue(table: memory.runtimePartitions, row: row, column: 6) == 0 && compilerIntTableValue(table: memory.runtimePartitions, row: row, column: 7) == 0) { return false }
+        row: row + 1
+    }
+    row: 0
+    while row < valueCount {
+        let representationID: Int(compilerIntTableValue(table: memory.runtimeValues, row: row, column: 1))
+        let partitionID: Int(compilerIntTableValue(table: memory.runtimeValues, row: row, column: 2))
+        let memberID: Int(compilerIntTableValue(table: memory.runtimeValues, row: row, column: 3))
+        let applicationRow: Int(compilerIntTableValue(table: memory.runtimeValues, row: row, column: 4))
+        let targetSyntaxID: Int(compilerIntTableValue(table: memory.runtimeValues, row: row, column: 5))
+        if compilerIntTableValue(table: memory.runtimeValues, row: row, column: 0) != row
+            || representationID < 0 || representationID >= representationCount
+            || partitionID < 0 || partitionID >= partitionCount
+            || compilerIntTableValue(table: memory.runtimePartitions, row: partitionID, column: 1) != representationID
+            || memberID != row
+            || applicationRow != compilerIntTableValue(table: memory.macroFamilyMembers, row: memberID, column: 2)
+            || targetSyntaxID != compilerIntTableValue(table: memory.macroFamilyMembers, row: memberID, column: 5)
+            || compilerIntTableValue(table: memory.runtimeValues, row: row, column: 10) != compilerMemoryPriorRowCountWithValue(table: memory.runtimeValues, endRow: row, column: 2, value: partitionID)
+            || compilerIntTableValue(table: memory.runtimeValues, row: row, column: 11) != compilerMemoryRuntimeValuePresent()
+            || (compilerIntTableValue(table: memory.runtimeValues, row: row, column: 6) == 0 && compilerIntTableValue(table: memory.runtimeValues, row: row, column: 7) == 0)
+            || (compilerIntTableValue(table: memory.runtimeValues, row: row, column: 8) == 0 && compilerIntTableValue(table: memory.runtimeValues, row: row, column: 9) == 0) { return false }
+        row: row + 1
+    }
+    row: 0
+    while row < changeCount {
+        let representationID: Int(compilerIntTableValue(table: memory.representationChanges, row: row, column: 1))
+        let changeKind: Int(compilerIntTableValue(table: memory.representationChanges, row: row, column: 2))
+        let partitionID: Int(compilerIntTableValue(table: memory.representationChanges, row: row, column: 3))
+        let valueID: Int(compilerIntTableValue(table: memory.representationChanges, row: row, column: 4))
+        if compilerIntTableValue(table: memory.representationChanges, row: row, column: 0) != row
+            || representationID < 0 || representationID >= representationCount
+            || partitionID < 0 || partitionID >= partitionCount
+            || compilerIntTableValue(table: memory.runtimePartitions, row: partitionID, column: 1) != representationID
+            || (changeKind != compilerMemoryRepresentationChangePartitionAdded() && changeKind != compilerMemoryRepresentationChangeValueInserted())
+            || (compilerIntTableValue(table: memory.representationChanges, row: row, column: 9) == 0 && compilerIntTableValue(table: memory.representationChanges, row: row, column: 10) == 0) { return false }
+        if changeKind == compilerMemoryRepresentationChangePartitionAdded() {
+            if valueID != 0 - 1
+                || compilerIntTableValue(table: memory.representationChanges, row: row, column: 5) != 0 - 1
+                || compilerIntTableValue(table: memory.representationChanges, row: row, column: 6) != 0 - 1
+                || compilerIntTableValue(table: memory.representationChanges, row: row, column: 11) != 0 { return false }
+        } else {
+            if valueID < 0 || valueID >= valueCount
+                || partitionID != compilerIntTableValue(table: memory.runtimeValues, row: valueID, column: 2)
+                || compilerIntTableValue(table: memory.representationChanges, row: row, column: 5) != compilerIntTableValue(table: memory.runtimeValues, row: valueID, column: 4)
+                || compilerIntTableValue(table: memory.representationChanges, row: row, column: 6) != compilerIntTableValue(table: memory.runtimeValues, row: valueID, column: 5)
+                || compilerIntTableValue(table: memory.representationChanges, row: row, column: 11) != compilerIntTableValue(table: memory.runtimeValues, row: valueID, column: 10) + 1 { return false }
+        }
+        row: row + 1
+    }
+    return true
 }
 
 function compilerMemoryLayoutRowForType(memory: CompilerMemoryGraph, typeNodeID: Int): Int {
@@ -9086,6 +9524,7 @@ function compilerMemoryBuild(tables: CompilerSyntaxTables, delta: CompilerGraphD
         compilerMemoryGraphPoison(memory: memory)
         return 0 - 1
     }
+    if compilerMemoryBuildMacroFamilyRepresentations(tables: tables, memory: memory) != 0 { return 0 - 1 }
     if compilerMemoryBuildLayouts(tables: tables, delta: delta, semantics: semantics, memory: memory) != 0 { return 0 - 1 }
     if compilerMemoryBuildStorages(tables: tables, delta: delta, semantics: semantics, memory: memory) != 0 { return 0 - 1 }
     if compilerMemoryBuildLayoutDecisions(memory: memory) != 0 { return 0 - 1 }
@@ -9270,7 +9709,8 @@ function compilerMemoryGraphIsValid(tables: CompilerSyntaxTables, delta: Compile
     if rawBufferCount(buffer: memory.failures) != 0
         || !compilerIntTableIsComplete(table: memory.layouts)
         || !compilerIntTableIsComplete(table: memory.storages)
-        || !compilerIntTableIsComplete(table: memory.decisions) { return false }
+        || !compilerIntTableIsComplete(table: memory.decisions)
+        || !compilerMemoryMacroFamilyRepresentationsAreValid(tables: tables, memory: memory) { return false }
     let memoryLayoutCount: Int(compilerIntTableRowCount(table: memory.layouts))
     let memoryStorageCount: Int(compilerIntTableRowCount(table: memory.storages))
     let memoryConstructParameterCount: Int(compilerMemoryConstructParameterCount(tables: tables, semantics: semantics))
@@ -9465,7 +9905,27 @@ function compilerMemoryRenderSnapshot(memory: CompilerMemoryGraph): String {
     let memoryLayouts: String(compilerTypedSyntaxRenderRawTable(name: String("memoryLayout"), table: memory.layouts))
     let memoryStorages: String(compilerTypedSyntaxRenderRawTable(name: String("memoryStorage"), table: memory.storages))
     let memoryDecisions: String(compilerTypedSyntaxRenderRawTable(name: String("memoryDecision"), table: memory.decisions))
-    return "memoryGraph\(memoryTab)valid=true\(memoryTab)layoutCount=\(compilerIntTableRowCount(table: memory.layouts))\(memoryTab)storageCount=\(compilerIntTableRowCount(table: memory.storages))\(memoryTab)decisionCount=\(compilerIntTableRowCount(table: memory.decisions))\(memoryNewline)\(memoryLayouts)\(memoryStorages)\(memoryDecisions)"
+    let memoryMacroFamilies: String(compilerTypedSyntaxRenderRawTable(name: String("memoryMacroFamily"), table: memory.macroFamilies))
+    let memoryMacroFamilyMembers: String(compilerTypedSyntaxRenderRawTable(name: String("memoryMacroFamilyMember"), table: memory.macroFamilyMembers))
+    let memoryRepresentations: String(compilerTypedSyntaxRenderRawTable(name: String("memoryRuntimeRepresentation"), table: memory.runtimeRepresentations))
+    let memoryPartitions: String(compilerTypedSyntaxRenderRawTable(name: String("memoryRuntimePartition"), table: memory.runtimePartitions))
+    let memoryValues: String(compilerTypedSyntaxRenderRawTable(name: String("memoryRuntimeValue"), table: memory.runtimeValues))
+    let memoryRepresentationChanges: String(compilerTypedSyntaxRenderRawTable(name: String("memoryRepresentationChange"), table: memory.representationChanges))
+    return "memoryGraph\(memoryTab)valid=true\(memoryTab)layoutCount=\(compilerIntTableRowCount(table: memory.layouts))\(memoryTab)storageCount=\(compilerIntTableRowCount(table: memory.storages))\(memoryTab)decisionCount=\(compilerIntTableRowCount(table: memory.decisions))\(memoryTab)macroFamilyCount=\(compilerIntTableRowCount(table: memory.macroFamilies))\(memoryTab)macroFamilyMemberCount=\(compilerIntTableRowCount(table: memory.macroFamilyMembers))\(memoryTab)runtimeRepresentationCount=\(compilerIntTableRowCount(table: memory.runtimeRepresentations))\(memoryTab)runtimePartitionCount=\(compilerIntTableRowCount(table: memory.runtimePartitions))\(memoryTab)runtimeValueCount=\(compilerIntTableRowCount(table: memory.runtimeValues))\(memoryTab)representationChangeCount=\(compilerIntTableRowCount(table: memory.representationChanges))\(memoryNewline)\(memoryLayouts)\(memoryStorages)\(memoryDecisions)\(memoryMacroFamilies)\(memoryMacroFamilyMembers)\(memoryRepresentations)\(memoryPartitions)\(memoryValues)\(memoryRepresentationChanges)"
+}
+
+function compilerMemoryRenderMacroFamilySnapshot(memory: CompilerMemoryGraph): String {
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    state validText: String("true")
+    if rawBufferCount(buffer: memory.failures) != 0 { validText: String("false") }
+    let families: String(compilerTypedSyntaxRenderRawTable(name: String("memoryMacroFamily"), table: memory.macroFamilies))
+    let members: String(compilerTypedSyntaxRenderRawTable(name: String("memoryMacroFamilyMember"), table: memory.macroFamilyMembers))
+    let representations: String(compilerTypedSyntaxRenderRawTable(name: String("memoryRuntimeRepresentation"), table: memory.runtimeRepresentations))
+    let partitions: String(compilerTypedSyntaxRenderRawTable(name: String("memoryRuntimePartition"), table: memory.runtimePartitions))
+    let values: String(compilerTypedSyntaxRenderRawTable(name: String("memoryRuntimeValue"), table: memory.runtimeValues))
+    let changes: String(compilerTypedSyntaxRenderRawTable(name: String("memoryRepresentationChange"), table: memory.representationChanges))
+    return "macroFamilyMemory\(tab)valid=\(validText)\(tab)familyCount=\(compilerIntTableRowCount(table: memory.macroFamilies))\(tab)memberCount=\(compilerIntTableRowCount(table: memory.macroFamilyMembers))\(tab)representationCount=\(compilerIntTableRowCount(table: memory.runtimeRepresentations))\(tab)partitionCount=\(compilerIntTableRowCount(table: memory.runtimePartitions))\(tab)valueCount=\(compilerIntTableRowCount(table: memory.runtimeValues))\(tab)changeCount=\(compilerIntTableRowCount(table: memory.representationChanges))\(newline)\(families)\(members)\(representations)\(partitions)\(values)\(changes)"
 }
 
 function compilerMemorySummary(source: String): String {
@@ -9477,6 +9937,8 @@ function compilerMemorySummary(source: String): String {
     state memorySummary: String("")
     if memoryCaptureStatus != 0 || !compilerSyntaxTablesIsValid(tables: memoryTables) {
         memorySummary: compilerNativeDiagnostic(kind: String("invalidTypedSyntaxSnapshot"))
+    } else if compilerMacroLink(tables: memoryTables) != 0 || compilerIntTableRowCount(table: memoryTables.macroDiagnostics) != 0 {
+        memorySummary: compilerMacroRenderDiagnostics(tables: memoryTables)
     } else if compilerPlotterBuild(tables: memoryTables, delta: memoryDelta) != 0 || !compilerGraphDeltaIsValid(tables: memoryTables, delta: memoryDelta) {
         memorySummary: compilerNativeDiagnostic(kind: String("invalidGraphDelta"))
     } else if compilerSemanticBuild(tables: memoryTables, delta: memoryDelta, semantics: memorySemantics) != 0 || !compilerSemanticGraphIsValid(tables: memoryTables, delta: memoryDelta, semantics: memorySemantics) {
@@ -10941,13 +11403,20 @@ function compilerMacroRenderSnapshot(tables: CompilerSyntaxTables): String {
 
 function compilerMacroExecutionSummaryForValidIndex(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex): String {
     let execution: CompilerMacroExecutionResult(compilerMacroExecution(tables: tables, index: index))
+    let memory: CompilerMemoryGraph(compilerMemoryGraphCreate())
     state output: String("")
     if execution.status != 0 {
         output: compilerMacroRenderExecutionError(tables: tables, result: execution)
+    } else if compilerMemoryBuildMacroFamilyRepresentations(tables: tables, memory: memory) != 0
+        || !compilerMemoryMacroFamilyRepresentationsAreValid(tables: tables, memory: memory) {
+        output: "\(compilerNativeDiagnostic(kind: String("invalidMacroFamilyMemoryGraph")))\(compilerMemoryRenderMacroFamilySnapshot(memory: memory))"
     } else {
-        output: "\(compilerMacroRenderExecutionSnapshot(tables: tables, result: execution))\(compilerMacroRenderSnapshot(tables: tables))"
+        output: "\(compilerMacroRenderExecutionSnapshot(tables: tables, result: execution))\(compilerMacroRenderSnapshot(tables: tables))\(compilerMemoryRenderMacroFamilySnapshot(memory: memory))"
     }
     if compilerGraphDeltaDestroy(delta: execution.graphDelta) != 0 {
+        output: "compilerError\tkind=macroOwnershipFailure\n"
+    }
+    if compilerMemoryGraphDestroy(memory: memory) != 0 {
         output: "compilerError\tkind=macroOwnershipFailure\n"
     }
     return output
@@ -11323,6 +11792,7 @@ function compilerSourceSetLLVMText(source: String): String {
 
 function compilerNativeSourceSetLLVMTextForValidIndex(source: String, declarationTables: CompilerSyntaxTables, executionIndex: CompilerDeclarationIndex): String {
     let execution: CompilerMacroExecutionResult(compilerMacroExecution(tables: declarationTables, index: executionIndex))
+    let familyMemory: CompilerMemoryGraph(compilerMemoryGraphCreate())
     state output: String("")
     if execution.status != 0 {
         output: compilerMacroRenderExecutionError(tables: declarationTables, result: execution)
@@ -11336,11 +11806,17 @@ function compilerNativeSourceSetLLVMTextForValidIndex(source: String, declaratio
             compilerDeclarationIndexDestroy(index: executionIndex)
         } else {
             compilerDeclarationIndexDestroy(index: executionIndex)
-            let combinedProgram: CompilerProgram(compilerNativeSourceSetProgramForLLVM(source: source))
-            output: compilerCoreLLVMNativeEntryTextForProgram(program: combinedProgram, declarationTables: declarationTables, expansionDelta: execution.graphDelta)
+            if compilerMemoryBuildMacroFamilyRepresentations(tables: declarationTables, memory: familyMemory) != 0
+                || !compilerMemoryMacroFamilyRepresentationsAreValid(tables: declarationTables, memory: familyMemory) {
+                output: compilerNativeDiagnostic(kind: String("invalidMacroFamilyMemoryGraph"))
+            } else {
+                let combinedProgram: CompilerProgram(compilerNativeSourceSetProgramForLLVM(source: source))
+                output: compilerCoreLLVMNativeEntryTextForProgram(program: combinedProgram, declarationTables: declarationTables, expansionDelta: execution.graphDelta)
+            }
             compilerGraphDeltaDestroy(delta: execution.graphDelta)
         }
     }
+    if compilerMemoryGraphDestroy(memory: familyMemory) != 0 { return compilerNativeDiagnostic(kind: String("memoryOwnershipFailure")) }
     return output
 }
 
@@ -12576,6 +13052,9 @@ function compilerCoreTypeReferenceFromState(firstToken: RangeLexedToken, parseSt
 
 function compilerCoreParseTypeReferenceToken(parseState: CompilerTypeReferenceParseState, token: RangeLexedToken): CompilerTypeReferenceParseState {
     if token.kind == String("identifier") {
+        return compilerCoreTypeReferenceAppend(parseState: parseState, token: token, text: token.text, genericDelta: 0, arrayDelta: 0)
+    }
+    if token.kind == String("macroAttribute") && parseState.arrayDepth > 0 {
         return compilerCoreTypeReferenceAppend(parseState: parseState, token: token, text: token.text, genericDelta: 0, arrayDelta: 0)
     }
     if token.kind == String("dot") {
