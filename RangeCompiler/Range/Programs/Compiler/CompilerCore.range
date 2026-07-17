@@ -1102,8 +1102,9 @@ function compilerSyntaxKindSwitch(): Int { return 40 }
 function compilerSyntaxKindSwitchCase(): Int { return 41 }
 function compilerSyntaxKindEnumCaseValue(): Int { return 42 }
 function compilerSyntaxKindArrayLiteral(): Int { return 43 }
-function compilerSyntaxKindLastBody(): Int { return compilerSyntaxKindArrayLiteral() }
-function compilerSyntaxKindEnum(): Int { return 44 }
+function compilerSyntaxKindDoubleLiteral(): Int { return 44 }
+function compilerSyntaxKindLastBody(): Int { return compilerSyntaxKindDoubleLiteral() }
+function compilerSyntaxKindEnum(): Int { return 45 }
 
 function compilerSyntaxLocalKindLet(): Int { return 1 }
 function compilerSyntaxLocalKindState(): Int { return 2 }
@@ -1124,6 +1125,7 @@ function compilerSyntaxTypeTargetDeclaration(): Int { return 2 }
 function compilerSyntaxBuiltinTypeInt(): Int { return 1 }
 function compilerSyntaxBuiltinTypeBool(): Int { return 2 }
 function compilerSyntaxBuiltinTypeString(): Int { return 3 }
+function compilerSyntaxBuiltinTypeFloat(): Int { return 4 }
 
 function compilerSyntaxRoleStatement(): Int { return 1 }
 function compilerSyntaxRoleInitializer(): Int { return 2 }
@@ -2039,8 +2041,8 @@ function compilerBodySyntaxCaptureExpressionLeaf(source: String, tables: Compile
     let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursor))
     let token: RangeLexedToken(maybeToken ?? fallbackToken)
     state matchesSource: Bool(false)
-    if kindTag == compilerSyntaxKindIntegerLiteral() {
-        matchesSource: token.kind == .integer && token.start == start && token.end == end && token.text == value
+    if kindTag == compilerSyntaxKindIntegerLiteral() || kindTag == compilerSyntaxKindDoubleLiteral() {
+        matchesSource: (kindTag == compilerSyntaxKindIntegerLiteral() && token.kind == .integer || kindTag == compilerSyntaxKindDoubleLiteral() && token.kind == .double) && token.start == start && token.end == end && token.text == value
     } else if kindTag == compilerSyntaxKindIdentifier() {
         matchesSource: (token.kind == .identifier || token.kind == .keyword) && token.start == start && token.end == end && token.text == value
     }
@@ -4074,6 +4076,7 @@ function compilerSyntaxBuiltinTypeIDForName(name: String): Int {
     if name == String("Int") { return compilerSyntaxBuiltinTypeInt() }
     if name == String("Bool") { return compilerSyntaxBuiltinTypeBool() }
     if name == String("String") { return compilerSyntaxBuiltinTypeString() }
+    if name == String("Float") { return compilerSyntaxBuiltinTypeFloat() }
     return 0 - 1
 }
 
@@ -4455,7 +4458,7 @@ function compilerSyntaxBodyNodeShapeIsValid(tables: CompilerSyntaxTables, syntax
         return compilerSyntaxBodyEdgeCount(tables: tables, syntaxID: syntaxID, roleTag: compilerSyntaxRoleArgumentValue(), asOwner: true) == 1
             && compilerSyntaxBodyEdgeCount(tables: tables, syntaxID: syntaxID, roleTag: 0 - 1, asOwner: true) == 1
     }
-    return (kindTag == compilerSyntaxKindIdentifier() || kindTag == compilerSyntaxKindIntegerLiteral())
+    return (kindTag == compilerSyntaxKindIdentifier() || kindTag == compilerSyntaxKindIntegerLiteral() || kindTag == compilerSyntaxKindDoubleLiteral())
         && compilerSyntaxBodyEdgeCount(tables: tables, syntaxID: syntaxID, roleTag: 0 - 1, asOwner: true) == 0
 }
 
@@ -4464,6 +4467,7 @@ function compilerSyntaxKindIsBodyExpression(kindTag: Int): Bool {
         || kindTag == compilerSyntaxKindApplication()
         || kindTag == compilerSyntaxKindMemberRead()
         || kindTag == compilerSyntaxKindIntegerLiteral()
+        || kindTag == compilerSyntaxKindDoubleLiteral()
         || kindTag == compilerSyntaxKindAddition()
         || kindTag == compilerSyntaxKindIndex()
         || kindTag == compilerSyntaxKindBindingReference()
@@ -7085,6 +7089,7 @@ function compilerSemanticResolutionArgumentMember(): Int { return 6 }
 function compilerSemanticResolutionArgumentParameter(): Int { return 7 }
 function compilerSemanticTypeNone(): Int { return 0 }
 function compilerSemanticTypeInt(): Int { return 1 }
+function compilerSemanticTypeFloat(): Int { return 2 }
 function compilerSemanticTypeConstruct(): Int { return 2 }
 
 function compilerSemanticGraphCreate(): CompilerSemanticGraph {
@@ -7810,6 +7815,7 @@ function compilerSemanticTypeForNode(tables: CompilerSyntaxTables, delta: Compil
     if semanticNodeKind == compilerSyntaxKindIntegerLiteral() || semanticNodeKind == compilerSyntaxKindAddition() {
         return CompilerSemanticType(kindTag: compilerSemanticTypeInt(), declarationNodeID: 0 - 1)
     }
+    if semanticNodeKind == compilerSyntaxKindDoubleLiteral() { return CompilerSemanticType(kindTag: compilerSemanticTypeFloat(), declarationNodeID: 0 - 1) }
     if semanticNodeKind == compilerSyntaxKindIdentifier() || semanticNodeKind == compilerSyntaxKindBindingReference() {
         let semanticIdentifierResolutionKind: Int(compilerSemanticResolutionKind(semantics: semantics, useNodeID: nodeID))
         if semanticIdentifierResolutionKind == compilerSemanticResolutionLocal() || semanticIdentifierResolutionKind == compilerSemanticResolutionParameter() {
@@ -14216,6 +14222,7 @@ function compilerCoreLLVMDirectCallSignatureAudit(tables: CompilerSyntaxTables, 
         state llvmReturnType: String(compilerCoreLLVMTypeNameForRangeType(typeName: returnType))
         if returnCategory == compilerBodyFunctionSignatureABICategoryInt() { llvmReturnType: String("i32") }
         if returnCategory == compilerBodyFunctionSignatureABICategoryBool() { llvmReturnType: String("i1") }
+        if returnCategory == compilerBodyFunctionSignatureABICategoryFloat() { llvmReturnType: String("double") }
         if returnCategory == compilerBodyFunctionSignatureABICategoryPointer() { llvmReturnType: String("ptr") }
         if returnCategory == compilerBodyFunctionSignatureABICategoryNone() && compilerModuleABIPlanIsParticipant(plan: abiPlan, functionRow: functionRow) {
             llvmReturnType: compilerCoreLLVMNativeABITypeName(tables: tables, index: index, typeName: returnType)
@@ -14681,6 +14688,7 @@ function compilerBodyFunctionSignatureABICategoryNone(): Int { return 0 }
 function compilerBodyFunctionSignatureABICategoryInt(): Int { return 1 }
 function compilerBodyFunctionSignatureABICategoryBool(): Int { return 2 }
 function compilerBodyFunctionSignatureABICategoryPointer(): Int { return 3 }
+function compilerBodyFunctionSignatureABICategoryFloat(): Int { return 4 }
 
 function compilerReachableLLVMStateFunctionInstanceRow(reachability: CompilerReachableLLVMState, instanceID: Int): Int {
     if instanceID < 0 || instanceID >= compilerIntTableRowCount(table: reachability.functionInstances) { return 0 - 1 }
@@ -16018,6 +16026,7 @@ function compilerBodyResolutionArrayLiteral(): Int { return 16 }
 function compilerBodyResolutionArrayCount(): Int { return 17 }
 function compilerBodyBuiltinArraySyntaxID(): Int { return 0 - 2 }
 function compilerBodyBuiltinString(): Int { return 1 }
+function compilerBodyBuiltinFloat(): Int { return 2 }
 function compilerBodyBuiltinRuntimeCall(): Int { return 2 }
 function compilerBodyBuiltinNil(): Int { return 3 }
 function compilerBodyRuntimeBuiltinNone(): Int { return 0 }
@@ -16308,7 +16317,8 @@ function compilerBodyTypeMacroTarget(): Int { return 6 }
 function compilerBodyTypeMacroDiagnostics(): Int { return 7 }
 function compilerBodyTypeMacroGraph(): Int { return 8 }
 function compilerBodyTypeEnum(): Int { return 9 }
-function compilerBodyTypeLast(): Int { return compilerBodyTypeEnum() }
+function compilerBodyTypeFloat(): Int { return 10 }
+function compilerBodyTypeLast(): Int { return compilerBodyTypeFloat() }
 
 function compilerBodyTypeInstanceColumnCount(): Int { return 6 }
 function compilerBodyTypeInstanceIDColumn(): Int { return 0 }
@@ -17411,6 +17421,7 @@ function compilerBodyArenaParsePrimary(arena: CompilerBodyArena, start: Int, lim
     }
     state kind: Int(0 - 1)
     if token.kind == .integer { kind: compilerSyntaxKindIntegerLiteral() }
+    if token.kind == .double { kind: compilerSyntaxKindDoubleLiteral() }
     if token.kind == .stringLiteral {
         if compilerCoreStringContentHasInterpolation(content: compilerCoreStringLiteralContent(text: token.text)) { return compilerBodyArenaParseInterpolatedString(arena: arena, token: token) }
         kind: compilerSyntaxKindStringLiteral()
@@ -18099,6 +18110,7 @@ function compilerBodyArenaTypeKindForName(arena: CompilerBodyArena, typeName: St
     if typeName == String("Int") { return compilerBodyTypeInt() }
     if typeName == String("Bool") { return compilerBodyTypeBool() }
     if typeName == String("String") { return compilerBodyTypeString() }
+    if typeName == String("Float") { return compilerBodyTypeFloat() }
     if typeName == String("Void") { return compilerBodyTypeVoid() }
     if compilerBodyRuntimeABITypeIsOpaque(tables: arena.tables, typeName: typeName) { return compilerBodyTypeConstruct() }
     let outerName: String(compilerBodyArenaTypeOuterName(typeName: typeName))
@@ -18260,6 +18272,7 @@ function compilerBodyArenaTypeKindForSpan(arena: CompilerBodyArena, fileID: Int,
     if compilerSemanticLocalRangeEqualsText(tables: arena.tables, fileID: fileID, start: normalizedRange.start, end: normalizedRange.end, text: String("Int")) { return compilerBodyTypeInt() }
     if compilerSemanticLocalRangeEqualsText(tables: arena.tables, fileID: fileID, start: normalizedRange.start, end: normalizedRange.end, text: String("Bool")) { return compilerBodyTypeBool() }
     if compilerSemanticLocalRangeEqualsText(tables: arena.tables, fileID: fileID, start: normalizedRange.start, end: normalizedRange.end, text: String("String")) { return compilerBodyTypeString() }
+    if compilerSemanticLocalRangeEqualsText(tables: arena.tables, fileID: fileID, start: normalizedRange.start, end: normalizedRange.end, text: String("Float")) { return compilerBodyTypeFloat() }
     if compilerSemanticLocalRangeEqualsText(tables: arena.tables, fileID: fileID, start: normalizedRange.start, end: normalizedRange.end, text: String("Void")) { return compilerBodyTypeVoid() }
     let outerRange: CompilerSourceRange(compilerBodyArenaTypeOuterRangeForSpan(arena: arena, fileID: fileID, start: normalizedRange.start, end: normalizedRange.end))
     if outerRange.start < 0 { return compilerBodyTypeUnknown() }
@@ -19005,6 +19018,7 @@ function compilerBodyArenaNodeText(arena: CompilerBodyArena, nodeID: Int): Strin
 function compilerBodyArenaExpressionTypeKind(arena: CompilerBodyArena, nodeID: Int): Int {
     let kind: Int(compilerIntTableValue(table: arena.nodes, row: nodeID, column: 1))
     if kind == compilerSyntaxKindIntegerLiteral() { return compilerBodyTypeInt() }
+    if kind == compilerSyntaxKindDoubleLiteral() { return compilerBodyTypeFloat() }
     if kind == compilerSyntaxKindStringLiteral() || kind == compilerSyntaxKindStringSegment() || kind == compilerSyntaxKindInterpolatedString() { return compilerBodyTypeString() }
     if kind == compilerSyntaxKindBoolLiteral() { return compilerBodyTypeBool() }
     if kind == compilerSyntaxKindGrouping() {
@@ -19753,13 +19767,17 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
                 targetKind: compilerBodyResolutionMemberRuntimeBuiltin()
                 returnTypeKind: compilerBodyRuntimeBuiltinReturnTypeKind(id: targetID)
             }
-        } else if calleeName == String("String") {
+        } else if calleeName == String("String") || calleeName == String("Float") {
             if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 1 { return 0 - 1 }
             let builtinArgument: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleArgument(), ordinal: 0))
             if builtinArgument < 0 || compilerIntTableValue(table: arena.nodes, row: builtinArgument, column: 6) >= 0 { return 0 - 1 }
             targetKind: compilerBodyResolutionBuiltin()
             targetID: compilerBodyBuiltinString()
             returnTypeKind: compilerBodyTypeString()
+            if calleeName == String("Float") {
+                targetID: compilerBodyBuiltinFloat()
+                returnTypeKind: compilerBodyTypeFloat()
+            }
         } else {
             let declarationRow: Int(compilerDeclarationIndexLookup(tables: arena.tables, index: index, name: calleeName, kindTag: compilerSyntaxKindFunction()))
             if declarationRow < 0 {
@@ -19921,7 +19939,7 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
         if interpolationOrdinal == 0 { return 0 - 1 }
         return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: nodeID, targetKind: compilerBodyResolutionOperator(), targetID: kind, typeKind: compilerBodyTypeString(), typeID: 0 - 1, regionNodeID: regionNodeID)
     }
-    if kind == compilerSyntaxKindIntegerLiteral() || kind == compilerSyntaxKindStringLiteral() || kind == compilerSyntaxKindStringSegment() || kind == compilerSyntaxKindBoolLiteral() { return 0 }
+    if kind == compilerSyntaxKindIntegerLiteral() || kind == compilerSyntaxKindDoubleLiteral() || kind == compilerSyntaxKindStringLiteral() || kind == compilerSyntaxKindStringSegment() || kind == compilerSyntaxKindBoolLiteral() { return 0 }
     if kind == compilerSyntaxKindGrouping() {
         let groupedNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleGroupedValue(), ordinal: 0))
         if groupedNodeID < 0 { return 0 - 1 }
@@ -19983,12 +20001,12 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
         let rightType: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: binaryRightNodeID))
         state binaryResultType: Int(compilerBodyTypeBool())
         if kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication() || kind == compilerSyntaxKindDivision() || kind == compilerSyntaxKindRemainder() {
-            if leftType != compilerBodyTypeInt() || rightType != compilerBodyTypeInt() { return 0 - 1 }
-            binaryResultType: compilerBodyTypeInt()
+            if leftType != rightType || (leftType != compilerBodyTypeInt() && leftType != compilerBodyTypeFloat()) { return 0 - 1 }
+            binaryResultType: leftType
         } else if kind == compilerSyntaxKindBooleanAnd() || kind == compilerSyntaxKindBooleanOr() {
             if leftType != compilerBodyTypeBool() || rightType != compilerBodyTypeBool() { return 0 - 1 }
         } else if kind == compilerSyntaxKindLessThan() || kind == compilerSyntaxKindLessEqual() || kind == compilerSyntaxKindGreaterThan() || kind == compilerSyntaxKindGreaterEqual() {
-            if leftType != rightType || (leftType != compilerBodyTypeInt() && leftType != compilerBodyTypeString()) { return 0 - 1 }
+            if leftType != rightType || (leftType != compilerBodyTypeInt() && leftType != compilerBodyTypeFloat() && leftType != compilerBodyTypeString()) { return 0 - 1 }
         } else if leftType == compilerBodyTypeUnknown() || leftType != rightType { return 0 - 1 }
         if kind == compilerSyntaxKindEquality() && leftType == compilerBodyTypeEnum() {
             let leftEnumTypeID: Int(compilerBodyArenaExpressionTypeID(arena: arena, nodeID: binaryLeftNodeID))
@@ -20010,8 +20028,8 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
         if kind == compilerSyntaxKindPrefixNot() {
             if operandType != compilerBodyTypeBool() { return 0 - 1 }
         } else {
-            if operandType != compilerBodyTypeInt() { return 0 - 1 }
-            prefixResultType: compilerBodyTypeInt()
+            if operandType != compilerBodyTypeInt() && operandType != compilerBodyTypeFloat() { return 0 - 1 }
+            prefixResultType: operandType
         }
         return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: nodeID, targetKind: compilerBodyResolutionOperator(), targetID: kind, typeKind: prefixResultType, typeID: 0 - 1, regionNodeID: regionNodeID)
     }
@@ -20854,7 +20872,7 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
             || targetKind < compilerBodyResolutionLocalSymbol() || targetKind > compilerBodyResolutionArrayCount() { return false }
         if targetKind == compilerBodyResolutionLocalSymbol() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.symbols)) { return false }
         if targetKind == compilerBodyResolutionFunction() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.functions)) { return false }
-        if targetKind == compilerBodyResolutionBuiltin() && targetID != compilerBodyBuiltinString() && targetID != compilerBodyBuiltinRuntimeCall() && targetID != compilerBodyBuiltinNil() { return false }
+        if targetKind == compilerBodyResolutionBuiltin() && targetID != compilerBodyBuiltinString() && targetID != compilerBodyBuiltinFloat() && targetID != compilerBodyBuiltinRuntimeCall() && targetID != compilerBodyBuiltinNil() { return false }
         if targetKind == compilerBodyResolutionMember() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.members)) { return false }
         if targetKind == compilerBodyResolutionOperator()
             && ((targetID < compilerSyntaxKindAddition() || targetID > compilerSyntaxKindPrefixNegate())
@@ -25710,12 +25728,13 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         }
         return CompilerBodyMIRValueResult(valueID: interpolationValueID, isValid: interpolationValueID >= 0)
     }
-    if kind == compilerSyntaxKindIntegerLiteral() || kind == compilerSyntaxKindBoolLiteral() || kind == compilerSyntaxKindStringLiteral() || kind == compilerSyntaxKindStringSegment() || kind == compilerSyntaxKindEnumCaseValue() {
+    if kind == compilerSyntaxKindIntegerLiteral() || kind == compilerSyntaxKindDoubleLiteral() || kind == compilerSyntaxKindBoolLiteral() || kind == compilerSyntaxKindStringLiteral() || kind == compilerSyntaxKindStringSegment() || kind == compilerSyntaxKindEnumCaseValue() {
         state literalTypeKind: Int(compilerBodyTypeInt())
         state literalTypeID: Int(0 - 1)
         state valueKind: Int(compilerBodyMIRValueConstant())
         state literalOperationKind: Int(compilerBodyMIROperationConstant())
         if kind == compilerSyntaxKindBoolLiteral() { literalTypeKind: compilerBodyTypeBool() }
+        if kind == compilerSyntaxKindDoubleLiteral() { literalTypeKind: compilerBodyTypeFloat() }
         if kind == compilerSyntaxKindEnumCaseValue() {
             let enumResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: nodeID))
             if enumResolutionRow < 0 { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
@@ -25747,6 +25766,12 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         }
         if resolutionTargetKind == compilerBodyResolutionEnum() {
             return compilerBodyMIRBuildEnumApplication(arena: arena, applicationNodeID: nodeID, callResolutionRow: callResolutionRow, blockID: blockID)
+        }
+        if resolutionTargetKind == compilerBodyResolutionBuiltin()
+            && targetID == compilerBodyBuiltinFloat() {
+            let floatArgumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleArgument(), ordinal: 0))
+            if floatArgumentNodeID < 0 { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
+            return compilerBodyMIRBuildExpression(arena: arena, nodeID: compilerBodyArenaChild(arena: arena, ownerNodeID: floatArgumentNodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0), blockID: blockID)
         }
         if resolutionTargetKind == compilerBodyResolutionBuiltin() { callTargetKind: compilerBodyMIROperationTargetBuiltin() }
         if resolutionTargetKind == compilerBodyResolutionRuntimeBuiltin() { callTargetKind: compilerBodyMIROperationTargetRuntimeBuiltin() }
@@ -25858,7 +25883,7 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         state resultType: Int(compilerBodyTypeBool())
         if kind == compilerSyntaxKindPrefixNegate() {
             operationKind: compilerBodyMIROperationPrefixNegate()
-            resultType: compilerBodyTypeInt()
+            resultType: compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: operandNodeID)
         }
         let prefixResultValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueBinary(), typeKind: resultType, typeID: 0 - 1, sourceNodeID: nodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: nodeID))
         let prefixOperationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
@@ -25909,7 +25934,7 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
             if operatorText == String("!=") { binaryOperationKind: compilerBodyMIROperationNotEqual() }
         }
         state binaryTypeKind: Int(compilerBodyTypeBool())
-        if kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication() || kind == compilerSyntaxKindDivision() || kind == compilerSyntaxKindRemainder() { binaryTypeKind: compilerBodyTypeInt() }
+        if kind == compilerSyntaxKindAddition() || kind == compilerSyntaxKindSubtraction() || kind == compilerSyntaxKindMultiplication() || kind == compilerSyntaxKindDivision() || kind == compilerSyntaxKindRemainder() { binaryTypeKind: compilerIntTableValue(table: arena.mirValues, row: binaryMIRLeftValue.valueID, column: compilerBodyMIRValueTypeColumn()) }
         let binaryValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueBinary(), typeKind: binaryTypeKind, typeID: 0 - 1, sourceNodeID: nodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: nodeID))
         let binaryOperationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
         let binaryFirstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
@@ -26451,7 +26476,7 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
             || (compilerBodyMIROperationIsTerminator(kind: operationKind) && resultValueID != 0 - 1) { return 300000 + operationRow * 100 + operationKind }
         if operationKind == compilerBodyMIROperationDirectCall() {
             if validationTargetKind == compilerBodyMIROperationTargetFunction() && (validationTargetID < 0 || validationTargetID >= compilerIntTableRowCount(table: arena.tables.functions)) { return 311001 }
-            if validationTargetKind == compilerBodyMIROperationTargetBuiltin() && validationTargetID != compilerBodyBuiltinString() { return 311002 }
+            if validationTargetKind == compilerBodyMIROperationTargetBuiltin() && validationTargetID != compilerBodyBuiltinString() && validationTargetID != compilerBodyBuiltinFloat() { return 311002 }
             if validationTargetKind == compilerBodyMIROperationTargetRuntimeBuiltin() && (validationTargetID <= compilerBodyRuntimeBuiltinNone() || validationTargetID > compilerBodyRuntimeBuiltinCount()) { return 311003 }
             if validationTargetKind != compilerBodyMIROperationTargetFunction() && validationTargetKind != compilerBodyMIROperationTargetBuiltin() && validationTargetKind != compilerBodyMIROperationTargetRuntimeBuiltin() { return 311004 }
             if validationTargetKind == compilerBodyMIROperationTargetRuntimeBuiltin() {
@@ -26950,6 +26975,7 @@ function compilerBodyLLVMValueAssignmentRow(emitter: CompilerBodyLLVMEmitter, va
 function compilerBodyLLVMTypeName(typeKind: Int): String {
     if typeKind == compilerBodyTypeInt() { return String("i32") }
     if typeKind == compilerBodyTypeBool() { return String("i1") }
+    if typeKind == compilerBodyTypeFloat() { return String("double") }
     if typeKind == compilerBodyTypeString() { return String("ptr") }
     if typeKind == compilerBodyTypeEnum() { return String("i32") }
     return String("ptr")
@@ -27272,6 +27298,7 @@ function compilerBodyArenaFunctionSignatureTypeID(arena: CompilerBodyArena, rece
 
 function compilerBodyArenaFunctionSignatureABICategory(arena: CompilerBodyArena, typeID: Int, typeKind: Int): Int {
     if typeKind == compilerBodyTypeInt() { return compilerBodyFunctionSignatureABICategoryInt() }
+    if typeKind == compilerBodyTypeFloat() { return compilerBodyFunctionSignatureABICategoryFloat() }
     if typeKind == compilerBodyTypeEnum() {
         if compilerBodyArenaTypeIDHasNativeNominalLayout(arena: arena, typeID: typeID) { return compilerBodyFunctionSignatureABICategoryNone() }
         return compilerBodyFunctionSignatureABICategoryInt()
@@ -28132,18 +28159,48 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
             return 0
         }
         state instructionName: String("icmp eq")
+        let isFloatBinary: Bool(leftValue.typeName == String("double"))
         if operationKind == compilerBodyMIROperationNotEqual() { instructionName: String("icmp ne") }
         if operationKind == compilerBodyMIROperationAnd() { instructionName: String("and") }
         if operationKind == compilerBodyMIROperationOr() { instructionName: String("or") }
-        if operationKind == compilerBodyMIROperationAdd() { instructionName: String("add") }
-        if operationKind == compilerBodyMIROperationSubtract() { instructionName: String("sub") }
-        if operationKind == compilerBodyMIROperationMultiply() { instructionName: String("mul") }
-        if operationKind == compilerBodyMIROperationDivide() { instructionName: String("sdiv") }
-        if operationKind == compilerBodyMIROperationRemainder() { instructionName: String("srem") }
-        if operationKind == compilerBodyMIROperationLessThan() { instructionName: String("icmp slt") }
-        if operationKind == compilerBodyMIROperationLessEqual() { instructionName: String("icmp sle") }
-        if operationKind == compilerBodyMIROperationGreaterThan() { instructionName: String("icmp sgt") }
-        if operationKind == compilerBodyMIROperationGreaterEqual() { instructionName: String("icmp sge") }
+        if operationKind == compilerBodyMIROperationAdd() {
+            instructionName: "add"
+            if isFloatBinary { instructionName: "fadd" }
+        }
+        if operationKind == compilerBodyMIROperationSubtract() {
+            instructionName: "sub"
+            if isFloatBinary { instructionName: "fsub" }
+        }
+        if operationKind == compilerBodyMIROperationMultiply() {
+            instructionName: "mul"
+            if isFloatBinary { instructionName: "fmul" }
+        }
+        if operationKind == compilerBodyMIROperationDivide() {
+            instructionName: "sdiv"
+            if isFloatBinary { instructionName: "fdiv" }
+        }
+        if operationKind == compilerBodyMIROperationRemainder() {
+            instructionName: "srem"
+            if isFloatBinary { instructionName: "frem" }
+        }
+        if operationKind == compilerBodyMIROperationLessThan() {
+            instructionName: "icmp slt"
+            if isFloatBinary { instructionName: "fcmp olt" }
+        }
+        if operationKind == compilerBodyMIROperationLessEqual() {
+            instructionName: "icmp sle"
+            if isFloatBinary { instructionName: "fcmp ole" }
+        }
+        if operationKind == compilerBodyMIROperationGreaterThan() {
+            instructionName: "icmp sgt"
+            if isFloatBinary { instructionName: "fcmp ogt" }
+        }
+        if operationKind == compilerBodyMIROperationGreaterEqual() {
+            instructionName: "icmp sge"
+            if isFloatBinary { instructionName: "fcmp oge" }
+        }
+        if isFloatBinary && operationKind == compilerBodyMIROperationEqual() { instructionName: "fcmp oeq" }
+        if isFloatBinary && operationKind == compilerBodyMIROperationNotEqual() { instructionName: "fcmp one" }
         let binaryInstruction: CompilerLLVMInstruction(CompilerLLVMInstruction(result: "%r\(binaryTemporary)", operation: instructionName, typeName: leftValue.typeName, left: leftValue.text, right: rightValue.text))
         if compilerBodyLLVMEmitterAppendInstruction(emitter: emitter, instruction: binaryInstruction) != 0 { return 0 - 1 }
         return 0
@@ -31368,6 +31425,10 @@ function compilerCoreLLVMTypeNameForRangeType(typeName: String): String {
 
     if typeName == String("Int") {
         return String("i32")
+    }
+
+    if typeName == String("Float") {
+        return String("double")
     }
 
     return String("ptr")
