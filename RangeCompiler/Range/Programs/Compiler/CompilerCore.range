@@ -7089,7 +7089,7 @@ function compilerSemanticResolutionArgumentMember(): Int { return 6 }
 function compilerSemanticResolutionArgumentParameter(): Int { return 7 }
 function compilerSemanticTypeNone(): Int { return 0 }
 function compilerSemanticTypeInt(): Int { return 1 }
-function compilerSemanticTypeFloat(): Int { return 2 }
+function compilerSemanticTypeFloat(): Int { return 3 }
 function compilerSemanticTypeConstruct(): Int { return 2 }
 
 function compilerSemanticGraphCreate(): CompilerSemanticGraph {
@@ -7824,6 +7824,13 @@ function compilerSemanticTypeForNode(tables: CompilerSyntaxTables, delta: Compil
         return CompilerSemanticType(kindTag: compilerSemanticTypeNone(), declarationNodeID: 0 - 1)
     }
     if semanticNodeKind == compilerSyntaxKindApplication() {
+        let semanticCalleeNodeID: Int(compilerSemanticGraphChild(delta: delta, subjectNodeID: nodeID, roleTag: compilerSyntaxRoleCallee(), ordinal: 0))
+        if semanticCalleeNodeID >= 0 {
+            let semanticCalleeFacetRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: semanticCalleeNodeID, column: 1))
+            let semanticCalleeFileID: Int(compilerIntTableValue(table: tables.bodyNodes, row: semanticCalleeFacetRow, column: 1))
+            let semanticCalleeName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: semanticCalleeFileID, localStart: compilerIntTableValue(table: tables.bodyNodes, row: semanticCalleeFacetRow, column: 6), localEnd: compilerIntTableValue(table: tables.bodyNodes, row: semanticCalleeFacetRow, column: 7)))
+            if semanticCalleeName == String("Float") { return CompilerSemanticType(kindTag: compilerSemanticTypeFloat(), declarationNodeID: 0 - 1) }
+        }
         let semanticApplicationResolutionKind: Int(compilerSemanticResolutionKind(semantics: semantics, useNodeID: nodeID))
         let semanticApplicationTarget: Int(compilerSemanticResolutionTarget(semantics: semantics, useNodeID: nodeID))
         if semanticApplicationResolutionKind == compilerSemanticResolutionConstruct() {
@@ -9982,6 +9989,8 @@ function compilerTypedIROperationTransfer(): Int { return 12 }
 function compilerTypedIROperationCallReceive(): Int { return 13 }
 function compilerTypedIROperationStoragePolicy(): Int { return 14 }
 function compilerTypedIROperationStore(): Int { return 15 }
+function compilerTypedIROperationFloatLiteral(): Int { return 16 }
+function compilerTypedIROperationFloatDivide(): Int { return 17 }
 
 function compilerTypedIRCreate(): CompilerTypedIR {
     return CompilerTypedIR(
@@ -10058,6 +10067,11 @@ function compilerTypedIRIntegerValue(tables: CompilerSyntaxTables, nodeID: Int):
     let typedIRIntegerFacetRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: nodeID, column: 1))
     let typedIRIntegerText: String(compilerTypedSyntaxLocalText(tables: tables, fileID: compilerIntTableValue(table: tables.bodyNodes, row: typedIRIntegerFacetRow, column: 1), localStart: compilerIntTableValue(table: tables.bodyNodes, row: typedIRIntegerFacetRow, column: 6), localEnd: compilerIntTableValue(table: tables.bodyNodes, row: typedIRIntegerFacetRow, column: 7)))
     return compilerCoreParseDecimalInt(value: typedIRIntegerText)
+}
+
+function compilerTypedIRFloatText(tables: CompilerSyntaxTables, nodeID: Int): String {
+    let facetRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: nodeID, column: 1))
+    return compilerTypedSyntaxLocalText(tables: tables, fileID: compilerIntTableValue(table: tables.bodyNodes, row: facetRow, column: 1), localStart: compilerIntTableValue(table: tables.bodyNodes, row: facetRow, column: 6), localEnd: compilerIntTableValue(table: tables.bodyNodes, row: facetRow, column: 7))
 }
 
 function compilerTypedIRArgumentIntegerForMember(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, semantics: CompilerSemanticGraph, applicationNodeID: Int, memberOrdinal: Int): Int {
@@ -10138,6 +10152,9 @@ function compilerTypedIRBuildNode(tables: CompilerSyntaxTables, delta: CompilerG
     if typedIRNodeKind == compilerSyntaxKindIntegerLiteral() {
         return compilerTypedIRAppendOperation(ir: ir, nodeID: nodeID, regionNodeID: typedIRRegionNodeID, operationKind: compilerTypedIROperationInteger(), typeNodeID: 0 - 1, storageID: 0 - 1, first: compilerTypedIRIntegerValue(tables: tables, nodeID: nodeID), second: 0, memoryDecisionRow: 0 - 1)
     }
+    if typedIRNodeKind == compilerSyntaxKindDoubleLiteral() {
+        return compilerTypedIRAppendOperation(ir: ir, nodeID: nodeID, regionNodeID: typedIRRegionNodeID, operationKind: compilerTypedIROperationFloatLiteral(), typeNodeID: compilerSemanticTypeFloat(), storageID: 0 - 1, first: nodeID, second: 0, memoryDecisionRow: 0 - 1)
+    }
     if typedIRNodeKind == compilerSyntaxKindMemberRead() {
         if compilerSemanticGraphParent(delta: delta, objectNodeID: nodeID, roleTag: compilerSyntaxRoleAssignmentTarget()) >= 0 { return 0 }
         let typedIRMemberNodeID: Int(compilerSemanticResolutionTarget(semantics: semantics, useNodeID: nodeID))
@@ -10156,6 +10173,9 @@ function compilerTypedIRBuildNode(tables: CompilerSyntaxTables, delta: CompilerG
     if typedIRNodeKind == compilerSyntaxKindAddition() {
         return compilerTypedIRAppendOperation(ir: ir, nodeID: nodeID, regionNodeID: typedIRRegionNodeID, operationKind: compilerTypedIROperationAddition(), typeNodeID: 0 - 1, storageID: 0 - 1, first: compilerSemanticGraphChild(delta: delta, subjectNodeID: nodeID, roleTag: compilerSyntaxRoleLeftOperand(), ordinal: 0), second: compilerSemanticGraphChild(delta: delta, subjectNodeID: nodeID, roleTag: compilerSyntaxRoleRightOperand(), ordinal: 0), memoryDecisionRow: 0 - 1)
     }
+    if typedIRNodeKind == compilerSyntaxKindDivision() {
+        return compilerTypedIRAppendOperation(ir: ir, nodeID: nodeID, regionNodeID: typedIRRegionNodeID, operationKind: compilerTypedIROperationFloatDivide(), typeNodeID: compilerSemanticTypeFloat(), storageID: 0 - 1, first: compilerSemanticGraphChild(delta: delta, subjectNodeID: nodeID, roleTag: compilerSyntaxRoleLeftOperand(), ordinal: 0), second: compilerSemanticGraphChild(delta: delta, subjectNodeID: nodeID, roleTag: compilerSyntaxRoleRightOperand(), ordinal: 0), memoryDecisionRow: 0 - 1)
+    }
     if typedIRNodeKind == compilerSyntaxKindLocalBinding() {
         let typedIRLocalStorageID: Int(compilerMemoryStorageForLocal(memory: memory, localNodeID: nodeID))
         let typedIRPlacementDecisionRow: Int(compilerTypedIRMemoryDecisionRow(memory: memory, decisionKind: compilerMemoryDecisionPlacement(), nodeID: nodeID, storageID: typedIRLocalStorageID))
@@ -10167,6 +10187,25 @@ function compilerTypedIRBuildNode(tables: CompilerSyntaxTables, delta: CompilerG
         return compilerTypedIRAppendOperation(ir: ir, nodeID: nodeID, regionNodeID: typedIRRegionNodeID, operationKind: compilerTypedIROperationNoEscape(), typeNodeID: compilerIntTableValue(table: memory.storages, row: typedIRLocalStorageID, column: 2), storageID: typedIRLocalStorageID, first: nodeID, second: 0, memoryDecisionRow: typedIREscapeDecisionRow)
     }
     if typedIRNodeKind == compilerSyntaxKindApplication() {
+        let typedIRApplicationSemanticType: CompilerSemanticType(compilerSemanticTypeForNode(tables: tables, delta: delta, semantics: semantics, nodeID: nodeID))
+        if compilerSemanticTypeKind(type: typedIRApplicationSemanticType) == compilerSemanticTypeFloat() {
+            let typedIRFloatArgumentNodeID: Int(compilerSemanticGraphChild(delta: delta, subjectNodeID: nodeID, roleTag: compilerSyntaxRoleArgument(), ordinal: 0))
+            let typedIRFloatValueNodeID: Int(compilerSemanticGraphChild(delta: delta, subjectNodeID: typedIRFloatArgumentNodeID, roleTag: compilerSyntaxRoleArgumentValue(), ordinal: 0))
+            if typedIRFloatValueNodeID < 0 { return 0 - 1 }
+            return compilerTypedIRAppendOperation(ir: ir, nodeID: nodeID, regionNodeID: typedIRRegionNodeID, operationKind: compilerTypedIROperationFloatLiteral(), typeNodeID: compilerSemanticTypeFloat(), storageID: 0 - 1, first: typedIRFloatValueNodeID, second: 0, memoryDecisionRow: 0 - 1)
+        }
+        let typedIRCalleeNodeID: Int(compilerSemanticGraphChild(delta: delta, subjectNodeID: nodeID, roleTag: compilerSyntaxRoleCallee(), ordinal: 0))
+        if typedIRCalleeNodeID >= 0 {
+            let typedIRCalleeFacetRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: typedIRCalleeNodeID, column: 1))
+            let typedIRCalleeFileID: Int(compilerIntTableValue(table: tables.bodyNodes, row: typedIRCalleeFacetRow, column: 1))
+            let typedIRCalleeName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: typedIRCalleeFileID, localStart: compilerIntTableValue(table: tables.bodyNodes, row: typedIRCalleeFacetRow, column: 6), localEnd: compilerIntTableValue(table: tables.bodyNodes, row: typedIRCalleeFacetRow, column: 7)))
+            if typedIRCalleeName == String("Float") {
+                let typedIRFloatArgumentNodeID: Int(compilerSemanticGraphChild(delta: delta, subjectNodeID: nodeID, roleTag: compilerSyntaxRoleArgument(), ordinal: 0))
+                let typedIRFloatValueNodeID: Int(compilerSemanticGraphChild(delta: delta, subjectNodeID: typedIRFloatArgumentNodeID, roleTag: compilerSyntaxRoleArgumentValue(), ordinal: 0))
+                if typedIRFloatValueNodeID < 0 { return 0 - 1 }
+                return compilerTypedIRAppendOperation(ir: ir, nodeID: nodeID, regionNodeID: typedIRRegionNodeID, operationKind: compilerTypedIROperationFloatLiteral(), typeNodeID: compilerSemanticTypeFloat(), storageID: 0 - 1, first: typedIRFloatValueNodeID, second: 0, memoryDecisionRow: 0 - 1)
+            }
+        }
         let typedIRApplicationKind: Int(compilerSemanticResolutionKind(semantics: semantics, useNodeID: nodeID))
         if typedIRApplicationKind == compilerSemanticResolutionConstruct() {
             let typedIRApplicationLocalNodeID: Int(compilerSemanticGraphParent(delta: delta, objectNodeID: nodeID, roleTag: compilerSyntaxRoleInitializer()))
@@ -10595,6 +10634,17 @@ function compilerTypedIRFixedLLVMRenderEntry(tables: CompilerSyntaxTables, memor
                     rawBufferDestroy(buffer: typedIREntryBuffer)
                     return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure"))
                 }
+            } else if typedIREntryOperationKind == compilerTypedIROperationFloatLiteral() {
+                let floatText: String(compilerTypedIRFloatText(tables: tables, nodeID: compilerIntTableValue(table: ir.operations, row: typedIREntryOperationRow, column: 5)))
+                if !compilerTypedIRLLVMAppend(buffer: typedIREntryBuffer, text: "  %value\(typedIREntryOperationNodeID) = fadd double 0.0, \(floatText)\(typedIREntryNewline)") {
+                    rawBufferDestroy(buffer: typedIREntryBuffer)
+                    return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure"))
+                }
+            } else if typedIREntryOperationKind == compilerTypedIROperationFloatDivide() {
+                if !compilerTypedIRLLVMAppend(buffer: typedIREntryBuffer, text: "  %value\(typedIREntryOperationNodeID) = fdiv double %value\(compilerIntTableValue(table: ir.operations, row: typedIREntryOperationRow, column: 5)), %value\(compilerIntTableValue(table: ir.operations, row: typedIREntryOperationRow, column: 6))\(typedIREntryNewline)") {
+                    rawBufferDestroy(buffer: typedIREntryBuffer)
+                    return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure"))
+                }
             } else if typedIREntryOperationKind == compilerTypedIROperationReturn() {
                 if !compilerTypedIRLLVMAppend(buffer: typedIREntryBuffer, text: "  ret i32 %value\(compilerIntTableValue(table: ir.operations, row: typedIREntryOperationRow, column: 5))\(typedIREntryNewline)") {
                     rawBufferDestroy(buffer: typedIREntryBuffer)
@@ -10742,6 +10792,17 @@ function compilerTypedIRFixedLLVMRenderReturned(tables: CompilerSyntaxTables, me
                 }
             } else if typedIRReturnedOperationKind == compilerTypedIROperationAddition() {
                 if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "  %value\(typedIRReturnedNodeID) = add i32 %value\(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 5)), %value\(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 6))\(typedIRReturnedNewline)") {
+                    rawBufferDestroy(buffer: typedIRReturnedBuffer)
+                    return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure"))
+                }
+            } else if typedIRReturnedOperationKind == compilerTypedIROperationFloatLiteral() {
+                let floatText: String(compilerTypedIRFloatText(tables: tables, nodeID: compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 5)))
+                if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "  %value\(typedIRReturnedNodeID) = fadd double 0.0, \(floatText)\(typedIRReturnedNewline)") {
+                    rawBufferDestroy(buffer: typedIRReturnedBuffer)
+                    return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure"))
+                }
+            } else if typedIRReturnedOperationKind == compilerTypedIROperationFloatDivide() {
+                if !compilerTypedIRLLVMAppend(buffer: typedIRReturnedBuffer, text: "  %value\(typedIRReturnedNodeID) = fdiv double %value\(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 5)), %value\(compilerIntTableValue(table: ir.operations, row: typedIRReturnedOperationRow, column: 6))\(typedIRReturnedNewline)") {
                     rawBufferDestroy(buffer: typedIRReturnedBuffer)
                     return compilerNativeDiagnostic(kind: String("typedIRLLVMAppendFailure"))
                 }
@@ -18378,7 +18439,7 @@ function compilerBodyArenaExpressionConcreteTypeID(arena: CompilerBodyArena, nod
     let resolvedTypeID: Int(compilerBodyArenaExpressionTypeID(arena: arena, nodeID: nodeID))
     if resolvedTypeID >= 0 { return resolvedTypeID }
     let typeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: nodeID))
-    if typeKind != compilerBodyTypeInt() && typeKind != compilerBodyTypeBool() && typeKind != compilerBodyTypeString() { return 0 - 1 }
+    if typeKind != compilerBodyTypeInt() && typeKind != compilerBodyTypeBool() && typeKind != compilerBodyTypeFloat() && typeKind != compilerBodyTypeString() { return 0 - 1 }
     let noArguments: RawBuffer(rawBufferCreate(capacity: 0, stride: 4))
     let typeID: Int(compilerBodyArenaTypeInstanceInternStructural(arena: arena, typeKind: typeKind, nominalSyntaxID: 0 - 1, sourceNodeID: nodeID, argumentIDs: noArguments))
     rawBufferDestroy(buffer: noArguments)
@@ -20099,7 +20160,7 @@ function compilerBodyArenaSwitchSubjectIsStorage(arena: CompilerBodyArena, subje
 }
 
 function compilerBodyArenaSwitchTypeHasMatcher(arena: CompilerBodyArena, typeKind: Int, typeID: Int): Bool {
-    if typeKind == compilerBodyTypeInt() || typeKind == compilerBodyTypeBool() || typeKind == compilerBodyTypeString() { return true }
+    if typeKind == compilerBodyTypeInt() || typeKind == compilerBodyTypeBool() || typeKind == compilerBodyTypeFloat() || typeKind == compilerBodyTypeString() { return true }
     if typeKind == compilerBodyTypeEnum() { return compilerBodyArenaEnumSyntaxIDForTypeID(arena: arena, typeID: typeID) >= 0 }
     return false
 }
@@ -27223,7 +27284,7 @@ function compilerBodyLLVMCallTargetInstanceIsValid(emitter: CompilerBodyLLVMEmit
 }
 
 function compilerBodyArenaSpecializedLLVMTypeName(arena: CompilerBodyArena, typeKind: Int, typeID: Int, fileID: Int, start: Int, end: Int): String {
-    if typeKind == compilerBodyTypeInt() || typeKind == compilerBodyTypeBool() || typeKind == compilerBodyTypeString() { return compilerBodyLLVMTypeName(typeKind: typeKind) }
+    if typeKind == compilerBodyTypeInt() || typeKind == compilerBodyTypeBool() || typeKind == compilerBodyTypeString() || typeKind == compilerBodyTypeFloat() { return compilerBodyLLVMTypeName(typeKind: typeKind) }
     if typeKind == compilerBodyTypeEnum() {
         let enumTypeName: String(compilerBodyLLVMNominalTypeNameForTypeID(arena: arena, typeID: typeID))
         if enumTypeName != String("") { return enumTypeName }
@@ -28230,7 +28291,12 @@ function compilerBodyLLVMEmitterRenderBlock(emitter: CompilerBodyLLVMEmitter, mi
             if rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  store \(returnValue.typeName) \(returnValue.text), ptr %returnDestination\n") != 0 { return 0 - 1 }
             terminal: CompilerLLVMTerminator(kind: String("return"), typeName: String("void"), value: String(""), trueLabel: String(""), falseLabel: String(""))
         } else {
-            terminal: CompilerLLVMTerminator(kind: String("return"), typeName: returnValue.typeName, value: returnValue.text, trueLabel: String(""), falseLabel: String(""))
+            if compilerBodyArenaIsEntry(arena: emitter.arena) && returnValue.typeName == String("i1") {
+                if rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %entry_result = zext i1 \(returnValue.text) to i32\n") != 0 { return 0 - 1 }
+                terminal: CompilerLLVMTerminator(kind: String("return"), typeName: String("i32"), value: String("%entry_result"), trueLabel: String(""), falseLabel: String(""))
+            } else {
+                terminal: CompilerLLVMTerminator(kind: String("return"), typeName: returnValue.typeName, value: returnValue.text, trueLabel: String(""), falseLabel: String(""))
+            }
         }
     }
     if terminatorKind == compilerBodyMIROperationBranch() {
@@ -28544,7 +28610,8 @@ function compilerBodyArenaEntryReturnsInt(arena: CompilerBodyArena): Bool {
         if compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationKindColumn()) == compilerBodyMIROperationReturn() {
             let returnValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
             if returnValueID < 0 || returnValueID >= compilerIntTableRowCount(table: arena.mirValues) { return false }
-            if compilerIntTableValue(table: arena.mirValues, row: returnValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeInt() { return false }
+            let returnTypeKind: Int(compilerIntTableValue(table: arena.mirValues, row: returnValueID, column: compilerBodyMIRValueTypeColumn()))
+            if returnTypeKind != compilerBodyTypeInt() && returnTypeKind != compilerBodyTypeBool() { return false }
             returnCount: returnCount + 1
         }
         operationRow: operationRow + 1
@@ -29048,6 +29115,10 @@ function compilerCoreMainLLVMBasicBlock(block: CompilerLLVMLoweredBlock): Compil
     state instructionRecords: String("")
     instructionRecords: block.instructionRecords
     state terminal: CompilerLLVMTerminator(CompilerLLVMTerminator(kind: String("return"), typeName: block.returnLLVMType, value: block.returnLLVMValue, trueLabel: String(""), falseLabel: String("")))
+    if block.returnLLVMType == String("i1") && block.returnLLVMValue != String("") {
+        instructionRecords: "\(instructionRecords)  %entry_result = zext i1 \(block.returnLLVMValue) to i32\n"
+        terminal: CompilerLLVMTerminator(kind: String("return"), typeName: String("i32"), value: String("%entry_result"), trueLabel: String(""), falseLabel: String(""))
+    }
     if block.hasEntryBranch {
         terminal: CompilerLLVMTerminator(kind: String("branch"), typeName: String("i1"), value: block.entryBranchCondition, trueLabel: block.entryBranchThenLabel, falseLabel: block.entryBranchElseLabel)
     } else if block.hasReturn {
