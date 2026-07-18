@@ -34,6 +34,10 @@ main {
 }
 
 .pageHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
   margin-bottom: 36px;
 }
 
@@ -42,6 +46,17 @@ main {
   font-size: clamp(28px, 4vw, 42px);
   font-weight: 500;
   letter-spacing: -0.04em;
+}
+
+.pageHeader a {
+  color: var(--ink);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 13px;
+  text-underline-offset: 4px;
+}
+
+.pageHeader a:hover {
+  color: var(--range);
 }
 
 .statusLabel {

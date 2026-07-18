@@ -114,6 +114,7 @@ export default function Home() {
     <main>
       <header className="pageHeader">
         <h1>Range Performance</h1>
+        <a href="https://github.com/georgetchelidze/Range">GitHub</a>
       </header>
 
       <div className="chartGrid">
