@@ -148,17 +148,10 @@ function RangeImprovementChart() {
     <section className="improvementChart" aria-labelledby="range-improvement-chart-title">
       <header className="improvementHeader">
         <div className="improvementTitle">
-          <h2 id="range-improvement-chart-title">Strings</h2>
-          <span>100k appends · Range</span>
-        </div>
-        <div className="improvementCallout" aria-hidden="true">
+          <h2 id="range-improvement-chart-title">100k appends · Range</h2>
           <div className="improvementSummary">
-            <p>144× faster</p>
-            <p>~2,800× less peak memory</p>
-          </div>
-          <div className="changeLabels">
-            <span>491.2 → 3.4 ms</span>
-            <span>5.3 GB → 1.9 MB</span>
+            <span>144× faster</span>
+            <span>~2,800× less peak memory</span>
           </div>
         </div>
       </header>
@@ -166,7 +159,7 @@ function RangeImprovementChart() {
       <div className="improvementPlot">
         <svg
           className="bezierChart"
-          viewBox="0 0 960 350"
+          viewBox="0 0 960 380"
           role="img"
           aria-labelledby="range-improvement-svg-title range-improvement-svg-description"
         >
@@ -177,24 +170,31 @@ function RangeImprovementChart() {
           </desc>
 
           <g className="bezierGrid">
-            <line x1="55" y1="24" x2="930" y2="24" />
-            <line x1="55" y1="154" x2="930" y2="154" />
-            <line x1="55" y1="284" x2="930" y2="284" />
+            <line x1="55" y1="70" x2="930" y2="70" />
+            <line x1="55" y1="180" x2="930" y2="180" />
+            <line x1="55" y1="290" x2="930" y2="290" />
           </g>
           <g className="bezierAxis">
-            <text x="43" y="29" textAnchor="end">500</text>
-            <text x="43" y="159" textAnchor="end">250</text>
-            <text x="43" y="289" textAnchor="end">0</text>
-            <text x="14" y="154" textAnchor="middle" transform="rotate(-90 14 154)">milliseconds</text>
+            <text x="43" y="75" textAnchor="end">500</text>
+            <text x="43" y="185" textAnchor="end">250</text>
+            <text x="43" y="295" textAnchor="end">0</text>
+            <text x="14" y="180" textAnchor="middle" transform="rotate(-90 14 180)">milliseconds</text>
           </g>
 
-          <path className="bezierLine" d="M 90 29 C 285 29, 430 284, 900 284" />
-          <circle className="bezierPoint" cx="90" cy="29" r="6" />
-          <circle className="bezierPoint" cx="900" cy="284" r="6" />
+          <path className="bezierLine" d="M 90 72 C 285 72, 430 290, 900 290" />
+          <circle className="bezierPoint" cx="90" cy="72" r="6" />
+          <circle className="bezierPoint" cx="900" cy="290" r="6" />
+
+          <g className="pointMetrics">
+            <text className="pointTime" x="90" y="48" textAnchor="middle">491.2 ms</text>
+            <text className="pointMemory" x="90" y="102" textAnchor="middle">5.3 GB</text>
+            <text className="pointTime" x="900" y="266" textAnchor="middle">3.4 ms</text>
+            <text className="pointMemory" x="900" y="320" textAnchor="middle">1.9 MB</text>
+          </g>
 
           <g className="bezierLabels">
-            <text x="90" y="327" textAnchor="middle">Before</text>
-            <text x="900" y="327" textAnchor="middle">Self-hosted</text>
+            <text x="90" y="364" textAnchor="middle">Before</text>
+            <text x="900" y="364" textAnchor="middle">Self-hosted</text>
           </g>
         </svg>
       </div>
