@@ -84,7 +84,8 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
           const ratioToFastest = result.milliseconds / fastestTime;
           const isFastest = Math.abs(result.milliseconds - fastestTime) < 0.0001;
           const width = `${(result.milliseconds / benchmark.axisMax) * 100}%`;
-          const grayMix = Math.min(100, Math.max(0, ((ratioToFastest - 1) / 0.25) * 100));
+          const relativeGray = Math.min(100, Math.max(0, ((ratioToFastest - 1) / 0.25) * 100));
+          const grayMix = isFastest ? 0 : Math.min(100, 28 + relativeGray * 0.72);
           const redMix = ratioToFastest <= 1.25
             ? 0
             : Math.min(
@@ -99,7 +100,7 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
           const barColor = ratioToFastest <= 1.25
             ? `color-mix(in oklch, var(--fastest-bar), var(--comparison-bar) ${grayMix.toFixed(1)}%)`
             : `color-mix(in oklch, var(--comparison-bar), var(--slow-bar) ${redMix.toFixed(1)}%)`;
-          const barFill = `linear-gradient(90deg, color-mix(in oklch, ${barColor}, var(--paper) 28%), ${barColor})`;
+          const barFill = `linear-gradient(90deg, color-mix(in oklch, ${barColor}, var(--paper) 8%), ${barColor})`;
 
           return (
             <div
@@ -112,8 +113,8 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
               </span>
               <span className="value">
                 <span>{result.milliseconds.toFixed(1)} ms</span>
-                {isFastest && <small>fastest</small>}
-                {isRange && !isFastest && <small>{ratioToFastest.toFixed(2)}× fastest</small>}
+                {isFastest && <small>absolute best</small>}
+                {isRange && !isFastest && <small>{ratioToFastest.toFixed(2)}× best</small>}
               </span>
             </div>
           );
