@@ -1,0 +1,32 @@
+function fade(value: Float): Float {
+    return value * value * value * (value * (value * Float(6.0) - Float(15.0)) + Float(10.0))
+}
+
+function gradientNoise(x: Float, y: Float, z: Float): Float {
+    let xy: Float(x * y)
+    let yz: Float(y * z)
+    let zx: Float(z * x)
+    let u: Float(fade(value: x))
+    let v: Float(fade(value: y))
+    let w: Float(fade(value: z))
+    let first: Float(xy + yz)
+    let second: Float(yz + zx)
+    let third: Float(zx + xy)
+    return (first * (Float(1.0) - u) + second * u) * (Float(1.0) - w) + third * w + v
+}
+
+@main {
+    state total: Float(0.0)
+    state index: Int(0)
+    state x: Float(0.37)
+    while index < 1000000 {
+        let sample: Float(gradientNoise(x: x, y: Float(0.61), z: Float(0.23)))
+        total: total + sample
+        index: index + 1
+        x: x + Float(0.00001)
+    }
+    if total > Float(0.0) {
+        return 1
+    }
+    return 0
+}

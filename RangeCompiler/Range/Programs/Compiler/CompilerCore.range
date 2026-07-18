@@ -263,6 +263,7 @@ construct CompilerBodyArena {
     let cfgBlocks: CompilerIntTable
     let cfgEdges: CompilerIntTable
     let cfgSchedule: CompilerIntTable
+    let graphZeroCFGRegions: CompilerIntTable
     let storages: CompilerIntTable
     let ownedPaths: CompilerIntTable
     let bindingAliases: CompilerIntTable
@@ -276,6 +277,9 @@ construct CompilerBodyArena {
     let mirOperands: CompilerIntTable
     let mirVersions: CompilerIntTable
     let mirExpressionValues: CompilerIntTable
+    let graphZeroMIRDependencies: CompilerIntTable
+    let graphZeroMIRFrontiers: CompilerIntTable
+    let graphZeroState: RawBuffer
     let mirTraversal: RawBuffer
     let failures: RawBuffer
 }
@@ -16422,6 +16426,17 @@ function compilerBodyCFGScheduleBlockColumn(): Int { return 1 }
 function compilerBodyCFGScheduleNodeColumn(): Int { return 2 }
 function compilerBodyCFGScheduleActionColumn(): Int { return 3 }
 function compilerBodyCFGScheduleOrdinalColumn(): Int { return 4 }
+
+function compilerBodyGraphZeroCFGRegionColumnCount(): Int { return 5 }
+function compilerBodyGraphZeroCFGRegionIDColumn(): Int { return 0 }
+function compilerBodyGraphZeroCFGRegionBlockColumn(): Int { return 1 }
+function compilerBodyGraphZeroCFGRegionKindColumn(): Int { return 2 }
+function compilerBodyGraphZeroCFGRegionEdgeCountColumn(): Int { return 3 }
+function compilerBodyGraphZeroCFGRegionAuxColumn(): Int { return 4 }
+function compilerBodyGraphZeroCFGRegionLinear(): Int { return 1 }
+function compilerBodyGraphZeroCFGRegionFork(): Int { return 2 }
+function compilerBodyGraphZeroCFGRegionJoin(): Int { return 3 }
+function compilerBodyGraphZeroCFGRegionLoop(): Int { return 4 }
 function compilerBodyCFGScheduleEvaluateNode(): Int { return 1 }
 function compilerBodyCFGScheduleOptionalTag(): Int { return 2 }
 function compilerBodyCFGScheduleOptionalPayload(): Int { return 3 }
@@ -17090,6 +17105,66 @@ function compilerBodyMIRExpressionValueActionColumn(): Int { return 1 }
 function compilerBodyMIRExpressionValueValueColumn(): Int { return 2 }
 function compilerBodyMIRExpressionValueBlockColumn(): Int { return 3 }
 
+function compilerBodyGraphZeroMIRDependencyColumnCount(): Int { return 6 }
+function compilerBodyGraphZeroMIRDependencyIDColumn(): Int { return 0 }
+function compilerBodyGraphZeroMIRDependencyProducerColumn(): Int { return 1 }
+function compilerBodyGraphZeroMIRDependencyConsumerColumn(): Int { return 2 }
+function compilerBodyGraphZeroMIRDependencyValueColumn(): Int { return 3 }
+function compilerBodyGraphZeroMIRDependencyKindColumn(): Int { return 4 }
+function compilerBodyGraphZeroMIRDependencyOrdinalColumn(): Int { return 5 }
+function compilerBodyGraphZeroMIRDependencyData(): Int { return 1 }
+function compilerBodyGraphZeroMIRDependencyOrder(): Int { return 2 }
+function compilerBodyGraphZeroMIRDependencyControl(): Int { return 3 }
+function compilerBodyGraphZeroMIRDependencyLoopCarried(): Int { return 4 }
+
+function compilerBodyGraphZeroMIRFrontierColumnCount(): Int { return 5 }
+function compilerBodyGraphZeroMIRFrontierIDColumn(): Int { return 0 }
+function compilerBodyGraphZeroMIRFrontierOperationColumn(): Int { return 1 }
+function compilerBodyGraphZeroMIRFrontierBlockColumn(): Int { return 2 }
+function compilerBodyGraphZeroMIRFrontierDepthColumn(): Int { return 3 }
+function compilerBodyGraphZeroMIRFrontierOrdinalColumn(): Int { return 4 }
+
+function compilerBodyGraphZeroStateCount(): Int { return 2 }
+function compilerBodyGraphZeroStateFrozen(): Int { return 0 }
+function compilerBodyGraphZeroStateValid(): Int { return 1 }
+
+function compilerBodyGraphZeroIsFrozenAndValid(arena: CompilerBodyArena): Bool {
+    return rawBufferCount(buffer: arena.graphZeroState) == compilerBodyGraphZeroStateCount()
+        && rawBufferLoadInt(buffer: arena.graphZeroState, index: compilerBodyGraphZeroStateFrozen()) == 1
+        && rawBufferLoadInt(buffer: arena.graphZeroState, index: compilerBodyGraphZeroStateValid()) == 1
+        && compilerIntTableIsComplete(table: arena.graphZeroCFGRegions)
+        && compilerIntTableIsComplete(table: arena.graphZeroMIRDependencies)
+        && compilerIntTableIsComplete(table: arena.graphZeroMIRFrontiers)
+}
+
+function compilerBodyGraphZeroMIRIsValid(arena: CompilerBodyArena): Bool {
+    if !compilerBodyGraphZeroIsFrozenAndValid(arena: arena)
+        || compilerIntTableRowCount(table: arena.graphZeroMIRFrontiers) != compilerIntTableRowCount(table: arena.mirOperations) { return false }
+    state dependencyRow: Int(0)
+    while dependencyRow < compilerIntTableRowCount(table: arena.graphZeroMIRDependencies) {
+        let producer: Int(compilerIntTableValue(table: arena.graphZeroMIRDependencies, row: dependencyRow, column: compilerBodyGraphZeroMIRDependencyProducerColumn()))
+        let consumer: Int(compilerIntTableValue(table: arena.graphZeroMIRDependencies, row: dependencyRow, column: compilerBodyGraphZeroMIRDependencyConsumerColumn()))
+        let kind: Int(compilerIntTableValue(table: arena.graphZeroMIRDependencies, row: dependencyRow, column: compilerBodyGraphZeroMIRDependencyKindColumn()))
+        if compilerIntTableValue(table: arena.graphZeroMIRDependencies, row: dependencyRow, column: compilerBodyGraphZeroMIRDependencyIDColumn()) != dependencyRow
+            || producer < 0 || producer >= compilerIntTableRowCount(table: arena.mirOperations)
+            || consumer < 0 || consumer >= compilerIntTableRowCount(table: arena.mirOperations)
+            || kind < compilerBodyGraphZeroMIRDependencyData() || kind > compilerBodyGraphZeroMIRDependencyLoopCarried()
+            || kind != compilerBodyGraphZeroMIRDependencyLoopCarried() && producer >= consumer
+            || kind == compilerBodyGraphZeroMIRDependencyLoopCarried() && producer < consumer { return false }
+        dependencyRow: dependencyRow + 1
+    }
+    state operationID: Int(0)
+    while operationID < compilerIntTableRowCount(table: arena.mirOperations) {
+        if compilerIntTableValue(table: arena.graphZeroMIRFrontiers, row: operationID, column: compilerBodyGraphZeroMIRFrontierIDColumn()) != operationID
+            || compilerIntTableValue(table: arena.graphZeroMIRFrontiers, row: operationID, column: compilerBodyGraphZeroMIRFrontierOperationColumn()) != operationID
+            || compilerIntTableValue(table: arena.graphZeroMIRFrontiers, row: operationID, column: compilerBodyGraphZeroMIRFrontierBlockColumn()) != compilerIntTableValue(table: arena.mirOperations, row: operationID, column: compilerBodyMIROperationBlockColumn())
+            || compilerIntTableValue(table: arena.graphZeroMIRFrontiers, row: operationID, column: compilerBodyGraphZeroMIRFrontierDepthColumn()) < 1
+            || compilerIntTableValue(table: arena.graphZeroMIRFrontiers, row: operationID, column: compilerBodyGraphZeroMIRFrontierOrdinalColumn()) != operationID { return false }
+        operationID: operationID + 1
+    }
+    return true
+}
+
 function compilerBodyLLVMValueAssignmentColumnCount(): Int { return 4 }
 function compilerBodyLLVMValueAssignmentValueColumn(): Int { return 0 }
 function compilerBodyLLVMValueAssignmentKindColumn(): Int { return 1 }
@@ -17211,6 +17286,7 @@ function compilerBodyArenaCreateForBodyWithTypeTables(tables: CompilerSyntaxTabl
     let cfgBlocks: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyCFGBlockColumnCount(), estimatedRowCount: 16))
     let cfgEdges: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyCFGEdgeColumnCount(), estimatedRowCount: 24))
     let cfgSchedule: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyCFGScheduleColumnCount(), estimatedRowCount: 64))
+    let graphZeroCFGRegions: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyGraphZeroCFGRegionColumnCount(), estimatedRowCount: 16))
     let storages: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyStorageColumnCount(), estimatedRowCount: 8))
     let ownedPaths: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyOwnedPathColumnCount(), estimatedRowCount: 8))
     let bindingAliases: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyBindingAliasColumnCount(), estimatedRowCount: 8))
@@ -17223,6 +17299,11 @@ function compilerBodyArenaCreateForBodyWithTypeTables(tables: CompilerSyntaxTabl
     let mirOperands: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyMIROperandColumnCount(), estimatedRowCount: 128))
     let mirVersions: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyMIRVersionColumnCount(), estimatedRowCount: 32))
     let mirExpressionValues: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyMIRExpressionValueColumnCount(), estimatedRowCount: 64))
+    let graphZeroMIRDependencies: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyGraphZeroMIRDependencyColumnCount(), estimatedRowCount: 128))
+    let graphZeroMIRFrontiers: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyGraphZeroMIRFrontierColumnCount(), estimatedRowCount: 64))
+    let graphZeroState: RawBuffer(rawBufferCreate(capacity: compilerBodyGraphZeroStateCount(), stride: 4))
+    rawBufferAppendInt(buffer: graphZeroState, value: 0)
+    rawBufferAppendInt(buffer: graphZeroState, value: 1)
     let mirTraversal: RawBuffer(rawBufferCreate(capacity: 32, stride: 4))
     let failures: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
     let created: CompilerBodyArena(CompilerBodyArena(
@@ -17247,6 +17328,7 @@ function compilerBodyArenaCreateForBodyWithTypeTables(tables: CompilerSyntaxTabl
         cfgBlocks: cfgBlocks,
         cfgEdges: cfgEdges,
         cfgSchedule: cfgSchedule,
+        graphZeroCFGRegions: graphZeroCFGRegions,
         storages: storages,
         ownedPaths: ownedPaths,
         bindingAliases: bindingAliases,
@@ -17260,6 +17342,9 @@ function compilerBodyArenaCreateForBodyWithTypeTables(tables: CompilerSyntaxTabl
         mirOperands: mirOperands,
         mirVersions: mirVersions,
         mirExpressionValues: mirExpressionValues,
+        graphZeroMIRDependencies: graphZeroMIRDependencies,
+        graphZeroMIRFrontiers: graphZeroMIRFrontiers,
+        graphZeroState: graphZeroState,
         mirTraversal: mirTraversal,
         failures: failures
     ))
@@ -20862,6 +20947,44 @@ function compilerBodyArenaBuildCFG(arena: CompilerBodyArena): Int {
     if entryBlockID != 0 { return 0 - 1 }
     let result: CompilerBodyCFGResult(compilerBodyArenaBuildCFGRegion(arena: arena, regionNodeID: arena.rootNodeID, initialBlockID: entryBlockID))
     if !result.isValid || !result.isTerminated { return 0 - 1 }
+    state blockID: Int(0)
+    while blockID < compilerIntTableRowCount(table: arena.cfgBlocks) {
+        state incoming: Int(0)
+        state outgoing: Int(0)
+        state hasBackEdge: Bool(false)
+        state edgeRow: Int(0)
+        while edgeRow < compilerIntTableRowCount(table: arena.cfgEdges) {
+            let fromBlockID: Int(compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeFromColumn()))
+            let toBlockID: Int(compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeToColumn()))
+            if fromBlockID == blockID {
+                outgoing: outgoing + 1
+                if toBlockID <= blockID { hasBackEdge: true }
+            }
+            if toBlockID == blockID {
+                incoming: incoming + 1
+                if fromBlockID >= blockID { hasBackEdge: true }
+            }
+            edgeRow: edgeRow + 1
+        }
+        state kind: Int(compilerBodyGraphZeroCFGRegionLinear())
+        state edgeCount: Int(outgoing)
+        if incoming > edgeCount { edgeCount: incoming }
+        if hasBackEdge {
+            kind: compilerBodyGraphZeroCFGRegionLoop()
+        } else if outgoing > 1 {
+            kind: compilerBodyGraphZeroCFGRegionFork()
+        } else if incoming > 1 {
+            kind: compilerBodyGraphZeroCFGRegionJoin()
+        }
+        let regionID: Int(compilerIntTableRowCount(table: arena.graphZeroCFGRegions))
+        if regionID != blockID
+            || compilerIntTableAppend(table: arena.graphZeroCFGRegions, value: regionID) != 0
+            || compilerIntTableAppend(table: arena.graphZeroCFGRegions, value: blockID) != 0
+            || compilerIntTableAppend(table: arena.graphZeroCFGRegions, value: kind) != 0
+            || compilerIntTableAppend(table: arena.graphZeroCFGRegions, value: edgeCount) != 0
+            || compilerIntTableAppend(table: arena.graphZeroCFGRegions, value: compilerIntTableValue(table: arena.cfgBlocks, row: blockID, column: compilerBodyCFGBlockRegionColumn())) != 0 { return 0 - 1 }
+        blockID: blockID + 1
+    }
     return 0
 }
 
@@ -21776,10 +21899,24 @@ function compilerBodyMIRAppendValue(arena: CompilerBodyArena, kind: Int, typeKin
 }
 
 function compilerBodyMIRAppendOperand(arena: CompilerBodyArena, operationID: Int, ordinal: Int, valueID: Int, role: Int): Int {
+    if rawBufferLoadInt(buffer: arena.graphZeroState, index: compilerBodyGraphZeroStateFrozen()) != 0 { return 0 - 1 }
     if compilerIntTableAppend(table: arena.mirOperands, value: operationID) != 0
         || compilerIntTableAppend(table: arena.mirOperands, value: ordinal) != 0
         || compilerIntTableAppend(table: arena.mirOperands, value: valueID) != 0
         || compilerIntTableAppend(table: arena.mirOperands, value: role) != 0 { return 0 - 1 }
+    let producer: Int(compilerBodyMIRValueProducerOperationAny(arena: arena, valueID: valueID))
+    if producer == 0 - 2 { return 0 - 1 }
+    if producer >= 0 {
+        let dependencyID: Int(compilerIntTableRowCount(table: arena.graphZeroMIRDependencies))
+        state dependencyKind: Int(compilerBodyGraphZeroMIRDependencyData())
+        if producer >= operationID { dependencyKind: compilerBodyGraphZeroMIRDependencyLoopCarried() }
+        if compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: dependencyID) != 0
+            || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: producer) != 0
+            || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: operationID) != 0
+            || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: valueID) != 0
+            || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: dependencyKind) != 0
+            || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: ordinal) != 0 { return 0 - 1 }
+    }
     return 0
 }
 
@@ -21813,7 +21950,66 @@ function compilerBodyMIRValueIsProducedBy(arena: CompilerBodyArena, valueID: Int
     return compilerBodyMIRValueProducerOperation(arena: arena, valueID: valueID, operationKind: operationKind) >= 0
 }
 
+function compilerBodyMIROperationIsOwnershipOrEffectBarrier(kind: Int): Bool {
+    return kind == compilerBodyMIROperationAssignVersion()
+        || kind == compilerBodyMIROperationMemberRead()
+        || kind == compilerBodyMIROperationConstruct()
+        || kind == compilerBodyMIROperationOptionalSome()
+        || kind == compilerBodyMIROperationOptionalPayload()
+        || kind == compilerBodyMIROperationStringConcat()
+        || kind == compilerBodyMIROperationStringFromInt()
+        || kind == compilerBodyMIROperationStringFromBool()
+        || kind == compilerBodyMIROperationMemberAssign()
+        || kind == compilerBodyMIROperationEnumConstruct()
+        || kind == compilerBodyMIROperationEnumPayload()
+        || kind == compilerBodyMIROperationArrayLiteral()
+        || kind == compilerBodyMIROperationArrayIndex()
+        || kind == compilerBodyMIROperationArrayCount()
+        || kind == compilerBodyMIROperationArrayStore()
+}
+
+function compilerBodyGraphZeroSourceHasOwnershipOrEffectBarrier(arena: CompilerBodyArena, sourceNodeID: Int): Bool {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: arena.memoryFacts) {
+        if compilerIntTableValue(table: arena.memoryFacts, row: row, column: compilerBodyMemoryFactSourceColumn()) == sourceNodeID {
+            let kind: Int(compilerIntTableValue(table: arena.memoryFacts, row: row, column: compilerBodyMemoryFactKindColumn()))
+            if kind == compilerBodyMemoryFactWriteUnique()
+                || kind == compilerBodyMemoryFactMemberWrite()
+                || kind == compilerBodyMemoryFactMove()
+                || kind == compilerBodyMemoryFactSharedBorrow()
+                || kind == compilerBodyMemoryFactUniqueBorrow()
+                || kind == compilerBodyMemoryFactConsume()
+                || kind == compilerBodyMemoryFactDestruction() { return true }
+        }
+        row: row + 1
+    }
+    return false
+}
+
+function compilerBodyMIROperationRequiresOrder(arena: CompilerBodyArena, kind: Int, sourceNodeID: Int): Bool {
+    return compilerBodyMIROperationIsOwnershipOrEffectBarrier(kind: kind)
+        || compilerBodyGraphZeroSourceHasOwnershipOrEffectBarrier(arena: arena, sourceNodeID: sourceNodeID)
+        || kind == compilerBodyMIROperationCondBranch()
+        || kind == compilerBodyMIROperationBranch()
+        || kind == compilerBodyMIROperationReturn()
+        || kind == compilerBodyMIROperationPhi()
+}
+
+function compilerBodyMIRValueProducerOperationAny(arena: CompilerBodyArena, valueID: Int): Int {
+    state producer: Int(0 - 1)
+    state operationRow: Int(0)
+    while operationRow < compilerIntTableRowCount(table: arena.mirOperations) {
+        if compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()) == valueID {
+            if producer >= 0 { return 0 - 2 }
+            producer: operationRow
+        }
+        operationRow: operationRow + 1
+    }
+    return producer
+}
+
 function compilerBodyMIRAppendOperation(arena: CompilerBodyArena, blockID: Int, kind: Int, resultValueID: Int, sourceNodeID: Int, firstOperand: Int, operandCount: Int, targetKind: Int, targetID: Int): Int {
+    if rawBufferLoadInt(buffer: arena.graphZeroState, index: compilerBodyGraphZeroStateFrozen()) != 0 { return 0 - 1 }
     let operationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
     state storageID: Int(0 - 1)
     if kind == compilerBodyMIROperationDirectCall() { storageID: compilerBodyStorageForCall(arena: arena, callNodeID: sourceNodeID) }
@@ -21830,6 +22026,24 @@ function compilerBodyMIRAppendOperation(arena: CompilerBodyArena, blockID: Int, 
     if compilerIntTableAppend(table: arena.mirOperations, value: targetID) != 0 { return 0 - 1 }
     if compilerIntTableAppend(table: arena.mirOperations, value: storageID) != 0 { return 0 - 1 }
     if compilerIntTableAppend(table: arena.mirOperations, value: 0 - 1) != 0 { return 0 - 1 }
+    if compilerBodyMIROperationRequiresOrder(arena: arena, kind: kind, sourceNodeID: sourceNodeID) {
+        state priorOperation: Int(operationID - 1)
+        state orderProducer: Int(0 - 1)
+        while priorOperation >= 0 && orderProducer < 0 {
+            if compilerIntTableValue(table: arena.mirOperations, row: priorOperation, column: compilerBodyMIROperationBlockColumn()) == blockID
+                && compilerBodyMIROperationRequiresOrder(arena: arena, kind: compilerIntTableValue(table: arena.mirOperations, row: priorOperation, column: compilerBodyMIROperationKindColumn()), sourceNodeID: compilerIntTableValue(table: arena.mirOperations, row: priorOperation, column: compilerBodyMIROperationSourceColumn())) { orderProducer: priorOperation }
+            priorOperation: priorOperation - 1
+        }
+        if orderProducer >= 0 {
+            let dependencyID: Int(compilerIntTableRowCount(table: arena.graphZeroMIRDependencies))
+            if compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: dependencyID) != 0
+                || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: orderProducer) != 0
+                || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: operationID) != 0
+                || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: 0 - 1) != 0
+                || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: compilerBodyGraphZeroMIRDependencyOrder()) != 0
+                || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: 0) != 0 { return 0 - 1 }
+        }
+    }
     return operationID
 }
 
@@ -26394,6 +26608,100 @@ function compilerBodyMIRAppendBlock(arena: CompilerBodyArena, cfgBlockID: Int, f
     return cfgBlockID
 }
 
+function compilerBodyGraphZeroAppendControlDependencies(arena: CompilerBodyArena): Int {
+    state edgeRow: Int(0)
+    while edgeRow < compilerIntTableRowCount(table: arena.cfgEdges) {
+        let fromBlockID: Int(compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeFromColumn()))
+        let toBlockID: Int(compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeToColumn()))
+        if fromBlockID < 0 || fromBlockID >= compilerIntTableRowCount(table: arena.mirBlocks)
+            || toBlockID < 0 || toBlockID >= compilerIntTableRowCount(table: arena.mirBlocks) { return 0 - 1 }
+        let fromFirst: Int(compilerIntTableValue(table: arena.mirBlocks, row: fromBlockID, column: compilerBodyMIRBlockFirstOperationColumn()))
+        let fromCount: Int(compilerIntTableValue(table: arena.mirBlocks, row: fromBlockID, column: compilerBodyMIRBlockOperationCountColumn()))
+        let toFirst: Int(compilerIntTableValue(table: arena.mirBlocks, row: toBlockID, column: compilerBodyMIRBlockFirstOperationColumn()))
+        let toCount: Int(compilerIntTableValue(table: arena.mirBlocks, row: toBlockID, column: compilerBodyMIRBlockOperationCountColumn()))
+        if fromFirst < 0 || fromCount < 1 || toFirst < 0 || toCount < 1 { return 0 - 1 }
+        let producer: Int(fromFirst + fromCount - 1)
+        state ordinal: Int(0)
+        while ordinal < toCount {
+            let consumer: Int(toFirst + ordinal)
+            state hasLocalProducer: Bool(false)
+            state existingDependencyRow: Int(0)
+            while existingDependencyRow < compilerIntTableRowCount(table: arena.graphZeroMIRDependencies) {
+                if compilerIntTableValue(table: arena.graphZeroMIRDependencies, row: existingDependencyRow, column: compilerBodyGraphZeroMIRDependencyConsumerColumn()) == consumer {
+                    let existingProducer: Int(compilerIntTableValue(table: arena.graphZeroMIRDependencies, row: existingDependencyRow, column: compilerBodyGraphZeroMIRDependencyProducerColumn()))
+                    if existingProducer >= toFirst && existingProducer < toFirst + toCount { hasLocalProducer: true }
+                }
+                existingDependencyRow: existingDependencyRow + 1
+            }
+            if !hasLocalProducer && producer != consumer {
+                state dependencyKind: Int(compilerBodyGraphZeroMIRDependencyControl())
+                if producer >= consumer { dependencyKind: compilerBodyGraphZeroMIRDependencyLoopCarried() }
+                let dependencyID: Int(compilerIntTableRowCount(table: arena.graphZeroMIRDependencies))
+                if compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: dependencyID) != 0
+                    || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: producer) != 0
+                    || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: consumer) != 0
+                    || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: 0 - 1) != 0
+                    || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: dependencyKind) != 0
+                    || compilerIntTableAppend(table: arena.graphZeroMIRDependencies, value: ordinal) != 0 { return 0 - 1 }
+            }
+            ordinal: ordinal + 1
+        }
+        edgeRow: edgeRow + 1
+    }
+    return 0
+}
+
+function compilerBodyGraphZeroFreezeMIR(arena: CompilerBodyArena): Int {
+    if rawBufferLoadInt(buffer: arena.graphZeroState, index: compilerBodyGraphZeroStateFrozen()) != 0 { return 0 - 1 }
+    let operationCount: Int(compilerIntTableRowCount(table: arena.mirOperations))
+    let depths: RawBuffer(rawBufferCreate(capacity: operationCount + 1, stride: 4))
+    state operationID: Int(0)
+    while operationID < operationCount {
+        if rawBufferAppendInt(buffer: depths, value: 1) != 0 {
+            rawBufferDestroy(buffer: depths)
+            return 0 - 1
+        }
+        operationID: operationID + 1
+    }
+    operationID: 0
+    while operationID < operationCount {
+        state depth: Int(1)
+        state dependencyRow: Int(0)
+        while dependencyRow < compilerIntTableRowCount(table: arena.graphZeroMIRDependencies) {
+            if compilerIntTableValue(table: arena.graphZeroMIRDependencies, row: dependencyRow, column: compilerBodyGraphZeroMIRDependencyConsumerColumn()) == operationID
+                && compilerIntTableValue(table: arena.graphZeroMIRDependencies, row: dependencyRow, column: compilerBodyGraphZeroMIRDependencyKindColumn()) != compilerBodyGraphZeroMIRDependencyLoopCarried() {
+                let producer: Int(compilerIntTableValue(table: arena.graphZeroMIRDependencies, row: dependencyRow, column: compilerBodyGraphZeroMIRDependencyProducerColumn()))
+                if producer >= 0 && producer < operationID {
+                    let candidate: Int(rawBufferLoadInt(buffer: depths, index: producer) + 1)
+                    if candidate > depth { depth: candidate }
+                }
+            }
+            dependencyRow: dependencyRow + 1
+        }
+        if rawBufferStoreInt(buffer: depths, index: operationID, value: depth) != 0 {
+            rawBufferDestroy(buffer: depths)
+            return 0 - 1
+        }
+        let blockID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationID, column: compilerBodyMIROperationBlockColumn()))
+        let frontierID: Int(compilerIntTableRowCount(table: arena.graphZeroMIRFrontiers))
+        if frontierID != operationID
+            || compilerIntTableAppend(table: arena.graphZeroMIRFrontiers, value: frontierID) != 0
+            || compilerIntTableAppend(table: arena.graphZeroMIRFrontiers, value: operationID) != 0
+            || compilerIntTableAppend(table: arena.graphZeroMIRFrontiers, value: blockID) != 0
+            || compilerIntTableAppend(table: arena.graphZeroMIRFrontiers, value: depth) != 0
+            || compilerIntTableAppend(table: arena.graphZeroMIRFrontiers, value: operationID) != 0 {
+            rawBufferDestroy(buffer: depths)
+            return 0 - 1
+        }
+        operationID: operationID + 1
+    }
+    let destroyStatus: Int(rawBufferDestroy(buffer: depths))
+    if destroyStatus != 0
+        || rawBufferStoreInt(buffer: arena.graphZeroState, index: compilerBodyGraphZeroStateValid(), value: 1) != 0
+        || rawBufferStoreInt(buffer: arena.graphZeroState, index: compilerBodyGraphZeroStateFrozen(), value: 1) != 0 { return 0 - 1 }
+    return 0
+}
+
 function compilerBodyMIRBuild(arena: CompilerBodyArena): Int {
     if !compilerBodyMemoryIsFrozenAndValid(arena: arena)
         || !compilerBodyArenaSymbolsAndResolutionsAreValid(arena: arena)
@@ -26474,20 +26782,26 @@ function compilerBodyMIRBuildWithScheduleIndex(arena: CompilerBodyArena, schedul
         if compilerBodyMIRAppendBlock(arena: arena, cfgBlockID: cfgBlockID, firstOperation: firstOperation, operationCount: compilerIntTableRowCount(table: arena.mirOperations) - firstOperation) != cfgBlockID { return 0 - 1 }
         traversalIndex: traversalIndex + 1
     }
-    return compilerBodyMIRCompleteLoopPhis(arena: arena)
+    let loopStatus: Int(compilerBodyMIRCompleteLoopPhis(arena: arena))
+    if loopStatus != 0 { return loopStatus }
+    if compilerBodyGraphZeroAppendControlDependencies(arena: arena) != 0 { return 0 - 1 }
+    return compilerBodyGraphZeroFreezeMIR(arena: arena)
 }
 
 function compilerBodyMIRValidationMacroTargetQueryInvalidBase(): Int { return 320600 }
 
 function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: CompilerModuleABIPlan): Int {
     if !compilerBodyMemoryIsFrozenAndValid(arena: arena)
+        || !compilerBodyGraphZeroMIRIsValid(arena: arena)
         || !compilerIntTableIsComplete(table: arena.mirValues)
         || !compilerIntTableIsComplete(table: arena.mirBlocks)
         || !compilerIntTableIsComplete(table: arena.mirOperations)
         || !compilerIntTableIsComplete(table: arena.mirOperands)
         || !compilerIntTableIsComplete(table: arena.mirExpressionValues)
         || !compilerIntTableIsComplete(table: arena.mirVersions)
-        || compilerIntTableRowCount(table: arena.mirBlocks) != compilerIntTableRowCount(table: arena.cfgBlocks) { return 1 }
+        || compilerIntTableRowCount(table: arena.mirBlocks) != compilerIntTableRowCount(table: arena.cfgBlocks)
+        || compilerIntTableRowCount(table: arena.graphZeroCFGRegions) != compilerIntTableRowCount(table: arena.cfgBlocks)
+        || compilerIntTableRowCount(table: arena.graphZeroMIRFrontiers) != compilerIntTableRowCount(table: arena.mirOperations) { return 1 }
     let valueCount: Int(compilerIntTableRowCount(table: arena.mirValues))
     state valueRow: Int(0)
     while valueRow < valueCount {
@@ -28480,6 +28794,7 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
         || !compilerIntTableIsComplete(table: arena.cfgBlocks)
         || !compilerIntTableIsComplete(table: arena.cfgEdges)
         || !compilerIntTableIsComplete(table: arena.cfgSchedule)
+        || !compilerIntTableIsComplete(table: arena.graphZeroCFGRegions)
         || !compilerIntTableIsComplete(table: arena.storages)
         || !compilerIntTableIsComplete(table: arena.memoryFacts)
         || rawBufferCount(buffer: arena.memoryState) != compilerBodyMemoryStateCount()
@@ -28488,6 +28803,9 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
         || !compilerIntTableIsComplete(table: arena.mirOperations)
         || !compilerIntTableIsComplete(table: arena.mirOperands)
         || !compilerIntTableIsComplete(table: arena.mirExpressionValues)
+        || !compilerIntTableIsComplete(table: arena.graphZeroMIRDependencies)
+        || !compilerIntTableIsComplete(table: arena.graphZeroMIRFrontiers)
+        || rawBufferCount(buffer: arena.graphZeroState) != compilerBodyGraphZeroStateCount()
         || compilerIntTableRowCount(table: arena.nodes) < 1
         || compilerIntTableValue(table: arena.nodes, row: 0, column: 0) != 0
         || compilerIntTableValue(table: arena.nodes, row: 0, column: 1) != compilerSyntaxKindLexicalRegion() { return false }
@@ -28534,6 +28852,7 @@ function compilerBodyArenaDestroy(arena: CompilerBodyArena): Int {
     let cfgBlockStatus: Int(compilerIntTableDestroy(table: arena.cfgBlocks))
     let cfgEdgeStatus: Int(compilerIntTableDestroy(table: arena.cfgEdges))
     let cfgScheduleStatus: Int(compilerIntTableDestroy(table: arena.cfgSchedule))
+    let graphZeroCFGRegionStatus: Int(compilerIntTableDestroy(table: arena.graphZeroCFGRegions))
     let storageStatus: Int(compilerIntTableDestroy(table: arena.storages))
     let ownedPathStatus: Int(compilerIntTableDestroy(table: arena.ownedPaths))
     let bindingAliasStatus: Int(compilerIntTableDestroy(table: arena.bindingAliases))
@@ -28547,11 +28866,14 @@ function compilerBodyArenaDestroy(arena: CompilerBodyArena): Int {
     let mirOperandStatus: Int(compilerIntTableDestroy(table: arena.mirOperands))
     let mirVersionStatus: Int(compilerIntTableDestroy(table: arena.mirVersions))
     let mirExpressionValueStatus: Int(compilerIntTableDestroy(table: arena.mirExpressionValues))
+    let graphZeroMIRDependencyStatus: Int(compilerIntTableDestroy(table: arena.graphZeroMIRDependencies))
+    let graphZeroMIRFrontierStatus: Int(compilerIntTableDestroy(table: arena.graphZeroMIRFrontiers))
+    let graphZeroStateStatus: Int(rawBufferDestroy(buffer: arena.graphZeroState))
     let mirTraversalStatus: Int(rawBufferDestroy(buffer: arena.mirTraversal))
     let failureStatus: Int(rawBufferDestroy(buffer: arena.failures))
     if nodeStatus != 0 || edgeStatus != 0 || symbolStatus != 0 || resolutionStatus != 0 || typeInstanceStatus != 0 || typeArgumentStatus != 0
-        || cfgBlockStatus != 0 || cfgEdgeStatus != 0 || cfgScheduleStatus != 0 || storageStatus != 0 || ownedPathStatus != 0 || bindingAliasStatus != 0 || runtimeContractStatus != 0 || ownedReturnTransferStatus != 0 || memoryStatus != 0 || memoryStateStatus != 0
-        || mirValueStatus != 0 || mirBlockStatus != 0 || mirStatus != 0 || mirOperandStatus != 0 || mirVersionStatus != 0 || mirExpressionValueStatus != 0 || mirTraversalStatus != 0
+        || cfgBlockStatus != 0 || cfgEdgeStatus != 0 || cfgScheduleStatus != 0 || graphZeroCFGRegionStatus != 0 || storageStatus != 0 || ownedPathStatus != 0 || bindingAliasStatus != 0 || runtimeContractStatus != 0 || ownedReturnTransferStatus != 0 || memoryStatus != 0 || memoryStateStatus != 0
+        || mirValueStatus != 0 || mirBlockStatus != 0 || mirStatus != 0 || mirOperandStatus != 0 || mirVersionStatus != 0 || mirExpressionValueStatus != 0 || graphZeroMIRDependencyStatus != 0 || graphZeroMIRFrontierStatus != 0 || graphZeroStateStatus != 0 || mirTraversalStatus != 0
         || failureStatus != 0 { return 0 - 1 }
     return 0
 }
