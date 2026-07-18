@@ -20,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
     requestHeaders.get("host") ??
     "range-native-performance.offhand-tot-0v.chatgpt.site";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https";
-  const imageUrl = `${protocol}://${host}/og-v2.png`;
+  const imageUrl = `${protocol}://${host}/og-v3.png`;
   const title = "Range";
   const description =
     "Native benchmark results for Range, C, C++, Rust, Go, and Swift, with compiler emission status.";
@@ -35,8 +35,8 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: imageUrl,
-          width: 1730,
-          height: 909,
+          width: 1200,
+          height: 630,
           alt: "Range native benchmark charts for loops, noise, function calls, and strings",
         },
       ],
