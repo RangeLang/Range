@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-labelledby="title description">
+  <title id="title">Range String performance improvement</title>
+  <desc id="description">Median wall time improved from 491.2 milliseconds to 4.1 milliseconds, while peak memory fell from 5.3 gigabytes to 1.9 megabytes.</desc>
+  <rect width="1200" height="500" rx="24" fill="oklch(0.985 0.006 72)"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="64" y="68" font-size="24" font-weight="600" fill="oklch(0.21 0.018 255)">100k appends · Range</text>
+    <text x="64" y="108" font-size="27" font-weight="650" fill="oklch(0.65 0.2 252)">~120× faster</text>
+    <text x="284" y="108" font-size="27" font-weight="650" fill="oklch(0.65 0.2 252)">~2,800× less peak memory</text>
+
+    <g stroke="oklch(0.9 0.012 255)" stroke-width="1">
+      <line x1="70" y1="175" x2="1130" y2="175"/>
+      <line x1="70" y1="285" x2="1130" y2="285"/>
+      <line x1="70" y1="395" x2="1130" y2="395"/>
+    </g>
+
+    <path d="M 120 177 C 340 177, 500 395, 1080 395" fill="none" stroke="oklch(0.65 0.2 252)" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="120" cy="177" r="8" fill="oklch(0.985 0.006 72)" stroke="oklch(0.65 0.2 252)" stroke-width="5"/>
+    <circle cx="1080" cy="395" r="8" fill="oklch(0.985 0.006 72)" stroke="oklch(0.65 0.2 252)" stroke-width="5"/>
+
+    <text x="120" y="154" text-anchor="middle" font-size="23" font-weight="600" fill="oklch(0.21 0.018 255)">491.2 ms</text>
+    <text x="120" y="209" text-anchor="middle" font-size="18" fill="oklch(0.58 0.015 255)">5.3 GB</text>
+    <text x="1080" y="372" text-anchor="middle" font-size="23" font-weight="600" fill="oklch(0.21 0.018 255)">4.1 ms</text>
+    <text x="1080" y="427" text-anchor="middle" font-size="18" fill="oklch(0.58 0.015 255)">1.9 MB</text>
+    <text x="120" y="468" text-anchor="middle" font-size="18" fill="oklch(0.58 0.015 255)">Before</text>
+    <text x="1080" y="468" text-anchor="middle" font-size="18" fill="oklch(0.58 0.015 255)">After</text>
+  </g>
+</svg>

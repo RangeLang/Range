@@ -1,108 +1,117 @@
-# Range
+<div align="center">
 
-Range's normal `compile`, source `check`, `run`, `emit-llvm`, and
-`compile-executable` commands now use
-the checked-in native seed compiler to emit LLVM IR, link it with `clang`, and
-launch the native executable. The native self-hosting compiler and macro
-candidate/seed gates are green, including the actual Foundation `Registrable`
-macro. The complete LLVM example/run manifest still uses the retained
-SwiftBootstrap path: the native seed's current bounded language slice does not
-yet cover the manifest's print/Text, arrays, enums/switch, generics, optionals,
-and file-I/O programs. Swift compiler/package/test deletion is therefore
-blocked until that parity is implemented.
+# Range Performance
 
-## Download
+Native LLVM · `-O3` · July 2026
 
-The active development command surface is the repository script:
+</div>
+
+![Range String performance improved from 491.2 ms and 5.3 GB to 4.1 ms and 1.9 MB](Development/Benchmarks/Speed/range-strings-improvement.svg)
+
+Range's owned String storage now carries its length, capacity, and data forward, allowing uniquely owned strings to grow in the same allocation.
+
+| 100k appends | Before | After | Improvement |
+|---|---:|---:|---:|
+| Median wall time | 491.2 ms | **4.1 ms** | **~120× faster** |
+| Peak memory | 5.3 GB | **1.9 MB** | **~2,800× less** |
+
+## Native comparison
+
+All results below are ordered fastest to slowest. Range is highlighted in bold.
+
+| Strings · 100k appends | Median wall time |
+|---|---:|
+| C | 3.9 ms |
+| C++ | 3.9 ms |
+| **Range** | **4.1 ms** |
+| Rust | 4.2 ms |
+| Go | 4.8 ms |
+| Swift | 5.6 ms |
+
+Range peak memory: **1.9 MB**.
+
+<details>
+<summary><strong>Initial benchmark</strong> · July 18, 2026</summary>
+
+### Loops · 20m iterations
+
+| Language | Median wall time |
+|---|---:|
+| C++ | 61.3 ms |
+| C | 61.4 ms |
+| Rust | 61.9 ms |
+| Swift | 62.5 ms |
+| **Range** | **66.3 ms** |
+| Go | 79.6 ms |
+
+### Noise · 50m samples
+
+| Language | Median wall time |
+|---|---:|
+| C | 70.5 ms |
+| C++ | 70.9 ms |
+| Go | 78.9 ms |
+| **Range** | **82.4 ms** |
+| Rust | 82.9 ms |
+| Swift | 82.9 ms |
+
+### Function calls · 20m iterations
+
+| Language | Median wall time |
+|---|---:|
+| Go | 64.2 ms |
+| C++ | 67.4 ms |
+| C | 67.5 ms |
+| Rust | 67.9 ms |
+| Swift | 68.5 ms |
+| **Range** | **72.3 ms** |
+
+### Strings before lowering · 100k appends
+
+| Language | Median wall time |
+|---|---:|
+| C++ | 3.6 ms |
+| Rust | 3.6 ms |
+| Go | 4.3 ms |
+| C | 4.4 ms |
+| Swift | 4.8 ms |
+| **Range** | **491.2 ms** |
+
+Range peak memory: **5.3 GB** · peers: **1.8–4.2 MB**.
+
+</details>
+
+<details>
+<summary><strong>String scaling</strong> · 30 runs at each size</summary>
+
+| 100k appends | 1m appends | 5m appends | 10m appends |
+|---|---|---|---|
+| C · 4.2 ms | C++ · 8.2 ms | C · 20.0 ms | C · 36.1 ms |
+| C++ · 4.3 ms | C · 8.7 ms | C++ · 20.2 ms | Rust · 36.2 ms |
+| **Range · 4.3 ms** | Rust · 8.9 ms | Rust · 20.3 ms | C++ · 36.3 ms |
+| Rust · 4.4 ms | Go · 9.5 ms | Go · 21.3 ms | Go · 37.0 ms |
+| Go · 5.3 ms | **Range · 10.1 ms** | **Range · 27.2 ms** | **Range · 50.1 ms** |
+| Swift · 6.2 ms | Swift · 20.7 ms | Swift · 62.1 ms | Swift · 118.4 ms |
+
+</details>
+
+## Compiler status
+
+**4 of 6 tests emitted and passed.**
+
+| Result | Tests |
+|---|---|
+| Passed | Loops, Noise, Function Calls, Strings |
+| Did not emit | Collections · resolution stage 2 |
+| Did not emit | Constructs · constructor-argument parse reachability |
+| Emitted but failed | None |
+
+## Use Range
 
 ```sh
 scripts/range run path/to/Main.range
-```
-
-## Start
-
-Compile a Range file to LLVM on standard output, or type-check it without
-emitting output:
-
-```sh
 scripts/range compile path/to/Main.range
 scripts/range check path/to/Main.range
 ```
 
-Projects can own a command line by declaring a `commandLine` source in their
-`Project.range`. The Compiler project exposes its Range-authored CLI under its
-project namespace:
-
-```sh
-scripts/range compiler compile path/to/Main.range
-scripts/range compiler check path/to/Main.range
-scripts/range compiler emit-llvm path/to/Main.range Main.ll
-```
-
-The command-line target is ordinary Range code, so another project can define
-its own argument vocabulary and run it as `scripts/range ProjectName ...`.
-
-Build one content-addressed compiler candidate from the accepted previous seed:
-
-```sh
-scripts/range compiler next
-```
-
-`next` validates and links the candidate under `.range/Compiler/Next`, reports
-whether its LLVM already matches the accepted fixed point, and never promotes
-the checked-in seed.
-
-Exercise the complete compiler-specific bootstrap progression:
-
-```sh
-scripts/range compiler progression
-```
-
-`progression` uses the accepted seed to build `previous`, then uses `previous`
-to build `current` from the exact same compiler source bundle. It reports the
-LLVM and linked-executable byte sizes and signed deltas for
-`seed -> previous -> current`. Size is diagnostic; the gate succeeds only when
-the `previous` and `current` LLVM and executable artifacts are byte-identical.
-Completed results are content-addressed under `.range/Compiler/Progression`.
-
-Run the active LLVM executable gate:
-
-```sh
-scripts/range check
-```
-
-Emit LLVM IR directly:
-
-```sh
-scripts/range emit-llvm path/to/Main.range .range/Build/llvm/Main.ll
-```
-
-Check that the LLVM example corpus still emits module text:
-
-```sh
-scripts/range check-llvm-examples
-```
-
-Check representative examples by linking and running the emitted LLVM:
-
-```sh
-scripts/range check-llvm-runs
-```
-
-`scripts/range check` still delegates the run manifest to `SwiftBootstrap`,
-which validates manifest coverage, emits LLVM, links with `clang`, launches
-each executable, and checks exit/stdout expectations. The emit-only example
-corpus check also remains on that retained path. `scripts/range run` is native
-by default and writes `.range/Build/llvm/Main.ll` through the checked-in seed.
-
-`SwiftBootstrap` remains only for the legacy example corpus; it is no longer a
-build stage for the Range-authored compiler. Native compiler regressions link
-the checked-in seed directly, so new compiler syntax and runtime ABI work does
-not need a duplicate Swift implementation.
-
-The self-hosting compiler lives at `RangeCompiler/Range/Programs/Compiler`.
-Run `scripts/range check-compiler-candidate` for the full Stage 2/3 fixed-point
-gate, or `scripts/range check-stage2-compiler` to verify the checked-in seed and
-its frozen source/runtime manifest. The compiler now uses the core-declared
-`RawBuffer` storage ABI for both integer tables and text assembly; the former
-`IntBuffer` and `TextBuffer` compiler/runtime models have been removed.
+The active compiler is Range-authored and emits native LLVM. The full legacy example manifest still uses the retained Swift bootstrap while unsupported language coverage is completed. See [Development](Development/README.md), the [speed benchmark](Development/Benchmarks/Speed/README.md), and the [compiler core](RangeCompiler/Range/Core/README.md) for details.
