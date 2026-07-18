@@ -4360,6 +4360,61 @@ struct RangeScriptTests {
         #expect(!disabledFirst.stdout.contains("compilerMetricsReset"))
     }
 
+    @Test("Owned String growth is linear, preserves copied aliases, and resets with its transient region")
+    func ownedStringGrowthPreservesCopiesAndRegionLifetime() throws {
+        let root = try repositoryRoot()
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let harness = directory.appendingPathComponent("OwnedStringHarness.c")
+        let executable = directory.appendingPathComponent("OwnedStringHarness")
+        try """
+        #include <stdint.h>
+        #include <string.h>
+        int32_t stringTransientRegionMark(void);
+        int32_t stringTransientRegionReset(int32_t mark);
+        char *stringOwnedCopy(char *source);
+        char *stringAppendOwned(char *left, char *right);
+        int32_t compilerMetricsReset(void);
+        int32_t compilerMetricsSetEnabled(_Bool enabled);
+        char *compilerMetricsReport(void);
+        int main(void) {
+            int32_t mark = stringTransientRegionMark();
+            compilerMetricsReset();
+            compilerMetricsSetEnabled(1);
+            char *value = stringOwnedCopy("a");
+            char *alias = stringOwnedCopy(value);
+            for (int32_t index = 0; index < 100000; index += 1) {
+                value = stringAppendOwned(value, "a");
+            }
+            if (strlen(value) != 100001 || strcmp(alias, "a") != 0) return 1;
+            char *report = compilerMetricsReport();
+            if (!strstr(report, "stringConcatCalls=100000\tstringConcatBytes=100000")) return 2;
+            if (stringTransientRegionReset(mark) != 0) return 3;
+            return 0;
+        }
+        """.write(to: harness, atomically: true, encoding: .utf8)
+        let runtime = root.appendingPathComponent("RangeCompiler/Runtime")
+        let compile = try runCapturedProcess(
+            executable: "/usr/bin/clang",
+            arguments: [
+                harness.path,
+                runtime.appendingPathComponent("RangeCompilerHost.c").path,
+                runtime.appendingPathComponent("RangeCompilerMetrics.c").path,
+                runtime.appendingPathComponent("RangeString.c").path,
+                runtime.appendingPathComponent("RangeRawBuffer.c").path,
+                "-O3", "-o", executable.path,
+            ]
+        )
+        #expect(compile.exitCode == 0)
+        #expect(compile.stderr.isEmpty)
+        let result = try runCapturedProcess(executable: executable.path, arguments: [])
+        #expect(result.exitCode == 0)
+        #expect(result.stdout.isEmpty)
+        #expect(result.stderr.isEmpty)
+    }
+
     @Test("Shared compiler metrics runtime counts controlled operations only when enabled")
     func sharedCompilerMetricsRuntimeCountsControlledOperationsOnlyWhenEnabled() throws {
         let root = try repositoryRoot()
@@ -4641,8 +4696,6 @@ struct RangeScriptTests {
 
         let source = directory.appendingPathComponent("StringStateLoop.range")
         try """
-        compilerCoreLLVM
-
         function appendOnce(source: String): String {
             state output: String("")
             state records: String("")
@@ -4659,22 +4712,19 @@ struct RangeScriptTests {
         }
 
         @main {
-            return 0
+            return stringLength(value: appendOnce(source: String("xy")))
         }
         """.write(to: source, atomically: true, encoding: .utf8)
 
-        let compiler = try repositoryRoot()
-            .appendingPathComponent("RangeCompiler/Range/Programs/Compiler", isDirectory: true)
-        let result = try runRangeScript(
-            arguments: ["run", compiler.path, "--", source.path],
-            timeout: 120
-        )
+        let result = try runNativeCompiler(source: source)
 
         #expect(result.timedOut == false)
         #expect(result.exitCode == 0)
         #expect(result.stderr.isEmpty)
         #expect(result.stdout.contains("define ptr @appendOnce(ptr %source)"))
-        #expect(result.stdout.contains("phi ptr [getelementptr inbounds ([1 x i8]"))
+        #expect(result.stdout.contains(" = phi ptr ["))
+        #expect(result.stdout.contains("call ptr @stringOwnedCopy(ptr getelementptr inbounds ([1 x i8]"))
+        #expect(result.stdout.contains("call ptr @stringAppendOwned(ptr %"))
         #expect(result.stdout.contains("call ptr @stringConcat(ptr %"))
         #expect(result.stdout.contains("ret ptr %"))
         let hasSelfReferentialEmptyStringPhi = result.stdout.split(separator: "\n").contains { line in

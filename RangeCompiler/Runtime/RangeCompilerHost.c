@@ -7,6 +7,7 @@
 #include <crt_externs.h>
 
 void *stringTransientAllocate(size_t size);
+void *stringTransientReallocate(void *allocation, size_t size);
 
 void compilerMetricsObserveStringConcat(size_t bytesCopied);
 void compilerMetricsObserveStringSubstring(size_t sourceBytes, size_t resultBytes);
@@ -155,6 +156,94 @@ char *stringConcat(char *left, char *right) {
     memcpy(buffer + leftLength, right, rightLength);
     buffer[leftLength + rightLength] = 0;
     return buffer;
+}
+
+typedef struct RangeOwnedStringHeader {
+    uint64_t magic;
+    size_t length;
+    size_t capacity;
+} RangeOwnedStringHeader;
+
+static const uint64_t rangeOwnedStringMagic = UINT64_C(0x52414E4745535452);
+
+static size_t rangeOwnedStringCapacity(size_t required) {
+    size_t capacity = 16;
+    while (capacity < required) {
+        if (capacity > SIZE_MAX / 2) {
+            return required;
+        }
+        capacity *= 2;
+    }
+    return capacity;
+}
+
+char *stringOwnedCopy(char *source) {
+    if (!source) {
+        source = "";
+    }
+    size_t length = strlen(source);
+    size_t capacity = rangeOwnedStringCapacity(length);
+    if (capacity > SIZE_MAX - sizeof(RangeOwnedStringHeader) - 1) {
+        abort();
+    }
+    RangeOwnedStringHeader *header = stringTransientAllocate(
+        sizeof(RangeOwnedStringHeader) + capacity + 1
+    );
+    if (!header) {
+        return "";
+    }
+    header->magic = rangeOwnedStringMagic;
+    header->length = length;
+    header->capacity = capacity;
+    char *buffer = (char *)(header + 1);
+    memcpy(buffer, source, length + 1);
+    return buffer;
+}
+
+char *stringAppendOwned(char *left, char *right) {
+    if (!left || !right) {
+        abort();
+    }
+    RangeOwnedStringHeader *header = ((RangeOwnedStringHeader *)left) - 1;
+    if (header->magic != rangeOwnedStringMagic || header->length > header->capacity) {
+        abort();
+    }
+
+    size_t rightLength = strlen(right);
+    if (rightLength > SIZE_MAX - header->length) {
+        abort();
+    }
+    size_t required = header->length + rightLength;
+    uintptr_t leftAddress = (uintptr_t)left;
+    uintptr_t rightAddress = (uintptr_t)right;
+    bool rightAliasesLeft = rightAddress >= leftAddress
+        && rightAddress <= leftAddress + header->length;
+    size_t rightOffset = rightAliasesLeft ? (size_t)(rightAddress - leftAddress) : 0;
+
+    if (required > header->capacity) {
+        size_t capacity = rangeOwnedStringCapacity(required);
+        if (capacity > SIZE_MAX - sizeof(RangeOwnedStringHeader) - 1) {
+            abort();
+        }
+        header = stringTransientReallocate(
+            header,
+            sizeof(RangeOwnedStringHeader) + capacity + 1
+        );
+        if (!header) {
+            return "";
+        }
+        header->capacity = capacity;
+        left = (char *)(header + 1);
+        if (rightAliasesLeft) {
+            right = left + rightOffset;
+        }
+    }
+
+    compilerMetricsObserveStringConcat(rightLength);
+    memmove(left + header->length, right, rightLength);
+    header->length = required;
+    left[required] = 0;
+    return left;
 }
 
 char *stringFromInt(int32_t value) {

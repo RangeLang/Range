@@ -32,6 +32,33 @@ void *stringTransientAllocate(size_t size) {
     return allocation;
 }
 
+void *stringTransientReallocate(void *allocation, size_t size) {
+    if (!allocation) {
+        return stringTransientAllocate(size);
+    }
+    if (transientStringRegionDepth == 0) {
+        return realloc(allocation, size);
+    }
+
+    size_t allocationIndex = transientStringAllocationCount;
+    for (size_t index = 0; index < transientStringAllocationCount; index += 1) {
+        if (transientStringAllocations[index] == allocation) {
+            allocationIndex = index;
+            break;
+        }
+    }
+    if (allocationIndex == transientStringAllocationCount) {
+        abort();
+    }
+
+    void *next = realloc(allocation, size);
+    if (!next) {
+        return NULL;
+    }
+    transientStringAllocations[allocationIndex] = next;
+    return next;
+}
+
 int32_t stringTransientRegionMark(void) {
     if (transientStringAllocationCount > INT32_MAX) {
         abort();

@@ -584,7 +584,7 @@ def cases() -> list[BenchmarkCase]:
                         acc: (acc + i + 1) % 1000003
                         i: i + 1
                     }}
-                    return ((acc + n) % 1000003) % 251
+                    return ((acc + stringLength(value: text)) % 1000003) % 251
                 }}
             """,
         ),
@@ -995,11 +995,11 @@ def build_case(
     range_project = prepare_range_project(case)
     range_binary = range_project / ".range" / "Build" / "llvm" / range_project.name
     range_llvm = range_project / ".range" / "Build" / "llvm" / "Main.ll"
+    range_source = range_project / "Playground.range"
     optimized_range_binary = range_binary.with_name(range_binary.name + "-O3")
+    range_llvm.parent.mkdir(parents=True, exist_ok=True)
     native_compiler = verified_range_compiler()
     if native_compiler:
-        range_llvm.parent.mkdir(parents=True, exist_ok=True)
-        range_source = range_project / "Playground.range"
         emitted = timed_setup(
             f"{case.name} Range native emit",
             [str(native_compiler), "emit-llvm", str(range_source), str(range_llvm)],
@@ -1007,8 +1007,8 @@ def build_case(
     else:
         print(f"{case.name} Range: no byte-identical Stage 2/3 compiler; using pinned seed")
         emitted = timed_setup(
-            f"{case.name} Range emit/build",
-            [str(range_cli), "run", str(range_project)],
+            f"{case.name} Range emit",
+            [str(range_cli), "emit-llvm", str(range_source), str(range_llvm)],
             env=range_env,
         )
 

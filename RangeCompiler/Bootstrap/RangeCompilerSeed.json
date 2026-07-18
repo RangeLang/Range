@@ -2,12 +2,12 @@
   "formatVersion": 1,
   "seed": {
     "path": "RangeCompiler/Bootstrap/RangeCompilerSeed.ll",
-    "bytes": 5626884,
-    "sha256": "de51a91dd72ee238d4e2fdb1f2b1e67fd2e949848e9be135998cb76f2e2736e7"
+    "bytes": 5751483,
+    "sha256": "c978ce8bafb94ad1a3d4e065b452f79f6e49a4f486f6ef91fa50937f3de79c19"
   },
   "expectedStage3LLVM": {
-    "bytes": 5626884,
-    "sha256": "de51a91dd72ee238d4e2fdb1f2b1e67fd2e949848e9be135998cb76f2e2736e7"
+    "bytes": 5751483,
+    "sha256": "c978ce8bafb94ad1a3d4e065b452f79f6e49a4f486f6ef91fa50937f3de79c19"
   },
   "compilerSources": [
     {
@@ -18,12 +18,17 @@
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Compiler.range",
       "role": "project",
-      "sha256": "e58b153285b5575dc8c4aae1387116e14fdeee62a7c5d614ffa66bd1475c7dcb"
+      "sha256": "dd1aa8cadffb3d36a8902df325946b43658fdabb22c040d972e0b17a576de831"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerCore.range",
       "role": "project",
-      "sha256": "7268896cd28921952c060d985dd1004e4cee45eaa6590358c06e5b35fbffd64e"
+      "sha256": "2c9517dfe0013bb0eb5dadebdefc3f78e10d85bfab5a5847e1155ef289390a22"
+    },
+    {
+      "path": "RangeCompiler/Range/Programs/Compiler/CompilerDirectives.range",
+      "role": "project",
+      "sha256": "8fd707d26ed6b092ad4a758f0db65e934c8f35ae9e260e5b5aabb9e706fa069d"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Lexer.range",
@@ -40,11 +45,11 @@
   "runtimeSources": [
     {
       "path": "RangeCompiler/Runtime/RangeCompilerHost.c",
-      "sha256": "1f517788534750b05ba7e31b8508f08219e7993f7a64bddeb1ff5d1fbf09c7da"
+      "sha256": "7654485f95f7a6d73c12a744542afa6628b25c46859dc07c239c896f111e660e"
     },
     {
       "path": "RangeCompiler/Runtime/RangeString.c",
-      "sha256": "e245e90ef6d97b7ed5070c612448e1eca7b9b383292fec2528d8dc889076b129"
+      "sha256": "3d9757b730c581e77445e80d5d2046f1a09a813f6d1dc3c0b92f9a7c09ab14ca"
     },
     {
       "path": "RangeCompiler/Runtime/RangeRawBuffer.c",
