@@ -8,10 +8,10 @@
   --line: oklch(0.9 0.012 255);
   --peer: oklch(0.72 0.23 65);
   --range: oklch(0.65 0.2 252);
-  --fastest-bar: oklch(0.72 0.21 145);
-  --yellow-bar: oklch(0.72 0.22 95);
-  --warning-bar: oklch(0.72 0.23 65);
-  --slow-bar: oklch(0.72 0.24 28);
+  --fastest-bar: oklch(0.76 0.19 145);
+  --yellow-bar: oklch(0.84 0.18 100);
+  --warning-bar: oklch(0.76 0.2 65);
+  --slow-bar: oklch(0.7 0.22 28);
   --error: oklch(0.62 0.22 28);
 }
 
