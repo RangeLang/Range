@@ -99,6 +99,7 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
           const barColor = ratioToFastest <= 1.25
             ? `color-mix(in oklch, var(--fastest-bar), var(--comparison-bar) ${grayMix.toFixed(1)}%)`
             : `color-mix(in oklch, var(--comparison-bar), var(--slow-bar) ${redMix.toFixed(1)}%)`;
+          const barFill = `linear-gradient(90deg, color-mix(in oklch, ${barColor}, var(--paper) 28%), ${barColor})`;
 
           return (
             <div
@@ -107,7 +108,7 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
             >
               <span className="language">{result.language}</span>
               <span className="track" aria-hidden="true">
-                <span className="bar" style={{ width, background: barColor }} />
+                <span className="bar" style={{ width, background: barFill }} />
               </span>
               <span className="value">
                 <span>{result.milliseconds.toFixed(1)} ms</span>
