@@ -6,9 +6,11 @@
   --ink: oklch(0.21 0.018 255);
   --muted: oklch(0.58 0.015 255);
   --line: oklch(0.9 0.012 255);
-  --peer: oklch(0.62 0.025 145);
+  --peer: oklch(0.61 0.018 145);
   --range: oklch(0.65 0.2 252);
-  --baseline-bar: oklch(0.76 0.2 145);
+  --fastest-bar: oklch(0.76 0.2 145);
+  --comparison-bar: oklch(0.61 0.018 145);
+  --slow-bar: oklch(0.62 0.22 28);
 }
 
 * {
@@ -178,8 +180,10 @@ main {
   font-weight: 500;
 }
 
-.baseline .bar {
-  background: var(--baseline-bar);
+.fastest .language,
+.fastest .value {
+  color: var(--ink);
+  font-weight: 500;
 }
 
 .axis {

@@ -69,7 +69,7 @@ const baselineBenchmarks: Benchmark[] = [
 
 function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
   const midpoint = benchmark.axisMax / 2;
-  const cBaseline = benchmark.results.find((result) => result.language === "C")?.milliseconds;
+  const fastestTime = Math.min(...benchmark.results.map((result) => result.milliseconds));
 
   return (
     <section className="chart" aria-labelledby={`${id}-title`}>
@@ -81,23 +81,38 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
       <div className="rows">
         {benchmark.results.map((result) => {
           const isRange = result.language === "Range";
-          const isBaseline = result.language === "C";
+          const ratioToFastest = result.milliseconds / fastestTime;
+          const isFastest = Math.abs(result.milliseconds - fastestTime) < 0.0001;
           const width = `${(result.milliseconds / benchmark.axisMax) * 100}%`;
-          const ratioToC = isRange && cBaseline ? result.milliseconds / cBaseline : undefined;
+          const grayMix = Math.min(100, Math.max(0, ((ratioToFastest - 1) / 0.25) * 100));
+          const redMix = ratioToFastest <= 1.25
+            ? 0
+            : Math.min(
+                100,
+                Math.max(
+                  0,
+                  ((Math.log10(ratioToFastest) - Math.log10(1.25)) /
+                    (Math.log10(8) - Math.log10(1.25))) *
+                    100,
+                ),
+              );
+          const barColor = ratioToFastest <= 1.25
+            ? `color-mix(in oklch, var(--fastest-bar), var(--comparison-bar) ${grayMix.toFixed(1)}%)`
+            : `color-mix(in oklch, var(--comparison-bar), var(--slow-bar) ${redMix.toFixed(1)}%)`;
 
           return (
             <div
-              className={`row${isRange ? " range" : ""}${isBaseline ? " baseline" : ""}`}
+              className={`row${isRange ? " range" : ""}${isFastest ? " fastest" : ""}`}
               key={result.language}
             >
               <span className="language">{result.language}</span>
               <span className="track" aria-hidden="true">
-                <span className="bar" style={{ width }} />
+                <span className="bar" style={{ width, background: barColor }} />
               </span>
               <span className="value">
                 <span>{result.milliseconds.toFixed(1)} ms</span>
-                {isBaseline && <small>C baseline</small>}
-                {ratioToC && <small>{ratioToC.toFixed(2)}× C</small>}
+                {isFastest && <small>fastest</small>}
+                {isRange && !isFastest && <small>{ratioToFastest.toFixed(2)}× fastest</small>}
               </span>
             </div>
           );
