@@ -117,53 +117,50 @@ function RangeImprovementChart() {
         <span>100k appends · Range</span>
       </header>
 
-      <svg
-        className="bezierChart"
-        viewBox="0 0 480 300"
-        role="img"
-        aria-labelledby="range-improvement-svg-title range-improvement-svg-description"
-      >
-        <title id="range-improvement-svg-title">Range String performance before and after lowering</title>
-        <desc id="range-improvement-svg-description">
-          Median wall time falls from 491.2 milliseconds to 3.4 milliseconds, while peak memory
-          falls from 5.3 gigabytes to 1.9 megabytes.
-        </desc>
+      <div className="improvementPlot">
+        <svg
+          className="bezierChart"
+          viewBox="0 0 960 350"
+          role="img"
+          aria-labelledby="range-improvement-svg-title range-improvement-svg-description"
+        >
+          <title id="range-improvement-svg-title">Range String performance before and after lowering</title>
+          <desc id="range-improvement-svg-description">
+            Median wall time falls from 491.2 milliseconds to 3.4 milliseconds, while peak memory
+            falls from 5.3 gigabytes to 1.9 megabytes.
+          </desc>
 
-        <g className="bezierGrid">
-          <line x1="55" y1="24" x2="450" y2="24" />
-          <line x1="55" y1="124" x2="450" y2="124" />
-          <line x1="55" y1="224" x2="450" y2="224" />
-        </g>
-        <g className="bezierAxis">
-          <text x="43" y="29" textAnchor="end">500</text>
-          <text x="43" y="129" textAnchor="end">250</text>
-          <text x="43" y="229" textAnchor="end">0</text>
-          <text x="14" y="124" textAnchor="middle" transform="rotate(-90 14 124)">milliseconds</text>
-        </g>
+          <g className="bezierGrid">
+            <line x1="55" y1="24" x2="930" y2="24" />
+            <line x1="55" y1="154" x2="930" y2="154" />
+            <line x1="55" y1="284" x2="930" y2="284" />
+          </g>
+          <g className="bezierAxis">
+            <text x="43" y="29" textAnchor="end">500</text>
+            <text x="43" y="159" textAnchor="end">250</text>
+            <text x="43" y="289" textAnchor="end">0</text>
+            <text x="14" y="154" textAnchor="middle" transform="rotate(-90 14 154)">milliseconds</text>
+          </g>
 
-        <path
-          className="bezierLine"
-          d="M 76 28 C 190 28, 275 222, 420 222"
-          pathLength="1"
-        />
-        <circle className="bezierPoint" cx="76" cy="28" r="5" />
-        <circle className="bezierPoint" cx="420" cy="222" r="5" />
+          <path className="bezierLine" d="M 90 29 C 285 29, 430 284, 900 284" />
+          <circle className="bezierPoint" cx="90" cy="29" r="6" />
+          <circle className="bezierPoint" cx="900" cy="284" r="6" />
 
-        <g className="bezierValues">
-          <text x="89" y="48">491.2 ms</text>
-          <text x="407" y="204" textAnchor="end">3.4 ms</text>
-        </g>
-        <g className="bezierDelta">
-          <text x="248" y="86" textAnchor="middle">144× faster</text>
-          <text x="248" y="106" textAnchor="middle">~2,800× less peak memory</text>
-        </g>
-        <g className="bezierLabels">
-          <text x="76" y="258" textAnchor="middle">Before</text>
-          <text x="76" y="280" textAnchor="middle">5.3 GB peak</text>
-          <text x="420" y="258" textAnchor="middle">Self-hosted</text>
-          <text x="420" y="280" textAnchor="middle">1.9 MB peak</text>
-        </g>
-      </svg>
+          <g className="bezierLabels">
+            <text x="90" y="327" textAnchor="middle">Before</text>
+            <text x="900" y="327" textAnchor="middle">Self-hosted</text>
+          </g>
+        </svg>
+
+        <div className="improvementCallout" aria-hidden="true">
+          <p>144× faster</p>
+          <p>~2,800× less peak memory</p>
+          <div className="changeLabels">
+            <span>491.2 → 3.4 ms</span>
+            <span>5.3 GB → 1.9 MB</span>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
