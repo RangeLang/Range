@@ -112,14 +112,6 @@ function Chart({ benchmark }: { benchmark: Benchmark }) {
 export default function Home() {
   return (
     <main>
-      <header className="hero">
-        <p className="eyebrow">Range native performance</p>
-        <h1>Competitive on compute. Strings are the cliff.</h1>
-        <p className="summary">
-          Median wall time in milliseconds · fastest to slowest · Range highlighted
-        </p>
-      </header>
-
       <div className="chartGrid">
         {benchmarks.map((benchmark) => (
           <Chart benchmark={benchmark} key={benchmark.name} />

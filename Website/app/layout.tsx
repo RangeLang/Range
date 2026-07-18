@@ -20,10 +20,10 @@ export async function generateMetadata(): Promise<Metadata> {
     requestHeaders.get("host") ??
     "range-native-performance.offhand-tot-0v.chatgpt.site";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https";
-  const imageUrl = `${protocol}://${host}/og.png`;
+  const imageUrl = `${protocol}://${host}/og-v2.png`;
   const title = "Range Native Performance";
   const description =
-    "Competitive on compute. Strings are the cliff. Verified native benchmark results with compiler emission status.";
+    "Native benchmark results for Range, C, C++, Rust, Go, and Swift, with compiler emission status.";
 
   return {
     title,
