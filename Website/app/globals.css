@@ -249,7 +249,8 @@ main {
 }
 
 .contextSection,
-.improvementSection {
+.improvementSection,
+.scalingSection {
   margin-top: 72px;
   padding-top: 32px;
   border-top: 1px solid var(--line);
@@ -411,7 +412,8 @@ footer {
   }
 
   .contextSection,
-  .improvementSection {
+  .improvementSection,
+  .scalingSection {
     margin-top: 52px;
   }
 }
