@@ -261,7 +261,7 @@ main {
 
 .contextImageCrop {
   overflow: hidden;
-  aspect-ratio: 1680 / 1225;
+  aspect-ratio: 1680 / 1395;
   background: var(--paper);
   -webkit-mask-image:
     linear-gradient(to right, transparent, black 2.5%, black 97.5%, transparent),
