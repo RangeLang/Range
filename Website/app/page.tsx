@@ -88,8 +88,8 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
           const fasterMix = ratioToC ? Math.min(100, Math.max(0, (1 - ratioToC) * 200)) : 0;
           const rangeColor = ratioToC
             ? ratioToC >= 1
-              ? `color-mix(in oklch, var(--range), var(--range-slower) ${slowerMix.toFixed(1)}%)`
-              : `color-mix(in oklch, var(--range), var(--range-faster) ${fasterMix.toFixed(1)}%)`
+              ? `color-mix(in oklch, var(--range-bar), var(--range-bar-slower) ${slowerMix.toFixed(1)}%)`
+              : `color-mix(in oklch, var(--range-bar), var(--range-bar-faster) ${fasterMix.toFixed(1)}%)`
             : undefined;
 
           return (

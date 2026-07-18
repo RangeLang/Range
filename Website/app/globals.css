@@ -8,8 +8,9 @@
   --line: oklch(0.9 0.012 255);
   --peer: oklch(0.77 0.14 55);
   --range: oklch(0.65 0.2 252);
-  --range-faster: oklch(0.66 0.18 150);
-  --range-slower: oklch(0.64 0.2 35);
+  --range-bar: oklch(0.71 0.19 145);
+  --range-bar-faster: oklch(0.79 0.21 145);
+  --range-bar-slower: oklch(0.52 0.1 145);
 }
 
 * {
@@ -180,7 +181,7 @@ main {
 }
 
 .range .bar {
-  background: var(--range);
+  background: var(--range-bar);
 }
 
 .baseline .bar {
