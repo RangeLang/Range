@@ -128,7 +128,6 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
           const barColor = scaleDeviation <= redThreshold
             ? preRedColor
             : `color-mix(in oklch, var(--warning-bar), var(--slow-bar) ${redMix.toFixed(1)}%)`;
-          const barFill = `linear-gradient(90deg, color-mix(in oklch, ${barColor}, oklch(0.72 0 0) 14%), ${barColor})`;
 
           return (
             <div
@@ -137,7 +136,7 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
             >
               <span className="language">{result.language}</span>
               <span className="track" aria-hidden="true">
-                <span className="bar" style={{ width, background: barFill }} />
+                <span className="bar" style={{ width, background: barColor }} />
               </span>
               <span className="value">
                 <span>{result.milliseconds.toFixed(1)} ms</span>
