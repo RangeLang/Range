@@ -1,3 +1,5 @@
+import { MarkGithubIcon } from "@primer/octicons-react";
+
 type Result = {
   language: string;
   milliseconds: number;
@@ -274,7 +276,6 @@ export default function Home() {
     <main>
       <header className="pageHeader">
         <h1>Range Performance</h1>
-        <a href="https://github.com/georgetchelidze/Range">GitHub</a>
       </header>
 
       <section className="benchmarkSection" aria-labelledby="baseline-title">
@@ -358,8 +359,20 @@ export default function Home() {
       </section>
 
       <footer>
-        <span>Range · native LLVM · O3</span>
-        <span>July 2026</span>
+        <a
+          className="githubButton"
+          href="https://github.com/georgetchelidze/Range/tree/development"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Open the Range development branch on GitHub"
+        >
+          <MarkGithubIcon size={19} aria-hidden="true" />
+          <span>GitHub</span>
+        </a>
+        <div className="footerMeta">
+          <span>Range · native LLVM · O3</span>
+          <span>July 2026</span>
+        </div>
       </footer>
     </main>
   );
