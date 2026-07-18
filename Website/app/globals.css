@@ -250,15 +250,15 @@ main {
 
 .contextImageCrop {
   overflow: hidden;
-  aspect-ratio: 2.1;
+  aspect-ratio: 1680 / 1225;
   background: var(--paper);
   -webkit-mask-image:
-    linear-gradient(to right, transparent, black 6%, black 94%, transparent),
-    linear-gradient(to bottom, transparent, black 9%, black 91%, transparent);
+    linear-gradient(to right, transparent, black 2.5%, black 97.5%, transparent),
+    linear-gradient(to bottom, transparent, black 3.5%, black 96.5%, transparent);
   -webkit-mask-composite: source-in;
   mask-image:
-    linear-gradient(to right, transparent, black 6%, black 94%, transparent),
-    linear-gradient(to bottom, transparent, black 9%, black 91%, transparent);
+    linear-gradient(to right, transparent, black 2.5%, black 97.5%, transparent),
+    linear-gradient(to bottom, transparent, black 3.5%, black 96.5%, transparent);
   mask-composite: intersect;
 }
 
@@ -267,8 +267,6 @@ main {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 52% 43%;
-  transform: scale(1.58);
 }
 
 .contextFigure figcaption {

@@ -256,8 +256,8 @@ export default function Home() {
         <figure className="contextFigure">
           <div className="contextImageCrop">
             <img
-              src="/string-lowering-context.png"
-              alt="Range String lowering discussion showing owned length, capacity, and data storage"
+              src="/string-lowering-response.png"
+              alt="Complete Codex response explaining Range String lowering with owned length, capacity, and data storage"
             />
           </div>
           <figcaption>
