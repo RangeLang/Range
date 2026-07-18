@@ -71,12 +71,12 @@
     <text class="scale" x="530" y="22" text-anchor="end">100k appends</text>
     <line class="grid" x1="88" y1="48" x2="88" y2="230"/>
     <line class="grid" x1="294" y1="48" x2="294" y2="230"/>
-    <text class="label muted" x="76" y="68">C++</text><rect class="peer" x="88" y="51" width="220" height="22" rx="4"/><text class="value" x="322" y="68">3.2 ms</text>
-    <text class="label muted" x="76" y="96">C</text><rect class="peer" x="88" y="79" width="233" height="22" rx="4"/><text class="value" x="335" y="96">3.4 ms</text>
-    <text class="label range-label" x="76" y="124">Range</text><rect class="range" x="88" y="107" width="233" height="22" rx="4"/><text class="value range-value" x="335" y="124">3.4 ms</text>
-    <text class="label muted" x="76" y="152">Rust</text><rect class="peer" x="88" y="135" width="282" height="22" rx="4"/><text class="value" x="384" y="152">4.1 ms</text>
-    <text class="label muted" x="76" y="180">Go</text><rect class="peer" x="88" y="163" width="282" height="22" rx="4"/><text class="value" x="384" y="180">4.1 ms</text>
-    <text class="label muted" x="76" y="208">Swift</text><rect class="peer" x="88" y="191" width="357" height="22" rx="4"/><text class="value" x="459" y="208">5.2 ms</text>
+    <text class="label muted" x="76" y="68">C</text><rect class="peer" x="88" y="51" width="268" height="22" rx="4"/><text class="value" x="370" y="68">3.9 ms</text>
+    <text class="label muted" x="76" y="96">C++</text><rect class="peer" x="88" y="79" width="268" height="22" rx="4"/><text class="value" x="370" y="96">3.9 ms</text>
+    <text class="label range-label" x="76" y="124">Range</text><rect class="range" x="88" y="107" width="282" height="22" rx="4"/><text class="value range-value" x="384" y="124">4.1 ms</text>
+    <text class="label muted" x="76" y="152">Rust</text><rect class="peer" x="88" y="135" width="288" height="22" rx="4"/><text class="value" x="390" y="152">4.2 ms</text>
+    <text class="label muted" x="76" y="180">Go</text><rect class="peer" x="88" y="163" width="330" height="22" rx="4"/><text class="value" x="432" y="180">4.8 ms</text>
+    <text class="label muted" x="76" y="208">Swift</text><rect class="peer" x="88" y="191" width="385" height="22" rx="4"/><text class="value" x="487" y="208">5.6 ms</text>
     <line class="grid" x1="88" y1="220" x2="500" y2="220"/>
     <text class="axis" x="88" y="238">0</text><text class="axis" x="294" y="238" text-anchor="middle">3</text><text class="axis" x="500" y="238" text-anchor="end">6</text>
     <text class="status" x="88" y="260">Range peak memory: 1.9 MB · peers: 1.8–4.1 MB</text>

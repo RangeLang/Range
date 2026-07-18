@@ -70,14 +70,14 @@ const baselineBenchmarks: Benchmark[] = [
 const improvedStringsBenchmark: Benchmark = {
   name: "Strings",
   scale: "100k appends",
-  axisMax: 5,
+  axisMax: 6,
   results: [
-    { language: "Range", milliseconds: 3.4 },
-    { language: "C++", milliseconds: 3.6 },
-    { language: "Rust", milliseconds: 3.6 },
-    { language: "Go", milliseconds: 4.3 },
-    { language: "C", milliseconds: 4.4 },
-    { language: "Swift", milliseconds: 4.8 },
+    { language: "C", milliseconds: 3.9 },
+    { language: "C++", milliseconds: 3.9 },
+    { language: "Range", milliseconds: 4.1 },
+    { language: "Rust", milliseconds: 4.2 },
+    { language: "Go", milliseconds: 4.8 },
+    { language: "Swift", milliseconds: 5.6 },
   ],
   note: "Range peak memory: 1.9 MB",
 };
@@ -169,7 +169,7 @@ function RangeImprovementChart() {
         <div className="improvementTitle">
           <h2 id="range-improvement-chart-title">100k appends · Range</h2>
           <div className="improvementSummary">
-            <span>144× faster</span>
+            <span>~120× faster</span>
             <span>~2,800× less peak memory</span>
           </div>
         </div>
@@ -184,7 +184,7 @@ function RangeImprovementChart() {
         >
           <title id="range-improvement-svg-title">Range String performance before and after lowering</title>
           <desc id="range-improvement-svg-description">
-            Median wall time falls from 491.2 milliseconds to 3.4 milliseconds, while peak memory
+            Median wall time falls from 491.2 milliseconds to 4.1 milliseconds, while peak memory
             falls from 5.3 gigabytes to 1.9 megabytes.
           </desc>
 
@@ -200,7 +200,7 @@ function RangeImprovementChart() {
           <g className="pointMetrics">
             <text className="pointTime" x="90" y="48" textAnchor="middle">491.2 ms</text>
             <text className="pointMemory" x="90" y="102" textAnchor="middle">5.3 GB</text>
-            <text className="pointTime" x="900" y="266" textAnchor="middle">3.4 ms</text>
+            <text className="pointTime" x="900" y="266" textAnchor="middle">4.1 ms</text>
             <text className="pointMemory" x="900" y="320" textAnchor="middle">1.9 MB</text>
           </g>
 
