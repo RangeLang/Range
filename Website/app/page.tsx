@@ -11,7 +11,7 @@ type Benchmark = {
   note?: string;
 };
 
-const benchmarks: Benchmark[] = [
+const baselineBenchmarks: Benchmark[] = [
   {
     name: "Loops",
     scale: "20m iterations",
@@ -54,26 +54,41 @@ const benchmarks: Benchmark[] = [
   {
     name: "Strings",
     scale: "100k appends",
-    axisMax: 6,
+    axisMax: 500,
     results: [
-      { language: "C++", milliseconds: 3.2 },
-      { language: "C", milliseconds: 3.4 },
-      { language: "Range", milliseconds: 3.4 },
-      { language: "Rust", milliseconds: 4.1 },
-      { language: "Go", milliseconds: 4.1 },
-      { language: "Swift", milliseconds: 5.2 },
+      { language: "C++", milliseconds: 3.6 },
+      { language: "Rust", milliseconds: 3.6 },
+      { language: "Go", milliseconds: 4.3 },
+      { language: "C", milliseconds: 4.4 },
+      { language: "Swift", milliseconds: 4.8 },
+      { language: "Range", milliseconds: 491.2 },
     ],
-    note: "Range peak memory: 1.9 MB · peers: 1.8–4.1 MB",
+    note: "Range peak memory: 5.3 GB · peers: 1.8–4.2 MB",
   },
 ];
 
-function Chart({ benchmark }: { benchmark: Benchmark }) {
+const improvedStringBenchmark: Benchmark = {
+  name: "Strings",
+  scale: "100k appends",
+  axisMax: 6,
+  results: [
+    { language: "C++", milliseconds: 3.2 },
+    { language: "C", milliseconds: 3.4 },
+    { language: "Range", milliseconds: 3.4 },
+    { language: "Rust", milliseconds: 4.1 },
+    { language: "Go", milliseconds: 4.1 },
+    { language: "Swift", milliseconds: 5.2 },
+  ],
+  note: "Range peak memory: 1.9 MB · peers: 1.8–4.1 MB",
+};
+
+function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
   const midpoint = benchmark.axisMax / 2;
 
   return (
-    <section className="chart" aria-labelledby={`${benchmark.name}-title`}>
+    <section className="chart" aria-labelledby={`${id}-title`}>
       <header className="chartHeader">
-        <h2 id={`${benchmark.name}-title`}>{benchmark.name}</h2>
+        <h2 id={`${id}-title`}>{benchmark.name}</h2>
         <span>{benchmark.scale}</span>
       </header>
 
@@ -117,11 +132,22 @@ export default function Home() {
         <a href="https://github.com/georgetchelidze/Range">GitHub</a>
       </header>
 
-      <div className="chartGrid">
-        {benchmarks.map((benchmark) => (
-          <Chart benchmark={benchmark} key={benchmark.name} />
-        ))}
-      </div>
+      <section className="benchmarkSection" aria-labelledby="baseline-title">
+        <div className="sectionHeader">
+          <h2 id="baseline-title">Initial benchmark</h2>
+          <p className="dateLabel">July 18, 2026</p>
+        </div>
+
+        <div className="chartGrid">
+          {baselineBenchmarks.map((benchmark) => (
+            <Chart
+              benchmark={benchmark}
+              id={`baseline-${benchmark.name.toLowerCase().replaceAll(" ", "-")}`}
+              key={benchmark.name}
+            />
+          ))}
+        </div>
+      </section>
 
       <section className="status" aria-labelledby="range-status-title">
         <div>
@@ -142,6 +168,33 @@ export default function Home() {
             <dd>None</dd>
           </div>
         </dl>
+      </section>
+
+      <section className="contextSection" aria-labelledby="lowering-title">
+        <div className="sectionHeader">
+          <h2 id="lowering-title">String lowering</h2>
+          <p className="dateLabel">July 18, 2026 · 7:29 PM</p>
+        </div>
+        <figure className="contextFigure">
+          <img
+            src="/string-lowering-context.png"
+            alt="Range String lowering discussion showing owned length, capacity, and data storage"
+          />
+          <figcaption>
+            Owned String storage carries length, capacity, and data forward so unique growth can
+            extend the same allocation.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section className="improvementSection" aria-labelledby="improved-title">
+        <div className="sectionHeader">
+          <h2 id="improved-title">Improved self-hosted result</h2>
+          <p className="dateLabel">July 18, 2026</p>
+        </div>
+        <div className="improvedChart">
+          <Chart benchmark={improvedStringBenchmark} id="improved-strings" />
+        </div>
       </section>
 
       <footer>
