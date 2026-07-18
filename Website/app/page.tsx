@@ -85,15 +85,14 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
           const isFastest = Math.abs(result.milliseconds - fastestTime) < 0.0001;
           const width = `${(result.milliseconds / benchmark.axisMax) * 100}%`;
           const scaleDeviation = (result.milliseconds - fastestTime) / benchmark.axisMax;
+          const greenThreshold = 0.02;
           const redThreshold = 0.3;
-          const relativeOrange = Math.min(
-            100,
-            Math.max(
-              0,
-              (Math.log1p(scaleDeviation * 8) / Math.log1p(redThreshold * 8)) * 100,
-            ),
+          const orangeProgress = Math.min(
+            1,
+            Math.max(0, (scaleDeviation - greenThreshold) / (redThreshold - greenThreshold)),
           );
-          const orangeMix = isFastest ? 0 : Math.min(100, 28 + relativeOrange * 0.72);
+          const softenedOrangeProgress = Math.log1p(2 * orangeProgress ** 1.7) / Math.log(3);
+          const orangeMix = softenedOrangeProgress * 100;
           const redMix = scaleDeviation <= redThreshold
             ? 0
             : Math.min(
