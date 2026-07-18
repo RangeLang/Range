@@ -284,7 +284,7 @@ main {
 }
 
 .improvementPlot {
-  position: relative;
+  width: 100%;
 }
 
 .bezierChart {
@@ -322,16 +322,42 @@ main {
 }
 
 .improvementCallout {
-  position: absolute;
-  z-index: 1;
-  top: 32px;
-  right: 0;
-  width: min(53%, 590px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 28px;
 }
 
-.improvementCallout p {
+.improvementHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 40px;
+  margin-bottom: 24px;
+}
+
+.improvementTitle {
+  flex: 0 0 auto;
+}
+
+.improvementTitle h2 {
   margin: 0;
-  font-size: clamp(30px, 4vw, 54px);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+.improvementTitle span {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.improvementSummary p {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 42px);
   font-weight: 500;
   letter-spacing: -0.055em;
   line-height: 1.02;
@@ -339,9 +365,10 @@ main {
 
 .changeLabels {
   display: flex;
+  flex-direction: column;
   flex-wrap: wrap;
   gap: 8px 22px;
-  margin-top: 22px;
+  margin-top: 3px;
   color: var(--range);
   font-family: var(--font-geist-mono), monospace;
   font-size: clamp(14px, 1.6vw, 19px);
@@ -377,19 +404,24 @@ footer {
   }
 
   .improvementPlot {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .improvementCallout {
-    position: static;
-    order: -1;
     width: 100%;
-    margin-bottom: 18px;
   }
 
-  .improvementCallout p {
+  .improvementHeader,
+  .improvementCallout {
+    display: grid;
+    justify-content: stretch;
+    width: 100%;
+    gap: 16px;
+  }
+
+  .improvementSummary p {
     font-size: clamp(28px, 10vw, 42px);
+  }
+
+  .changeLabels {
+    flex-direction: row;
+    margin-top: 0;
   }
 
   .contextSection,

@@ -137,9 +137,21 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
 function RangeImprovementChart() {
   return (
     <section className="improvementChart" aria-labelledby="range-improvement-chart-title">
-      <header className="chartHeader">
-        <h2 id="range-improvement-chart-title">Strings</h2>
-        <span>100k appends · Range</span>
+      <header className="improvementHeader">
+        <div className="improvementTitle">
+          <h2 id="range-improvement-chart-title">Strings</h2>
+          <span>100k appends · Range</span>
+        </div>
+        <div className="improvementCallout" aria-hidden="true">
+          <div className="improvementSummary">
+            <p>144× faster</p>
+            <p>~2,800× less peak memory</p>
+          </div>
+          <div className="changeLabels">
+            <span>491.2 → 3.4 ms</span>
+            <span>5.3 GB → 1.9 MB</span>
+          </div>
+        </div>
       </header>
 
       <div className="improvementPlot">
@@ -176,15 +188,6 @@ function RangeImprovementChart() {
             <text x="900" y="327" textAnchor="middle">Self-hosted</text>
           </g>
         </svg>
-
-        <div className="improvementCallout" aria-hidden="true">
-          <p>144× faster</p>
-          <p>~2,800× less peak memory</p>
-          <div className="changeLabels">
-            <span>491.2 → 3.4 ms</span>
-            <span>5.3 GB → 1.9 MB</span>
-          </div>
-        </div>
       </div>
     </section>
   );
