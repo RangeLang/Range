@@ -227,16 +227,17 @@ main {
 }
 
 .statusList li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 12px;
 }
 
 .statusIcon {
   display: inline-block;
-  flex: 0 0 auto;
-  width: 16px;
+  width: 18px;
   color: var(--error);
+  font-family: var(--font-geist-mono), monospace;
   font-size: 22px;
   font-weight: 500;
   line-height: 1;
