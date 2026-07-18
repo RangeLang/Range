@@ -84,13 +84,6 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
           const isBaseline = result.language === "C";
           const width = `${(result.milliseconds / benchmark.axisMax) * 100}%`;
           const ratioToC = isRange && cBaseline ? result.milliseconds / cBaseline : undefined;
-          const slowerMix = ratioToC ? Math.min(100, Math.max(0, (ratioToC - 1) * 100)) : 0;
-          const fasterMix = ratioToC ? Math.min(100, Math.max(0, (1 - ratioToC) * 200)) : 0;
-          const rangeColor = ratioToC
-            ? ratioToC >= 1
-              ? `color-mix(in oklch, var(--range-bar), var(--range-bar-slower) ${slowerMix.toFixed(1)}%)`
-              : `color-mix(in oklch, var(--range-bar), var(--range-bar-faster) ${fasterMix.toFixed(1)}%)`
-            : undefined;
 
           return (
             <div
@@ -99,7 +92,7 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
             >
               <span className="language">{result.language}</span>
               <span className="track" aria-hidden="true">
-                <span className="bar" style={{ width, background: rangeColor }} />
+                <span className="bar" style={{ width }} />
               </span>
               <span className="value">
                 <span>{result.milliseconds.toFixed(1)} ms</span>
