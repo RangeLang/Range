@@ -86,14 +86,14 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
           const width = `${(result.milliseconds / benchmark.axisMax) * 100}%`;
           const scaleDeviation = (result.milliseconds - fastestTime) / benchmark.axisMax;
           const redThreshold = 0.3;
-          const relativeGray = Math.min(
+          const relativeOrange = Math.min(
             100,
             Math.max(
               0,
               (Math.log1p(scaleDeviation * 8) / Math.log1p(redThreshold * 8)) * 100,
             ),
           );
-          const grayMix = isFastest ? 0 : Math.min(100, 28 + relativeGray * 0.72);
+          const orangeMix = isFastest ? 0 : Math.min(100, 28 + relativeOrange * 0.72);
           const redMix = scaleDeviation <= redThreshold
             ? 0
             : Math.min(
@@ -105,8 +105,8 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
                 ),
               );
           const barColor = scaleDeviation <= redThreshold
-            ? `color-mix(in oklch, var(--fastest-bar), var(--comparison-bar) ${grayMix.toFixed(1)}%)`
-            : `color-mix(in oklch, var(--comparison-bar), var(--slow-bar) ${redMix.toFixed(1)}%)`;
+            ? `color-mix(in oklch, var(--fastest-bar), var(--warning-bar) ${orangeMix.toFixed(1)}%)`
+            : `color-mix(in oklch, var(--warning-bar), var(--slow-bar) ${redMix.toFixed(1)}%)`;
           const barFill = `linear-gradient(90deg, color-mix(in oklch, ${barColor}, var(--paper) 8%), ${barColor})`;
 
           return (

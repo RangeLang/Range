@@ -6,10 +6,10 @@
   --ink: oklch(0.21 0.018 255);
   --muted: oklch(0.58 0.015 255);
   --line: oklch(0.9 0.012 255);
-  --peer: oklch(0.7 0.018 145);
+  --peer: oklch(0.71 0.15 65);
   --range: oklch(0.65 0.2 252);
   --fastest-bar: oklch(0.74 0.2 145);
-  --comparison-bar: oklch(0.7 0.018 145);
+  --warning-bar: oklch(0.71 0.15 65);
   --slow-bar: oklch(0.68 0.22 28);
 }
 
