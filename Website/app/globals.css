@@ -9,6 +9,7 @@
   --peer: oklch(0.72 0.15 65);
   --range: oklch(0.65 0.2 252);
   --fastest-bar: oklch(0.72 0.2 145);
+  --yellow-bar: oklch(0.72 0.18 95);
   --warning-bar: oklch(0.72 0.15 65);
   --slow-bar: oklch(0.72 0.22 28);
   --error: oklch(0.62 0.22 28);

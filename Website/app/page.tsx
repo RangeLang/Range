@@ -92,7 +92,12 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
             Math.max(0, (scaleDeviation - greenThreshold) / (redThreshold - greenThreshold)),
           );
           const softenedOrangeProgress = Math.log1p(2 * orangeProgress ** 1.7) / Math.log(3);
-          const orangeMix = softenedOrangeProgress * 100;
+          const yellowStop = 0.58;
+          const yellowMix = Math.min(100, (softenedOrangeProgress / yellowStop) * 100);
+          const orangeMix = Math.max(
+            0,
+            ((softenedOrangeProgress - yellowStop) / (1 - yellowStop)) * 100,
+          );
           const redMix = scaleDeviation <= redThreshold
             ? 0
             : Math.min(
@@ -103,8 +108,11 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
                     100,
                 ),
               );
+          const preRedColor = softenedOrangeProgress <= yellowStop
+            ? `color-mix(in oklch, var(--fastest-bar), var(--yellow-bar) ${yellowMix.toFixed(1)}%)`
+            : `color-mix(in oklch, var(--yellow-bar), var(--warning-bar) ${orangeMix.toFixed(1)}%)`;
           const barColor = scaleDeviation <= redThreshold
-            ? `color-mix(in oklch, var(--fastest-bar), var(--warning-bar) ${orangeMix.toFixed(1)}%)`
+            ? preRedColor
             : `color-mix(in oklch, var(--warning-bar), var(--slow-bar) ${redMix.toFixed(1)}%)`;
           const barFill = `linear-gradient(90deg, color-mix(in oklch, ${barColor}, oklch(0.72 0 0) 14%), ${barColor})`;
 
