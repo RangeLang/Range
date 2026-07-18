@@ -174,13 +174,6 @@ function RangeImprovementChart() {
             <line x1="55" y1="180" x2="930" y2="180" />
             <line x1="55" y1="290" x2="930" y2="290" />
           </g>
-          <g className="bezierAxis">
-            <text x="43" y="75" textAnchor="end">500</text>
-            <text x="43" y="185" textAnchor="end">250</text>
-            <text x="43" y="295" textAnchor="end">0</text>
-            <text x="14" y="180" textAnchor="middle" transform="rotate(-90 14 180)">milliseconds</text>
-          </g>
-
           <path className="bezierLine" d="M 90 72 C 285 72, 430 290, 900 290" />
           <circle className="bezierPoint" cx="90" cy="72" r="6" />
           <circle className="bezierPoint" cx="900" cy="290" r="6" />

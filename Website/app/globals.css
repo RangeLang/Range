@@ -298,7 +298,6 @@ main {
   vector-effect: non-scaling-stroke;
 }
 
-.bezierAxis,
 .bezierLabels {
   fill: var(--muted);
   font-size: 15px;
