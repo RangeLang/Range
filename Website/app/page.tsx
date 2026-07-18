@@ -84,20 +84,27 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
           const ratioToFastest = result.milliseconds / fastestTime;
           const isFastest = Math.abs(result.milliseconds - fastestTime) < 0.0001;
           const width = `${(result.milliseconds / benchmark.axisMax) * 100}%`;
-          const relativeGray = Math.min(100, Math.max(0, ((ratioToFastest - 1) / 0.25) * 100));
+          const scaleDeviation = (result.milliseconds - fastestTime) / benchmark.axisMax;
+          const redThreshold = 0.3;
+          const relativeGray = Math.min(
+            100,
+            Math.max(
+              0,
+              (Math.log1p(scaleDeviation * 8) / Math.log1p(redThreshold * 8)) * 100,
+            ),
+          );
           const grayMix = isFastest ? 0 : Math.min(100, 28 + relativeGray * 0.72);
-          const redMix = ratioToFastest <= 1.25
+          const redMix = scaleDeviation <= redThreshold
             ? 0
             : Math.min(
                 100,
                 Math.max(
                   0,
-                  ((Math.log10(ratioToFastest) - Math.log10(1.25)) /
-                    (Math.log10(8) - Math.log10(1.25))) *
+                  (Math.log(scaleDeviation / redThreshold) / Math.log(1 / redThreshold)) *
                     100,
                 ),
               );
-          const barColor = ratioToFastest <= 1.25
+          const barColor = scaleDeviation <= redThreshold
             ? `color-mix(in oklch, var(--fastest-bar), var(--comparison-bar) ${grayMix.toFixed(1)}%)`
             : `color-mix(in oklch, var(--comparison-bar), var(--slow-bar) ${redMix.toFixed(1)}%)`;
           const barFill = `linear-gradient(90deg, color-mix(in oklch, ${barColor}, var(--paper) 8%), ${barColor})`;
