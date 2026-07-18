@@ -112,6 +112,10 @@ function Chart({ benchmark }: { benchmark: Benchmark }) {
 export default function Home() {
   return (
     <main>
+      <header className="pageHeader">
+        <h1>Range Performance</h1>
+      </header>
+
       <div className="chartGrid">
         {benchmarks.map((benchmark) => (
           <Chart benchmark={benchmark} key={benchmark.name} />
