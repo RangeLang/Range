@@ -233,17 +233,14 @@ main {
 }
 
 .statusIcon {
-  display: inline-grid;
+  display: inline-block;
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  place-items: center;
-  border: 1.5px solid currentColor;
-  border-radius: 50%;
+  width: 16px;
   color: var(--error);
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 500;
   line-height: 1;
+  text-align: center;
 }
 
 .statusList strong {
