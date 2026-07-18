@@ -220,24 +220,20 @@ export default function Home() {
       </section>
 
       <section className="status" aria-labelledby="range-status-title">
-        <div>
+        <div className="statusHeader">
           <p className="statusLabel">Compiler status</p>
           <h2 id="range-status-title">4 of 6 tests emitted and passed</h2>
         </div>
-        <dl className="statusList">
-          <div>
-            <dt>Not emitted</dt>
-            <dd>Collections · resolution stage 2</dd>
-          </div>
-          <div>
-            <dt>Not emitted</dt>
-            <dd>Constructs · constructor-argument parse reachability</dd>
-          </div>
-          <div>
-            <dt>Emitted but failed</dt>
-            <dd>None</dd>
-          </div>
-        </dl>
+        <ul className="statusList" aria-label="Tests not emitted in this pass">
+          <li>
+            <span className="statusIcon" aria-hidden="true">×</span>
+            <span><strong>Collections</strong> · resolution stage 2</span>
+          </li>
+          <li>
+            <span className="statusIcon" aria-hidden="true">×</span>
+            <span><strong>Constructs</strong> · constructor-argument parse reachability</span>
+          </li>
+        </ul>
       </section>
 
       <section className="contextSection" aria-labelledby="lowering-title">

@@ -11,6 +11,7 @@
   --fastest-bar: oklch(0.74 0.2 145);
   --warning-bar: oklch(0.71 0.15 65);
   --slow-bar: oklch(0.68 0.22 28);
+  --error: oklch(0.62 0.22 28);
 }
 
 * {
@@ -209,8 +210,7 @@ main {
 
 .status {
   display: grid;
-  grid-template-columns: 0.8fr 1.2fr;
-  gap: 48px;
+  gap: 28px;
   margin-top: 72px;
   padding: 32px 0;
   border-top: 1px solid var(--line);
@@ -219,22 +219,34 @@ main {
 
 .statusList {
   display: grid;
-  gap: 13px;
+  gap: 12px;
   margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.statusList div {
-  display: grid;
-  grid-template-columns: 132px 1fr;
-  gap: 16px;
+.statusList li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.statusList dt {
-  color: var(--muted);
+.statusIcon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  color: var(--error);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1;
 }
 
-.statusList dd {
-  margin: 0;
+.statusList strong {
+  font-weight: 500;
 }
 
 .contextSection,
@@ -381,7 +393,6 @@ footer {
   }
 
   .status {
-    grid-template-columns: 1fr;
     gap: 24px;
     margin-top: 52px;
   }
@@ -417,8 +428,4 @@ footer {
     margin-left: 61px;
   }
 
-  .statusList div {
-    grid-template-columns: 1fr;
-    gap: 3px;
-  }
 }
