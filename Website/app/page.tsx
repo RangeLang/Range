@@ -81,7 +81,6 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
       <div className="rows">
         {benchmark.results.map((result) => {
           const isRange = result.language === "Range";
-          const ratioToFastest = result.milliseconds / fastestTime;
           const isFastest = Math.abs(result.milliseconds - fastestTime) < 0.0001;
           const width = `${(result.milliseconds / benchmark.axisMax) * 100}%`;
           const scaleDeviation = (result.milliseconds - fastestTime) / benchmark.axisMax;
@@ -128,7 +127,6 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
               <span className="value">
                 <span>{result.milliseconds.toFixed(1)} ms</span>
                 {isFastest && <small>absolute best</small>}
-                {isRange && !isFastest && <small>{ratioToFastest.toFixed(2)}× best</small>}
               </span>
             </div>
           );
