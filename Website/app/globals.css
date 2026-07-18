@@ -213,20 +213,16 @@ main {
 
 .statusList li {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: baseline;
-  column-gap: 12px;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 7px;
 }
 
 .statusIcon {
-  display: inline-block;
-  width: 18px;
+  display: block;
+  width: 16px;
+  height: 16px;
   color: var(--error);
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 22px;
-  font-weight: 500;
-  line-height: 1;
-  text-align: center;
 }
 
 .statusList strong {

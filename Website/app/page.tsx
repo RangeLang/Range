@@ -1,4 +1,4 @@
-import { MarkGithubIcon } from "@primer/octicons-react";
+import { MarkGithubIcon, XIcon } from "@primer/octicons-react";
 
 type Result = {
   language: string;
@@ -302,11 +302,11 @@ export default function Home() {
         </div>
         <ul className="statusList" aria-label="Tests not emitted in this pass">
           <li>
-            <span className="statusIcon" aria-hidden="true">×</span>
+            <XIcon className="statusIcon" size={18} aria-hidden="true" />
             <span><strong>Collections</strong> · resolution stage 2</span>
           </li>
           <li>
-            <span className="statusIcon" aria-hidden="true">×</span>
+            <XIcon className="statusIcon" size={18} aria-hidden="true" />
             <span><strong>Constructs</strong> · constructor-argument parse reachability</span>
           </li>
         </ul>
