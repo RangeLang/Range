@@ -249,12 +249,27 @@ main {
   margin: 0;
 }
 
-.contextFigure img {
+.contextImageCrop {
+  overflow: hidden;
+  aspect-ratio: 2.1;
+  background: var(--paper);
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, black 6%, black 94%, transparent),
+    linear-gradient(to bottom, transparent, black 9%, black 91%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, transparent, black 6%, black 94%, transparent),
+    linear-gradient(to bottom, transparent, black 9%, black 91%, transparent);
+  mask-composite: intersect;
+}
+
+.contextImageCrop img {
   display: block;
   width: 100%;
-  height: auto;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  height: 100%;
+  object-fit: cover;
+  object-position: 52% 43%;
+  transform: scale(1.58);
 }
 
 .contextFigure figcaption {

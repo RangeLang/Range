@@ -234,10 +234,12 @@ export default function Home() {
           <p className="dateLabel">July 18, 2026 · 7:29 PM</p>
         </div>
         <figure className="contextFigure">
-          <img
-            src="/string-lowering-context.png"
-            alt="Range String lowering discussion showing owned length, capacity, and data storage"
-          />
+          <div className="contextImageCrop">
+            <img
+              src="/string-lowering-context.png"
+              alt="Range String lowering discussion showing owned length, capacity, and data storage"
+            />
+          </div>
           <figcaption>
             Owned String storage carries length, capacity, and data forward so unique growth can
             extend the same allocation.
