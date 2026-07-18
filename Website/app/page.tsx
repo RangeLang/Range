@@ -187,7 +187,7 @@ function RangeImprovementChart() {
 
           <g className="bezierLabels">
             <text x="90" y="364" textAnchor="middle">Before</text>
-            <text x="900" y="364" textAnchor="middle">Self-hosted</text>
+            <text x="900" y="364" textAnchor="middle">After</text>
           </g>
         </svg>
       </div>
