@@ -54,16 +54,16 @@ const benchmarks: Benchmark[] = [
   {
     name: "Strings",
     scale: "100k appends",
-    axisMax: 500,
+    axisMax: 6,
     results: [
-      { language: "C++", milliseconds: 3.6 },
-      { language: "Rust", milliseconds: 3.6 },
-      { language: "Go", milliseconds: 4.3 },
-      { language: "C", milliseconds: 4.4 },
-      { language: "Swift", milliseconds: 4.8 },
-      { language: "Range", milliseconds: 491.2 },
+      { language: "C++", milliseconds: 3.2 },
+      { language: "C", milliseconds: 3.4 },
+      { language: "Range", milliseconds: 3.4 },
+      { language: "Rust", milliseconds: 4.1 },
+      { language: "Go", milliseconds: 4.1 },
+      { language: "Swift", milliseconds: 5.2 },
     ],
-    note: "Range peak memory: 5.3 GB · peers: 1.8–4.2 MB",
+    note: "Range peak memory: 1.9 MB · peers: 1.8–4.1 MB",
   },
 ];
 
