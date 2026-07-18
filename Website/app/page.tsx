@@ -106,7 +106,7 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
           const barColor = scaleDeviation <= redThreshold
             ? `color-mix(in oklch, var(--fastest-bar), var(--warning-bar) ${orangeMix.toFixed(1)}%)`
             : `color-mix(in oklch, var(--warning-bar), var(--slow-bar) ${redMix.toFixed(1)}%)`;
-          const barFill = `linear-gradient(90deg, color-mix(in oklch, ${barColor}, var(--paper) 8%), ${barColor})`;
+          const barFill = `linear-gradient(90deg, color-mix(in oklch, ${barColor}, oklch(0.72 0 0) 14%), ${barColor})`;
 
           return (
             <div
