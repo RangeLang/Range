@@ -67,21 +67,6 @@ const baselineBenchmarks: Benchmark[] = [
   },
 ];
 
-const improvedStringBenchmark: Benchmark = {
-  name: "Strings",
-  scale: "100k appends",
-  axisMax: 6,
-  results: [
-    { language: "C++", milliseconds: 3.2 },
-    { language: "C", milliseconds: 3.4 },
-    { language: "Range", milliseconds: 3.4 },
-    { language: "Rust", milliseconds: 4.1 },
-    { language: "Go", milliseconds: 4.1 },
-    { language: "Swift", milliseconds: 5.2 },
-  ],
-  note: "Range peak memory: 1.9 MB · peers: 1.8–4.1 MB",
-};
-
 function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
   const midpoint = benchmark.axisMax / 2;
 
@@ -120,6 +105,65 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
       </div>
 
       {benchmark.note && <p className="chartNote">{benchmark.note}</p>}
+    </section>
+  );
+}
+
+function RangeImprovementChart() {
+  return (
+    <section className="improvementChart" aria-labelledby="range-improvement-chart-title">
+      <header className="chartHeader">
+        <h2 id="range-improvement-chart-title">Strings</h2>
+        <span>100k appends · Range</span>
+      </header>
+
+      <svg
+        className="bezierChart"
+        viewBox="0 0 480 300"
+        role="img"
+        aria-labelledby="range-improvement-svg-title range-improvement-svg-description"
+      >
+        <title id="range-improvement-svg-title">Range String performance before and after lowering</title>
+        <desc id="range-improvement-svg-description">
+          Median wall time falls from 491.2 milliseconds to 3.4 milliseconds, while peak memory
+          falls from 5.3 gigabytes to 1.9 megabytes.
+        </desc>
+
+        <g className="bezierGrid">
+          <line x1="55" y1="24" x2="450" y2="24" />
+          <line x1="55" y1="124" x2="450" y2="124" />
+          <line x1="55" y1="224" x2="450" y2="224" />
+        </g>
+        <g className="bezierAxis">
+          <text x="43" y="29" textAnchor="end">500</text>
+          <text x="43" y="129" textAnchor="end">250</text>
+          <text x="43" y="229" textAnchor="end">0</text>
+          <text x="14" y="124" textAnchor="middle" transform="rotate(-90 14 124)">milliseconds</text>
+        </g>
+
+        <path
+          className="bezierLine"
+          d="M 76 28 C 190 28, 275 222, 420 222"
+          pathLength="1"
+        />
+        <circle className="bezierPoint" cx="76" cy="28" r="5" />
+        <circle className="bezierPoint" cx="420" cy="222" r="5" />
+
+        <g className="bezierValues">
+          <text x="89" y="48">491.2 ms</text>
+          <text x="407" y="204" textAnchor="end">3.4 ms</text>
+        </g>
+        <g className="bezierDelta">
+          <text x="248" y="86" textAnchor="middle">144× faster</text>
+          <text x="248" y="106" textAnchor="middle">~2,800× less peak memory</text>
+        </g>
+        <g className="bezierLabels">
+          <text x="76" y="258" textAnchor="middle">Before</text>
+          <text x="76" y="280" textAnchor="middle">5.3 GB peak</text>
+          <text x="420" y="258" textAnchor="middle">Self-hosted</text>
+          <text x="420" y="280" textAnchor="middle">1.9 MB peak</text>
+        </g>
+      </svg>
     </section>
   );
 }
@@ -189,12 +233,10 @@ export default function Home() {
 
       <section className="improvementSection" aria-labelledby="improved-title">
         <div className="sectionHeader">
-          <h2 id="improved-title">Improved self-hosted result</h2>
+          <h2 id="improved-title">Range Strings improvement</h2>
           <p className="dateLabel">July 18, 2026</p>
         </div>
-        <div className="improvedChart">
-          <Chart benchmark={improvedStringBenchmark} id="improved-strings" />
-        </div>
+        <RangeImprovementChart />
       </section>
 
       <footer>

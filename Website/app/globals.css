@@ -250,8 +250,55 @@ main {
   line-height: 1.5;
 }
 
-.improvedChart {
+.improvementChart {
   width: min(100%, 620px);
+}
+
+.bezierChart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.bezierGrid line {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.bezierAxis,
+.bezierLabels {
+  fill: var(--muted);
+  font-size: 16px;
+}
+
+.bezierLine {
+  fill: none;
+  stroke: var(--range);
+  stroke-width: 4;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.bezierPoint {
+  fill: var(--paper);
+  stroke: var(--range);
+  stroke-width: 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.bezierValues {
+  fill: var(--ink);
+  font-size: 20px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.bezierDelta {
+  fill: var(--ink);
+  font-size: 16px;
+  font-weight: 500;
 }
 
 footer {
