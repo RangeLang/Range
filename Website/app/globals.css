@@ -294,6 +294,11 @@ main {
   width: 100%;
 }
 
+.improvedStringComparison {
+  width: min(100%, 555px);
+  margin-top: 52px;
+}
+
 .improvementPlot {
   width: 100%;
 }

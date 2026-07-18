@@ -67,6 +67,21 @@ const baselineBenchmarks: Benchmark[] = [
   },
 ];
 
+const improvedStringsBenchmark: Benchmark = {
+  name: "Strings",
+  scale: "100k appends",
+  axisMax: 5,
+  results: [
+    { language: "Range", milliseconds: 3.4 },
+    { language: "C++", milliseconds: 3.6 },
+    { language: "Rust", milliseconds: 3.6 },
+    { language: "Go", milliseconds: 4.3 },
+    { language: "C", milliseconds: 4.4 },
+    { language: "Swift", milliseconds: 4.8 },
+  ],
+  note: "Range peak memory: 1.9 MB",
+};
+
 function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
   const midpoint = benchmark.axisMax / 2;
   const fastestTime = Math.min(...benchmark.results.map((result) => result.milliseconds));
@@ -126,7 +141,7 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
               </span>
               <span className="value">
                 <span>{result.milliseconds.toFixed(1)} ms</span>
-                {isFastest && <small>absolute best</small>}
+                {isFastest && !isRange && <small>absolute best</small>}
               </span>
             </div>
           );
@@ -267,6 +282,9 @@ export default function Home() {
           <p className="dateLabel">July 18, 2026</p>
         </div>
         <RangeImprovementChart />
+        <div className="improvedStringComparison">
+          <Chart benchmark={improvedStringsBenchmark} id="improved-strings" />
+        </div>
       </section>
 
       <footer>
