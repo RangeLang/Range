@@ -39,8 +39,8 @@ export function createScaleMarks({ divisionBase = 3, divisionLevels = 2 } = {}) 
 
 export function pinchScaleValue(value, {
   center = 0.27,
-  falloff = 0.12,
-  strength = 0.72,
+  falloff = 0.16,
+  strength = 0.9,
 } = {}) {
   assertFiniteNumber(value, "value");
   assertFiniteNumber(center, "center");
@@ -53,7 +53,7 @@ export function pinchScaleValue(value, {
   if (strength < 0 || strength >= 1) throw new RangeError("strength must be within [0, 1)");
 
   const offset = value - center;
-  return value - strength * offset * pinchInfluence(value, center, falloff);
+  return value + strength * offset * pinchInfluence(value, center, falloff);
 }
 
 export function measureWithFalloff(position, {
@@ -166,7 +166,7 @@ export function createRangeMarks(config = {}) {
         minimum: config.measureMinimum,
       }),
       stroke,
-      opacity: Math.max(0, 1 - tone / 0.95),
+      opacity: Math.max(0, 1 - tone ** 6 / 0.98),
       tone,
       position: pinchScaleValue(mark.position, {
         center: config.pinch,

@@ -30,7 +30,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*division-base="3")(?=[^>]*division-levels="2")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-minimum="0.35")(?=[^>]*stroke-minimum="0.25")(?=[^>]*tone-falloff="0.06")(?=[^>]*tone-intensity="0.82")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*division-base="3")(?=[^>]*division-levels="2")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.16")(?=[^>]*pinch-strength="0.9")(?=[^>]*measure-minimum="0.35")(?=[^>]*stroke-minimum="0.25")(?=[^>]*tone-falloff="0.12")(?=[^>]*tone-intensity="0.82")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js"/);
   assert.match(html, /Range-authored and emits native LLVM/);
@@ -150,18 +150,18 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.equal(pinchScaleValue(0), 0);
   assert.equal(pinchScaleValue(0.27), 0.27);
   assert.equal(pinchScaleValue(1), 1);
-  assert.ok(pinchScaleValue(0.22) > 0.22);
-  assert.ok(pinchScaleValue(0.32) < 0.32);
+  assert.ok(pinchScaleValue(0.22, { falloff: 0.16, strength: 0.9 }) < 0.22);
+  assert.ok(pinchScaleValue(0.32, { falloff: 0.16, strength: 0.9 }) > 0.32);
 
   const marks = createRangeMarks({
     divisionBase: 3,
     divisionLevels: 2,
     pinch: 0.27,
-    pinchFalloff: 0.12,
-    pinchStrength: 0.72,
+    pinchFalloff: 0.16,
+    pinchStrength: 0.9,
     measureMinimum: 0.35,
     strokeMinimum: 0.25,
-    toneFalloff: 0.06,
+    toneFalloff: 0.12,
   });
   assert.ok(marks.every((mark) => mark.position >= 0 && mark.position <= 1));
   assert.ok(marks.every((mark) => mark.measure >= 0.35 - 1e-12));
@@ -170,14 +170,13 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(marks.every((mark) => mark.opacity >= 0 && mark.opacity <= 1));
   assert.ok(marks.every((mark, index) => index === 0 || mark.position > marks[index - 1].position));
   assert.equal(marks.length, 10);
-  const closestPinchMark = marks.reduce((closest, mark) => (
-    Math.abs(mark.position - 0.27) < Math.abs(closest.position - 0.27) ? mark : closest
-  ));
-  assert.ok(Math.abs(closestPinchMark.position - 0.27) < 0.04);
-  assert.ok(closestPinchMark.measure < 3);
-  assert.ok(closestPinchMark.stroke < 1);
-  assert.ok(closestPinchMark.tone > 0);
-  assert.ok(closestPinchMark.opacity < 1);
+  assert.ok(marks[2].position < 2 / 9);
+  assert.ok(marks[3].position > 1 / 3);
+  assert.ok(marks[3].position - marks[2].position > 0.18);
+  assert.ok(marks[2].measure < 3);
+  assert.ok(marks[2].stroke < 1);
+  assert.ok(marks[2].tone > 0.8);
+  assert.ok(marks[2].opacity > 0.5);
   assert.equal(marks[0].measure, 5);
   assert.equal(marks[8].measure, 3);
   assert.equal(marks[9].measure, 5);

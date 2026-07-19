@@ -5,11 +5,11 @@ const defaults = {
   divisionBase: 3,
   divisionLevels: 2,
   pinch: 0.27,
-  pinchFalloff: 0.12,
-  pinchStrength: 0.72,
+  pinchFalloff: 0.16,
+  pinchStrength: 0.9,
   measureMinimum: 0.35,
   strokeMinimum: 0.25,
-  toneFalloff: 0.06,
+  toneFalloff: 0.12,
   toneIntensity: 0.82,
 };
 

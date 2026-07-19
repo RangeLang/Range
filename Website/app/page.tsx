@@ -39,11 +39,11 @@ export default function Home() {
           division-base="3"
           division-levels="2"
           pinch="0.27"
-          pinch-falloff="0.12"
-          pinch-strength="0.72"
+          pinch-falloff="0.16"
+          pinch-strength="0.9"
           measure-minimum="0.35"
           stroke-minimum="0.25"
-          tone-falloff="0.06"
+          tone-falloff="0.12"
           tone-intensity="0.82"
         />
         {/* ES modules are deferred by the browser; this loads the native custom element without a React client boundary. */}
