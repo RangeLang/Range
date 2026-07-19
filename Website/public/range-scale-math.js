@@ -4,6 +4,16 @@ function assertFiniteNumber(value, label) {
   if (!Number.isFinite(value)) throw new TypeError(`${label} must be finite`);
 }
 
+function pinchInfluence(value, center, falloff) {
+  const normalizedDistance = (value - center) / falloff;
+  const supportRadius = Math.min(center, 1 - center, falloff * 2);
+  const supportDistance = Math.abs(value - center) / supportRadius;
+  if (supportDistance >= 1) return 0;
+
+  const taper = Math.pow(1 - supportDistance * supportDistance, 2);
+  return Math.exp(-0.5 * normalizedDistance * normalizedDistance) * taper;
+}
+
 export function createScaleMarks({ count = 18 } = {}) {
   if (!Number.isInteger(count) || count < 2) {
     throw new RangeError("count must be an integer of at least 2");
@@ -34,10 +44,7 @@ export function pinchScaleValue(value, {
   if (strength < 0 || strength >= 1) throw new RangeError("strength must be within [0, 1)");
 
   const offset = value - center;
-  const normalizedDistance = offset / falloff;
-  const influence = Math.exp(-0.5 * normalizedDistance * normalizedDistance);
-  const endpointEnvelope = value * (1 - value) / (center * (1 - center));
-  return value - strength * offset * influence * endpointEnvelope;
+  return value - strength * offset * pinchInfluence(value, center, falloff);
 }
 
 export function measureWithFalloff(position, {
@@ -60,11 +67,7 @@ export function measureWithFalloff(position, {
     throw new RangeError("minimum must be positive and cannot exceed baseline");
   }
 
-  const normalizedDistance = (position - center) / falloff;
-  const supportRadius = Math.min(center, 1 - center, falloff * 2);
-  const supportDistance = Math.abs(position - center) / supportRadius;
-  const taper = supportDistance >= 1 ? 0 : Math.pow(1 - supportDistance * supportDistance, 2);
-  const influence = Math.exp(-0.5 * normalizedDistance * normalizedDistance) * taper;
+  const influence = pinchInfluence(position, center, falloff);
   return baseline - (baseline - minimum) * influence;
 }
 

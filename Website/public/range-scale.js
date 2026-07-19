@@ -24,7 +24,33 @@ class RangeScale extends HTMLElement {
     "measure-minimum",
   ];
 
+  #activePinch;
+  #lastReturnTime = 0;
   #resizeObserver;
+  #returnFrame;
+  #returnVelocity = 0;
+
+  #handlePointerMove = (event) => {
+    const bounds = this.getBoundingClientRect();
+    if (bounds.height <= 0) return;
+
+    this.#cancelReturn();
+    const position = (event.clientY - bounds.top) / bounds.height;
+    this.#activePinch = Math.min(0.999999, Math.max(0.000001, position));
+    this.#render();
+  };
+
+  #handlePointerLeave = () => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      this.#activePinch = this.#config().pinch;
+      this.#render();
+      return;
+    }
+
+    this.#returnVelocity = 0;
+    this.#lastReturnTime = 0;
+    this.#returnFrame = requestAnimationFrame((time) => this.#returnToOrigin(time));
+  };
 
   constructor() {
     super();
@@ -32,7 +58,10 @@ class RangeScale extends HTMLElement {
   }
 
   connectedCallback() {
+    this.#activePinch = this.#config().pinch;
     this.#render();
+    this.addEventListener("pointermove", this.#handlePointerMove);
+    this.addEventListener("pointerleave", this.#handlePointerLeave);
     this.#resizeObserver = new ResizeObserver(() => this.#align());
     const sequence = this.parentElement;
     const zero = sequence?.querySelector("[data-scale-zero]");
@@ -45,11 +74,15 @@ class RangeScale extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this.removeEventListener("pointermove", this.#handlePointerMove);
+    this.removeEventListener("pointerleave", this.#handlePointerLeave);
+    this.#cancelReturn();
     this.#resizeObserver?.disconnect();
   }
 
   attributeChangedCallback() {
     if (!this.isConnected) return;
+    this.#activePinch = this.#config().pinch;
     this.#render();
     this.#align();
   }
@@ -66,14 +99,19 @@ class RangeScale extends HTMLElement {
   }
 
   #render() {
-    const marks = createRangeMarks(this.#config());
+    const config = this.#config();
+    const marks = createRangeMarks({
+      ...config,
+      pinch: this.#activePinch ?? config.pinch,
+    });
     this.shadowRoot.innerHTML = `
       <style>
         :host {
           display: block;
           position: absolute;
-          width: 1px;
-          pointer-events: none;
+          width: 48px;
+          pointer-events: auto;
+          transform: translateX(-50%);
         }
         i {
           position: absolute;
@@ -97,6 +135,40 @@ class RangeScale extends HTMLElement {
         `<i class="${mark.isRadix ? "radix" : "normal"}" style="--measure:${mark.measure};--position:${mark.position * 100}%"></i>`
       )).join("")}
     `;
+  }
+
+  #cancelReturn() {
+    if (this.#returnFrame === undefined) return;
+    cancelAnimationFrame(this.#returnFrame);
+    this.#returnFrame = undefined;
+  }
+
+  #returnToOrigin(time) {
+    const target = this.#config().pinch;
+    const current = this.#activePinch ?? target;
+    const elapsed = this.#lastReturnTime === 0 ? 1 / 60 : (time - this.#lastReturnTime) / 1000;
+    const deltaTime = Math.min(1 / 30, Math.max(1 / 240, elapsed));
+    this.#lastReturnTime = time;
+
+    const spring = 180;
+    const damping = 14;
+    const acceleration = spring * (target - current) - damping * this.#returnVelocity;
+    this.#returnVelocity += acceleration * deltaTime;
+    this.#activePinch = Math.min(0.999999, Math.max(
+      0.000001,
+      current + this.#returnVelocity * deltaTime,
+    ));
+    this.#render();
+
+    if (Math.abs(target - this.#activePinch) < 0.0001 && Math.abs(this.#returnVelocity) < 0.0001) {
+      this.#activePinch = target;
+      this.#returnVelocity = 0;
+      this.#returnFrame = undefined;
+      this.#render();
+      return;
+    }
+
+    this.#returnFrame = requestAnimationFrame((nextTime) => this.#returnToOrigin(nextTime));
   }
 
   #align() {

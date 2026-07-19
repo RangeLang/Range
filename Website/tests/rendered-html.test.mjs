@@ -158,8 +158,13 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(Math.abs(
     (marks.find((mark) => Math.abs(mark.position - 0.27) < 1e-12)?.measure ?? 0) - 0.35,
   ) < 1e-12);
-  for (let index = 1; index <= 1000; index += 1) {
-    assert.ok(pinchScaleValue(index / 1000) > pinchScaleValue((index - 1) / 1000));
+  for (const center of [0.001, 0.01, 0.1, 0.27, 0.5, 0.9, 0.99, 0.999]) {
+    for (let index = 1; index <= 1000; index += 1) {
+      assert.ok(
+        pinchScaleValue(index / 1000, { center }) >
+        pinchScaleValue((index - 1) / 1000, { center }),
+      );
+    }
   }
 
   const merged = mergeMarks([
@@ -231,6 +236,10 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(landingPage, /<range-scale/);
   assert.match(rangeScaleElement, /customElements\.define\("range-scale"/);
   assert.match(rangeScaleElement, /createRangeMarks/);
+  assert.match(rangeScaleElement, /pointermove/);
+  assert.match(rangeScaleElement, /pointerleave/);
+  assert.match(rangeScaleElement, /requestAnimationFrame/);
+  assert.match(rangeScaleElement, /spring\s*=\s*180/);
   assert.match(styles, /\.landingIndex\s*{[^}]*font-size:\s*20px/s);
   assert.match(styles, /\.landingNav \[data-scale-zero\]\s*{[^}]*font-size:\s*14\.6px/s);
   assert.match(styles, /\.landingHero h1\s*{[^}]*align-items:\s*flex-start[^}]*gap:\s*10px/s);
