@@ -214,7 +214,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingIndex\s*{[^}]*font-size:\s*20px/s);
   assert.match(styles, /\.landingNav \[data-scale-zero\]\s*{[^}]*font-size:\s*14\.6px/s);
   assert.match(styles, /\.landingHero h1\s*{[^}]*align-items:\s*flex-start[^}]*gap:\s*10px/s);
-  assert.match(styles, /\.landingHero \[data-scale-one\]\s*{[^}]*margin-top:\s*5px/s);
+  assert.match(styles, /\.landingHero \[data-scale-one\]\s*{[^}]*font-size:\s*25\.4px[^}]*margin-top:\s*5px/s);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(serverBundle, /@shikijs|engine-oniguruma|wasm-DtTceah8/);
 });

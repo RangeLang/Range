@@ -233,6 +233,7 @@ main {
 }
 
 .landingHero [data-scale-one] {
+  font-size: 25.4px;
   margin-top: 5px;
 }
 
