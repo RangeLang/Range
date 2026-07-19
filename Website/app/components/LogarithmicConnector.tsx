@@ -15,6 +15,7 @@ const logarithmicScaleMarks = Array.from({ length: 18 }, (_, index) => {
 });
 
 const pinchCenter = 0.27;
+const endpointGap = 8;
 const logarithmicPinchMarks = Array.from({ length: 9 }, (_, index) => {
   const signedStep = index - 4;
   const distance = signedStep === 0
@@ -50,8 +51,8 @@ export function LogarithmicConnector() {
       const zeroRect = zero.getBoundingClientRect();
       const oneRect = one.getBoundingClientRect();
       const startX = zeroRect.left + zeroRect.width / 2 - sequenceRect.left;
-      const startY = zeroRect.bottom - sequenceRect.top;
-      const endY = oneRect.top - sequenceRect.top;
+      const startY = zeroRect.bottom - sequenceRect.top + endpointGap;
+      const endY = oneRect.top - sequenceRect.top - endpointGap;
 
       connector.style.left = `${startX}px`;
       connector.style.top = `${startY}px`;
