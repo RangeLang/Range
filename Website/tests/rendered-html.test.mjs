@@ -205,7 +205,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(logScaleElement, /customElements\.define\("range-log-scale"/);
   assert.match(logScaleElement, /createLogarithmicMarks/);
   assert.match(styles, /\.landingIndex\s*{[^}]*font-size:\s*20px/s);
-  assert.match(styles, /\.landingHero h1\s*{[^}]*gap:\s*10px/s);
+  assert.match(styles, /\.landingHero h1\s*{[^}]*align-items:\s*flex-start[^}]*gap:\s*10px/s);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(serverBundle, /@shikijs|engine-oniguruma|wasm-DtTceah8/);
 });
