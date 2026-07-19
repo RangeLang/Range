@@ -256,15 +256,18 @@ main {
   overflow: auto;
 }
 
-.codeBlockBody .shiki {
+.codeBlockBody pre {
   min-width: max-content;
   margin: 0;
   padding: 12px;
-  background: transparent !important;
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 11px;
   line-height: 1.58;
   tab-size: 2;
+}
+
+.codeBlockBody code > span {
+  display: block;
 }
 
 .benchmarkCategory {

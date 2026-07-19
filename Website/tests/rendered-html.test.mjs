@@ -68,10 +68,11 @@ test("renders string lowering as its own update route", async () => {
 });
 
 test("keeps the benchmark artifact complete and versioned", async () => {
-  const [artifactText, page, schemaText] = await Promise.all([
+  const [artifactText, page, schemaText, serverBundle] = await Promise.all([
     readFile(new URL("../public/benchmarks.json", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../../benchmark-results.schema.json", import.meta.url), "utf8"),
+    readFile(new URL("../dist/server/index.js", import.meta.url), "utf8"),
   ]);
   const artifact = JSON.parse(artifactText);
   const schema = JSON.parse(schemaText);
@@ -96,4 +97,5 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.ok(leaves.every((leaf) => leaf.implementations.some((item) => item.language === "Range")));
   assert.ok(leaves.every((leaf) => leaf.results.some((result) => result.language === "Range")));
   assert.match(page, /from "\.\.\/public\/benchmarks\.json"/);
+  assert.doesNotMatch(serverBundle, /@shikijs|engine-oniguruma|wasm-DtTceah8/);
 });

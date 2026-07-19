@@ -1,4 +1,6 @@
-import { codeToHtml } from "shiki";
+import { CodeBlock } from "./CodeBlock";
+
+export { CodeBlock } from "./CodeBlock";
 
 export type BenchmarkImplementation = {
   language: string;
@@ -17,29 +19,6 @@ export type Benchmark = {
   description?: string;
   implementations?: BenchmarkImplementation[];
 };
-
-export async function CodeBlock({
-  source,
-  syntax,
-  label,
-}: {
-  source: string;
-  syntax: string;
-  label: string;
-}) {
-  const language = syntax === "range" ? "swift" : syntax;
-  const highlighted = await codeToHtml(source, {
-    lang: language,
-    theme: "github-light",
-  });
-
-  return (
-    <section className="codeBlock" aria-label={label}>
-      <header>{label}</header>
-      <div className="codeBlockBody" dangerouslySetInnerHTML={{ __html: highlighted }} />
-    </section>
-  );
-}
 
 export function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
   const midpoint = benchmark.axisMax / 2;
