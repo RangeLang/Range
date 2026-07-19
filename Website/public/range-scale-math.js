@@ -14,18 +14,24 @@ function pinchInfluence(value, center, falloff) {
   return Math.exp(-0.5 * normalizedDistance * normalizedDistance) * taper;
 }
 
-export function createScaleMarks({ count = 18 } = {}) {
+export function createScaleMarks({ count = 100, radixBase = 10 } = {}) {
   if (!Number.isInteger(count) || count < 2) {
     throw new RangeError("count must be an integer of at least 2");
   }
+  if (!Number.isInteger(radixBase) || radixBase < 1) {
+    throw new RangeError("radixBase must be a positive integer");
+  }
 
-  return Array.from({ length: count }, (_, index) => ({
-    isRadix: index === 0 || index === count - 1 || index % 4 === 0,
-    measure: index === 0 || index === count - 1 || index % 4 === 0 ? 1.8 : 1,
-    position: index / (count - 1),
-    source: "scale",
-    weight: 1,
-  }));
+  return Array.from({ length: count }, (_, index) => {
+    const isRadix = index === 0 || index === count - 1 || index % radixBase === 0;
+    return {
+      isRadix,
+      measure: isRadix ? 1.8 : 1,
+      position: index / (count - 1),
+      source: "scale",
+      weight: 1,
+    };
+  });
 }
 
 export function pinchScaleValue(value, {
@@ -126,15 +132,10 @@ export function mergeMarks(markGroups, epsilon = DEFAULT_EPSILON) {
 }
 
 export function createRangeMarks(config = {}) {
-  const logicalMarks = mergeMarks([
-    createScaleMarks({ count: config.marks }),
-    [{
-      isRadix: true,
-      position: config.pinch,
-      source: "scale",
-      weight: 1,
-    }],
-  ]);
+  const logicalMarks = createScaleMarks({
+    count: config.marks,
+    radixBase: config.radixBase,
+  });
 
   return logicalMarks.map((mark) => {
     const baseline = mark.measure ?? (mark.isRadix ? 1.8 : 1);

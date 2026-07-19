@@ -26,11 +26,11 @@ test("renders the Range landing page", async () => {
   assert.equal(response.status, 200);
 
   const html = (await response.text()).replaceAll("<!-- -->", "");
-  assert.match(html, /<h1[^>]*>.*>1<\/span>.*>Range<\/span><\/h1>/);
+  assert.match(html, /<h1[^>]*>.*>10<\/span><\/span>.*>Range<\/span><\/h1>/);
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="18")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-minimum="0.35")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="100")(?=[^>]*radix-base="10")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-minimum="0.35")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js"/);
   assert.match(html, /Range-authored and emits native LLVM/);
@@ -133,6 +133,11 @@ test("merges linear scale and pinch marks deterministically", async () => {
     createScaleMarks({ count: 5 }).map(({ position }) => position),
     [0, 0.25, 0.5, 0.75, 1],
   );
+  assert.equal(createScaleMarks({ count: 100, radixBase: 10 }).length, 100);
+  assert.equal(
+    createScaleMarks({ count: 100, radixBase: 10 }).filter(({ isRadix }) => isRadix).length,
+    11,
+  );
   assert.equal(measureWithFalloff(0.27), 0.35);
   assert.equal(measureWithFalloff(0), 1);
   assert.equal(measureWithFalloff(1), 1);
@@ -145,7 +150,8 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(pinchScaleValue(0.32) < 0.32);
 
   const marks = createRangeMarks({
-    marks: 18,
+    marks: 100,
+    radixBase: 10,
     pinch: 0.27,
     pinchFalloff: 0.12,
     pinchStrength: 0.72,
@@ -154,10 +160,12 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(marks.every((mark) => mark.position >= 0 && mark.position <= 1));
   assert.ok(marks.every((mark) => mark.measure >= 0.35 - 1e-12));
   assert.ok(marks.every((mark, index) => index === 0 || mark.position > marks[index - 1].position));
-  assert.ok(marks.some((mark) => Math.abs(mark.position - 0.27) < 1e-12 && mark.isRadix));
-  assert.ok(Math.abs(
-    (marks.find((mark) => Math.abs(mark.position - 0.27) < 1e-12)?.measure ?? 0) - 0.35,
-  ) < 1e-12);
+  assert.equal(marks.length, 100);
+  const closestPinchMark = marks.reduce((closest, mark) => (
+    Math.abs(mark.position - 0.27) < Math.abs(closest.position - 0.27) ? mark : closest
+  ));
+  assert.ok(Math.abs(closestPinchMark.position - 0.27) < 0.01);
+  assert.ok(closestPinchMark.measure < 0.4);
   for (const center of [0.001, 0.01, 0.1, 0.27, 0.5, 0.9, 0.99, 0.999]) {
     for (let index = 1; index <= 1000; index += 1) {
       assert.ok(
@@ -243,7 +251,8 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingIndex\s*{[^}]*font-size:\s*20px/s);
   assert.match(styles, /\.landingNav \[data-scale-zero\]\s*{[^}]*font-size:\s*14\.6px/s);
   assert.match(styles, /\.landingHero h1\s*{[^}]*align-items:\s*flex-start[^}]*gap:\s*10px/s);
-  assert.match(styles, /\.landingHero \[data-scale-one\]\s*{[^}]*place-items:\s*center[^}]*font-size:\s*25\.4px[^}]*margin-top:\s*5px[^}]*transform:\s*translateX\(-0\.22em\)/s);
+  assert.match(styles, /\.landingHero \[data-scale-end\]\s*{[^}]*position:\s*relative[^}]*font-size:\s*25\.4px[^}]*overflow:\s*visible/s);
+  assert.match(styles, /\.landingHero \[data-scale-end\] > span\s*{[^}]*left:\s*50%[^}]*transform:\s*translateX\(-50%\)/s);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(serverBundle, /@shikijs|engine-oniguruma|wasm-DtTceah8/);
 });

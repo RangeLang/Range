@@ -6,6 +6,7 @@ declare module "react" {
       "range-scale": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
         "endpoint-gap"?: string;
         marks?: string;
+        "radix-base"?: string;
         pinch?: string;
         "pinch-falloff"?: string;
         "pinch-strength"?: string;

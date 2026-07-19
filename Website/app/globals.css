@@ -238,12 +238,20 @@ range-typed-text[data-typing]::after {
   line-height: 0.82;
 }
 
-.landingHero [data-scale-one] {
-  display: inline-grid;
-  place-items: center;
+.landingHero [data-scale-end] {
+  position: relative;
+  height: 1em;
   font-size: 25.4px;
   margin-top: 5px;
-  transform: translateX(-0.22em);
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.landingHero [data-scale-end] > span {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .landingHero p {

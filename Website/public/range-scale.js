@@ -2,7 +2,8 @@ import { createRangeMarks } from "./range-scale-math.js";
 
 const defaults = {
   endpointGap: 8,
-  marks: 18,
+  marks: 100,
+  radixBase: 10,
   pinch: 0.27,
   pinchFalloff: 0.12,
   pinchStrength: 0.72,
@@ -18,6 +19,7 @@ class RangeScale extends HTMLElement {
   static observedAttributes = [
     "endpoint-gap",
     "marks",
+    "radix-base",
     "pinch",
     "pinch-falloff",
     "pinch-strength",
@@ -65,10 +67,10 @@ class RangeScale extends HTMLElement {
     this.#resizeObserver = new ResizeObserver(() => this.#align());
     const sequence = this.parentElement;
     const zero = sequence?.querySelector("[data-scale-zero]");
-    const one = sequence?.querySelector("[data-scale-one]");
+    const end = sequence?.querySelector("[data-scale-end]");
     if (sequence) this.#resizeObserver.observe(sequence);
     if (zero) this.#resizeObserver.observe(zero);
-    if (one) this.#resizeObserver.observe(one);
+    if (end) this.#resizeObserver.observe(end);
     document.fonts.ready.then(() => this.#align());
     this.#align();
   }
@@ -91,6 +93,7 @@ class RangeScale extends HTMLElement {
     return {
       endpointGap: Math.max(0, finiteAttribute(this, "endpoint-gap", defaults.endpointGap)),
       marks: Math.max(2, Math.round(finiteAttribute(this, "marks", defaults.marks))),
+      radixBase: Math.max(1, Math.round(finiteAttribute(this, "radix-base", defaults.radixBase))),
       pinch: Math.min(1, Math.max(0, finiteAttribute(this, "pinch", defaults.pinch))),
       pinchFalloff: Math.max(0.000001, finiteAttribute(this, "pinch-falloff", defaults.pinchFalloff)),
       pinchStrength: Math.min(0.999999, Math.max(0, finiteAttribute(this, "pinch-strength", defaults.pinchStrength))),
@@ -174,16 +177,16 @@ class RangeScale extends HTMLElement {
   #align() {
     const sequence = this.parentElement;
     const zero = sequence?.querySelector("[data-scale-zero]");
-    const one = sequence?.querySelector("[data-scale-one]");
-    if (!sequence || !zero || !one) return;
+    const end = sequence?.querySelector("[data-scale-end]");
+    if (!sequence || !zero || !end) return;
 
     const { endpointGap } = this.#config();
     const sequenceRect = sequence.getBoundingClientRect();
     const zeroRect = zero.getBoundingClientRect();
-    const oneRect = one.getBoundingClientRect();
+    const endRect = end.getBoundingClientRect();
     const startX = zeroRect.left + zeroRect.width / 2 - sequenceRect.left;
     const startY = zeroRect.bottom - sequenceRect.top + endpointGap;
-    const endY = oneRect.top - sequenceRect.top - endpointGap;
+    const endY = endRect.top - sequenceRect.top - endpointGap;
 
     this.style.left = `${startX}px`;
     this.style.top = `${startY}px`;

@@ -36,7 +36,8 @@ export default function Home() {
         <range-scale
           aria-hidden="true"
           endpoint-gap="8"
-          marks="18"
+          marks="100"
+          radix-base="10"
           pinch="0.27"
           pinch-falloff="0.12"
           pinch-strength="0.72"
@@ -48,7 +49,7 @@ export default function Home() {
 
         <section className="landingHero" aria-labelledby="range-title">
           <h1 id="range-title">
-            <span className="landingIndex" data-scale-one>1</span>
+            <span className="landingIndex" data-scale-end><span>10</span></span>
             <span className="rangeTitleWord">Range</span>
           </h1>
           <p>The active compiler is Range-authored and emits native LLVM.</p>
