@@ -10,7 +10,7 @@ const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname === "/globals.css") {
+    if (url.pathname === "/globals.css" || url.pathname === "/range-geist.css") {
       return new Response(styles, {
         headers: {
           "cache-control": "public, max-age=3600",

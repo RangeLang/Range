@@ -433,7 +433,7 @@ test("serves Geist Sans and Mono from the site artifact", async () => {
   assert.match(license, /SIL Open Font License/);
 
   const response = await render("/");
-  assert.match(await response.text(), /href="\/globals\.css\?font=geist-local-v1"/);
+  assert.match(await response.text(), /href="\/range-geist\.css"/);
 });
 
 test("serves local fonts with the WOFF2 media type", async () => {
