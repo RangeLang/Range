@@ -47,10 +47,12 @@ main {
 }
 
 .pageHeader h1 {
+  width: fit-content;
   margin: 0;
   font-size: clamp(28px, 4vw, 42px);
   font-weight: 500;
   letter-spacing: -0.04em;
+  view-transition-name: range-title-morph;
 }
 
 .backLink {
@@ -105,6 +107,20 @@ main {
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+::view-transition-group(range-title-morph) {
+  z-index: 19;
+  animation-duration: 560ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(range-title-morph) {
+  animation: range-title-out 420ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+::view-transition-new(range-title-morph) {
+  animation: range-title-in 480ms 60ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 ::view-transition-old(root) {
   animation: range-page-out 150ms ease both;
 }
@@ -127,8 +143,34 @@ main {
   }
 }
 
+@keyframes range-title-out {
+  0%,
+  58% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes range-title-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(range-navigation),
+  ::view-transition-group(range-title-morph),
+  ::view-transition-old(range-title-morph),
+  ::view-transition-new(range-title-morph),
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation-duration: 1ms;
@@ -185,6 +227,7 @@ main {
 }
 
 .landingHero h1 {
+  width: fit-content;
   display: flex;
   align-items: baseline;
   gap: clamp(12px, 1.8vw, 24px);
@@ -194,6 +237,7 @@ main {
   font-weight: 500;
   letter-spacing: -0.085em;
   line-height: 0.82;
+  view-transition-name: range-title-morph;
 }
 
 .landingHero h1 .landingIndex {

@@ -147,6 +147,8 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(landingPage, /from "\.\.\/public\/benchmarks\.json"/);
   assert.match(styles, /@view-transition\s*{\s*navigation:\s*auto/);
   assert.match(styles, /view-transition-name:\s*range-navigation/);
+  assert.match(styles, /view-transition-name:\s*range-title-morph/);
+  assert.match(styles, /view-transition-group\(range-title-morph\)/);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(serverBundle, /@shikijs|engine-oniguruma|wasm-DtTceah8/);
 });
