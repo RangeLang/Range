@@ -89,10 +89,6 @@ main {
   letter-spacing: -0.04em;
 }
 
-.rangeTitleWord {
-  view-transition-name: range-title-morph;
-}
-
 .landingHero .rangeTitleWord {
   transform: translateX(-3px);
 }
@@ -119,8 +115,22 @@ range-typed-text[data-typing]::after {
   text-decoration: none;
 }
 
-.pageHeader .backLink {
-  view-transition-name: range-navigation;
+.routeWordmark {
+  display: inline-grid;
+  grid-template-columns: var(--range-index-column, 15px) auto;
+  align-items: center;
+  column-gap: var(--range-index-gap, 10px);
+}
+
+.routeWordmarkIndex {
+  width: var(--range-index-column, 15px);
+  visibility: hidden;
+}
+
+.landingWordmark .rangeWord,
+.routeWordmark .rangeWord {
+  width: fit-content;
+  view-transition-name: range-route-wordmark;
 }
 
 .backLink:hover,
@@ -157,7 +167,6 @@ range-typed-text[data-typing]::after {
   font-weight: 600;
   letter-spacing: -0.04em;
   text-decoration: none;
-  view-transition-name: range-navigation;
 }
 
 .landingWordmark .rangeWord {
@@ -168,28 +177,15 @@ range-optical-guide {
   display: none;
 }
 
-::view-transition-group(range-navigation) {
+::view-transition-group(range-route-wordmark) {
   z-index: 20;
-  animation-duration: 460ms;
+  animation-duration: 440ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-::view-transition-group(range-title-morph) {
-  z-index: 19;
-  animation-duration: 560ms;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-::view-transition-old(range-title-morph) {
-  opacity: 1;
+::view-transition-old(range-route-wordmark),
+::view-transition-new(range-route-wordmark) {
   mix-blend-mode: normal;
-  animation: none;
-}
-
-::view-transition-new(range-title-morph) {
-  opacity: 0;
-  mix-blend-mode: normal;
-  animation: none;
 }
 
 ::view-transition-old(root) {
@@ -221,10 +217,9 @@ range-optical-guide {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(range-navigation),
-  ::view-transition-group(range-title-morph),
-  ::view-transition-old(range-title-morph),
-  ::view-transition-new(range-title-morph),
+  ::view-transition-group(range-route-wordmark),
+  ::view-transition-old(range-route-wordmark),
+  ::view-transition-new(range-route-wordmark),
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation-duration: 1ms;

@@ -55,7 +55,7 @@ test("renders the generated benchmark hierarchy", async () => {
   const html = await response.text();
   const normalized = html.replaceAll("<!-- -->", "");
   assert.match(normalized, /<title>Range<\/title>/i);
-  assert.match(normalized, /class="rangeTitleWord">Range<\/span>/);
+  assert.match(normalized, /class="backLink routeWordmark"[^>]*><span class="routeWordmarkIndex" aria-hidden="true">0<\/span><span class="rangeWord">Range<\/span>/);
   assert.match(normalized, /<range-typed-text(?=[^>]*text="Performance")(?=[^>]*delay="600")(?=[^>]*interval="45")[^>]*>/);
   assert.match(normalized, /src="\/range-typed-text\.js"/);
   assert.match(normalized, /Benchmark suite/);
@@ -346,8 +346,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(renderer, /<range-benchmark-chart>/);
   assert.match(siteComponents, /customElements\.define/);
   assert.match(styles, /@view-transition\s*{\s*navigation:\s*auto/);
-  assert.match(styles, /view-transition-name:\s*range-navigation/);
-  assert.match(styles, /view-transition-name:\s*range-title-morph/);
+  assert.match(styles, /view-transition-name:\s*range-route-wordmark/);
   assert.match(styles, /\.landingHero \.rangeTitleWord\s*{[^}]*transform:\s*translateX\(-3px\)/s);
   assert.match(styles, /\.landingSequence\s*{[^}]*--range-title-leading:\s*calc\(var\(--range-index-column\) \+ var\(--range-index-gap\) - 3px\)/s);
   assert.match(styles, /\.landingHero p\s*{[^}]*margin:\s*40px 0 0 var\(--range-title-leading\)/s);
@@ -355,9 +354,9 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingWordmark \.rangeWord\s*{[^}]*--range-wordmark-optical-shift/s);
   assert.match(styles, /\.landingHero p\s*{[^}]*--range-copy-optical-shift/s);
   assert.match(styles, /\.landingActions\s*{[^}]*--range-actions-optical-shift/s);
-  assert.match(styles, /view-transition-group\(range-title-morph\)/);
-  assert.match(styles, /view-transition-old\(range-title-morph\)\s*{[^}]*opacity:\s*1[^}]*animation:\s*none/s);
-  assert.match(styles, /view-transition-new\(range-title-morph\)\s*{[^}]*opacity:\s*0[^}]*animation:\s*none/s);
+  assert.match(styles, /view-transition-group\(range-route-wordmark\)/);
+  assert.match(styles, /\.routeWordmarkIndex\s*{[^}]*visibility:\s*hidden/s);
+  assert.doesNotMatch(styles, /range-title-morph/);
   assert.match(styles, /range-typed-text\[data-typing\]::after/);
   assert.doesNotMatch(styles, /range-title-(?:out|in)/);
   assert.match(renderer, /<range-scale/);
@@ -441,7 +440,7 @@ test("serves Geist Sans and Mono from the site artifact", async () => {
   assert.match(license, /SIL Open Font License/);
 
   const response = await render("/");
-  assert.match(await response.text(), /href="\/range-geist\.css"/);
+  assert.match(await response.text(), /href="\/range-ui\.css"/);
 });
 
 test("serves local fonts with the WOFF2 media type", async () => {
