@@ -45,6 +45,9 @@ test("renders the generated benchmark hierarchy", async () => {
   assert.match(normalized, /C · main\.c/);
   assert.match(normalized, /Range · Playground\.range/);
   assert.match(normalized, /aria-label="Suite"/);
+  assert.match(normalized, /class="token keyword"[^>]*>state<\/span>/);
+  assert.match(normalized, /class="token [^"]*atrule[^"]*"[^>]*>@main<\/span>/);
+  assert.match(normalized, /class="token [^"]*class-name[^"]*"[^>]*>Int<\/span>/);
   assert.match(normalized, /Initial benchmark/);
   assert.match(normalized, /href="\/updates\/string-lowering"/);
   assert.doesNotMatch(normalized, /Range Strings improvement/);

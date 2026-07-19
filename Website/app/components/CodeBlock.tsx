@@ -1,6 +1,9 @@
 "use client";
 
 import { Highlight, themes, type Language } from "prism-react-renderer";
+import { registerRangePrism } from "../lib/prism-range";
+
+const prism = registerRangePrism();
 
 export function CodeBlock({
   source,
@@ -11,12 +14,12 @@ export function CodeBlock({
   syntax: string;
   label: string;
 }) {
-  const language = (syntax === "range" ? "swift" : syntax) as Language;
+  const language = syntax as Language;
 
   return (
     <section className="codeBlock" aria-label={label}>
       <header>{label}</header>
-      <Highlight theme={themes.github} code={source.trimEnd()} language={language}>
+      <Highlight prism={prism} theme={themes.github} code={source.trimEnd()} language={language}>
         {({ className, style, tokens, getLineProps, getTokenProps }) => (
           <div className="codeBlockBody">
             <pre className={className} style={{ ...style, background: "transparent" }}>
