@@ -38,6 +38,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink-box"/);
   assert.match(html, /<html lang="en" class="range-layout-pending">/);
   assert.match(html, /src="\/range-layout-ready\.js"/);
+  assert.match(html, /src="\/range-navigation-v1\.js"/);
   assert.match(html, /a love letter to electrons, logic and abstraction/);
   assert.doesNotMatch(html, /Range-authored and emits native LLVM/);
   assert.doesNotMatch(html, /12 of 12 passed/);
@@ -407,12 +408,13 @@ test("keeps the benchmark artifact complete and versioned", async () => {
 });
 
 test("uses Web Components without React, Next, or Vinext", async () => {
-  const [packageText, worker, renderer, components, layoutReady] = await Promise.all([
+  const [packageText, worker, renderer, components, layoutReady, navigation] = await Promise.all([
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/render.ts", import.meta.url), "utf8"),
     readFile(new URL("../public/range-site.js", import.meta.url), "utf8"),
     readFile(new URL("../public/range-layout-ready.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/range-navigation-v1.js", import.meta.url), "utf8"),
   ]);
   const packageJson = JSON.parse(packageText);
   const installed = { ...packageJson.dependencies, ...packageJson.devDependencies };
@@ -428,6 +430,11 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(layoutReady, /customElements\.whenDefined\("range-optical-guide"\)/);
   assert.match(layoutReady, /requestAnimationFrame\(\(\) => requestAnimationFrame\(resolve\)\)/);
   assert.match(layoutReady, /classList\.remove\("range-layout-pending"\)/);
+  assert.match(navigation, /document\.startViewTransition\(commit\)\.finished/);
+  assert.match(navigation, /currentShell\.replaceChildren/);
+  assert.match(navigation, /await settleLayout\(\)/);
+  assert.match(navigation, /history\.pushState/);
+  assert.match(navigation, /addEventListener\("popstate"/);
 });
 
 test("serves Geist Sans and Mono from the site artifact", async () => {
