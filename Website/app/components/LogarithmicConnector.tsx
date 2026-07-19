@@ -3,16 +3,35 @@
 import { useLayoutEffect, useRef } from "react";
 import type { CSSProperties } from "react";
 
-const logarithmicDashPositions = Array.from({ length: 18 }, (_, index) => {
+const logarithmicScaleMarks = Array.from({ length: 18 }, (_, index) => {
   const step = index / 17;
   const logarithmicPosition = Math.log1p(9 * step) / Math.log(10);
 
   return {
-    index,
+    id: `scale-${index}`,
     isRadix: index === 0 || index === 17 || index % 4 === 0,
     position: logarithmicPosition * 100,
   };
 });
+
+const pinchCenter = 0.27;
+const logarithmicPinchMarks = Array.from({ length: 9 }, (_, index) => {
+  const signedStep = index - 4;
+  const distance = signedStep === 0
+    ? 0
+    : Math.sign(signedStep) * 0.006 * Math.pow(1.8, Math.abs(signedStep) - 1);
+
+  return {
+    id: `pinch-${index}`,
+    isRadix: signedStep === 0,
+    position: (pinchCenter + distance) * 100,
+  };
+});
+
+const logarithmicDashPositions = [
+  ...logarithmicScaleMarks,
+  ...logarithmicPinchMarks,
+].sort((left, right) => left.position - right.position);
 
 export function LogarithmicConnector() {
   const connectorRef = useRef<HTMLDivElement>(null);
@@ -57,10 +76,10 @@ export function LogarithmicConnector() {
 
   return (
     <div className="landingLogLine" aria-hidden="true" ref={connectorRef}>
-      {logarithmicDashPositions.map(({ index, isRadix, position }) => (
+      {logarithmicDashPositions.map(({ id, isRadix, position }) => (
         <span
           className={`landingLogDash${isRadix ? " landingLogDashRadix" : ""}`}
-          key={index}
+          key={id}
           style={{
             "--dash-position": `${position}%`,
           } as CSSProperties}

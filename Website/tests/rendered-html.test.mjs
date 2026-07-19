@@ -29,7 +29,8 @@ test("renders the Range landing page", async () => {
   assert.match(html, /<h1[^>]*>.*>1<\/span>.*>Range<\/span><\/h1>/);
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(html, /class="landingLogLine"/);
-  assert.equal((html.match(/class="landingLogDash(?: landingLogDashRadix)?"/g) ?? []).length, 18);
+  assert.equal((html.match(/class="landingLogDash(?: landingLogDashRadix)?"/g) ?? []).length, 27);
+  assert.match(html, /--dash-position:27%/);
   assert.match(html, /Range-authored and emits native LLVM/);
   assert.doesNotMatch(html, /12 of 12 passed/);
   assert.doesNotMatch(html, /landingFacts/);
