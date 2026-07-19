@@ -87,15 +87,96 @@ main {
   border-bottom: 1px solid var(--line);
 }
 
-.benchmarkCategory + .benchmarkCategory {
-  margin-top: 64px;
+.benchmarkIndex {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -8px 0 28px;
 }
 
-.benchmarkCategory h3 {
-  margin: 0 0 26px;
+.benchmarkIndex a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 13px;
+  text-decoration: none;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.benchmarkIndex a:hover,
+.benchmarkIndex a:focus-visible {
+  border-color: color-mix(in oklch, var(--range), var(--line) 35%);
+  background: color-mix(in oklch, var(--range), transparent 92%);
+  outline: none;
+}
+
+.benchmarkIndex small {
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+}
+
+.benchmarkCategory {
+  scroll-margin-top: 20px;
+}
+
+.benchmarkCategory + .benchmarkCategory {
+  margin-top: 12px;
+}
+
+.benchmarkCategory summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+  list-style: none;
+}
+
+.benchmarkCategory summary::-webkit-details-marker {
+  display: none;
+}
+
+.benchmarkCategory summary::after {
+  content: "+";
+  flex: 0 0 auto;
+  color: var(--range);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 20px;
+}
+
+.benchmarkCategory[open] summary::after {
+  content: "−";
+}
+
+.benchmarkCategory summary > span:last-of-type {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+}
+
+.benchmarkCategoryTitle {
   font-size: 18px;
   font-weight: 500;
   letter-spacing: -0.02em;
+}
+
+.benchmarkCategory > .chartGrid {
+  padding: 18px 0 42px;
 }
 
 .benchmarkRunStatus {
@@ -479,7 +560,7 @@ footer {
   }
 
   .benchmarkCategory + .benchmarkCategory {
-    margin-top: 52px;
+    margin-top: 8px;
   }
 
   footer {

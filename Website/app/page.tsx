@@ -371,7 +371,25 @@ export default function Home() {
           </p>
         </div>
 
-        {benchmarkData.categories.map((category) => {
+        <nav className="benchmarkIndex" aria-label="Benchmark categories">
+          {benchmarkData.categories.map((category) => {
+            const comparisonCount = category.subcategories.reduce(
+              (count, subcategory) =>
+                count + subcategory.leaves.filter((leaf) => leaf.results.length > 0).length,
+              0,
+            );
+            if (comparisonCount === 0) return null;
+
+            return (
+              <a href={`#category-${category.id}`} key={category.id}>
+                <span>{category.name}</span>
+                <small>{comparisonCount}</small>
+              </a>
+            );
+          })}
+        </nav>
+
+        {benchmarkData.categories.map((category, categoryIndex) => {
           const completedSubcategories = category.subcategories
             .map((subcategory) => ({
               ...subcategory,
@@ -380,9 +398,24 @@ export default function Home() {
             .filter((subcategory) => subcategory.leaves.length > 0);
           if (completedSubcategories.length === 0) return null;
 
+          const comparisonCount = completedSubcategories.reduce(
+            (count, subcategory) => count + subcategory.leaves.length,
+            0,
+          );
+
           return (
-            <section className="benchmarkCategory" aria-labelledby={`category-${category.id}`} key={category.id}>
-              <h3 id={`category-${category.id}`}>{category.name}</h3>
+            <details
+              className="benchmarkCategory"
+              id={`category-${category.id}`}
+              key={category.id}
+              open={categoryIndex === 0}
+            >
+              <summary>
+                <span className="benchmarkCategoryTitle" role="heading" aria-level={3}>
+                  {category.name}
+                </span>
+                <span>{comparisonCount} {comparisonCount === 1 ? "comparison" : "comparisons"}</span>
+              </summary>
               <div className="chartGrid">
                 {completedSubcategories.flatMap((subcategory) =>
                   subcategory.leaves.map((leaf) => (
@@ -394,7 +427,7 @@ export default function Home() {
                   )),
                 )}
               </div>
-            </section>
+            </details>
           );
         })}
 
