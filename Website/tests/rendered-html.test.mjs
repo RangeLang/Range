@@ -26,7 +26,9 @@ test("renders the Range landing page", async () => {
   assert.equal(response.status, 200);
 
   const html = (await response.text()).replaceAll("<!-- -->", "");
-  assert.match(html, /<h1[^>]*>Range<\/h1>/);
+  assert.match(html, /<h1[^>]*>.*>1<\/span>.*>Range<\/span><\/h1>/);
+  assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
+  assert.match(html, /class="landingLogLine"/);
   assert.match(html, /Range-authored and emits native LLVM/);
   assert.match(html, /12 of 12 passed/);
   assert.match(html, /href="\/benchmarks"/);

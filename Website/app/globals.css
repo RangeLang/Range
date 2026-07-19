@@ -67,6 +67,11 @@ main {
   min-height: 100vh;
 }
 
+.landingSequence {
+  --log-end-offset: clamp(28px, 4.2vw, 50px);
+  position: relative;
+}
+
 .landingNav {
   display: flex;
   align-items: center;
@@ -75,11 +80,36 @@ main {
 }
 
 .landingWordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
   color: var(--ink);
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.04em;
   text-decoration: none;
+}
+
+.landingIndex {
+  flex: 0 0 auto;
+  color: var(--range);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.48em;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.landingLogLine {
+  position: absolute;
+  top: 22px;
+  left: 4px;
+  width: var(--log-end-offset);
+  height: clamp(258px, 31vw, 350px);
+  border-bottom: 1.5px dashed color-mix(in oklch, var(--range), var(--line) 48%);
+  border-left: 1.5px dashed color-mix(in oklch, var(--range), var(--line) 48%);
+  border-bottom-left-radius: 100% 34%;
+  pointer-events: none;
 }
 
 .landingNav nav {
@@ -109,11 +139,19 @@ main {
 }
 
 .landingHero h1 {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(12px, 1.8vw, 24px);
+  padding-left: var(--log-end-offset);
   margin: 0;
   font-size: clamp(76px, 15vw, 180px);
   font-weight: 500;
   letter-spacing: -0.085em;
   line-height: 0.82;
+}
+
+.landingHero h1 .landingIndex {
+  font-size: clamp(18px, 2.4vw, 30px);
 }
 
 .landingHero p {
@@ -1041,6 +1079,14 @@ footer {
 
   .landingHero {
     min-height: 440px;
+  }
+
+  .landingSequence {
+    --log-end-offset: 28px;
+  }
+
+  .landingLogLine {
+    height: 260px;
   }
 
   .benchmarkIndex {
