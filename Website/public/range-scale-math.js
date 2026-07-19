@@ -154,6 +154,9 @@ export function createRangeMarks(config = {}) {
       falloff: config.toneFalloff,
       minimum: config.strokeMinimum,
     });
+    const tone = config.strokeMinimum < 1
+      ? (1 - toneStroke) / (1 - config.strokeMinimum)
+      : 0;
     return {
       ...mark,
       measure: baseline * measureWithFalloff(mark.position, {
@@ -163,9 +166,8 @@ export function createRangeMarks(config = {}) {
         minimum: config.measureMinimum,
       }),
       stroke,
-      tone: config.strokeMinimum < 1
-        ? (1 - toneStroke) / (1 - config.strokeMinimum)
-        : 0,
+      opacity: Math.max(0, 1 - tone / 0.95),
+      tone,
       position: pinchScaleValue(mark.position, {
         center: config.pinch,
         falloff: config.pinchFalloff,

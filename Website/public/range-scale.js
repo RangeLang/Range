@@ -143,6 +143,7 @@ class RangeScale extends HTMLElement {
             var(--line, oklch(0.9 0.012 255)),
             white var(--lighten)
           );
+          opacity: var(--opacity);
           transform: translate(-50%, -50%);
         }
         i.radix,
@@ -159,7 +160,7 @@ class RangeScale extends HTMLElement {
         }
       </style>
       ${marks.map((mark) => (
-        `<i class="${mark.tier}" style="--measure:${mark.measure};--stroke:${mark.stroke};--lighten:${mark.tone * config.toneIntensity * 100}%;--position:${mark.position * 100}%"></i>`
+        `<i class="${mark.tier}" style="--measure:${mark.measure};--stroke:${mark.stroke};--lighten:${mark.tone * config.toneIntensity * 100}%;--opacity:${mark.opacity};--position:${mark.position * 100}%"></i>`
       )).join("")}
     `;
   }
