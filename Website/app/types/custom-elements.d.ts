@@ -16,6 +16,9 @@ declare module "react" {
         "marker-capture-falloff"?: string;
         "marker-capture-strength"?: string;
         "measure-minimum"?: string;
+        "invisible-collapse-power"?: string;
+        "invisible-measure-minimum"?: string;
+        "invisible-stroke-minimum"?: string;
         "stroke-minimum"?: string;
         "tone-falloff"?: string;
         "tone-intensity"?: string;

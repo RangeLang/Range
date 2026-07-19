@@ -44,6 +44,9 @@ export default function Home() {
           pinch-inner-edge="0.68"
           pinch-strength="0.9"
           measure-minimum="0.35"
+          invisible-collapse-power="1.35"
+          invisible-measure-minimum="0.1"
+          invisible-stroke-minimum="0.06"
           marker-capture-division-weight="0.48"
           marker-capture-falloff="0.14"
           marker-capture-strength="0.9"
@@ -53,7 +56,7 @@ export default function Home() {
         />
         {/* ES modules are deferred by the browser; this loads the native custom element without a React client boundary. */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script type="module" src="/range-scale.js?profile=spherical-capture" />
+        <script type="module" src="/range-scale.js?profile=invisible-collapse" />
         <range-optical-guide aria-hidden="true" />
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script type="module" src="/range-optical-guide.js?guide=glyph-ink" />

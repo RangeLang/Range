@@ -1,4 +1,4 @@
-import { createRangeMarks } from "./range-scale-math.js?profile=spherical-capture";
+import { createRangeMarks } from "./range-scale-math.js?profile=invisible-collapse";
 
 const defaults = {
   endpointGap: 8,
@@ -10,6 +10,9 @@ const defaults = {
   pinchInnerEdge: 0.68,
   pinchStrength: 0.9,
   measureMinimum: 0.35,
+  invisibleCollapsePower: 1.35,
+  invisibleMeasureMinimum: 0.1,
+  invisibleStrokeMinimum: 0.06,
   markerCaptureDivisionWeight: 0.48,
   markerCaptureFalloff: 0.14,
   markerCaptureStrength: 0.9,
@@ -34,6 +37,9 @@ class RangeScale extends HTMLElement {
     "pinch-inner-edge",
     "pinch-strength",
     "measure-minimum",
+    "invisible-collapse-power",
+    "invisible-measure-minimum",
+    "invisible-stroke-minimum",
     "marker-capture-division-weight",
     "marker-capture-falloff",
     "marker-capture-strength",
@@ -123,6 +129,9 @@ class RangeScale extends HTMLElement {
       pinchInnerEdge: Math.min(1, Math.max(0, finiteAttribute(this, "pinch-inner-edge", defaults.pinchInnerEdge))),
       pinchStrength: Math.min(0.999999, Math.max(0, finiteAttribute(this, "pinch-strength", defaults.pinchStrength))),
       measureMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "measure-minimum", defaults.measureMinimum))),
+      invisibleCollapsePower: Math.max(0.000001, finiteAttribute(this, "invisible-collapse-power", defaults.invisibleCollapsePower)),
+      invisibleMeasureMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "invisible-measure-minimum", defaults.invisibleMeasureMinimum))),
+      invisibleStrokeMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "invisible-stroke-minimum", defaults.invisibleStrokeMinimum))),
       markerCaptureDivisionWeight: Math.min(1, Math.max(0, finiteAttribute(this, "marker-capture-division-weight", defaults.markerCaptureDivisionWeight))),
       markerCaptureFalloff: Math.max(0.000001, finiteAttribute(this, "marker-capture-falloff", defaults.markerCaptureFalloff)),
       markerCaptureStrength: Math.min(1, Math.max(0, finiteAttribute(this, "marker-capture-strength", defaults.markerCaptureStrength))),
