@@ -448,7 +448,7 @@ range-spline-nav a:focus-visible {
   position: absolute;
   top: 0;
   left: 50%;
-  transform: translate(-50%, var(--range-one-contact-shift, 0px));
+  transform: translate(calc(-50% + var(--range-one-inline-shift, 0px)), var(--range-one-contact-shift, 0px));
 }
 
 .landingSupport {

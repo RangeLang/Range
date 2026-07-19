@@ -17,7 +17,7 @@ class RangeOpticalGuide extends HTMLElement {
   #context;
   #frame;
   #resizeObserver;
-  #shifts = { actionEnd: 0, copy: 0, oneContact: 0, wordmark: 0 };
+  #shifts = { actionEnd: 0, copy: 0, oneContact: 0, oneInline: 0, wordmark: 0 };
 
   connectedCallback() {
     this.#canvas = document.createElement("canvas");
@@ -106,8 +106,9 @@ class RangeOpticalGuide extends HTMLElement {
     const wordmark = sequence?.querySelector(".landingWordmark .rangeWord");
     const copy = sequence?.querySelector(".landingHero p");
     const github = sequence?.querySelector(".secondaryAction");
+    const zero = sequence?.querySelector("[data-scale-zero]");
     const one = sequence?.querySelector("[data-scale-end] > span");
-    if (!sequence || !reference || !wordmark || !copy || !github || !one) return;
+    if (!sequence || !reference || !wordmark || !copy || !github || !zero || !one) return;
 
     const guide = this.#inkStart(reference);
     const copyShift = guide - this.#inkStart(copy, this.#shifts.copy);
@@ -116,6 +117,7 @@ class RangeOpticalGuide extends HTMLElement {
       actionEnd: copyEnd - this.#inkEnd(github, this.#shifts.actionEnd),
       copy: copyShift,
       oneContact: this.#inkTop(reference) - this.#inkBottom(one, this.#shifts.oneContact),
+      oneInline: this.#inkEnd(zero) - this.#inkEnd(one, this.#shifts.oneInline),
       wordmark: guide - this.#inkStart(wordmark, this.#shifts.wordmark),
     };
 
@@ -123,6 +125,7 @@ class RangeOpticalGuide extends HTMLElement {
     sequence.style.setProperty("--range-actions-end-shift", `${nextShifts.actionEnd}px`);
     sequence.style.setProperty("--range-copy-optical-shift", `${nextShifts.copy}px`);
     sequence.style.setProperty("--range-one-contact-shift", `${nextShifts.oneContact}px`);
+    sequence.style.setProperty("--range-one-inline-shift", `${nextShifts.oneInline}px`);
     sequence.style.setProperty("--range-wordmark-optical-shift", `${nextShifts.wordmark}px`);
   }
 }
