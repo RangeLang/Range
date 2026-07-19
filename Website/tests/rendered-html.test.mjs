@@ -38,7 +38,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink-box"/);
   assert.match(html, /<html lang="en" class="range-layout-pending">/);
   assert.match(html, /src="\/range-layout-ready\.js"/);
-  assert.match(html, /a love letter to electrons, logic and abstractions/);
+  assert.match(html, /a love letter to electrons, logic and abstraction/);
   assert.doesNotMatch(html, /Range-authored and emits native LLVM/);
   assert.doesNotMatch(html, /12 of 12 passed/);
   assert.doesNotMatch(html, /landingFacts/);
