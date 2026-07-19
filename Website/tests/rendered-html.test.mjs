@@ -412,3 +412,20 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.doesNotMatch(`${worker}\n${renderer}`, /\b(?:React|next\/|vinext)\b/);
   assert.match(components, /class RangeElement extends HTMLElement/);
 });
+
+test("serves Avio Sans from the site artifact", async () => {
+  const [styles, regular, medium, semibold, license] = await Promise.all([
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/fonts/avio-sans/AvioSans-Regular.woff2", import.meta.url)),
+    readFile(new URL("../dist/client/fonts/avio-sans/AvioSans-Medium.woff2", import.meta.url)),
+    readFile(new URL("../dist/client/fonts/avio-sans/AvioSans-SemiBold.woff2", import.meta.url)),
+    readFile(new URL("../dist/client/fonts/avio-sans/OFL.txt", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(styles, /font-family:\s*"Avio Sans"/);
+  assert.match(styles, /--font-range-sans:\s*"Avio Sans"/);
+  for (const font of [regular, medium, semibold]) {
+    assert.equal(font.subarray(0, 4).toString("ascii"), "wOF2");
+  }
+  assert.match(license, /SIL OPEN FONT LICENSE Version 1\.1/);
+});
