@@ -446,9 +446,11 @@ range-spline-nav a:focus-visible {
 
 .landingHero [data-scale-end] > span {
   position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translate(calc(-50% + var(--range-one-inline-shift, 0px)), var(--range-one-contact-shift, 0px));
+  top: var(--range-one-contact-shift, 0px);
+  left: calc(50% + var(--range-one-inline-shift, 0px));
+  width: 1em;
+  margin-left: -0.5em;
+  text-align: center;
 }
 
 .landingSupport {
