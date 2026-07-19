@@ -30,7 +30,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="100")(?=[^>]*radix-base="10")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-minimum="0.35")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="100")(?=[^>]*radix-base="10")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-minimum="0.35")(?=[^>]*stroke-minimum="0.25")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js"/);
   assert.match(html, /Range-authored and emits native LLVM/);
@@ -156,9 +156,11 @@ test("merges linear scale and pinch marks deterministically", async () => {
     pinchFalloff: 0.12,
     pinchStrength: 0.72,
     measureMinimum: 0.35,
+    strokeMinimum: 0.25,
   });
   assert.ok(marks.every((mark) => mark.position >= 0 && mark.position <= 1));
   assert.ok(marks.every((mark) => mark.measure >= 0.35 - 1e-12));
+  assert.ok(marks.every((mark) => mark.stroke >= 0.25 - 1e-12 && mark.stroke <= 1));
   assert.ok(marks.every((mark, index) => index === 0 || mark.position > marks[index - 1].position));
   assert.equal(marks.length, 100);
   const closestPinchMark = marks.reduce((closest, mark) => (
@@ -166,6 +168,7 @@ test("merges linear scale and pinch marks deterministically", async () => {
   ));
   assert.ok(Math.abs(closestPinchMark.position - 0.27) < 0.01);
   assert.ok(closestPinchMark.measure < 0.4);
+  assert.ok(closestPinchMark.stroke < 0.3);
   for (const center of [0.001, 0.01, 0.1, 0.27, 0.5, 0.9, 0.99, 0.999]) {
     for (let index = 1; index <= 1000; index += 1) {
       assert.ok(
@@ -244,6 +247,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(landingPage, /<range-scale/);
   assert.match(rangeScaleElement, /customElements\.define\("range-scale"/);
   assert.match(rangeScaleElement, /createRangeMarks/);
+  assert.match(rangeScaleElement, /height:\s*calc\(1px \* var\(--stroke\)\)/);
   assert.match(rangeScaleElement, /pointermove/);
   assert.match(rangeScaleElement, /pointerleave/);
   assert.match(rangeScaleElement, /requestAnimationFrame/);

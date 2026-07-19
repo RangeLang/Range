@@ -8,6 +8,7 @@ const defaults = {
   pinchFalloff: 0.12,
   pinchStrength: 0.72,
   measureMinimum: 0.35,
+  strokeMinimum: 0.25,
 };
 
 function finiteAttribute(element, name, fallback) {
@@ -24,6 +25,7 @@ class RangeScale extends HTMLElement {
     "pinch-falloff",
     "pinch-strength",
     "measure-minimum",
+    "stroke-minimum",
   ];
 
   #activePinch;
@@ -98,6 +100,7 @@ class RangeScale extends HTMLElement {
       pinchFalloff: Math.max(0.000001, finiteAttribute(this, "pinch-falloff", defaults.pinchFalloff)),
       pinchStrength: Math.min(0.999999, Math.max(0, finiteAttribute(this, "pinch-strength", defaults.pinchStrength))),
       measureMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "measure-minimum", defaults.measureMinimum))),
+      strokeMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "stroke-minimum", defaults.strokeMinimum))),
     };
   }
 
@@ -121,7 +124,7 @@ class RangeScale extends HTMLElement {
           top: var(--position);
           left: 50%;
           width: calc(5px * var(--measure));
-          height: 1px;
+          height: calc(1px * var(--stroke));
           border-radius: 999px;
           background: var(--line, oklch(0.9 0.012 255));
           transform: translate(-50%, -50%);
@@ -135,7 +138,7 @@ class RangeScale extends HTMLElement {
         }
       </style>
       ${marks.map((mark) => (
-        `<i class="${mark.isRadix ? "radix" : "normal"}" style="--measure:${mark.measure};--position:${mark.position * 100}%"></i>`
+        `<i class="${mark.isRadix ? "radix" : "normal"}" style="--measure:${mark.measure};--stroke:${mark.stroke};--position:${mark.position * 100}%"></i>`
       )).join("")}
     `;
   }

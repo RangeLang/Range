@@ -147,6 +147,12 @@ export function createRangeMarks(config = {}) {
         falloff: config.pinchFalloff,
         minimum: config.measureMinimum,
       }),
+      stroke: measureWithFalloff(mark.position, {
+        baseline: 1,
+        center: config.pinch,
+        falloff: config.pinchFalloff,
+        minimum: config.strokeMinimum,
+      }),
       position: pinchScaleValue(mark.position, {
         center: config.pinch,
         falloff: config.pinchFalloff,
