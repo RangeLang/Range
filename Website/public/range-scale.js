@@ -1,11 +1,13 @@
-import { createRangeMarks } from "./range-scale-math.js";
+import { createRangeMarks } from "./range-scale-math.js?profile=spherical-10";
 
 const defaults = {
   endpointGap: 8,
   divisionBase: 3,
   divisionLevels: 3,
   pinch: 0.27,
+  pinchCore: 10,
   pinchFalloff: 0.16,
+  pinchInnerEdge: 0.68,
   pinchStrength: 0.9,
   measureMinimum: 0.35,
   strokeMinimum: 0.25,
@@ -24,7 +26,9 @@ class RangeScale extends HTMLElement {
     "division-base",
     "division-levels",
     "pinch",
+    "pinch-core",
     "pinch-falloff",
+    "pinch-inner-edge",
     "pinch-strength",
     "measure-minimum",
     "stroke-minimum",
@@ -70,6 +74,7 @@ class RangeScale extends HTMLElement {
   connectedCallback() {
     this.#activePinch = this.#config().pinch;
     this.#motionTarget = this.#activePinch;
+    this.#align();
     this.#render();
     this.addEventListener("pointerenter", this.#setPointerTarget);
     this.addEventListener("pointermove", this.#setPointerTarget);
@@ -107,7 +112,9 @@ class RangeScale extends HTMLElement {
       divisionBase: Math.max(2, Math.round(finiteAttribute(this, "division-base", defaults.divisionBase))),
       divisionLevels: Math.min(6, Math.max(1, Math.round(finiteAttribute(this, "division-levels", defaults.divisionLevels)))),
       pinch: Math.min(1, Math.max(0, finiteAttribute(this, "pinch", defaults.pinch))),
+      pinchCore: Math.max(0, finiteAttribute(this, "pinch-core", defaults.pinchCore)),
       pinchFalloff: Math.max(0.000001, finiteAttribute(this, "pinch-falloff", defaults.pinchFalloff)),
+      pinchInnerEdge: Math.min(1, Math.max(0, finiteAttribute(this, "pinch-inner-edge", defaults.pinchInnerEdge))),
       pinchStrength: Math.min(0.999999, Math.max(0, finiteAttribute(this, "pinch-strength", defaults.pinchStrength))),
       measureMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "measure-minimum", defaults.measureMinimum))),
       strokeMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "stroke-minimum", defaults.strokeMinimum))),
@@ -121,6 +128,7 @@ class RangeScale extends HTMLElement {
     const marks = createRangeMarks({
       ...config,
       pinch: this.#activePinch ?? config.pinch,
+      pinchCoreRadius: config.pinchCore / (2 * Math.max(1, this.getBoundingClientRect().height)),
     });
     this.shadowRoot.innerHTML = `
       <style>

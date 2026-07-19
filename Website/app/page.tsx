@@ -39,7 +39,9 @@ export default function Home() {
           division-base="3"
           division-levels="3"
           pinch="0.27"
+          pinch-core="10"
           pinch-falloff="0.16"
+          pinch-inner-edge="0.68"
           pinch-strength="0.9"
           measure-minimum="0.35"
           stroke-minimum="0.25"
@@ -48,7 +50,7 @@ export default function Home() {
         />
         {/* ES modules are deferred by the browser; this loads the native custom element without a React client boundary. */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script type="module" src="/range-scale.js" />
+        <script type="module" src="/range-scale.js?profile=spherical-10" />
 
         <section className="landingHero" aria-labelledby="range-title">
           <h1 id="range-title">

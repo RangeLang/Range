@@ -14,6 +14,38 @@ function pinchInfluence(value, center, falloff) {
   return Math.exp(-0.5 * normalizedDistance * normalizedDistance) * taper;
 }
 
+export function sphericalPinchInfluence(value, {
+  center = 0.27,
+  coreRadius = 0,
+  falloff = 0.12,
+  innerEdge = 0.68,
+} = {}) {
+  assertFiniteNumber(value, "value");
+  assertFiniteNumber(center, "center");
+  assertFiniteNumber(coreRadius, "coreRadius");
+  assertFiniteNumber(falloff, "falloff");
+  assertFiniteNumber(innerEdge, "innerEdge");
+  if (value < 0 || value > 1) throw new RangeError("value must be within [0, 1]");
+  if (center <= 0 || center >= 1) throw new RangeError("center must be inside (0, 1)");
+  if (coreRadius < 0) throw new RangeError("coreRadius cannot be negative");
+  if (falloff <= 0) throw new RangeError("falloff must be positive");
+  if (innerEdge < 0 || innerEdge > 1) throw new RangeError("innerEdge must be within [0, 1]");
+
+  const distance = Math.abs(value - center);
+  if (coreRadius > 0 && distance < coreRadius) {
+    const progress = distance / coreRadius;
+    const smoothProgress = progress * progress * (3 - 2 * progress);
+    return 1 - (1 - innerEdge) * smoothProgress;
+  }
+
+  const outsideDistance = Math.max(0, distance - coreRadius);
+  const outside = Math.exp(-0.5 * (outsideDistance / falloff) ** 2);
+  const supportRadius = Math.min(center, 1 - center, coreRadius + falloff * 2);
+  const supportProgress = Math.min(1, distance / supportRadius);
+  const taper = (1 - supportProgress * supportProgress) ** 2;
+  return innerEdge * outside * taper;
+}
+
 export function createScaleMarks({ divisionBase = 3, divisionLevels = 3 } = {}) {
   if (!Number.isInteger(divisionBase) || divisionBase < 2) {
     throw new RangeError("divisionBase must be an integer of at least 2");
@@ -146,29 +178,22 @@ export function createRangeMarks(config = {}) {
 
   return logicalMarks.map((mark) => {
     const baseline = mark.measure ?? (mark.isRadix ? 1.8 : 1);
-    const stroke = measureWithFalloff(mark.position, {
-      baseline: 1,
+    const shape = sphericalPinchInfluence(mark.position, {
       center: config.pinch,
+      coreRadius: config.pinchCoreRadius,
       falloff: config.pinchFalloff,
-      minimum: config.strokeMinimum,
+      innerEdge: config.pinchInnerEdge,
     });
-    const toneStroke = measureWithFalloff(mark.position, {
-      baseline: 1,
+    const tone = sphericalPinchInfluence(mark.position, {
       center: config.pinch,
+      coreRadius: config.pinchCoreRadius,
       falloff: config.toneFalloff,
-      minimum: config.strokeMinimum,
+      innerEdge: config.pinchInnerEdge,
     });
-    const tone = config.strokeMinimum < 1
-      ? (1 - toneStroke) / (1 - config.strokeMinimum)
-      : 0;
+    const stroke = 1 - (1 - config.strokeMinimum) * shape;
     return {
       ...mark,
-      measure: baseline * measureWithFalloff(mark.position, {
-        baseline: 1,
-        center: config.pinch,
-        falloff: config.pinchFalloff,
-        minimum: config.measureMinimum,
-      }),
+      measure: baseline * (1 - (1 - config.measureMinimum) * shape),
       stroke,
       opacity: Math.max(0, 1 - tone ** 6 / 0.98),
       tone,
