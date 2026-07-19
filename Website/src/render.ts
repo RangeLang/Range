@@ -109,7 +109,17 @@ function chart(benchmark: any, id: string): string {
 
 function procedure(data: BenchmarkData): string {
   const commands = data.procedure.commands;
-  return `<ol>${data.procedure.steps.map((step: string) => `<li>${escapeHtml(step)}</li>`).join("")}</ol><div class="runCommands">${codeBlock(`${commands.suite.join("\n")}\n`, "shellscript", "Suite")}${codeBlock(`${commands.c.join("\n")}\n`, "shellscript", "C")}${codeBlock(`${commands.range.join("\n")}\n`, "shellscript", "Range")}</div><ul class="runNotes">${data.procedure.notes.map((note: string) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>`;
+  const runs = Number(data.configuration.runs) || 5;
+  const buildLanes = [
+    ["C", "cc · O3"],
+    ["C++", "c++ · O3"],
+    ["Rust", "rustc · opt 3"],
+    ["Go", "go build"],
+    ["Swift", "swiftc · Ounchecked"],
+    ["Range", "LLVM · clang O3"],
+  ].map(([language, compiler]) => `<li><strong>${language}</strong><span>${compiler}</span></li>`).join("");
+  const samples = Array.from({ length: runs }, (_, index) => `<i aria-hidden="true">${index + 1}</i>`).join("");
+  return `<range-procedure-graph role="img" aria-label="Generated benchmark source fans out into optimized builds for C, C++, Rust, Go, Swift, and Range. The binaries run ${runs} times in rotating order, outputs are validated, and median wall time, CPU time, and peak memory are published."><div class="procedureGraph"><div class="procedureNode procedureSource"><span class="procedureIndex">01</span><strong>Generated source</strong><small>isolated case directory</small></div><div class="procedureConnector" aria-hidden="true"><span></span></div><div class="procedureBuilds"><span class="procedureIndex">02 · optimized builds</span><ul>${buildLanes}</ul></div><div class="procedureConnector" aria-hidden="true"><span></span></div><div class="procedureNode procedureRuns"><span class="procedureIndex">03</span><strong>Rotating run order</strong><small>${runs} measured runs</small><span class="procedureSamples" aria-hidden="true">${samples}</span></div><div class="procedureConnector" aria-hidden="true"><span></span></div><div class="procedureNode procedureValidate"><span class="procedureIndex">04</span><strong>Validate output</strong><small>exit code + identical result</small></div><div class="procedureConnector" aria-hidden="true"><span></span></div><div class="procedureNode procedureResult"><span class="procedureIndex">05</span><strong>Median results</strong><small>wall · CPU · peak RSS</small></div></div></range-procedure-graph><details class="procedureDetails"><summary>Commands and notes</summary><div class="procedureDetailsBody"><div class="runCommands">${codeBlock(`${commands.suite.join("\n")}\n`, "shellscript", "Suite")}${codeBlock(`${commands.c.join("\n")}\n`, "shellscript", "C")}${codeBlock(`${commands.range.join("\n")}\n`, "shellscript", "Range")}</div><ul class="runNotes">${data.procedure.notes.map((note: string) => `<li>${escapeHtml(note)}</li>`).join("")}</ul></div></details>`;
 }
 
 function benchmarkRecords(data: BenchmarkData): any[] {

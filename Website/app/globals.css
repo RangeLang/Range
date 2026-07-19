@@ -46,6 +46,7 @@ range-benchmark-page,
 range-update-page,
 range-benchmark-chart,
 range-code-block,
+range-procedure-graph,
 range-status-list,
 range-site-footer {
   display: block;
@@ -712,21 +713,203 @@ range-spline-nav a:focus-visible {
 }
 
 .runProcedureBody {
-  padding: 4px 17px 18px;
+  padding: 20px 17px 17px;
   border-top: 1px solid var(--line);
 }
 
-.runProcedure ol {
+.procedureGraph {
+  position: relative;
+  isolation: isolate;
   display: grid;
-  gap: 10px;
-  margin: 18px 0 22px;
-  padding-left: 24px;
-  color: var(--ink);
-  font-size: 14px;
-  line-height: 1.5;
+  grid-template-columns: minmax(126px, 0.9fr) 34px minmax(218px, 1.55fr) 34px minmax(132px, 0.95fr) 34px minmax(132px, 0.95fr) 34px minmax(132px, 0.95fr);
+  align-items: center;
+  min-height: 208px;
+  padding: 22px;
+  overflow: hidden;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 42% 50%, color-mix(in oklch, var(--range), transparent 85%) 0, transparent 29%),
+    linear-gradient(135deg, color-mix(in oklch, var(--range), var(--paper) 96%), var(--paper) 62%);
 }
 
-.runProcedure li::marker {
+.procedureGraph::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: radial-gradient(circle, color-mix(in oklch, var(--range), transparent 70%) 0.75px, transparent 0.9px);
+  background-size: 13px 13px;
+  content: "";
+  opacity: 0.26;
+  -webkit-mask-image: radial-gradient(ellipse at center, black, transparent 76%);
+  mask-image: radial-gradient(ellipse at center, black, transparent 76%);
+}
+
+.procedureNode,
+.procedureBuilds {
+  position: relative;
+  min-width: 0;
+  border: 1px solid color-mix(in oklch, var(--line), var(--range) 16%);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--paper), transparent 8%);
+  box-shadow: 0 12px 30px color-mix(in oklch, var(--range), transparent 94%);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.procedureNode {
+  display: grid;
+  gap: 5px;
+  padding: 15px;
+}
+
+.procedureNode:hover,
+.procedureBuilds:hover {
+  border-color: color-mix(in oklch, var(--range), var(--line) 34%);
+  box-shadow: 0 16px 36px color-mix(in oklch, var(--range), transparent 88%);
+  transform: translateY(-2px);
+}
+
+.procedureNode strong,
+.procedureBuilds strong {
+  font-size: 13px;
+  font-weight: 550;
+  letter-spacing: -0.015em;
+}
+
+.procedureNode small,
+.procedureBuilds li span,
+.procedureIndex {
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.procedureIndex {
+  color: var(--range);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.procedureConnector {
+  position: relative;
+  height: 1px;
+  background: color-mix(in oklch, var(--line), var(--range) 22%);
+}
+
+.procedureConnector::after {
+  position: absolute;
+  top: -2px;
+  right: -1px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--range);
+  box-shadow: 0 0 12px color-mix(in oklch, var(--range), transparent 20%);
+  content: "";
+}
+
+.procedureConnector span {
+  position: absolute;
+  top: -1px;
+  left: 10%;
+  width: 38%;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--range), transparent 30%);
+}
+
+.procedureBuilds {
+  padding: 12px;
+}
+
+.procedureBuilds > .procedureIndex {
+  display: block;
+  margin: 0 0 9px 3px;
+}
+
+.procedureBuilds ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.procedureBuilds li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 9px;
+  border-radius: 7px;
+  background: color-mix(in oklch, var(--range), var(--paper) 94%);
+}
+
+.procedureBuilds li:last-child {
+  background: color-mix(in oklch, var(--range), var(--paper) 87%);
+}
+
+.procedureSamples {
+  display: flex;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.procedureSamples i {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in oklch, var(--range), var(--paper) 84%);
+  color: var(--range);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px;
+  font-style: normal;
+}
+
+.procedureResult {
+  border-color: color-mix(in oklch, var(--range), var(--line) 54%);
+  background: color-mix(in oklch, var(--range), var(--paper) 91%);
+}
+
+.procedureDetails {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.procedureDetails > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 2px 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  list-style: none;
+}
+
+.procedureDetails > summary::-webkit-details-marker {
+  display: none;
+}
+
+.procedureDetails > summary::after {
+  color: var(--range);
+  content: "+";
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 16px;
+}
+
+.procedureDetails[open] > summary::after {
+  content: "−";
+}
+
+.procedureDetailsBody {
+  padding-top: 14px;
+}
+
+.runNotes li::marker {
   color: var(--range);
   font-family: var(--font-geist-mono), monospace;
 }
@@ -1347,6 +1530,35 @@ footer {
 }
 
 @media (max-width: 760px) {
+  .procedureGraph {
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding: 16px;
+  }
+
+  .procedureConnector {
+    justify-self: center;
+    width: 1px;
+    height: 24px;
+  }
+
+  .procedureConnector::after {
+    top: auto;
+    right: -2px;
+    bottom: -1px;
+  }
+
+  .procedureConnector span {
+    top: 10%;
+    left: -1px;
+    width: 3px;
+    height: 38%;
+  }
+
+  .procedureBuilds ul {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   main {
     width: min(100% - 28px, 600px);
     padding-top: 28px;
