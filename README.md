@@ -118,6 +118,12 @@ The active compiler is Range-authored and emits native LLVM. The full legacy exa
 
 ## License
 
-Copyright 2026 George Tchelidze.
+Copyright 2026 Giorgi Tchelidze.
 
 Range is licensed under the [Apache License, Version 2.0](LICENSE).
+
+## Trademarks
+
+The Range name and logo are trademarks of Giorgi Tchelidze. The Apache License
+does not grant permission to use these marks except as required for reasonable
+and customary use in describing the origin of the software.
