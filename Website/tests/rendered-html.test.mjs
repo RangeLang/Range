@@ -361,7 +361,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingHero \.rangeTitleWord\s*{[^}]*transform:\s*translateX\(-3px\)/s);
   assert.match(styles, /\.landingSequence\s*{[^}]*--range-title-leading:\s*calc\(var\(--range-index-column\) \+ var\(--range-index-gap\) - 3px\)/s);
   assert.match(styles, /\.landingHero p\s*{[^}]*margin:\s*40px 0 0 var\(--range-title-leading\)/s);
-  assert.match(styles, /\.landingActions\s*{[^}]*margin:\s*32px 0 0 var\(--range-title-leading\)/s);
+  assert.match(styles, /\.landingActions\s*{[^}]*justify-self:\s*end[^}]*margin:\s*32px 0 0/s);
   assert.match(styles, /\.landingWordmark \.rangeWord\s*{[^}]*--range-wordmark-optical-shift/s);
   assert.match(styles, /\.landingHero p\s*{[^}]*--range-copy-optical-shift/s);
   assert.match(styles, /\.landingActions\s*{[^}]*--range-actions-optical-shift/s);
@@ -487,8 +487,8 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(typedText, /data-collapsing/);
   assert.match(typedText, /setTimeout\(resolve, 180\)/);
   assert.doesNotMatch(typedText, /for \(let index = characters\.length - 1/);
-  assert.match(worker, /range-ui-v86\.css/);
-  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v86\.css'\)/);
+  assert.match(worker, /range-ui-v90\.css/);
+  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v90\.css'\)/);
   assert.match(worker, /replace\('\/range-navigation-v2\.js', '\/range-navigation-v2\.js\?version=86'\)/);
   assert.doesNotMatch(worker, /data-route-zero>0/);
 });
@@ -512,7 +512,7 @@ test("serves Geist Sans and Mono from the site artifact", async () => {
   assert.match(license, /SIL Open Font License/);
 
   const response = await render("/");
-  assert.match(await response.text(), /href="\/range-ui-v86\.css"/);
+  assert.match(await response.text(), /href="\/range-ui-v90\.css"/);
 });
 
 test("serves local fonts with the WOFF2 media type", async () => {

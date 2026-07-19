@@ -460,7 +460,8 @@ html.range-route-performance.range-route-backward::view-transition-old(range-per
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin: 32px 0 0 var(--range-title-leading);
+  justify-self: end;
+  margin: 32px 0 0;
   transform: translateX(var(--range-actions-optical-shift, 0px));
 }
 
