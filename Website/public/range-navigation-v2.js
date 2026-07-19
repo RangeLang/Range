@@ -85,6 +85,8 @@ async function loadRoute(destination, historyMode) {
     if (typeof document.startViewTransition === "function") {
       document.documentElement.classList.add(...routeClasses);
       await document.startViewTransition(commit).finished;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      dispatchEvent(new Event("range-route-transition-finished"));
     } else {
       commit();
     }

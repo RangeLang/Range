@@ -2,6 +2,7 @@ class RangeTypedText extends HTMLElement {
   static observedAttributes = ["delay", "interval", "text"];
 
   #timer;
+  #routeReady;
   #run = 0;
 
   connectedCallback() {
@@ -19,15 +20,19 @@ class RangeTypedText extends HTMLElement {
   #cancel() {
     this.#run += 1;
     clearTimeout(this.#timer);
+    if (this.#routeReady) removeEventListener("range-route-transition-finished", this.#routeReady);
+    this.#routeReady = undefined;
     this.removeAttribute("data-typing");
+    this.removeAttribute("data-route-pending");
   }
 
   #start() {
     this.#cancel();
     const run = this.#run;
     const text = this.getAttribute("text") ?? this.textContent ?? "";
-    const routeDelay = document.documentElement.classList.contains("range-route-forward") ? 440 : 0;
-    const delay = Math.max(routeDelay, Number(this.getAttribute("delay")) || 0);
+    const waitsForRoute = document.documentElement.classList.contains("range-route-performance")
+      && document.documentElement.classList.contains("range-route-forward");
+    const delay = Math.max(0, Number(this.getAttribute("delay")) || 0);
     const interval = Math.max(1, Number(this.getAttribute("interval")) || 45);
     this.setAttribute("aria-label", text);
 
@@ -38,7 +43,6 @@ class RangeTypedText extends HTMLElement {
 
     const characters = [...text];
     this.textContent = "";
-    this.setAttribute("data-typing", "");
 
     const typeCharacter = (index) => {
       if (run !== this.#run) return;
@@ -50,7 +54,20 @@ class RangeTypedText extends HTMLElement {
       }
     };
 
-    this.#timer = setTimeout(() => typeCharacter(1), delay);
+    const begin = (startDelay) => {
+      if (run !== this.#run) return;
+      this.removeAttribute("data-route-pending");
+      this.setAttribute("data-typing", "");
+      this.#timer = setTimeout(() => typeCharacter(1), startDelay);
+    };
+
+    if (waitsForRoute) {
+      this.setAttribute("data-route-pending", "");
+      this.#routeReady = () => begin(16);
+      addEventListener("range-route-transition-finished", this.#routeReady, { once: true });
+    } else {
+      begin(delay);
+    }
   }
 }
 

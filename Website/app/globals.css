@@ -81,16 +81,30 @@ main {
 .pageHeader h1 {
   width: fit-content;
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 0.24em;
   margin: 0;
   font-size: clamp(28px, 4vw, 42px);
   font-weight: 500;
   letter-spacing: -0.04em;
+  line-height: 1;
 }
 
 .landingHero .rangeTitleWord {
   transform: translateX(-3px);
+}
+
+.landingHero .rangeTitleWord,
+.pageHeader h1 > span:first-child {
+  display: block;
+  font-weight: 500;
+  letter-spacing: -0.06em;
+  line-height: 1;
+}
+
+range-typed-text {
+  display: block;
+  line-height: 1;
 }
 
 range-typed-text:not(:defined) {
@@ -105,6 +119,10 @@ range-typed-text[data-typing]::after {
   background: currentColor;
   content: "";
   animation: range-caret 500ms step-end infinite;
+}
+
+range-typed-text[data-route-pending]::after {
+  content: none;
 }
 
 .backLink {

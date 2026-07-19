@@ -38,7 +38,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink-box"/);
   assert.match(html, /<html lang="en" class="range-layout-pending">/);
   assert.match(html, /src="\/range-layout-ready\.js"/);
-  assert.match(html, /src="\/range-navigation-v2\.js"/);
+  assert.match(html, /src="\/range-navigation-v2\.js\?version=80"/);
   assert.match(html, /a love letter to electrons, logic and abstraction/);
   assert.doesNotMatch(html, /Range-authored and emits native LLVM/);
   assert.doesNotMatch(html, /12 of 12 passed/);
@@ -59,7 +59,8 @@ test("renders the generated benchmark hierarchy", async () => {
   assert.match(normalized, /class="backLink routeWordmark"[^>]*><span class="rangeWord">Range<\/span>/);
   assert.doesNotMatch(normalized, /data-route-zero/);
   assert.match(normalized, /<range-typed-text(?=[^>]*text="Performance")(?=[^>]*delay="300")(?=[^>]*interval="45")[^>]*>/);
-  assert.match(normalized, /src="\/range-typed-text\.js\?version=78"/);
+  assert.match(normalized, /src="\/range-typed-text\.js\?version=80"/);
+  assert.match(normalized, /src="\/range-navigation-v2\.js\?version=80"/);
   assert.match(normalized, /Benchmark suite/);
   assert.match(normalized, /Sequential modulo/);
   assert.match(normalized, /href="\/benchmarks\?category=noise"/);
@@ -361,6 +362,10 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /view-transition-group\(range-performance-wordmark\)/);
   assert.doesNotMatch(styles, /routeWordmarkIndex/);
   assert.match(styles, /\.backLink\.routeWordmark\s*{[^}]*font-family:\s*var\(--font-range-sans\)[^}]*font-size:\s*20px[^}]*font-weight:\s*600/s);
+  assert.match(styles, /\.pageHeader h1\s*{[^}]*align-items:\s*flex-start[^}]*line-height:\s*1/s);
+  assert.match(styles, /\.landingHero \.rangeTitleWord,\s*\.pageHeader h1 > span:first-child\s*{[^}]*letter-spacing:\s*-0\.06em[^}]*line-height:\s*1/s);
+  assert.match(styles, /range-typed-text\s*{[^}]*display:\s*block[^}]*line-height:\s*1/s);
+  assert.match(styles, /range-typed-text\[data-route-pending\]::after\s*{[^}]*content:\s*none/s);
   assert.match(styles, /::view-transition-group\(root\)\s*{[^}]*420ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
   assert.match(styles, /::view-transition-old\(root\)\s*{[^}]*420ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
   assert.match(styles, /::view-transition-new\(root\)\s*{[^}]*420ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
@@ -440,6 +445,8 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(layoutReady, /requestAnimationFrame\(\(\) => requestAnimationFrame\(resolve\)\)/);
   assert.match(layoutReady, /classList\.remove\("range-layout-pending"\)/);
   assert.match(navigation, /document\.startViewTransition\(commit\)\.finished/);
+  assert.match(navigation, /range-route-transition-finished/);
+  assert.match(navigation, /requestAnimationFrame\(resolve\)/);
   assert.match(navigation, /function routeDirection/);
   assert.match(navigation, /function isPerformanceTransition/);
   assert.match(navigation, /routeClasses\.push\("range-route-performance"\)/);
@@ -453,9 +460,11 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(navigation, /requestIdleCallback/);
   assert.match(navigation, /history\.pushState/);
   assert.match(navigation, /addEventListener\("popstate"/);
-  assert.match(typedText, /classList\.contains\("range-route-forward"\) \? 440 : 0/);
-  assert.match(worker, /range-ui-v79\.css/);
-  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v79\.css'\)/);
+  assert.match(typedText, /classList\.contains\("range-route-performance"\)/);
+  assert.match(typedText, /range-route-transition-finished/);
+  assert.match(typedText, /data-route-pending/);
+  assert.match(worker, /range-ui-v80\.css/);
+  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v80\.css'\)/);
   assert.doesNotMatch(worker, /data-route-zero>0/);
 });
 
@@ -478,7 +487,7 @@ test("serves Geist Sans and Mono from the site artifact", async () => {
   assert.match(license, /SIL Open Font License/);
 
   const response = await render("/");
-  assert.match(await response.text(), /href="\/range-ui-v79\.css"/);
+  assert.match(await response.text(), /href="\/range-ui-v80\.css"/);
 });
 
 test("serves local fonts with the WOFF2 media type", async () => {
