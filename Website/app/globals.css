@@ -128,6 +128,14 @@ range-typed-text[data-typing]::after {
   view-transition-name: range-navigation;
 }
 
+.landingWordmark .rangeWord {
+  transform: translateX(var(--range-wordmark-optical-shift, 0px));
+}
+
+range-optical-guide {
+  display: none;
+}
+
 ::view-transition-group(range-navigation) {
   z-index: 20;
   animation-duration: 460ms;
@@ -271,6 +279,7 @@ range-typed-text[data-typing]::after {
   font-size: clamp(18px, 2.5vw, 28px);
   line-height: 1.3;
   letter-spacing: -0.025em;
+  transform: translateX(var(--range-copy-optical-shift, 0px));
 }
 
 .landingActions {
@@ -278,6 +287,7 @@ range-typed-text[data-typing]::after {
   flex-wrap: wrap;
   gap: 10px;
   margin: 32px 0 0 var(--range-title-leading);
+  transform: translateX(var(--range-actions-optical-shift, 0px));
 }
 
 .landingActions a {

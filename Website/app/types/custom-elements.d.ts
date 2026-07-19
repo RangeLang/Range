@@ -8,13 +8,19 @@ declare module "react" {
         "division-base"?: string;
         "division-levels"?: string;
         pinch?: string;
+        "pinch-core"?: string;
         "pinch-falloff"?: string;
+        "pinch-inner-edge"?: string;
         "pinch-strength"?: string;
+        "marker-capture-division-weight"?: string;
+        "marker-capture-falloff"?: string;
+        "marker-capture-strength"?: string;
         "measure-minimum"?: string;
         "stroke-minimum"?: string;
         "tone-falloff"?: string;
         "tone-intensity"?: string;
       };
+      "range-optical-guide": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
       "range-typed-text": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
         delay?: string;
         interval?: string;

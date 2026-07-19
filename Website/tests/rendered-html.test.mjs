@@ -33,6 +33,9 @@ test("renders the Range landing page", async () => {
     /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*division-base="3")(?=[^>]*division-levels="3")(?=[^>]*pinch="0.27")(?=[^>]*pinch-core="10")(?=[^>]*pinch-falloff="0.16")(?=[^>]*pinch-inner-edge="0.68")(?=[^>]*pinch-strength="0.9")(?=[^>]*measure-minimum="0.35")(?=[^>]*marker-capture-division-weight="0.48")(?=[^>]*marker-capture-falloff="0.14")(?=[^>]*marker-capture-strength="0.9")(?=[^>]*stroke-minimum="0.25")(?=[^>]*tone-falloff="0.12")(?=[^>]*tone-intensity="0.82")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js(?:\?[^\"]*)?"/);
+  assert.match(html, /class="rangeWord">Range<\/span>/);
+  assert.match(html, /<range-optical-guide[^>]*aria-hidden="true"/);
+  assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink"/);
   assert.match(html, /Range-authored and emits native LLVM/);
   assert.doesNotMatch(html, /12 of 12 passed/);
   assert.doesNotMatch(html, /landingFacts/);
@@ -231,6 +234,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
     schemaText,
     serverBundle,
     rangeScaleElement,
+    rangeOpticalGuide,
   ] = await Promise.all([
     readFile(new URL("../public/benchmarks.json", import.meta.url), "utf8"),
     readFile(new URL("../app/benchmarks/page.tsx", import.meta.url), "utf8"),
@@ -239,6 +243,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
     readFile(new URL("../../benchmark-results.schema.json", import.meta.url), "utf8"),
     readFile(new URL("../dist/server/index.js", import.meta.url), "utf8"),
     readFile(new URL("../public/range-scale.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/range-optical-guide.js", import.meta.url), "utf8"),
   ]);
   const artifact = JSON.parse(artifactText);
   const schema = JSON.parse(schemaText);
@@ -271,6 +276,9 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingSequence\s*{[^}]*--range-title-leading:\s*calc\(var\(--range-index-column\) \+ var\(--range-index-gap\) - 3px\)/s);
   assert.match(styles, /\.landingHero p\s*{[^}]*margin:\s*40px 0 0 var\(--range-title-leading\)/s);
   assert.match(styles, /\.landingActions\s*{[^}]*margin:\s*32px 0 0 var\(--range-title-leading\)/s);
+  assert.match(styles, /\.landingWordmark \.rangeWord\s*{[^}]*--range-wordmark-optical-shift/s);
+  assert.match(styles, /\.landingHero p\s*{[^}]*--range-copy-optical-shift/s);
+  assert.match(styles, /\.landingActions\s*{[^}]*--range-actions-optical-shift/s);
   assert.match(styles, /view-transition-group\(range-title-morph\)/);
   assert.match(styles, /view-transition-old\(range-title-morph\)\s*{[^}]*opacity:\s*1[^}]*animation:\s*none/s);
   assert.match(styles, /view-transition-new\(range-title-morph\)\s*{[^}]*opacity:\s*0[^}]*animation:\s*none/s);
@@ -278,6 +286,12 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.doesNotMatch(styles, /range-title-(?:out|in)/);
   assert.match(landingPage, /<range-scale/);
   assert.match(rangeScaleElement, /customElements\.define\("range-scale"/);
+  assert.match(rangeOpticalGuide, /customElements\.define\("range-optical-guide"/);
+  assert.match(rangeOpticalGuide, /measureText\(character\)/);
+  assert.match(rangeOpticalGuide, /metrics\.actualBoundingBoxLeft/);
+  assert.match(rangeOpticalGuide, /--range-wordmark-optical-shift/);
+  assert.match(rangeOpticalGuide, /--range-copy-optical-shift/);
+  assert.match(rangeOpticalGuide, /--range-actions-optical-shift/);
   assert.match(rangeScaleElement, /createRangeMarks/);
   assert.match(rangeScaleElement, /width:\s*calc\(1px \* var\(--measure\)\)/);
   assert.match(rangeScaleElement, /height:\s*calc\(1px \* var\(--stroke\)\)/);

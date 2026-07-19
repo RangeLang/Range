@@ -18,7 +18,7 @@ export default function Home() {
         <header className="landingNav">
           <Link className="landingWordmark" href="/">
             <span className="landingIndex" data-scale-zero>0</span>
-            <span>Range</span>
+            <span className="rangeWord">Range</span>
           </Link>
           <nav aria-label="Primary navigation">
             <a href="/benchmarks">Benchmarks</a>
@@ -54,6 +54,9 @@ export default function Home() {
         {/* ES modules are deferred by the browser; this loads the native custom element without a React client boundary. */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script type="module" src="/range-scale.js?profile=spherical-capture" />
+        <range-optical-guide aria-hidden="true" />
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script type="module" src="/range-optical-guide.js?guide=glyph-ink" />
 
         <section className="landingHero" aria-labelledby="range-title">
           <h1 id="range-title">
