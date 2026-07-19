@@ -212,6 +212,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(rangeScaleElement, /customElements\.define\("range-scale"/);
   assert.match(rangeScaleElement, /createRangeMarks/);
   assert.match(styles, /\.landingIndex\s*{[^}]*font-size:\s*20px/s);
+  assert.match(styles, /\.landingNav \[data-scale-zero\]\s*{[^}]*font-size:\s*14\.6px/s);
   assert.match(styles, /\.landingHero h1\s*{[^}]*align-items:\s*flex-start[^}]*gap:\s*10px/s);
   assert.match(styles, /\.landingHero \[data-scale-one\]\s*{[^}]*margin-top:\s*5px/s);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);

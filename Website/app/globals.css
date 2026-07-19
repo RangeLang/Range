@@ -188,6 +188,10 @@ main {
   line-height: 1;
 }
 
+.landingNav [data-scale-zero] {
+  font-size: 14.6px;
+}
+
 .landingNav nav {
   display: flex;
   flex-wrap: wrap;
