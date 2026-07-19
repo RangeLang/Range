@@ -26,7 +26,7 @@ test("renders the Range landing page", async () => {
   assert.equal(response.status, 200);
 
   const html = (await response.text()).replaceAll("<!-- -->", "");
-  assert.match(html, /<h1[^>]*>.*>1<\/span><\/span>.*>Range<\/span><\/h1>/);
+  assert.match(html, /<h1[^>]*>.*>1<\/span><\/span>.*>Range<\/span>.*rangePerformanceAnchor.*<\/h1>/);
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
@@ -38,7 +38,8 @@ test("renders the Range landing page", async () => {
   assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink-box"/);
   assert.match(html, /<html lang="en" class="range-layout-pending">/);
   assert.match(html, /src="\/range-layout-ready\.js"/);
-  assert.match(html, /src="\/range-navigation-v2\.js\?version=85"/);
+  assert.match(html, /class="rangePerformanceAnchor" aria-hidden="true"/);
+  assert.match(html, /src="\/range-navigation-v2\.js\?version=86"/);
   assert.match(html, /a love letter to electrons, logic and abstraction/);
   assert.doesNotMatch(html, /Range-authored and emits native LLVM/);
   assert.doesNotMatch(html, /12 of 12 passed/);
@@ -60,7 +61,7 @@ test("renders the generated benchmark hierarchy", async () => {
   assert.doesNotMatch(normalized, /data-route-zero/);
   assert.match(normalized, /<range-typed-text(?=[^>]*text="Performance")(?=[^>]*delay="300")(?=[^>]*interval="45")[^>]*>/);
   assert.match(normalized, /src="\/range-typed-text\.js\?version=84"/);
-  assert.match(normalized, /src="\/range-navigation-v2\.js\?version=85"/);
+  assert.match(normalized, /src="\/range-navigation-v2\.js\?version=86"/);
   assert.match(normalized, /Benchmark suite/);
   assert.match(normalized, /Sequential modulo/);
   assert.match(normalized, /href="\/benchmarks\?category=noise"/);
@@ -372,7 +373,8 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /@keyframes range-performance-collapse/);
   assert.match(styles, /transform:\s*translateX\(calc\(-100% - 0\.24em\)\)/);
   assert.doesNotMatch(styles, /scaleX\(0\.08\)|filter:\s*blur/);
-  assert.match(styles, /::view-transition-group\(range-performance-suffix\)\s*{[^}]*overflow:\s*clip[^}]*animation:\s*none/s);
+  assert.match(styles, /\.rangePerformanceAnchor\s*{[^}]*var\(--range-performance-suffix-width, 1px\)[^}]*view-transition-name:\s*range-performance-suffix/s);
+  assert.match(styles, /::view-transition-group\(range-performance-suffix\)\s*{[^}]*overflow:\s*clip[^}]*animation-duration:\s*420ms/s);
   assert.match(styles, /range-route-performance\.range-route-backward::view-transition-old\(range-performance-suffix\)\s*{[^}]*range-performance-collapse 420ms cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
   assert.match(styles, /::view-transition-group\(root\)\s*{[^}]*420ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
   assert.match(styles, /::view-transition-old\(root\)\s*{[^}]*420ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
@@ -457,6 +459,8 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(navigation, /requestAnimationFrame\(resolve\)/);
   assert.match(navigation, /direction === "backward"/);
   assert.match(navigation, /await typedTitle\.collapse\(\)/);
+  assert.match(navigation, /typedTitle\?\.getBoundingClientRect\(\)\.width/);
+  assert.match(navigation, /--range-performance-suffix-width/);
   assert.match(navigation, /function routeDirection/);
   assert.match(navigation, /function isPerformanceTransition/);
   assert.match(navigation, /routeClasses\.push\("range-route-performance"\)/);
@@ -477,9 +481,9 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(typedText, /data-collapsing/);
   assert.match(typedText, /setTimeout\(resolve, 180\)/);
   assert.doesNotMatch(typedText, /for \(let index = characters\.length - 1/);
-  assert.match(worker, /range-ui-v85\.css/);
-  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v85\.css'\)/);
-  assert.match(worker, /replace\('\/range-navigation-v2\.js', '\/range-navigation-v2\.js\?version=85'\)/);
+  assert.match(worker, /range-ui-v86\.css/);
+  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v86\.css'\)/);
+  assert.match(worker, /replace\('\/range-navigation-v2\.js', '\/range-navigation-v2\.js\?version=86'\)/);
   assert.doesNotMatch(worker, /data-route-zero>0/);
 });
 
@@ -502,7 +506,7 @@ test("serves Geist Sans and Mono from the site artifact", async () => {
   assert.match(license, /SIL Open Font License/);
 
   const response = await render("/");
-  assert.match(await response.text(), /href="\/range-ui-v85\.css"/);
+  assert.match(await response.text(), /href="\/range-ui-v86\.css"/);
 });
 
 test("serves local fonts with the WOFF2 media type", async () => {

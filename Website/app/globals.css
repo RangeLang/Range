@@ -94,6 +94,16 @@ main {
   transform: translateX(-3px);
 }
 
+.rangePerformanceAnchor {
+  width: var(--range-performance-suffix-width, 1px);
+  height: clamp(28px, 4vw, 42px);
+  flex: 0 0 var(--range-performance-suffix-width, 1px);
+  margin-left: calc(-1 * var(--range-index-gap));
+  opacity: 0;
+  pointer-events: none;
+  view-transition-name: range-performance-suffix;
+}
+
 .landingHero .rangeTitleWord,
 .pageHeader h1 > span:first-child {
   display: block;
@@ -227,7 +237,8 @@ range-optical-guide {
 ::view-transition-group(range-performance-suffix) {
   z-index: 20;
   overflow: clip;
-  animation: none;
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html.range-route-performance.range-route-backward::view-transition-old(range-performance-suffix) {

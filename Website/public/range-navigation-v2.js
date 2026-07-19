@@ -73,6 +73,10 @@ async function loadRoute(destination, historyMode) {
     const typedTitle = direction === "backward" && routeClasses.includes("range-route-performance")
       ? document.querySelector(".pageHeader range-typed-text")
       : null;
+    const suffixWidth = typedTitle?.getBoundingClientRect().width;
+    if (suffixWidth > 0) {
+      document.documentElement.style.setProperty("--range-performance-suffix-width", `${suffixWidth}px`);
+    }
     const nextDocument = await nextDocumentPromise;
     const currentShell = document.querySelector(shellSelector);
     const nextShell = nextDocument.querySelector(shellSelector);
@@ -98,6 +102,7 @@ async function loadRoute(destination, historyMode) {
   } catch {
     location.assign(destination);
   } finally {
+    document.documentElement.style.removeProperty("--range-performance-suffix-width");
     document.documentElement.classList.remove(...routeClasses);
     navigationInFlight = false;
   }
