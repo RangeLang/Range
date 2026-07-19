@@ -110,7 +110,7 @@ range-typed-text[data-typing]::after {
 
 .landingWordmark {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   color: var(--ink);
   font-size: 20px;

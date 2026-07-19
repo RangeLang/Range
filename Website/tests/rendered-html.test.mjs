@@ -277,6 +277,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(rangeScaleElement, /spring\s*=\s*this\.#isPointerActive\s*\?\s*240\s*:\s*180/);
   assert.match(rangeScaleElement, /damping\s*=\s*this\.#isPointerActive\s*\?\s*28\s*:\s*14/);
   assert.match(styles, /\.landingIndex\s*{[^}]*font-size:\s*20px/s);
+  assert.match(styles, /\.landingWordmark\s*{[^}]*align-items:\s*center/s);
   assert.match(styles, /\.landingNav \[data-scale-zero\]\s*{[^}]*font-size:\s*14\.6px/s);
   assert.match(styles, /\.landingHero h1\s*{[^}]*align-items:\s*flex-start[^}]*gap:\s*10px/s);
   assert.match(styles, /\.landingHero \[data-scale-end\]\s*{[^}]*position:\s*relative[^}]*font-size:\s*25\.4px[^}]*overflow:\s*visible/s);
