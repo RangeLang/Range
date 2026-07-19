@@ -58,7 +58,7 @@ export default function Home() {
         />
         {/* ES modules are deferred by the browser; this loads the native custom element without a React client boundary. */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script type="module" src="/range-scale.js?profile=snapped-bubble" />
+        <script type="module" src="/range-scale.js?profile=anchored-endpoints" />
         <range-optical-guide aria-hidden="true" />
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script type="module" src="/range-optical-guide.js?guide=glyph-ink-box" />

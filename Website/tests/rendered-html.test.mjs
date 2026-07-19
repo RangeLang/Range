@@ -207,9 +207,17 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(marks[7].measure < 0.2);
   assert.ok(marks[7].stroke < 0.15);
   assert.equal(marks[0].measure, 5);
+  assert.equal(marks[0].anchored, true);
+  assert.equal(marks[0].position, 0);
+  assert.equal(marks[0].opacity, 1);
+  assert.equal(marks[0].stroke, 1);
   assert.equal(marks[21].measure, 3);
   assert.equal(marks[22].measure, 1);
   assert.equal(marks[27].measure, 5);
+  assert.equal(marks[27].anchored, true);
+  assert.equal(marks[27].position, 1);
+  assert.equal(marks[27].opacity, 1);
+  assert.equal(marks[27].stroke, 1);
   const snappedCenter = 7 / 27;
   const snappedMarks = createRangeMarks({
     divisionBase: 3,
@@ -232,6 +240,33 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(Math.abs(snappedMarks[7].position - snappedCenter) < 1e-12);
   assert.ok(snappedMarks[6].position < 6 / 27);
   assert.ok(snappedMarks[8].position > 8 / 27);
+  for (const pinch of [0.001, 0.999]) {
+    const edgeMarks = createRangeMarks({
+      divisionBase: 3,
+      divisionLevels: 3,
+      pinch,
+      pinchCoreRadius: 5 / 136,
+      pinchFalloff: 0.16,
+      pinchInnerEdge: 0.68,
+      pinchStrength: 0.9,
+      measureMinimum: 0.35,
+      invisibleCollapsePower: 1.35,
+      invisibleMeasureMinimum: 0.1,
+      invisibleStrokeMinimum: 0.06,
+      markerCaptureDivisionWeight: 0.48,
+      markerCaptureFalloff: 0.14,
+      markerCaptureStrength: 0.9,
+      strokeMinimum: 0.25,
+      toneFalloff: 0.12,
+    });
+    assert.deepEqual(
+      edgeMarks.filter((mark) => mark.anchored).map(({ measure, opacity, position, stroke }) => ({ measure, opacity, position, stroke })),
+      [
+        { measure: 5, opacity: 1, position: 0, stroke: 1 },
+        { measure: 5, opacity: 1, position: 1, stroke: 1 },
+      ],
+    );
+  }
   for (const center of [0.001, 0.01, 0.1, 0.27, 0.5, 0.9, 0.99, 0.999]) {
     for (let index = 1; index <= 1000; index += 1) {
       assert.ok(
@@ -329,6 +364,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(rangeScaleElement, /snapScalePosition/);
   assert.match(rangeScaleElement, /#snappedIndex/);
   assert.match(rangeScaleElement, /this\.#motionTarget = this\.#snapTarget/);
+  assert.match(rangeScaleElement, /mark\.anchored \? " anchored"/);
   assert.match(rangeScaleElement, /width:\s*calc\(1px \* var\(--measure\)\)/);
   assert.match(rangeScaleElement, /height:\s*calc\(1px \* var\(--stroke\)\)/);
   assert.match(rangeScaleElement, /white var\(--lighten\)/);

@@ -1,4 +1,4 @@
-import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profile=snapped-bubble";
+import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profile=anchored-endpoints";
 
 const defaults = {
   endpointGap: 8,
@@ -209,7 +209,7 @@ class RangeScale extends HTMLElement {
         }
       </style>
       ${marks.map((mark) => (
-        `<i class="${mark.tier}" style="--measure:${mark.measure};--stroke:${mark.stroke};--lighten:${mark.tone * config.toneIntensity * 100}%;--opacity:${mark.opacity};--position:${mark.position * 100}%"></i>`
+        `<i class="${mark.tier}${mark.anchored ? " anchored" : ""}" style="--measure:${mark.measure};--stroke:${mark.stroke};--lighten:${mark.tone * config.toneIntensity * 100}%;--opacity:${mark.opacity};--position:${mark.position * 100}%"></i>`
       )).join("")}
     `;
   }

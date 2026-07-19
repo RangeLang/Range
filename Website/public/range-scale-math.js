@@ -242,6 +242,17 @@ export function createRangeMarks(config = {}) {
 
   return logicalMarks.map((mark) => {
     const baseline = mark.measure ?? (mark.isRadix ? 1.8 : 1);
+    if (mark.position === 0 || mark.position === 1) {
+      return {
+        ...mark,
+        anchored: true,
+        measure: baseline,
+        opacity: 1,
+        position: mark.position,
+        stroke: 1,
+        tone: 0,
+      };
+    }
     const markerCaptureWeight = baseline >= 5
       ? 1
       : baseline >= 3
