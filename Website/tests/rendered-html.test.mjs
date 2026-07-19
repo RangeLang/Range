@@ -59,7 +59,7 @@ test("renders the generated benchmark hierarchy", async () => {
   assert.match(normalized, /class="backLink routeWordmark"[^>]*><span class="rangeWord">Range<\/span>/);
   assert.doesNotMatch(normalized, /data-route-zero/);
   assert.match(normalized, /<range-typed-text(?=[^>]*text="Performance")(?=[^>]*delay="300")(?=[^>]*interval="45")[^>]*>/);
-  assert.match(normalized, /src="\/range-typed-text\.js\?version=82"/);
+  assert.match(normalized, /src="\/range-typed-text\.js\?version=83"/);
   assert.match(normalized, /src="\/range-navigation-v2\.js\?version=81"/);
   assert.match(normalized, /Benchmark suite/);
   assert.match(normalized, /Sequential modulo/);
@@ -471,11 +471,10 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(typedText, /data-route-pending/);
   assert.match(typedText, /async collapse\(\)/);
   assert.match(typedText, /data-collapsing/);
-  assert.match(typedText, /this\.getAnimations\(\)/);
-  assert.match(typedText, /animation\.finished/);
+  assert.match(typedText, /setTimeout\(resolve, 180\)/);
   assert.doesNotMatch(typedText, /for \(let index = characters\.length - 1/);
-  assert.match(worker, /range-ui-v82\.css/);
-  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v82\.css'\)/);
+  assert.match(worker, /range-ui-v83\.css/);
+  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v83\.css'\)/);
   assert.doesNotMatch(worker, /data-route-zero>0/);
 });
 
@@ -498,7 +497,7 @@ test("serves Geist Sans and Mono from the site artifact", async () => {
   assert.match(license, /SIL Open Font License/);
 
   const response = await render("/");
-  assert.match(await response.text(), /href="\/range-ui-v82\.css"/);
+  assert.match(await response.text(), /href="\/range-ui-v83\.css"/);
 });
 
 test("serves local fonts with the WOFF2 media type", async () => {
