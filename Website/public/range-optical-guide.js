@@ -7,7 +7,7 @@ class RangeOpticalGuide extends HTMLElement {
   #context;
   #frame;
   #resizeObserver;
-  #shifts = { copy: 0, wordmark: 0 };
+  #shifts = { actions: 0, copy: 0, wordmark: 0 };
 
   connectedCallback() {
     this.#canvas = document.createElement("canvas");
@@ -44,20 +44,27 @@ class RangeOpticalGuide extends HTMLElement {
     return rect.left - appliedShift - metrics.actualBoundingBoxLeft;
   }
 
+  #boxStart(element, appliedShift = 0) {
+    return element.getBoundingClientRect().left - appliedShift;
+  }
+
   #align() {
     const sequence = this.closest(".landingSequence");
     const reference = sequence?.querySelector(".rangeTitleWord");
     const wordmark = sequence?.querySelector(".landingWordmark .rangeWord");
     const copy = sequence?.querySelector(".landingHero p");
-    if (!sequence || !reference || !wordmark || !copy) return;
+    const action = sequence?.querySelector(".primaryAction");
+    if (!sequence || !reference || !wordmark || !copy || !action) return;
 
     const guide = this.#inkStart(reference);
     const nextShifts = {
+      actions: guide - this.#boxStart(action, this.#shifts.actions),
       copy: guide - this.#inkStart(copy, this.#shifts.copy),
       wordmark: guide - this.#inkStart(wordmark, this.#shifts.wordmark),
     };
 
     this.#shifts = nextShifts;
+    sequence.style.setProperty("--range-actions-optical-shift", `${nextShifts.actions}px`);
     sequence.style.setProperty("--range-copy-optical-shift", `${nextShifts.copy}px`);
     sequence.style.setProperty("--range-wordmark-optical-shift", `${nextShifts.wordmark}px`);
   }
