@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- benchmark links use document navigation for the shared Range transition */
 import { MarkGithubIcon } from "@primer/octicons-react";
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { LogarithmicConnector } from "./components/LogarithmicConnector";
 import benchmarkDataJson from "../public/benchmarks.json";
 
 type BenchmarkSummary = {
@@ -12,23 +12,13 @@ type BenchmarkSummary = {
 
 const benchmarkData = benchmarkDataJson as BenchmarkSummary;
 
-const logarithmicDashPositions = Array.from({ length: 18 }, (_, index) => {
-  const step = index / 17;
-  const logarithmicPosition = Math.log1p(9 * step) / Math.log(10);
-  const position = 4 + logarithmicPosition * 92;
-  const offset = Math.pow(logarithmicPosition, 3) * 100;
-  const rotation = 90 - 23 * Math.pow(logarithmicPosition, 2);
-
-  return { index, position, offset, rotation };
-});
-
 export default function Home() {
   return (
     <main className="landingPage">
       <div className="landingSequence">
         <header className="landingNav">
           <Link className="landingWordmark" href="/">
-            <span className="landingIndex">0</span>
+            <span className="landingIndex" data-log-zero>0</span>
             <span>Range</span>
           </Link>
           <nav aria-label="Primary navigation">
@@ -44,23 +34,11 @@ export default function Home() {
           </nav>
         </header>
 
-        <div className="landingLogLine" aria-hidden="true">
-          {logarithmicDashPositions.map(({ index, position, offset, rotation }) => (
-            <span
-              className="landingLogDash"
-              key={index}
-              style={{
-                "--dash-position": `${position}%`,
-                "--dash-offset": `${offset}%`,
-                "--dash-rotation": `${rotation}deg`,
-              } as CSSProperties}
-            />
-          ))}
-        </div>
+        <LogarithmicConnector />
 
         <section className="landingHero" aria-labelledby="range-title">
           <h1 id="range-title">
-            <span className="landingIndex">1</span>
+            <span className="landingIndex" data-log-one>1</span>
             <span>Range</span>
           </h1>
           <p>The active compiler is Range-authored and emits native LLVM.</p>
