@@ -36,7 +36,8 @@ test("renders the Range landing page", async () => {
   assert.match(html, /class="rangeWord">Range<\/span>/);
   assert.match(html, /<range-optical-guide[^>]*aria-hidden="true"/);
   assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink-box"/);
-  assert.match(html, /Range-authored and emits native LLVM/);
+  assert.match(html, /a love letter to electrons, logic and abstractions/);
+  assert.doesNotMatch(html, /Range-authored and emits native LLVM/);
   assert.doesNotMatch(html, /12 of 12 passed/);
   assert.doesNotMatch(html, /landingFacts/);
   assert.match(html, /href="\/benchmarks"/);
