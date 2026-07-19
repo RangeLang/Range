@@ -1,6 +1,7 @@
 {
   "name": "range",
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "private": true,
   "scripts": {
     "speed": "python3 Development/Benchmarks/Speed/run.py"

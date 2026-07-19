@@ -115,3 +115,9 @@ scripts/range check path/to/Main.range
 ```
 
 The active compiler is Range-authored and emits native LLVM. The full legacy example manifest still uses the retained Swift bootstrap while unsupported language coverage is completed. See [Development](Development/README.md), the [speed benchmark](Development/Benchmarks/Speed/README.md), and the [compiler core](RangeCompiler/Range/Core/README.md) for details.
+
+## License
+
+Copyright 2026 George Tchelidze.
+
+Range is licensed under the [Apache License, Version 2.0](LICENSE).
