@@ -29,31 +29,33 @@ class RangeScale extends HTMLElement {
   ];
 
   #activePinch;
-  #lastReturnTime = 0;
+  #isPointerActive = false;
+  #lastMotionTime = 0;
+  #motionFrame;
+  #motionTarget;
+  #motionVelocity = 0;
   #resizeObserver;
-  #returnFrame;
-  #returnVelocity = 0;
 
-  #handlePointerMove = (event) => {
+  #setPointerTarget = (event) => {
     const bounds = this.getBoundingClientRect();
     if (bounds.height <= 0) return;
 
-    this.#cancelReturn();
     const position = (event.clientY - bounds.top) / bounds.height;
-    this.#activePinch = Math.min(0.999999, Math.max(0.000001, position));
-    this.#render();
+    this.#isPointerActive = true;
+    this.#motionTarget = Math.min(0.999999, Math.max(0.000001, position));
+    this.#startMotion();
   };
 
   #handlePointerLeave = () => {
+    this.#isPointerActive = false;
+    this.#motionTarget = this.#config().pinch;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      this.#activePinch = this.#config().pinch;
+      this.#activePinch = this.#motionTarget;
       this.#render();
       return;
     }
 
-    this.#returnVelocity = 0;
-    this.#lastReturnTime = 0;
-    this.#returnFrame = requestAnimationFrame((time) => this.#returnToOrigin(time));
+    this.#startMotion();
   };
 
   constructor() {
@@ -63,8 +65,10 @@ class RangeScale extends HTMLElement {
 
   connectedCallback() {
     this.#activePinch = this.#config().pinch;
+    this.#motionTarget = this.#activePinch;
     this.#render();
-    this.addEventListener("pointermove", this.#handlePointerMove);
+    this.addEventListener("pointerenter", this.#setPointerTarget);
+    this.addEventListener("pointermove", this.#setPointerTarget);
     this.addEventListener("pointerleave", this.#handlePointerLeave);
     this.#resizeObserver = new ResizeObserver(() => this.#align());
     const sequence = this.parentElement;
@@ -78,15 +82,17 @@ class RangeScale extends HTMLElement {
   }
 
   disconnectedCallback() {
-    this.removeEventListener("pointermove", this.#handlePointerMove);
+    this.removeEventListener("pointerenter", this.#setPointerTarget);
+    this.removeEventListener("pointermove", this.#setPointerTarget);
     this.removeEventListener("pointerleave", this.#handlePointerLeave);
-    this.#cancelReturn();
+    this.#cancelMotion();
     this.#resizeObserver?.disconnect();
   }
 
   attributeChangedCallback() {
     if (!this.isConnected) return;
     this.#activePinch = this.#config().pinch;
+    this.#motionTarget = this.#activePinch;
     this.#render();
     this.#align();
   }
@@ -143,38 +149,49 @@ class RangeScale extends HTMLElement {
     `;
   }
 
-  #cancelReturn() {
-    if (this.#returnFrame === undefined) return;
-    cancelAnimationFrame(this.#returnFrame);
-    this.#returnFrame = undefined;
+  #startMotion() {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      this.#activePinch = this.#motionTarget;
+      this.#render();
+      return;
+    }
+    if (this.#motionFrame !== undefined) return;
+    this.#lastMotionTime = 0;
+    this.#motionFrame = requestAnimationFrame((time) => this.#animateMotion(time));
   }
 
-  #returnToOrigin(time) {
-    const target = this.#config().pinch;
-    const current = this.#activePinch ?? target;
-    const elapsed = this.#lastReturnTime === 0 ? 1 / 60 : (time - this.#lastReturnTime) / 1000;
-    const deltaTime = Math.min(1 / 30, Math.max(1 / 240, elapsed));
-    this.#lastReturnTime = time;
+  #cancelMotion() {
+    if (this.#motionFrame === undefined) return;
+    cancelAnimationFrame(this.#motionFrame);
+    this.#motionFrame = undefined;
+  }
 
-    const spring = 180;
-    const damping = 14;
-    const acceleration = spring * (target - current) - damping * this.#returnVelocity;
-    this.#returnVelocity += acceleration * deltaTime;
+  #animateMotion(time) {
+    const target = this.#motionTarget ?? this.#config().pinch;
+    const current = this.#activePinch ?? target;
+    const elapsed = this.#lastMotionTime === 0 ? 1 / 60 : (time - this.#lastMotionTime) / 1000;
+    const deltaTime = Math.min(1 / 30, Math.max(1 / 240, elapsed));
+    this.#lastMotionTime = time;
+
+    const spring = this.#isPointerActive ? 240 : 180;
+    const damping = this.#isPointerActive ? 28 : 14;
+    const acceleration = spring * (target - current) - damping * this.#motionVelocity;
+    this.#motionVelocity += acceleration * deltaTime;
     this.#activePinch = Math.min(0.999999, Math.max(
       0.000001,
-      current + this.#returnVelocity * deltaTime,
+      current + this.#motionVelocity * deltaTime,
     ));
     this.#render();
 
-    if (Math.abs(target - this.#activePinch) < 0.0001 && Math.abs(this.#returnVelocity) < 0.0001) {
+    if (Math.abs(target - this.#activePinch) < 0.0001 && Math.abs(this.#motionVelocity) < 0.0001) {
       this.#activePinch = target;
-      this.#returnVelocity = 0;
-      this.#returnFrame = undefined;
+      this.#motionVelocity = 0;
+      this.#motionFrame = undefined;
       this.#render();
       return;
     }
 
-    this.#returnFrame = requestAnimationFrame((nextTime) => this.#returnToOrigin(nextTime));
+    this.#motionFrame = requestAnimationFrame((nextTime) => this.#animateMotion(nextTime));
   }
 
   #align() {
