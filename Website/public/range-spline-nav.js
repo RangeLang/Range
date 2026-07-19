@@ -1,13 +1,5 @@
-export function splinePairGap(leftWidth, rightWidth, {
-  minGap = 24,
-  maxGap = 42,
-  widthFloor = 40,
-  widthCeiling = 100,
-} = {}) {
-  const pairMeasure = Math.sqrt(Math.max(0, leftWidth) * Math.max(0, rightWidth));
-  const progress = Math.min(1, Math.max(0, (pairMeasure - widthFloor) / (widthCeiling - widthFloor)));
-  const spline = progress * progress * (3 - 2 * progress);
-  return minGap + (maxGap - minGap) * spline;
+export function nextItemGap(nextWidth, extra = 1) {
+  return Math.max(0, nextWidth) + Math.max(0, extra);
 }
 
 const ElementBase = globalThis.HTMLElement ?? class {};
@@ -32,7 +24,7 @@ class RangeSplineNav extends ElementBase {
     const widths = links.map((link) => link.getBoundingClientRect().width);
     links.forEach((link, index) => {
       if (index === 0) return;
-      const gap = splinePairGap(widths[index - 1], widths[index]);
+      const gap = nextItemGap(widths[index], 1);
       link.style.setProperty("--spline-gap-before", `${gap.toFixed(2)}px`);
     });
   }
