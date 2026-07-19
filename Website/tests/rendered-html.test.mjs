@@ -55,7 +55,7 @@ test("renders the generated benchmark hierarchy", async () => {
   const html = await response.text();
   const normalized = html.replaceAll("<!-- -->", "");
   assert.match(normalized, /<title>Range<\/title>/i);
-  assert.match(normalized, /class="backLink routeWordmark"[^>]*><span class="routeWordmarkIndex" aria-hidden="true">0<\/span><span class="rangeWord">Range<\/span>/);
+  assert.match(normalized, /class="backLink routeWordmark"[^>]*><span class="rangeWord">Range<\/span>/);
   assert.match(normalized, /<range-typed-text(?=[^>]*text="Performance")(?=[^>]*delay="500")(?=[^>]*interval="45")[^>]*>/);
   assert.match(normalized, /src="\/range-typed-text\.js"/);
   assert.match(normalized, /Benchmark suite/);
@@ -355,7 +355,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingHero p\s*{[^}]*--range-copy-optical-shift/s);
   assert.match(styles, /\.landingActions\s*{[^}]*--range-actions-optical-shift/s);
   assert.match(styles, /view-transition-group\(range-route-wordmark\)/);
-  assert.match(styles, /\.routeWordmarkIndex\s*{[^}]*visibility:\s*hidden/s);
+  assert.doesNotMatch(styles, /routeWordmarkIndex/);
   assert.match(styles, /\.backLink\.routeWordmark\s*{[^}]*font-family:\s*var\(--font-range-sans\)[^}]*font-size:\s*20px[^}]*font-weight:\s*600/s);
   assert.match(styles, /::view-transition-old\(root\)\s*{[^}]*520ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
   assert.match(styles, /::view-transition-new\(root\)\s*{[^}]*520ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
@@ -391,11 +391,15 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(rangeScaleElement, /damping\s*=\s*this\.#isPointerActive\s*\?\s*28\s*:\s*14/);
   assert.match(styles, /\.landingIndex\s*{[^}]*font-size:\s*20px/s);
   assert.match(styles, /\.landingSequence\s*{[^}]*--range-index-column:\s*15px[^}]*--range-index-gap:\s*10px/s);
-  assert.match(styles, /\.landingWordmark\s*{[^}]*display:\s*inline-grid[^}]*grid-template-columns:\s*var\(--range-index-column\) auto[^}]*align-items:\s*center[^}]*column-gap:\s*var\(--range-index-gap\)/s);
+  assert.match(styles, /\.landingWordmark\s*{[^}]*display:\s*inline-flex[^}]*align-items:\s*baseline[^}]*gap:\s*var\(--range-index-gap\)/s);
   assert.match(styles, /\.landingIndex\s*{[^}]*width:\s*var\(--range-index-column\)/s);
   assert.match(styles, /\.landingIndex\s*{[^}]*text-align:\s*center/s);
   assert.match(styles, /\.landingNav \[data-scale-zero\]\s*{[^}]*font-size:\s*14\.6px/s);
-  assert.match(styles, /\.landingHero h1\s*{[^}]*display:\s*grid[^}]*grid-template-columns:\s*var\(--range-index-column\) auto[^}]*align-items:\s*flex-start[^}]*column-gap:\s*var\(--range-index-gap\)/s);
+  assert.match(styles, /\.landingHero h1\s*{[^}]*display:\s*flex[^}]*align-items:\s*flex-start[^}]*gap:\s*var\(--range-index-gap\)/s);
+  assert.match(styles, /\[data-scale-zero\]\s*{[^}]*view-transition-name:\s*range-zero-index/s);
+  assert.match(styles, /\[data-scale-end\]\s*{[^}]*view-transition-name:\s*range-one-index/s);
+  assert.match(styles, /@keyframes range-index-collapse\s*{[^}]*to\s*{[^}]*translateX\(20px\) scale\(0\)/s);
+  assert.match(styles, /@keyframes range-index-expand\s*{[^}]*from\s*{[^}]*translateX\(20px\) scale\(0\)/s);
   assert.match(styles, /\.landingHero \[data-scale-end\]\s*{[^}]*position:\s*relative[^}]*font-size:\s*25\.4px[^}]*overflow:\s*visible/s);
   assert.match(styles, /\.landingHero \[data-scale-end\] > span\s*{[^}]*left:\s*50%[^}]*transform:\s*translateX\(-50%\)/s);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);

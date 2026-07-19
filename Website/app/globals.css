@@ -116,10 +116,8 @@ range-typed-text[data-typing]::after {
 }
 
 .routeWordmark {
-  display: inline-grid;
-  grid-template-columns: var(--range-index-column, 15px) auto;
-  align-items: center;
-  column-gap: var(--range-index-gap, 10px);
+  display: inline-flex;
+  align-items: baseline;
 }
 
 .backLink.routeWordmark {
@@ -128,11 +126,6 @@ range-typed-text[data-typing]::after {
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.04em;
-}
-
-.routeWordmarkIndex {
-  width: var(--range-index-column, 15px);
-  visibility: hidden;
 }
 
 .landingWordmark .rangeWord,
@@ -166,10 +159,9 @@ range-typed-text[data-typing]::after {
 }
 
 .landingWordmark {
-  display: inline-grid;
-  grid-template-columns: var(--range-index-column) auto;
-  align-items: center;
-  column-gap: var(--range-index-gap);
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--range-index-gap);
   color: var(--ink);
   font-size: 20px;
   font-weight: 600;
@@ -199,6 +191,25 @@ range-optical-guide {
 ::view-transition-new(range-route-wordmark) {
   mix-blend-mode: normal;
   animation: range-shared-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+::view-transition-group(range-zero-index),
+::view-transition-group(range-one-index) {
+  z-index: 21;
+  animation-duration: 520ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(range-zero-index),
+::view-transition-old(range-one-index) {
+  transform-origin: right center;
+  animation: range-index-collapse 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+::view-transition-new(range-zero-index),
+::view-transition-new(range-one-index) {
+  transform-origin: right center;
+  animation: range-index-expand 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 ::view-transition-old(root) {
@@ -235,6 +246,20 @@ range-optical-guide {
   }
 }
 
+@keyframes range-index-collapse {
+  to {
+    opacity: 0;
+    transform: translateX(20px) scale(0);
+  }
+}
+
+@keyframes range-index-expand {
+  from {
+    opacity: 0;
+    transform: translateX(20px) scale(0);
+  }
+}
+
 @keyframes range-caret {
   50% {
     opacity: 0;
@@ -245,6 +270,12 @@ range-optical-guide {
   ::view-transition-group(range-route-wordmark),
   ::view-transition-old(range-route-wordmark),
   ::view-transition-new(range-route-wordmark),
+  ::view-transition-group(range-zero-index),
+  ::view-transition-group(range-one-index),
+  ::view-transition-old(range-zero-index),
+  ::view-transition-old(range-one-index),
+  ::view-transition-new(range-zero-index),
+  ::view-transition-new(range-one-index),
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation-duration: 1ms;
@@ -266,6 +297,7 @@ range-optical-guide {
 
 .landingNav [data-scale-zero] {
   font-size: 14.6px;
+  view-transition-name: range-zero-index;
 }
 
 .landingNav nav {
@@ -296,10 +328,9 @@ range-optical-guide {
 
 .landingHero h1 {
   width: fit-content;
-  display: grid;
-  grid-template-columns: var(--range-index-column) auto;
+  display: flex;
   align-items: flex-start;
-  column-gap: var(--range-index-gap);
+  gap: var(--range-index-gap);
   padding-left: 0;
   margin: 0;
   font-size: clamp(76px, 15vw, 180px);
@@ -315,6 +346,7 @@ range-optical-guide {
   margin-top: 5px;
   overflow: visible;
   white-space: nowrap;
+  view-transition-name: range-one-index;
 }
 
 .landingHero [data-scale-end] > span {
