@@ -56,9 +56,9 @@ test("renders the generated benchmark hierarchy", async () => {
   const html = await response.text();
   const normalized = html.replaceAll("<!-- -->", "");
   assert.match(normalized, /<title>Range<\/title>/i);
-  assert.match(normalized, /class="backLink routeWordmark"[^>]*><span class="rangeWord">Range<\/span>/);
+  assert.match(normalized, /class="backLink routeWordmark"[^>]*><span class="landingIndex" data-route-zero>0<\/span><span class="rangeWord">Range<\/span>/);
   assert.match(normalized, /<range-typed-text(?=[^>]*text="Performance")(?=[^>]*delay="300")(?=[^>]*interval="45")[^>]*>/);
-  assert.match(normalized, /src="\/range-typed-text\.js"/);
+  assert.match(normalized, /src="\/range-typed-text\.js\?version=78"/);
   assert.match(normalized, /Benchmark suite/);
   assert.match(normalized, /Sequential modulo/);
   assert.match(normalized, /href="\/benchmarks\?category=noise"/);
@@ -347,8 +347,8 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(renderer, /<range-benchmark-chart>/);
   assert.match(siteComponents, /customElements\.define/);
   assert.match(styles, /@view-transition\s*{\s*navigation:\s*auto/);
-  assert.match(styles, /\.landingHero \.rangeTitleWord,\s*\.routeWordmark \.rangeWord\s*{[^}]*view-transition-name:\s*range-hero-wordmark/s);
-  assert.doesNotMatch(styles, /\.landingWordmark \.rangeWord[^}]*view-transition-name/s);
+  assert.match(styles, /\.landingWordmark,\s*\.routeWordmark\s*{[^}]*view-transition-name:\s*range-home-control/s);
+  assert.match(styles, /\.landingHero \.rangeTitleWord,\s*\.pageHeader h1 > span:first-child\s*{[^}]*view-transition-name:\s*range-performance-wordmark/s);
   assert.match(styles, /\.landingHero \.rangeTitleWord\s*{[^}]*transform:\s*translateX\(-3px\)/s);
   assert.match(styles, /\.landingSequence\s*{[^}]*--range-title-leading:\s*calc\(var\(--range-index-column\) \+ var\(--range-index-gap\) - 3px\)/s);
   assert.match(styles, /\.landingHero p\s*{[^}]*margin:\s*40px 0 0 var\(--range-title-leading\)/s);
@@ -356,16 +356,17 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingWordmark \.rangeWord\s*{[^}]*--range-wordmark-optical-shift/s);
   assert.match(styles, /\.landingHero p\s*{[^}]*--range-copy-optical-shift/s);
   assert.match(styles, /\.landingActions\s*{[^}]*--range-actions-optical-shift/s);
-  assert.match(styles, /view-transition-group\(range-hero-wordmark\)/);
+  assert.match(styles, /view-transition-group\(range-home-control\)/);
+  assert.match(styles, /view-transition-group\(range-performance-wordmark\)/);
   assert.doesNotMatch(styles, /routeWordmarkIndex/);
   assert.match(styles, /\.backLink\.routeWordmark\s*{[^}]*font-family:\s*var\(--font-range-sans\)[^}]*font-size:\s*20px[^}]*font-weight:\s*600/s);
   assert.match(styles, /::view-transition-group\(root\)\s*{[^}]*420ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
   assert.match(styles, /::view-transition-old\(root\)\s*{[^}]*420ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
   assert.match(styles, /::view-transition-new\(root\)\s*{[^}]*420ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
-  assert.match(styles, /range-route-forward::view-transition-old\(range-hero-wordmark\)[^{]*\{[^}]*opacity:\s*1/s);
-  assert.match(styles, /range-route-forward::view-transition-new\(range-hero-wordmark\)[^{]*\{[^}]*opacity:\s*0/s);
-  assert.match(styles, /range-route-backward::view-transition-new\(range-hero-wordmark\)[^{]*\{[^}]*opacity:\s*1/s);
-  assert.match(styles, /range-route-backward::view-transition-old\(range-hero-wordmark\)[^{]*\{[^}]*opacity:\s*0/s);
+  assert.match(styles, /range-route-performance\.range-route-forward::view-transition-old\(range-performance-wordmark\)[^{]*\{[^}]*opacity:\s*1/s);
+  assert.match(styles, /range-route-performance\.range-route-forward::view-transition-new\(range-performance-wordmark\)[^{]*\{[^}]*opacity:\s*0/s);
+  assert.match(styles, /range-route-performance\.range-route-backward::view-transition-new\(range-performance-wordmark\)[^{]*\{[^}]*opacity:\s*1/s);
+  assert.match(styles, /range-route-performance\.range-route-backward::view-transition-old\(range-performance-wordmark\)[^{]*\{[^}]*opacity:\s*0/s);
   assert.match(styles, /transform:\s*translateX\(-20px\)/);
   assert.match(styles, /transform:\s*translateX\(20px\)/);
   assert.doesNotMatch(styles, /range-title-morph/);
@@ -401,9 +402,9 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingWordmark\s*{[^}]*display:\s*inline-flex[^}]*align-items:\s*baseline[^}]*gap:\s*var\(--range-index-gap\)/s);
   assert.match(styles, /\.landingIndex\s*{[^}]*width:\s*var\(--range-index-column\)/s);
   assert.match(styles, /\.landingIndex\s*{[^}]*text-align:\s*center/s);
-  assert.match(styles, /\.landingNav \[data-scale-zero\]\s*{[^}]*font-size:\s*14\.6px/s);
+  assert.match(styles, /\.landingNav \[data-scale-zero\],\s*\.routeWordmark \[data-route-zero\]\s*{[^}]*font-size:\s*14\.6px/s);
   assert.match(styles, /\.landingHero h1\s*{[^}]*display:\s*flex[^}]*align-items:\s*flex-start[^}]*gap:\s*var\(--range-index-gap\)/s);
-  assert.match(styles, /\[data-scale-zero\]\s*{[^}]*view-transition-name:\s*range-zero-index/s);
+  assert.doesNotMatch(styles, /view-transition-name:\s*range-zero-index/);
   assert.match(styles, /\[data-scale-end\]\s*{[^}]*view-transition-name:\s*range-one-index/s);
   assert.match(styles, /@keyframes range-index-collapse\s*{[^}]*to\s*{[^}]*translateX\(20px\) scale\(0\)/s);
   assert.match(styles, /@keyframes range-index-expand\s*{[^}]*from\s*{[^}]*translateX\(20px\) scale\(0\)/s);
@@ -414,13 +415,14 @@ test("keeps the benchmark artifact complete and versioned", async () => {
 });
 
 test("uses Web Components without React, Next, or Vinext", async () => {
-  const [packageText, worker, renderer, components, layoutReady, navigation] = await Promise.all([
+  const [packageText, worker, renderer, components, layoutReady, navigation, typedText] = await Promise.all([
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/render.ts", import.meta.url), "utf8"),
     readFile(new URL("../public/range-site.js", import.meta.url), "utf8"),
     readFile(new URL("../public/range-layout-ready.js", import.meta.url), "utf8"),
     readFile(new URL("../public/range-navigation-v2.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/range-typed-text.js", import.meta.url), "utf8"),
   ]);
   const packageJson = JSON.parse(packageText);
   const installed = { ...packageJson.dependencies, ...packageJson.devDependencies };
@@ -438,6 +440,8 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(layoutReady, /classList\.remove\("range-layout-pending"\)/);
   assert.match(navigation, /document\.startViewTransition\(commit\)\.finished/);
   assert.match(navigation, /function routeDirection/);
+  assert.match(navigation, /function isPerformanceTransition/);
+  assert.match(navigation, /routeClasses\.push\("range-route-performance"\)/);
   assert.match(navigation, /let activeRoute = location\.href/);
   assert.match(navigation, /activeRoute = destination/);
   assert.match(navigation, /`range-route-\$\{direction\}`/);
@@ -448,8 +452,10 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(navigation, /requestIdleCallback/);
   assert.match(navigation, /history\.pushState/);
   assert.match(navigation, /addEventListener\("popstate"/);
-  assert.match(worker, /range-ui-v76\.css/);
-  assert.match(worker, /rendered\.html\.replace\('\/range-ui\.css', '\/range-ui-v76\.css'\)/);
+  assert.match(typedText, /classList\.contains\("range-route-forward"\) \? 440 : 0/);
+  assert.match(worker, /range-ui-v78\.css/);
+  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v78\.css'\)/);
+  assert.match(worker, /data-route-zero>0/);
 });
 
 test("serves Geist Sans and Mono from the site artifact", async () => {
@@ -471,7 +477,7 @@ test("serves Geist Sans and Mono from the site artifact", async () => {
   assert.match(license, /SIL Open Font License/);
 
   const response = await render("/");
-  assert.match(await response.text(), /href="\/range-ui-v76\.css"/);
+  assert.match(await response.text(), /href="\/range-ui-v78\.css"/);
 });
 
 test("serves local fonts with the WOFF2 media type", async () => {

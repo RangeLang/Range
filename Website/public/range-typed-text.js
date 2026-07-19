@@ -26,7 +26,8 @@ class RangeTypedText extends HTMLElement {
     this.#cancel();
     const run = this.#run;
     const text = this.getAttribute("text") ?? this.textContent ?? "";
-    const delay = Math.max(0, Number(this.getAttribute("delay")) || 0);
+    const routeDelay = document.documentElement.classList.contains("range-route-forward") ? 440 : 0;
+    const delay = Math.max(routeDelay, Number(this.getAttribute("delay")) || 0);
     const interval = Math.max(1, Number(this.getAttribute("interval")) || 45);
     this.setAttribute("aria-label", text);
 

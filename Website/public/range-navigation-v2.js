@@ -23,6 +23,13 @@ function routeDirection(destination) {
   return "lateral";
 }
 
+function isPerformanceTransition(destination) {
+  const currentPath = new URL(activeRoute, location.href).pathname;
+  const nextPath = new URL(destination, location.href).pathname;
+  return (currentPath === "/" && nextPath === "/benchmarks")
+    || (currentPath === "/benchmarks" && nextPath === "/");
+}
+
 function fetchRoute(destination) {
   const key = routeKey(destination);
   if (!routeCache.has(key)) {
@@ -58,6 +65,8 @@ async function loadRoute(destination, historyMode) {
   navigationInFlight = true;
   const direction = routeDirection(destination);
   const transitionClass = `range-route-${direction}`;
+  const routeClasses = [transitionClass];
+  if (isPerformanceTransition(destination)) routeClasses.push("range-route-performance");
 
   try {
     const nextDocument = await fetchRoute(destination);
@@ -74,7 +83,7 @@ async function loadRoute(destination, historyMode) {
     };
 
     if (typeof document.startViewTransition === "function") {
-      document.documentElement.classList.add(transitionClass);
+      document.documentElement.classList.add(...routeClasses);
       await document.startViewTransition(commit).finished;
     } else {
       commit();
@@ -82,7 +91,7 @@ async function loadRoute(destination, historyMode) {
   } catch {
     location.assign(destination);
   } finally {
-    document.documentElement.classList.remove(transitionClass);
+    document.documentElement.classList.remove(...routeClasses);
     navigationInFlight = false;
   }
 }
