@@ -53,6 +53,9 @@ class RangeScale extends HTMLElement {
   ];
 
   #activePinch;
+  #canvas;
+  #context;
+  #colorProbe;
   #isPointerActive = false;
   #lastMotionTime = 0;
   #motionFrame;
@@ -171,48 +174,47 @@ class RangeScale extends HTMLElement {
       pinch: this.#activePinch ?? config.pinch,
       pinchCoreRadius: config.pinchCore / (2 * Math.max(1, this.getBoundingClientRect().height)),
     });
-    this.shadowRoot.innerHTML = `
-      <style>
-        :host {
-          display: block;
-          position: absolute;
-          width: 48px;
-          pointer-events: auto;
-          transform: translateX(-50%);
-        }
-        i {
-          position: absolute;
-          top: var(--position);
-          left: 50%;
-          width: calc(1px * var(--measure));
-          height: calc(1px * var(--stroke));
-          border-radius: 999px;
-          background: color-mix(
-            in oklch,
-            var(--line, oklch(0.9 0.012 255)),
-            white var(--lighten)
-          );
-          filter: blur(calc(1px * var(--blur)));
-          opacity: var(--opacity);
-          transform: translate(-50%, -50%);
-        }
-        i.division,
-        i.major {
-          background: color-mix(
-            in oklch,
-            color-mix(
-              in oklch,
-              var(--muted, oklch(0.58 0.015 255)),
-              var(--line, oklch(0.9 0.012 255)) 42%
-            ),
-            white var(--lighten)
-          );
-        }
-      </style>
-      ${marks.map((mark) => (
-        `<i class="${mark.tier}${mark.anchored ? " anchored" : ""}" style="--measure:${mark.measure};--stroke:${mark.stroke};--blur:${mark.blur};--lighten:${mark.tone * config.toneIntensity * 100}%;--opacity:${mark.opacity};--position:${mark.position * 100}%"></i>`
-      )).join("")}
-    `;
+    if (!this.#canvas) {
+      this.shadowRoot.innerHTML = `<style>:host{display:block;position:absolute;width:48px;pointer-events:auto;transform:translateX(-50%)}canvas{display:block;width:100%;height:100%}.colorProbe{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}</style><canvas role="presentation"></canvas><span class="colorProbe" aria-hidden="true"></span>`;
+      this.#canvas = this.shadowRoot.querySelector("canvas");
+      this.#context = this.#canvas?.getContext("2d");
+      this.#colorProbe = this.shadowRoot.querySelector(".colorProbe");
+    }
+    if (!this.#canvas || !this.#context) return;
+
+    const bounds = this.getBoundingClientRect();
+    const width = Math.max(1, bounds.width);
+    const height = Math.max(1, bounds.height);
+    const pixelRatio = Math.min(4, Math.max(1, globalThis.devicePixelRatio || 1));
+    this.#canvas.width = Math.ceil(width * pixelRatio);
+    this.#canvas.height = Math.ceil(height * pixelRatio);
+    this.#canvas.style.width = `${width}px`;
+    this.#canvas.style.height = `${height}px`;
+    this.#context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    this.#context.clearRect(0, 0, width, height);
+    this.#context.lineCap = "round";
+
+    const styles = getComputedStyle(this);
+    const line = styles.getPropertyValue("--line").trim() || "oklch(0.9 0.012 255)";
+    const muted = styles.getPropertyValue("--muted").trim() || "oklch(0.58 0.015 255)";
+    for (const mark of marks) {
+      const base = mark.tier === "division" || mark.tier === "major"
+        ? `color-mix(in oklch, color-mix(in oklch, ${muted}, ${line} 42%), white ${mark.tone * config.toneIntensity * 100}%)`
+        : `color-mix(in oklch, ${line}, white ${mark.tone * config.toneIntensity * 100}%)`;
+      if (this.#colorProbe) this.#colorProbe.style.background = base;
+      this.#context.strokeStyle = this.#colorProbe
+        ? getComputedStyle(this.#colorProbe).backgroundColor
+        : line;
+      this.#context.globalAlpha = mark.opacity;
+      this.#context.lineWidth = Math.max(0.1, mark.stroke);
+      const y = mark.position * height;
+      const halfWidth = mark.measure / 2;
+      this.#context.beginPath();
+      this.#context.moveTo(width / 2 - halfWidth, y);
+      this.#context.lineTo(width / 2 + halfWidth, y);
+      this.#context.stroke();
+    }
+    this.#context.globalAlpha = 1;
   }
 
   #startMotion() {
