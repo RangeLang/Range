@@ -43,12 +43,33 @@ export function createPinchMarks({
 
     return {
       isRadix: signedStep === 0,
-      measure: 1.65 + (radius - Math.abs(signedStep)) * 0.65,
       position: center + distance,
       source: "pinch",
       weight: 1,
     };
   }).filter(({ position }) => position >= 0 && position <= 1);
+}
+
+export function measureWithFalloff(position, {
+  baseline = 1,
+  center = 0.27,
+  falloff = 0.018,
+  peak = 2.95,
+} = {}) {
+  assertFiniteNumber(position, "position");
+  assertFiniteNumber(baseline, "baseline");
+  assertFiniteNumber(center, "center");
+  assertFiniteNumber(falloff, "falloff");
+  assertFiniteNumber(peak, "peak");
+  if (position < 0 || position > 1) throw new RangeError("position must be within [0, 1]");
+  if (center < 0 || center > 1) throw new RangeError("center must be within [0, 1]");
+  if (baseline <= 0) throw new RangeError("baseline must be positive");
+  if (falloff <= 0) throw new RangeError("falloff must be positive");
+  if (peak < baseline) throw new RangeError("peak cannot be less than baseline");
+
+  const normalizedDistance = (position - center) / falloff;
+  const influence = Math.exp(-0.5 * normalizedDistance * normalizedDistance);
+  return baseline + (peak - baseline) * influence;
 }
 
 export function mergeMarks(markGroups, epsilon = DEFAULT_EPSILON) {
@@ -106,7 +127,7 @@ export function mergeMarks(markGroups, epsilon = DEFAULT_EPSILON) {
 }
 
 export function createRangeMarks(config = {}) {
-  return mergeMarks([
+  const groups = [
     createScaleMarks({ count: config.marks }),
     createPinchMarks({
       center: config.pinch,
@@ -114,5 +135,17 @@ export function createRangeMarks(config = {}) {
       growth: config.pinchGrowth,
       minimumDistance: config.pinchDistance,
     }),
-  ]);
+  ];
+
+  return mergeMarks(groups.map((marks) => marks.map((mark) => {
+    const baseline = mark.measure ?? (mark.isRadix ? 1.8 : 1);
+    return {
+      ...mark,
+      measure: Math.max(baseline, measureWithFalloff(mark.position, {
+        center: config.pinch,
+        falloff: config.measureFalloff,
+        peak: config.measurePeak,
+      })),
+    };
+  })));
 }

@@ -10,6 +10,8 @@ declare module "react" {
         "pinch-distance"?: string;
         "pinch-growth"?: string;
         "pinch-marks"?: string;
+        "measure-falloff"?: string;
+        "measure-peak"?: string;
       };
       "range-typed-text": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
         delay?: string;

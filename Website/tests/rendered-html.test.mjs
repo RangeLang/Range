@@ -30,7 +30,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="18")(?=[^>]*pinch="0.27")(?=[^>]*pinch-distance="0.012")(?=[^>]*pinch-growth="2.2")(?=[^>]*pinch-marks="5")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="18")(?=[^>]*pinch="0.27")(?=[^>]*pinch-distance="0.012")(?=[^>]*pinch-growth="2.2")(?=[^>]*pinch-marks="5")(?=[^>]*measure-falloff="0.018")(?=[^>]*measure-peak="2.95")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js"/);
   assert.match(html, /Range-authored and emits native LLVM/);
@@ -125,6 +125,7 @@ test("merges linear scale and pinch marks deterministically", async () => {
     createRangeMarks,
     createPinchMarks,
     createScaleMarks,
+    measureWithFalloff,
     mergeMarks,
   } = await import(mathUrl.href);
 
@@ -137,11 +138,9 @@ test("merges linear scale and pinch marks deterministically", async () => {
       .map(({ position }) => Number(position.toFixed(4))),
     [0.2436, 0.258, 0.27, 0.282, 0.2964],
   );
-  assert.deepEqual(
-    createPinchMarks({ center: 0.27, count: 5, growth: 2.2, minimumDistance: 0.012 })
-      .map(({ measure }) => measure),
-    [1.65, 2.3, 2.95, 2.3, 1.65],
-  );
+  assert.equal(measureWithFalloff(0.27), 2.95);
+  assert.ok(Math.abs(measureWithFalloff(0.258) - measureWithFalloff(0.282)) < 1e-12);
+  assert.ok(measureWithFalloff(0.258) > measureWithFalloff(0.2436));
 
   const marks = createRangeMarks({
     marks: 18,
@@ -149,11 +148,14 @@ test("merges linear scale and pinch marks deterministically", async () => {
     pinchDistance: 0.012,
     pinchGrowth: 2.2,
     pinchMarks: 5,
+    measureFalloff: 0.018,
+    measurePeak: 2.95,
   });
   assert.ok(marks.every((mark) => mark.position >= 0 && mark.position <= 1));
   assert.ok(marks.every((mark) => mark.measure >= 1));
   assert.ok(marks.every((mark, index) => index === 0 || mark.position > marks[index - 1].position));
   assert.ok(marks.some((mark) => Math.abs(mark.position - 0.27) < 1e-12 && mark.isRadix));
+  assert.equal(marks.find((mark) => Math.abs(mark.position - 0.27) < 1e-12)?.measure, 2.95);
 
   const merged = mergeMarks([
     [{ isRadix: false, position: 0.27, source: "scale", weight: 1 }],

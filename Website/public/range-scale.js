@@ -7,6 +7,8 @@ const defaults = {
   pinchDistance: 0.012,
   pinchGrowth: 2.2,
   pinchMarks: 5,
+  measureFalloff: 0.018,
+  measurePeak: 2.95,
 };
 
 function finiteAttribute(element, name, fallback) {
@@ -22,6 +24,8 @@ class RangeScale extends HTMLElement {
     "pinch-distance",
     "pinch-growth",
     "pinch-marks",
+    "measure-falloff",
+    "measure-peak",
   ];
 
   #resizeObserver;
@@ -63,6 +67,8 @@ class RangeScale extends HTMLElement {
       pinchDistance: Math.max(0.000001, finiteAttribute(this, "pinch-distance", defaults.pinchDistance)),
       pinchGrowth: Math.max(1.000001, finiteAttribute(this, "pinch-growth", defaults.pinchGrowth)),
       pinchMarks: pinchMarks % 2 === 0 ? pinchMarks + 1 : pinchMarks,
+      measureFalloff: Math.max(0.000001, finiteAttribute(this, "measure-falloff", defaults.measureFalloff)),
+      measurePeak: Math.max(1, finiteAttribute(this, "measure-peak", defaults.measurePeak)),
     };
   }
 
