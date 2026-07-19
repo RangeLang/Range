@@ -4,10 +4,8 @@ const defaults = {
   endpointGap: 8,
   marks: 18,
   pinch: 0.27,
-  pinchDistance: 0.012,
-  pinchGrowth: 2.2,
-  pinchMarks: 5,
-  measureFalloff: 0.018,
+  pinchFalloff: 0.12,
+  pinchStrength: 0.72,
   measurePeak: 2.95,
 };
 
@@ -21,10 +19,8 @@ class RangeScale extends HTMLElement {
     "endpoint-gap",
     "marks",
     "pinch",
-    "pinch-distance",
-    "pinch-growth",
-    "pinch-marks",
-    "measure-falloff",
+    "pinch-falloff",
+    "pinch-strength",
     "measure-peak",
   ];
 
@@ -59,15 +55,12 @@ class RangeScale extends HTMLElement {
   }
 
   #config() {
-    const pinchMarks = Math.max(1, Math.round(finiteAttribute(this, "pinch-marks", defaults.pinchMarks)));
     return {
       endpointGap: Math.max(0, finiteAttribute(this, "endpoint-gap", defaults.endpointGap)),
       marks: Math.max(2, Math.round(finiteAttribute(this, "marks", defaults.marks))),
       pinch: Math.min(1, Math.max(0, finiteAttribute(this, "pinch", defaults.pinch))),
-      pinchDistance: Math.max(0.000001, finiteAttribute(this, "pinch-distance", defaults.pinchDistance)),
-      pinchGrowth: Math.max(1.000001, finiteAttribute(this, "pinch-growth", defaults.pinchGrowth)),
-      pinchMarks: pinchMarks % 2 === 0 ? pinchMarks + 1 : pinchMarks,
-      measureFalloff: Math.max(0.000001, finiteAttribute(this, "measure-falloff", defaults.measureFalloff)),
+      pinchFalloff: Math.max(0.000001, finiteAttribute(this, "pinch-falloff", defaults.pinchFalloff)),
+      pinchStrength: Math.min(0.999999, Math.max(0, finiteAttribute(this, "pinch-strength", defaults.pinchStrength))),
       measurePeak: Math.max(1, finiteAttribute(this, "measure-peak", defaults.measurePeak)),
     };
   }

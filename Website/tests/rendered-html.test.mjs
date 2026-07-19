@@ -30,7 +30,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="18")(?=[^>]*pinch="0.27")(?=[^>]*pinch-distance="0.012")(?=[^>]*pinch-growth="2.2")(?=[^>]*pinch-marks="5")(?=[^>]*measure-falloff="0.018")(?=[^>]*measure-peak="2.95")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="18")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-peak="2.95")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js"/);
   assert.match(html, /Range-authored and emits native LLVM/);
@@ -123,32 +123,30 @@ test("merges linear scale and pinch marks deterministically", async () => {
   mathUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const {
     createRangeMarks,
-    createPinchMarks,
     createScaleMarks,
     measureWithFalloff,
     mergeMarks,
+    pinchScaleValue,
   } = await import(mathUrl.href);
 
   assert.deepEqual(
     createScaleMarks({ count: 5 }).map(({ position }) => position),
     [0, 0.25, 0.5, 0.75, 1],
   );
-  assert.deepEqual(
-    createPinchMarks({ center: 0.27, count: 5, growth: 2.2, minimumDistance: 0.012 })
-      .map(({ position }) => Number(position.toFixed(4))),
-    [0.2436, 0.258, 0.27, 0.282, 0.2964],
-  );
   assert.equal(measureWithFalloff(0.27), 2.95);
   assert.ok(Math.abs(measureWithFalloff(0.258) - measureWithFalloff(0.282)) < 1e-12);
   assert.ok(measureWithFalloff(0.258) > measureWithFalloff(0.2436));
+  assert.equal(pinchScaleValue(0), 0);
+  assert.equal(pinchScaleValue(0.27), 0.27);
+  assert.equal(pinchScaleValue(1), 1);
+  assert.ok(pinchScaleValue(0.22) > 0.22);
+  assert.ok(pinchScaleValue(0.32) < 0.32);
 
   const marks = createRangeMarks({
     marks: 18,
     pinch: 0.27,
-    pinchDistance: 0.012,
-    pinchGrowth: 2.2,
-    pinchMarks: 5,
-    measureFalloff: 0.018,
+    pinchFalloff: 0.12,
+    pinchStrength: 0.72,
     measurePeak: 2.95,
   });
   assert.ok(marks.every((mark) => mark.position >= 0 && mark.position <= 1));
@@ -156,6 +154,9 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(marks.every((mark, index) => index === 0 || mark.position > marks[index - 1].position));
   assert.ok(marks.some((mark) => Math.abs(mark.position - 0.27) < 1e-12 && mark.isRadix));
   assert.equal(marks.find((mark) => Math.abs(mark.position - 0.27) < 1e-12)?.measure, 2.95);
+  for (let index = 1; index <= 1000; index += 1) {
+    assert.ok(pinchScaleValue(index / 1000) > pinchScaleValue((index - 1) / 1000));
+  }
 
   const merged = mergeMarks([
     [{ isRadix: false, position: 0.27, source: "scale", weight: 1 }],

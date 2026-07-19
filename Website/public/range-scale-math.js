@@ -18,42 +18,32 @@ export function createScaleMarks({ count = 18 } = {}) {
   }));
 }
 
-export function createPinchMarks({
+export function pinchScaleValue(value, {
   center = 0.27,
-  count = 5,
-  growth = 2.2,
-  minimumDistance = 0.012,
+  falloff = 0.12,
+  strength = 0.72,
 } = {}) {
+  assertFiniteNumber(value, "value");
   assertFiniteNumber(center, "center");
-  assertFiniteNumber(growth, "growth");
-  assertFiniteNumber(minimumDistance, "minimumDistance");
+  assertFiniteNumber(falloff, "falloff");
+  assertFiniteNumber(strength, "strength");
+  if (value < 0 || value > 1) throw new RangeError("value must be within [0, 1]");
   if (center < 0 || center > 1) throw new RangeError("center must be within [0, 1]");
-  if (!Number.isInteger(count) || count < 1 || count % 2 === 0) {
-    throw new RangeError("count must be a positive odd integer");
-  }
-  if (growth <= 1) throw new RangeError("growth must be greater than 1");
-  if (minimumDistance <= 0) throw new RangeError("minimumDistance must be positive");
+  if (center === 0 || center === 1) throw new RangeError("center must be inside (0, 1)");
+  if (falloff <= 0) throw new RangeError("falloff must be positive");
+  if (strength < 0 || strength >= 1) throw new RangeError("strength must be within [0, 1)");
 
-  const radius = (count - 1) / 2;
-  return Array.from({ length: count }, (_, index) => {
-    const signedStep = index - radius;
-    const distance = signedStep === 0
-      ? 0
-      : Math.sign(signedStep) * minimumDistance * Math.pow(growth, Math.abs(signedStep) - 1);
-
-    return {
-      isRadix: signedStep === 0,
-      position: center + distance,
-      source: "pinch",
-      weight: 1,
-    };
-  }).filter(({ position }) => position >= 0 && position <= 1);
+  const offset = value - center;
+  const normalizedDistance = offset / falloff;
+  const influence = Math.exp(-0.5 * normalizedDistance * normalizedDistance);
+  const endpointEnvelope = value * (1 - value) / (center * (1 - center));
+  return value - strength * offset * influence * endpointEnvelope;
 }
 
 export function measureWithFalloff(position, {
   baseline = 1,
   center = 0.27,
-  falloff = 0.018,
+  falloff = 0.12,
   peak = 2.95,
 } = {}) {
   assertFiniteNumber(position, "position");
@@ -127,25 +117,30 @@ export function mergeMarks(markGroups, epsilon = DEFAULT_EPSILON) {
 }
 
 export function createRangeMarks(config = {}) {
-  const groups = [
+  const logicalMarks = mergeMarks([
     createScaleMarks({ count: config.marks }),
-    createPinchMarks({
-      center: config.pinch,
-      count: config.pinchMarks,
-      growth: config.pinchGrowth,
-      minimumDistance: config.pinchDistance,
-    }),
-  ];
+    [{
+      isRadix: true,
+      position: config.pinch,
+      source: "scale",
+      weight: 1,
+    }],
+  ]);
 
-  return mergeMarks(groups.map((marks) => marks.map((mark) => {
+  return logicalMarks.map((mark) => {
     const baseline = mark.measure ?? (mark.isRadix ? 1.8 : 1);
     return {
       ...mark,
       measure: Math.max(baseline, measureWithFalloff(mark.position, {
         center: config.pinch,
-        falloff: config.measureFalloff,
+        falloff: config.pinchFalloff,
         peak: config.measurePeak,
       })),
+      position: pinchScaleValue(mark.position, {
+        center: config.pinch,
+        falloff: config.pinchFalloff,
+        strength: config.pinchStrength,
+      }),
     };
-  })));
+  });
 }

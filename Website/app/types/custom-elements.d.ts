@@ -7,10 +7,8 @@ declare module "react" {
         "endpoint-gap"?: string;
         marks?: string;
         pinch?: string;
-        "pinch-distance"?: string;
-        "pinch-growth"?: string;
-        "pinch-marks"?: string;
-        "measure-falloff"?: string;
+        "pinch-falloff"?: string;
+        "pinch-strength"?: string;
         "measure-peak"?: string;
       };
       "range-typed-text": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {

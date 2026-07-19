@@ -38,10 +38,8 @@ export default function Home() {
           endpoint-gap="8"
           marks="18"
           pinch="0.27"
-          pinch-distance="0.012"
-          pinch-growth="2.2"
-          pinch-marks="5"
-          measure-falloff="0.018"
+          pinch-falloff="0.12"
+          pinch-strength="0.72"
           measure-peak="2.95"
         />
         {/* ES modules are deferred by the browser; this loads the native custom element without a React client boundary. */}
