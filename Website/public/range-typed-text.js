@@ -20,6 +20,11 @@ class RangeTypedText extends HTMLElement {
   async collapse() {
     this.#cancel();
     const run = this.#run;
+    const content = document.createElement("span");
+    content.setAttribute("data-collapse-content", "");
+    content.textContent = this.textContent;
+    this.textContent = "";
+    this.append(content);
     this.setAttribute("data-collapsing", "");
 
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) {

@@ -102,12 +102,6 @@ main {
   line-height: 1;
 }
 
-.pageHeader h1 > span:first-child {
-  position: relative;
-  z-index: 2;
-  background: var(--paper);
-}
-
 range-typed-text {
   position: relative;
   z-index: 1;
@@ -135,8 +129,15 @@ range-typed-text[data-route-pending]::after {
 }
 
 range-typed-text[data-collapsing] {
+  margin-left: -0.24em;
+  padding-left: 0.24em;
+  overflow: clip;
+}
+
+range-typed-text[data-collapsing] > [data-collapse-content] {
+  display: block;
   animation: range-performance-collapse 180ms cubic-bezier(0.32, 0.72, 0, 1) both;
-  will-change: transform, opacity, filter;
+  will-change: transform;
 }
 
 .backLink {
@@ -317,14 +318,8 @@ html.range-route-performance.range-route-backward::view-transition-old(range-per
 }
 
 @keyframes range-performance-collapse {
-  60% {
-    opacity: 0.82;
-  }
-
   to {
-    opacity: 0;
-    filter: blur(1.5px);
-    transform: translateX(calc(-100% - 0.24em)) scaleX(0.08);
+    transform: translateX(calc(-100% - 0.24em));
   }
 }
 

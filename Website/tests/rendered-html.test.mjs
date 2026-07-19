@@ -59,7 +59,7 @@ test("renders the generated benchmark hierarchy", async () => {
   assert.match(normalized, /class="backLink routeWordmark"[^>]*><span class="rangeWord">Range<\/span>/);
   assert.doesNotMatch(normalized, /data-route-zero/);
   assert.match(normalized, /<range-typed-text(?=[^>]*text="Performance")(?=[^>]*delay="300")(?=[^>]*interval="45")[^>]*>/);
-  assert.match(normalized, /src="\/range-typed-text\.js\?version=83"/);
+  assert.match(normalized, /src="\/range-typed-text\.js\?version=84"/);
   assert.match(normalized, /src="\/range-navigation-v2\.js\?version=81"/);
   assert.match(normalized, /Benchmark suite/);
   assert.match(normalized, /Sequential modulo/);
@@ -366,10 +366,11 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingHero \.rangeTitleWord,\s*\.pageHeader h1 > span:first-child\s*{[^}]*letter-spacing:\s*-0\.06em[^}]*line-height:\s*1/s);
   assert.match(styles, /range-typed-text\s*{[^}]*display:\s*block[^}]*line-height:\s*1/s);
   assert.match(styles, /range-typed-text\[data-route-pending\]::after\s*{[^}]*content:\s*none/s);
-  assert.match(styles, /range-typed-text\[data-collapsing\]\s*{[^}]*range-performance-collapse 180ms cubic-bezier\(0\.32, 0\.72, 0, 1\)/s);
+  assert.match(styles, /range-typed-text\[data-collapsing\]\s*{[^}]*margin-left:\s*-0\.24em[^}]*padding-left:\s*0\.24em[^}]*overflow:\s*clip/s);
+  assert.match(styles, /range-typed-text\[data-collapsing\] > \[data-collapse-content\]\s*{[^}]*range-performance-collapse 180ms cubic-bezier\(0\.32, 0\.72, 0, 1\)/s);
   assert.match(styles, /@keyframes range-performance-collapse/);
-  assert.match(styles, /transform:\s*translateX\(calc\(-100% - 0\.24em\)\) scaleX\(0\.08\)/);
-  assert.match(styles, /\.pageHeader h1 > span:first-child\s*{[^}]*z-index:\s*2[^}]*background:\s*var\(--paper\)/s);
+  assert.match(styles, /transform:\s*translateX\(calc\(-100% - 0\.24em\)\)/);
+  assert.doesNotMatch(styles, /scaleX\(0\.08\)|filter:\s*blur/);
   assert.match(styles, /::view-transition-group\(root\)\s*{[^}]*420ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
   assert.match(styles, /::view-transition-old\(root\)\s*{[^}]*420ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
   assert.match(styles, /::view-transition-new\(root\)\s*{[^}]*420ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
@@ -473,8 +474,8 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(typedText, /data-collapsing/);
   assert.match(typedText, /setTimeout\(resolve, 180\)/);
   assert.doesNotMatch(typedText, /for \(let index = characters\.length - 1/);
-  assert.match(worker, /range-ui-v83\.css/);
-  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v83\.css'\)/);
+  assert.match(worker, /range-ui-v84\.css/);
+  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v84\.css'\)/);
   assert.doesNotMatch(worker, /data-route-zero>0/);
 });
 
@@ -497,7 +498,7 @@ test("serves Geist Sans and Mono from the site artifact", async () => {
   assert.match(license, /SIL Open Font License/);
 
   const response = await render("/");
-  assert.match(await response.text(), /href="\/range-ui-v83\.css"/);
+  assert.match(await response.text(), /href="\/range-ui-v84\.css"/);
 });
 
 test("serves local fonts with the WOFF2 media type", async () => {
