@@ -37,7 +37,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js\?profile=pinch-dissolve-v4"/);
   assert.match(html, /class="rangeWord">Range<\/span>/);
   assert.match(html, /<range-optical-guide[^>]*aria-hidden="true"/);
-  assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink-box"/);
+  assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink-edges-v2"/);
   assert.match(html, /<html lang="en" class="range-layout-pending">/);
   assert.match(html, /src="\/range-layout-ready\.js"/);
   assert.match(html, /class="rangePerformanceAnchor" aria-hidden="true"/);
@@ -380,7 +380,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingActions\s*{[^}]*justify-content:\s*flex-end[^}]*margin:\s*32px 0 0/s);
   assert.match(styles, /\.landingWordmark \.rangeWord\s*{[^}]*--range-wordmark-optical-shift/s);
   assert.match(styles, /\.landingHero p\s*{[^}]*--range-copy-optical-shift/s);
-  assert.match(styles, /\.landingActions\s*{[^}]*--range-copy-optical-shift/s);
+  assert.match(styles, /\.landingActions\s*{[^}]*--range-actions-end-shift/s);
   assert.match(styles, /view-transition-group\(range-home-wordmark\)/);
   assert.match(styles, /view-transition-group\(range-performance-wordmark\)/);
   assert.doesNotMatch(styles, /routeWordmarkIndex/);
@@ -417,8 +417,9 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(rangeOpticalGuide, /metrics\.actualBoundingBoxLeft/);
   assert.match(rangeOpticalGuide, /--range-wordmark-optical-shift/);
   assert.match(rangeOpticalGuide, /--range-copy-optical-shift/);
-  assert.match(rangeOpticalGuide, /#boxStart\(action, this\.#shifts\.actions\)/);
-  assert.match(rangeOpticalGuide, /--range-actions-optical-shift/);
+  assert.match(rangeOpticalGuide, /document\.createRange\(\)/);
+  assert.match(rangeOpticalGuide, /#inkEnd\(github, this\.#shifts\.actionEnd\)/);
+  assert.match(rangeOpticalGuide, /--range-actions-end-shift/);
   assert.match(rangeScaleElement, /createRangeMarks/);
   assert.match(rangeScaleElement, /snapScalePosition/);
   assert.match(rangeScaleElement, /#snappedIndex/);
@@ -503,8 +504,8 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(typedText, /data-collapsing/);
   assert.match(typedText, /setTimeout\(resolve, 180\)/);
   assert.doesNotMatch(typedText, /for \(let index = characters\.length - 1/);
-  assert.match(worker, /range-ui-v92\.css/);
-  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v92\.css'\)/);
+  assert.match(worker, /range-ui-v93\.css/);
+  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v93\.css'\)/);
   assert.match(worker, /replace\('\/range-navigation-v2\.js', '\/range-navigation-v2\.js\?version=86'\)/);
   assert.doesNotMatch(worker, /data-route-zero>0/);
 });
@@ -528,7 +529,7 @@ test("serves Geist Sans and Mono from the site artifact", async () => {
   assert.match(license, /SIL Open Font License/);
 
   const response = await render("/");
-  assert.match(await response.text(), /href="\/range-ui-v92\.css"/);
+  assert.match(await response.text(), /href="\/range-ui-v93\.css"/);
 });
 
 test("serves local fonts with the WOFF2 media type", async () => {

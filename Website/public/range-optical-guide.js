@@ -2,12 +2,22 @@ function firstVisibleCharacter(element) {
   return element.textContent?.trim().charAt(0) ?? "";
 }
 
+function lastVisibleTextNode(element) {
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  let node;
+  let last;
+  while ((node = walker.nextNode())) {
+    if (node.data.trim().length > 0) last = node;
+  }
+  return last;
+}
+
 class RangeOpticalGuide extends HTMLElement {
   #canvas;
   #context;
   #frame;
   #resizeObserver;
-  #shifts = { actions: 0, copy: 0, wordmark: 0 };
+  #shifts = { actionEnd: 0, copy: 0, wordmark: 0 };
 
   connectedCallback() {
     this.#canvas = document.createElement("canvas");
@@ -45,8 +55,22 @@ class RangeOpticalGuide extends HTMLElement {
     return rect.left - appliedShift - metrics.actualBoundingBoxLeft;
   }
 
-  #boxStart(element, appliedShift = 0) {
-    return element.getBoundingClientRect().left - appliedShift;
+  #inkEnd(element, appliedShift = 0) {
+    const node = lastVisibleTextNode(element);
+    const end = node?.data.trimEnd().length ?? 0;
+    if (!node || end === 0 || !this.#context) {
+      return element.getBoundingClientRect().right - appliedShift;
+    }
+
+    const range = document.createRange();
+    range.setStart(node, end - 1);
+    range.setEnd(node, end);
+    const rect = range.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    this.#context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    this.#context.fontKerning = style.fontKerning;
+    const metrics = this.#context.measureText(node.data.charAt(end - 1));
+    return rect.left - appliedShift + metrics.actualBoundingBoxRight;
   }
 
   #align() {
@@ -54,18 +78,20 @@ class RangeOpticalGuide extends HTMLElement {
     const reference = sequence?.querySelector(".rangeTitleWord");
     const wordmark = sequence?.querySelector(".landingWordmark .rangeWord");
     const copy = sequence?.querySelector(".landingHero p");
-    const action = sequence?.querySelector(".primaryAction");
-    if (!sequence || !reference || !wordmark || !copy || !action) return;
+    const github = sequence?.querySelector(".secondaryAction");
+    if (!sequence || !reference || !wordmark || !copy || !github) return;
 
     const guide = this.#inkStart(reference);
+    const copyShift = guide - this.#inkStart(copy, this.#shifts.copy);
+    const copyEnd = this.#inkEnd(copy, this.#shifts.copy) + copyShift;
     const nextShifts = {
-      actions: guide - this.#boxStart(action, this.#shifts.actions),
-      copy: guide - this.#inkStart(copy, this.#shifts.copy),
+      actionEnd: copyEnd - this.#inkEnd(github, this.#shifts.actionEnd),
+      copy: copyShift,
       wordmark: guide - this.#inkStart(wordmark, this.#shifts.wordmark),
     };
 
     this.#shifts = nextShifts;
-    sequence.style.setProperty("--range-actions-optical-shift", `${nextShifts.actions}px`);
+    sequence.style.setProperty("--range-actions-end-shift", `${nextShifts.actionEnd}px`);
     sequence.style.setProperty("--range-copy-optical-shift", `${nextShifts.copy}px`);
     sequence.style.setProperty("--range-wordmark-optical-shift", `${nextShifts.wordmark}px`);
   }

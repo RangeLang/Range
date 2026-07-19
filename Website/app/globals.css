@@ -473,7 +473,7 @@ range-spline-nav a:focus-visible {
   gap: 10px;
   justify-content: flex-end;
   margin: 32px 0 0;
-  transform: translateX(var(--range-copy-optical-shift, 0px));
+  transform: translateX(var(--range-actions-end-shift, 0px));
 }
 
 .landingActions a {
