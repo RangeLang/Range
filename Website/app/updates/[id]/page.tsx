@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Benchmark, Chart } from "../../components/BenchmarkChart";
 
 const improvedStringsBenchmark: Benchmark = {
@@ -131,7 +132,7 @@ export default async function UpdatePage({ params }: { params: Promise<{ id: str
   return (
     <main>
       <header className="updatePageHeader">
-        <a href="/">Range Performance</a>
+        <Link href="/">Range</Link>
         <div>
           <h1>String lowering</h1>
           <p className="dateLabel">July 18, 2026</p>

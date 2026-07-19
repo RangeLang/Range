@@ -21,8 +21,21 @@ async function render(pathname = "/") {
   );
 }
 
-test("renders the generated benchmark hierarchy", async () => {
+test("renders the Range landing page", async () => {
   const response = await render();
+  assert.equal(response.status, 200);
+
+  const html = (await response.text()).replaceAll("<!-- -->", "");
+  assert.match(html, /<h1[^>]*>Range<\/h1>/);
+  assert.match(html, /Range-authored and emits native LLVM/);
+  assert.match(html, /12 of 12 passed/);
+  assert.match(html, /href="\/benchmarks"/);
+  assert.match(html, /href="\/updates\/string-lowering"/);
+  assert.doesNotMatch(html, /Benchmark suite/);
+});
+
+test("renders the generated benchmark hierarchy", async () => {
+  const response = await render("/benchmarks");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
@@ -49,9 +62,24 @@ test("renders the generated benchmark hierarchy", async () => {
   assert.match(normalized, /class="token [^"]*atrule[^"]*"[^>]*>@main<\/span>/);
   assert.match(normalized, /class="token [^"]*class-name[^"]*"[^>]*>Int<\/span>/);
   assert.match(normalized, /Initial benchmark/);
+  assert.match(normalized, /href="\/benchmarks\/integer_loop"/);
   assert.match(normalized, /href="\/updates\/string-lowering"/);
   assert.doesNotMatch(normalized, /Range Strings improvement/);
   assert.doesNotMatch(normalized, /Building your site|Your site is taking shape|codex-preview/i);
+});
+
+test("renders an individual benchmark route", async () => {
+  const response = await render("/benchmarks/integer_loop");
+  assert.equal(response.status, 200);
+
+  const html = (await response.text()).replaceAll("<!-- -->", "");
+  assert.match(html, /<a[^>]*href="\/benchmarks"[^>]*>Benchmarks<\/a>/);
+  assert.match(html, /<h1>While · Sequential modulo<\/h1>/);
+  assert.match(html, /Measurements/);
+  assert.match(html, /Peak memory/);
+  assert.match(html, /Run procedure/);
+  assert.match(html, /Test code/);
+  assert.match(html, /class="token keyword"[^>]*>state<\/span>/);
 });
 
 test("renders string lowering as its own update route", async () => {
@@ -60,7 +88,7 @@ test("renders string lowering as its own update route", async () => {
 
   const html = (await response.text()).replaceAll("<!-- -->", "");
   assert.match(html, /<h1>String lowering<\/h1>/);
-  assert.match(html, /href="\/">Range Performance<\/a>/);
+  assert.match(html, /href="\/">Range<\/a>/);
   assert.match(html, /Sequence/);
   assert.match(html, /Improvement/);
   assert.match(html, /~120× faster/);
@@ -71,8 +99,9 @@ test("renders string lowering as its own update route", async () => {
 });
 
 test("keeps the benchmark artifact complete and versioned", async () => {
-  const [artifactText, page, schemaText, serverBundle] = await Promise.all([
+  const [artifactText, benchmarkPage, landingPage, schemaText, serverBundle] = await Promise.all([
     readFile(new URL("../public/benchmarks.json", import.meta.url), "utf8"),
+    readFile(new URL("../app/benchmarks/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../../benchmark-results.schema.json", import.meta.url), "utf8"),
     readFile(new URL("../dist/server/index.js", import.meta.url), "utf8"),
@@ -99,6 +128,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.ok(leaves.every((leaf) => leaf.implementations.some((item) => item.language === "C")));
   assert.ok(leaves.every((leaf) => leaf.implementations.some((item) => item.language === "Range")));
   assert.ok(leaves.every((leaf) => leaf.results.some((result) => result.language === "Range")));
-  assert.match(page, /from "\.\.\/public\/benchmarks\.json"/);
+  assert.match(benchmarkPage, /from "\.\.\/\.\.\/public\/benchmarks\.json"/);
+  assert.match(landingPage, /from "\.\.\/public\/benchmarks\.json"/);
   assert.doesNotMatch(serverBundle, /@shikijs|engine-oniguruma|wasm-DtTceah8/);
 });

@@ -18,6 +18,7 @@ export type Benchmark = {
   leaf?: string;
   description?: string;
   implementations?: BenchmarkImplementation[];
+  href?: string;
 };
 
 export function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
@@ -28,7 +29,9 @@ export function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
     <section className="chart" aria-labelledby={`${id}-title`}>
       <header className="chartHeader">
         <div>
-          <h2 id={`${id}-title`}>{benchmark.name}</h2>
+          <h2 id={`${id}-title`}>
+            {benchmark.href ? <a href={benchmark.href}>{benchmark.name}</a> : benchmark.name}
+          </h2>
           {benchmark.leaf && <p className="chartLeaf">{benchmark.leaf}</p>}
         </div>
         <span>{benchmark.scale}</span>
