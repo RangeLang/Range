@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-html-link-for-pages -- the home link uses document navigation for the shared Range transition */
 import { MarkGithubIcon, XIcon } from "@primer/octicons-react";
 import Link from "next/link";
 import { Benchmark, BenchmarkImplementation, Chart, CodeBlock } from "../components/BenchmarkChart";
@@ -166,7 +167,7 @@ export default async function Home({
   return (
     <main>
       <header className="pageHeader">
-        <Link className="backLink" href="/">Range</Link>
+        <a className="backLink" href="/">Range</a>
         <h1>Range Performance</h1>
       </header>
 

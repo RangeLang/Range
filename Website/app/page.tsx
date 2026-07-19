@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-html-link-for-pages -- benchmark links use document navigation for the shared Range transition */
 import { MarkGithubIcon } from "@primer/octicons-react";
 import Link from "next/link";
 import benchmarkDataJson from "../public/benchmarks.json";
@@ -20,7 +21,7 @@ export default function Home() {
             <span>Range</span>
           </Link>
           <nav aria-label="Primary navigation">
-            <Link href="/benchmarks">Benchmarks</Link>
+            <a href="/benchmarks">Benchmarks</a>
             <Link href="/updates/string-lowering">Updates</Link>
             <a
               href="https://github.com/georgetchelidze/Range/tree/development"
@@ -41,7 +42,7 @@ export default function Home() {
           </h1>
           <p>The active compiler is Range-authored and emits native LLVM.</p>
           <div className="landingActions">
-            <Link className="primaryAction" href="/benchmarks">Benchmarks</Link>
+            <a className="primaryAction" href="/benchmarks">Benchmarks</a>
             <a
               className="secondaryAction"
               href="https://github.com/georgetchelidze/Range/tree/development"
@@ -56,13 +57,13 @@ export default function Home() {
       </div>
 
       <section className="landingLinks" aria-label="Range links">
-        <Link href="/benchmarks">
+        <a href="/benchmarks">
           <span>
             <strong>Benchmarks</strong>
             <small>{benchmarkData.summary.runLeafCount} generated comparisons</small>
           </span>
           <span>View</span>
-        </Link>
+        </a>
         <Link href="/updates/string-lowering">
           <span>
             <strong>String lowering</strong>

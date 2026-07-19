@@ -113,10 +113,11 @@ test("renders string lowering as its own update route", async () => {
 });
 
 test("keeps the benchmark artifact complete and versioned", async () => {
-  const [artifactText, benchmarkPage, landingPage, schemaText, serverBundle] = await Promise.all([
+  const [artifactText, benchmarkPage, landingPage, styles, schemaText, serverBundle] = await Promise.all([
     readFile(new URL("../public/benchmarks.json", import.meta.url), "utf8"),
     readFile(new URL("../app/benchmarks/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../../benchmark-results.schema.json", import.meta.url), "utf8"),
     readFile(new URL("../dist/server/index.js", import.meta.url), "utf8"),
   ]);
@@ -144,5 +145,8 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.ok(leaves.every((leaf) => leaf.results.some((result) => result.language === "Range")));
   assert.match(benchmarkPage, /from "\.\.\/\.\.\/public\/benchmarks\.json"/);
   assert.match(landingPage, /from "\.\.\/public\/benchmarks\.json"/);
+  assert.match(styles, /@view-transition\s*{\s*navigation:\s*auto/);
+  assert.match(styles, /view-transition-name:\s*range-navigation/);
+  assert.match(styles, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(serverBundle, /@shikijs|engine-oniguruma|wasm-DtTceah8/);
 });
