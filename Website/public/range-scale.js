@@ -2,8 +2,8 @@ import { createRangeMarks } from "./range-scale-math.js";
 
 const defaults = {
   endpointGap: 8,
-  marks: 100,
-  radixBase: 10,
+  marks: 51,
+  radixBase: 5,
   pinch: 0.27,
   pinchFalloff: 0.12,
   pinchStrength: 0.72,

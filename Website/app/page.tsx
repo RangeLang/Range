@@ -36,8 +36,8 @@ export default function Home() {
         <range-scale
           aria-hidden="true"
           endpoint-gap="8"
-          marks="100"
-          radix-base="10"
+          marks="51"
+          radix-base="5"
           pinch="0.27"
           pinch-falloff="0.12"
           pinch-strength="0.72"

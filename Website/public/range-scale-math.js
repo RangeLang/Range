@@ -14,7 +14,7 @@ function pinchInfluence(value, center, falloff) {
   return Math.exp(-0.5 * normalizedDistance * normalizedDistance) * taper;
 }
 
-export function createScaleMarks({ count = 100, radixBase = 10 } = {}) {
+export function createScaleMarks({ count = 51, radixBase = 5 } = {}) {
   if (!Number.isInteger(count) || count < 2) {
     throw new RangeError("count must be an integer of at least 2");
   }

@@ -30,7 +30,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="100")(?=[^>]*radix-base="10")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-minimum="0.35")(?=[^>]*stroke-minimum="0.25")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="51")(?=[^>]*radix-base="5")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-minimum="0.35")(?=[^>]*stroke-minimum="0.25")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js"/);
   assert.match(html, /Range-authored and emits native LLVM/);
@@ -133,9 +133,9 @@ test("merges linear scale and pinch marks deterministically", async () => {
     createScaleMarks({ count: 5 }).map(({ position }) => position),
     [0, 0.25, 0.5, 0.75, 1],
   );
-  assert.equal(createScaleMarks({ count: 100, radixBase: 10 }).length, 100);
+  assert.equal(createScaleMarks({ count: 51, radixBase: 5 }).length, 51);
   assert.equal(
-    createScaleMarks({ count: 100, radixBase: 10 }).filter(({ isRadix }) => isRadix).length,
+    createScaleMarks({ count: 51, radixBase: 5 }).filter(({ isRadix }) => isRadix).length,
     11,
   );
   assert.equal(measureWithFalloff(0.27), 0.35);
@@ -150,8 +150,8 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(pinchScaleValue(0.32) < 0.32);
 
   const marks = createRangeMarks({
-    marks: 100,
-    radixBase: 10,
+    marks: 51,
+    radixBase: 5,
     pinch: 0.27,
     pinchFalloff: 0.12,
     pinchStrength: 0.72,
@@ -162,7 +162,7 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(marks.every((mark) => mark.measure >= 0.35 - 1e-12));
   assert.ok(marks.every((mark) => mark.stroke >= 0.25 - 1e-12 && mark.stroke <= 1));
   assert.ok(marks.every((mark, index) => index === 0 || mark.position > marks[index - 1].position));
-  assert.equal(marks.length, 100);
+  assert.equal(marks.length, 51);
   const closestPinchMark = marks.reduce((closest, mark) => (
     Math.abs(mark.position - 0.27) < Math.abs(closest.position - 0.27) ? mark : closest
   ));
