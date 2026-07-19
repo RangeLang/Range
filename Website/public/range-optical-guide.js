@@ -2,17 +2,12 @@ function firstVisibleCharacter(element) {
   return element.textContent?.trim().charAt(0) ?? "";
 }
 
-function numericStyle(style, property) {
-  const value = Number.parseFloat(style[property]);
-  return Number.isFinite(value) ? value : 0;
-}
-
 class RangeOpticalGuide extends HTMLElement {
   #canvas;
   #context;
   #frame;
   #resizeObserver;
-  #shifts = { actions: 0, copy: 0, wordmark: 0 };
+  #shifts = { copy: 0, wordmark: 0 };
 
   connectedCallback() {
     this.#canvas = document.createElement("canvas");
@@ -37,7 +32,7 @@ class RangeOpticalGuide extends HTMLElement {
     });
   }
 
-  #inkStart(element, appliedShift = 0, includeBoxInset = false) {
+  #inkStart(element, appliedShift = 0) {
     const character = firstVisibleCharacter(element);
     const style = getComputedStyle(element);
     const rect = element.getBoundingClientRect();
@@ -46,10 +41,7 @@ class RangeOpticalGuide extends HTMLElement {
     this.#context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
     this.#context.fontKerning = style.fontKerning;
     const metrics = this.#context.measureText(character);
-    const boxInset = includeBoxInset
-      ? numericStyle(style, "borderLeftWidth") + numericStyle(style, "paddingLeft")
-      : 0;
-    return rect.left - appliedShift + boxInset - metrics.actualBoundingBoxLeft;
+    return rect.left - appliedShift - metrics.actualBoundingBoxLeft;
   }
 
   #align() {
@@ -57,18 +49,15 @@ class RangeOpticalGuide extends HTMLElement {
     const reference = sequence?.querySelector(".rangeTitleWord");
     const wordmark = sequence?.querySelector(".landingWordmark .rangeWord");
     const copy = sequence?.querySelector(".landingHero p");
-    const action = sequence?.querySelector(".primaryAction");
-    if (!sequence || !reference || !wordmark || !copy || !action) return;
+    if (!sequence || !reference || !wordmark || !copy) return;
 
     const guide = this.#inkStart(reference);
     const nextShifts = {
-      actions: guide - this.#inkStart(action, this.#shifts.actions, true),
       copy: guide - this.#inkStart(copy, this.#shifts.copy),
       wordmark: guide - this.#inkStart(wordmark, this.#shifts.wordmark),
     };
 
     this.#shifts = nextShifts;
-    sequence.style.setProperty("--range-actions-optical-shift", `${nextShifts.actions}px`);
     sequence.style.setProperty("--range-copy-optical-shift", `${nextShifts.copy}px`);
     sequence.style.setProperty("--range-wordmark-optical-shift", `${nextShifts.wordmark}px`);
   }

@@ -35,7 +35,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js(?:\?[^\"]*)?"/);
   assert.match(html, /class="rangeWord">Range<\/span>/);
   assert.match(html, /<range-optical-guide[^>]*aria-hidden="true"/);
-  assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink"/);
+  assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink-copy"/);
   assert.match(html, /Range-authored and emits native LLVM/);
   assert.doesNotMatch(html, /12 of 12 passed/);
   assert.doesNotMatch(html, /landingFacts/);
@@ -283,7 +283,6 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingActions\s*{[^}]*margin:\s*32px 0 0 var\(--range-title-leading\)/s);
   assert.match(styles, /\.landingWordmark \.rangeWord\s*{[^}]*--range-wordmark-optical-shift/s);
   assert.match(styles, /\.landingHero p\s*{[^}]*--range-copy-optical-shift/s);
-  assert.match(styles, /\.landingActions\s*{[^}]*--range-actions-optical-shift/s);
   assert.match(styles, /view-transition-group\(range-title-morph\)/);
   assert.match(styles, /view-transition-old\(range-title-morph\)\s*{[^}]*opacity:\s*1[^}]*animation:\s*none/s);
   assert.match(styles, /view-transition-new\(range-title-morph\)\s*{[^}]*opacity:\s*0[^}]*animation:\s*none/s);
@@ -296,7 +295,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(rangeOpticalGuide, /metrics\.actualBoundingBoxLeft/);
   assert.match(rangeOpticalGuide, /--range-wordmark-optical-shift/);
   assert.match(rangeOpticalGuide, /--range-copy-optical-shift/);
-  assert.match(rangeOpticalGuide, /--range-actions-optical-shift/);
+  assert.doesNotMatch(rangeOpticalGuide, /--range-actions-optical-shift/);
   assert.match(rangeScaleElement, /createRangeMarks/);
   assert.match(rangeScaleElement, /width:\s*calc\(1px \* var\(--measure\)\)/);
   assert.match(rangeScaleElement, /height:\s*calc\(1px \* var\(--stroke\)\)/);

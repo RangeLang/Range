@@ -59,7 +59,7 @@ export default function Home() {
         <script type="module" src="/range-scale.js?profile=invisible-collapse" />
         <range-optical-guide aria-hidden="true" />
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script type="module" src="/range-optical-guide.js?guide=glyph-ink" />
+        <script type="module" src="/range-optical-guide.js?guide=glyph-ink-copy" />
 
         <section className="landingHero" aria-labelledby="range-title">
           <h1 id="range-title">

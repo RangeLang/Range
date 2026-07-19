@@ -287,7 +287,6 @@ range-optical-guide {
   flex-wrap: wrap;
   gap: 10px;
   margin: 32px 0 0 var(--range-title-leading);
-  transform: translateX(var(--range-actions-optical-shift, 0px));
 }
 
 .landingActions a {
