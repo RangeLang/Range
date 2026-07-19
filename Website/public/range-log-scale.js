@@ -7,7 +7,7 @@ const defaults = {
   pinch: 0.27,
   pinchDistance: 0.006,
   pinchGrowth: 1.8,
-  pinchMarks: 9,
+  pinchMarks: 5,
 };
 
 function finiteAttribute(element, name, fallback) {

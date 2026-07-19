@@ -30,7 +30,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-log-scale(?=[^>]*base="10")(?=[^>]*endpoint-gap="8")(?=[^>]*marks="18")(?=[^>]*pinch="0.27")(?=[^>]*pinch-marks="9")[^>]*>/,
+    /<range-log-scale(?=[^>]*base="10")(?=[^>]*endpoint-gap="8")(?=[^>]*marks="18")(?=[^>]*pinch="0.27")(?=[^>]*pinch-marks="5")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-log-scale\.js"/);
   assert.match(html, /Range-authored and emits native LLVM/);
@@ -134,7 +134,7 @@ test("merges configurable logarithmic marks deterministically", async () => {
     pinch: 0.27,
     pinchDistance: 0.006,
     pinchGrowth: 1.8,
-    pinchMarks: 9,
+    pinchMarks: 5,
   });
   assert.ok(marks.every((mark) => mark.position >= 0 && mark.position <= 1));
   assert.ok(marks.every((mark, index) => index === 0 || mark.position > marks[index - 1].position));

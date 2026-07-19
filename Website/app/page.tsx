@@ -41,7 +41,7 @@ export default function Home() {
           pinch="0.27"
           pinch-distance="0.006"
           pinch-growth="1.8"
-          pinch-marks="9"
+          pinch-marks="5"
         />
         {/* ES modules are deferred by the browser; this loads the native custom element without a React client boundary. */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
