@@ -132,19 +132,27 @@ class RangeScale extends HTMLElement {
           width: calc(5px * var(--measure));
           height: calc(1px * var(--stroke));
           border-radius: 999px;
-          background: var(--line, oklch(0.9 0.012 255));
+          background: color-mix(
+            in oklch,
+            var(--line, oklch(0.9 0.012 255)),
+            white var(--lighten)
+          );
           transform: translate(-50%, -50%);
         }
         i.radix {
           background: color-mix(
             in oklch,
-            var(--muted, oklch(0.58 0.015 255)),
-            var(--line, oklch(0.9 0.012 255)) 42%
+            color-mix(
+              in oklch,
+              var(--muted, oklch(0.58 0.015 255)),
+              var(--line, oklch(0.9 0.012 255)) 42%
+            ),
+            white var(--lighten)
           );
         }
       </style>
       ${marks.map((mark) => (
-        `<i class="${mark.isRadix ? "radix" : "normal"}" style="--measure:${mark.measure};--stroke:${mark.stroke};--position:${mark.position * 100}%"></i>`
+        `<i class="${mark.isRadix ? "radix" : "normal"}" style="--measure:${mark.measure};--stroke:${mark.stroke};--lighten:${mark.tone * 58}%;--position:${mark.position * 100}%"></i>`
       )).join("")}
     `;
   }

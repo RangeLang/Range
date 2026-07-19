@@ -139,6 +139,12 @@ export function createRangeMarks(config = {}) {
 
   return logicalMarks.map((mark) => {
     const baseline = mark.measure ?? (mark.isRadix ? 1.8 : 1);
+    const stroke = measureWithFalloff(mark.position, {
+      baseline: 1,
+      center: config.pinch,
+      falloff: config.pinchFalloff,
+      minimum: config.strokeMinimum,
+    });
     return {
       ...mark,
       measure: measureWithFalloff(mark.position, {
@@ -147,12 +153,10 @@ export function createRangeMarks(config = {}) {
         falloff: config.pinchFalloff,
         minimum: config.measureMinimum,
       }),
-      stroke: measureWithFalloff(mark.position, {
-        baseline: 1,
-        center: config.pinch,
-        falloff: config.pinchFalloff,
-        minimum: config.strokeMinimum,
-      }),
+      stroke,
+      tone: config.strokeMinimum < 1
+        ? (1 - stroke) / (1 - config.strokeMinimum)
+        : 0,
       position: pinchScaleValue(mark.position, {
         center: config.pinch,
         falloff: config.pinchFalloff,
