@@ -390,20 +390,24 @@ html.range-route-performance.range-route-backward::view-transition-old(range-per
   view-transition-name: range-zero-index;
 }
 
-.landingNav nav {
+range-spline-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
+  align-items: center;
 }
 
-.landingNav nav a {
+range-spline-nav > a + a {
+  margin-inline-start: var(--spline-gap-before, 24px);
+}
+
+range-spline-nav a {
   color: var(--muted);
   font-size: 13px;
   text-decoration: none;
 }
 
-.landingNav nav a:hover,
-.landingNav nav a:focus-visible {
+range-spline-nav a:hover,
+range-spline-nav a:focus-visible {
   color: var(--ink);
   outline: none;
 }
@@ -1415,9 +1419,8 @@ footer {
     align-items: flex-start;
   }
 
-  .landingNav nav {
+  range-spline-nav {
     justify-content: flex-end;
-    gap: 10px 14px;
   }
 
   .landingHero h1 {

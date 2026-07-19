@@ -28,6 +28,8 @@ test("renders the Range landing page", async () => {
   const html = (await response.text()).replaceAll("<!-- -->", "");
   assert.match(html, /<h1[^>]*>.*>1<\/span><\/span>.*>Range<\/span>.*rangePerformanceAnchor.*<\/h1>/);
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
+  assert.match(html, /<range-spline-nav role="navigation" aria-label="Primary navigation">/);
+  assert.match(html, /src="\/range-spline-nav\.js\?version=1"/);
   assert.match(
     html,
     /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*division-base="3")(?=[^>]*division-levels="3")(?=[^>]*pinch="0.27")(?=[^>]*pinch-core="10")(?=[^>]*pinch-falloff="0.16")(?=[^>]*pinch-inner-edge="0.68")(?=[^>]*pinch-strength="0.9")(?=[^>]*measure-minimum="0.7")(?=[^>]*invisible-collapse-power="1.35")(?=[^>]*invisible-measure-minimum="0.1")(?=[^>]*invisible-stroke-minimum="0.06")(?=[^>]*marker-capture-division-weight="0.48")(?=[^>]*marker-capture-falloff="0.14")(?=[^>]*marker-capture-strength="0.9")(?=[^>]*stroke-minimum="0.65")(?=[^>]*snap-hysteresis="0.08")(?=[^>]*snap-to-marks="true")(?=[^>]*tone-falloff="0.12")(?=[^>]*tone-intensity="0.16")[^>]*>/,
@@ -47,6 +49,18 @@ test("renders the Range landing page", async () => {
   assert.match(html, /href="\/benchmarks"/);
   assert.match(html, /href="\/updates\/string-lowering"/);
   assert.doesNotMatch(html, /Benchmark suite/);
+});
+
+test("derives navigation spacing from a cubic width spline", async () => {
+  const moduleUrl = new URL("../public/range-spline-nav.js", import.meta.url);
+  moduleUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
+  const { splinePairGap } = await import(moduleUrl.href);
+
+  assert.equal(splinePairGap(40, 40), 24);
+  assert.equal(splinePairGap(70, 70), 33);
+  assert.equal(splinePairGap(100, 100), 42);
+  assert.equal(splinePairGap(60, 90), splinePairGap(90, 60));
+  assert.ok(splinePairGap(60, 60) < splinePairGap(80, 80));
 });
 
 test("renders the generated benchmark hierarchy", async () => {
@@ -489,8 +503,8 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(typedText, /data-collapsing/);
   assert.match(typedText, /setTimeout\(resolve, 180\)/);
   assert.doesNotMatch(typedText, /for \(let index = characters\.length - 1/);
-  assert.match(worker, /range-ui-v91\.css/);
-  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v91\.css'\)/);
+  assert.match(worker, /range-ui-v92\.css/);
+  assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v92\.css'\)/);
   assert.match(worker, /replace\('\/range-navigation-v2\.js', '\/range-navigation-v2\.js\?version=86'\)/);
   assert.doesNotMatch(worker, /data-route-zero>0/);
 });
@@ -514,7 +528,7 @@ test("serves Geist Sans and Mono from the site artifact", async () => {
   assert.match(license, /SIL Open Font License/);
 
   const response = await render("/");
-  assert.match(await response.text(), /href="\/range-ui-v91\.css"/);
+  assert.match(await response.text(), /href="\/range-ui-v92\.css"/);
 });
 
 test("serves local fonts with the WOFF2 media type", async () => {
