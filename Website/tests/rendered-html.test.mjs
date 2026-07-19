@@ -138,6 +138,14 @@ test("merges linear scale and pinch marks deterministically", async () => {
     createScaleMarks({ count: 51, radixBase: 5 }).filter(({ isRadix }) => isRadix).length,
     11,
   );
+  const scaleHierarchy = createScaleMarks({ count: 51, radixBase: 5 });
+  assert.equal(scaleHierarchy.filter(({ tier }) => tier === "major").length, 6);
+  assert.equal(scaleHierarchy.filter(({ tier }) => tier === "radix").length, 5);
+  assert.equal(scaleHierarchy.filter(({ tier }) => tier === "normal").length, 40);
+  assert.deepEqual(
+    [scaleHierarchy[0].measure, scaleHierarchy[5].measure, scaleHierarchy[1].measure],
+    [5, 3, 1],
+  );
   assert.equal(measureWithFalloff(0.27), 0.35);
   assert.equal(measureWithFalloff(0), 1);
   assert.equal(measureWithFalloff(1), 1);
@@ -171,6 +179,9 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(closestPinchMark.measure < 0.4);
   assert.ok(closestPinchMark.stroke < 0.3);
   assert.ok(closestPinchMark.tone > 0.9);
+  assert.equal(marks[40].measure, 5);
+  assert.equal(marks[45].measure, 3);
+  assert.equal(marks[49].measure, 1);
   for (const center of [0.001, 0.01, 0.1, 0.27, 0.5, 0.9, 0.99, 0.999]) {
     for (let index = 1; index <= 1000; index += 1) {
       assert.ok(
@@ -249,6 +260,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(landingPage, /<range-scale/);
   assert.match(rangeScaleElement, /customElements\.define\("range-scale"/);
   assert.match(rangeScaleElement, /createRangeMarks/);
+  assert.match(rangeScaleElement, /width:\s*calc\(1px \* var\(--measure\)\)/);
   assert.match(rangeScaleElement, /height:\s*calc\(1px \* var\(--stroke\)\)/);
   assert.match(rangeScaleElement, /white var\(--lighten\)/);
   assert.match(rangeScaleElement, /pointerenter/);

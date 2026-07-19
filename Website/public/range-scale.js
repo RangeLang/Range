@@ -129,7 +129,7 @@ class RangeScale extends HTMLElement {
           position: absolute;
           top: var(--position);
           left: 50%;
-          width: calc(5px * var(--measure));
+          width: calc(1px * var(--measure));
           height: calc(1px * var(--stroke));
           border-radius: 999px;
           background: color-mix(
@@ -139,7 +139,8 @@ class RangeScale extends HTMLElement {
           );
           transform: translate(-50%, -50%);
         }
-        i.radix {
+        i.radix,
+        i.major {
           background: color-mix(
             in oklch,
             color-mix(
@@ -152,7 +153,7 @@ class RangeScale extends HTMLElement {
         }
       </style>
       ${marks.map((mark) => (
-        `<i class="${mark.isRadix ? "radix" : "normal"}" style="--measure:${mark.measure};--stroke:${mark.stroke};--lighten:${mark.tone * 58}%;--position:${mark.position * 100}%"></i>`
+        `<i class="${mark.tier}" style="--measure:${mark.measure};--stroke:${mark.stroke};--lighten:${mark.tone * 58}%;--position:${mark.position * 100}%"></i>`
       )).join("")}
     `;
   }

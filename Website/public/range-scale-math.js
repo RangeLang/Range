@@ -24,11 +24,14 @@ export function createScaleMarks({ count = 51, radixBase = 5 } = {}) {
 
   return Array.from({ length: count }, (_, index) => {
     const isRadix = index === 0 || index === count - 1 || index % radixBase === 0;
+    const isMajor = index === 0 || index === count - 1 || index % (radixBase * 2) === 0;
+    const tier = isMajor ? "major" : isRadix ? "radix" : "normal";
     return {
       isRadix,
-      measure: isRadix ? 1.8 : 1,
+      measure: isMajor ? 5 : isRadix ? 3 : 1,
       position: index / (count - 1),
       source: "scale",
+      tier,
       weight: 1,
     };
   });
@@ -147,8 +150,8 @@ export function createRangeMarks(config = {}) {
     });
     return {
       ...mark,
-      measure: measureWithFalloff(mark.position, {
-        baseline,
+      measure: baseline * measureWithFalloff(mark.position, {
+        baseline: 1,
         center: config.pinch,
         falloff: config.pinchFalloff,
         minimum: config.measureMinimum,
