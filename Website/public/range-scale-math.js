@@ -4,22 +4,14 @@ function assertFiniteNumber(value, label) {
   if (!Number.isFinite(value)) throw new TypeError(`${label} must be finite`);
 }
 
-export function normalizedLogPosition(step, base = 10) {
-  assertFiniteNumber(step, "step");
-  assertFiniteNumber(base, "base");
-  if (step < 0 || step > 1) throw new RangeError("step must be within [0, 1]");
-  if (base <= 1) throw new RangeError("base must be greater than 1");
-  return Math.log1p((base - 1) * step) / Math.log(base);
-}
-
-export function createScaleMarks({ count = 18, base = 10 } = {}) {
+export function createScaleMarks({ count = 18 } = {}) {
   if (!Number.isInteger(count) || count < 2) {
     throw new RangeError("count must be an integer of at least 2");
   }
 
   return Array.from({ length: count }, (_, index) => ({
     isRadix: index === 0 || index === count - 1 || index % 4 === 0,
-    position: normalizedLogPosition(index / (count - 1), base),
+    position: index / (count - 1),
     source: "scale",
     weight: 1,
   }));
@@ -27,9 +19,9 @@ export function createScaleMarks({ count = 18, base = 10 } = {}) {
 
 export function createPinchMarks({
   center = 0.27,
-  count = 9,
-  growth = 1.8,
-  minimumDistance = 0.006,
+  count = 5,
+  growth = 2.2,
+  minimumDistance = 0.012,
 } = {}) {
   assertFiniteNumber(center, "center");
   assertFiniteNumber(growth, "growth");
@@ -103,9 +95,9 @@ export function mergeMarks(markGroups, epsilon = DEFAULT_EPSILON) {
   }));
 }
 
-export function createLogarithmicMarks(config = {}) {
+export function createRangeMarks(config = {}) {
   return mergeMarks([
-    createScaleMarks({ count: config.marks, base: config.base }),
+    createScaleMarks({ count: config.marks }),
     createPinchMarks({
       center: config.pinch,
       count: config.pinchMarks,

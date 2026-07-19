@@ -30,9 +30,9 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-log-scale(?=[^>]*base="10")(?=[^>]*endpoint-gap="8")(?=[^>]*marks="18")(?=[^>]*pinch="0.27")(?=[^>]*pinch-marks="5")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="18")(?=[^>]*pinch="0.27")(?=[^>]*pinch-distance="0.012")(?=[^>]*pinch-growth="2.2")(?=[^>]*pinch-marks="5")[^>]*>/,
   );
-  assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-log-scale\.js"/);
+  assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js"/);
   assert.match(html, /Range-authored and emits native LLVM/);
   assert.doesNotMatch(html, /12 of 12 passed/);
   assert.doesNotMatch(html, /landingFacts/);
@@ -116,24 +116,31 @@ test("renders string lowering as its own update route", async () => {
   assert.match(html, /10m appends/);
 });
 
-test("merges configurable logarithmic marks deterministically", async () => {
-  const mathUrl = new URL("../public/range-log-scale-math.js", import.meta.url);
+test("merges linear scale and pinch marks deterministically", async () => {
+  const mathUrl = new URL("../public/range-scale-math.js", import.meta.url);
   mathUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const {
-    createLogarithmicMarks,
+    createRangeMarks,
+    createPinchMarks,
+    createScaleMarks,
     mergeMarks,
-    normalizedLogPosition,
   } = await import(mathUrl.href);
 
-  assert.equal(normalizedLogPosition(0, 10), 0);
-  assert.equal(normalizedLogPosition(1, 10), 1);
+  assert.deepEqual(
+    createScaleMarks({ count: 5 }).map(({ position }) => position),
+    [0, 0.25, 0.5, 0.75, 1],
+  );
+  assert.deepEqual(
+    createPinchMarks({ center: 0.27, count: 5, growth: 2.2, minimumDistance: 0.012 })
+      .map(({ position }) => Number(position.toFixed(4))),
+    [0.2436, 0.258, 0.27, 0.282, 0.2964],
+  );
 
-  const marks = createLogarithmicMarks({
-    base: 10,
+  const marks = createRangeMarks({
     marks: 18,
     pinch: 0.27,
-    pinchDistance: 0.006,
-    pinchGrowth: 1.8,
+    pinchDistance: 0.012,
+    pinchGrowth: 2.2,
     pinchMarks: 5,
   });
   assert.ok(marks.every((mark) => mark.position >= 0 && mark.position <= 1));
@@ -163,7 +170,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
     styles,
     schemaText,
     serverBundle,
-    logScaleElement,
+    rangeScaleElement,
   ] = await Promise.all([
     readFile(new URL("../public/benchmarks.json", import.meta.url), "utf8"),
     readFile(new URL("../app/benchmarks/page.tsx", import.meta.url), "utf8"),
@@ -171,7 +178,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../../benchmark-results.schema.json", import.meta.url), "utf8"),
     readFile(new URL("../dist/server/index.js", import.meta.url), "utf8"),
-    readFile(new URL("../public/range-log-scale.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/range-scale.js", import.meta.url), "utf8"),
   ]);
   const artifact = JSON.parse(artifactText);
   const schema = JSON.parse(schemaText);
@@ -201,9 +208,9 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /view-transition-name:\s*range-navigation/);
   assert.match(styles, /view-transition-name:\s*range-title-morph/);
   assert.match(styles, /view-transition-group\(range-title-morph\)/);
-  assert.match(landingPage, /<range-log-scale/);
-  assert.match(logScaleElement, /customElements\.define\("range-log-scale"/);
-  assert.match(logScaleElement, /createLogarithmicMarks/);
+  assert.match(landingPage, /<range-scale/);
+  assert.match(rangeScaleElement, /customElements\.define\("range-scale"/);
+  assert.match(rangeScaleElement, /createRangeMarks/);
   assert.match(styles, /\.landingIndex\s*{[^}]*font-size:\s*20px/s);
   assert.match(styles, /\.landingHero h1\s*{[^}]*align-items:\s*flex-start[^}]*gap:\s*10px/s);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);

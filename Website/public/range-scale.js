@@ -1,12 +1,11 @@
-import { createLogarithmicMarks } from "./range-log-scale-math.js";
+import { createRangeMarks } from "./range-scale-math.js";
 
 const defaults = {
-  base: 10,
   endpointGap: 8,
   marks: 18,
   pinch: 0.27,
-  pinchDistance: 0.006,
-  pinchGrowth: 1.8,
+  pinchDistance: 0.012,
+  pinchGrowth: 2.2,
   pinchMarks: 5,
 };
 
@@ -15,9 +14,8 @@ function finiteAttribute(element, name, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
-class RangeLogScale extends HTMLElement {
+class RangeScale extends HTMLElement {
   static observedAttributes = [
-    "base",
     "endpoint-gap",
     "marks",
     "pinch",
@@ -37,8 +35,8 @@ class RangeLogScale extends HTMLElement {
     this.#render();
     this.#resizeObserver = new ResizeObserver(() => this.#align());
     const sequence = this.parentElement;
-    const zero = sequence?.querySelector("[data-log-zero]");
-    const one = sequence?.querySelector("[data-log-one]");
+    const zero = sequence?.querySelector("[data-scale-zero]");
+    const one = sequence?.querySelector("[data-scale-one]");
     if (sequence) this.#resizeObserver.observe(sequence);
     if (zero) this.#resizeObserver.observe(zero);
     if (one) this.#resizeObserver.observe(one);
@@ -59,7 +57,6 @@ class RangeLogScale extends HTMLElement {
   #config() {
     const pinchMarks = Math.max(1, Math.round(finiteAttribute(this, "pinch-marks", defaults.pinchMarks)));
     return {
-      base: Math.max(1.000001, finiteAttribute(this, "base", defaults.base)),
       endpointGap: Math.max(0, finiteAttribute(this, "endpoint-gap", defaults.endpointGap)),
       marks: Math.max(2, Math.round(finiteAttribute(this, "marks", defaults.marks))),
       pinch: Math.min(1, Math.max(0, finiteAttribute(this, "pinch", defaults.pinch))),
@@ -70,7 +67,7 @@ class RangeLogScale extends HTMLElement {
   }
 
   #render() {
-    const marks = createLogarithmicMarks(this.#config());
+    const marks = createRangeMarks(this.#config());
     this.shadowRoot.innerHTML = `
       <style>
         :host {
@@ -106,8 +103,8 @@ class RangeLogScale extends HTMLElement {
 
   #align() {
     const sequence = this.parentElement;
-    const zero = sequence?.querySelector("[data-log-zero]");
-    const one = sequence?.querySelector("[data-log-one]");
+    const zero = sequence?.querySelector("[data-scale-zero]");
+    const one = sequence?.querySelector("[data-scale-one]");
     if (!sequence || !zero || !one) return;
 
     const { endpointGap } = this.#config();
@@ -124,6 +121,6 @@ class RangeLogScale extends HTMLElement {
   }
 }
 
-if (!customElements.get("range-log-scale")) {
-  customElements.define("range-log-scale", RangeLogScale);
+if (!customElements.get("range-scale")) {
+  customElements.define("range-scale", RangeScale);
 }

@@ -17,7 +17,7 @@ export default function Home() {
       <div className="landingSequence">
         <header className="landingNav">
           <Link className="landingWordmark" href="/">
-            <span className="landingIndex" data-log-zero>0</span>
+            <span className="landingIndex" data-scale-zero>0</span>
             <span>Range</span>
           </Link>
           <nav aria-label="Primary navigation">
@@ -33,23 +33,22 @@ export default function Home() {
           </nav>
         </header>
 
-        <range-log-scale
+        <range-scale
           aria-hidden="true"
-          base="10"
           endpoint-gap="8"
           marks="18"
           pinch="0.27"
-          pinch-distance="0.006"
-          pinch-growth="1.8"
+          pinch-distance="0.012"
+          pinch-growth="2.2"
           pinch-marks="5"
         />
         {/* ES modules are deferred by the browser; this loads the native custom element without a React client boundary. */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script type="module" src="/range-log-scale.js" />
+        <script type="module" src="/range-scale.js" />
 
         <section className="landingHero" aria-labelledby="range-title">
           <h1 id="range-title">
-            <span className="landingIndex" data-log-one>1</span>
+            <span className="landingIndex" data-scale-one>1</span>
             <span>Range</span>
           </h1>
           <p>The active compiler is Range-authored and emits native LLVM.</p>

@@ -3,8 +3,7 @@ import type { DetailedHTMLProps, HTMLAttributes } from "react";
 declare module "react" {
   namespace JSX {
     interface IntrinsicElements {
-      "range-log-scale": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
-        base?: string;
+      "range-scale": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
         "endpoint-gap"?: string;
         marks?: string;
         pinch?: string;
