@@ -10,7 +10,7 @@ const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname === "/globals.css" || url.pathname === "/range-geist.css" || url.pathname === "/range-ui.css" || url.pathname === "/range-ui-v80.css") {
+    if (url.pathname === "/globals.css" || url.pathname === "/range-geist.css" || url.pathname === "/range-ui.css" || url.pathname === "/range-ui-v82.css") {
       return new Response(styles, {
         headers: {
           "cache-control": "no-cache",
@@ -26,8 +26,8 @@ const worker = {
     const rendered = renderDocument(url, benchmarkData);
     if (rendered) {
       const html = rendered.html
-        .replace('/range-ui.css', '/range-ui-v80.css')
-        .replace('/range-typed-text.js', '/range-typed-text.js?version=81')
+        .replace('/range-ui.css', '/range-ui-v82.css')
+        .replace('/range-typed-text.js', '/range-typed-text.js?version=82')
         .replace('/range-navigation-v2.js', '/range-navigation-v2.js?version=81');
       return new Response(request.method === "HEAD" ? null : html, {
         status: rendered.status,

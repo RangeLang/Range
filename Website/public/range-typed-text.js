@@ -18,7 +18,6 @@ class RangeTypedText extends HTMLElement {
   }
 
   async collapse() {
-    const characters = [...(this.textContent ?? "")];
     this.#cancel();
     const run = this.#run;
     this.setAttribute("data-collapsing", "");
@@ -29,14 +28,18 @@ class RangeTypedText extends HTMLElement {
       return;
     }
 
-    for (let index = characters.length - 1; index >= 0; index -= 1) {
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const animations = this.getAnimations();
+    if (animations.length > 0) {
+      await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
+    } else {
       await new Promise((resolve) => {
-        this.#timer = setTimeout(resolve, 28);
+        this.#timer = setTimeout(resolve, 180);
       });
-      if (run !== this.#run) return;
-      this.textContent = characters.slice(0, index).join("");
     }
 
+    if (run !== this.#run) return;
+    this.textContent = "";
     this.removeAttribute("data-collapsing");
   }
 
