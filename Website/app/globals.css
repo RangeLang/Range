@@ -127,6 +127,114 @@ main {
   font-size: 10px;
 }
 
+.runProcedure {
+  margin: 0 0 24px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--paper), white 38%);
+}
+
+.runProcedure > summary,
+.testCode > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none;
+}
+
+.runProcedure > summary::-webkit-details-marker,
+.testCode > summary::-webkit-details-marker {
+  display: none;
+}
+
+.runProcedure > summary {
+  padding: 15px 17px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.runProcedure > summary::after,
+.testCode > summary::after {
+  content: "+";
+  color: var(--range);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 18px;
+}
+
+.runProcedure[open] > summary::after,
+.testCode[open] > summary::after {
+  content: "−";
+}
+
+.runProcedureBody {
+  padding: 4px 17px 18px;
+  border-top: 1px solid var(--line);
+}
+
+.runProcedure ol {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 22px;
+  padding-left: 24px;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.runProcedure li::marker {
+  color: var(--range);
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.runCommands {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.runNotes {
+  display: grid;
+  gap: 7px;
+  margin: 18px 0 0;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.codeBlock {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: oklch(0.97 0.006 255);
+}
+
+.codeBlock > header {
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+}
+
+.codeBlockBody {
+  max-height: 430px;
+  overflow: auto;
+}
+
+.codeBlockBody .shiki {
+  min-width: max-content;
+  margin: 0;
+  padding: 12px;
+  background: transparent !important;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.58;
+  tab-size: 2;
+}
+
 .benchmarkCategory {
   scroll-margin-top: 20px;
 }
@@ -318,6 +426,24 @@ main {
   margin: 16px 0 0 76px;
   font-size: 13px;
   font-weight: 500;
+}
+
+.testCode {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.testCode > summary {
+  padding: 12px 0 0;
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+}
+
+.testCodeGrid {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .status {
@@ -536,6 +662,10 @@ footer {
   .chartGrid {
     grid-template-columns: 1fr;
     gap: 44px;
+  }
+
+  .runCommands {
+    grid-template-columns: 1fr;
   }
 
   .status {

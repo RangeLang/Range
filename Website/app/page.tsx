@@ -1,4 +1,5 @@
 import { MarkGithubIcon, XIcon } from "@primer/octicons-react";
+import { codeToHtml } from "shiki";
 import benchmarkDataJson from "../public/benchmarks.json";
 
 type Result = {
@@ -14,6 +15,14 @@ type Benchmark = {
   note?: string;
   leaf?: string;
   description?: string;
+  implementations?: BenchmarkImplementation[];
+};
+
+type BenchmarkImplementation = {
+  language: string;
+  syntax: string;
+  filename: string;
+  source: string;
 };
 
 type BenchmarkMeasurement = {
@@ -35,6 +44,7 @@ type BenchmarkLeaf = {
   runStatus: "passed" | "notRun";
   rangeStatus: "passed" | "notEmitted" | "notRun";
   axisMaxMilliseconds: number;
+  implementations: BenchmarkImplementation[];
   results: BenchmarkMeasurement[];
 };
 
@@ -42,6 +52,11 @@ type BenchmarkArtifact = {
   schemaVersion: number;
   generatedAt: string;
   configuration: { baseIterations: number; runs: number; caseFilter: string[] };
+  procedure: {
+    steps: string[];
+    commands: { c: string[]; range: string[]; suite: string[] };
+    notes: string[];
+  };
   summary: {
     leafCount: number;
     runLeafCount: number;
@@ -61,6 +76,29 @@ type BenchmarkArtifact = {
 };
 
 const benchmarkData = benchmarkDataJson as BenchmarkArtifact;
+
+async function CodeBlock({
+  source,
+  syntax,
+  label,
+}: {
+  source: string;
+  syntax: string;
+  label: string;
+}) {
+  const language = syntax === "range" ? "swift" : syntax;
+  const highlighted = await codeToHtml(source, {
+    lang: language,
+    theme: "github-light",
+  });
+
+  return (
+    <section className="codeBlock" aria-label={label}>
+      <header>{label}</header>
+      <div className="codeBlockBody" dangerouslySetInnerHTML={{ __html: highlighted }} />
+    </section>
+  );
+}
 
 const baselineBenchmarks: Benchmark[] = [
   {
@@ -269,6 +307,22 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
       </div>
 
       {benchmark.note && <p className="chartNote">{benchmark.note}</p>}
+
+      {benchmark.implementations && (
+        <details className="testCode">
+          <summary>Test code</summary>
+          <div className="testCodeGrid">
+            {benchmark.implementations.map((implementation) => (
+              <CodeBlock
+                source={implementation.source}
+                syntax={implementation.syntax}
+                label={`${implementation.language} · ${implementation.filename}`}
+                key={implementation.language}
+              />
+            ))}
+          </div>
+        </details>
+      )}
     </section>
   );
 }
@@ -292,6 +346,7 @@ function benchmarkFromLeaf(subcategory: string, leaf: BenchmarkLeaf): Benchmark 
     description: leaf.description,
     scale: `${formatWorkload(leaf.workload.count)} ${leaf.workload.unit} · ${benchmarkData.configuration.runs} runs`,
     axisMax: Math.max(leaf.axisMaxMilliseconds, 1),
+    implementations: leaf.implementations,
     results: leaf.results.map((result) => ({
       language: result.language,
       milliseconds: result.wallMilliseconds,
@@ -388,6 +443,35 @@ export default function Home() {
             );
           })}
         </nav>
+
+        <details className="runProcedure">
+          <summary>Run procedure</summary>
+          <div className="runProcedureBody">
+            <ol>
+              {benchmarkData.procedure.steps.map((step) => <li key={step}>{step}</li>)}
+            </ol>
+            <div className="runCommands">
+              <CodeBlock
+                source={`${benchmarkData.procedure.commands.suite.join("\n")}\n`}
+                syntax="shellscript"
+                label="Suite"
+              />
+              <CodeBlock
+                source={`${benchmarkData.procedure.commands.c.join("\n")}\n`}
+                syntax="shellscript"
+                label="C"
+              />
+              <CodeBlock
+                source={`${benchmarkData.procedure.commands.range.join("\n")}\n`}
+                syntax="shellscript"
+                label="Range"
+              />
+            </div>
+            <ul className="runNotes">
+              {benchmarkData.procedure.notes.map((note) => <li key={note}>{note}</li>)}
+            </ul>
+          </div>
+        </details>
 
         {benchmarkData.categories.map((category, categoryIndex) => {
           const completedSubcategories = category.subcategories
