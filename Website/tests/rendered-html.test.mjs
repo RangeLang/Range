@@ -414,24 +414,26 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(components, /class RangeElement extends HTMLElement/);
 });
 
-test("serves Avio Sans from the site artifact", async () => {
-  const [styles, regular, medium, semibold, license] = await Promise.all([
+test("serves Geist Sans and Mono from the site artifact", async () => {
+  const [styles, sans, mono, license] = await Promise.all([
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
-    readFile(new URL("../dist/client/fonts/avio-sans/AvioSans-Regular.woff2", import.meta.url)),
-    readFile(new URL("../dist/client/fonts/avio-sans/AvioSans-Medium.woff2", import.meta.url)),
-    readFile(new URL("../dist/client/fonts/avio-sans/AvioSans-SemiBold.woff2", import.meta.url)),
-    readFile(new URL("../dist/client/fonts/avio-sans/OFL.txt", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/fonts/geist/Geist-Variable.woff2", import.meta.url)),
+    readFile(new URL("../dist/client/fonts/geist/GeistMono-Variable.woff2", import.meta.url)),
+    readFile(new URL("../dist/client/fonts/geist/LICENSE.txt", import.meta.url), "utf8"),
   ]);
 
-  assert.match(styles, /font-family:\s*"Avio Sans"/);
-  assert.match(styles, /--font-range-sans:\s*"Avio Sans"/);
-  for (const font of [regular, medium, semibold]) {
+  assert.match(styles, /font-family:\s*"Geist"/);
+  assert.match(styles, /font-family:\s*"Geist Mono"/);
+  assert.match(styles, /--font-range-sans:\s*"Geist"/);
+  assert.match(styles, /--font-geist-mono:\s*"Geist Mono"/);
+  assert.doesNotMatch(styles, /Avio Sans/);
+  for (const font of [sans, mono]) {
     assert.equal(font.subarray(0, 4).toString("ascii"), "wOF2");
   }
-  assert.match(license, /SIL OPEN FONT LICENSE Version 1\.1/);
+  assert.match(license, /SIL Open Font License/);
 
   const response = await render("/");
-  assert.match(await response.text(), /href="\/globals\.css\?font=avio-sans-v1"/);
+  assert.match(await response.text(), /href="\/globals\.css\?font=geist-local-v1"/);
 });
 
 test("serves local fonts with the WOFF2 media type", async () => {
@@ -439,7 +441,7 @@ test("serves local fonts with the WOFF2 media type", async () => {
   workerUrl.searchParams.set("font-test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
   const response = await worker.fetch(
-    new Request("http://localhost/fonts/avio-sans/AvioSans-Regular.woff2"),
+    new Request("http://localhost/fonts/geist/Geist-Variable.woff2"),
     {
       ASSETS: {
         fetch: async () => new Response(Buffer.from("wOF2font"), {
