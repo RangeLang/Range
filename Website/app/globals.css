@@ -49,6 +49,40 @@ main {
   letter-spacing: -0.04em;
 }
 
+.updatePageHeader {
+  display: grid;
+  gap: 36px;
+  margin-bottom: 0;
+}
+
+.updatePageHeader > a {
+  width: fit-content;
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.updatePageHeader > a:hover,
+.updatePageHeader > a:focus-visible {
+  color: var(--range);
+  outline: none;
+}
+
+.updatePageHeader > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.updatePageHeader h1 {
+  margin: 0;
+  font-size: clamp(32px, 5vw, 56px);
+  font-weight: 500;
+  letter-spacing: -0.05em;
+}
+
 .sectionHeader {
   display: flex;
   align-items: baseline;
@@ -483,10 +517,51 @@ main {
 
 .contextSection,
 .improvementSection,
-.scalingSection {
+.scalingSection,
+.updatesSection {
   margin-top: 72px;
   padding-top: 32px;
   border-top: 1px solid var(--line);
+}
+
+.updateLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.updateLink > span {
+  display: grid;
+  gap: 5px;
+}
+
+.updateLink strong {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.updateLink small,
+.updateLink time {
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+}
+
+.updateLink:hover strong,
+.updateLink:focus-visible strong {
+  color: var(--range);
+}
+
+.updateLink:focus-visible {
+  outline: 2px solid var(--range);
+  outline-offset: 6px;
 }
 
 .contextFigure {
@@ -685,6 +760,7 @@ footer {
   .contextSection,
   .improvementSection,
   .scalingSection,
+  .updatesSection,
   .benchmarkSection {
     margin-top: 52px;
   }
@@ -699,9 +775,14 @@ footer {
 }
 
 @media (max-width: 420px) {
+  .updatePageHeader > div,
   .sectionHeader {
     display: grid;
     gap: 6px;
+  }
+
+  .updateLink {
+    align-items: start;
   }
 
   .row,

@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-async function render() {
+async function render(pathname = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html" } }),
+    new Request(`http://localhost${pathname}`, { headers: { accept: "text/html" } }),
     {
       ASSETS: {
         fetch: async () => new Response("Not found", { status: 404 }),
@@ -46,8 +46,25 @@ test("renders the generated benchmark hierarchy", async () => {
   assert.match(normalized, /Range · Playground\.range/);
   assert.match(normalized, /aria-label="Suite"/);
   assert.match(normalized, /Initial benchmark/);
-  assert.match(normalized, /Range Strings improvement/);
+  assert.match(normalized, /href="\/updates\/string-lowering"/);
+  assert.doesNotMatch(normalized, /Range Strings improvement/);
   assert.doesNotMatch(normalized, /Building your site|Your site is taking shape|codex-preview/i);
+});
+
+test("renders string lowering as its own update route", async () => {
+  const response = await render("/updates/string-lowering");
+  assert.equal(response.status, 200);
+
+  const html = (await response.text()).replaceAll("<!-- -->", "");
+  assert.match(html, /<h1>String lowering<\/h1>/);
+  assert.match(html, /href="\/">Range Performance<\/a>/);
+  assert.match(html, /Sequence/);
+  assert.match(html, /Improvement/);
+  assert.match(html, /~120× faster/);
+  assert.match(html, /491\.2 ms/);
+  assert.match(html, /4\.1 ms/);
+  assert.match(html, /Scaling/);
+  assert.match(html, /10m appends/);
 });
 
 test("keeps the benchmark artifact complete and versioned", async () => {
