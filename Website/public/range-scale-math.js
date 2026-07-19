@@ -92,6 +92,35 @@ export function pinchScaleValue(value, {
   return value + strength * offset * pinchInfluence(value, center, falloff);
 }
 
+export function captureMarkerPosition(position, {
+  anchor = position,
+  center = 0.27,
+  falloff = 0.14,
+  strength = 1,
+  weight = 1,
+} = {}) {
+  for (const [value, label] of [
+    [position, "position"],
+    [anchor, "anchor"],
+    [center, "center"],
+    [falloff, "falloff"],
+    [strength, "strength"],
+    [weight, "weight"],
+  ]) assertFiniteNumber(value, label);
+  if (position < 0 || position > 1) throw new RangeError("position must be within [0, 1]");
+  if (anchor < 0 || anchor > 1) throw new RangeError("anchor must be within [0, 1]");
+  if (center <= 0 || center >= 1) throw new RangeError("center must be inside (0, 1)");
+  if (falloff <= 0) throw new RangeError("falloff must be positive");
+  if (strength < 0 || strength > 1) throw new RangeError("strength must be within [0, 1]");
+  if (weight < 0 || weight > 1) throw new RangeError("weight must be within [0, 1]");
+
+  const distance = Math.abs(anchor - center);
+  if (distance >= falloff || strength === 0 || weight === 0) return position;
+  const proximity = 1 - distance / falloff;
+  const field = proximity * proximity * (3 - 2 * proximity);
+  return position + (center - position) * field * strength * weight;
+}
+
 export function measureWithFalloff(position, {
   baseline = 1,
   center = 0.27,
@@ -178,6 +207,11 @@ export function createRangeMarks(config = {}) {
 
   return logicalMarks.map((mark) => {
     const baseline = mark.measure ?? (mark.isRadix ? 1.8 : 1);
+    const markerCaptureWeight = baseline >= 5
+      ? 1
+      : baseline >= 3
+        ? (config.markerCaptureDivisionWeight ?? 0.48)
+        : 0;
     const shape = sphericalPinchInfluence(mark.position, {
       center: config.pinch,
       coreRadius: config.pinchCoreRadius,
@@ -197,10 +231,16 @@ export function createRangeMarks(config = {}) {
       stroke,
       opacity: Math.max(0, 1 - tone ** 6 / 0.98),
       tone,
-      position: pinchScaleValue(mark.position, {
+      position: captureMarkerPosition(pinchScaleValue(mark.position, {
         center: config.pinch,
         falloff: config.pinchFalloff,
         strength: config.pinchStrength,
+      }), {
+        anchor: mark.position,
+        center: config.pinch,
+        falloff: config.markerCaptureFalloff ?? 0.14,
+        strength: config.markerCaptureStrength ?? 1,
+        weight: markerCaptureWeight,
       }),
     };
   });

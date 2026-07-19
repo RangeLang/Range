@@ -44,13 +44,16 @@ export default function Home() {
           pinch-inner-edge="0.68"
           pinch-strength="0.9"
           measure-minimum="0.35"
+          marker-capture-division-weight="0.48"
+          marker-capture-falloff="0.14"
+          marker-capture-strength="0.9"
           stroke-minimum="0.25"
           tone-falloff="0.12"
           tone-intensity="0.82"
         />
         {/* ES modules are deferred by the browser; this loads the native custom element without a React client boundary. */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script type="module" src="/range-scale.js?profile=spherical-10" />
+        <script type="module" src="/range-scale.js?profile=spherical-capture" />
 
         <section className="landingHero" aria-labelledby="range-title">
           <h1 id="range-title">

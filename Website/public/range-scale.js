@@ -1,4 +1,4 @@
-import { createRangeMarks } from "./range-scale-math.js?profile=spherical-10";
+import { createRangeMarks } from "./range-scale-math.js?profile=spherical-capture";
 
 const defaults = {
   endpointGap: 8,
@@ -10,6 +10,9 @@ const defaults = {
   pinchInnerEdge: 0.68,
   pinchStrength: 0.9,
   measureMinimum: 0.35,
+  markerCaptureDivisionWeight: 0.48,
+  markerCaptureFalloff: 0.14,
+  markerCaptureStrength: 0.9,
   strokeMinimum: 0.25,
   toneFalloff: 0.12,
   toneIntensity: 0.82,
@@ -31,6 +34,9 @@ class RangeScale extends HTMLElement {
     "pinch-inner-edge",
     "pinch-strength",
     "measure-minimum",
+    "marker-capture-division-weight",
+    "marker-capture-falloff",
+    "marker-capture-strength",
     "stroke-minimum",
     "tone-falloff",
     "tone-intensity",
@@ -117,6 +123,9 @@ class RangeScale extends HTMLElement {
       pinchInnerEdge: Math.min(1, Math.max(0, finiteAttribute(this, "pinch-inner-edge", defaults.pinchInnerEdge))),
       pinchStrength: Math.min(0.999999, Math.max(0, finiteAttribute(this, "pinch-strength", defaults.pinchStrength))),
       measureMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "measure-minimum", defaults.measureMinimum))),
+      markerCaptureDivisionWeight: Math.min(1, Math.max(0, finiteAttribute(this, "marker-capture-division-weight", defaults.markerCaptureDivisionWeight))),
+      markerCaptureFalloff: Math.max(0.000001, finiteAttribute(this, "marker-capture-falloff", defaults.markerCaptureFalloff)),
+      markerCaptureStrength: Math.min(1, Math.max(0, finiteAttribute(this, "marker-capture-strength", defaults.markerCaptureStrength))),
       strokeMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "stroke-minimum", defaults.strokeMinimum))),
       toneFalloff: Math.max(0.000001, finiteAttribute(this, "tone-falloff", defaults.toneFalloff)),
       toneIntensity: Math.min(1, Math.max(0, finiteAttribute(this, "tone-intensity", defaults.toneIntensity))),
