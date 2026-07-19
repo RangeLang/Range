@@ -30,7 +30,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="51")(?=[^>]*radix-base="5")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-minimum="0.35")(?=[^>]*stroke-minimum="0.25")(?=[^>]*tone-falloff="0.06")(?=[^>]*tone-intensity="0.82")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*division-base="3")(?=[^>]*division-levels="2")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-minimum="0.35")(?=[^>]*stroke-minimum="0.25")(?=[^>]*tone-falloff="0.06")(?=[^>]*tone-intensity="0.82")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js"/);
   assert.match(html, /Range-authored and emits native LLVM/);
@@ -130,21 +130,17 @@ test("merges linear scale and pinch marks deterministically", async () => {
   } = await import(mathUrl.href);
 
   assert.deepEqual(
-    createScaleMarks({ count: 5 }).map(({ position }) => position),
-    [0, 0.25, 0.5, 0.75, 1],
+    createScaleMarks({ divisionBase: 3, divisionLevels: 1 }).map(({ position }) => position),
+    [0, 1 / 3, 2 / 3, 1],
   );
-  assert.equal(createScaleMarks({ count: 51, radixBase: 5 }).length, 51);
-  assert.equal(
-    createScaleMarks({ count: 51, radixBase: 5 }).filter(({ isRadix }) => isRadix).length,
-    11,
-  );
-  const scaleHierarchy = createScaleMarks({ count: 51, radixBase: 5 });
-  assert.equal(scaleHierarchy.filter(({ tier }) => tier === "major").length, 6);
-  assert.equal(scaleHierarchy.filter(({ tier }) => tier === "radix").length, 5);
-  assert.equal(scaleHierarchy.filter(({ tier }) => tier === "normal").length, 40);
+  const scaleHierarchy = createScaleMarks({ divisionBase: 3, divisionLevels: 2 });
+  assert.equal(scaleHierarchy.length, 10);
+  assert.equal(scaleHierarchy.filter(({ tier }) => tier === "major").length, 4);
+  assert.equal(scaleHierarchy.filter(({ tier }) => tier === "division").length, 6);
+  assert.equal(scaleHierarchy.filter(({ tier }) => tier === "normal").length, 0);
   assert.deepEqual(
-    [scaleHierarchy[0].measure, scaleHierarchy[5].measure, scaleHierarchy[1].measure],
-    [5, 3, 1],
+    [scaleHierarchy[0].measure, scaleHierarchy[1].measure, scaleHierarchy[3].measure],
+    [5, 3, 5],
   );
   assert.equal(measureWithFalloff(0.27), 0.35);
   assert.equal(measureWithFalloff(0), 1);
@@ -158,8 +154,8 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(pinchScaleValue(0.32) < 0.32);
 
   const marks = createRangeMarks({
-    marks: 51,
-    radixBase: 5,
+    divisionBase: 3,
+    divisionLevels: 2,
     pinch: 0.27,
     pinchFalloff: 0.12,
     pinchStrength: 0.72,
@@ -173,20 +169,18 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(marks.every((mark) => mark.tone >= 0 && mark.tone <= 1));
   assert.ok(marks.every((mark) => mark.opacity >= 0 && mark.opacity <= 1));
   assert.ok(marks.every((mark, index) => index === 0 || mark.position > marks[index - 1].position));
-  assert.equal(marks.length, 51);
+  assert.equal(marks.length, 10);
   const closestPinchMark = marks.reduce((closest, mark) => (
     Math.abs(mark.position - 0.27) < Math.abs(closest.position - 0.27) ? mark : closest
   ));
-  assert.ok(Math.abs(closestPinchMark.position - 0.27) < 0.01);
-  assert.ok(closestPinchMark.measure < 0.4);
-  assert.ok(closestPinchMark.stroke < 0.3);
-  assert.ok(closestPinchMark.tone > 0.9);
-  assert.equal(closestPinchMark.opacity, 0);
-  assert.equal(marks[20].tone, 0);
-  assert.equal(marks[20].opacity, 1);
-  assert.equal(marks[40].measure, 5);
-  assert.equal(marks[45].measure, 3);
-  assert.equal(marks[49].measure, 1);
+  assert.ok(Math.abs(closestPinchMark.position - 0.27) < 0.04);
+  assert.ok(closestPinchMark.measure < 3);
+  assert.ok(closestPinchMark.stroke < 1);
+  assert.ok(closestPinchMark.tone > 0);
+  assert.ok(closestPinchMark.opacity < 1);
+  assert.equal(marks[0].measure, 5);
+  assert.equal(marks[8].measure, 3);
+  assert.equal(marks[9].measure, 5);
   for (const center of [0.001, 0.01, 0.1, 0.27, 0.5, 0.9, 0.99, 0.999]) {
     for (let index = 1; index <= 1000; index += 1) {
       assert.ok(

@@ -14,24 +14,24 @@ function pinchInfluence(value, center, falloff) {
   return Math.exp(-0.5 * normalizedDistance * normalizedDistance) * taper;
 }
 
-export function createScaleMarks({ count = 51, radixBase = 5 } = {}) {
-  if (!Number.isInteger(count) || count < 2) {
-    throw new RangeError("count must be an integer of at least 2");
+export function createScaleMarks({ divisionBase = 3, divisionLevels = 2 } = {}) {
+  if (!Number.isInteger(divisionBase) || divisionBase < 2) {
+    throw new RangeError("divisionBase must be an integer of at least 2");
   }
-  if (!Number.isInteger(radixBase) || radixBase < 1) {
-    throw new RangeError("radixBase must be a positive integer");
+  if (!Number.isInteger(divisionLevels) || divisionLevels < 1 || divisionLevels > 6) {
+    throw new RangeError("divisionLevels must be an integer within [1, 6]");
   }
 
-  return Array.from({ length: count }, (_, index) => {
-    const isRadix = index === 0 || index === count - 1 || index % radixBase === 0;
-    const isMajor = index === 0 || index === count - 1 || index % (radixBase * 2) === 0;
-    const tier = isMajor ? "major" : isRadix ? "radix" : "normal";
+  const intervalCount = divisionBase ** divisionLevels;
+  const majorStride = divisionBase ** (divisionLevels - 1);
+  return Array.from({ length: intervalCount + 1 }, (_, index) => {
+    const isMajor = index === 0 || index === intervalCount || index % majorStride === 0;
     return {
-      isRadix,
-      measure: isMajor ? 5 : isRadix ? 3 : 1,
-      position: index / (count - 1),
+      isRadix: isMajor,
+      measure: isMajor ? 5 : 3,
+      position: index / intervalCount,
       source: "scale",
-      tier,
+      tier: isMajor ? "major" : "division",
       weight: 1,
     };
   });
@@ -136,8 +136,8 @@ export function mergeMarks(markGroups, epsilon = DEFAULT_EPSILON) {
 
 export function createRangeMarks(config = {}) {
   const logicalMarks = createScaleMarks({
-    count: config.marks,
-    radixBase: config.radixBase,
+    divisionBase: config.divisionBase,
+    divisionLevels: config.divisionLevels,
   });
 
   return logicalMarks.map((mark) => {

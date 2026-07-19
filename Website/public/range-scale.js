@@ -2,8 +2,8 @@ import { createRangeMarks } from "./range-scale-math.js";
 
 const defaults = {
   endpointGap: 8,
-  marks: 51,
-  radixBase: 5,
+  divisionBase: 3,
+  divisionLevels: 2,
   pinch: 0.27,
   pinchFalloff: 0.12,
   pinchStrength: 0.72,
@@ -21,8 +21,8 @@ function finiteAttribute(element, name, fallback) {
 class RangeScale extends HTMLElement {
   static observedAttributes = [
     "endpoint-gap",
-    "marks",
-    "radix-base",
+    "division-base",
+    "division-levels",
     "pinch",
     "pinch-falloff",
     "pinch-strength",
@@ -104,8 +104,8 @@ class RangeScale extends HTMLElement {
   #config() {
     return {
       endpointGap: Math.max(0, finiteAttribute(this, "endpoint-gap", defaults.endpointGap)),
-      marks: Math.max(2, Math.round(finiteAttribute(this, "marks", defaults.marks))),
-      radixBase: Math.max(1, Math.round(finiteAttribute(this, "radix-base", defaults.radixBase))),
+      divisionBase: Math.max(2, Math.round(finiteAttribute(this, "division-base", defaults.divisionBase))),
+      divisionLevels: Math.min(6, Math.max(1, Math.round(finiteAttribute(this, "division-levels", defaults.divisionLevels)))),
       pinch: Math.min(1, Math.max(0, finiteAttribute(this, "pinch", defaults.pinch))),
       pinchFalloff: Math.max(0.000001, finiteAttribute(this, "pinch-falloff", defaults.pinchFalloff)),
       pinchStrength: Math.min(0.999999, Math.max(0, finiteAttribute(this, "pinch-strength", defaults.pinchStrength))),
@@ -146,7 +146,7 @@ class RangeScale extends HTMLElement {
           opacity: var(--opacity);
           transform: translate(-50%, -50%);
         }
-        i.radix,
+        i.division,
         i.major {
           background: color-mix(
             in oklch,
