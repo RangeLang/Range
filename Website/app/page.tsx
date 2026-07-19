@@ -49,7 +49,7 @@ export default function Home() {
 
         <section className="landingHero" aria-labelledby="range-title">
           <h1 id="range-title">
-            <span className="landingIndex" data-scale-end><span>10</span></span>
+            <span className="landingIndex" data-scale-end><span>1</span></span>
             <span className="rangeTitleWord">Range</span>
           </h1>
           <p>The active compiler is Range-authored and emits native LLVM.</p>

@@ -26,7 +26,7 @@ test("renders the Range landing page", async () => {
   assert.equal(response.status, 200);
 
   const html = (await response.text()).replaceAll("<!-- -->", "");
-  assert.match(html, /<h1[^>]*>.*>10<\/span><\/span>.*>Range<\/span><\/h1>/);
+  assert.match(html, /<h1[^>]*>.*>1<\/span><\/span>.*>Range<\/span><\/h1>/);
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
