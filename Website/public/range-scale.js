@@ -1,4 +1,4 @@
-import { createRangeMarks } from "./range-scale-math.js?profile=invisible-collapse";
+import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profile=snapped-bubble";
 
 const defaults = {
   endpointGap: 8,
@@ -17,6 +17,8 @@ const defaults = {
   markerCaptureFalloff: 0.14,
   markerCaptureStrength: 0.9,
   strokeMinimum: 0.25,
+  snapHysteresis: 0.08,
+  snapToMarks: true,
   toneFalloff: 0.12,
   toneIntensity: 0.82,
 };
@@ -44,6 +46,8 @@ class RangeScale extends HTMLElement {
     "marker-capture-falloff",
     "marker-capture-strength",
     "stroke-minimum",
+    "snap-hysteresis",
+    "snap-to-marks",
     "tone-falloff",
     "tone-intensity",
   ];
@@ -55,6 +59,7 @@ class RangeScale extends HTMLElement {
   #motionTarget;
   #motionVelocity = 0;
   #resizeObserver;
+  #snappedIndex;
 
   #setPointerTarget = (event) => {
     const bounds = this.getBoundingClientRect();
@@ -62,13 +67,14 @@ class RangeScale extends HTMLElement {
 
     const position = (event.clientY - bounds.top) / bounds.height;
     this.#isPointerActive = true;
-    this.#motionTarget = Math.min(0.999999, Math.max(0.000001, position));
+    this.#motionTarget = this.#snapTarget(Math.min(1, Math.max(0, position)));
     this.#startMotion();
   };
 
   #handlePointerLeave = () => {
     this.#isPointerActive = false;
-    this.#motionTarget = this.#config().pinch;
+    this.#snappedIndex = undefined;
+    this.#motionTarget = this.#snapTarget(this.#config().pinch, false);
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       this.#activePinch = this.#motionTarget;
       this.#render();
@@ -84,7 +90,8 @@ class RangeScale extends HTMLElement {
   }
 
   connectedCallback() {
-    this.#activePinch = this.#config().pinch;
+    this.#snappedIndex = undefined;
+    this.#activePinch = this.#snapTarget(this.#config().pinch, false);
     this.#motionTarget = this.#activePinch;
     this.#align();
     this.#render();
@@ -112,7 +119,8 @@ class RangeScale extends HTMLElement {
 
   attributeChangedCallback() {
     if (!this.isConnected) return;
-    this.#activePinch = this.#config().pinch;
+    this.#snappedIndex = undefined;
+    this.#activePinch = this.#snapTarget(this.#config().pinch, false);
     this.#motionTarget = this.#activePinch;
     this.#render();
     this.#align();
@@ -136,9 +144,24 @@ class RangeScale extends HTMLElement {
       markerCaptureFalloff: Math.max(0.000001, finiteAttribute(this, "marker-capture-falloff", defaults.markerCaptureFalloff)),
       markerCaptureStrength: Math.min(1, Math.max(0, finiteAttribute(this, "marker-capture-strength", defaults.markerCaptureStrength))),
       strokeMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "stroke-minimum", defaults.strokeMinimum))),
+      snapHysteresis: Math.min(0.499999, Math.max(0, finiteAttribute(this, "snap-hysteresis", defaults.snapHysteresis))),
+      snapToMarks: this.getAttribute("snap-to-marks") !== "false",
       toneFalloff: Math.max(0.000001, finiteAttribute(this, "tone-falloff", defaults.toneFalloff)),
       toneIntensity: Math.min(1, Math.max(0, finiteAttribute(this, "tone-intensity", defaults.toneIntensity))),
     };
+  }
+
+  #snapTarget(position, preserveIndex = true) {
+    const config = this.#config();
+    if (!config.snapToMarks) return position;
+    const snapped = snapScalePosition(position, {
+      divisionBase: config.divisionBase,
+      divisionLevels: config.divisionLevels,
+      hysteresis: config.snapHysteresis,
+      previousIndex: preserveIndex ? this.#snappedIndex : undefined,
+    });
+    this.#snappedIndex = snapped.index;
+    return snapped.position;
   }
 
   #render() {

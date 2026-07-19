@@ -20,6 +20,8 @@ declare module "react" {
         "invisible-measure-minimum"?: string;
         "invisible-stroke-minimum"?: string;
         "stroke-minimum"?: string;
+        "snap-hysteresis"?: string;
+        "snap-to-marks"?: string;
         "tone-falloff"?: string;
         "tone-intensity"?: string;
       };

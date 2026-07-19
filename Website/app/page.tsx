@@ -51,12 +51,14 @@ export default function Home() {
           marker-capture-falloff="0.14"
           marker-capture-strength="0.9"
           stroke-minimum="0.25"
+          snap-hysteresis="0.08"
+          snap-to-marks="true"
           tone-falloff="0.12"
           tone-intensity="0.82"
         />
         {/* ES modules are deferred by the browser; this loads the native custom element without a React client boundary. */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script type="module" src="/range-scale.js?profile=invisible-collapse" />
+        <script type="module" src="/range-scale.js?profile=snapped-bubble" />
         <range-optical-guide aria-hidden="true" />
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script type="module" src="/range-optical-guide.js?guide=glyph-ink-box" />

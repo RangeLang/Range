@@ -121,6 +121,41 @@ export function captureMarkerPosition(position, {
   return position + (center - position) * field * strength * weight;
 }
 
+export function snapScalePosition(value, {
+  divisionBase = 3,
+  divisionLevels = 3,
+  hysteresis = 0.08,
+  previousIndex,
+} = {}) {
+  assertFiniteNumber(value, "value");
+  assertFiniteNumber(hysteresis, "hysteresis");
+  if (value < 0 || value > 1) throw new RangeError("value must be within [0, 1]");
+  if (!Number.isInteger(divisionBase) || divisionBase < 2) {
+    throw new RangeError("divisionBase must be an integer of at least 2");
+  }
+  if (!Number.isInteger(divisionLevels) || divisionLevels < 1 || divisionLevels > 6) {
+    throw new RangeError("divisionLevels must be an integer within [1, 6]");
+  }
+  if (hysteresis < 0 || hysteresis >= 0.5) {
+    throw new RangeError("hysteresis must be within [0, 0.5)");
+  }
+
+  const intervalCount = divisionBase ** divisionLevels;
+  const candidate = Math.min(intervalCount, Math.max(0, Math.round(value * intervalCount)));
+  let index = candidate;
+  if (Number.isInteger(previousIndex) && previousIndex >= 0 && previousIndex <= intervalCount) {
+    if (candidate > previousIndex) {
+      const forwardBoundary = (previousIndex + 0.5 + hysteresis) / intervalCount;
+      if (value < forwardBoundary) index = previousIndex;
+    } else if (candidate < previousIndex) {
+      const backwardBoundary = (previousIndex - 0.5 - hysteresis) / intervalCount;
+      if (value > backwardBoundary) index = previousIndex;
+    }
+  }
+
+  return { index, position: index / intervalCount };
+}
+
 export function measureWithFalloff(position, {
   baseline = 1,
   center = 0.27,

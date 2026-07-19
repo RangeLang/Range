@@ -30,7 +30,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*division-base="3")(?=[^>]*division-levels="3")(?=[^>]*pinch="0.27")(?=[^>]*pinch-core="10")(?=[^>]*pinch-falloff="0.16")(?=[^>]*pinch-inner-edge="0.68")(?=[^>]*pinch-strength="0.9")(?=[^>]*measure-minimum="0.35")(?=[^>]*invisible-collapse-power="1.35")(?=[^>]*invisible-measure-minimum="0.1")(?=[^>]*invisible-stroke-minimum="0.06")(?=[^>]*marker-capture-division-weight="0.48")(?=[^>]*marker-capture-falloff="0.14")(?=[^>]*marker-capture-strength="0.9")(?=[^>]*stroke-minimum="0.25")(?=[^>]*tone-falloff="0.12")(?=[^>]*tone-intensity="0.82")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*division-base="3")(?=[^>]*division-levels="3")(?=[^>]*pinch="0.27")(?=[^>]*pinch-core="10")(?=[^>]*pinch-falloff="0.16")(?=[^>]*pinch-inner-edge="0.68")(?=[^>]*pinch-strength="0.9")(?=[^>]*measure-minimum="0.35")(?=[^>]*invisible-collapse-power="1.35")(?=[^>]*invisible-measure-minimum="0.1")(?=[^>]*invisible-stroke-minimum="0.06")(?=[^>]*marker-capture-division-weight="0.48")(?=[^>]*marker-capture-falloff="0.14")(?=[^>]*marker-capture-strength="0.9")(?=[^>]*stroke-minimum="0.25")(?=[^>]*snap-hysteresis="0.08")(?=[^>]*snap-to-marks="true")(?=[^>]*tone-falloff="0.12")(?=[^>]*tone-intensity="0.82")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js(?:\?[^\"]*)?"/);
   assert.match(html, /class="rangeWord">Range<\/span>/);
@@ -131,6 +131,7 @@ test("merges linear scale and pinch marks deterministically", async () => {
     measureWithFalloff,
     mergeMarks,
     pinchScaleValue,
+    snapScalePosition,
     sphericalPinchInfluence,
   } = await import(mathUrl.href);
 
@@ -161,6 +162,10 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.equal(captureMarkerPosition(0.27, { anchor: 0.27, center: 0.27 }), 0.27);
   assert.ok(captureMarkerPosition(0.34, { anchor: 0.31, center: 0.27 }) < 0.34);
   assert.equal(captureMarkerPosition(0.34, { anchor: 0.31, center: 0.27, weight: 0 }), 0.34);
+  assert.deepEqual(snapScalePosition(0.27), { index: 7, position: 7 / 27 });
+  assert.deepEqual(snapScalePosition(0.5), { index: 14, position: 14 / 27 });
+  assert.equal(snapScalePosition(0.5, { previousIndex: 13, hysteresis: 0.08 }).index, 13);
+  assert.equal(snapScalePosition(0.505, { previousIndex: 13, hysteresis: 0.08 }).index, 14);
   assert.equal(sphericalPinchInfluence(0.27, { coreRadius: 0.04 }), 1);
   assert.equal(sphericalPinchInfluence(0.31, { coreRadius: 0.04 }), 0.68);
   assert.ok(sphericalPinchInfluence(0.29, { coreRadius: 0.04 }) > 0.68);
@@ -205,6 +210,28 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.equal(marks[21].measure, 3);
   assert.equal(marks[22].measure, 1);
   assert.equal(marks[27].measure, 5);
+  const snappedCenter = 7 / 27;
+  const snappedMarks = createRangeMarks({
+    divisionBase: 3,
+    divisionLevels: 3,
+    pinch: snappedCenter,
+    pinchCoreRadius: 5 / 136,
+    pinchFalloff: 0.16,
+    pinchInnerEdge: 0.68,
+    pinchStrength: 0.9,
+    measureMinimum: 0.35,
+    invisibleCollapsePower: 1.35,
+    invisibleMeasureMinimum: 0.1,
+    invisibleStrokeMinimum: 0.06,
+    markerCaptureDivisionWeight: 0.48,
+    markerCaptureFalloff: 0.14,
+    markerCaptureStrength: 0.9,
+    strokeMinimum: 0.25,
+    toneFalloff: 0.12,
+  });
+  assert.ok(Math.abs(snappedMarks[7].position - snappedCenter) < 1e-12);
+  assert.ok(snappedMarks[6].position < 6 / 27);
+  assert.ok(snappedMarks[8].position > 8 / 27);
   for (const center of [0.001, 0.01, 0.1, 0.27, 0.5, 0.9, 0.99, 0.999]) {
     for (let index = 1; index <= 1000; index += 1) {
       assert.ok(
@@ -299,6 +326,9 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(rangeOpticalGuide, /#boxStart\(action, this\.#shifts\.actions\)/);
   assert.match(rangeOpticalGuide, /--range-actions-optical-shift/);
   assert.match(rangeScaleElement, /createRangeMarks/);
+  assert.match(rangeScaleElement, /snapScalePosition/);
+  assert.match(rangeScaleElement, /#snappedIndex/);
+  assert.match(rangeScaleElement, /this\.#motionTarget = this\.#snapTarget/);
   assert.match(rangeScaleElement, /width:\s*calc\(1px \* var\(--measure\)\)/);
   assert.match(rangeScaleElement, /height:\s*calc\(1px \* var\(--stroke\)\)/);
   assert.match(rangeScaleElement, /white var\(--lighten\)/);
