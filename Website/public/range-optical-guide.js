@@ -16,6 +16,7 @@ class RangeOpticalGuide extends HTMLElement {
     const sequence = this.closest(".landingSequence");
     if (sequence) this.#resizeObserver.observe(sequence);
     document.fonts.ready.then(() => this.#schedule());
+    this.#align();
     this.#schedule();
   }
 

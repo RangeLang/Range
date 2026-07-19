@@ -179,45 +179,50 @@ range-optical-guide {
 
 ::view-transition-group(range-route-wordmark) {
   z-index: 20;
-  animation-duration: 520ms;
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-group(root) {
+  animation-duration: 320ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 ::view-transition-old(range-route-wordmark) {
   mix-blend-mode: normal;
-  animation: range-shared-out 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: range-shared-out 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 ::view-transition-new(range-route-wordmark) {
   mix-blend-mode: normal;
-  animation: range-shared-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: range-shared-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 ::view-transition-group(range-zero-index),
 ::view-transition-group(range-one-index) {
   z-index: 21;
-  animation-duration: 520ms;
+  animation-duration: 320ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 ::view-transition-old(range-zero-index),
 ::view-transition-old(range-one-index) {
   transform-origin: right center;
-  animation: range-index-collapse 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: range-index-collapse 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 ::view-transition-new(range-zero-index),
 ::view-transition-new(range-one-index) {
   transform-origin: right center;
-  animation: range-index-expand 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: range-index-expand 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 ::view-transition-old(root) {
-  animation: range-page-out 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: range-page-out 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 ::view-transition-new(root) {
-  animation: range-page-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: range-page-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes range-page-out {

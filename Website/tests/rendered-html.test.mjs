@@ -38,7 +38,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink-box"/);
   assert.match(html, /<html lang="en" class="range-layout-pending">/);
   assert.match(html, /src="\/range-layout-ready\.js"/);
-  assert.match(html, /src="\/range-navigation-v1\.js"/);
+  assert.match(html, /src="\/range-navigation-v2\.js"/);
   assert.match(html, /a love letter to electrons, logic and abstraction/);
   assert.doesNotMatch(html, /Range-authored and emits native LLVM/);
   assert.doesNotMatch(html, /12 of 12 passed/);
@@ -57,7 +57,7 @@ test("renders the generated benchmark hierarchy", async () => {
   const normalized = html.replaceAll("<!-- -->", "");
   assert.match(normalized, /<title>Range<\/title>/i);
   assert.match(normalized, /class="backLink routeWordmark"[^>]*><span class="rangeWord">Range<\/span>/);
-  assert.match(normalized, /<range-typed-text(?=[^>]*text="Performance")(?=[^>]*delay="500")(?=[^>]*interval="45")[^>]*>/);
+  assert.match(normalized, /<range-typed-text(?=[^>]*text="Performance")(?=[^>]*delay="300")(?=[^>]*interval="45")[^>]*>/);
   assert.match(normalized, /src="\/range-typed-text\.js"/);
   assert.match(normalized, /Benchmark suite/);
   assert.match(normalized, /Sequential modulo/);
@@ -358,8 +358,9 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /view-transition-group\(range-route-wordmark\)/);
   assert.doesNotMatch(styles, /routeWordmarkIndex/);
   assert.match(styles, /\.backLink\.routeWordmark\s*{[^}]*font-family:\s*var\(--font-range-sans\)[^}]*font-size:\s*20px[^}]*font-weight:\s*600/s);
-  assert.match(styles, /::view-transition-old\(root\)\s*{[^}]*520ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
-  assert.match(styles, /::view-transition-new\(root\)\s*{[^}]*520ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
+  assert.match(styles, /::view-transition-group\(root\)\s*{[^}]*320ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
+  assert.match(styles, /::view-transition-old\(root\)\s*{[^}]*320ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
+  assert.match(styles, /::view-transition-new\(root\)\s*{[^}]*320ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
   assert.match(styles, /transform:\s*translateX\(-20px\)/);
   assert.match(styles, /transform:\s*translateX\(20px\)/);
   assert.doesNotMatch(styles, /range-title-morph/);
@@ -414,7 +415,7 @@ test("uses Web Components without React, Next, or Vinext", async () => {
     readFile(new URL("../src/render.ts", import.meta.url), "utf8"),
     readFile(new URL("../public/range-site.js", import.meta.url), "utf8"),
     readFile(new URL("../public/range-layout-ready.js", import.meta.url), "utf8"),
-    readFile(new URL("../public/range-navigation-v1.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/range-navigation-v2.js", import.meta.url), "utf8"),
   ]);
   const packageJson = JSON.parse(packageText);
   const installed = { ...packageJson.dependencies, ...packageJson.devDependencies };
@@ -432,7 +433,10 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(layoutReady, /classList\.remove\("range-layout-pending"\)/);
   assert.match(navigation, /document\.startViewTransition\(commit\)\.finished/);
   assert.match(navigation, /currentShell\.replaceChildren/);
-  assert.match(navigation, /await settleLayout\(\)/);
+  assert.doesNotMatch(navigation, /settleLayout/);
+  assert.match(navigation, /routeCache/);
+  assert.match(navigation, /pointerover/);
+  assert.match(navigation, /requestIdleCallback/);
   assert.match(navigation, /history\.pushState/);
   assert.match(navigation, /addEventListener\("popstate"/);
 });
