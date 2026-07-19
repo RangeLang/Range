@@ -1,4 +1,4 @@
-import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profile=pinch-density-v3";
+import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profile=pinch-dissolve-v4";
 
 const defaults = {
   endpointGap: 8,
@@ -192,6 +192,7 @@ class RangeScale extends HTMLElement {
             var(--line, oklch(0.9 0.012 255)),
             white var(--lighten)
           );
+          filter: blur(calc(1px * var(--blur)));
           opacity: var(--opacity);
           transform: translate(-50%, -50%);
         }
@@ -209,7 +210,7 @@ class RangeScale extends HTMLElement {
         }
       </style>
       ${marks.map((mark) => (
-        `<i class="${mark.tier}${mark.anchored ? " anchored" : ""}" style="--measure:${mark.measure};--stroke:${mark.stroke};--lighten:${mark.tone * config.toneIntensity * 100}%;--opacity:${mark.opacity};--position:${mark.position * 100}%"></i>`
+        `<i class="${mark.tier}${mark.anchored ? " anchored" : ""}" style="--measure:${mark.measure};--stroke:${mark.stroke};--blur:${mark.blur};--lighten:${mark.tone * config.toneIntensity * 100}%;--opacity:${mark.opacity};--position:${mark.position * 100}%"></i>`
       )).join("")}
     `;
   }

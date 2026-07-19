@@ -246,6 +246,7 @@ export function createRangeMarks(config = {}) {
       return {
         ...mark,
         anchored: true,
+        blur: 0,
         measure: baseline,
         opacity: 1,
         position: mark.position,
@@ -270,10 +271,12 @@ export function createRangeMarks(config = {}) {
       falloff: config.toneFalloff,
       innerEdge: config.pinchInnerEdge,
     });
-    const opacity = 1 - 0.1 * tone;
+    const opacity = (1 - tone) ** 1.25;
+    const blur = 1.6 * tone ** 1.5;
     const stroke = 1 - (1 - config.strokeMinimum) * shape;
     return {
       ...mark,
+      blur,
       measure: baseline * (1 - (1 - config.measureMinimum) * shape),
       stroke,
       opacity,

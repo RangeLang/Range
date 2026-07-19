@@ -32,7 +32,7 @@ test("renders the Range landing page", async () => {
     html,
     /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*division-base="3")(?=[^>]*division-levels="3")(?=[^>]*pinch="0.27")(?=[^>]*pinch-core="10")(?=[^>]*pinch-falloff="0.16")(?=[^>]*pinch-inner-edge="0.68")(?=[^>]*pinch-strength="0.9")(?=[^>]*measure-minimum="0.7")(?=[^>]*invisible-collapse-power="1.35")(?=[^>]*invisible-measure-minimum="0.1")(?=[^>]*invisible-stroke-minimum="0.06")(?=[^>]*marker-capture-division-weight="0.48")(?=[^>]*marker-capture-falloff="0.14")(?=[^>]*marker-capture-strength="0.9")(?=[^>]*stroke-minimum="0.65")(?=[^>]*snap-hysteresis="0.08")(?=[^>]*snap-to-marks="true")(?=[^>]*tone-falloff="0.12")(?=[^>]*tone-intensity="0.16")[^>]*>/,
   );
-  assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js\?profile=pinch-density-v3"/);
+  assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js\?profile=pinch-dissolve-v4"/);
   assert.match(html, /class="rangeWord">Range<\/span>/);
   assert.match(html, /<range-optical-guide[^>]*aria-hidden="true"/);
   assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink-box"/);
@@ -200,6 +200,7 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(marks.every((mark) => mark.measure >= 0.7 - 1e-12));
   assert.ok(marks.every((mark) => mark.stroke >= 0.65 - 1e-12 && mark.stroke <= 1));
   assert.ok(marks.every((mark) => mark.tone >= 0 && mark.tone <= 1));
+  assert.ok(marks.every((mark) => mark.blur >= 0 && mark.blur <= 1.6));
   assert.ok(marks.every((mark) => mark.opacity >= 0 && mark.opacity <= 1));
   assert.ok(marks.every((mark, index) => index === 0 || mark.position > marks[index - 1].position));
   assert.equal(marks.length, 28);
@@ -213,7 +214,8 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(marks[7].measure < 1);
   assert.ok(marks[7].stroke < 1);
   assert.ok(marks[7].tone > 0.9);
-  assert.ok(marks[7].opacity > 0.9);
+  assert.ok(marks[7].opacity < 0.1);
+  assert.ok(marks[7].blur > 1.3);
   assert.ok(marks[8].opacity > marks[7].opacity);
   assert.ok(marks[7].measure >= 0.7);
   assert.ok(marks[7].stroke >= 0.65);
