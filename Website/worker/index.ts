@@ -34,7 +34,14 @@ const worker = {
       });
     }
 
-    return env.ASSETS.fetch(request);
+    const asset = await env.ASSETS.fetch(request);
+    if (url.pathname.endsWith(".woff2") && asset.ok) {
+      const headers = new Headers(asset.headers);
+      headers.set("content-type", "font/woff2");
+      headers.set("cache-control", "public, max-age=31536000, immutable");
+      return new Response(asset.body, { status: asset.status, headers });
+    }
+    return asset;
   },
 };
 
