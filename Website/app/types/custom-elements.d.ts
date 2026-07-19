@@ -12,6 +12,8 @@ declare module "react" {
         "pinch-strength"?: string;
         "measure-minimum"?: string;
         "stroke-minimum"?: string;
+        "tone-falloff"?: string;
+        "tone-intensity"?: string;
       };
       "range-typed-text": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
         delay?: string;

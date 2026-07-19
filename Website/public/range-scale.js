@@ -9,6 +9,8 @@ const defaults = {
   pinchStrength: 0.72,
   measureMinimum: 0.35,
   strokeMinimum: 0.25,
+  toneFalloff: 0.06,
+  toneIntensity: 0.82,
 };
 
 function finiteAttribute(element, name, fallback) {
@@ -26,6 +28,8 @@ class RangeScale extends HTMLElement {
     "pinch-strength",
     "measure-minimum",
     "stroke-minimum",
+    "tone-falloff",
+    "tone-intensity",
   ];
 
   #activePinch;
@@ -107,6 +111,8 @@ class RangeScale extends HTMLElement {
       pinchStrength: Math.min(0.999999, Math.max(0, finiteAttribute(this, "pinch-strength", defaults.pinchStrength))),
       measureMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "measure-minimum", defaults.measureMinimum))),
       strokeMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "stroke-minimum", defaults.strokeMinimum))),
+      toneFalloff: Math.max(0.000001, finiteAttribute(this, "tone-falloff", defaults.toneFalloff)),
+      toneIntensity: Math.min(1, Math.max(0, finiteAttribute(this, "tone-intensity", defaults.toneIntensity))),
     };
   }
 
@@ -153,7 +159,7 @@ class RangeScale extends HTMLElement {
         }
       </style>
       ${marks.map((mark) => (
-        `<i class="${mark.tier}" style="--measure:${mark.measure};--stroke:${mark.stroke};--lighten:${mark.tone * 58}%;--position:${mark.position * 100}%"></i>`
+        `<i class="${mark.tier}" style="--measure:${mark.measure};--stroke:${mark.stroke};--lighten:${mark.tone * config.toneIntensity * 100}%;--position:${mark.position * 100}%"></i>`
       )).join("")}
     `;
   }

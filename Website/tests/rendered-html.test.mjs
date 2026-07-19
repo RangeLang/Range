@@ -30,7 +30,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="51")(?=[^>]*radix-base="5")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-minimum="0.35")(?=[^>]*stroke-minimum="0.25")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="51")(?=[^>]*radix-base="5")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-minimum="0.35")(?=[^>]*stroke-minimum="0.25")(?=[^>]*tone-falloff="0.06")(?=[^>]*tone-intensity="0.82")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js"/);
   assert.match(html, /Range-authored and emits native LLVM/);
@@ -165,6 +165,7 @@ test("merges linear scale and pinch marks deterministically", async () => {
     pinchStrength: 0.72,
     measureMinimum: 0.35,
     strokeMinimum: 0.25,
+    toneFalloff: 0.06,
   });
   assert.ok(marks.every((mark) => mark.position >= 0 && mark.position <= 1));
   assert.ok(marks.every((mark) => mark.measure >= 0.35 - 1e-12));
@@ -179,6 +180,7 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(closestPinchMark.measure < 0.4);
   assert.ok(closestPinchMark.stroke < 0.3);
   assert.ok(closestPinchMark.tone > 0.9);
+  assert.equal(marks[20].tone, 0);
   assert.equal(marks[40].measure, 5);
   assert.equal(marks[45].measure, 3);
   assert.equal(marks[49].measure, 1);
@@ -263,6 +265,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(rangeScaleElement, /width:\s*calc\(1px \* var\(--measure\)\)/);
   assert.match(rangeScaleElement, /height:\s*calc\(1px \* var\(--stroke\)\)/);
   assert.match(rangeScaleElement, /white var\(--lighten\)/);
+  assert.match(rangeScaleElement, /mark\.tone \* config\.toneIntensity \* 100/);
   assert.match(rangeScaleElement, /pointerenter/);
   assert.match(rangeScaleElement, /pointermove/);
   assert.match(rangeScaleElement, /pointerleave/);

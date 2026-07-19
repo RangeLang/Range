@@ -148,6 +148,12 @@ export function createRangeMarks(config = {}) {
       falloff: config.pinchFalloff,
       minimum: config.strokeMinimum,
     });
+    const toneStroke = measureWithFalloff(mark.position, {
+      baseline: 1,
+      center: config.pinch,
+      falloff: config.toneFalloff,
+      minimum: config.strokeMinimum,
+    });
     return {
       ...mark,
       measure: baseline * measureWithFalloff(mark.position, {
@@ -158,7 +164,7 @@ export function createRangeMarks(config = {}) {
       }),
       stroke,
       tone: config.strokeMinimum < 1
-        ? (1 - stroke) / (1 - config.strokeMinimum)
+        ? (1 - toneStroke) / (1 - config.strokeMinimum)
         : 0,
       position: pinchScaleValue(mark.position, {
         center: config.pinch,
