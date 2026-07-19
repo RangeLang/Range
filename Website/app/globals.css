@@ -118,8 +118,6 @@ range-typed-text[data-typing]::after {
 .routeWordmark {
   display: inline-flex;
   align-items: baseline;
-  gap: 10px;
-  --range-index-column: 15px;
 }
 
 .backLink.routeWordmark {
@@ -130,14 +128,10 @@ range-typed-text[data-typing]::after {
   letter-spacing: -0.04em;
 }
 
-.landingWordmark,
-.routeWordmark {
-  view-transition-name: range-home-control;
-}
-
 .landingWordmark .rangeWord,
 .routeWordmark .rangeWord {
   width: fit-content;
+  view-transition-name: range-home-wordmark;
 }
 
 .landingHero .rangeTitleWord,
@@ -189,7 +183,7 @@ range-optical-guide {
   display: none;
 }
 
-::view-transition-group(range-home-control),
+::view-transition-group(range-home-wordmark),
 ::view-transition-group(range-performance-wordmark) {
   z-index: 20;
   animation-duration: 420ms;
@@ -201,45 +195,48 @@ range-optical-guide {
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-::view-transition-old(range-home-control),
-::view-transition-new(range-home-control),
+::view-transition-old(range-home-wordmark),
+::view-transition-new(range-home-wordmark),
 ::view-transition-old(range-performance-wordmark),
 ::view-transition-new(range-performance-wordmark) {
   mix-blend-mode: normal;
 }
 
-html.range-route-performance::view-transition-old(range-home-control),
-html.range-route-performance::view-transition-new(range-home-control),
+html.range-route-performance::view-transition-old(range-home-wordmark),
+html.range-route-performance::view-transition-new(range-home-wordmark),
 html.range-route-performance::view-transition-old(range-performance-wordmark),
 html.range-route-performance::view-transition-new(range-performance-wordmark) {
   animation: none;
 }
 
-html.range-route-performance.range-route-forward::view-transition-old(range-home-control),
-html.range-route-performance.range-route-backward::view-transition-new(range-home-control),
+html.range-route-performance.range-route-forward::view-transition-old(range-home-wordmark),
+html.range-route-performance.range-route-backward::view-transition-new(range-home-wordmark),
 html.range-route-performance.range-route-forward::view-transition-old(range-performance-wordmark),
 html.range-route-performance.range-route-backward::view-transition-new(range-performance-wordmark) {
   opacity: 1;
 }
 
-html.range-route-performance.range-route-forward::view-transition-new(range-home-control),
-html.range-route-performance.range-route-backward::view-transition-old(range-home-control),
+html.range-route-performance.range-route-forward::view-transition-new(range-home-wordmark),
+html.range-route-performance.range-route-backward::view-transition-old(range-home-wordmark),
 html.range-route-performance.range-route-forward::view-transition-new(range-performance-wordmark),
 html.range-route-performance.range-route-backward::view-transition-old(range-performance-wordmark) {
   opacity: 0;
 }
 
+::view-transition-group(range-zero-index),
 ::view-transition-group(range-one-index) {
   z-index: 21;
   animation-duration: 420ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+::view-transition-old(range-zero-index),
 ::view-transition-old(range-one-index) {
   transform-origin: right center;
   animation: range-index-collapse 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+::view-transition-new(range-zero-index),
 ::view-transition-new(range-one-index) {
   transform-origin: right center;
   animation: range-index-expand 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -288,14 +285,17 @@ html.range-route-performance.range-route-backward::view-transition-old(range-per
 }
 
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(range-home-control),
-  ::view-transition-old(range-home-control),
-  ::view-transition-new(range-home-control),
+  ::view-transition-group(range-home-wordmark),
+  ::view-transition-old(range-home-wordmark),
+  ::view-transition-new(range-home-wordmark),
   ::view-transition-group(range-performance-wordmark),
   ::view-transition-old(range-performance-wordmark),
   ::view-transition-new(range-performance-wordmark),
+  ::view-transition-group(range-zero-index),
   ::view-transition-group(range-one-index),
+  ::view-transition-old(range-zero-index),
   ::view-transition-old(range-one-index),
+  ::view-transition-new(range-zero-index),
   ::view-transition-new(range-one-index),
   ::view-transition-old(root),
   ::view-transition-new(root) {
@@ -316,9 +316,9 @@ html.range-route-performance.range-route-backward::view-transition-old(range-per
   line-height: 1;
 }
 
-.landingNav [data-scale-zero],
-.routeWordmark [data-route-zero] {
+.landingNav [data-scale-zero] {
   font-size: 14.6px;
+  view-transition-name: range-zero-index;
 }
 
 .landingNav nav {
