@@ -295,8 +295,8 @@ test("merges linear scale and pinch marks deterministically", async () => {
 test("keeps the benchmark artifact complete and versioned", async () => {
   const [
     artifactText,
-    benchmarkPage,
-    landingPage,
+    renderer,
+    siteComponents,
     styles,
     schemaText,
     serverBundle,
@@ -304,8 +304,8 @@ test("keeps the benchmark artifact complete and versioned", async () => {
     rangeOpticalGuide,
   ] = await Promise.all([
     readFile(new URL("../public/benchmarks.json", import.meta.url), "utf8"),
-    readFile(new URL("../app/benchmarks/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/render.ts", import.meta.url), "utf8"),
+    readFile(new URL("../public/range-site.js", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../../benchmark-results.schema.json", import.meta.url), "utf8"),
     readFile(new URL("../dist/server/index.js", import.meta.url), "utf8"),
@@ -334,8 +334,14 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.ok(leaves.every((leaf) => leaf.implementations.some((item) => item.language === "C")));
   assert.ok(leaves.every((leaf) => leaf.implementations.some((item) => item.language === "Range")));
   assert.ok(leaves.every((leaf) => leaf.results.some((result) => result.language === "Range")));
-  assert.match(benchmarkPage, /from "\.\.\/\.\.\/public\/benchmarks\.json"/);
-  assert.match(landingPage, /from "\.\.\/public\/benchmarks\.json"/);
+  assert.match(renderer, /function benchmarksPage/);
+  assert.match(renderer, /function home/);
+  assert.match(renderer, /<range-home-page>/);
+  assert.match(renderer, /<range-benchmarks-page>/);
+  assert.match(renderer, /<range-benchmark-page>/);
+  assert.match(renderer, /<range-update-page>/);
+  assert.match(renderer, /<range-benchmark-chart>/);
+  assert.match(siteComponents, /customElements\.define/);
   assert.match(styles, /@view-transition\s*{\s*navigation:\s*auto/);
   assert.match(styles, /view-transition-name:\s*range-navigation/);
   assert.match(styles, /view-transition-name:\s*range-title-morph/);
@@ -351,7 +357,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /view-transition-new\(range-title-morph\)\s*{[^}]*opacity:\s*0[^}]*animation:\s*none/s);
   assert.match(styles, /range-typed-text\[data-typing\]::after/);
   assert.doesNotMatch(styles, /range-title-(?:out|in)/);
-  assert.match(landingPage, /<range-scale/);
+  assert.match(renderer, /<range-scale/);
   assert.match(rangeScaleElement, /customElements\.define\("range-scale"/);
   assert.match(rangeOpticalGuide, /customElements\.define\("range-optical-guide"/);
   assert.match(rangeOpticalGuide, /measureText\(character\)/);
@@ -387,4 +393,22 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingHero \[data-scale-end\] > span\s*{[^}]*left:\s*50%[^}]*transform:\s*translateX\(-50%\)/s);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(serverBundle, /@shikijs|engine-oniguruma|wasm-DtTceah8/);
+});
+
+test("uses Web Components without React, Next, or Vinext", async () => {
+  const [packageText, worker, renderer, components] = await Promise.all([
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/render.ts", import.meta.url), "utf8"),
+    readFile(new URL("../public/range-site.js", import.meta.url), "utf8"),
+  ]);
+  const packageJson = JSON.parse(packageText);
+  const installed = { ...packageJson.dependencies, ...packageJson.devDependencies };
+
+  assert.equal(installed.react, undefined);
+  assert.equal(installed["react-dom"], undefined);
+  assert.equal(installed.next, undefined);
+  assert.equal(installed.vinext, undefined);
+  assert.doesNotMatch(`${worker}\n${renderer}`, /\b(?:React|next\/|vinext)\b/);
+  assert.match(components, /class RangeElement extends HTMLElement/);
 });
