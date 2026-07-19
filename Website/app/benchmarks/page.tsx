@@ -139,7 +139,30 @@ function benchmarkFromLeaf(subcategory: string, leaf: BenchmarkLeaf): Benchmark 
   };
 }
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ category?: string | string[] }>;
+}) {
+  const requestedCategory = (await searchParams).category;
+  const requestedCategoryId = Array.isArray(requestedCategory)
+    ? requestedCategory[0]
+    : requestedCategory;
+  const completedCategories = benchmarkData.categories
+    .map((category) => ({
+      ...category,
+      subcategories: category.subcategories
+        .map((subcategory) => ({
+          ...subcategory,
+          leaves: subcategory.leaves.filter((leaf) => leaf.results.length > 0),
+        }))
+        .filter((subcategory) => subcategory.leaves.length > 0),
+    }))
+    .filter((category) => category.subcategories.length > 0);
+  const activeCategory = completedCategories.find(
+    (category) => category.id === requestedCategoryId,
+  ) ?? completedCategories[0];
+
   return (
     <main>
       <header className="pageHeader">
@@ -161,19 +184,23 @@ export default function Home() {
         </div>
 
         <nav className="benchmarkIndex" aria-label="Benchmark categories">
-          {benchmarkData.categories.map((category) => {
+          {completedCategories.map((category) => {
             const comparisonCount = category.subcategories.reduce(
-              (count, subcategory) =>
-                count + subcategory.leaves.filter((leaf) => leaf.results.length > 0).length,
+              (count, subcategory) => count + subcategory.leaves.length,
               0,
             );
-            if (comparisonCount === 0) return null;
+            const isActive = category.id === activeCategory.id;
 
             return (
-              <a href={`#category-${category.id}`} key={category.id}>
+              <Link
+                aria-current={isActive ? "page" : undefined}
+                href={`/benchmarks?category=${category.id}`}
+                key={category.id}
+                scroll={false}
+              >
                 <span>{category.name}</span>
                 <small>{comparisonCount}</small>
-              </a>
+              </Link>
             );
           })}
         </nav>
@@ -207,16 +234,8 @@ export default function Home() {
           </div>
         </details>
 
-        {benchmarkData.categories.map((category, categoryIndex) => {
-          const completedSubcategories = category.subcategories
-            .map((subcategory) => ({
-              ...subcategory,
-              leaves: subcategory.leaves.filter((leaf) => leaf.results.length > 0),
-            }))
-            .filter((subcategory) => subcategory.leaves.length > 0);
-          if (completedSubcategories.length === 0) return null;
-
-          const comparisonCount = completedSubcategories.reduce(
+        {activeCategory && (() => {
+          const comparisonCount = activeCategory.subcategories.reduce(
             (count, subcategory) => count + subcategory.leaves.length,
             0,
           );
@@ -224,22 +243,21 @@ export default function Home() {
           return (
             <details
               className="benchmarkCategory"
-              id={`category-${category.id}`}
-              key={category.id}
-              open={categoryIndex === 0}
+              key={activeCategory.id}
+              open
             >
               <summary>
                 <span className="benchmarkCategoryTitle" role="heading" aria-level={3}>
-                  {category.name}
+                  {activeCategory.name}
                 </span>
                 <span>{comparisonCount} {comparisonCount === 1 ? "comparison" : "comparisons"}</span>
               </summary>
               <div className="chartGrid">
-                {completedSubcategories.flatMap((subcategory) =>
+                {activeCategory.subcategories.flatMap((subcategory) =>
                   subcategory.leaves.map((leaf) => (
                     <Chart
                       benchmark={benchmarkFromLeaf(subcategory.name, leaf)}
-                      id={`current-${category.id}-${subcategory.id}-${leaf.id}`}
+                      id={`current-${activeCategory.id}-${subcategory.id}-${leaf.id}`}
                       key={leaf.id}
                     />
                   )),
@@ -247,7 +265,7 @@ export default function Home() {
               </div>
             </details>
           );
-        })}
+        })()}
 
         <div className="benchmarkRunStatus" aria-label="Current benchmark run status">
           <span>{benchmarkData.summary.runLeafCount} of {benchmarkData.summary.leafCount} leaves run</span>

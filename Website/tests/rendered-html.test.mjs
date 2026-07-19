@@ -47,11 +47,10 @@ test("renders the generated benchmark hierarchy", async () => {
   assert.match(normalized, /<title>Range<\/title>/i);
   assert.match(normalized, /Range Performance/);
   assert.match(normalized, /Benchmark suite/);
-  assert.match(normalized, /Perlin/);
-  assert.match(normalized, /Voronoi/);
-  assert.match(normalized, /Value Noise/);
-  assert.match(normalized, /1D Three Tap/);
-  assert.match(normalized, /Fibonacci/);
+  assert.match(normalized, /Sequential modulo/);
+  assert.match(normalized, /href="\/benchmarks\?category=noise"/);
+  assert.match(normalized, /<a(?=[^>]*href="\/benchmarks\?category=loops")(?=[^>]*aria-current="page")[^>]*>/);
+  assert.doesNotMatch(normalized, /Perlin/);
   assert.match(normalized, /12 of 12 leaves run/);
   assert.match(normalized, /Range passed 12/);
   assert.match(normalized, /Not emitted 0/);
@@ -69,6 +68,18 @@ test("renders the generated benchmark hierarchy", async () => {
   assert.match(normalized, /href="\/updates\/string-lowering"/);
   assert.doesNotMatch(normalized, /Range Strings improvement/);
   assert.doesNotMatch(normalized, /Building your site|Your site is taking shape|codex-preview/i);
+});
+
+test("filters the benchmark display by selected category", async () => {
+  const response = await render("/benchmarks?category=noise");
+  assert.equal(response.status, 200);
+
+  const html = (await response.text()).replaceAll("<!-- -->", "");
+  assert.match(html, /<a(?=[^>]*href="\/benchmarks\?category=noise")(?=[^>]*aria-current="page")[^>]*>/);
+  assert.match(html, /Perlin/);
+  assert.match(html, /Voronoi/);
+  assert.match(html, /Value Noise/);
+  assert.doesNotMatch(html, /Sequential modulo/);
 });
 
 test("renders an individual benchmark route", async () => {

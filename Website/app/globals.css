@@ -342,6 +342,17 @@ main {
   outline: none;
 }
 
+.benchmarkIndex a[aria-current="page"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.benchmarkIndex a[aria-current="page"] small {
+  background: color-mix(in oklch, var(--paper), transparent 78%);
+  color: var(--paper);
+}
+
 .benchmarkIndex small {
   display: grid;
   min-width: 20px;
