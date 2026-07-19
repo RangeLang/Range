@@ -1,4 +1,4 @@
-import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profile=anchored-endpoints";
+import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profile=pinch-field-v2";
 
 const defaults = {
   endpointGap: 8,

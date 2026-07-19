@@ -89,7 +89,7 @@ export function pinchScaleValue(value, {
   if (strength < 0 || strength >= 1) throw new RangeError("strength must be within [0, 1)");
 
   const offset = value - center;
-  return value + strength * offset * pinchInfluence(value, center, falloff);
+  return value - strength * offset * pinchInfluence(value, center, falloff);
 }
 
 export function captureMarkerPosition(position, {
