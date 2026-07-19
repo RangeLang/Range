@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const host =
     requestHeaders.get("x-forwarded-host") ??
     requestHeaders.get("host") ??
-    "range-native-performance.offhand-tot-0v.chatgpt.site";
+    "range.offhand-tot-0v.chatgpt.site";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https";
   const imageUrl = `${protocol}://${host}/og-v3.png`;
   const title = "Range";

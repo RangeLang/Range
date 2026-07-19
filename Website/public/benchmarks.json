@@ -1,0 +1,1184 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-19T12:05:17Z",
+  "configuration": {
+    "baseIterations": 20000000,
+    "runs": 7,
+    "caseFilter": []
+  },
+  "environment": {
+    "system": "Darwin",
+    "release": "27.0.0",
+    "architecture": "arm64",
+    "python": "3.14.3"
+  },
+  "languages": [
+    "C",
+    "C++",
+    "Go",
+    "Range",
+    "Rust",
+    "Swift"
+  ],
+  "summary": {
+    "leafCount": 12,
+    "runLeafCount": 12,
+    "rangePassed": 12,
+    "rangeNotEmitted": 0,
+    "rangeFailed": 0
+  },
+  "categories": [
+    {
+      "id": "loops",
+      "name": "Loops",
+      "subcategories": [
+        {
+          "id": "while",
+          "name": "While",
+          "leaves": [
+            {
+              "id": "integer_loop",
+              "name": "Sequential modulo",
+              "description": "Sequential integer arithmetic and modulo dependency chain",
+              "workload": {
+                "count": 20000000,
+                "unit": "iterations"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 79.9938,
+              "results": [
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 58.2713,
+                  "cpuMilliseconds": 56.22,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "5431"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 58.29,
+                  "cpuMilliseconds": 56.476,
+                  "peakRssKilobytes": 1952,
+                  "relativeToFastest": 1.0003,
+                  "relativeToC": 1.0003,
+                  "cpuRelativeToC": 1.0046,
+                  "memoryRelativeToC": 1.0991,
+                  "output": "5431"
+                },
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 58.2954,
+                  "cpuMilliseconds": 56.332,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.0004,
+                  "relativeToC": 1.0004,
+                  "cpuRelativeToC": 1.002,
+                  "memoryRelativeToC": 1.0,
+                  "output": "5431"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 59.1574,
+                  "cpuMilliseconds": 56.859,
+                  "peakRssKilobytes": 2176,
+                  "relativeToFastest": 1.0152,
+                  "relativeToC": 1.0152,
+                  "cpuRelativeToC": 1.0114,
+                  "memoryRelativeToC": 1.2252,
+                  "output": "5431"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 62.991,
+                  "cpuMilliseconds": 61.442,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.081,
+                  "relativeToC": 1.081,
+                  "cpuRelativeToC": 1.0929,
+                  "memoryRelativeToC": 1.0,
+                  "output": "exit:160"
+                },
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 74.0683,
+                  "cpuMilliseconds": 72.312,
+                  "peakRssKilobytes": 4112,
+                  "relativeToFastest": 1.2711,
+                  "relativeToC": 1.2711,
+                  "cpuRelativeToC": 1.2862,
+                  "memoryRelativeToC": 2.3153,
+                  "output": "5431"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "if",
+          "name": "If",
+          "leaves": [
+            {
+              "id": "loop_if",
+              "name": "75% taken",
+              "description": "Repeated one-sided conditional with a 75% taken branch",
+              "workload": {
+                "count": 20000000,
+                "unit": "iterations"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 62.6662,
+              "results": [
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 44.1902,
+                  "cpuMilliseconds": 42.607,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 0.9884,
+                  "cpuRelativeToC": 0.9959,
+                  "memoryRelativeToC": 0.991,
+                  "output": "4006"
+                },
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 44.7081,
+                  "cpuMilliseconds": 42.783,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.0117,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "4006"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 45.0342,
+                  "cpuMilliseconds": 43.075,
+                  "peakRssKilobytes": 2176,
+                  "relativeToFastest": 1.0191,
+                  "relativeToC": 1.0073,
+                  "cpuRelativeToC": 1.0068,
+                  "memoryRelativeToC": 1.2252,
+                  "output": "4006"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 45.4348,
+                  "cpuMilliseconds": 43.264,
+                  "peakRssKilobytes": 1968,
+                  "relativeToFastest": 1.0282,
+                  "relativeToC": 1.0163,
+                  "cpuRelativeToC": 1.0112,
+                  "memoryRelativeToC": 1.1081,
+                  "output": "4006"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 47.9085,
+                  "cpuMilliseconds": 46.381,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.0841,
+                  "relativeToC": 1.0716,
+                  "cpuRelativeToC": 1.0841,
+                  "memoryRelativeToC": 1.0,
+                  "output": "exit:241"
+                },
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 58.0243,
+                  "cpuMilliseconds": 56.009,
+                  "peakRssKilobytes": 4208,
+                  "relativeToFastest": 1.3131,
+                  "relativeToC": 1.2978,
+                  "cpuRelativeToC": 1.3091,
+                  "memoryRelativeToC": 2.3694,
+                  "output": "4006"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "if-else",
+          "name": "If Else",
+          "leaves": [
+            {
+              "id": "loop_if_else",
+              "name": "Balanced alternating",
+              "description": "Repeated balanced two-outcome conditional",
+              "workload": {
+                "count": 20000000,
+                "unit": "iterations"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 87.0316,
+              "results": [
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 59.34,
+                  "cpuMilliseconds": 57.327,
+                  "peakRssKilobytes": 1952,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 0.9872,
+                  "cpuRelativeToC": 0.9946,
+                  "memoryRelativeToC": 1.0991,
+                  "output": "7201"
+                },
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 59.4933,
+                  "cpuMilliseconds": 57.396,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.0026,
+                  "relativeToC": 0.9897,
+                  "cpuRelativeToC": 0.9958,
+                  "memoryRelativeToC": 0.991,
+                  "output": "7201"
+                },
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 60.1099,
+                  "cpuMilliseconds": 57.64,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.013,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "7201"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 64.1787,
+                  "cpuMilliseconds": 62.163,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.0815,
+                  "relativeToC": 1.0677,
+                  "cpuRelativeToC": 1.0785,
+                  "memoryRelativeToC": 1.0,
+                  "output": "exit:173"
+                },
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 75.24,
+                  "cpuMilliseconds": 73.415,
+                  "peakRssKilobytes": 4112,
+                  "relativeToFastest": 1.2679,
+                  "relativeToC": 1.2517,
+                  "cpuRelativeToC": 1.2737,
+                  "memoryRelativeToC": 2.3153,
+                  "output": "7201"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 80.5848,
+                  "cpuMilliseconds": 77.804,
+                  "peakRssKilobytes": 2176,
+                  "relativeToFastest": 1.358,
+                  "relativeToC": 1.3406,
+                  "cpuRelativeToC": 1.3498,
+                  "memoryRelativeToC": 1.2252,
+                  "output": "7201"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "noise",
+      "name": "Noise",
+      "subcategories": [
+        {
+          "id": "perlin",
+          "name": "Perlin",
+          "leaves": [
+            {
+              "id": "perlin_noise",
+              "name": "2D single cell",
+              "description": "Two-dimensional single-cell Perlin gradient interpolation",
+              "workload": {
+                "count": 20000000,
+                "unit": "samples"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 77.4217,
+              "results": [
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 55.9251,
+                  "cpuMilliseconds": 54.521,
+                  "peakRssKilobytes": 3968,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 0.9183,
+                  "cpuRelativeToC": 0.9167,
+                  "memoryRelativeToC": 2.2342,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 60.899,
+                  "cpuMilliseconds": 59.475,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.0889,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 61.0203,
+                  "cpuMilliseconds": 59.556,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.0911,
+                  "relativeToC": 1.002,
+                  "cpuRelativeToC": 1.0014,
+                  "memoryRelativeToC": 0.991,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 67.95,
+                  "cpuMilliseconds": 66.456,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.215,
+                  "relativeToC": 1.1158,
+                  "cpuRelativeToC": 1.1174,
+                  "memoryRelativeToC": 1.0,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 71.6457,
+                  "cpuMilliseconds": 70.343,
+                  "peakRssKilobytes": 1952,
+                  "relativeToFastest": 1.2811,
+                  "relativeToC": 1.1765,
+                  "cpuRelativeToC": 1.1827,
+                  "memoryRelativeToC": 1.0991,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 71.6868,
+                  "cpuMilliseconds": 70.363,
+                  "peakRssKilobytes": 1888,
+                  "relativeToFastest": 1.2818,
+                  "relativeToC": 1.1771,
+                  "cpuRelativeToC": 1.1831,
+                  "memoryRelativeToC": 1.0631,
+                  "output": "exit:1"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "voronoi",
+          "name": "Voronoi",
+          "leaves": [
+            {
+              "id": "voronoi_noise",
+              "name": "Three feature points",
+              "description": "Squared distance to the nearest of three two-dimensional feature points",
+              "workload": {
+                "count": 20000000,
+                "unit": "samples"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 52.118,
+              "results": [
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 32.4097,
+                  "cpuMilliseconds": 31.058,
+                  "peakRssKilobytes": 3968,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 0.6716,
+                  "cpuRelativeToC": 0.663,
+                  "memoryRelativeToC": 2.2545,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 45.4825,
+                  "cpuMilliseconds": 44.115,
+                  "peakRssKilobytes": 1952,
+                  "relativeToFastest": 1.4034,
+                  "relativeToC": 0.9425,
+                  "cpuRelativeToC": 0.9417,
+                  "memoryRelativeToC": 1.1091,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 45.8707,
+                  "cpuMilliseconds": 44.61,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.4153,
+                  "relativeToC": 0.9506,
+                  "cpuRelativeToC": 0.9523,
+                  "memoryRelativeToC": 1.0091,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 46.0177,
+                  "cpuMilliseconds": 44.819,
+                  "peakRssKilobytes": 1904,
+                  "relativeToFastest": 1.4199,
+                  "relativeToC": 0.9536,
+                  "cpuRelativeToC": 0.9568,
+                  "memoryRelativeToC": 1.0818,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 48.2555,
+                  "cpuMilliseconds": 46.844,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.4889,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 48.2574,
+                  "cpuMilliseconds": 46.95,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.489,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0023,
+                  "memoryRelativeToC": 1.0,
+                  "output": "exit:1"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "value-noise",
+          "name": "Value Noise",
+          "leaves": [
+            {
+              "id": "value_noise",
+              "name": "Four lattice values",
+              "description": "Two-dimensional smooth bilinear interpolation of four lattice values",
+              "workload": {
+                "count": 20000000,
+                "unit": "samples"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 53.5723,
+              "results": [
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 37.5237,
+                  "cpuMilliseconds": 36.23,
+                  "peakRssKilobytes": 3968,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 0.7578,
+                  "cpuRelativeToC": 0.7518,
+                  "memoryRelativeToC": 2.2342,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 48.3528,
+                  "cpuMilliseconds": 46.814,
+                  "peakRssKilobytes": 1968,
+                  "relativeToFastest": 1.2886,
+                  "relativeToC": 0.9765,
+                  "cpuRelativeToC": 0.9714,
+                  "memoryRelativeToC": 1.1081,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 49.1946,
+                  "cpuMilliseconds": 47.837,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.311,
+                  "relativeToC": 0.9935,
+                  "cpuRelativeToC": 0.9927,
+                  "memoryRelativeToC": 1.0,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 49.2973,
+                  "cpuMilliseconds": 47.857,
+                  "peakRssKilobytes": 1888,
+                  "relativeToFastest": 1.3138,
+                  "relativeToC": 0.9956,
+                  "cpuRelativeToC": 0.9931,
+                  "memoryRelativeToC": 1.0631,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 49.5158,
+                  "cpuMilliseconds": 48.19,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.3196,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "exit:1"
+                },
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 49.604,
+                  "cpuMilliseconds": 48.168,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.3219,
+                  "relativeToC": 1.0018,
+                  "cpuRelativeToC": 0.9995,
+                  "memoryRelativeToC": 0.991,
+                  "output": "exit:1"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "strings",
+      "name": "Strings",
+      "subcategories": [
+        {
+          "id": "append",
+          "name": "Append",
+          "leaves": [
+            {
+              "id": "strings",
+              "name": "Incremental owned growth",
+              "description": "Incremental string growth and length tracking",
+              "workload": {
+                "count": 2000000,
+                "unit": "appends"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 27.5729,
+              "results": [
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 8.326,
+                  "cpuMilliseconds": 6.923,
+                  "peakRssKilobytes": 3728,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 0.9806,
+                  "cpuRelativeToC": 0.9904,
+                  "memoryRelativeToC": 1.0,
+                  "output": "9"
+                },
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 8.4911,
+                  "cpuMilliseconds": 6.99,
+                  "peakRssKilobytes": 3728,
+                  "relativeToFastest": 1.0198,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "9"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 8.5848,
+                  "cpuMilliseconds": 7.081,
+                  "peakRssKilobytes": 3952,
+                  "relativeToFastest": 1.0311,
+                  "relativeToC": 1.011,
+                  "cpuRelativeToC": 1.013,
+                  "memoryRelativeToC": 1.0601,
+                  "output": "9"
+                },
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 9.1273,
+                  "cpuMilliseconds": 7.755,
+                  "peakRssKilobytes": 6192,
+                  "relativeToFastest": 1.0962,
+                  "relativeToC": 1.0749,
+                  "cpuRelativeToC": 1.1094,
+                  "memoryRelativeToC": 1.6609,
+                  "output": "9"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 11.4725,
+                  "cpuMilliseconds": 10.293,
+                  "peakRssKilobytes": 4880,
+                  "relativeToFastest": 1.3779,
+                  "relativeToC": 1.3511,
+                  "cpuRelativeToC": 1.4725,
+                  "memoryRelativeToC": 1.309,
+                  "output": "exit:9"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 25.5305,
+                  "cpuMilliseconds": 23.637,
+                  "peakRssKilobytes": 4176,
+                  "relativeToFastest": 3.0664,
+                  "relativeToC": 3.0067,
+                  "cpuRelativeToC": 3.3815,
+                  "memoryRelativeToC": 1.1202,
+                  "output": "9"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "collections",
+      "name": "Collections",
+      "subcategories": [
+        {
+          "id": "indexed-read",
+          "name": "Indexed Read",
+          "leaves": [
+            {
+              "id": "collections",
+              "name": "Eight-value reduction",
+              "description": "Repeated indexed array reads, branching, and reduction",
+              "workload": {
+                "count": 2000000,
+                "unit": "reads"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 5.6739,
+              "results": [
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 3.5283,
+                  "cpuMilliseconds": 1.777,
+                  "peakRssKilobytes": 2176,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 0.9009,
+                  "cpuRelativeToC": 0.7194,
+                  "memoryRelativeToC": 1.2364,
+                  "output": "6000000"
+                },
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 3.6574,
+                  "cpuMilliseconds": 2.136,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.0366,
+                  "relativeToC": 0.9339,
+                  "cpuRelativeToC": 0.8648,
+                  "memoryRelativeToC": 1.0091,
+                  "output": "6000000"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 3.8308,
+                  "cpuMilliseconds": 2.352,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.0858,
+                  "relativeToC": 0.9782,
+                  "cpuRelativeToC": 0.9522,
+                  "memoryRelativeToC": 1.0,
+                  "output": "exit:96"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 3.8331,
+                  "cpuMilliseconds": 2.358,
+                  "peakRssKilobytes": 1952,
+                  "relativeToFastest": 1.0864,
+                  "relativeToC": 0.9788,
+                  "cpuRelativeToC": 0.9547,
+                  "memoryRelativeToC": 1.1091,
+                  "output": "6000000"
+                },
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 3.9163,
+                  "cpuMilliseconds": 2.47,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.11,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "6000000"
+                },
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 5.2536,
+                  "cpuMilliseconds": 3.845,
+                  "peakRssKilobytes": 4096,
+                  "relativeToFastest": 1.489,
+                  "relativeToC": 1.3415,
+                  "cpuRelativeToC": 1.5567,
+                  "memoryRelativeToC": 2.3273,
+                  "output": "6000000"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "convolution",
+      "name": "Convolution",
+      "subcategories": [
+        {
+          "id": "1d-three-tap",
+          "name": "1D Three Tap",
+          "leaves": [
+            {
+              "id": "convolution_1d",
+              "name": "Circular eight sample",
+              "description": "Circular one-dimensional three-tap stencil over eight integer samples",
+              "workload": {
+                "count": 2000000,
+                "unit": "windows"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 11.506,
+              "results": [
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 9.5415,
+                  "cpuMilliseconds": 8.219,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 0.9842,
+                  "cpuRelativeToC": 0.9994,
+                  "memoryRelativeToC": 1.0,
+                  "output": "999775"
+                },
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 9.6951,
+                  "cpuMilliseconds": 8.224,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.0161,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "999775"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 9.8293,
+                  "cpuMilliseconds": 8.438,
+                  "peakRssKilobytes": 1968,
+                  "relativeToFastest": 1.0302,
+                  "relativeToC": 1.0138,
+                  "cpuRelativeToC": 1.026,
+                  "memoryRelativeToC": 1.1182,
+                  "output": "999775"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 10.4055,
+                  "cpuMilliseconds": 8.844,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.0906,
+                  "relativeToC": 1.0733,
+                  "cpuRelativeToC": 1.0754,
+                  "memoryRelativeToC": 1.0,
+                  "output": "exit:42"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 10.543,
+                  "cpuMilliseconds": 8.691,
+                  "peakRssKilobytes": 2192,
+                  "relativeToFastest": 1.105,
+                  "relativeToC": 1.0874,
+                  "cpuRelativeToC": 1.0568,
+                  "memoryRelativeToC": 1.2455,
+                  "output": "999775"
+                },
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 10.6537,
+                  "cpuMilliseconds": 9.188,
+                  "peakRssKilobytes": 4080,
+                  "relativeToFastest": 1.1166,
+                  "relativeToC": 1.0989,
+                  "cpuRelativeToC": 1.1172,
+                  "memoryRelativeToC": 2.3182,
+                  "output": "999775"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "constructs",
+      "name": "Constructs",
+      "subcategories": [
+        {
+          "id": "value-construction",
+          "name": "Value Construction",
+          "leaves": [
+            {
+              "id": "constructs",
+              "name": "Pair construction",
+              "description": "Short-lived value construction and member access",
+              "workload": {
+                "count": 2000000,
+                "unit": "constructions"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 12.377,
+              "results": [
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 8.3224,
+                  "cpuMilliseconds": 6.896,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "36"
+                },
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 8.4001,
+                  "cpuMilliseconds": 6.864,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.0093,
+                  "relativeToC": 1.0093,
+                  "cpuRelativeToC": 0.9954,
+                  "memoryRelativeToC": 1.0,
+                  "output": "36"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 8.9948,
+                  "cpuMilliseconds": 7.513,
+                  "peakRssKilobytes": 1776,
+                  "relativeToFastest": 1.0808,
+                  "relativeToC": 1.0808,
+                  "cpuRelativeToC": 1.0895,
+                  "memoryRelativeToC": 1.0,
+                  "output": "exit:36"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 9.0147,
+                  "cpuMilliseconds": 7.323,
+                  "peakRssKilobytes": 1968,
+                  "relativeToFastest": 1.0832,
+                  "relativeToC": 1.0832,
+                  "cpuRelativeToC": 1.0619,
+                  "memoryRelativeToC": 1.1081,
+                  "output": "36"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 9.2414,
+                  "cpuMilliseconds": 7.308,
+                  "peakRssKilobytes": 2176,
+                  "relativeToFastest": 1.1104,
+                  "relativeToC": 1.1104,
+                  "cpuRelativeToC": 1.0597,
+                  "memoryRelativeToC": 1.2252,
+                  "output": "36"
+                },
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 11.4602,
+                  "cpuMilliseconds": 10.011,
+                  "peakRssKilobytes": 4192,
+                  "relativeToFastest": 1.377,
+                  "relativeToC": 1.377,
+                  "cpuRelativeToC": 1.4517,
+                  "memoryRelativeToC": 2.3604,
+                  "output": "36"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "recursion",
+      "name": "Recursion",
+      "subcategories": [
+        {
+          "id": "fibonacci",
+          "name": "Fibonacci",
+          "leaves": [
+            {
+              "id": "fibonacci_recursion",
+              "name": "Depth 20 and 21",
+              "description": "Repeated binary recursion alternating depths 20 and 21",
+              "workload": {
+                "count": 2000,
+                "unit": "root calls"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 59.2002,
+              "results": [
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 46.4396,
+                  "cpuMilliseconds": 44.871,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 0.9941,
+                  "cpuRelativeToC": 1.0055,
+                  "memoryRelativeToC": 1.0,
+                  "output": "710949"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 46.5923,
+                  "cpuMilliseconds": 44.974,
+                  "peakRssKilobytes": 1792,
+                  "relativeToFastest": 1.0033,
+                  "relativeToC": 0.9973,
+                  "cpuRelativeToC": 1.0078,
+                  "memoryRelativeToC": 1.0182,
+                  "output": "exit:117"
+                },
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 46.7168,
+                  "cpuMilliseconds": 44.627,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.006,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "710949"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 51.2218,
+                  "cpuMilliseconds": 49.667,
+                  "peakRssKilobytes": 1968,
+                  "relativeToFastest": 1.103,
+                  "relativeToC": 1.0964,
+                  "cpuRelativeToC": 1.1129,
+                  "memoryRelativeToC": 1.1182,
+                  "output": "710949"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 52.1736,
+                  "cpuMilliseconds": 50.275,
+                  "peakRssKilobytes": 2176,
+                  "relativeToFastest": 1.1235,
+                  "relativeToC": 1.1168,
+                  "cpuRelativeToC": 1.1266,
+                  "memoryRelativeToC": 1.2364,
+                  "output": "710949"
+                },
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 54.815,
+                  "cpuMilliseconds": 52.928,
+                  "peakRssKilobytes": 4080,
+                  "relativeToFastest": 1.1804,
+                  "relativeToC": 1.1733,
+                  "cpuRelativeToC": 1.186,
+                  "memoryRelativeToC": 2.3182,
+                  "output": "710949"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "function-calls",
+      "name": "Function Calls",
+      "subcategories": [
+        {
+          "id": "direct-call",
+          "name": "Direct Call",
+          "leaves": [
+            {
+              "id": "function_calls",
+              "name": "Choose",
+              "description": "Small reusable function calls and predictable branching",
+              "workload": {
+                "count": 20000000,
+                "unit": "calls"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 73.6231,
+              "results": [
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 59.318,
+                  "cpuMilliseconds": 57.612,
+                  "peakRssKilobytes": 4112,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 0.9374,
+                  "cpuRelativeToC": 0.9377,
+                  "memoryRelativeToC": 2.3364,
+                  "output": "1800"
+                },
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 63.2778,
+                  "cpuMilliseconds": 61.439,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.0668,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "1800"
+                },
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 63.5405,
+                  "cpuMilliseconds": 61.573,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.0712,
+                  "relativeToC": 1.0042,
+                  "cpuRelativeToC": 1.0022,
+                  "memoryRelativeToC": 1.0,
+                  "output": "1800"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 63.893,
+                  "cpuMilliseconds": 61.739,
+                  "peakRssKilobytes": 1952,
+                  "relativeToFastest": 1.0771,
+                  "relativeToC": 1.0097,
+                  "cpuRelativeToC": 1.0049,
+                  "memoryRelativeToC": 1.1091,
+                  "output": "1800"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 64.1206,
+                  "cpuMilliseconds": 61.961,
+                  "peakRssKilobytes": 2192,
+                  "relativeToFastest": 1.081,
+                  "relativeToC": 1.0133,
+                  "cpuRelativeToC": 1.0085,
+                  "memoryRelativeToC": 1.2455,
+                  "output": "1800"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 68.1695,
+                  "cpuMilliseconds": 66.65,
+                  "peakRssKilobytes": 1760,
+                  "relativeToFastest": 1.1492,
+                  "relativeToC": 1.0773,
+                  "cpuRelativeToC": 1.0848,
+                  "memoryRelativeToC": 1.0,
+                  "output": "exit:43"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

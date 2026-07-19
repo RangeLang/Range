@@ -1,4 +1,5 @@
 import { MarkGithubIcon, XIcon } from "@primer/octicons-react";
+import benchmarkDataJson from "../public/benchmarks.json";
 
 type Result = {
   language: string;
@@ -11,7 +12,55 @@ type Benchmark = {
   axisMax: number;
   results: Result[];
   note?: string;
+  leaf?: string;
+  description?: string;
 };
+
+type BenchmarkMeasurement = {
+  language: string;
+  status: "passed";
+  wallMilliseconds: number;
+  cpuMilliseconds: number;
+  peakRssKilobytes: number;
+  relativeToFastest: number;
+  relativeToC: number;
+  output: string;
+};
+
+type BenchmarkLeaf = {
+  id: string;
+  name: string;
+  description: string;
+  workload: { count: number; unit: string };
+  runStatus: "passed" | "notRun";
+  rangeStatus: "passed" | "notEmitted" | "notRun";
+  axisMaxMilliseconds: number;
+  results: BenchmarkMeasurement[];
+};
+
+type BenchmarkArtifact = {
+  schemaVersion: number;
+  generatedAt: string;
+  configuration: { baseIterations: number; runs: number; caseFilter: string[] };
+  summary: {
+    leafCount: number;
+    runLeafCount: number;
+    rangePassed: number;
+    rangeNotEmitted: number;
+    rangeFailed: number;
+  };
+  categories: Array<{
+    id: string;
+    name: string;
+    subcategories: Array<{
+      id: string;
+      name: string;
+      leaves: BenchmarkLeaf[];
+    }>;
+  }>;
+};
+
+const benchmarkData = benchmarkDataJson as BenchmarkArtifact;
 
 const baselineBenchmarks: Benchmark[] = [
   {
@@ -146,9 +195,14 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
   return (
     <section className="chart" aria-labelledby={`${id}-title`}>
       <header className="chartHeader">
-        <h2 id={`${id}-title`}>{benchmark.name}</h2>
+        <div>
+          <h2 id={`${id}-title`}>{benchmark.name}</h2>
+          {benchmark.leaf && <p className="chartLeaf">{benchmark.leaf}</p>}
+        </div>
         <span>{benchmark.scale}</span>
       </header>
+
+      {benchmark.description && <p className="chartDescription">{benchmark.description}</p>}
 
       <div className="rows">
         {benchmark.results.map((result) => {
@@ -219,6 +273,32 @@ function Chart({ benchmark, id }: { benchmark: Benchmark; id: string }) {
   );
 }
 
+function formatWorkload(count: number): string {
+  if (count >= 1_000_000) {
+    const millions = count / 1_000_000;
+    return `${Number.isInteger(millions) ? millions.toFixed(0) : millions.toFixed(1)}m`;
+  }
+  if (count >= 1_000) {
+    const thousands = count / 1_000;
+    return `${Number.isInteger(thousands) ? thousands.toFixed(0) : thousands.toFixed(1)}k`;
+  }
+  return count.toString();
+}
+
+function benchmarkFromLeaf(subcategory: string, leaf: BenchmarkLeaf): Benchmark {
+  return {
+    name: subcategory,
+    leaf: leaf.name,
+    description: leaf.description,
+    scale: `${formatWorkload(leaf.workload.count)} ${leaf.workload.unit} · ${benchmarkData.configuration.runs} runs`,
+    axisMax: Math.max(leaf.axisMaxMilliseconds, 1),
+    results: leaf.results.map((result) => ({
+      language: result.language,
+      milliseconds: result.wallMilliseconds,
+    })),
+  };
+}
+
 function RangeImprovementChart() {
   return (
     <section className="improvementChart" aria-labelledby="range-improvement-chart-title">
@@ -277,6 +357,54 @@ export default function Home() {
       <header className="pageHeader">
         <h1>Range Performance</h1>
       </header>
+
+      <section className="benchmarkProject" aria-labelledby="benchmark-project-title">
+        <div className="sectionHeader">
+          <h2 id="benchmark-project-title">Benchmark suite</h2>
+          <p className="dateLabel">
+            {new Date(benchmarkData.generatedAt).toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+              timeZone: "UTC",
+            })}
+          </p>
+        </div>
+
+        {benchmarkData.categories.map((category) => {
+          const completedSubcategories = category.subcategories
+            .map((subcategory) => ({
+              ...subcategory,
+              leaves: subcategory.leaves.filter((leaf) => leaf.results.length > 0),
+            }))
+            .filter((subcategory) => subcategory.leaves.length > 0);
+          if (completedSubcategories.length === 0) return null;
+
+          return (
+            <section className="benchmarkCategory" aria-labelledby={`category-${category.id}`} key={category.id}>
+              <h3 id={`category-${category.id}`}>{category.name}</h3>
+              <div className="chartGrid">
+                {completedSubcategories.flatMap((subcategory) =>
+                  subcategory.leaves.map((leaf) => (
+                    <Chart
+                      benchmark={benchmarkFromLeaf(subcategory.name, leaf)}
+                      id={`current-${category.id}-${subcategory.id}-${leaf.id}`}
+                      key={leaf.id}
+                    />
+                  )),
+                )}
+              </div>
+            </section>
+          );
+        })}
+
+        <div className="benchmarkRunStatus" aria-label="Current benchmark run status">
+          <span>{benchmarkData.summary.runLeafCount} of {benchmarkData.summary.leafCount} leaves run</span>
+          <span>Range passed {benchmarkData.summary.rangePassed}</span>
+          <span>Not emitted {benchmarkData.summary.rangeNotEmitted}</span>
+          <span>Failed {benchmarkData.summary.rangeFailed}</span>
+        </div>
+      </section>
 
       <section className="benchmarkSection" aria-labelledby="baseline-title">
         <div className="sectionHeader">
