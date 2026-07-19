@@ -11,6 +11,7 @@ export function createScaleMarks({ count = 18 } = {}) {
 
   return Array.from({ length: count }, (_, index) => ({
     isRadix: index === 0 || index === count - 1 || index % 4 === 0,
+    measure: index === 0 || index === count - 1 || index % 4 === 0 ? 1.8 : 1,
     position: index / (count - 1),
     source: "scale",
     weight: 1,
@@ -42,6 +43,7 @@ export function createPinchMarks({
 
     return {
       isRadix: signedStep === 0,
+      measure: 1.65 + (radius - Math.abs(signedStep)) * 0.65,
       position: center + distance,
       source: "pinch",
       weight: 1,
@@ -55,16 +57,19 @@ export function mergeMarks(markGroups, epsilon = DEFAULT_EPSILON) {
 
   const sorted = markGroups.flat().map((mark) => {
     const weight = mark.weight ?? 1;
+    const measure = mark.measure ?? (mark.isRadix ? 1.8 : 1);
     assertFiniteNumber(mark.position, "mark.position");
     assertFiniteNumber(weight, "mark.weight");
+    assertFiniteNumber(measure, "mark.measure");
     if (mark.position < 0 || mark.position > 1) {
       throw new RangeError("mark.position must be within [0, 1]");
     }
     if (weight <= 0) throw new RangeError("mark.weight must be positive");
+    if (measure <= 0) throw new RangeError("mark.measure must be positive");
     if (typeof mark.source !== "string" || mark.source.length === 0) {
       throw new TypeError("mark.source must be a non-empty string");
     }
-    return { ...mark, weight };
+    return { ...mark, measure, weight };
   }).sort((left, right) => left.position - right.position);
 
   return sorted.reduce((merged, mark) => {
@@ -73,6 +78,7 @@ export function mergeMarks(markGroups, epsilon = DEFAULT_EPSILON) {
       merged.push({
         anchor: mark.position,
         isRadix: Boolean(mark.isRadix),
+        measure: mark.measure,
         position: mark.position,
         sources: new Set([mark.source]),
         weight: mark.weight,
@@ -84,12 +90,16 @@ export function mergeMarks(markGroups, epsilon = DEFAULT_EPSILON) {
     previous.position = (
       previous.position * previous.weight + mark.position * mark.weight
     ) / combinedWeight;
+    previous.measure = (
+      previous.measure * previous.weight + mark.measure * mark.weight
+    ) / combinedWeight;
     previous.weight = combinedWeight;
     previous.isRadix ||= Boolean(mark.isRadix);
     previous.sources.add(mark.source);
     return merged;
   }, []).map((mark) => ({
     isRadix: mark.isRadix,
+    measure: mark.measure,
     position: mark.position,
     sources: [...mark.sources].sort(),
   }));

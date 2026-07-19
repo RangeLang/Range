@@ -137,6 +137,11 @@ test("merges linear scale and pinch marks deterministically", async () => {
       .map(({ position }) => Number(position.toFixed(4))),
     [0.2436, 0.258, 0.27, 0.282, 0.2964],
   );
+  assert.deepEqual(
+    createPinchMarks({ center: 0.27, count: 5, growth: 2.2, minimumDistance: 0.012 })
+      .map(({ measure }) => measure),
+    [1.65, 2.3, 2.95, 2.3, 1.65],
+  );
 
   const marks = createRangeMarks({
     marks: 18,
@@ -146,6 +151,7 @@ test("merges linear scale and pinch marks deterministically", async () => {
     pinchMarks: 5,
   });
   assert.ok(marks.every((mark) => mark.position >= 0 && mark.position <= 1));
+  assert.ok(marks.every((mark) => mark.measure >= 1));
   assert.ok(marks.every((mark, index) => index === 0 || mark.position > marks[index - 1].position));
   assert.ok(marks.some((mark) => Math.abs(mark.position - 0.27) < 1e-12 && mark.isRadix));
 
@@ -156,6 +162,7 @@ test("merges linear scale and pinch marks deterministically", async () => {
   const expectedPosition = (0.27 + 0.27000000001 * 3) / 4;
   assert.equal(merged.length, 1);
   assert.ok(Math.abs(merged[0].position - expectedPosition) < 1e-15);
+  assert.equal(merged[0].measure, 1.6);
   assert.equal(merged[0].isRadix, true);
   assert.deepEqual(merged[0].sources, ["pinch", "scale"]);
   assert.throws(

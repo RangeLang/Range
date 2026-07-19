@@ -80,14 +80,13 @@ class RangeScale extends HTMLElement {
           position: absolute;
           top: var(--position);
           left: 50%;
-          width: 5px;
+          width: calc(5px * var(--measure));
           height: 1px;
           border-radius: 999px;
           background: var(--line, oklch(0.9 0.012 255));
           transform: translate(-50%, -50%);
         }
         i.radix {
-          width: 9px;
           background: color-mix(
             in oklch,
             var(--muted, oklch(0.58 0.015 255)),
@@ -96,7 +95,7 @@ class RangeScale extends HTMLElement {
         }
       </style>
       ${marks.map((mark) => (
-        `<i class="${mark.isRadix ? "radix" : "normal"}" style="--position:${mark.position * 100}%"></i>`
+        `<i class="${mark.isRadix ? "radix" : "normal"}" style="--measure:${mark.measure};--position:${mark.position * 100}%"></i>`
       )).join("")}
     `;
   }
