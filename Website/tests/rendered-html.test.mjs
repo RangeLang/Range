@@ -251,6 +251,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /@view-transition\s*{\s*navigation:\s*auto/);
   assert.match(styles, /view-transition-name:\s*range-navigation/);
   assert.match(styles, /view-transition-name:\s*range-title-morph/);
+  assert.match(styles, /\.landingHero \.rangeTitleWord\s*{[^}]*transform:\s*translateX\(-3px\)/s);
   assert.match(styles, /view-transition-group\(range-title-morph\)/);
   assert.match(styles, /view-transition-old\(range-title-morph\)\s*{[^}]*opacity:\s*1[^}]*animation:\s*none/s);
   assert.match(styles, /view-transition-new\(range-title-morph\)\s*{[^}]*opacity:\s*0[^}]*animation:\s*none/s);
@@ -277,7 +278,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingNav \[data-scale-zero\]\s*{[^}]*font-size:\s*14\.6px/s);
   assert.match(styles, /\.landingHero h1\s*{[^}]*display:\s*grid[^}]*grid-template-columns:\s*var\(--range-index-column\) auto[^}]*align-items:\s*flex-start[^}]*column-gap:\s*var\(--range-index-gap\)/s);
   assert.match(styles, /\.landingHero \[data-scale-end\]\s*{[^}]*position:\s*relative[^}]*font-size:\s*25\.4px[^}]*overflow:\s*visible/s);
-  assert.match(styles, /\.landingHero \[data-scale-end\] > span\s*{[^}]*left:\s*calc\(50% - 0\.12em\)[^}]*transform:\s*translateX\(-50%\)/s);
+  assert.match(styles, /\.landingHero \[data-scale-end\] > span\s*{[^}]*left:\s*50%[^}]*transform:\s*translateX\(-50%\)/s);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(serverBundle, /@shikijs|engine-oniguruma|wasm-DtTceah8/);
 });

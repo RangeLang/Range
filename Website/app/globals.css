@@ -61,6 +61,10 @@ main {
   view-transition-name: range-title-morph;
 }
 
+.landingHero .rangeTitleWord {
+  transform: translateX(-3px);
+}
+
 range-typed-text:not(:defined) {
   visibility: hidden;
 }
@@ -254,7 +258,7 @@ range-typed-text[data-typing]::after {
 .landingHero [data-scale-end] > span {
   position: absolute;
   top: 0;
-  left: calc(50% - 0.12em);
+  left: 50%;
   transform: translateX(-50%);
 }
 
