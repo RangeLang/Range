@@ -261,7 +261,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingNav \[data-scale-zero\]\s*{[^}]*font-size:\s*14\.6px/s);
   assert.match(styles, /\.landingHero h1\s*{[^}]*align-items:\s*flex-start[^}]*gap:\s*10px/s);
   assert.match(styles, /\.landingHero \[data-scale-end\]\s*{[^}]*position:\s*relative[^}]*font-size:\s*25\.4px[^}]*overflow:\s*visible/s);
-  assert.match(styles, /\.landingHero \[data-scale-end\] > span\s*{[^}]*left:\s*50%[^}]*transform:\s*translateX\(-50%\)/s);
+  assert.match(styles, /\.landingHero \[data-scale-end\] > span\s*{[^}]*left:\s*calc\(50% - 0\.12em\)[^}]*transform:\s*translateX\(-50%\)/s);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(serverBundle, /@shikijs|engine-oniguruma|wasm-DtTceah8/);
 });

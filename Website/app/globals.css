@@ -250,7 +250,7 @@ range-typed-text[data-typing]::after {
 .landingHero [data-scale-end] > span {
   position: absolute;
   top: 0;
-  left: 50%;
+  left: calc(50% - 0.12em);
   transform: translateX(-50%);
 }
 
