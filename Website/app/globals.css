@@ -194,6 +194,7 @@ range-typed-text[data-typing]::after {
 .landingIndex {
   flex: 0 0 auto;
   width: var(--range-index-column);
+  text-align: center;
   color: var(--ink);
   font-family: var(--font-geist-mono), monospace;
   font-size: 20px;

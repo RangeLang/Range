@@ -275,6 +275,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingSequence\s*{[^}]*--range-index-column:\s*15px[^}]*--range-index-gap:\s*10px/s);
   assert.match(styles, /\.landingWordmark\s*{[^}]*display:\s*inline-grid[^}]*grid-template-columns:\s*var\(--range-index-column\) auto[^}]*align-items:\s*center[^}]*column-gap:\s*var\(--range-index-gap\)/s);
   assert.match(styles, /\.landingIndex\s*{[^}]*width:\s*var\(--range-index-column\)/s);
+  assert.match(styles, /\.landingIndex\s*{[^}]*text-align:\s*center/s);
   assert.match(styles, /\.landingNav \[data-scale-zero\]\s*{[^}]*font-size:\s*14\.6px/s);
   assert.match(styles, /\.landingHero h1\s*{[^}]*display:\s*grid[^}]*grid-template-columns:\s*var\(--range-index-column\) auto[^}]*align-items:\s*flex-start[^}]*column-gap:\s*var\(--range-index-gap\)/s);
   assert.match(styles, /\.landingHero \[data-scale-end\]\s*{[^}]*position:\s*relative[^}]*font-size:\s*25\.4px[^}]*overflow:\s*visible/s);
