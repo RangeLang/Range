@@ -40,3 +40,9 @@ entry:
   ret i32 0
 }
 ```
+
+## License
+
+Copyright 2026 George Tchelidze.
+
+Range is licensed under the [Apache License, Version 2.0](LICENSE).
