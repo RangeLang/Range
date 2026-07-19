@@ -450,3 +450,8 @@ test("serves local fonts with the WOFF2 media type", async () => {
   assert.match(response.headers.get("cache-control") ?? "", /immutable/);
   assert.equal(await response.text(), "wOF2font");
 });
+
+test("routes font assets through the Worker", async () => {
+  const config = await readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
+  assert.match(config, /run_worker_first:\s*\["\/fonts\/\*"\]/);
+});

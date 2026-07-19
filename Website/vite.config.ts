@@ -27,7 +27,11 @@ export default defineConfig(async () => {
           main: "./worker/index.ts",
           compatibility_date: "2026-07-19",
           compatibility_flags: ["nodejs_compat"],
-          assets: { directory: "./public", binding: "ASSETS" },
+          assets: {
+            directory: "./public",
+            binding: "ASSETS",
+            run_worker_first: ["/fonts/*"],
+          },
         },
       }),
     ],
