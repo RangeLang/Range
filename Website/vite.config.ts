@@ -30,7 +30,7 @@ export default defineConfig(async () => {
           assets: {
             directory: "./public",
             binding: "ASSETS",
-            run_worker_first: ["/fonts/*"],
+            run_worker_first: true,
           },
         },
       }),

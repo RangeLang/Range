@@ -453,5 +453,5 @@ test("serves local fonts with the WOFF2 media type", async () => {
 
 test("routes font assets through the Worker", async () => {
   const config = await readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
-  assert.match(config, /run_worker_first:\s*\["\/fonts\/\*"\]/);
+  assert.match(config, /run_worker_first:\s*true/);
 });
