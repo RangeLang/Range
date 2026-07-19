@@ -270,14 +270,11 @@ export function createRangeMarks(config = {}) {
       falloff: config.toneFalloff,
       innerEdge: config.pinchInnerEdge,
     });
-    const opacity = Math.max(0, 1 - tone ** 6 / 0.98);
-    const collapse = (1 - opacity) ** (config.invisibleCollapsePower ?? 1.35);
-    const measureCollapse = 1 - (1 - (config.invisibleMeasureMinimum ?? 0.1)) * collapse;
-    const strokeCollapse = 1 - (1 - (config.invisibleStrokeMinimum ?? 0.06)) * collapse;
-    const stroke = (1 - (1 - config.strokeMinimum) * shape) * strokeCollapse;
+    const opacity = 1 - 0.1 * tone;
+    const stroke = 1 - (1 - config.strokeMinimum) * shape;
     return {
       ...mark,
-      measure: baseline * (1 - (1 - config.measureMinimum) * shape) * measureCollapse,
+      measure: baseline * (1 - (1 - config.measureMinimum) * shape),
       stroke,
       opacity,
       tone,

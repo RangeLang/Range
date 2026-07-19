@@ -30,9 +30,9 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*division-base="3")(?=[^>]*division-levels="3")(?=[^>]*pinch="0.27")(?=[^>]*pinch-core="10")(?=[^>]*pinch-falloff="0.16")(?=[^>]*pinch-inner-edge="0.68")(?=[^>]*pinch-strength="0.9")(?=[^>]*measure-minimum="0.35")(?=[^>]*invisible-collapse-power="1.35")(?=[^>]*invisible-measure-minimum="0.1")(?=[^>]*invisible-stroke-minimum="0.06")(?=[^>]*marker-capture-division-weight="0.48")(?=[^>]*marker-capture-falloff="0.14")(?=[^>]*marker-capture-strength="0.9")(?=[^>]*stroke-minimum="0.25")(?=[^>]*snap-hysteresis="0.08")(?=[^>]*snap-to-marks="true")(?=[^>]*tone-falloff="0.12")(?=[^>]*tone-intensity="0.82")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*division-base="3")(?=[^>]*division-levels="3")(?=[^>]*pinch="0.27")(?=[^>]*pinch-core="10")(?=[^>]*pinch-falloff="0.16")(?=[^>]*pinch-inner-edge="0.68")(?=[^>]*pinch-strength="0.9")(?=[^>]*measure-minimum="0.7")(?=[^>]*invisible-collapse-power="1.35")(?=[^>]*invisible-measure-minimum="0.1")(?=[^>]*invisible-stroke-minimum="0.06")(?=[^>]*marker-capture-division-weight="0.48")(?=[^>]*marker-capture-falloff="0.14")(?=[^>]*marker-capture-strength="0.9")(?=[^>]*stroke-minimum="0.65")(?=[^>]*snap-hysteresis="0.08")(?=[^>]*snap-to-marks="true")(?=[^>]*tone-falloff="0.12")(?=[^>]*tone-intensity="0.16")[^>]*>/,
   );
-  assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js\?profile=pinch-field-v2"/);
+  assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js\?profile=pinch-density-v3"/);
   assert.match(html, /class="rangeWord">Range<\/span>/);
   assert.match(html, /<range-optical-guide[^>]*aria-hidden="true"/);
   assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink-box"/);
@@ -186,19 +186,19 @@ test("merges linear scale and pinch marks deterministically", async () => {
     pinchFalloff: 0.16,
     pinchInnerEdge: 0.68,
     pinchStrength: 0.9,
-    measureMinimum: 0.35,
+    measureMinimum: 0.7,
     invisibleCollapsePower: 1.35,
     invisibleMeasureMinimum: 0.1,
     invisibleStrokeMinimum: 0.06,
     markerCaptureDivisionWeight: 0.48,
     markerCaptureFalloff: 0.14,
     markerCaptureStrength: 0.9,
-    strokeMinimum: 0.25,
+    strokeMinimum: 0.65,
     toneFalloff: 0.12,
   });
   assert.ok(marks.every((mark) => mark.position >= 0 && mark.position <= 1));
-  assert.ok(marks.every((mark) => mark.measure >= 0.035 - 1e-12));
-  assert.ok(marks.every((mark) => mark.stroke >= 0.015 - 1e-12 && mark.stroke <= 1));
+  assert.ok(marks.every((mark) => mark.measure >= 0.7 - 1e-12));
+  assert.ok(marks.every((mark) => mark.stroke >= 0.65 - 1e-12 && mark.stroke <= 1));
   assert.ok(marks.every((mark) => mark.tone >= 0 && mark.tone <= 1));
   assert.ok(marks.every((mark) => mark.opacity >= 0 && mark.opacity <= 1));
   assert.ok(marks.every((mark, index) => index === 0 || mark.position > marks[index - 1].position));
@@ -206,13 +206,17 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(marks[7].position > 7 / 27);
   assert.ok(marks[8].position < 8 / 27);
   assert.ok(marks[8].position - marks[7].position < 1 / 27);
+  assert.ok(
+    marks.filter((mark) => Math.abs(mark.position - 0.27) < 0.04).length
+      > scaleHierarchy.filter((mark) => Math.abs(mark.position - 0.27) < 0.04).length,
+  );
   assert.ok(marks[7].measure < 1);
   assert.ok(marks[7].stroke < 1);
   assert.ok(marks[7].tone > 0.9);
-  assert.ok(marks[7].opacity < 0.4);
+  assert.ok(marks[7].opacity > 0.9);
   assert.ok(marks[8].opacity > marks[7].opacity);
-  assert.ok(marks[7].measure < 0.2);
-  assert.ok(marks[7].stroke < 0.15);
+  assert.ok(marks[7].measure >= 0.7);
+  assert.ok(marks[7].stroke >= 0.65);
   assert.equal(marks[0].measure, 5);
   assert.equal(marks[0].anchored, true);
   assert.equal(marks[0].position, 0);
@@ -234,14 +238,14 @@ test("merges linear scale and pinch marks deterministically", async () => {
     pinchFalloff: 0.16,
     pinchInnerEdge: 0.68,
     pinchStrength: 0.9,
-    measureMinimum: 0.35,
+    measureMinimum: 0.7,
     invisibleCollapsePower: 1.35,
     invisibleMeasureMinimum: 0.1,
     invisibleStrokeMinimum: 0.06,
     markerCaptureDivisionWeight: 0.48,
     markerCaptureFalloff: 0.14,
     markerCaptureStrength: 0.9,
-    strokeMinimum: 0.25,
+    strokeMinimum: 0.65,
     toneFalloff: 0.12,
   });
   assert.ok(Math.abs(snappedMarks[7].position - snappedCenter) < 1e-12);
@@ -256,14 +260,14 @@ test("merges linear scale and pinch marks deterministically", async () => {
       pinchFalloff: 0.16,
       pinchInnerEdge: 0.68,
       pinchStrength: 0.9,
-      measureMinimum: 0.35,
+      measureMinimum: 0.7,
       invisibleCollapsePower: 1.35,
       invisibleMeasureMinimum: 0.1,
       invisibleStrokeMinimum: 0.06,
       markerCaptureDivisionWeight: 0.48,
       markerCaptureFalloff: 0.14,
       markerCaptureStrength: 0.9,
-      strokeMinimum: 0.25,
+      strokeMinimum: 0.65,
       toneFalloff: 0.12,
     });
     assert.deepEqual(

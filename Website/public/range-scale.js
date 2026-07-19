@@ -1,4 +1,4 @@
-import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profile=pinch-field-v2";
+import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profile=pinch-density-v3";
 
 const defaults = {
   endpointGap: 8,
@@ -9,18 +9,18 @@ const defaults = {
   pinchFalloff: 0.16,
   pinchInnerEdge: 0.68,
   pinchStrength: 0.9,
-  measureMinimum: 0.35,
+  measureMinimum: 0.7,
   invisibleCollapsePower: 1.35,
   invisibleMeasureMinimum: 0.1,
   invisibleStrokeMinimum: 0.06,
   markerCaptureDivisionWeight: 0.48,
   markerCaptureFalloff: 0.14,
   markerCaptureStrength: 0.9,
-  strokeMinimum: 0.25,
+  strokeMinimum: 0.65,
   snapHysteresis: 0.08,
   snapToMarks: true,
   toneFalloff: 0.12,
-  toneIntensity: 0.82,
+  toneIntensity: 0.16,
 };
 
 function finiteAttribute(element, name, fallback) {
