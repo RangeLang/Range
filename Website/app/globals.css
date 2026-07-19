@@ -228,6 +228,10 @@ main {
   view-transition-name: range-title-morph;
 }
 
+.landingHero [data-scale-one] {
+  margin-top: 5px;
+}
+
 .landingHero p {
   max-width: 620px;
   margin: 40px 0 0;
