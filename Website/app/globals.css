@@ -446,9 +446,16 @@ html.range-route-performance.range-route-backward::view-transition-old(range-per
   transform: translateX(-50%);
 }
 
+.landingSupport {
+  width: fit-content;
+  max-width: calc(100% - var(--range-title-leading));
+  display: grid;
+  margin: 40px 0 0 var(--range-title-leading);
+}
+
 .landingHero p {
   max-width: 620px;
-  margin: 40px 0 0 var(--range-title-leading);
+  margin: 0;
   color: var(--muted);
   font-size: clamp(18px, 2.5vw, 28px);
   line-height: 1.3;
@@ -460,9 +467,9 @@ html.range-route-performance.range-route-backward::view-transition-old(range-per
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  justify-self: end;
+  justify-content: flex-end;
   margin: 32px 0 0;
-  transform: translateX(var(--range-actions-optical-shift, 0px));
+  transform: translateX(var(--range-copy-optical-shift, 0px));
 }
 
 .landingActions a {
