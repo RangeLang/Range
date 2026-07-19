@@ -239,8 +239,11 @@ range-typed-text[data-typing]::after {
 }
 
 .landingHero [data-scale-one] {
+  display: inline-grid;
+  place-items: center;
   font-size: 25.4px;
   margin-top: 5px;
+  transform: translateX(-0.22em);
 }
 
 .landingHero p {
