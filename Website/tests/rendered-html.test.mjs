@@ -152,6 +152,8 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /view-transition-name:\s*range-title-morph/);
   assert.match(styles, /view-transition-group\(range-title-morph\)/);
   assert.match(styles, /\.landingLogDashRadix/);
+  assert.match(styles, /\.landingIndex\s*{[^}]*font-size:\s*20px/s);
+  assert.match(styles, /\.landingHero h1\s*{[^}]*gap:\s*10px/s);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(serverBundle, /@shikijs|engine-oniguruma|wasm-DtTceah8/);
 });
