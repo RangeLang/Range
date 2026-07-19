@@ -70,10 +70,9 @@ async function loadRoute(destination, historyMode) {
 
   try {
     const nextDocumentPromise = fetchRoute(destination);
-    if (direction === "backward" && routeClasses.includes("range-route-performance")) {
-      const typedTitle = document.querySelector(".pageHeader range-typed-text");
-      if (typeof typedTitle?.collapse === "function") await typedTitle.collapse();
-    }
+    const typedTitle = direction === "backward" && routeClasses.includes("range-route-performance")
+      ? document.querySelector(".pageHeader range-typed-text")
+      : null;
     const nextDocument = await nextDocumentPromise;
     const currentShell = document.querySelector(shellSelector);
     const nextShell = nextDocument.querySelector(shellSelector);
@@ -93,6 +92,7 @@ async function loadRoute(destination, historyMode) {
       await new Promise((resolve) => requestAnimationFrame(resolve));
       dispatchEvent(new Event("range-route-transition-finished"));
     } else {
+      if (typeof typedTitle?.collapse === "function") await typedTitle.collapse();
       commit();
     }
   } catch {

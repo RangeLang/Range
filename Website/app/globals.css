@@ -108,6 +108,7 @@ range-typed-text {
   display: block;
   line-height: 1;
   transform-origin: left center;
+  view-transition-name: range-performance-suffix;
 }
 
 range-typed-text:not(:defined) {
@@ -223,6 +224,21 @@ range-optical-guide {
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+::view-transition-group(range-performance-suffix) {
+  z-index: 20;
+  overflow: clip;
+  animation: none;
+}
+
+html.range-route-performance.range-route-backward::view-transition-old(range-performance-suffix) {
+  transform-origin: left center;
+  animation: range-performance-collapse 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html.range-route-performance.range-route-forward::view-transition-new(range-performance-suffix) {
+  opacity: 0;
+}
+
 ::view-transition-group(root) {
   animation-duration: 420ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
@@ -330,6 +346,9 @@ html.range-route-performance.range-route-backward::view-transition-old(range-per
   ::view-transition-group(range-performance-wordmark),
   ::view-transition-old(range-performance-wordmark),
   ::view-transition-new(range-performance-wordmark),
+  ::view-transition-group(range-performance-suffix),
+  ::view-transition-old(range-performance-suffix),
+  ::view-transition-new(range-performance-suffix),
   ::view-transition-group(range-zero-index),
   ::view-transition-group(range-one-index),
   ::view-transition-old(range-zero-index),
