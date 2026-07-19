@@ -30,7 +30,8 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(html, /class="landingLogLine"/);
   assert.match(html, /Range-authored and emits native LLVM/);
-  assert.match(html, /12 of 12 passed/);
+  assert.doesNotMatch(html, /12 of 12 passed/);
+  assert.doesNotMatch(html, /landingFacts/);
   assert.match(html, /href="\/benchmarks"/);
   assert.match(html, /href="\/updates\/string-lowering"/);
   assert.doesNotMatch(html, /Benchmark suite/);

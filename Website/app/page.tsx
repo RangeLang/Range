@@ -3,11 +3,8 @@ import Link from "next/link";
 import benchmarkDataJson from "../public/benchmarks.json";
 
 type BenchmarkSummary = {
-  generatedAt: string;
   summary: {
-    leafCount: number;
     runLeafCount: number;
-    rangePassed: number;
   };
 };
 
@@ -57,21 +54,6 @@ export default function Home() {
           </div>
         </section>
       </div>
-
-      <dl className="landingFacts">
-        <div>
-          <dt>Compiler</dt>
-          <dd>Range-authored</dd>
-        </div>
-        <div>
-          <dt>Output</dt>
-          <dd>Native LLVM</dd>
-        </div>
-        <div>
-          <dt>Benchmarks</dt>
-          <dd>{benchmarkData.summary.rangePassed} of {benchmarkData.summary.leafCount} passed</dd>
-        </div>
-      </dl>
 
       <section className="landingLinks" aria-label="Range links">
         <Link href="/benchmarks">
