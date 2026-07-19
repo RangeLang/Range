@@ -1,7 +1,6 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- benchmark links use document navigation for the shared Range transition */
 import { MarkGithubIcon } from "@primer/octicons-react";
 import Link from "next/link";
-import { LogarithmicConnector } from "./components/LogarithmicConnector";
 import benchmarkDataJson from "../public/benchmarks.json";
 
 type BenchmarkSummary = {
@@ -34,7 +33,19 @@ export default function Home() {
           </nav>
         </header>
 
-        <LogarithmicConnector />
+        <range-log-scale
+          aria-hidden="true"
+          base="10"
+          endpoint-gap="8"
+          marks="18"
+          pinch="0.27"
+          pinch-distance="0.006"
+          pinch-growth="1.8"
+          pinch-marks="9"
+        />
+        {/* ES modules are deferred by the browser; this loads the native custom element without a React client boundary. */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script type="module" src="/range-log-scale.js" />
 
         <section className="landingHero" aria-labelledby="range-title">
           <h1 id="range-title">

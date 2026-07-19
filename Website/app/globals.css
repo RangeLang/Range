@@ -188,32 +188,6 @@ main {
   line-height: 1;
 }
 
-.landingLogLine {
-  position: absolute;
-  top: 22px;
-  left: 4px;
-  width: 1px;
-  height: clamp(258px, 31vw, 350px);
-  pointer-events: none;
-}
-
-.landingLogDash {
-  position: absolute;
-  top: var(--dash-position);
-  left: 50%;
-  width: 5px;
-  height: 1px;
-  border-radius: 999px;
-  background: var(--line);
-  transform: translate(-50%, -50%);
-  transform-origin: center;
-}
-
-.landingLogDashRadix {
-  width: 9px;
-  background: color-mix(in oklch, var(--muted), var(--line) 42%);
-}
-
 .landingNav nav {
   display: flex;
   flex-wrap: wrap;
@@ -1161,10 +1135,6 @@ footer {
 
   .landingHero {
     min-height: 440px;
-  }
-
-  .landingLogLine {
-    height: 260px;
   }
 
   .benchmarkIndex {
