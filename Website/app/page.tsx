@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- benchmark links use document navigation for the shared Range transition */
 import { MarkGithubIcon } from "@primer/octicons-react";
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import benchmarkDataJson from "../public/benchmarks.json";
 
 type BenchmarkSummary = {
@@ -10,6 +11,16 @@ type BenchmarkSummary = {
 };
 
 const benchmarkData = benchmarkDataJson as BenchmarkSummary;
+
+const logarithmicDashPositions = Array.from({ length: 18 }, (_, index) => {
+  const step = index / 17;
+  const logarithmicPosition = Math.log1p(9 * step) / Math.log(10);
+  const position = 4 + logarithmicPosition * 92;
+  const offset = Math.pow(logarithmicPosition, 3) * 100;
+  const rotation = 90 - 23 * Math.pow(logarithmicPosition, 2);
+
+  return { index, position, offset, rotation };
+});
 
 export default function Home() {
   return (
@@ -33,7 +44,19 @@ export default function Home() {
           </nav>
         </header>
 
-        <div className="landingLogLine" aria-hidden="true" />
+        <div className="landingLogLine" aria-hidden="true">
+          {logarithmicDashPositions.map(({ index, position, offset, rotation }) => (
+            <span
+              className="landingLogDash"
+              key={index}
+              style={{
+                "--dash-position": `${position}%`,
+                "--dash-offset": `${offset}%`,
+                "--dash-rotation": `${rotation}deg`,
+              } as CSSProperties}
+            />
+          ))}
+        </div>
 
         <section className="landingHero" aria-labelledby="range-title">
           <h1 id="range-title">

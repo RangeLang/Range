@@ -194,10 +194,19 @@ main {
   left: 4px;
   width: var(--log-end-offset);
   height: clamp(258px, 31vw, 350px);
-  border-bottom: 1.5px dashed color-mix(in oklch, var(--range), var(--line) 48%);
-  border-left: 1.5px dashed color-mix(in oklch, var(--range), var(--line) 48%);
-  border-bottom-left-radius: 100% 34%;
   pointer-events: none;
+}
+
+.landingLogDash {
+  position: absolute;
+  top: var(--dash-position);
+  left: var(--dash-offset);
+  width: clamp(4px, 0.55vw, 7px);
+  height: 1.25px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--range), var(--line) 36%);
+  transform: translate(-50%, -50%) rotate(var(--dash-rotation));
+  transform-origin: center;
 }
 
 .landingNav nav {
