@@ -122,6 +122,14 @@ range-typed-text[data-typing]::after {
   column-gap: var(--range-index-gap, 10px);
 }
 
+.backLink.routeWordmark {
+  color: var(--ink);
+  font-family: var(--font-range-sans);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
 .routeWordmarkIndex {
   width: var(--range-index-column, 15px);
   visibility: hidden;
@@ -179,34 +187,51 @@ range-optical-guide {
 
 ::view-transition-group(range-route-wordmark) {
   z-index: 20;
-  animation-duration: 440ms;
+  animation-duration: 520ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-::view-transition-old(range-route-wordmark),
+::view-transition-old(range-route-wordmark) {
+  mix-blend-mode: normal;
+  animation: range-shared-out 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 ::view-transition-new(range-route-wordmark) {
   mix-blend-mode: normal;
+  animation: range-shared-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 ::view-transition-old(root) {
-  animation: range-page-out 150ms ease both;
+  animation: range-page-out 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 ::view-transition-new(root) {
-  animation: range-page-in 260ms 80ms ease both;
+  animation: range-page-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes range-page-out {
   to {
     opacity: 0;
-    transform: translateY(-5px);
+    transform: translateX(-20px);
   }
 }
 
 @keyframes range-page-in {
   from {
     opacity: 0;
-    transform: translateY(7px);
+    transform: translateX(20px);
+  }
+}
+
+@keyframes range-shared-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes range-shared-in {
+  from {
+    opacity: 0;
   }
 }
 

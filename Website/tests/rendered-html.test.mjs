@@ -56,7 +56,7 @@ test("renders the generated benchmark hierarchy", async () => {
   const normalized = html.replaceAll("<!-- -->", "");
   assert.match(normalized, /<title>Range<\/title>/i);
   assert.match(normalized, /class="backLink routeWordmark"[^>]*><span class="routeWordmarkIndex" aria-hidden="true">0<\/span><span class="rangeWord">Range<\/span>/);
-  assert.match(normalized, /<range-typed-text(?=[^>]*text="Performance")(?=[^>]*delay="600")(?=[^>]*interval="45")[^>]*>/);
+  assert.match(normalized, /<range-typed-text(?=[^>]*text="Performance")(?=[^>]*delay="500")(?=[^>]*interval="45")[^>]*>/);
   assert.match(normalized, /src="\/range-typed-text\.js"/);
   assert.match(normalized, /Benchmark suite/);
   assert.match(normalized, /Sequential modulo/);
@@ -356,6 +356,11 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /\.landingActions\s*{[^}]*--range-actions-optical-shift/s);
   assert.match(styles, /view-transition-group\(range-route-wordmark\)/);
   assert.match(styles, /\.routeWordmarkIndex\s*{[^}]*visibility:\s*hidden/s);
+  assert.match(styles, /\.backLink\.routeWordmark\s*{[^}]*font-family:\s*var\(--font-range-sans\)[^}]*font-size:\s*20px[^}]*font-weight:\s*600/s);
+  assert.match(styles, /::view-transition-old\(root\)\s*{[^}]*520ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
+  assert.match(styles, /::view-transition-new\(root\)\s*{[^}]*520ms[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/s);
+  assert.match(styles, /transform:\s*translateX\(-20px\)/);
+  assert.match(styles, /transform:\s*translateX\(20px\)/);
   assert.doesNotMatch(styles, /range-title-morph/);
   assert.match(styles, /range-typed-text\[data-typing\]::after/);
   assert.doesNotMatch(styles, /range-title-(?:out|in)/);
