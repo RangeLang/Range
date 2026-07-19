@@ -448,6 +448,8 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(navigation, /requestIdleCallback/);
   assert.match(navigation, /history\.pushState/);
   assert.match(navigation, /addEventListener\("popstate"/);
+  assert.match(worker, /range-ui-v76\.css/);
+  assert.match(worker, /rendered\.html\.replace\('\/range-ui\.css', '\/range-ui-v76\.css'\)/);
 });
 
 test("serves Geist Sans and Mono from the site artifact", async () => {
@@ -469,7 +471,7 @@ test("serves Geist Sans and Mono from the site artifact", async () => {
   assert.match(license, /SIL Open Font License/);
 
   const response = await render("/");
-  assert.match(await response.text(), /href="\/range-ui\.css"/);
+  assert.match(await response.text(), /href="\/range-ui-v76\.css"/);
 });
 
 test("serves local fonts with the WOFF2 media type", async () => {
