@@ -128,10 +128,10 @@ range-typed-text[data-typing]::after {
   letter-spacing: -0.04em;
 }
 
-.landingWordmark .rangeWord,
+.landingHero .rangeTitleWord,
 .routeWordmark .rangeWord {
   width: fit-content;
-  view-transition-name: range-route-wordmark;
+  view-transition-name: range-hero-wordmark;
 }
 
 .backLink:hover,
@@ -177,52 +177,58 @@ range-optical-guide {
   display: none;
 }
 
-::view-transition-group(range-route-wordmark) {
+::view-transition-group(range-hero-wordmark) {
   z-index: 20;
-  animation-duration: 320ms;
+  animation-duration: 420ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 ::view-transition-group(root) {
-  animation-duration: 320ms;
+  animation-duration: 420ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-::view-transition-old(range-route-wordmark) {
+::view-transition-old(range-hero-wordmark),
+::view-transition-new(range-hero-wordmark) {
   mix-blend-mode: normal;
-  animation: range-shared-out 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: none;
 }
 
-::view-transition-new(range-route-wordmark) {
-  mix-blend-mode: normal;
-  animation: range-shared-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+html.range-route-forward::view-transition-old(range-hero-wordmark),
+html.range-route-backward::view-transition-new(range-hero-wordmark) {
+  opacity: 1;
+}
+
+html.range-route-forward::view-transition-new(range-hero-wordmark),
+html.range-route-backward::view-transition-old(range-hero-wordmark) {
+  opacity: 0;
 }
 
 ::view-transition-group(range-zero-index),
 ::view-transition-group(range-one-index) {
   z-index: 21;
-  animation-duration: 320ms;
+  animation-duration: 420ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 ::view-transition-old(range-zero-index),
 ::view-transition-old(range-one-index) {
   transform-origin: right center;
-  animation: range-index-collapse 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: range-index-collapse 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 ::view-transition-new(range-zero-index),
 ::view-transition-new(range-one-index) {
   transform-origin: right center;
-  animation: range-index-expand 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: range-index-expand 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 ::view-transition-old(root) {
-  animation: range-page-out 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: range-page-out 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 ::view-transition-new(root) {
-  animation: range-page-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: range-page-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes range-page-out {
@@ -236,18 +242,6 @@ range-optical-guide {
   from {
     opacity: 0;
     transform: translateX(20px);
-  }
-}
-
-@keyframes range-shared-out {
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes range-shared-in {
-  from {
-    opacity: 0;
   }
 }
 
@@ -272,9 +266,9 @@ range-optical-guide {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(range-route-wordmark),
-  ::view-transition-old(range-route-wordmark),
-  ::view-transition-new(range-route-wordmark),
+  ::view-transition-group(range-hero-wordmark),
+  ::view-transition-old(range-hero-wordmark),
+  ::view-transition-new(range-hero-wordmark),
   ::view-transition-group(range-zero-index),
   ::view-transition-group(range-one-index),
   ::view-transition-old(range-zero-index),

@@ -1,10 +1,26 @@
 const shellSelector = "range-site-shell";
 const routeCache = new Map();
 let navigationInFlight = false;
+let activeRoute = location.href;
 
 function routeKey(destination) {
   const url = new URL(destination, location.href);
   return `${url.pathname}${url.search}`;
+}
+
+function routeDepth(destination) {
+  const pathname = new URL(destination, location.href).pathname;
+  if (pathname === "/") return 0;
+  if (/^\/benchmarks\/[^/]+$/.test(pathname)) return 2;
+  return 1;
+}
+
+function routeDirection(destination) {
+  const currentDepth = routeDepth(activeRoute);
+  const nextDepth = routeDepth(destination);
+  if (nextDepth > currentDepth) return "forward";
+  if (nextDepth < currentDepth) return "backward";
+  return "lateral";
 }
 
 function fetchRoute(destination) {
@@ -40,6 +56,8 @@ function warmRoute(anchor) {
 async function loadRoute(destination, historyMode) {
   if (navigationInFlight) return;
   navigationInFlight = true;
+  const direction = routeDirection(destination);
+  const transitionClass = `range-route-${direction}`;
 
   try {
     const nextDocument = await fetchRoute(destination);
@@ -51,10 +69,12 @@ async function loadRoute(destination, historyMode) {
       currentShell.replaceChildren(...nextShell.cloneNode(true).childNodes);
       document.title = nextDocument.title;
       if (historyMode === "push") history.pushState({}, "", destination);
+      activeRoute = destination;
       scrollTo({ top: 0, left: 0, behavior: "instant" });
     };
 
     if (typeof document.startViewTransition === "function") {
+      document.documentElement.classList.add(transitionClass);
       await document.startViewTransition(commit).finished;
     } else {
       commit();
@@ -62,6 +82,7 @@ async function loadRoute(destination, historyMode) {
   } catch {
     location.assign(destination);
   } finally {
+    document.documentElement.classList.remove(transitionClass);
     navigationInFlight = false;
   }
 }
