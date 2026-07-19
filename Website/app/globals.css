@@ -78,7 +78,6 @@ main {
 }
 
 .landingSequence {
-  --log-end-offset: clamp(28px, 4.2vw, 50px);
   position: relative;
 }
 
@@ -180,9 +179,10 @@ main {
 
 .landingIndex {
   flex: 0 0 auto;
-  color: var(--range);
+  width: 1ch;
+  color: var(--ink);
   font-family: var(--font-geist-mono), monospace;
-  font-size: 0.48em;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0;
   line-height: 1;
@@ -192,7 +192,7 @@ main {
   position: absolute;
   top: 22px;
   left: 4px;
-  width: var(--log-end-offset);
+  width: 1px;
   height: clamp(258px, 31vw, 350px);
   pointer-events: none;
 }
@@ -200,13 +200,18 @@ main {
 .landingLogDash {
   position: absolute;
   top: var(--dash-position);
-  left: var(--dash-offset);
-  width: clamp(4px, 0.55vw, 7px);
-  height: 1.25px;
+  left: 50%;
+  width: 5px;
+  height: 1px;
   border-radius: 999px;
-  background: color-mix(in oklch, var(--range), var(--line) 36%);
-  transform: translate(-50%, -50%) rotate(var(--dash-rotation));
+  background: var(--line);
+  transform: translate(-50%, -50%);
   transform-origin: center;
+}
+
+.landingLogDashRadix {
+  width: 9px;
+  background: color-mix(in oklch, var(--muted), var(--line) 42%);
 }
 
 .landingNav nav {
@@ -240,17 +245,13 @@ main {
   display: flex;
   align-items: baseline;
   gap: clamp(12px, 1.8vw, 24px);
-  padding-left: var(--log-end-offset);
+  padding-left: 0;
   margin: 0;
   font-size: clamp(76px, 15vw, 180px);
   font-weight: 500;
   letter-spacing: -0.085em;
   line-height: 0.82;
   view-transition-name: range-title-morph;
-}
-
-.landingHero h1 .landingIndex {
-  font-size: clamp(18px, 2.4vw, 30px);
 }
 
 .landingHero p {
@@ -1160,10 +1161,6 @@ footer {
 
   .landingHero {
     min-height: 440px;
-  }
-
-  .landingSequence {
-    --log-end-offset: 28px;
   }
 
   .landingLogLine {
