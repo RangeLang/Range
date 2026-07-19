@@ -447,7 +447,7 @@ range-spline-nav a:focus-visible {
 .landingHero [data-scale-end] > span {
   position: absolute;
   top: var(--range-one-contact-shift, 0px);
-  left: calc(50% + var(--range-one-inline-shift, 0px));
+  left: 50%;
   width: 1em;
   margin-left: -0.5em;
   text-align: center;

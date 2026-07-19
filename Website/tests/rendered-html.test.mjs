@@ -34,7 +34,7 @@ test("renders the Range landing page", async () => {
     html,
     /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*division-base="3")(?=[^>]*division-levels="3")(?=[^>]*pinch="0.27")(?=[^>]*pinch-core="10")(?=[^>]*pinch-falloff="0.16")(?=[^>]*pinch-inner-edge="0.68")(?=[^>]*pinch-strength="0.9")(?=[^>]*measure-minimum="0.7")(?=[^>]*invisible-collapse-power="1.35")(?=[^>]*invisible-measure-minimum="0.1")(?=[^>]*invisible-stroke-minimum="0.06")(?=[^>]*marker-capture-division-weight="0.48")(?=[^>]*marker-capture-falloff="0.14")(?=[^>]*marker-capture-strength="0.9")(?=[^>]*stroke-minimum="0.65")(?=[^>]*snap-hysteresis="0.08")(?=[^>]*snap-to-marks="true")(?=[^>]*tone-falloff="0.12")(?=[^>]*tone-intensity="0.16")[^>]*>/,
   );
-  assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js\?profile=pinch-canvas-v1"/);
+  assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js\?profile=pinch-canvas-v2"/);
   assert.match(html, /class="rangeWord">Range<\/span>/);
   assert.match(html, /<range-optical-guide[^>]*aria-hidden="true"/);
   assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-contact-v5"/);
@@ -430,8 +430,6 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(rangeOpticalGuide, /actualBoundingBoxAscent/);
   assert.match(rangeOpticalGuide, /actualBoundingBoxDescent/);
   assert.match(rangeOpticalGuide, /--range-one-contact-shift/);
-  assert.match(rangeOpticalGuide, /#inkEnd\(zero\) - this\.#inkEnd\(one, this\.#shifts\.oneInline\)/);
-  assert.match(rangeOpticalGuide, /--range-one-inline-shift/);
   assert.match(rangeScaleElement, /createRangeMarks/);
   assert.match(rangeScaleElement, /snapScalePosition/);
   assert.match(rangeScaleElement, /#snappedIndex/);
@@ -460,7 +458,7 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /@keyframes range-index-collapse\s*{[^}]*to\s*{[^}]*translateX\(20px\) scale\(0\)/s);
   assert.match(styles, /@keyframes range-index-expand\s*{[^}]*from\s*{[^}]*translateX\(20px\) scale\(0\)/s);
   assert.match(styles, /\.landingHero \[data-scale-end\]\s*{[^}]*position:\s*relative[^}]*font-size:\s*25\.4px[^}]*overflow:\s*visible/s);
-  assert.match(styles, /\.landingHero \[data-scale-end\] > span\s*{[^}]*top:\s*var\(--range-one-contact-shift, 0px\)[^}]*left:\s*calc\(50% \+ var\(--range-one-inline-shift, 0px\)\)[^}]*width:\s*1em[^}]*margin-left:\s*-0\.5em/s);
+  assert.match(styles, /\.landingHero \[data-scale-end\] > span\s*{[^}]*top:\s*var\(--range-one-contact-shift, 0px\)[^}]*left:\s*50%[^}]*width:\s*1em[^}]*margin-left:\s*-0\.5em/s);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(serverBundle, /@shikijs|engine-oniguruma|wasm-DtTceah8/);
 });
