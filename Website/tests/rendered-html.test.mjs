@@ -49,7 +49,9 @@ test("renders the generated benchmark hierarchy", async () => {
   const html = await response.text();
   const normalized = html.replaceAll("<!-- -->", "");
   assert.match(normalized, /<title>Range<\/title>/i);
-  assert.match(normalized, /Range Performance/);
+  assert.match(normalized, /class="rangeTitleWord">Range<\/span>/);
+  assert.match(normalized, /<range-typed-text(?=[^>]*text="Performance")(?=[^>]*delay="600")(?=[^>]*interval="45")[^>]*>/);
+  assert.match(normalized, /src="\/range-typed-text\.js"/);
   assert.match(normalized, /Benchmark suite/);
   assert.match(normalized, /Sequential modulo/);
   assert.match(normalized, /href="\/benchmarks\?category=noise"/);
@@ -208,6 +210,10 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /view-transition-name:\s*range-navigation/);
   assert.match(styles, /view-transition-name:\s*range-title-morph/);
   assert.match(styles, /view-transition-group\(range-title-morph\)/);
+  assert.match(styles, /view-transition-old\(range-title-morph\)\s*{[^}]*opacity:\s*1[^}]*animation:\s*none/s);
+  assert.match(styles, /view-transition-new\(range-title-morph\)\s*{[^}]*opacity:\s*0[^}]*animation:\s*none/s);
+  assert.match(styles, /range-typed-text\[data-typing\]::after/);
+  assert.doesNotMatch(styles, /range-title-(?:out|in)/);
   assert.match(landingPage, /<range-scale/);
   assert.match(rangeScaleElement, /customElements\.define\("range-scale"/);
   assert.match(rangeScaleElement, /createRangeMarks/);

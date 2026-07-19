@@ -11,6 +11,11 @@ declare module "react" {
         "pinch-growth"?: string;
         "pinch-marks"?: string;
       };
+      "range-typed-text": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
+        delay?: string;
+        interval?: string;
+        text?: string;
+      };
     }
   }
 }

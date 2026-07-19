@@ -168,7 +168,15 @@ export default async function Home({
     <main>
       <header className="pageHeader">
         <a className="backLink" href="/">Range</a>
-        <h1>Range Performance</h1>
+        <h1>
+          <span className="rangeTitleWord">Range</span>
+          <range-typed-text text="Performance" delay="600" interval="45">
+            Performance
+          </range-typed-text>
+        </h1>
+        {/* ES modules are deferred by the browser; this defines the native keyboard-text element. */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script type="module" src="/range-typed-text.js" />
       </header>
 
       <section className="benchmarkProject" aria-labelledby="benchmark-project-title">

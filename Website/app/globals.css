@@ -48,11 +48,31 @@ main {
 
 .pageHeader h1 {
   width: fit-content;
+  display: flex;
+  align-items: baseline;
+  gap: 0.24em;
   margin: 0;
   font-size: clamp(28px, 4vw, 42px);
   font-weight: 500;
   letter-spacing: -0.04em;
+}
+
+.rangeTitleWord {
   view-transition-name: range-title-morph;
+}
+
+range-typed-text:not(:defined) {
+  visibility: hidden;
+}
+
+range-typed-text[data-typing]::after {
+  width: 1px;
+  height: 0.78em;
+  display: inline-block;
+  margin-left: 0.08em;
+  background: currentColor;
+  content: "";
+  animation: range-caret 500ms step-end infinite;
 }
 
 .backLink {
@@ -113,11 +133,15 @@ main {
 }
 
 ::view-transition-old(range-title-morph) {
-  animation: range-title-out 420ms cubic-bezier(0.4, 0, 1, 1) both;
+  opacity: 1;
+  mix-blend-mode: normal;
+  animation: none;
 }
 
 ::view-transition-new(range-title-morph) {
-  animation: range-title-in 480ms 60ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  opacity: 0;
+  mix-blend-mode: normal;
+  animation: none;
 }
 
 ::view-transition-old(root) {
@@ -142,26 +166,9 @@ main {
   }
 }
 
-@keyframes range-title-out {
-  0%,
-  58% {
-    opacity: 1;
-  }
-
-  to {
+@keyframes range-caret {
+  50% {
     opacity: 0;
-  }
-}
-
-@keyframes range-title-in {
-  from {
-    opacity: 0;
-    filter: blur(2px);
-  }
-
-  to {
-    opacity: 1;
-    filter: blur(0);
   }
 }
 
@@ -229,7 +236,6 @@ main {
   font-weight: 500;
   letter-spacing: -0.085em;
   line-height: 0.82;
-  view-transition-name: range-title-morph;
 }
 
 .landingHero [data-scale-one] {
