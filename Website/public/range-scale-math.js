@@ -14,7 +14,7 @@ function pinchInfluence(value, center, falloff) {
   return Math.exp(-0.5 * normalizedDistance * normalizedDistance) * taper;
 }
 
-export function createScaleMarks({ divisionBase = 3, divisionLevels = 2 } = {}) {
+export function createScaleMarks({ divisionBase = 3, divisionLevels = 3 } = {}) {
   if (!Number.isInteger(divisionBase) || divisionBase < 2) {
     throw new RangeError("divisionBase must be an integer of at least 2");
   }
@@ -24,14 +24,18 @@ export function createScaleMarks({ divisionBase = 3, divisionLevels = 2 } = {}) 
 
   const intervalCount = divisionBase ** divisionLevels;
   const majorStride = divisionBase ** (divisionLevels - 1);
+  const divisionStride = divisionLevels > 1
+    ? divisionBase ** (divisionLevels - 2)
+    : majorStride;
   return Array.from({ length: intervalCount + 1 }, (_, index) => {
     const isMajor = index === 0 || index === intervalCount || index % majorStride === 0;
+    const isDivision = !isMajor && index % divisionStride === 0;
     return {
-      isRadix: isMajor,
-      measure: isMajor ? 5 : 3,
+      isRadix: isMajor || isDivision,
+      measure: isMajor ? 5 : isDivision ? 3 : 1,
       position: index / intervalCount,
       source: "scale",
-      tier: isMajor ? "major" : "division",
+      tier: isMajor ? "major" : isDivision ? "division" : "single",
       weight: 1,
     };
   });

@@ -37,7 +37,7 @@ export default function Home() {
           aria-hidden="true"
           endpoint-gap="8"
           division-base="3"
-          division-levels="2"
+          division-levels="3"
           pinch="0.27"
           pinch-falloff="0.16"
           pinch-strength="0.9"

@@ -30,7 +30,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*division-base="3")(?=[^>]*division-levels="2")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.16")(?=[^>]*pinch-strength="0.9")(?=[^>]*measure-minimum="0.35")(?=[^>]*stroke-minimum="0.25")(?=[^>]*tone-falloff="0.12")(?=[^>]*tone-intensity="0.82")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*division-base="3")(?=[^>]*division-levels="3")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.16")(?=[^>]*pinch-strength="0.9")(?=[^>]*measure-minimum="0.35")(?=[^>]*stroke-minimum="0.25")(?=[^>]*tone-falloff="0.12")(?=[^>]*tone-intensity="0.82")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js"/);
   assert.match(html, /Range-authored and emits native LLVM/);
@@ -133,14 +133,14 @@ test("merges linear scale and pinch marks deterministically", async () => {
     createScaleMarks({ divisionBase: 3, divisionLevels: 1 }).map(({ position }) => position),
     [0, 1 / 3, 2 / 3, 1],
   );
-  const scaleHierarchy = createScaleMarks({ divisionBase: 3, divisionLevels: 2 });
-  assert.equal(scaleHierarchy.length, 10);
+  const scaleHierarchy = createScaleMarks({ divisionBase: 3, divisionLevels: 3 });
+  assert.equal(scaleHierarchy.length, 28);
   assert.equal(scaleHierarchy.filter(({ tier }) => tier === "major").length, 4);
   assert.equal(scaleHierarchy.filter(({ tier }) => tier === "division").length, 6);
-  assert.equal(scaleHierarchy.filter(({ tier }) => tier === "normal").length, 0);
+  assert.equal(scaleHierarchy.filter(({ tier }) => tier === "single").length, 18);
   assert.deepEqual(
-    [scaleHierarchy[0].measure, scaleHierarchy[1].measure, scaleHierarchy[3].measure],
-    [5, 3, 5],
+    [scaleHierarchy[0].measure, scaleHierarchy[3].measure, scaleHierarchy[1].measure],
+    [5, 3, 1],
   );
   assert.equal(measureWithFalloff(0.27), 0.35);
   assert.equal(measureWithFalloff(0), 1);
@@ -155,7 +155,7 @@ test("merges linear scale and pinch marks deterministically", async () => {
 
   const marks = createRangeMarks({
     divisionBase: 3,
-    divisionLevels: 2,
+    divisionLevels: 3,
     pinch: 0.27,
     pinchFalloff: 0.16,
     pinchStrength: 0.9,
@@ -169,17 +169,18 @@ test("merges linear scale and pinch marks deterministically", async () => {
   assert.ok(marks.every((mark) => mark.tone >= 0 && mark.tone <= 1));
   assert.ok(marks.every((mark) => mark.opacity >= 0 && mark.opacity <= 1));
   assert.ok(marks.every((mark, index) => index === 0 || mark.position > marks[index - 1].position));
-  assert.equal(marks.length, 10);
-  assert.ok(marks[2].position < 2 / 9);
-  assert.ok(marks[3].position > 1 / 3);
-  assert.ok(marks[3].position - marks[2].position > 0.18);
-  assert.ok(marks[2].measure < 3);
-  assert.ok(marks[2].stroke < 1);
-  assert.ok(marks[2].tone > 0.8);
-  assert.ok(marks[2].opacity > 0.5);
+  assert.equal(marks.length, 28);
+  assert.ok(marks[7].position < 7 / 27);
+  assert.ok(marks[8].position > 8 / 27);
+  assert.ok(marks[8].position - marks[7].position > 0.065);
+  assert.ok(marks[7].measure < 1);
+  assert.ok(marks[7].stroke < 1);
+  assert.ok(marks[7].tone > 0.9);
+  assert.ok(marks[7].opacity < 0.03);
   assert.equal(marks[0].measure, 5);
-  assert.equal(marks[8].measure, 3);
-  assert.equal(marks[9].measure, 5);
+  assert.equal(marks[21].measure, 3);
+  assert.equal(marks[22].measure, 1);
+  assert.equal(marks[27].measure, 5);
   for (const center of [0.001, 0.01, 0.1, 0.27, 0.5, 0.9, 0.99, 0.999]) {
     for (let index = 1; index <= 1000; index += 1) {
       assert.ok(

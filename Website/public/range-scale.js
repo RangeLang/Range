@@ -3,7 +3,7 @@ import { createRangeMarks } from "./range-scale-math.js";
 const defaults = {
   endpointGap: 8,
   divisionBase: 3,
-  divisionLevels: 2,
+  divisionLevels: 3,
   pinch: 0.27,
   pinchFalloff: 0.16,
   pinchStrength: 0.9,
