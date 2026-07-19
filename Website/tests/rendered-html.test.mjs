@@ -260,6 +260,9 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(styles, /view-transition-name:\s*range-navigation/);
   assert.match(styles, /view-transition-name:\s*range-title-morph/);
   assert.match(styles, /\.landingHero \.rangeTitleWord\s*{[^}]*transform:\s*translateX\(-3px\)/s);
+  assert.match(styles, /\.landingSequence\s*{[^}]*--range-title-leading:\s*calc\(var\(--range-index-column\) \+ var\(--range-index-gap\) - 3px\)/s);
+  assert.match(styles, /\.landingHero p\s*{[^}]*margin:\s*40px 0 0 var\(--range-title-leading\)/s);
+  assert.match(styles, /\.landingActions\s*{[^}]*margin:\s*32px 0 0 var\(--range-title-leading\)/s);
   assert.match(styles, /view-transition-group\(range-title-morph\)/);
   assert.match(styles, /view-transition-old\(range-title-morph\)\s*{[^}]*opacity:\s*1[^}]*animation:\s*none/s);
   assert.match(styles, /view-transition-new\(range-title-morph\)\s*{[^}]*opacity:\s*0[^}]*animation:\s*none/s);
