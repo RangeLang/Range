@@ -428,6 +428,9 @@ test("serves Avio Sans from the site artifact", async () => {
     assert.equal(font.subarray(0, 4).toString("ascii"), "wOF2");
   }
   assert.match(license, /SIL OPEN FONT LICENSE Version 1\.1/);
+
+  const response = await render("/");
+  assert.match(await response.text(), /href="\/globals\.css\?font=avio-sans-v1"/);
 });
 
 test("serves local fonts with the WOFF2 media type", async () => {
