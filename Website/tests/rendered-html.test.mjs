@@ -36,6 +36,8 @@ test("renders the Range landing page", async () => {
   assert.match(html, /class="rangeWord">Range<\/span>/);
   assert.match(html, /<range-optical-guide[^>]*aria-hidden="true"/);
   assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink-box"/);
+  assert.match(html, /<html lang="en" class="range-layout-pending">/);
+  assert.match(html, /src="\/range-layout-ready\.js"/);
   assert.match(html, /a love letter to electrons, logic and abstractions/);
   assert.doesNotMatch(html, /Range-authored and emits native LLVM/);
   assert.doesNotMatch(html, /12 of 12 passed/);
@@ -397,11 +399,12 @@ test("keeps the benchmark artifact complete and versioned", async () => {
 });
 
 test("uses Web Components without React, Next, or Vinext", async () => {
-  const [packageText, worker, renderer, components] = await Promise.all([
+  const [packageText, worker, renderer, components, layoutReady] = await Promise.all([
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/render.ts", import.meta.url), "utf8"),
     readFile(new URL("../public/range-site.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/range-layout-ready.js", import.meta.url), "utf8"),
   ]);
   const packageJson = JSON.parse(packageText);
   const installed = { ...packageJson.dependencies, ...packageJson.devDependencies };
@@ -412,6 +415,11 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.equal(installed.vinext, undefined);
   assert.doesNotMatch(`${worker}\n${renderer}`, /\b(?:React|next\/|vinext)\b/);
   assert.match(components, /class RangeElement extends HTMLElement/);
+  assert.match(layoutReady, /document\.fonts\.load\('500 1em "Geist"'\)/);
+  assert.match(layoutReady, /document\.fonts\.ready/);
+  assert.match(layoutReady, /customElements\.whenDefined\("range-optical-guide"\)/);
+  assert.match(layoutReady, /requestAnimationFrame\(\(\) => requestAnimationFrame\(resolve\)\)/);
+  assert.match(layoutReady, /classList\.remove\("range-layout-pending"\)/);
 });
 
 test("serves Geist Sans and Mono from the site artifact", async () => {

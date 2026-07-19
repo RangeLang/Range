@@ -55,6 +55,10 @@ html {
   background: var(--paper);
 }
 
+html.range-layout-pending body {
+  visibility: hidden;
+}
+
 body {
   margin: 0;
   background: var(--paper);
