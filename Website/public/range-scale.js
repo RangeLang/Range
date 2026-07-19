@@ -185,35 +185,35 @@ class RangeScale extends HTMLElement {
     const bounds = this.getBoundingClientRect();
     const width = Math.max(1, bounds.width);
     const height = Math.max(1, bounds.height);
-    const pixelRatio = Math.min(4, Math.max(1, globalThis.devicePixelRatio || 1));
+    const pixelRatio = Math.min(8, Math.max(1, globalThis.devicePixelRatio || 1));
     this.#canvas.width = Math.ceil(width * pixelRatio);
     this.#canvas.height = Math.ceil(height * pixelRatio);
     this.#canvas.style.width = `${width}px`;
     this.#canvas.style.height = `${height}px`;
-    this.#context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    this.#context.clearRect(0, 0, width, height);
-    this.#context.lineCap = "round";
+    this.#context.setTransform(1, 0, 0, 1, 0, 0);
+    this.#context.clearRect(0, 0, this.#canvas.width, this.#canvas.height);
 
     const styles = getComputedStyle(this);
-    const line = styles.getPropertyValue("--line").trim() || "oklch(0.9 0.012 255)";
-    const muted = styles.getPropertyValue("--muted").trim() || "oklch(0.58 0.015 255)";
+    const ink = styles.getPropertyValue("--ink").trim() || "oklch(0.21 0.018 255)";
     for (const mark of marks) {
-      const base = mark.tier === "division" || mark.tier === "major"
-        ? `color-mix(in oklch, color-mix(in oklch, ${muted}, ${line} 42%), white ${mark.tone * config.toneIntensity * 100}%)`
-        : `color-mix(in oklch, ${line}, white ${mark.tone * config.toneIntensity * 100}%)`;
-      if (this.#colorProbe) this.#colorProbe.style.background = base;
+      if (this.#colorProbe) this.#colorProbe.style.background = ink;
       this.#context.strokeStyle = this.#colorProbe
         ? getComputedStyle(this.#colorProbe).backgroundColor
-        : line;
+        : ink;
+      this.#context.fillStyle = this.#context.strokeStyle;
       this.#context.globalAlpha = mark.opacity;
-      this.#context.lineWidth = Math.max(0.1, mark.stroke);
-      const y = mark.position * height;
-      const halfWidth = mark.measure / 2;
-      this.#context.beginPath();
-      this.#context.moveTo(width / 2 - halfWidth, y);
-      this.#context.lineTo(width / 2 + halfWidth, y);
-      this.#context.stroke();
+      const deviceWidth = this.#canvas.width;
+      const deviceHeight = this.#canvas.height;
+      const markWidth = Math.max(1, Math.round(mark.measure * pixelRatio));
+      const markHeight = Math.max(1, Math.round(mark.stroke * pixelRatio));
+      const x = Math.round(deviceWidth / 2 - markWidth / 2);
+      const y = Math.round(mark.position * deviceHeight - markHeight / 2);
+      this.#context.shadowColor = mark.tier === "single" ? "transparent" : "rgba(0, 0, 0, 0.12)";
+      this.#context.shadowBlur = mark.tier === "single" ? 0 : Math.min(1.2 * pixelRatio, 3);
+      this.#context.fillRect(x, y, markWidth, markHeight);
     }
+    this.#context.shadowColor = "transparent";
+    this.#context.shadowBlur = 0;
     this.#context.globalAlpha = 1;
   }
 
