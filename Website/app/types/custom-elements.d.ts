@@ -9,7 +9,7 @@ declare module "react" {
         pinch?: string;
         "pinch-falloff"?: string;
         "pinch-strength"?: string;
-        "measure-peak"?: string;
+        "measure-minimum"?: string;
       };
       "range-typed-text": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
         delay?: string;

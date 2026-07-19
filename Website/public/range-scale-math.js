@@ -44,22 +44,28 @@ export function measureWithFalloff(position, {
   baseline = 1,
   center = 0.27,
   falloff = 0.12,
-  peak = 2.95,
+  minimum = 0.35,
 } = {}) {
   assertFiniteNumber(position, "position");
   assertFiniteNumber(baseline, "baseline");
   assertFiniteNumber(center, "center");
   assertFiniteNumber(falloff, "falloff");
-  assertFiniteNumber(peak, "peak");
+  assertFiniteNumber(minimum, "minimum");
   if (position < 0 || position > 1) throw new RangeError("position must be within [0, 1]");
   if (center < 0 || center > 1) throw new RangeError("center must be within [0, 1]");
+  if (center === 0 || center === 1) throw new RangeError("center must be inside (0, 1)");
   if (baseline <= 0) throw new RangeError("baseline must be positive");
   if (falloff <= 0) throw new RangeError("falloff must be positive");
-  if (peak < baseline) throw new RangeError("peak cannot be less than baseline");
+  if (minimum <= 0 || minimum > baseline) {
+    throw new RangeError("minimum must be positive and cannot exceed baseline");
+  }
 
   const normalizedDistance = (position - center) / falloff;
-  const influence = Math.exp(-0.5 * normalizedDistance * normalizedDistance);
-  return baseline + (peak - baseline) * influence;
+  const supportRadius = Math.min(center, 1 - center, falloff * 2);
+  const supportDistance = Math.abs(position - center) / supportRadius;
+  const taper = supportDistance >= 1 ? 0 : Math.pow(1 - supportDistance * supportDistance, 2);
+  const influence = Math.exp(-0.5 * normalizedDistance * normalizedDistance) * taper;
+  return baseline - (baseline - minimum) * influence;
 }
 
 export function mergeMarks(markGroups, epsilon = DEFAULT_EPSILON) {
@@ -131,11 +137,12 @@ export function createRangeMarks(config = {}) {
     const baseline = mark.measure ?? (mark.isRadix ? 1.8 : 1);
     return {
       ...mark,
-      measure: Math.max(baseline, measureWithFalloff(mark.position, {
+      measure: measureWithFalloff(mark.position, {
+        baseline,
         center: config.pinch,
         falloff: config.pinchFalloff,
-        peak: config.measurePeak,
-      })),
+        minimum: config.measureMinimum,
+      }),
       position: pinchScaleValue(mark.position, {
         center: config.pinch,
         falloff: config.pinchFalloff,

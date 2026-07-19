@@ -6,7 +6,7 @@ const defaults = {
   pinch: 0.27,
   pinchFalloff: 0.12,
   pinchStrength: 0.72,
-  measurePeak: 2.95,
+  measureMinimum: 0.35,
 };
 
 function finiteAttribute(element, name, fallback) {
@@ -21,7 +21,7 @@ class RangeScale extends HTMLElement {
     "pinch",
     "pinch-falloff",
     "pinch-strength",
-    "measure-peak",
+    "measure-minimum",
   ];
 
   #resizeObserver;
@@ -61,7 +61,7 @@ class RangeScale extends HTMLElement {
       pinch: Math.min(1, Math.max(0, finiteAttribute(this, "pinch", defaults.pinch))),
       pinchFalloff: Math.max(0.000001, finiteAttribute(this, "pinch-falloff", defaults.pinchFalloff)),
       pinchStrength: Math.min(0.999999, Math.max(0, finiteAttribute(this, "pinch-strength", defaults.pinchStrength))),
-      measurePeak: Math.max(1, finiteAttribute(this, "measure-peak", defaults.measurePeak)),
+      measureMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "measure-minimum", defaults.measureMinimum))),
     };
   }
 

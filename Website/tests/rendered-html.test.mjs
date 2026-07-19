@@ -30,7 +30,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /landingWordmark[^>]*>.*>0<\/span>.*>Range<\/span>/);
   assert.match(
     html,
-    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="18")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-peak="2.95")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*marks="18")(?=[^>]*pinch="0.27")(?=[^>]*pinch-falloff="0.12")(?=[^>]*pinch-strength="0.72")(?=[^>]*measure-minimum="0.35")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js"/);
   assert.match(html, /Range-authored and emits native LLVM/);
@@ -133,9 +133,11 @@ test("merges linear scale and pinch marks deterministically", async () => {
     createScaleMarks({ count: 5 }).map(({ position }) => position),
     [0, 0.25, 0.5, 0.75, 1],
   );
-  assert.equal(measureWithFalloff(0.27), 2.95);
+  assert.equal(measureWithFalloff(0.27), 0.35);
+  assert.equal(measureWithFalloff(0), 1);
+  assert.equal(measureWithFalloff(1), 1);
   assert.ok(Math.abs(measureWithFalloff(0.258) - measureWithFalloff(0.282)) < 1e-12);
-  assert.ok(measureWithFalloff(0.258) > measureWithFalloff(0.2436));
+  assert.ok(measureWithFalloff(0.258) < measureWithFalloff(0.2436));
   assert.equal(pinchScaleValue(0), 0);
   assert.equal(pinchScaleValue(0.27), 0.27);
   assert.equal(pinchScaleValue(1), 1);
@@ -147,13 +149,15 @@ test("merges linear scale and pinch marks deterministically", async () => {
     pinch: 0.27,
     pinchFalloff: 0.12,
     pinchStrength: 0.72,
-    measurePeak: 2.95,
+    measureMinimum: 0.35,
   });
   assert.ok(marks.every((mark) => mark.position >= 0 && mark.position <= 1));
-  assert.ok(marks.every((mark) => mark.measure >= 1));
+  assert.ok(marks.every((mark) => mark.measure >= 0.35 - 1e-12));
   assert.ok(marks.every((mark, index) => index === 0 || mark.position > marks[index - 1].position));
   assert.ok(marks.some((mark) => Math.abs(mark.position - 0.27) < 1e-12 && mark.isRadix));
-  assert.equal(marks.find((mark) => Math.abs(mark.position - 0.27) < 1e-12)?.measure, 2.95);
+  assert.ok(Math.abs(
+    (marks.find((mark) => Math.abs(mark.position - 0.27) < 1e-12)?.measure ?? 0) - 0.35,
+  ) < 1e-12);
   for (let index = 1; index <= 1000; index += 1) {
     assert.ok(pinchScaleValue(index / 1000) > pinchScaleValue((index - 1) / 1000));
   }

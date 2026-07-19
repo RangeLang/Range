@@ -40,7 +40,7 @@ export default function Home() {
           pinch="0.27"
           pinch-falloff="0.12"
           pinch-strength="0.72"
-          measure-peak="2.95"
+          measure-minimum="0.35"
         />
         {/* ES modules are deferred by the browser; this loads the native custom element without a React client boundary. */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
