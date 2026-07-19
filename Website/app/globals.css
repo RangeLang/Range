@@ -99,6 +99,8 @@ range-typed-text[data-typing]::after {
 
 .landingSequence {
   position: relative;
+  --range-index-column: 15px;
+  --range-index-gap: 10px;
 }
 
 .landingNav {
@@ -109,9 +111,10 @@ range-typed-text[data-typing]::after {
 }
 
 .landingWordmark {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: var(--range-index-column) auto;
   align-items: center;
-  gap: 10px;
+  column-gap: var(--range-index-gap);
   color: var(--ink);
   font-size: 20px;
   font-weight: 600;
@@ -186,7 +189,7 @@ range-typed-text[data-typing]::after {
 
 .landingIndex {
   flex: 0 0 auto;
-  width: 1ch;
+  width: var(--range-index-column);
   color: var(--ink);
   font-family: var(--font-geist-mono), monospace;
   font-size: 20px;
@@ -227,9 +230,10 @@ range-typed-text[data-typing]::after {
 
 .landingHero h1 {
   width: fit-content;
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--range-index-column) auto;
   align-items: flex-start;
-  gap: 10px;
+  column-gap: var(--range-index-gap);
   padding-left: 0;
   margin: 0;
   font-size: clamp(76px, 15vw, 180px);

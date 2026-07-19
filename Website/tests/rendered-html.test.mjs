@@ -271,9 +271,11 @@ test("keeps the benchmark artifact complete and versioned", async () => {
   assert.match(rangeScaleElement, /spring\s*=\s*this\.#isPointerActive\s*\?\s*240\s*:\s*180/);
   assert.match(rangeScaleElement, /damping\s*=\s*this\.#isPointerActive\s*\?\s*28\s*:\s*14/);
   assert.match(styles, /\.landingIndex\s*{[^}]*font-size:\s*20px/s);
-  assert.match(styles, /\.landingWordmark\s*{[^}]*align-items:\s*center/s);
+  assert.match(styles, /\.landingSequence\s*{[^}]*--range-index-column:\s*15px[^}]*--range-index-gap:\s*10px/s);
+  assert.match(styles, /\.landingWordmark\s*{[^}]*display:\s*inline-grid[^}]*grid-template-columns:\s*var\(--range-index-column\) auto[^}]*align-items:\s*center[^}]*column-gap:\s*var\(--range-index-gap\)/s);
+  assert.match(styles, /\.landingIndex\s*{[^}]*width:\s*var\(--range-index-column\)/s);
   assert.match(styles, /\.landingNav \[data-scale-zero\]\s*{[^}]*font-size:\s*14\.6px/s);
-  assert.match(styles, /\.landingHero h1\s*{[^}]*align-items:\s*flex-start[^}]*gap:\s*10px/s);
+  assert.match(styles, /\.landingHero h1\s*{[^}]*display:\s*grid[^}]*grid-template-columns:\s*var\(--range-index-column\) auto[^}]*align-items:\s*flex-start[^}]*column-gap:\s*var\(--range-index-gap\)/s);
   assert.match(styles, /\.landingHero \[data-scale-end\]\s*{[^}]*position:\s*relative[^}]*font-size:\s*25\.4px[^}]*overflow:\s*visible/s);
   assert.match(styles, /\.landingHero \[data-scale-end\] > span\s*{[^}]*left:\s*calc\(50% - 0\.12em\)[^}]*transform:\s*translateX\(-50%\)/s);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
