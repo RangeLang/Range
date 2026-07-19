@@ -27,8 +27,8 @@ const worker = {
     if (rendered) {
       const html = rendered.html
         .replace('/range-ui.css', '/range-ui-v80.css')
-        .replace('/range-typed-text.js', '/range-typed-text.js?version=80')
-        .replace('/range-navigation-v2.js', '/range-navigation-v2.js?version=80');
+        .replace('/range-typed-text.js', '/range-typed-text.js?version=81')
+        .replace('/range-navigation-v2.js', '/range-navigation-v2.js?version=81');
       return new Response(request.method === "HEAD" ? null : html, {
         status: rendered.status,
         headers: {

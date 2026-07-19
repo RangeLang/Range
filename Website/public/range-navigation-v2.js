@@ -69,7 +69,12 @@ async function loadRoute(destination, historyMode) {
   if (isPerformanceTransition(destination)) routeClasses.push("range-route-performance");
 
   try {
-    const nextDocument = await fetchRoute(destination);
+    const nextDocumentPromise = fetchRoute(destination);
+    if (direction === "backward" && routeClasses.includes("range-route-performance")) {
+      const typedTitle = document.querySelector(".pageHeader range-typed-text");
+      if (typeof typedTitle?.collapse === "function") await typedTitle.collapse();
+    }
+    const nextDocument = await nextDocumentPromise;
     const currentShell = document.querySelector(shellSelector);
     const nextShell = nextDocument.querySelector(shellSelector);
     if (!currentShell || !nextShell) throw new Error("Range shell missing");

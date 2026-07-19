@@ -38,7 +38,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /src="\/range-optical-guide\.js\?guide=glyph-ink-box"/);
   assert.match(html, /<html lang="en" class="range-layout-pending">/);
   assert.match(html, /src="\/range-layout-ready\.js"/);
-  assert.match(html, /src="\/range-navigation-v2\.js\?version=80"/);
+  assert.match(html, /src="\/range-navigation-v2\.js\?version=81"/);
   assert.match(html, /a love letter to electrons, logic and abstraction/);
   assert.doesNotMatch(html, /Range-authored and emits native LLVM/);
   assert.doesNotMatch(html, /12 of 12 passed/);
@@ -59,8 +59,8 @@ test("renders the generated benchmark hierarchy", async () => {
   assert.match(normalized, /class="backLink routeWordmark"[^>]*><span class="rangeWord">Range<\/span>/);
   assert.doesNotMatch(normalized, /data-route-zero/);
   assert.match(normalized, /<range-typed-text(?=[^>]*text="Performance")(?=[^>]*delay="300")(?=[^>]*interval="45")[^>]*>/);
-  assert.match(normalized, /src="\/range-typed-text\.js\?version=80"/);
-  assert.match(normalized, /src="\/range-navigation-v2\.js\?version=80"/);
+  assert.match(normalized, /src="\/range-typed-text\.js\?version=81"/);
+  assert.match(normalized, /src="\/range-navigation-v2\.js\?version=81"/);
   assert.match(normalized, /Benchmark suite/);
   assert.match(normalized, /Sequential modulo/);
   assert.match(normalized, /href="\/benchmarks\?category=noise"/);
@@ -447,6 +447,8 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(navigation, /document\.startViewTransition\(commit\)\.finished/);
   assert.match(navigation, /range-route-transition-finished/);
   assert.match(navigation, /requestAnimationFrame\(resolve\)/);
+  assert.match(navigation, /direction === "backward"/);
+  assert.match(navigation, /await typedTitle\.collapse\(\)/);
   assert.match(navigation, /function routeDirection/);
   assert.match(navigation, /function isPerformanceTransition/);
   assert.match(navigation, /routeClasses\.push\("range-route-performance"\)/);
@@ -463,6 +465,9 @@ test("uses Web Components without React, Next, or Vinext", async () => {
   assert.match(typedText, /classList\.contains\("range-route-performance"\)/);
   assert.match(typedText, /range-route-transition-finished/);
   assert.match(typedText, /data-route-pending/);
+  assert.match(typedText, /async collapse\(\)/);
+  assert.match(typedText, /data-collapsing/);
+  assert.match(typedText, /setTimeout\(resolve, 28\)/);
   assert.match(worker, /range-ui-v80\.css/);
   assert.match(worker, /replace\('\/range-ui\.css', '\/range-ui-v80\.css'\)/);
   assert.doesNotMatch(worker, /data-route-zero>0/);

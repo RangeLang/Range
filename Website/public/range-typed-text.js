@@ -17,6 +17,29 @@ class RangeTypedText extends HTMLElement {
     if (this.isConnected) this.#start();
   }
 
+  async collapse() {
+    const characters = [...(this.textContent ?? "")];
+    this.#cancel();
+    const run = this.#run;
+    this.setAttribute("data-collapsing", "");
+
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      this.textContent = "";
+      this.removeAttribute("data-collapsing");
+      return;
+    }
+
+    for (let index = characters.length - 1; index >= 0; index -= 1) {
+      await new Promise((resolve) => {
+        this.#timer = setTimeout(resolve, 28);
+      });
+      if (run !== this.#run) return;
+      this.textContent = characters.slice(0, index).join("");
+    }
+
+    this.removeAttribute("data-collapsing");
+  }
+
   #cancel() {
     this.#run += 1;
     clearTimeout(this.#timer);
@@ -24,6 +47,7 @@ class RangeTypedText extends HTMLElement {
     this.#routeReady = undefined;
     this.removeAttribute("data-typing");
     this.removeAttribute("data-route-pending");
+    this.removeAttribute("data-collapsing");
   }
 
   #start() {
