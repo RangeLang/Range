@@ -2,12 +2,12 @@
   "formatVersion": 1,
   "seed": {
     "path": "RangeCompiler/Bootstrap/RangeCompilerSeed.ll",
-    "bytes": 6098315,
-    "sha256": "8978a1011bfb38d2a3eba160e688a55f6723ecb46e94a2341a23c561af7d2c57"
+    "bytes": 5353820,
+    "sha256": "c8f40d7adefd530e0b609e927b3b3c6073298768ab358943bc51cbe3aa8ad42b"
   },
   "expectedStage3LLVM": {
-    "bytes": 6098315,
-    "sha256": "8978a1011bfb38d2a3eba160e688a55f6723ecb46e94a2341a23c561af7d2c57"
+    "bytes": 5353820,
+    "sha256": "c8f40d7adefd530e0b609e927b3b3c6073298768ab358943bc51cbe3aa8ad42b"
   },
   "compilerSources": [
     {
@@ -18,17 +18,17 @@
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Compiler.range",
       "role": "project",
-      "sha256": "dd1aa8cadffb3d36a8902df325946b43658fdabb22c040d972e0b17a576de831"
+      "sha256": "0ec349e4b6954784a69ce0cfcfcd6e355d64ee69c2703da03b1e038ca7af9cb2"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerCore.range",
       "role": "project",
-      "sha256": "9efd863514690241baa5f371018c4a312efd42dd599870e3768733147c5d56eb"
+      "sha256": "79629160efe092728874e477ff2920ab3de86c8d633811bbf51ec5fdd3a3c029"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerDirectives.range",
       "role": "project",
-      "sha256": "8fd707d26ed6b092ad4a758f0db65e934c8f35ae9e260e5b5aabb9e706fa069d"
+      "sha256": "62cc99f6ca3f3e866436732e1cc065e6c053e5e9e487d54550fb2fbf0fda069a"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Lexer.range",
