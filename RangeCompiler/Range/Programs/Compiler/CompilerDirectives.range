@@ -38,42 +38,6 @@ function compilerSourceRequestsNativeSourceSetLLVMText(source: String): Bool {
     return hasRangePrefix(source: source, start: 0, prefix: String("compilerNativeSourceSetLLVMText"))
 }
 
-function compilerSourceRequestsSourceSetAST(source: String): Bool {
-    return hasRangePrefix(source: source, start: 0, prefix: String("compilerSourceSetAST"))
-}
-
-function compilerSourceRequestsSourceSetTypes(source: String): Bool {
-    return hasRangePrefix(source: source, start: 0, prefix: String("compilerSourceSetTypes"))
-}
-
-function compilerSourceRequestsSourceSetLLVM(source: String): Bool {
-    return hasRangePrefix(source: source, start: 0, prefix: String("compilerSourceSetLLVM"))
-}
-
 function compilerSourceRequestsSourceSetLLVMText(source: String): Bool {
     return hasRangePrefix(source: source, start: 0, prefix: String("compilerSourceSetLLVMText"))
-}
-
-function compilerSourceRequestsProjectSourceSetLLVMText(source: String): Bool {
-    return hasRangePrefix(source: source, start: 0, prefix: String("compilerProjectSourceSetLLVMText"))
-}
-
-function compilerSourceRequestsCoreAST(source: String): Bool {
-    return hasRangePrefix(source: source, start: 0, prefix: String("compilerCoreAST"))
-}
-
-function compilerSourceRequestsCoreSymbols(source: String): Bool {
-    return hasRangePrefix(source: source, start: 0, prefix: String("compilerCoreSymbols"))
-}
-
-function compilerSourceRequestsCoreTypes(source: String): Bool {
-    return hasRangePrefix(source: source, start: 0, prefix: String("compilerCoreTypes"))
-}
-
-function compilerSourceRequestsCoreLLVM(source: String): Bool {
-    return hasRangePrefix(source: source, start: 0, prefix: String("compilerCoreLLVM"))
-}
-
-function compilerSourceRequestsCompilerLLVMText(source: String): Bool {
-    return hasRangePrefix(source: source, start: 0, prefix: String("compilerLLVMText"))
 }
