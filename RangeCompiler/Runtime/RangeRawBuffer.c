@@ -90,6 +90,50 @@ int32_t rawBufferAppendInt(void *opaqueBuffer, int32_t value) {
     return 0;
 }
 
+int32_t rawBufferAppendRandomBytes(void *opaqueBuffer, int32_t requestedCount) {
+    RangeRawBuffer *buffer = opaqueBuffer;
+    if (!buffer || buffer->stride != 1 || requestedCount < 0
+        || (size_t)requestedCount > INT32_MAX - buffer->count) {
+        return -1;
+    }
+    size_t count = (size_t)requestedCount;
+    size_t oldCount = buffer->count;
+    int32_t reserveResult = rawBufferReserve(buffer, count);
+    if (reserveResult < 0) {
+        return -1;
+    }
+    if (count > 0) {
+        arc4random_buf(buffer->data + buffer->count, count);
+        buffer->count += count;
+    }
+    buffer->data[buffer->count] = 0;
+    if (reserveResult > 0) {
+        compilerMetricsObserveRawBufferReallocation(oldCount);
+    }
+    compilerMetricsObserveRawBufferAppend(count);
+    return 0;
+}
+
+int32_t rawBufferAppendUnsigned8(void *opaqueBuffer, uint8_t value) {
+    RangeRawBuffer *buffer = opaqueBuffer;
+    if (!buffer || buffer->stride != 1 || buffer->count >= INT32_MAX) {
+        return -1;
+    }
+    size_t oldCount = buffer->count;
+    int32_t reserveResult = rawBufferReserve(buffer, 1);
+    if (reserveResult < 0) {
+        return -1;
+    }
+    buffer->data[buffer->count] = value;
+    buffer->count += 1;
+    buffer->data[buffer->count] = 0;
+    if (reserveResult > 0) {
+        compilerMetricsObserveRawBufferReallocation(oldCount);
+    }
+    compilerMetricsObserveRawBufferAppend(1);
+    return 0;
+}
+
 int32_t rawBufferCount(void *opaqueBuffer) {
     RangeRawBuffer *buffer = opaqueBuffer;
     if (!buffer || buffer->count > INT32_MAX) {
@@ -110,6 +154,15 @@ int32_t rawBufferLoadInt(void *opaqueBuffer, int32_t index) {
     return value;
 }
 
+uint8_t rawBufferLoadUnsigned8(void *opaqueBuffer, int32_t index) {
+    RangeRawBuffer *buffer = opaqueBuffer;
+    if (!buffer || buffer->stride != 1
+        || index < 0 || (size_t)index >= buffer->count) {
+        abort();
+    }
+    return buffer->data[index];
+}
+
 int32_t rawBufferStoreInt(void *opaqueBuffer, int32_t index, int32_t value) {
     RangeRawBuffer *buffer = opaqueBuffer;
     if (!buffer || buffer->stride != sizeof(value)
@@ -118,6 +171,16 @@ int32_t rawBufferStoreInt(void *opaqueBuffer, int32_t index, int32_t value) {
     }
 
     memcpy(buffer->data + (size_t)index * buffer->stride, &value, sizeof(value));
+    return 0;
+}
+
+int32_t rawBufferStoreUnsigned8(void *opaqueBuffer, int32_t index, uint8_t value) {
+    RangeRawBuffer *buffer = opaqueBuffer;
+    if (!buffer || buffer->stride != 1
+        || index < 0 || (size_t)index >= buffer->count) {
+        return -1;
+    }
+    buffer->data[index] = value;
     return 0;
 }
 

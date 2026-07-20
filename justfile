@@ -24,6 +24,10 @@ check:
   scripts/range compiler progression
 
 check-fast:
-  bash -n scripts/range scripts/range-native scripts/check-range-compiler-cache scripts/check-range-compiler-candidate scripts/verify-range-compiler-seed
+  bash -n scripts/range scripts/range-native scripts/check-range-unsigned8 scripts/check-range-compiler-cache scripts/check-range-compiler-candidate scripts/verify-range-compiler-seed
+  scripts/check-range-unsigned8
   scripts/check-range-compiler-cache
   scripts/range check-seed-integrity
+
+check-unsigned8 candidate="":
+  scripts/check-range-unsigned8 {{candidate}}
