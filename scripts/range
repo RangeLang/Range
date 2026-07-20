@@ -8,9 +8,12 @@ usage() {
     cat >&2 <<'USAGE'
 Usage:
   scripts/range compiler next
+  scripts/range compiler next --cached-only
   scripts/range compiler progression
+  scripts/range compiler progression --cached-only
   scripts/range compiler COMMAND [ARGS...]
   scripts/range check-compiler-candidate [DIR]
+  scripts/range check-seed-integrity
   scripts/range check-stage2-compiler
 
 The supported native surface is the self-hosted compiler kernel and its proof
@@ -33,12 +36,24 @@ case "$command" in
         shift
         case "$compiler_command" in
             next)
-                if [[ $# -ne 0 ]]; then usage; exit 1; fi
-                "$REPO_ROOT/scripts/range-native" compiler-next
+                if [[ $# -eq 0 ]]; then
+                    "$REPO_ROOT/scripts/range-native" compiler-next
+                elif [[ $# -eq 1 && "$1" == "--cached-only" ]]; then
+                    "$REPO_ROOT/scripts/range-native" compiler-next-cached
+                else
+                    usage
+                    exit 1
+                fi
                 ;;
             progression)
-                if [[ $# -ne 0 ]]; then usage; exit 1; fi
-                "$REPO_ROOT/scripts/range-native" compiler-progression
+                if [[ $# -eq 0 ]]; then
+                    "$REPO_ROOT/scripts/range-native" compiler-progression
+                elif [[ $# -eq 1 && "$1" == "--cached-only" ]]; then
+                    "$REPO_ROOT/scripts/range-native" compiler-progression-cached
+                else
+                    usage
+                    exit 1
+                fi
                 ;;
             *)
                 "$REPO_ROOT/scripts/range-native" compiler-command "$compiler_command" "$@"
@@ -53,6 +68,10 @@ case "$command" in
     check-stage2-compiler)
         if [[ $# -ne 0 ]]; then usage; exit 1; fi
         "$REPO_ROOT/scripts/verify-range-compiler-seed"
+        ;;
+    check-seed-integrity)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/verify-range-compiler-seed" --integrity-only
         ;;
     *)
         usage

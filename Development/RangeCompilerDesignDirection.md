@@ -3277,6 +3277,48 @@ cache hit returned in 0.65 seconds with 19,972,096 bytes maximum RSS. The cached
 executable compiled and emitted the focused fixture, whose linked program
 exited `7`.
 
+### Native command artifact cache (2026-07-20)
+
+Ordinary native `compile`, `check`, and `emit-llvm` commands now retain only
+successful final artifacts under `.range/Compiler/Artifacts`. The key includes
+the native compiler executable hash, command kind, canonical input path, and
+exact input-content hash. Metadata records those inputs plus the artifact hash
+and byte count. Every hit revalidates all fields and the artifact itself;
+partial, corrupt, failed, or diagnostic-producing entries are rebuilt instead
+of trusted. `emit-llvm` restores through a temporary output and rename, so a
+cache hit preserves the command's atomic output boundary.
+
+The cache is silent by default. `RANGE_CACHE_TRACE=1` reports hit, miss, or
+bypass decisions, `RANGE_CACHE_DISABLE=1` forces the uncached path, and
+`RANGE_COMPILER_CACHE_DIR` selects an isolated cache for tests. The focused
+regression proves cold/miss and warm/hit behavior, byte identity with an
+uncached emission, content invalidation, corrupt-entry repair, and separate
+`compile`/`check` result reuse.
+
+Compiler construction and fixed-point progression keep their stronger,
+existing content-addressed caches. `compiler next --cached-only` and `compiler
+progression --cached-only` validate and return an exact existing entry, but
+refuse a miss instead of silently beginning a full emission. `just check-fast`
+uses the latter boundary for the development loop. The uncached commands and
+`check-stage2-compiler` remain explicit proof operations; a cached hit is reuse
+of an earlier proof, not a new proof run.
+
+`check-seed-integrity` is the other bounded development check. It verifies the
+accepted seed, every manifested compiler/runtime source, target, byte count,
+and producer identity, but deliberately stops before self-reproduction. It is
+included in `just check-fast`; it must not replace the uncached Stage 2 to 3
+proof at an acceptance boundary.
+
+This is deliberately a final-artifact cache, not a claim that edited compiler
+sources now rebuild incrementally. A measured compilation-local body-syntax
+experiment copied cached node and edge tables into each fresh arena. Although
+it remained byte-identical and passed the complete candidate gate, the
+cache-enabled self-rebuild took about 11 minutes 19 seconds versus roughly
+10 minutes 44 seconds for the accepted compiler. Copying the tables cost more
+than reparsing them, so that experiment was removed. A later per-function
+typed-artifact cache must therefore use immutable shared or directly decoded
+storage; it must not reintroduce row-by-row table copying under a cache label.
+
 ### Native macro arrays and runtime-representation tracking (2026-07-17)
 
 Typed member syntax now preserves a macro application as an array element

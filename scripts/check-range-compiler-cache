@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-cache.XXXXXX")"
+CACHE_ROOT="$WORK_ROOT/cache"
+INPUT="$WORK_ROOT/ReturnInteger.range"
+
+cleanup() {
+    /bin/rm -rf "$WORK_ROOT"
+}
+trap cleanup EXIT
+
+fail() {
+    echo "Range compiler cache check failed: $1" >&2
+    exit 1
+}
+
+/bin/cp "$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnInteger.range" "$INPUT"
+
+RANGE_COMPILER_CACHE_DIR="$CACHE_ROOT" RANGE_CACHE_TRACE=1 \
+    "$REPO_ROOT/scripts/range" compiler emit-llvm "$INPUT" "$WORK_ROOT/cold.ll" \
+    > "$WORK_ROOT/cold.out" 2> "$WORK_ROOT/cold.trace"
+/usr/bin/grep -q $'range-cache\tmiss command=emit-llvm' "$WORK_ROOT/cold.trace" \
+    || fail "cold emit did not report a cache miss"
+
+RANGE_COMPILER_CACHE_DIR="$CACHE_ROOT" RANGE_CACHE_TRACE=1 \
+    "$REPO_ROOT/scripts/range" compiler emit-llvm "$INPUT" "$WORK_ROOT/warm.ll" \
+    > "$WORK_ROOT/warm.out" 2> "$WORK_ROOT/warm.trace"
+/usr/bin/grep -q $'range-cache\thit command=emit-llvm' "$WORK_ROOT/warm.trace" \
+    || fail "warm emit did not report a cache hit"
+/usr/bin/cmp -s "$WORK_ROOT/cold.ll" "$WORK_ROOT/warm.ll" \
+    || fail "cold and warm LLVM differ"
+
+RANGE_CACHE_DISABLE=1 "$REPO_ROOT/scripts/range" compiler emit-llvm \
+    "$INPUT" "$WORK_ROOT/uncached.ll"
+/usr/bin/cmp -s "$WORK_ROOT/cold.ll" "$WORK_ROOT/uncached.ll" \
+    || fail "cached and uncached LLVM differ"
+
+entry="$(/usr/bin/find "$CACHE_ROOT" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+[[ -n "$entry" && -f "$entry/Artifact" && -f "$entry/Metadata.txt" ]] \
+    || fail "cache entry is incomplete"
+/usr/bin/grep -q '^format=1$' "$entry/Metadata.txt" \
+    || fail "cache format is missing"
+/usr/bin/grep -q '^artifactHash=' "$entry/Metadata.txt" \
+    || fail "artifact hash is missing"
+/usr/bin/grep -q '^artifactBytes=' "$entry/Metadata.txt" \
+    || fail "artifact byte count is missing"
+
+/usr/bin/truncate -s 1 "$entry/Artifact"
+RANGE_COMPILER_CACHE_DIR="$CACHE_ROOT" RANGE_CACHE_TRACE=1 \
+    "$REPO_ROOT/scripts/range" compiler emit-llvm "$INPUT" "$WORK_ROOT/repaired.ll" \
+    > "$WORK_ROOT/repaired.out" 2> "$WORK_ROOT/repaired.trace"
+/usr/bin/grep -q $'range-cache\tmiss command=emit-llvm' "$WORK_ROOT/repaired.trace" \
+    || fail "corrupt artifact was accepted as a cache hit"
+/usr/bin/cmp -s "$WORK_ROOT/cold.ll" "$WORK_ROOT/repaired.ll" \
+    || fail "cache repair changed LLVM"
+
+/usr/bin/printf '\n' >> "$INPUT"
+RANGE_COMPILER_CACHE_DIR="$CACHE_ROOT" RANGE_CACHE_TRACE=1 \
+    "$REPO_ROOT/scripts/range" compiler emit-llvm "$INPUT" "$WORK_ROOT/changed.ll" \
+    > "$WORK_ROOT/changed.out" 2> "$WORK_ROOT/changed.trace"
+/usr/bin/grep -q $'range-cache\tmiss command=emit-llvm' "$WORK_ROOT/changed.trace" \
+    || fail "source change did not invalidate the cache"
+entry_count="$(/usr/bin/find "$CACHE_ROOT" -mindepth 1 -maxdepth 1 -type d | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
+[[ "$entry_count" == "2" ]] || fail "source change did not create a distinct content key"
+/usr/bin/cmp -s "$WORK_ROOT/repaired.ll" "$WORK_ROOT/changed.ll" \
+    || fail "non-semantic source change altered LLVM"
+
+RANGE_COMPILER_CACHE_DIR="$CACHE_ROOT" RANGE_CACHE_TRACE=1 \
+    "$REPO_ROOT/scripts/range" compiler compile "$INPUT" \
+    > "$WORK_ROOT/compile-cold.out" 2> "$WORK_ROOT/compile-cold.trace"
+RANGE_COMPILER_CACHE_DIR="$CACHE_ROOT" RANGE_CACHE_TRACE=1 \
+    "$REPO_ROOT/scripts/range" compiler compile "$INPUT" \
+    > "$WORK_ROOT/compile-warm.out" 2> "$WORK_ROOT/compile-warm.trace"
+/usr/bin/grep -q $'range-cache\thit command=compile' "$WORK_ROOT/compile-warm.trace" \
+    || fail "compile did not reuse its cached output"
+/usr/bin/cmp -s "$WORK_ROOT/compile-cold.out" "$WORK_ROOT/compile-warm.out" \
+    || fail "cold and warm compile output differ"
+
+RANGE_COMPILER_CACHE_DIR="$CACHE_ROOT" RANGE_CACHE_TRACE=1 \
+    "$REPO_ROOT/scripts/range" compiler check "$INPUT" \
+    > "$WORK_ROOT/check-cold.out" 2> "$WORK_ROOT/check-cold.trace"
+RANGE_COMPILER_CACHE_DIR="$CACHE_ROOT" RANGE_CACHE_TRACE=1 \
+    "$REPO_ROOT/scripts/range" compiler check "$INPUT" \
+    > "$WORK_ROOT/check-warm.out" 2> "$WORK_ROOT/check-warm.trace"
+/usr/bin/grep -q $'range-cache\thit command=check' "$WORK_ROOT/check-warm.trace" \
+    || fail "check did not reuse its cached result"
+[[ ! -s "$WORK_ROOT/check-cold.out" && ! -s "$WORK_ROOT/check-warm.out" ]] \
+    || fail "successful check output changed"
+
+echo "Range compiler cache check passed."

@@ -11,7 +11,9 @@ Usage:
   scripts/range-native source-graph INPUT OUTPUT
   scripts/range-native compiler-command COMMAND [ARGS...]
   scripts/range-native compiler-next
+  scripts/range-native compiler-next-cached
   scripts/range-native compiler-progression
+  scripts/range-native compiler-progression-cached
 
 This is the internal native self-hosting surface. source-graph remains exposed
 for candidate verification; ordinary project compilation is not yet supported.
@@ -120,7 +122,186 @@ compiler_project_command() {
     command_line_source="$(project_command_line_source "$project")"
     if [[ ! -d "$command_line_source" && ! -f "$command_line_source" ]]; then return 66; fi
     compiler="$(ensure_seed_compiler)"
-    "$compiler" "$@"
+    compiler_cached_command "$compiler" "$@"
+}
+
+compiler_cache_trace() {
+    if [[ "${RANGE_CACHE_TRACE:-0}" == "1" ]]; then
+        /usr/bin/printf 'range-cache\t%s\n' "$1" >&2
+    fi
+}
+
+compiler_cache_root() {
+    /usr/bin/printf '%s\n' "${RANGE_COMPILER_CACHE_DIR:-$REPO_ROOT/.range/Compiler/Artifacts}"
+}
+
+compiler_cache_source_key() {
+    local compiler="$1"
+    local command="$2"
+    local input="$3"
+    local canonical
+    canonical="$(cd "$(dirname "$input")" && pwd)/$(basename "$input")"
+    {
+        /usr/bin/printf 'format=1\n'
+        /usr/bin/printf 'compiler=%s\n' "$(sha256 "$compiler")"
+        /usr/bin/printf 'command=%s\n' "$command"
+        /usr/bin/printf 'path=%s\n' "$canonical"
+        /usr/bin/printf 'source=%s\n' "$(sha256 "$canonical")"
+    } | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}'
+}
+
+compiler_cache_metadata_value() {
+    local metadata="$1"
+    local key="$2"
+    /usr/bin/sed -n "s/^${key}=//p" "$metadata"
+}
+
+compiler_cache_entry_is_valid() {
+    local metadata="$1"
+    local artifact="$2"
+    local compiler="$3"
+    local command="$4"
+    local input="$5"
+    local key="$6"
+    local canonical
+    [[ -f "$metadata" && -f "$artifact" ]] || return 1
+    canonical="$(cd "$(dirname "$input")" && pwd)/$(basename "$input")"
+    [[ "$(compiler_cache_metadata_value "$metadata" format)" == "1"
+        && "$(compiler_cache_metadata_value "$metadata" key)" == "$key"
+        && "$(compiler_cache_metadata_value "$metadata" compiler)" == "$(sha256 "$compiler")"
+        && "$(compiler_cache_metadata_value "$metadata" command)" == "$command"
+        && "$(compiler_cache_metadata_value "$metadata" path)" == "$canonical"
+        && "$(compiler_cache_metadata_value "$metadata" source)" == "$(sha256 "$canonical")"
+        && "$(compiler_cache_metadata_value "$metadata" artifactHash)" == "$(sha256 "$artifact")"
+        && "$(compiler_cache_metadata_value "$metadata" artifactBytes)" == "$(/usr/bin/stat -f %z "$artifact")" ]]
+}
+
+compiler_cache_publish() {
+    local temporary="$1"
+    local cache_root="$2"
+    /bin/mv "$temporary/Artifact" "$cache_root/Artifact"
+    /bin/mv "$temporary/Metadata.txt" "$cache_root/Metadata.txt"
+    /bin/rmdir "$temporary"
+}
+
+compiler_cache_write_metadata() {
+    local metadata="$1"
+    local artifact="$2"
+    local compiler="$3"
+    local command="$4"
+    local input="$5"
+    local key="$6"
+    local canonical
+    canonical="$(cd "$(dirname "$input")" && pwd)/$(basename "$input")"
+    {
+        /usr/bin/printf 'format=1\n'
+        /usr/bin/printf 'key=%s\n' "$key"
+        /usr/bin/printf 'compiler=%s\n' "$(sha256 "$compiler")"
+        /usr/bin/printf 'command=%s\n' "$command"
+        /usr/bin/printf 'path=%s\n' "$canonical"
+        /usr/bin/printf 'source=%s\n' "$(sha256 "$canonical")"
+        /usr/bin/printf 'artifactHash=%s\n' "$(sha256 "$artifact")"
+        /usr/bin/printf 'artifactBytes=%s\n' "$(/usr/bin/stat -f %z "$artifact")"
+    } > "$metadata"
+}
+
+compiler_cached_text_command() {
+    local compiler="$1"
+    local command="$2"
+    local input="$3"
+    local key cache_root artifact metadata temporary error status
+    require_source_input "$input"
+    if [[ "${RANGE_CACHE_DISABLE:-0}" == "1" ]]; then
+        compiler_cache_trace "bypass command=$command"
+        "$compiler" "$command" "$input"
+        return $?
+    fi
+    key="$(compiler_cache_source_key "$compiler" "$command" "$input")"
+    cache_root="$(compiler_cache_root)/$key"
+    artifact="$cache_root/Artifact"
+    metadata="$cache_root/Metadata.txt"
+    if compiler_cache_entry_is_valid "$metadata" "$artifact" "$compiler" "$command" "$input" "$key"; then
+        compiler_cache_trace "hit command=$command key=$key"
+        /bin/cat "$artifact"
+        return 0
+    fi
+    compiler_cache_trace "miss command=$command key=$key"
+    /bin/mkdir -p "$cache_root"
+    temporary="$cache_root/.build.$$"
+    /bin/mkdir -p "$temporary"
+    error="$temporary/Error.txt"
+    if "$compiler" "$command" "$input" > "$temporary/Artifact" 2> "$error"; then status=0; else status=$?; fi
+    if [[ -s "$error" ]]; then /bin/cat "$error" >&2; fi
+    if [[ "$status" -ne 0 || -s "$error" ]]; then
+        /bin/cat "$temporary/Artifact"
+        /bin/rm -f "$temporary/Artifact" "$error"
+        /bin/rmdir "$temporary"
+        return "$status"
+    fi
+    /bin/rm -f "$error"
+    compiler_cache_write_metadata "$temporary/Metadata.txt" "$temporary/Artifact" "$compiler" "$command" "$input" "$key"
+    /bin/cat "$temporary/Artifact"
+    compiler_cache_publish "$temporary" "$cache_root"
+}
+
+compiler_cached_emit_llvm() {
+    local compiler="$1"
+    local input="$2"
+    local output="$3"
+    local key cache_root artifact metadata temporary error status output_temporary
+    require_source_input "$input"
+    if [[ "${RANGE_CACHE_DISABLE:-0}" == "1" ]]; then
+        compiler_cache_trace "bypass command=emit-llvm"
+        "$compiler" emit-llvm "$input" "$output"
+        return $?
+    fi
+    key="$(compiler_cache_source_key "$compiler" emit-llvm "$input")"
+    cache_root="$(compiler_cache_root)/$key"
+    artifact="$cache_root/Artifact"
+    metadata="$cache_root/Metadata.txt"
+    if ! compiler_cache_entry_is_valid "$metadata" "$artifact" "$compiler" emit-llvm "$input" "$key"; then
+        compiler_cache_trace "miss command=emit-llvm key=$key"
+        /bin/mkdir -p "$cache_root"
+        temporary="$cache_root/.build.$$"
+        /bin/mkdir -p "$temporary"
+        error="$temporary/Error.txt"
+        if "$compiler" emit-llvm "$input" "$temporary/Artifact" > "$temporary/Output.txt" 2> "$error"; then status=0; else status=$?; fi
+        if [[ -s "$temporary/Output.txt" ]]; then /bin/cat "$temporary/Output.txt"; fi
+        if [[ -s "$error" ]]; then /bin/cat "$error" >&2; fi
+        if [[ "$status" -eq 0 && ( -s "$error" || -s "$temporary/Output.txt" || ! -f "$temporary/Artifact" ) ]]; then status=65; fi
+        if [[ "$status" -ne 0 || -s "$error" || -s "$temporary/Output.txt" || ! -f "$temporary/Artifact" ]]; then
+            /bin/rm -f "$temporary/Artifact" "$temporary/Output.txt" "$error"
+            /bin/rmdir "$temporary"
+            return "$status"
+        fi
+        /bin/rm -f "$temporary/Output.txt" "$error"
+        compiler_cache_write_metadata "$temporary/Metadata.txt" "$temporary/Artifact" "$compiler" emit-llvm "$input" "$key"
+        compiler_cache_publish "$temporary" "$cache_root"
+    else
+        compiler_cache_trace "hit command=emit-llvm key=$key"
+    fi
+    output_temporary="$output.tmp.$$"
+    /bin/cp "$artifact" "$output_temporary"
+    /bin/mv "$output_temporary" "$output"
+}
+
+compiler_cached_command() {
+    local compiler="$1"
+    local command="${2:-}"
+    shift 2
+    case "$command" in
+        compile|check)
+            if [[ $# -ne 1 ]]; then "$compiler" "$command" "$@"; return $?; fi
+            compiler_cached_text_command "$compiler" "$command" "$1"
+            ;;
+        emit-llvm)
+            if [[ $# -ne 2 ]]; then "$compiler" "$command" "$@"; return $?; fi
+            compiler_cached_emit_llvm "$compiler" "$1" "$2"
+            ;;
+        *)
+            "$compiler" "$command" "$@"
+            ;;
+    esac
 }
 
 ensure_seed_compiler() {
@@ -228,6 +409,7 @@ write_source_graph() {
 }
 
 compiler_next() {
+    local cache_only="${1:-false}"
     local compiler compiler_project command_line_source compiler_directory project_source project_relative core_source core_relative
     local runtime source_key cache_root bundle llvm executable metadata temporary
     local compiler_exit_code fixed_point llvm_hash llvm_bytes executable_hash
@@ -326,6 +508,12 @@ compiler_next() {
         fi
     fi
 
+    if [[ "$cache_only" == true ]]; then
+        echo "No validated next-compiler cache entry exists for the current seed and sources." >&2
+        echo "Run 'scripts/range compiler next' only when an uncached compiler build is intentional." >&2
+        return 75
+    fi
+
     /bin/mkdir -p "$cache_root"
     temporary="$cache_root/.build.$$"
     /bin/mkdir -p "$temporary"
@@ -389,6 +577,7 @@ compiler_next() {
 }
 
 compiler_progression() {
+    local cache_only="${1:-false}"
     local next_metadata source_key seed_llvm seed_executable previous_llvm previous_executable bundle
     local progression_key cache_root current_llvm current_executable metadata temporary diagnostic
     local seed_llvm_hash seed_llvm_bytes seed_executable_hash seed_executable_bytes
@@ -405,7 +594,7 @@ compiler_progression() {
 
     # First the accepted seed builds `previous`; then `previous` builds
     # `current` from the exact source bundle retained by compiler-next.
-    next_metadata="$(compiler_next)"
+    next_metadata="$(compiler_next "$cache_only")"
     source_key="$(/usr/bin/printf '%s\n' "$next_metadata" | /usr/bin/sed -n 's/^source=//p')"
     previous_executable="$(/usr/bin/printf '%s\n' "$next_metadata" | /usr/bin/sed -n 's/^executable=//p')"
     if [[ -z "$source_key" || -z "$previous_executable" || ! -x "$previous_executable" ]]; then
@@ -485,6 +674,12 @@ compiler_progression() {
             if [[ "$fixed_point" != true ]]; then return 65; fi
             return 0
         fi
+    fi
+
+    if [[ "$cache_only" == true ]]; then
+        echo "No validated compiler-progression cache entry exists for the current compiler candidate." >&2
+        echo "Run 'scripts/range compiler progression' only when an uncached fixed-point proof is intentional." >&2
+        return 75
     fi
 
     /bin/mkdir -p "$cache_root"
@@ -585,9 +780,17 @@ case "$command" in
         if [[ $# -ne 0 ]]; then usage; exit 1; fi
         compiler_next
         ;;
+    compiler-next-cached)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        compiler_next true
+        ;;
     compiler-progression)
         if [[ $# -ne 0 ]]; then usage; exit 1; fi
         compiler_progression
+        ;;
+    compiler-progression-cached)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        compiler_progression true
         ;;
     compiler-command)
         if [[ $# -lt 1 ]]; then usage; exit 1; fi
