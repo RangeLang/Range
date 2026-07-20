@@ -1,0 +1,15 @@
+function float32Identity(value: Float<32>): Float<32> {
+    return value
+}
+
+function float64Identity(value: Float<64>): Float<64> {
+    return value
+}
+
+@main {
+    let small: Float<32>(1.5)
+    let wide: Float<64>(2.5)
+    let smallResult: Float<32>(float32Identity(value: small))
+    let wideResult: Float<64>(float64Identity(value: wide))
+    return smallResult == small && wideResult == wide
+}
