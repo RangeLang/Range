@@ -1,9 +1,0 @@
-construct Bag {
-    let values: [Int]
-}
-
-@main {
-    let bag: Bag(values: [1, 2, 3])
-    let index: Int(1)
-    return bag.values[index]
-}

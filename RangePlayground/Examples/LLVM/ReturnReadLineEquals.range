@@ -1,4 +1,0 @@
-@main {
-    let text: String(readLine())
-    return text == String("hello") ? 0 : 1
-}

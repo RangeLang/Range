@@ -1,5 +1,0 @@
-@main {
-    let values: [Int]([])
-    let first: Optional<Int>(values.first())
-    return first == nil && values.count == 0 ? 0 : 1
-}

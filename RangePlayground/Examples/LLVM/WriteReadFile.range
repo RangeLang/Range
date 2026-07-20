@@ -1,6 +1,0 @@
-@main {
-    writeFile(path: String("/tmp/range-write-read.txt"), text: String("Range write works"))
-    let text: String(readFile(path: String("/tmp/range-write-read.txt")))
-    print(value: text)
-    return 0
-}

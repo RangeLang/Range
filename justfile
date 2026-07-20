@@ -4,17 +4,15 @@ default:
   @just --list
 
 compiler-build:
-  swift build --package-path RangeCompiler
+  scripts/range compiler next
 
 compiler-test:
-  swift build --package-path RangeCompiler --product range
-  swift test --package-path RangeCompiler --filter RangeScriptTests
+  scripts/range compiler progression
 
-range-run:
-  scripts/range run RangePlayground/Examples/LLVM/EmptyMain.range
+candidate:
+  scripts/range check-compiler-candidate
 
 check:
-  bash -n scripts/range
-  swift build --package-path RangeCompiler --product range
-  swift test --package-path RangeCompiler --filter RangeScriptTests
-  scripts/range check
+  bash -n scripts/range scripts/range-native scripts/check-range-compiler-candidate scripts/verify-range-compiler-seed
+  scripts/range check-stage2-compiler
+  scripts/range compiler progression

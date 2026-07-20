@@ -1,9 +1,0 @@
-@main {
-    if commandLineArgumentCount() == 1 {
-        let command: String(commandLineArgument(index: 0))
-        if command == String("seven") {
-            return 7
-        }
-    }
-    return 64
-}

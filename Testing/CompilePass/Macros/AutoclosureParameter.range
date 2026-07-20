@@ -1,7 +1,0 @@
-function acceptDeferred(@autoclosure value: Int): Int {
-    return value()
-}
-
-@main {
-    let result: acceptDeferred(1 + 2)
-}

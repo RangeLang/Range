@@ -1,9 +1,0 @@
-construct Point {
-    let x: Int(3)
-    let y: Int(4)
-}
-
-@main {
-    let point: Point()
-    return point.x + point.y
-}

@@ -1,116 +1,23 @@
-# Testing
+# Native compiler proof fixtures
 
-This folder holds `.range` source files used by compiler regression tests.
+This folder contains only focused inputs consumed by the self-hosted compiler
+candidate verifier. It is not a general language conformance suite.
 
-- `CompilePass`: files that must parse, build a semantic graph, and validate.
-- `CompileFail`: files that must fail validation or compilation.
+- `SelfHosting/MacroFamilyMemory` protects candidate graph and macro-family
+  memory behavior.
+- `SelfHosting/ArrayWriteOutOfBounds.range` protects a native bounds failure.
+- `CompileFail/Collections/ImmutableArrayIndexedAssignment.range` protects the
+  one retained negative collection diagnostic used by candidate verification.
 
-These fixtures are discovered by the native `scripts/range test` command.
-`CompilePass` requires a clean native check, `CompileFail` requires a native
-compiler diagnostic, and the LLVM run manifest owns executable exit/stdout
-expectations. Use `--suite`, `--filter`, and `--list` for focused work.
+The retained `RangePlayground/Examples/LLVM` programs are likewise candidate
+lowering checks, not evidence that the complete Foundation or project language
+surface is operational. Run the supported gates with:
 
-Range-authored test functions use the Foundation `@test` macro. The initial
-macro enforces parameter-free test declarations; native test discovery and
-execution remain explicit compiler/driver artifacts rather than hidden Swift
-reflection.
+```sh
+scripts/range check-compiler-candidate
+scripts/range check-stage2-compiler
+scripts/range compiler progression
+```
 
-Compiler bootstrap progression is intentionally not represented as a source
-fixture. `scripts/range compiler progression` is the Compiler-project-specific
-artifact gate: the accepted seed builds `previous`, `previous` builds `current`
-from the same frozen source bundle, and the command reports byte-size deltas
-while requiring byte-identical LLVM and linked executables at the final step.
-
-## Adding Fixtures
-
-Create new compiler fixtures in this folder, not inline inside Swift test files.
-
-- Put validating examples in `CompilePass/<Category>/Name.range`.
-- Put expected-failure examples in `CompileFail/<Category>/Name.range`.
-- Reuse an existing category when possible. Add a new category only when it
-  reflects a real compiler surface that is starting to accumulate coverage.
-- Name fixtures after the behavior being protected, not after the test method.
-  Good examples: `ClampedState.range`, `InitMacroRewrite.range`,
-  `UnknownAttribute.range`.
-- Keep each fixture focused. Prefer one behavior per file unless the behaviors
-  are inseparable.
-- If a Swift test needs to inspect expanded AST or graph details for one
-  specific fixture, load the fixture file by path from `Testing` rather than
-  embedding the `.range` source directly in the test.
-
-Current top-level layout:
-
-- `CompilePass/Macros`: macro expansion and validation fixtures
-- `CompilePass/System`: core language/system behavior that should validate
-- `CompilePass/Concurrency`: concurrency semantics that should validate
-- `CompileFail/...`: negative fixtures grouped by the same surface areas
-
-The default rule is simple: if it is compiler input worth keeping around, it
-belongs in `Testing`.
-
-## Runnable LLVM Examples
-
-Runnable Range programs live under `RangePlayground/Examples/LLVM` and are
-checked through `scripts/range check`. The manifest
-`RangePlayground/Examples/LLVM/run-manifest.tsv` records the expected process
-exit code, optional stdin, optional arguments, and optional stdout for each
-example.
-
-The native runner requires the default run manifest to cover every LLVM example.
-Range source is emitted by the self-hosted compiler, linked with `clang`, and
-run as a native executable. Moving linking and process execution into Range's
-OS suite is the next ownership boundary.
-
-## Roadmap
-
-The current fixture surface is intentionally small. Add categories only when
-they protect real compiler behavior.
-
-- `CompileFail` diagnostics: require specific error text or diagnostic codes,
-  not just "any failure".
-- `EmitLLVM`: compare important emitted LLVM IR shapes when the script run
-  manifest does not give enough structural coverage.
-- `Artifacts`: verify compiler artifacts such as declaration graphs, dependency
-  graphs, and lowered IR once those formats stabilize.
-- `ParsePass` / `ParseFail`: add parser-only fixtures if syntax work starts
-  changing faster than semantic validation.
-
-This folder is the high-level testing surface. As Range-native testing grows,
-keep compiler fixtures and user-facing test examples grouped clearly under it.
-
-## Macro Fixtures
-
-The current macro fixtures cover only the supported bootstrap surface:
-
-- base literal attachment through `@literal` on literal-capable constructs
-- init-targeted call-site rewrite from attached init macros
-- function-targeted macro attachment and rewrite-site validation
-- function nested argument-slot rewrite shape (`target.call.arguments[i].expression.rewrite(...)`)
-- construct-target macro attachment validation
-- construct extension-surface call shape (`target.addExtension(...)`)
-- parameter-targeted `#autoclosure`
-- nested parameter application rewrite (`target.application.expression.rewrite(...)`)
-- parameter declaration type rewrite (`target.declaration.type.rewrite(...)`)
-- parameter single-application rewrite (`target.application.expression.rewrite(...)`)
-- expression-targeted `#stringify(...)`
-- expression-targeted rewrite through `target.rewrite(...)`, including
-  `#unwrap(...)` and a custom macro fixture
-- custom `@capture<Expression>` macro parameters
-- generic expression macro result substitution, for example
-  `#unwrap<T>(...) -> T` inferring the expanded expression result type
-- syntax-category expression macro parameters must use typed `@capture`, for example
-  `@capture<Expression> _ value: Expression`
-- invalid capture usage, for example `@capture<String> _ value: String`
-- missing capture metadata, for example bare `@capture _ value: Expression`
-- invalid rewrite-site usage for a macro target kind, for example a
-  `Parameter` macro using `target.rewrite(...)`
-- invalid nested parameter rewrite-site usage, for example
-  `target.application.rewrite(...)`
-- invalid rewrite-site usage for `Function` target macros, for example
-  `target.rewrite(...)` instead of `target.application.rewrite(...)`
-- invalid construct rewrite-site usage, for example `target.rewrite(...)` on a
-  `Construct` target macro
-- function nested rewrite execution gap fixture (expected fail until function
-  call-site rewrite execution is fully enabled)
-- parameter-targeted `#variadic` rewriting that now validates return semantics
-  against the expanded parameter type
+Add a fixture only when it protects behavior implemented by the Range-authored
+compiler and is wired into a native proof command.

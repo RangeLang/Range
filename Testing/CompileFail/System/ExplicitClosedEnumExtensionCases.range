@@ -1,8 +1,0 @@
-closed enum ExplicitClosedEncodingFormat {
-    case json
-}
-
-extension ExplicitClosedEncodingFormat {
-    case binary
-}
-

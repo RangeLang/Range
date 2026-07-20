@@ -1,4 +1,0 @@
-@main {
-    print(value: String("Hello from Range"))
-    return 0
-}

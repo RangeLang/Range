@@ -8,20 +8,13 @@ MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
 usage() {
     cat >&2 <<'USAGE'
 Usage:
-  scripts/range-native compile INPUT
-  scripts/range-native check INPUT
-  scripts/range-native emit-llvm INPUT OUTPUT
   scripts/range-native source-graph INPUT OUTPUT
-  scripts/range-native test [OPTIONS]
-  scripts/range-native project-run PROJECT [ARGS...]
   scripts/range-native compiler-command COMMAND [ARGS...]
   scripts/range-native compiler-next
   scripts/range-native compiler-progression
-  scripts/range-native compile-executable INPUT
-  scripts/range-native run INPUT [-- ARGS...]
 
-Ordinary inputs are compiled through one deterministic SourceGraph bundle:
-Core, Foundation, framework, then project files in bytewise path order.
+This is the internal native self-hosting surface. source-graph remains exposed
+for candidate verification; ordinary project compilation is not yet supported.
 USAGE
 }
 
@@ -121,43 +114,6 @@ project_command_line_source() {
     /usr/bin/printf '%s\n' "$canonical"
 }
 
-normalize_project_identity() {
-    /usr/bin/printf '%s' "$1" | /usr/bin/tr '[:upper:]' '[:lower:]' | /usr/bin/tr -cd '[:alnum:]'
-}
-
-project_file_for_name() {
-    local query project title construct directory role_alias candidate matched
-    query="$(normalize_project_identity "$1")"
-    candidate=""
-    while IFS= read -r project; do
-        if ! /usr/bin/grep -Eq '^[[:space:]]*let[[:space:]]*commandLine:' "$project"; then
-            continue
-        fi
-        title="$(/usr/bin/sed -n 's/.*let[[:space:]]*name:[[:space:]]*Title("\([^"]*\)").*/\1/p' "$project" | /usr/bin/head -1)"
-        construct="$(/usr/bin/sed -n 's/^[[:space:]]*construct[[:space:]]*\([^[:space:]{]*\).*/\1/p' "$project" | /usr/bin/head -1)"
-        directory="$(basename "$(dirname "$project")")"
-        role_alias=""
-        if /usr/bin/grep -Eq '^[[:space:]]*@compiler[[:space:]]*$' "$project"; then role_alias="compiler"; fi
-        matched=false
-        if [[ -n "$title" && "$(normalize_project_identity "$title")" == "$query" ]]; then matched=true; fi
-        if [[ -n "$construct" && "$(normalize_project_identity "$construct")" == "$query" ]]; then matched=true; fi
-        if [[ "$(normalize_project_identity "$directory")" == "$query" ]]; then matched=true; fi
-        if [[ -n "$role_alias" && "$role_alias" == "$query" ]]; then matched=true; fi
-        if [[ "$matched" == true ]]; then
-            if [[ -n "$candidate" ]]; then
-                echo "Project command-line name is ambiguous: $1" >&2
-                return 65
-            fi
-            candidate="$project"
-        fi
-    done < <(/usr/bin/find "$REPO_ROOT" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name Project.range -print | LC_ALL=C /usr/bin/sort)
-    if [[ -z "$candidate" ]]; then
-        echo "Unknown Range project command line: $1" >&2
-        return 64
-    fi
-    /usr/bin/printf '%s\n' "$candidate"
-}
-
 compiler_project_command() {
     local compiler project command_line_source
     project="$(compiler_project_file)"
@@ -243,7 +199,6 @@ source_graph_bundle() {
     : > "$bundle"
     source_graph_append_tree core Core "$REPO_ROOT/RangeCompiler/Range/Core" "$bundle"
     source_graph_append_tree foundation Foundation "$REPO_ROOT/RangeCompiler/Range/Foundation" "$bundle"
-    source_graph_append_tree framework Framework/Lexer "$REPO_ROOT/RangeCompiler/Range/Lexer" "$bundle"
     if [[ -f "$input" ]]; then
         absolute="$(cd "$(dirname "$input")" && pwd)/$(basename "$input")"
         source_graph_append_file project "Project/$(basename "$absolute")" "$absolute" "$bundle"
@@ -270,70 +225,6 @@ write_source_graph() {
     /bin/mkdir -p "$output_dir"
     output_dir="$(cd "$output_dir" && pwd)"
     source_graph_bundle "$input" "$output_dir/$(basename "$output")"
-}
-
-range_compiler_command() {
-    local command="$1"
-    local input="$2"
-    local compiler compiler_input bundle command_exit_code
-    require_source_input "$input"
-    compiler="$(ensure_seed_compiler)"
-    bundle="${TMPDIR:-/tmp}/range-source-graph.$$.range"
-    source_graph_bundle "$input" "$bundle"
-    compiler_input="$bundle"
-    if "$compiler" "$command" "$compiler_input"; then
-        command_exit_code=0
-    else
-        command_exit_code=$?
-    fi
-    /bin/rm -f "$bundle"
-    return "$command_exit_code"
-}
-
-emit_llvm() {
-    local input="$1"
-    local output="$2"
-    local compiler output_dir temporary object diagnostic compiler_input bundle
-    require_source_input "$input"
-    compiler="$(ensure_seed_compiler)"
-    output_dir="$(cd "$(dirname "$output")" 2>/dev/null && pwd || true)"
-    if [[ -z "$output_dir" ]]; then
-        /bin/mkdir -p "$(dirname "$output")"
-        output_dir="$(cd "$(dirname "$output")" && pwd)"
-    fi
-    output="$output_dir/$(basename "$output")"
-    temporary="$output.tmp.$$"
-    object="$output.o.$$"
-    diagnostic="$output.diagnostic.$$"
-    bundle="${TMPDIR:-/tmp}/range-source-graph.$$.range"
-    source_graph_bundle "$input" "$bundle"
-    compiler_input="$bundle"
-    local compiler_exit_code clang_exit_code
-    if "$compiler" emit-llvm "$compiler_input" "$temporary" > "$diagnostic"; then
-        compiler_exit_code=0
-    else
-        compiler_exit_code=$?
-    fi
-    /bin/rm -f "$bundle"
-    if [[ "$compiler_exit_code" -ne 0 ]]; then
-        if [[ -s "$diagnostic" ]]; then /bin/cat "$diagnostic" >&2; fi
-        /bin/rm -f "$temporary" "$object" "$diagnostic"
-        return "$compiler_exit_code"
-    fi
-    if [[ -s "$diagnostic" ]]; then
-        /bin/cat "$diagnostic" >&2
-        /bin/rm -f "$temporary" "$object" "$diagnostic"
-        return 65
-    fi
-    if clang -Wno-override-module -x ir -c "$temporary" -o "$object"; then
-        clang_exit_code=0
-    else
-        clang_exit_code=$?
-        /bin/rm -f "$temporary" "$object" "$diagnostic"
-        return "$clang_exit_code"
-    fi
-    /bin/mv "$temporary" "$output"
-    /bin/rm -f "$object" "$diagnostic"
 }
 
 compiler_next() {
@@ -678,60 +569,6 @@ compiler_progression() {
     fi
 }
 
-compile_executable() {
-    local input="$1"
-    local source_dir executable_name build_root llvm executable
-    local -a runtimes
-    require_source_input "$input"
-    if [[ -d "$input" ]]; then
-        source_dir="$(cd "$input" && pwd)"
-        input="$source_dir"
-        executable_name="$(basename "$source_dir")"
-    else
-        source_dir="$(cd "$(dirname "$input")" && pwd)"
-        input="$source_dir/$(basename "$input")"
-        executable_name="$(basename "${input%.range}")"
-    fi
-    build_root="$source_dir/.range/Build/llvm"
-    llvm="$build_root/Main.ll"
-    executable="$build_root/$executable_name"
-    /bin/mkdir -p "$build_root"
-    local emit_exit_code link_exit_code
-    if emit_llvm "$input" "$llvm"; then
-        emit_exit_code=0
-    else
-        emit_exit_code=$?
-    fi
-    if [[ "$emit_exit_code" -ne 0 ]]; then return "$emit_exit_code"; fi
-    runtimes=()
-    while IFS= read -r runtime; do
-        runtimes+=("$runtime")
-    done < <(runtime_inputs)
-    if clang -Wno-override-module "$llvm" "${runtimes[@]}" -o "$executable.tmp"; then
-        link_exit_code=0
-    else
-        link_exit_code=$?
-    fi
-    if [[ "$link_exit_code" -ne 0 ]]; then return "$link_exit_code"; fi
-    /bin/mv "$executable.tmp" "$executable"
-    /usr/bin/printf '%s\n' "$executable"
-}
-
-run_project_command_line() {
-    local name project compiler_project source executable
-    name="$1"
-    shift
-    project="$(project_file_for_name "$name")"
-    compiler_project="$(compiler_project_file)"
-    if [[ "$project" == "$compiler_project" ]]; then
-        compiler_project_command "$@"
-        return
-    fi
-    source="$(project_command_line_source "$project")"
-    executable="$(compile_executable "$source")"
-    "$executable" "$@"
-}
-
 command="${1:-}"
 if [[ -z "$command" ]]; then
     usage
@@ -740,20 +577,9 @@ fi
 shift
 
 case "$command" in
-    compile|check)
-        if [[ $# -ne 1 ]]; then usage; exit 1; fi
-        range_compiler_command "$command" "$1"
-        ;;
-    emit-llvm)
-        if [[ $# -ne 2 ]]; then usage; exit 1; fi
-        emit_llvm "$1" "$2"
-        ;;
     source-graph)
         if [[ $# -ne 2 ]]; then usage; exit 1; fi
         write_source_graph "$1" "$2"
-        ;;
-    test)
-        "$REPO_ROOT/scripts/range-native-test" "$@"
         ;;
     compiler-next)
         if [[ $# -ne 0 ]]; then usage; exit 1; fi
@@ -766,24 +592,6 @@ case "$command" in
     compiler-command)
         if [[ $# -lt 1 ]]; then usage; exit 1; fi
         compiler_project_command "$@"
-        ;;
-    project-run)
-        if [[ $# -lt 1 ]]; then usage; exit 1; fi
-        project_name="$1"
-        shift
-        run_project_command_line "$project_name" "$@"
-        ;;
-    compile-executable)
-        if [[ $# -ne 1 ]]; then usage; exit 1; fi
-        compile_executable "$1"
-        ;;
-    run)
-        if [[ $# -lt 1 ]]; then usage; exit 1; fi
-        input="$1"
-        shift
-        if [[ "${1:-}" == "--" ]]; then shift; fi
-        executable="$(compile_executable "$input")"
-        "$executable" "$@"
         ;;
     *)
         usage

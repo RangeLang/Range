@@ -1,9 +1,0 @@
-construct Person {
-    @clamped(min: 0, max: 120)
-    state age: Int(150)
-
-    function update(value: Int) {
-        set age   value
-        age: age + value
-    }
-}

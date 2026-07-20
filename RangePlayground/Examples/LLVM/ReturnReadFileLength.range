@@ -1,4 +1,0 @@
-@main {
-    let text: String(readFile(path: String("RangePlayground/Examples/LLVM/ReadFileInput.txt")))
-    return text.count
-}

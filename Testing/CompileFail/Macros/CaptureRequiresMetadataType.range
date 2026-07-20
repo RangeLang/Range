@@ -1,7 +1,0 @@
-macro badCapture(@capture _ value): Expression { target, diagnostics in
-    target.replace(with: value)
-}
-
-@main {
-    let text: String(@badCapture("hello"))
-}

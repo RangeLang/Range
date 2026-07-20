@@ -1,1 +1,0 @@
-function stringLength(value: String): Int

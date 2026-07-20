@@ -1,3 +1,0 @@
-@literal
-@builtin
-construct NilLiteral { }

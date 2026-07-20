@@ -1,6 +1,0 @@
-@main {
-    let maybe: Optional<[Int]>(nil)
-    let fallback: [Int]([4, 8, 12])
-    let chosen: [Int](maybe ?? fallback)
-    return chosen[1]
-}

@@ -1,9 +1,0 @@
-@main {
-    state unique: Set<Int>([1, 2])
-    unique.insert(element: 3)
-
-    let hasOne: unique.contains(element: 1)
-    let count: unique.count
-    let empty: unique.isEmpty
-    let removed: unique.remove(element: 2)
-}

@@ -1,1 +1,0 @@
-function writeFile(path: String, text: String): Int

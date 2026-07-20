@@ -1,3 +1,0 @@
-@main {
-    return stringLength(value: String("count \(7)"))
-}

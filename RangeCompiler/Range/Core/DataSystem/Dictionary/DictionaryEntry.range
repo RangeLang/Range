@@ -1,4 +1,0 @@
-construct DictionaryEntry<Key, Value> {
-    let key: Key
-    let value: Value
-}

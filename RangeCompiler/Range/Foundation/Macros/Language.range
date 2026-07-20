@@ -1,2 +1,0 @@
-macro language(): Construct -> Language<Construct> { target, diagnostics in
-}

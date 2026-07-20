@@ -1,7 +1,0 @@
-macro tuple(): Construct { target, diagnostics in
-    let bindings: [Binding](target.declaration.bindings)
-
-    if bindings.count != 2 {
-        diagnostics.error("@tuple expects exactly two binding fields.")
-    }
-}

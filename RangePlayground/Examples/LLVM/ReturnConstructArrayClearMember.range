@@ -1,9 +1,0 @@
-construct Bag {
-    let items: [Int]
-}
-
-@main {
-    let bag: Bag(items: [1, 2, 3])
-    bag.items.clear()
-    return bag.items.isEmpty && bag.items.count == 0 ? 0 : 1
-}

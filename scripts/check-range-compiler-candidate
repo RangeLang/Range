@@ -2309,8 +2309,8 @@ audit_driver_source_graph() {
     require_successful_output "$stage_label driver SourceGraph inventory" "$output" "$error"
     /usr/bin/perl -pe 's/\\t/\t/g; s/\\n/\n/g' "$output" > "$decoded"
     for role in core foundation framework project; do
-        expected_count="$(/usr/bin/grep -Fc "compilerSourceFile\\trole=$role\\t" "$graph")"
-        actual_count="$(/usr/bin/grep -Fc "role=$role" "$decoded")"
+        expected_count="$(/usr/bin/grep -Fc "compilerSourceFile\\trole=$role\\t" "$graph" || true)"
+        actual_count="$(/usr/bin/grep -Fc "role=$role" "$decoded" || true)"
         [[ "$actual_count" -eq "$expected_count" ]] \
             || fail "$stage_label driver SourceGraph $role count $actual_count; expected $expected_count"
     done
@@ -2325,7 +2325,7 @@ audit_driver_source_graph() {
         }
         END { if (last != 3) exit 1 }
     ' "$decoded" || fail "$stage_label driver SourceGraph role order changed"
-    echo "$stage_label driver SourceGraph: pass (deterministic Core/Foundation/framework/project inventory)"
+    echo "$stage_label driver SourceGraph: pass (deterministic ordered role inventory, including empty roles)"
 }
 
 audit_canonical_core() {
@@ -5254,7 +5254,7 @@ main() {
     echo "Stage 2/Stage 3 actual registrable macro: byte-identical LLVM/executable"
 
     local macro_snapshot_suffix
-    for macro_snapshot_suffix in positive.first.out positive.reordered.out generated.snapshot.out generated.snapshot.repeat.out generated.reordered.out generated.native.first.ll generated.native.repeat.ll generated.bare.out generated.user-global.out generated.root-collision.out generated.member-collision.out generated.malformed-extension.out generated.outside.out registrable.snapshot.out registrable.reordered.out registrable.native.ll registrable.authored-field-collision.out registrable.generated-field-collision.out registrable.root-storage.out registrable.malformed-splice.out registrable.immutable-field-mutation.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out declaration-reflection.out declaration-reflection.repeat.out execution-positive.out execution-positive.repeat.out execution-query.out execution-query.repeat.out execution-query-reordered.out execution-query-zero.out execution-member-present.out execution-member-present.repeat.out execution-member-present-reordered.out execution-member-missing.out execution-member-missing.repeat.out execution-member-path.out execution-member-path.repeat.out execution-member-invalid.out execution-member-invalid.repeat.out execution-member-invalid-type.out execution-member-invalid-type.repeat.out execution-member-nonconstruct.out execution-member-native.first.ll execution-member-native.repeat.ll execution-member-missing-native.out execution-expansion.out execution-expansion.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-query-invalid.out execution-expansion-duplicate.out execution-target-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
+    for macro_snapshot_suffix in positive.first.out positive.reordered.out generated.snapshot.out generated.snapshot.repeat.out generated.reordered.out generated.native.first.ll generated.native.repeat.ll generated.bare.out generated.user-global.out generated.root-collision.out generated.member-collision.out generated.malformed-extension.out generated.outside.out registrable.snapshot.out registrable.reordered.out registrable.native.ll registrable.authored-field-collision.out registrable.generated-field-collision.out registrable.root-storage.out registrable.malformed-splice.out registrable.immutable-field-mutation.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out execution-positive.out execution-positive.repeat.out execution-query.out execution-query.repeat.out execution-query-reordered.out execution-query-zero.out execution-member-present.out execution-member-present.repeat.out execution-member-present-reordered.out execution-member-missing.out execution-member-missing.repeat.out execution-member-path.out execution-member-path.repeat.out execution-member-invalid.out execution-member-invalid.repeat.out execution-member-invalid-type.out execution-member-invalid-type.repeat.out execution-member-nonconstruct.out execution-member-native.first.ll execution-member-native.repeat.ll execution-member-missing-native.out execution-expansion.out execution-expansion.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-query-invalid.out execution-expansion-duplicate.out execution-target-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
         /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.$macro_snapshot_suffix" "$WORK_ROOT/Stage3.macro.$macro_snapshot_suffix" \
             || fail "Stage 2 and Stage 3 macro snapshot differs: $macro_snapshot_suffix"
     done

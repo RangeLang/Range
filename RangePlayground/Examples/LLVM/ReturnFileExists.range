@@ -1,3 +1,0 @@
-@main {
-    return fileExists(path: String("/dev/null"))
-}

@@ -1,8 +1,0 @@
-macro fallbackOne(_ value: Int?): Expression { target, diagnostics in
-    target.replace(with: value ?? 1)
-}
-
-@main {
-    let maybe: Optional<Int>(nil)
-    let resolved: Int(@fallbackOne(maybe))
-}

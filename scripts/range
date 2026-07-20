@@ -3,60 +3,20 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-RANGE_ROOT="${RANGE_ROOT:-$REPO_ROOT/RangeCompiler/Range}"
-RANGE_BIN="${RANGE_BIN:-}"
-RANGE_DRIVER="${RANGE_DRIVER:-native}"
 
 usage() {
     cat >&2 <<'USAGE'
 Usage:
   scripts/range compiler next
   scripts/range compiler progression
-  scripts/range compiler compile INPUT
-  scripts/range compiler check INPUT
-  scripts/range compiler emit-llvm INPUT OUTPUT
-  scripts/range PROJECT [ARGS...]
-  scripts/range compile INPUT
-  scripts/range check [INPUT]
-  scripts/range run INPUT [-- ARGS...]
-  scripts/range emit-llvm INPUT OUTPUT
-  scripts/range source-graph INPUT OUTPUT
-  scripts/range test [OPTIONS]
-  scripts/range compile-executable INPUT
+  scripts/range compiler COMMAND [ARGS...]
   scripts/range check-compiler-candidate [DIR]
   scripts/range check-stage2-compiler
-  scripts/range check-llvm-examples [DIR]
-  scripts/range check-llvm-runs [MANIFEST]
+
+The supported native surface is the self-hosted compiler kernel and its proof
+commands. Broader language commands return only after their implementations are
+Range-owned and covered by the native proof boundary.
 USAGE
-}
-
-range_compiler() {
-    if [[ -n "$RANGE_BIN" ]]; then
-        "$RANGE_BIN" "$@"
-    else
-        swift run --package-path "$REPO_ROOT/RangeCompiler" range "$@"
-    fi
-}
-
-range_normal_command() {
-    if [[ -n "$RANGE_BIN" || "$RANGE_DRIVER" == "swift" ]]; then
-        range_compiler "$@"
-        return
-    fi
-    if [[ "$RANGE_DRIVER" != "native" ]]; then
-        echo "Unknown RANGE_DRIVER: $RANGE_DRIVER" >&2
-        exit 64
-    fi
-    "$REPO_ROOT/scripts/range-native" "$@"
-}
-
-prepare_range_bin() {
-    if [[ -n "$RANGE_BIN" ]]; then
-        return
-    fi
-
-    swift build --package-path "$REPO_ROOT/RangeCompiler" --product range >/dev/null
-    RANGE_BIN="$REPO_ROOT/RangeCompiler/.build/debug/range"
 }
 
 command="${1:-}"
@@ -69,10 +29,7 @@ shift
 case "$command" in
     compiler)
         compiler_command="${1:-}"
-        if [[ -z "$compiler_command" ]]; then
-            usage
-            exit 1
-        fi
+        if [[ -z "$compiler_command" ]]; then usage; exit 1; fi
         shift
         case "$compiler_command" in
             next)
@@ -88,121 +45,17 @@ case "$command" in
                 ;;
         esac
         ;;
-    compile)
-        if [[ $# -ne 1 ]]; then
-            usage
-            exit 1
-        fi
-        "$REPO_ROOT/scripts/range-native" compile "$1"
-        ;;
-    check)
-        if [[ $# -eq 1 ]]; then
-            "$REPO_ROOT/scripts/range-native" check "$1"
-        elif [[ $# -eq 0 ]]; then
-            "$0" check-llvm-runs
-        else
-            usage
-            exit 1
-        fi
-        ;;
-    emit-llvm)
-        if [[ $# -ne 2 ]]; then
-            usage
-            exit 1
-        fi
-        if [[ -n "$RANGE_BIN" || "$RANGE_DRIVER" == "swift" ]]; then
-            range_compiler emit-llvm --range-root "$RANGE_ROOT" "$1" "$2"
-        else
-            range_normal_command emit-llvm "$1" "$2"
-        fi
-        ;;
-    source-graph)
-        if [[ $# -ne 2 ]]; then
-            usage
-            exit 1
-        fi
-        "$REPO_ROOT/scripts/range-native" source-graph "$1" "$2"
-        ;;
-    test)
-        "$REPO_ROOT/scripts/range-native" test "$@"
-        ;;
-    compile-executable)
-        if [[ $# -ne 1 ]]; then
-            usage
-            exit 1
-        fi
-        if [[ -n "$RANGE_BIN" || "$RANGE_DRIVER" == "swift" ]]; then
-            range_compiler compile-executable --range-root "$RANGE_ROOT" "$1"
-        else
-            range_normal_command compile-executable "$1"
-        fi
-        ;;
     check-compiler-candidate)
-        if [[ $# -gt 1 ]]; then
-            usage
-            exit 1
-        fi
+        if [[ $# -gt 1 ]]; then usage; exit 1; fi
         compiler_dir="${1:-$REPO_ROOT/RangeCompiler/Range/Programs/Compiler}"
         "$REPO_ROOT/scripts/check-range-compiler-candidate" "$compiler_dir"
         ;;
     check-stage2-compiler)
-        if [[ $# -ne 0 ]]; then
-            usage
-            exit 1
-        fi
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
         "$REPO_ROOT/scripts/verify-range-compiler-seed"
         ;;
-    check-llvm-examples)
-        if [[ $# -gt 1 ]]; then
-            usage
-            exit 1
-        fi
-
-        examples_dir="${1:-$REPO_ROOT/RangePlayground/Examples/LLVM}"
-        range_compiler check-llvm-examples --range-root "$RANGE_ROOT" "$examples_dir"
-        ;;
-    check-llvm-runs)
-        if [[ $# -gt 1 ]]; then
-            usage
-            exit 1
-        fi
-
-        require_full_coverage="false"
-        if [[ $# -eq 0 ]]; then
-            manifest="$REPO_ROOT/RangePlayground/Examples/LLVM/run-manifest.tsv"
-            require_full_coverage="true"
-        else
-            manifest="$1"
-        fi
-        if [[ ! -f "$manifest" ]]; then
-            echo "Missing LLVM run manifest: $manifest" >&2
-            exit 1
-        fi
-
-        if [[ "$require_full_coverage" == "true" ]]; then
-            range_compiler check-llvm-runs --range-root "$RANGE_ROOT" "$manifest" --require-full-coverage
-        else
-            range_compiler check-llvm-runs --range-root "$RANGE_ROOT" "$manifest"
-        fi
-        ;;
-    run)
-        if [[ $# -lt 1 ]]; then
-            usage
-            exit 1
-        fi
-        input="$1"
-        shift
-        if [[ "${1:-}" == "--" ]]; then
-            shift
-        fi
-
-        if [[ -n "$RANGE_BIN" || "$RANGE_DRIVER" == "swift" ]]; then
-            range_compiler run --range-root "$RANGE_ROOT" "$input" -- "$@"
-        else
-            range_normal_command run "$input" -- "$@"
-        fi
-        ;;
     *)
-        "$REPO_ROOT/scripts/range-native" project-run "$command" "$@"
+        usage
+        exit 1
         ;;
 esac

@@ -1,9 +1,0 @@
-construct Box {
-    let value: Int
-}
-
-@main {
-    let maybe: Optional<Box>(nil)
-    let chosen: Box(maybe ?? Box(value: 5))
-    return chosen.value
-}

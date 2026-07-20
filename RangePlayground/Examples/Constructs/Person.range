@@ -1,8 +1,0 @@
-construct Person {
-    let name: String
-    state age: Int
-
-    function birthday() {
-        age: age + 1
-    }
-}

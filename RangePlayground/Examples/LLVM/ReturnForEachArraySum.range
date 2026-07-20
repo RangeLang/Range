@@ -1,7 +1,0 @@
-@main {
-    state total: Int(0)
-    for number in [1, 2, 3] {
-        total: total + number
-    }
-    return total
-}

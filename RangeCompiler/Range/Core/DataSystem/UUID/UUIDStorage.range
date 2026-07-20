@@ -1,4 +1,0 @@
-@builtin
-construct UUIDStorage {
-    function parse(uuidString: String): Result<Self, DecodingError>
-}

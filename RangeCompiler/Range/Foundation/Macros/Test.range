@@ -1,5 +1,0 @@
-open macro test(): Function { target, diagnostics, graph in
-    if target.declaration.parameters.count > 0 {
-        diagnostics.error("@test functions cannot declare parameters.")
-    }
-}

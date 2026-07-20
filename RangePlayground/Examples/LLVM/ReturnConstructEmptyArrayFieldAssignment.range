@@ -1,9 +1,0 @@
-construct Bag {
-    let items: [Int]
-}
-
-@main {
-    state bag: Bag(items: [1])
-    bag.items: []
-    return bag.items.count
-}

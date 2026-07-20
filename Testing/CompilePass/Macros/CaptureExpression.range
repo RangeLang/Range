@@ -1,7 +1,0 @@
-macro captureText(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
-    target.replace(with: "captured: \(value)")
-}
-
-@main {
-    let text: @captureText(1 + 2)
-}

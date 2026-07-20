@@ -1,5 +1,0 @@
-enum TrafficLight {
-    case red
-    case yellow
-    case green
-}

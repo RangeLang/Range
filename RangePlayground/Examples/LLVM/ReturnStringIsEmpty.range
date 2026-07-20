@@ -1,4 +1,0 @@
-@main {
-    let text: String("")
-    return text.isEmpty ? 0 : 1
-}

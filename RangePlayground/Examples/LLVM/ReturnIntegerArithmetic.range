@@ -1,5 +1,0 @@
-@main {
-    let count: Int(5)
-    let total: Int(count + 2)
-    return total
-}

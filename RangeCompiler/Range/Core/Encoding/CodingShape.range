@@ -1,5 +1,0 @@
-enum CodingShape {
-    case object
-    case array
-    case singleValue
-}

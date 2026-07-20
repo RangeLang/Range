@@ -109,12 +109,12 @@ Range peak memory: **5.3 GB** · peers: **1.8–4.2 MB**.
 ## Use Range
 
 ```sh
-scripts/range run path/to/Main.range
-scripts/range compile path/to/Main.range
-scripts/range check path/to/Main.range
+scripts/range compiler next
+scripts/range compiler progression
+scripts/range check-stage2-compiler
 ```
 
-The active compiler is Range-authored and emits native LLVM. The full legacy example manifest still uses the retained Swift bootstrap while unsupported language coverage is completed. See [Development](Development/README.md), the [speed benchmark](Development/Benchmarks/Speed/README.md), and the [compiler core](RangeCompiler/Range/Core/README.md) for details.
+The supported implementation is the Range-authored self-hosted compiler kernel. It emits native LLVM and must reproduce byte-identical LLVM and linked compiler executables before a compiler change is accepted. Ordinary project compilation is intentionally absent until its source loading, macro materialization, lowering, and runtime behavior are Range-owned and proven. See [Development](Development/README.md) and the [speed benchmark](Development/Benchmarks/Speed/README.md) for historical design work and performance comparisons.
 
 ## License
 

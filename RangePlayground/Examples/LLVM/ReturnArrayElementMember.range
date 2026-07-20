@@ -1,5 +1,0 @@
-@main {
-    let values: [1, 2, 3]
-    let index: Int(1)
-    return values.element(index: index) == 2 ? 0 : 1
-}

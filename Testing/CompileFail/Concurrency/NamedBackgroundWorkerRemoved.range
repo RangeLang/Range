@@ -1,7 +1,0 @@
-@background fetchUsername(id: Int) -> String {
-    return "george"
-}
-
-@main {
-    let name: fetchUsername(id: 1)
-}

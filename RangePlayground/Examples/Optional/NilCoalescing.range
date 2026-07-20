@@ -1,8 +1,0 @@
-function fallback(): Int {
-    return 42
-}
-
-@main {
-    state current: Optional<Int>(nil)
-    state resolved: current ?? fallback()
-}

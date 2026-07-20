@@ -1,3 +1,0 @@
-@main {
-    return commandLineArgumentCount() == 2 ? 0 : 1
-}

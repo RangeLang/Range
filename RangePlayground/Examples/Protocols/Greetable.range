@@ -1,3 +1,0 @@
-protocol Greetable {
-    function greeting(): String
-}

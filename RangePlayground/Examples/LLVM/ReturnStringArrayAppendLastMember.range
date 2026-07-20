@@ -1,7 +1,0 @@
-@main {
-    let values: [String]([String("alpha"), String("beta")])
-    values.append(element: String("gamma"))
-    let last: Optional<String>(values.last())
-    return (last ?? String("")) == String("gamma")
-        && values.count == 3 ? 0 : 1
-}

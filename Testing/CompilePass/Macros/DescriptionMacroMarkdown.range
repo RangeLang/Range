@@ -1,8 +1,0 @@
-@Description(FixtureConstruct carries macro source)
-construct FixtureConstruct {
-    let number: Int
-}
-
-@main {
-    let result: FixtureConstruct(number: 1)
-}

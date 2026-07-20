@@ -1,2 +1,0 @@
-function readFile(path: String): String
-function readFileIfExists(path: String): Optional<String>
