@@ -205,15 +205,11 @@ class RangeScale extends HTMLElement {
       const deviceWidth = this.#canvas.width;
       const deviceHeight = this.#canvas.height;
       const markWidth = Math.max(1, Math.round(mark.measure * pixelRatio));
-      const markHeight = Math.max(1, Math.round(mark.stroke * pixelRatio));
+      const markHeight = Math.max(1, Math.round(Math.min(1, mark.stroke) * pixelRatio));
       const x = Math.round(deviceWidth / 2 - markWidth / 2);
       const y = mark.position * deviceHeight - markHeight / 2;
-      this.#context.shadowColor = mark.tier === "single" ? "transparent" : "rgba(0, 0, 0, 0.12)";
-      this.#context.shadowBlur = mark.tier === "single" ? 0 : Math.min(1.2 * pixelRatio, 3);
       this.#context.fillRect(x, y, markWidth, markHeight);
     }
-    this.#context.shadowColor = "transparent";
-    this.#context.shadowBlur = 0;
     this.#context.globalAlpha = 1;
   }
 

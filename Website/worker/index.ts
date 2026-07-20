@@ -27,6 +27,7 @@ const worker = {
     if (rendered) {
       const html = rendered.html
         .replace('/range-ui.css', '/range-ui-v98.css')
+        .replace('/range-scale.js?profile=pinch-canvas-v4', '/range-scale.js?profile=pinch-canvas-v5')
         .replace('/range-typed-text.js', '/range-typed-text.js?version=84')
         .replace('/range-navigation-v2.js', '/range-navigation-v2.js?version=86');
       return new Response(request.method === "HEAD" ? null : html, {
