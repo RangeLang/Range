@@ -1,0 +1,16 @@
+compilerTypedSyntax
+
+construct Array<Element> {}
+
+enum Optional<Wrapped> {
+    case none
+    case some(value: Wrapped)
+}
+
+construct JSONField {}
+
+enum JSONValue {
+    case array(values: [JSONValue])
+    case object(fields: [JSONField])
+    case maybe(value: String?)
+}

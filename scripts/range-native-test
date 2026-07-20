@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+RANGE_NATIVE="$SCRIPT_DIR/range-native"
+
+usage() {
+    cat >&2 <<'USAGE'
+Usage:
+  scripts/range test [--suite all|compile-pass|compile-fail|runtime]
+                     [--filter TEXT] [--list] [--fail-fast]
+
+Suites:
+  compile-pass  Testing/CompilePass sources must pass native check.
+  compile-fail  Testing/CompileFail sources must produce a compiler diagnostic.
+  runtime       LLVM manifest sources must compile, link, run, and match results.
+USAGE
+}
+
+suite="all"
+filter=""
+list_only=false
+fail_fast=false
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --suite) [[ $# -ge 2 ]] || { usage; exit 64; }; suite="$2"; shift 2 ;;
+        --filter) [[ $# -ge 2 ]] || { usage; exit 64; }; filter="$2"; shift 2 ;;
+        --list) list_only=true; shift ;;
+        --fail-fast) fail_fast=true; shift ;;
+        --help|-h) usage; exit 0 ;;
+        *) usage; exit 64 ;;
+    esac
+done
+case "$suite" in all|compile-pass|compile-fail|runtime) ;; *) usage; exit 64 ;; esac
+
+work_root="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-native-test.XXXXXX")"
+trap '/bin/rm -rf "$work_root"' EXIT
+passed=0
+failed=0
+selected=0
+
+matches_filter() { [[ -z "$filter" || "$1" == *"$filter"* ]]; }
+record_pass() { passed=$((passed + 1)); /usr/bin/printf 'PASS\t%s\t%s\n' "$1" "$2"; }
+record_fail() {
+    failed=$((failed + 1))
+    /usr/bin/printf 'FAIL\t%s\t%s\t%s\n' "$1" "$2" "$3"
+    if [[ "$fail_fast" == true ]]; then
+        /usr/bin/printf 'SUMMARY\tselected=%s\tpassed=%s\tfailed=%s\n' "$selected" "$passed" "$failed"
+        exit 1
+    fi
+}
+
+run_compile_suite() {
+    local expectation="$1" root="$2" source relative output error status
+    while IFS= read -r source; do
+        relative="${source#"$REPO_ROOT/"}"
+        matches_filter "$relative" || continue
+        selected=$((selected + 1))
+        if [[ "$list_only" == true ]]; then
+            /usr/bin/printf '%s\t%s\n' "$expectation" "$relative"
+            continue
+        fi
+        output="$work_root/$selected.out"
+        error="$work_root/$selected.err"
+        if "$RANGE_NATIVE" check "$source" > "$output" 2> "$error"; then status=0; else status=$?; fi
+        if [[ "$expectation" == compile-pass ]]; then
+            if [[ "$status" -eq 0 && ! -s "$output" && ! -s "$error" ]]; then
+                record_pass "$expectation" "$relative"
+            else
+                record_fail "$expectation" "$relative" "exit=$status diagnostic=$({ /bin/cat "$output" "$error"; } | /usr/bin/head -c 240 | /usr/bin/tr '\n' ' ')"
+            fi
+        elif [[ "$status" -ne 0 ]] && /usr/bin/grep -Fq compilerError "$output" "$error"; then
+            record_pass "$expectation" "$relative"
+        elif [[ "$status" -eq 0 ]]; then
+            record_fail "$expectation" "$relative" unexpected-success
+        else
+            record_fail "$expectation" "$relative" "exit=$status missing-compiler-diagnostic"
+        fi
+    done < <(/usr/bin/find "$root" -type f -name '*.range' -print | LC_ALL=C /usr/bin/sort)
+}
+
+decode_field() { /usr/bin/printf '%b' "$1"; }
+
+run_runtime_suite() {
+    local manifest="$REPO_ROOT/RangePlayground/Examples/LLVM/run-manifest.tsv"
+    local manifest_root source relative expected_exit stdin_field args_field stdout_field
+    local output error expected_output status
+    local -a arguments
+    manifest_root="$(dirname "$manifest")"
+    /usr/bin/find "$manifest_root" -maxdepth 1 -type f -name '*.range' -exec /usr/bin/basename {} \; | LC_ALL=C /usr/bin/sort > "$work_root/runtime-corpus.list"
+    /usr/bin/awk -F '\t' '$1 !~ /^#/ && NF { print $1 }' "$manifest" | LC_ALL=C /usr/bin/sort > "$work_root/runtime-manifest.list"
+    if [[ -n "$(/usr/bin/uniq -d "$work_root/runtime-manifest.list")" ]]; then
+        /usr/bin/printf 'FAIL\truntime\tmanifest\tduplicate-source\n'
+        exit 1
+    fi
+    if ! /usr/bin/cmp -s "$work_root/runtime-corpus.list" "$work_root/runtime-manifest.list"; then
+        /usr/bin/printf 'FAIL\truntime\tmanifest\tcoverage-mismatch\n'
+        /usr/bin/comm -3 "$work_root/runtime-corpus.list" "$work_root/runtime-manifest.list"
+        exit 1
+    fi
+    while IFS=$'\t' read -r relative expected_exit stdin_field args_field stdout_field; do
+        [[ -n "$relative" && "$relative" != \#* ]] || continue
+        if [[ ! "$expected_exit" =~ ^[0-9]+$ || "$expected_exit" -gt 255 ]]; then
+            /usr/bin/printf 'FAIL\truntime\t%s\tinvalid-expected-exit=%s\n' "$relative" "$expected_exit"
+            exit 1
+        fi
+        source="$manifest_root/$relative"
+        matches_filter "$relative" || continue
+        selected=$((selected + 1))
+        if [[ "$list_only" == true ]]; then
+            /usr/bin/printf 'runtime\t%s\texit=%s\n' "$relative" "$expected_exit"
+            continue
+        fi
+        if [[ ! -f "$source" ]]; then record_fail runtime "$relative" missing-source; continue; fi
+        arguments=()
+        if [[ "$args_field" != - ]]; then read -r -a arguments <<< "$args_field"; fi
+        output="$work_root/$selected.out"
+        error="$work_root/$selected.err"
+        if [[ "$stdin_field" == - && "$args_field" == - ]]; then
+            if "$RANGE_NATIVE" run "$source" > "$output" 2> "$error"; then status=0; else status=$?; fi
+        elif [[ "$stdin_field" == - ]]; then
+            if "$RANGE_NATIVE" run "$source" -- "${arguments[@]}" > "$output" 2> "$error"; then status=0; else status=$?; fi
+        elif [[ "$args_field" == - ]]; then
+            if decode_field "$stdin_field" | "$RANGE_NATIVE" run "$source" > "$output" 2> "$error"; then status=0; else status=$?; fi
+        else
+            if decode_field "$stdin_field" | "$RANGE_NATIVE" run "$source" -- "${arguments[@]}" > "$output" 2> "$error"; then status=0; else status=$?; fi
+        fi
+        if [[ "$status" -ne "$expected_exit" ]]; then
+            record_fail runtime "$relative" "exit=$status expected=$expected_exit diagnostic=$(/usr/bin/head -c 240 "$error" | /usr/bin/tr '\n' ' ')"
+            continue
+        fi
+        if [[ -n "${stdout_field:-}" && "$stdout_field" != - ]]; then
+            expected_output="$work_root/$selected.expected"
+            decode_field "$stdout_field" > "$expected_output"
+            if ! /usr/bin/cmp -s "$output" "$expected_output"; then record_fail runtime "$relative" stdout-mismatch; continue; fi
+        fi
+        if [[ -s "$error" ]]; then
+            record_fail runtime "$relative" "unexpected-stderr=$(/usr/bin/head -c 240 "$error" | /usr/bin/tr '\n' ' ')"
+            continue
+        fi
+        record_pass runtime "$relative"
+    done < "$manifest"
+}
+
+if [[ "$suite" == all || "$suite" == compile-pass ]]; then run_compile_suite compile-pass "$REPO_ROOT/Testing/CompilePass"; fi
+if [[ "$suite" == all || "$suite" == compile-fail ]]; then run_compile_suite compile-fail "$REPO_ROOT/Testing/CompileFail"; fi
+if [[ "$suite" == all || "$suite" == runtime ]]; then run_runtime_suite; fi
+
+if [[ "$list_only" == true ]]; then /usr/bin/printf 'SUMMARY\tselected=%s\n' "$selected"; exit 0; fi
+/usr/bin/printf 'SUMMARY\tselected=%s\tpassed=%s\tfailed=%s\n' "$selected" "$passed" "$failed"
+[[ "$failed" -eq 0 ]]

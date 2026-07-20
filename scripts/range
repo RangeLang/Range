@@ -20,6 +20,8 @@ Usage:
   scripts/range check [INPUT]
   scripts/range run INPUT [-- ARGS...]
   scripts/range emit-llvm INPUT OUTPUT
+  scripts/range source-graph INPUT OUTPUT
+  scripts/range test [OPTIONS]
   scripts/range compile-executable INPUT
   scripts/range check-compiler-candidate [DIR]
   scripts/range check-stage2-compiler
@@ -113,6 +115,16 @@ case "$command" in
         else
             range_normal_command emit-llvm "$1" "$2"
         fi
+        ;;
+    source-graph)
+        if [[ $# -ne 2 ]]; then
+            usage
+            exit 1
+        fi
+        "$REPO_ROOT/scripts/range-native" source-graph "$1" "$2"
+        ;;
+    test)
+        "$REPO_ROOT/scripts/range-native" test "$@"
         ;;
     compile-executable)
         if [[ $# -ne 1 ]]; then

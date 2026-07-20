@@ -11,6 +11,8 @@ Usage:
   scripts/range-native compile INPUT
   scripts/range-native check INPUT
   scripts/range-native emit-llvm INPUT OUTPUT
+  scripts/range-native source-graph INPUT OUTPUT
+  scripts/range-native test [OPTIONS]
   scripts/range-native project-run PROJECT [ARGS...]
   scripts/range-native compiler-command COMMAND [ARGS...]
   scripts/range-native compiler-next
@@ -18,8 +20,8 @@ Usage:
   scripts/range-native compile-executable INPUT
   scripts/range-native run INPUT [-- ARGS...]
 
-Directory inputs are bundled recursively in bytewise relative-path order using
-Range's compilerSourceFile transport markers.
+Ordinary inputs are compiled through one deterministic SourceGraph bundle:
+Core, Foundation, framework, then project files in bytewise path order.
 USAGE
 }
 
@@ -198,30 +200,76 @@ require_source_input() {
     fi
 }
 
-project_bundle() {
-    local directory="$1"
-    local bundle="$2"
+source_graph_append_file() {
+    local role="$1"
+    local marker_path="$2"
+    local source="$3"
+    local bundle="$4"
+    if [[ "$marker_path" == *$'\t'* || "$marker_path" == *$'\n'* || "$marker_path" == *' '* ]]; then
+        echo "Range SourceGraph paths may not contain whitespace: $marker_path" >&2
+        return 64
+    fi
+    /usr/bin/printf 'compilerSourceFile\\trole=%s\\tpath=%s\n' "$role" "$marker_path" >> "$bundle"
+    /bin/cat "$source" >> "$bundle"
+    if [[ -n "$(/usr/bin/tail -c 1 "$source")" ]]; then
+        /usr/bin/printf '\n' >> "$bundle"
+    fi
+}
+
+source_graph_append_tree() {
+    local role="$1"
+    local marker_root="$2"
+    local directory="$3"
+    local bundle="$4"
     local absolute relative count
     directory="$(cd "$directory" && pwd)"
-    /usr/bin/printf '%s\n' 'compilerProjectSourceSetLLVMText' > "$bundle"
     count=0
     while IFS= read -r absolute; do
         relative="${absolute#"$directory/"}"
-        if [[ "$relative" == *$'\t'* || "$relative" == *$'\n'* || "$relative" == *' '* ]]; then
-            echo "Range source paths may not contain whitespace: $relative" >&2
-            return 64
-        fi
-        /usr/bin/printf 'compilerSourceFile\\t%s\n' "$relative" >> "$bundle"
-        /bin/cat "$absolute" >> "$bundle"
-        if [[ -n "$(/usr/bin/tail -c 1 "$absolute")" ]]; then
-            /usr/bin/printf '\n' >> "$bundle"
-        fi
+        source_graph_append_file "$role" "$marker_root/$relative" "$absolute" "$bundle" || return $?
         count=$((count + 1))
     done < <(/usr/bin/find "$directory" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print | LC_ALL=C /usr/bin/sort)
     if [[ "$count" -eq 0 ]]; then
-        echo "No .range source files found in: $directory" >&2
+        echo "No .range source files found in SourceGraph root: $directory" >&2
         return 66
     fi
+}
+
+source_graph_bundle() {
+    local input="$1"
+    local bundle="$2"
+    local input_root absolute relative count
+    require_source_input "$input"
+    : > "$bundle"
+    source_graph_append_tree core Core "$REPO_ROOT/RangeCompiler/Range/Core" "$bundle"
+    source_graph_append_tree foundation Foundation "$REPO_ROOT/RangeCompiler/Range/Foundation" "$bundle"
+    source_graph_append_tree framework Framework/Lexer "$REPO_ROOT/RangeCompiler/Range/Lexer" "$bundle"
+    if [[ -f "$input" ]]; then
+        absolute="$(cd "$(dirname "$input")" && pwd)/$(basename "$input")"
+        source_graph_append_file project "Project/$(basename "$absolute")" "$absolute" "$bundle"
+        return
+    fi
+    input_root="$(cd "$input" && pwd)"
+    count=0
+    while IFS= read -r absolute; do
+        relative="${absolute#"$input_root/"}"
+        source_graph_append_file project "Project/$relative" "$absolute" "$bundle" || return $?
+        count=$((count + 1))
+    done < <(/usr/bin/find "$input_root" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print | LC_ALL=C /usr/bin/sort)
+    if [[ "$count" -eq 0 ]]; then
+        echo "No project .range source files found in: $input_root" >&2
+        return 66
+    fi
+}
+
+write_source_graph() {
+    local input="$1"
+    local output="$2"
+    local output_dir
+    output_dir="$(dirname "$output")"
+    /bin/mkdir -p "$output_dir"
+    output_dir="$(cd "$output_dir" && pwd)"
+    source_graph_bundle "$input" "$output_dir/$(basename "$output")"
 }
 
 range_compiler_command() {
@@ -230,19 +278,15 @@ range_compiler_command() {
     local compiler compiler_input bundle command_exit_code
     require_source_input "$input"
     compiler="$(ensure_seed_compiler)"
-    compiler_input="$input"
-    bundle=""
-    if [[ -d "$input" ]]; then
-        bundle="${TMPDIR:-/tmp}/range-project-bundle.$$.range"
-        project_bundle "$input" "$bundle"
-        compiler_input="$bundle"
-    fi
+    bundle="${TMPDIR:-/tmp}/range-source-graph.$$.range"
+    source_graph_bundle "$input" "$bundle"
+    compiler_input="$bundle"
     if "$compiler" "$command" "$compiler_input"; then
         command_exit_code=0
     else
         command_exit_code=$?
     fi
-    if [[ -n "$bundle" ]]; then /bin/rm -f "$bundle"; fi
+    /bin/rm -f "$bundle"
     return "$command_exit_code"
 }
 
@@ -261,20 +305,16 @@ emit_llvm() {
     temporary="$output.tmp.$$"
     object="$output.o.$$"
     diagnostic="$output.diagnostic.$$"
-    compiler_input="$input"
-    bundle=""
-    if [[ -d "$input" ]]; then
-        bundle="${TMPDIR:-/tmp}/range-project-bundle.$$.range"
-        project_bundle "$input" "$bundle"
-        compiler_input="$bundle"
-    fi
+    bundle="${TMPDIR:-/tmp}/range-source-graph.$$.range"
+    source_graph_bundle "$input" "$bundle"
+    compiler_input="$bundle"
     local compiler_exit_code clang_exit_code
     if "$compiler" emit-llvm "$compiler_input" "$temporary" > "$diagnostic"; then
         compiler_exit_code=0
     else
         compiler_exit_code=$?
     fi
-    if [[ -n "$bundle" ]]; then /bin/rm -f "$bundle"; fi
+    /bin/rm -f "$bundle"
     if [[ "$compiler_exit_code" -ne 0 ]]; then
         if [[ -s "$diagnostic" ]]; then /bin/cat "$diagnostic" >&2; fi
         /bin/rm -f "$temporary" "$object" "$diagnostic"
@@ -656,12 +696,23 @@ compile_executable() {
     llvm="$build_root/Main.ll"
     executable="$build_root/$executable_name"
     /bin/mkdir -p "$build_root"
-    emit_llvm "$input" "$llvm"
+    local emit_exit_code link_exit_code
+    if emit_llvm "$input" "$llvm"; then
+        emit_exit_code=0
+    else
+        emit_exit_code=$?
+    fi
+    if [[ "$emit_exit_code" -ne 0 ]]; then return "$emit_exit_code"; fi
     runtimes=()
     while IFS= read -r runtime; do
         runtimes+=("$runtime")
     done < <(runtime_inputs)
-    clang -Wno-override-module "$llvm" "${runtimes[@]}" -o "$executable.tmp"
+    if clang -Wno-override-module "$llvm" "${runtimes[@]}" -o "$executable.tmp"; then
+        link_exit_code=0
+    else
+        link_exit_code=$?
+    fi
+    if [[ "$link_exit_code" -ne 0 ]]; then return "$link_exit_code"; fi
     /bin/mv "$executable.tmp" "$executable"
     /usr/bin/printf '%s\n' "$executable"
 }
@@ -696,6 +747,13 @@ case "$command" in
     emit-llvm)
         if [[ $# -ne 2 ]]; then usage; exit 1; fi
         emit_llvm "$1" "$2"
+        ;;
+    source-graph)
+        if [[ $# -ne 2 ]]; then usage; exit 1; fi
+        write_source_graph "$1" "$2"
+        ;;
+    test)
+        "$REPO_ROOT/scripts/range-native-test" "$@"
         ;;
     compiler-next)
         if [[ $# -ne 0 ]]; then usage; exit 1; fi

@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://range.offhand-tot-0v.chatgpt.site/benchmark-results.schema.json",
+  "title": "Range benchmark results",
+  "type": "object",
+  "required": ["schemaVersion", "generatedAt", "configuration", "environment", "procedure", "summary", "categories"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "configuration": {
+      "type": "object",
+      "required": ["baseIterations", "runs", "caseFilter"],
+      "properties": {
+        "baseIterations": { "type": "integer", "minimum": 1 },
+        "runs": { "type": "integer", "minimum": 1 },
+        "caseFilter": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "environment": { "type": "object" },
+    "procedure": {
+      "type": "object",
+      "required": ["steps", "commands", "notes"],
+      "properties": {
+        "steps": { "type": "array", "items": { "type": "string" } },
+        "commands": {
+          "type": "object",
+          "required": ["c", "range", "suite"],
+          "properties": {
+            "c": { "type": "array", "items": { "type": "string" } },
+            "range": { "type": "array", "items": { "type": "string" } },
+            "suite": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "languages": { "type": "array", "items": { "type": "string" } },
+    "summary": { "type": "object" },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "subcategories"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "subcategories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "name", "leaves"],
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" },
+                "leaves": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["id", "name", "description", "workload", "runStatus", "rangeStatus", "implementations", "results"],
+                    "properties": {
+                      "id": { "type": "string" },
+                      "name": { "type": "string" },
+                      "description": { "type": "string" },
+                      "workload": {
+                        "type": "object",
+                        "required": ["count", "unit"],
+                        "properties": {
+                          "count": { "type": "integer", "minimum": 1 },
+                          "unit": { "type": "string" }
+                        }
+                      },
+                      "runStatus": { "enum": ["passed", "notRun"] },
+                      "rangeStatus": { "enum": ["passed", "notEmitted", "notRun"] },
+                      "axisMaxMilliseconds": { "type": "number", "minimum": 0 },
+                      "implementations": {
+                        "type": "array",
+                        "minItems": 2,
+                        "items": {
+                          "type": "object",
+                          "required": ["language", "syntax", "filename", "source"],
+                          "properties": {
+                            "language": { "type": "string" },
+                            "syntax": { "type": "string" },
+                            "filename": { "type": "string" },
+                            "source": { "type": "string" }
+                          }
+                        }
+                      },
+                      "results": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": ["language", "status", "wallMilliseconds", "cpuMilliseconds", "peakRssKilobytes", "output"],
+                          "properties": {
+                            "language": { "type": "string" },
+                            "status": { "const": "passed" },
+                            "wallMilliseconds": { "type": "number", "minimum": 0 },
+                            "cpuMilliseconds": { "type": "number", "minimum": 0 },
+                            "peakRssKilobytes": { "type": "integer", "minimum": 0 },
+                            "output": { "type": "string" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

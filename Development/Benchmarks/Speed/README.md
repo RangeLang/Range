@@ -9,11 +9,17 @@ npm run speed
 The task builds and runs equivalent compatible programs in C, C++, Rust, Go,
 Swift, Bun, TypeScript 7, and Range. The evaluation matrix currently covers:
 
-- **Loops**: sequential integer arithmetic and modulo dependencies.
-- **Noise**: optimized floating-point arithmetic and a one-million-sample noise loop.
+- **Loops / While**: sequential integer arithmetic and modulo dependencies.
+- **Loops / If**: a repeated one-sided conditional with a 75% taken branch.
+- **Loops / If Else**: a repeated balanced two-outcome conditional.
+- **Noise / Perlin**: two-dimensional single-cell gradient interpolation.
+- **Noise / Voronoi**: nearest-feature squared-distance evaluation.
+- **Noise / Value Noise**: smooth bilinear lattice-value interpolation.
 - **Strings**: incremental string growth and length tracking.
 - **Collections**: array creation, traversal, branching, and reduction.
+- **Convolution / 1D Three Tap**: a circular integer stencil over eight samples.
 - **Constructs**: short-lived value construction and member access.
+- **Recursion / Fibonacci**: repeated binary recursion across alternating depths.
 - **Function Calls**: small reusable calls and predictable branching.
 
 Every measured target must produce its exact expected result. Native Range uses
@@ -66,6 +72,24 @@ emission, `clang`, process exit, and declared stdout checks.
 
 Use `VERBOSE=1` to show full setup command output on failures.
 
+## Generated results
+
+Every run writes the versioned category → subcategory → leaf tree to:
+
+- `results/latest.json`, the canonical benchmark artifact.
+- `Site/public/benchmarks.json`, the website input generated from the same run.
+
+Each leaf includes its workload count and unit, correctness status, Range emission status,
+fastest-to-slowest language measurements, wall and CPU milliseconds, peak memory, C-relative
+ratios, exact output, and the generated C and Range implementations shown by the website. The
+artifact also records the compile, execution, validation, and sampling procedure. The contract is
+documented by `benchmark-results.schema.json`.
+
+Filtered runs retain the complete catalog and mark leaves outside the filter as `notRun`, so the
+website never has to infer missing categories. Set `WRITE_SITE_RESULTS=0` to generate results
+without updating the website payload, or set `RESULTS_FILE` and `SITE_RESULTS_FILE` to choose
+different destinations.
+
 Use `N` to change the iteration count:
 
 ```sh
@@ -75,6 +99,8 @@ N=20000000 npm run speed
 Use `CASES` to run a comma-separated subset by internal name or category:
 
 ```sh
-CASES=integer_loop,float_noise RUNS=20 npm run speed
+CASES=integer_loop,perlin_noise RUNS=20 npm run speed
 CASES=Noise npm run speed
+CASES=Loops N=20000000 RUNS=20 npm run speed
+CASES="If Else" N=20000000 RUNS=20 npm run speed
 ```

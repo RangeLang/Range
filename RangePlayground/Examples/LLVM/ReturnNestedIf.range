@@ -1,0 +1,39 @@
+@main {
+    state outerTrueInnerTrue: Int(0)
+    let high: Int(7)
+    if high > 0 {
+        if high > 5 {
+            outerTrueInnerTrue: 31
+        } else {
+            outerTrueInnerTrue: 17
+        }
+    } else {
+        outerTrueInnerTrue: 9
+    }
+
+    state outerTrueInnerFalse: Int(0)
+    let low: Int(3)
+    if low > 0 {
+        if low > 5 {
+            outerTrueInnerFalse: 31
+        } else {
+            outerTrueInnerFalse: 17
+        }
+    } else {
+        outerTrueInnerFalse: 9
+    }
+
+    state outerFalse: Int(0)
+    let negative: Int(0 - 2)
+    if negative > 0 {
+        if negative > 5 {
+            outerFalse: 31
+        } else {
+            outerFalse: 17
+        }
+    } else {
+        outerFalse: 9
+    }
+
+    return outerTrueInnerTrue + outerTrueInnerFalse + outerFalse
+}

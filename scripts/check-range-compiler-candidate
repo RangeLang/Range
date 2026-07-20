@@ -614,12 +614,18 @@ audit_recursive_enum_declarations() {
         || fail "$stage_label recursive enum typed snapshot omitted indirect payload policy"
     /usr/bin/grep -Fq $'kind=casePayload\tstorage=direct' "$snapshot" \
         || fail "$stage_label recursive enum typed snapshot omitted direct payload policy"
-    /usr/bin/grep -Eq $'name=value.*type=BindingList.*kind=casePayload\tstorage=binding\ttypeTargetKind=declaration\ttypeTargetID=0' "$snapshot" \
-        || fail "$stage_label recursive enum typed snapshot omitted the BindingList payload type ID edge"
-    /usr/bin/grep -Eq $'name=value.*type=IndirectList.*kind=casePayload\tstorage=indirect\ttypeTargetKind=declaration\ttypeTargetID=4' "$snapshot" \
-        || fail "$stage_label recursive enum typed snapshot omitted the IndirectList payload type ID edge"
-    /usr/bin/grep -Eq $'name=value.*type=Int.*kind=casePayload\tstorage=direct\ttypeTargetKind=builtin\ttypeTargetID=1' "$snapshot" \
-        || fail "$stage_label recursive enum typed snapshot omitted the Int payload builtin type ID"
+    /usr/bin/grep -Eq $'name=value.*type=BindingList.*kind=casePayload\tstorage=binding\ttypeTargetKind=typeReference\ttypeTargetID=0' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the BindingList payload type-reference edge"
+    /usr/bin/grep -Eq $'typeReference\tid=0\townerMemberRow=.*kind=named\ttargetKind=declaration\ttargetID=0\tchildCount=0\tdepth=0' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the BindingList nominal type node"
+    /usr/bin/grep -Eq $'name=value.*type=IndirectList.*kind=casePayload\tstorage=indirect\ttypeTargetKind=typeReference\ttypeTargetID=1' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the IndirectList payload type-reference edge"
+    /usr/bin/grep -Eq $'typeReference\tid=1\townerMemberRow=.*kind=named\ttargetKind=declaration\ttargetID=4\tchildCount=0\tdepth=0' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the IndirectList nominal type node"
+    /usr/bin/grep -Eq $'name=value.*type=Int.*kind=casePayload\tstorage=direct\ttypeTargetKind=typeReference\ttypeTargetID=2' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the Int payload type-reference edge"
+    /usr/bin/grep -Eq $'typeReference\tid=2\townerMemberRow=.*kind=named\ttargetKind=builtin\ttargetID=1\tchildCount=0\tdepth=0' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the Int builtin type node"
 
     local negative_kind negative_source negative_output negative_error
     for negative_kind in direct-self direct-mutual unknown duplicate-payload; do
@@ -972,6 +978,8 @@ write_role_bundle() {
         'construct RoleCore {}' \
         'compilerSourceFile\trole=foundation\tpath=Foundation.range' \
         'construct RoleFoundation {}' \
+        'compilerSourceFile\trole=framework\tpath=Framework.range' \
+        'construct RoleFramework {}' \
         'compilerSourceFile\trole=generated\tpath=Generated.range' \
         'construct RoleGenerated {}' \
         'compilerSourceFile\trole=project\tpath=Project.range' \
@@ -2203,9 +2211,10 @@ assert_role_identity() {
     for expected in \
         $'sourceFile\tid=0\trole=core\tpath=Core.range' \
         $'sourceFile\tid=1\trole=foundation\tpath=Foundation.range' \
-        $'sourceFile\tid=2\trole=generated\tpath=Generated.range' \
-        $'sourceFile\tid=3\trole=project\tpath=Project.range' \
-        $'sourceFile\tid=4\trole=project\tpath=Legacy.range'; do
+        $'sourceFile\tid=2\trole=framework\tpath=Framework.range' \
+        $'sourceFile\tid=3\trole=generated\tpath=Generated.range' \
+        $'sourceFile\tid=4\trole=project\tpath=Project.range' \
+        $'sourceFile\tid=5\trole=project\tpath=Legacy.range'; do
         /usr/bin/grep -Fq "$expected" "$output" || fail "role identity missing: $expected"
     done
 }
@@ -2244,10 +2253,11 @@ audit_role_markers() {
     /usr/bin/printf 'sourceInventory\\tprogram\\n' > "$expected_inventory"
     /usr/bin/printf 'sourceFile\\tindex=0\\trole=core\\tpath=Core.range\\n' >> "$expected_inventory"
     /usr/bin/printf 'sourceFile\\tindex=1\\trole=foundation\\tpath=Foundation.range\\n' >> "$expected_inventory"
-    /usr/bin/printf 'sourceFile\\tindex=2\\trole=generated\\tpath=Generated.range\\n' >> "$expected_inventory"
-    /usr/bin/printf 'sourceFile\\tindex=3\\trole=project\\tpath=Project.range\\n' >> "$expected_inventory"
-    /usr/bin/printf 'sourceFile\\tindex=4\\trole=project\\tpath=Legacy.range\\n' >> "$expected_inventory"
-    /usr/bin/printf 'sourceFileCount\\t5\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFile\\tindex=2\\trole=framework\\tpath=Framework.range\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFile\\tindex=3\\trole=generated\\tpath=Generated.range\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFile\\tindex=4\\trole=project\\tpath=Project.range\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFile\\tindex=5\\trole=project\\tpath=Legacy.range\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFileCount\\t6\\n' >> "$expected_inventory"
     /usr/bin/printf '\n' >> "$expected_inventory"
     run_capture "$executable" "$inventory_bundle" "$inventory_output" "$inventory_error"
     require_successful_output "$stage_label role inventory" "$inventory_output" "$inventory_error"
@@ -2273,7 +2283,49 @@ audit_role_markers() {
     run_capture "$executable" "$fingerprint_core_bundle" "$fingerprint_core_output" "$fingerprint_core_error"
     require_successful_output "$stage_label core fingerprint" "$fingerprint_core_output" "$fingerprint_core_error"
     /usr/bin/cmp -s "$fingerprint_project_first" "$fingerprint_core_output" && fail "$stage_label role-only fingerprint change was not observed"
-    echo "$stage_label roles: pass (four explicit roles, legacy project, malformed rejection, deterministic role-sensitive fingerprint)"
+    echo "$stage_label roles: pass (five explicit roles, legacy project, malformed rejection, deterministic role-sensitive fingerprint)"
+}
+
+audit_driver_source_graph() {
+    local stage_label="$1"
+    local executable="$2"
+    local source="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnInteger.range"
+    local graph="$WORK_ROOT/$stage_label.source-graph.range"
+    local repeated="$WORK_ROOT/$stage_label.source-graph.repeat.range"
+    local inventory="$WORK_ROOT/$stage_label.source-graph.inventory.range"
+    local output="$WORK_ROOT/$stage_label.source-graph.inventory.out"
+    local decoded="$WORK_ROOT/$stage_label.source-graph.inventory.decoded"
+    local error="$WORK_ROOT/$stage_label.source-graph.inventory.err"
+    local role expected_count actual_count
+
+    "$REPO_ROOT/scripts/range-native" source-graph "$source" "$graph"
+    "$REPO_ROOT/scripts/range-native" source-graph "$source" "$repeated"
+    /usr/bin/cmp -s "$graph" "$repeated" || fail "$stage_label driver SourceGraph was not deterministic"
+    {
+        /usr/bin/printf '%s\n' 'compilerSourceInventory'
+        /bin/cat "$graph"
+    } > "$inventory"
+    run_capture "$executable" "$inventory" "$output" "$error"
+    require_successful_output "$stage_label driver SourceGraph inventory" "$output" "$error"
+    /usr/bin/perl -pe 's/\\t/\t/g; s/\\n/\n/g' "$output" > "$decoded"
+    for role in core foundation framework project; do
+        expected_count="$(/usr/bin/grep -Fc "compilerSourceFile\\trole=$role\\t" "$graph")"
+        actual_count="$(/usr/bin/grep -Fc "role=$role" "$decoded")"
+        [[ "$actual_count" -eq "$expected_count" ]] \
+            || fail "$stage_label driver SourceGraph $role count $actual_count; expected $expected_count"
+    done
+    /usr/bin/awk -F '\t' '
+        BEGIN { last = -1 }
+        $1 == "sourceFile" {
+            split($3, field, "=")
+            role = field[2]
+            rank = role == "core" ? 0 : role == "foundation" ? 1 : role == "framework" ? 2 : role == "project" ? 3 : -1
+            if (rank < last || rank < 0) { exit 1 }
+            last = rank
+        }
+        END { if (last != 3) exit 1 }
+    ' "$decoded" || fail "$stage_label driver SourceGraph role order changed"
+    echo "$stage_label driver SourceGraph: pass (deterministic Core/Foundation/framework/project inventory)"
 }
 
 audit_canonical_core() {
@@ -3545,6 +3597,35 @@ write_macro_execution_native_member_bundle() {
     fi
 }
 
+write_macro_declaration_reflection_bundle() {
+    local output="$1"
+
+    /usr/bin/printf '%b\n' \
+        'compilerMacroSnapshot' \
+        'compilerSourceFile\trole=core\tpath=Core/DeclarationReflection.range' \
+        'macro Reflect<let value: TypeReference>(@capture _ pattern: Expression): Construct -> Void { target, diagnostics, graph in' \
+        '    let nativeText: String("native")' \
+        '    if nativeText.count != 6 {' \
+        '        return diagnostics.error("wrong string count")' \
+        '    }' \
+        '    if target.declarationMemberCount(kind: "state") != 1 {' \
+        '        return diagnostics.error("wrong count")' \
+        '    }' \
+        '    if target.declarationMemberName(kind: "state", index: 0) != "value" {' \
+        '        return diagnostics.error("wrong name")' \
+        '    }' \
+        '    if !target.declarationMemberTypeMatches(kind: "state", index: 0, generic: "value") {' \
+        '        return diagnostics.error("wrong type")' \
+        '    }' \
+        '    return diagnostics.information("validated")' \
+        '}' \
+        'compilerSourceFile\trole=project\tpath=Project/DeclarationReflectionUse.range' \
+        '@Reflect<Int>' \
+        'construct Target {' \
+        '    state value: Int' \
+        '}' > "$output"
+}
+
 write_macro_expansion_commit_bundle() {
     local output="$1"
 
@@ -4068,6 +4149,23 @@ audit_macro_execution() {
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=3\teventCount=1\tgraphDeltaNodeCount=0\tgraphDeltaFactCount=0\treadDependencyCount=0' "$output" || fail "$stage_label macro execution positive counts changed"
     /usr/bin/grep -Fq $'macroInvocation\trow=0\tapplicationRow=0\tdeclarationRow=0\ttargetSyntaxID=' "$output" || fail "$stage_label macro execution omitted invocation provenance"
     /usr/bin/grep -Fq $'macroExecutionEvent\trow=0\tinvocationRow=0\tseverity=1\toperation=1\tmessage=checked' "$output" || fail "$stage_label macro execution omitted information event"
+
+    local reflection_bundle="$WORK_ROOT/$stage_label.macro.declaration-reflection.range"
+    local reflection_output="$WORK_ROOT/$stage_label.macro.declaration-reflection.out"
+    local reflection_repeat_output="$WORK_ROOT/$stage_label.macro.declaration-reflection.repeat.out"
+    local reflection_error="$WORK_ROOT/$stage_label.macro.declaration-reflection.err"
+    local reflection_repeat_error="$WORK_ROOT/$stage_label.macro.declaration-reflection.repeat.err"
+    write_macro_declaration_reflection_bundle "$reflection_bundle"
+    run_capture "$executable" "$reflection_bundle" "$reflection_output" "$reflection_error"
+    require_successful_output "$stage_label declaration reflection" "$reflection_output" "$reflection_error"
+    run_capture "$executable" "$reflection_bundle" "$reflection_repeat_output" "$reflection_repeat_error"
+    require_successful_output "$stage_label repeated declaration reflection" "$reflection_repeat_output" "$reflection_repeat_error"
+    /usr/bin/cmp -s "$reflection_output" "$reflection_repeat_output" || fail "$stage_label declaration reflection was not deterministic"
+    /usr/bin/grep -Fq $'eventCount=1\tgraphDeltaNodeCount=0\tgraphDeltaFactCount=0\treadDependencyCount=3' "$reflection_output" || fail "$stage_label declaration reflection counts changed"
+    /usr/bin/grep -Fq $'macroExecutionEvent\trow=0\tinvocationRow=0\tseverity=1\toperation=1\tmessage=validated' "$reflection_output" || fail "$stage_label declaration reflection executed the wrong branch"
+    /usr/bin/grep -Fq $'macroReadDependency\trow=0\tinvocationRow=0\toperation=4\tkind=Construct\tname=state\tobservedCount=1' "$reflection_output" || fail "$stage_label declaration member-count reflection omitted its dependency"
+    /usr/bin/grep -Fq $'macroReadDependency\trow=1\tinvocationRow=0\toperation=5\tkind=Construct\tname=state\tobservedCount=' "$reflection_output" || fail "$stage_label declaration member-name reflection omitted its dependency"
+    /usr/bin/grep -Fq $'macroReadDependency\trow=2\tinvocationRow=0\toperation=6\tkind=Construct\tname=state\tobservedCount=1' "$reflection_output" || fail "$stage_label declaration member-type reflection omitted its dependency"
 
     local query_bundle="$WORK_ROOT/$stage_label.macro.execution-query.range"
     local query_output="$WORK_ROOT/$stage_label.macro.execution-query.out"
@@ -4638,6 +4736,7 @@ audit_stage() {
 
     audit_inventory "$stage_label" "$executable"
     audit_role_markers "$stage_label" "$executable"
+    audit_driver_source_graph "$stage_label" "$executable"
     audit_canonical_core "$stage_label" "$executable" "$stage_directory"
     audit_binding_references "$stage_label" "$executable" "$stage_directory"
     audit_root_values "$stage_label" "$executable" "$stage_directory"
@@ -5201,7 +5300,7 @@ main() {
     echo "Stage 2/Stage 3 actual registrable macro: byte-identical LLVM/executable"
 
     local macro_snapshot_suffix
-    for macro_snapshot_suffix in positive.first.out positive.reordered.out generated.snapshot.out generated.snapshot.repeat.out generated.reordered.out generated.native.first.ll generated.native.repeat.ll generated.bare.out generated.user-global.out generated.root-collision.out generated.member-collision.out generated.malformed-extension.out generated.outside.out registrable.snapshot.out registrable.reordered.out registrable.native.ll registrable.authored-field-collision.out registrable.generated-field-collision.out registrable.root-storage.out registrable.malformed-splice.out registrable.immutable-field-mutation.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out execution-positive.out execution-positive.repeat.out execution-query.out execution-query.repeat.out execution-query-reordered.out execution-query-zero.out execution-member-present.out execution-member-present.repeat.out execution-member-present-reordered.out execution-member-missing.out execution-member-missing.repeat.out execution-member-path.out execution-member-path.repeat.out execution-member-invalid.out execution-member-invalid.repeat.out execution-member-invalid-type.out execution-member-invalid-type.repeat.out execution-member-nonconstruct.out execution-member-native.first.ll execution-member-native.repeat.ll execution-member-missing-native.out execution-expansion.out execution-expansion.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-query-invalid.out execution-expansion-duplicate.out execution-target-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
+    for macro_snapshot_suffix in positive.first.out positive.reordered.out generated.snapshot.out generated.snapshot.repeat.out generated.reordered.out generated.native.first.ll generated.native.repeat.ll generated.bare.out generated.user-global.out generated.root-collision.out generated.member-collision.out generated.malformed-extension.out generated.outside.out registrable.snapshot.out registrable.reordered.out registrable.native.ll registrable.authored-field-collision.out registrable.generated-field-collision.out registrable.root-storage.out registrable.malformed-splice.out registrable.immutable-field-mutation.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out declaration-reflection.out declaration-reflection.repeat.out execution-positive.out execution-positive.repeat.out execution-query.out execution-query.repeat.out execution-query-reordered.out execution-query-zero.out execution-member-present.out execution-member-present.repeat.out execution-member-present-reordered.out execution-member-missing.out execution-member-missing.repeat.out execution-member-path.out execution-member-path.repeat.out execution-member-invalid.out execution-member-invalid.repeat.out execution-member-invalid-type.out execution-member-invalid-type.repeat.out execution-member-nonconstruct.out execution-member-native.first.ll execution-member-native.repeat.ll execution-member-missing-native.out execution-expansion.out execution-expansion.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-query-invalid.out execution-expansion-duplicate.out execution-target-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
         /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.$macro_snapshot_suffix" "$WORK_ROOT/Stage3.macro.$macro_snapshot_suffix" \
             || fail "Stage 2 and Stage 3 macro snapshot differs: $macro_snapshot_suffix"
     done

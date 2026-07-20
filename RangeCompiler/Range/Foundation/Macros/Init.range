@@ -34,9 +34,9 @@ macro init<
             diagnostics.error("@init delimiter is required.")
         }
         let actualDelimiter: String(delimiter ?? "")
-        let lets: [Let](target.declaration.lets)
-        let states: [State](target.declaration.states)
-        let fieldCount: Int(lets.count + states.count)
+        let letCount: Int(target.declarationMemberCount(kind: "let"))
+        let stateCount: Int(target.declarationMemberCount(kind: "state"))
+        let fieldCount: Int(letCount + stateCount)
 
         if length != nil {
             let actualLength: Int(length ?? 0)
@@ -73,18 +73,16 @@ macro init<
         }
 
         state letIndex: Int(0)
-        while letIndex < lets.count {
-            let field: Let(lets.element(index: letIndex))
-
+        while letIndex < letCount {
             if source.count > 0 {
                 let slot: String(source.segment(index: letIndex, delimiter: actualDelimiter))
 
-                if field.identifier.name != slot {
+                if target.declarationMemberName(kind: "let", index: letIndex) != slot {
                     diagnostics.error("@init pattern slot must match the construct field name.")
                 }
             }
 
-            if field.type != value {
+            if !target.declarationMemberTypeMatches(kind: "let", index: letIndex, generic: "value") {
                 diagnostics.error("@init field type must match the literal value type.")
             }
 
@@ -92,20 +90,18 @@ macro init<
         }
 
         state stateIndex: Int(0)
-        while stateIndex < states.count {
-            let field: State(states.element(index: stateIndex))
-
+        while stateIndex < stateCount {
             if source.count > 0 {
                 let slot: String(
-                    source.segment(index: lets.count + stateIndex, delimiter: actualDelimiter)
+                    source.segment(index: letCount + stateIndex, delimiter: actualDelimiter)
                 )
 
-                if field.identifier.name != slot {
+                if target.declarationMemberName(kind: "state", index: stateIndex) != slot {
                     diagnostics.error("@init pattern slot must match the construct field name.")
                 }
             }
 
-            if field.type != value {
+            if !target.declarationMemberTypeMatches(kind: "state", index: stateIndex, generic: "value") {
                 diagnostics.error("@init field type must match the literal value type.")
             }
 

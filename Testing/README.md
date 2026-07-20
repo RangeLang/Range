@@ -5,7 +5,15 @@ This folder holds `.range` source files used by compiler regression tests.
 - `CompilePass`: files that must parse, build a semantic graph, and validate.
 - `CompileFail`: files that must fail validation or compilation.
 
-These are compiler fixtures, not the future Range-native testing library.
+These fixtures are discovered by the native `scripts/range test` command.
+`CompilePass` requires a clean native check, `CompileFail` requires a native
+compiler diagnostic, and the LLVM run manifest owns executable exit/stdout
+expectations. Use `--suite`, `--filter`, and `--list` for focused work.
+
+Range-authored test functions use the Foundation `@test` macro. The initial
+macro enforces parameter-free test declarations; native test discovery and
+execution remain explicit compiler/driver artifacts rather than hidden Swift
+reflection.
 
 Compiler bootstrap progression is intentionally not represented as a source
 fixture. `scripts/range compiler progression` is the Compiler-project-specific
@@ -48,10 +56,10 @@ checked through `scripts/range check`. The manifest
 exit code, optional stdin, optional arguments, and optional stdout for each
 example.
 
-`RangeScriptTests` verifies that the default run manifest covers every LLVM
-example and that malformed manifests fail before execution. The full executable
-gate is still the script path: Range source is emitted to LLVM IR by the
-Swift-hosted compiler path, linked with `clang`, and run as a native executable.
+The native runner requires the default run manifest to cover every LLVM example.
+Range source is emitted by the self-hosted compiler, linked with `clang`, and
+run as a native executable. Moving linking and process execution into Range's
+OS suite is the next ownership boundary.
 
 ## Roadmap
 
