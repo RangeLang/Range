@@ -3597,35 +3597,6 @@ write_macro_execution_native_member_bundle() {
     fi
 }
 
-write_macro_declaration_reflection_bundle() {
-    local output="$1"
-
-    /usr/bin/printf '%b\n' \
-        'compilerMacroSnapshot' \
-        'compilerSourceFile\trole=core\tpath=Core/DeclarationReflection.range' \
-        'macro Reflect<let value: TypeReference>(@capture _ pattern: Expression): Construct -> Void { target, diagnostics, graph in' \
-        '    let nativeText: String("native")' \
-        '    if nativeText.count != 6 {' \
-        '        return diagnostics.error("wrong string count")' \
-        '    }' \
-        '    if target.declarationMemberCount(kind: "state") != 1 {' \
-        '        return diagnostics.error("wrong count")' \
-        '    }' \
-        '    if target.declarationMemberName(kind: "state", index: 0) != "value" {' \
-        '        return diagnostics.error("wrong name")' \
-        '    }' \
-        '    if !target.declarationMemberTypeMatches(kind: "state", index: 0, generic: "value") {' \
-        '        return diagnostics.error("wrong type")' \
-        '    }' \
-        '    return diagnostics.information("validated")' \
-        '}' \
-        'compilerSourceFile\trole=project\tpath=Project/DeclarationReflectionUse.range' \
-        '@Reflect<Int>' \
-        'construct Target {' \
-        '    state value: Int' \
-        '}' > "$output"
-}
-
 write_macro_expansion_commit_bundle() {
     local output="$1"
 
@@ -4149,23 +4120,6 @@ audit_macro_execution() {
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=3\teventCount=1\tgraphDeltaNodeCount=0\tgraphDeltaFactCount=0\treadDependencyCount=0' "$output" || fail "$stage_label macro execution positive counts changed"
     /usr/bin/grep -Fq $'macroInvocation\trow=0\tapplicationRow=0\tdeclarationRow=0\ttargetSyntaxID=' "$output" || fail "$stage_label macro execution omitted invocation provenance"
     /usr/bin/grep -Fq $'macroExecutionEvent\trow=0\tinvocationRow=0\tseverity=1\toperation=1\tmessage=checked' "$output" || fail "$stage_label macro execution omitted information event"
-
-    local reflection_bundle="$WORK_ROOT/$stage_label.macro.declaration-reflection.range"
-    local reflection_output="$WORK_ROOT/$stage_label.macro.declaration-reflection.out"
-    local reflection_repeat_output="$WORK_ROOT/$stage_label.macro.declaration-reflection.repeat.out"
-    local reflection_error="$WORK_ROOT/$stage_label.macro.declaration-reflection.err"
-    local reflection_repeat_error="$WORK_ROOT/$stage_label.macro.declaration-reflection.repeat.err"
-    write_macro_declaration_reflection_bundle "$reflection_bundle"
-    run_capture "$executable" "$reflection_bundle" "$reflection_output" "$reflection_error"
-    require_successful_output "$stage_label declaration reflection" "$reflection_output" "$reflection_error"
-    run_capture "$executable" "$reflection_bundle" "$reflection_repeat_output" "$reflection_repeat_error"
-    require_successful_output "$stage_label repeated declaration reflection" "$reflection_repeat_output" "$reflection_repeat_error"
-    /usr/bin/cmp -s "$reflection_output" "$reflection_repeat_output" || fail "$stage_label declaration reflection was not deterministic"
-    /usr/bin/grep -Fq $'eventCount=1\tgraphDeltaNodeCount=0\tgraphDeltaFactCount=0\treadDependencyCount=3' "$reflection_output" || fail "$stage_label declaration reflection counts changed"
-    /usr/bin/grep -Fq $'macroExecutionEvent\trow=0\tinvocationRow=0\tseverity=1\toperation=1\tmessage=validated' "$reflection_output" || fail "$stage_label declaration reflection executed the wrong branch"
-    /usr/bin/grep -Fq $'macroReadDependency\trow=0\tinvocationRow=0\toperation=4\tkind=Construct\tname=state\tobservedCount=1' "$reflection_output" || fail "$stage_label declaration member-count reflection omitted its dependency"
-    /usr/bin/grep -Fq $'macroReadDependency\trow=1\tinvocationRow=0\toperation=5\tkind=Construct\tname=state\tobservedCount=' "$reflection_output" || fail "$stage_label declaration member-name reflection omitted its dependency"
-    /usr/bin/grep -Fq $'macroReadDependency\trow=2\tinvocationRow=0\toperation=6\tkind=Construct\tname=state\tobservedCount=1' "$reflection_output" || fail "$stage_label declaration member-type reflection omitted its dependency"
 
     local query_bundle="$WORK_ROOT/$stage_label.macro.execution-query.range"
     local query_output="$WORK_ROOT/$stage_label.macro.execution-query.out"

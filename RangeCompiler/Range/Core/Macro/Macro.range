@@ -6,10 +6,6 @@ construct Macro {
         let type: TypeReference?
         let elements: [Target]
         let written: WrittenSyntax
-
-        function declarationMemberCount(kind: String): Int
-        function declarationMemberName(kind: String, index: Int): String
-        function declarationMemberTypeMatches(kind: String, index: Int, generic: String): Bool
     }
 
     @graph(.declaration)

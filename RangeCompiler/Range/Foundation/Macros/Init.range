@@ -34,9 +34,9 @@ macro init<
             diagnostics.error("@init delimiter is required.")
         }
         let actualDelimiter: String(delimiter ?? "")
-        let letCount: Int(target.declarationMemberCount(kind: "let"))
-        let stateCount: Int(target.declarationMemberCount(kind: "state"))
-        let fieldCount: Int(letCount + stateCount)
+        let lets: [Let](target.declaration.lets)
+        let states: [State](target.declaration.states)
+        let fieldCount: Int(lets.count + states.count)
 
         if length != nil {
             let actualLength: Int(length ?? 0)
@@ -73,16 +73,18 @@ macro init<
         }
 
         state letIndex: Int(0)
-        while letIndex < letCount {
+        while letIndex < lets.count {
+            let field: Let(lets.element(index: letIndex))
+
             if source.count > 0 {
                 let slot: String(source.segment(index: letIndex, delimiter: actualDelimiter))
 
-                if target.declarationMemberName(kind: "let", index: letIndex) != slot {
+                if field.identifier.name != slot {
                     diagnostics.error("@init pattern slot must match the construct field name.")
                 }
             }
 
-            if !target.declarationMemberTypeMatches(kind: "let", index: letIndex, generic: "value") {
+            if field.type != value {
                 diagnostics.error("@init field type must match the literal value type.")
             }
 
@@ -90,18 +92,20 @@ macro init<
         }
 
         state stateIndex: Int(0)
-        while stateIndex < stateCount {
+        while stateIndex < states.count {
+            let field: State(states.element(index: stateIndex))
+
             if source.count > 0 {
                 let slot: String(
-                    source.segment(index: letCount + stateIndex, delimiter: actualDelimiter)
+                    source.segment(index: lets.count + stateIndex, delimiter: actualDelimiter)
                 )
 
-                if target.declarationMemberName(kind: "state", index: stateIndex) != slot {
+                if field.identifier.name != slot {
                     diagnostics.error("@init pattern slot must match the construct field name.")
                 }
             }
 
-            if !target.declarationMemberTypeMatches(kind: "state", index: stateIndex, generic: "value") {
+            if field.type != value {
                 diagnostics.error("@init field type must match the literal value type.")
             }
 

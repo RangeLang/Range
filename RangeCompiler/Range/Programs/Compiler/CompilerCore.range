@@ -1029,9 +1029,6 @@ function compilerMacroGraphOperationDeclarationCount(): Int { return 1 }
 function compilerMacroTargetOperationOmit(): Int { return 1 }
 function compilerMacroTargetOperationMemberCount(): Int { return 2 }
 function compilerMacroTargetOperationExpand(): Int { return 3 }
-function compilerMacroTargetOperationDeclarationMemberCount(): Int { return 4 }
-function compilerMacroTargetOperationDeclarationMemberName(): Int { return 5 }
-function compilerMacroTargetOperationDeclarationMemberTypeMatches(): Int { return 6 }
 
 function compilerMacroExpansionTemplatePlacementRoot(): Int { return 0 }
 function compilerMacroExpansionTemplatePlacementMember(): Int { return 1 }
@@ -5776,17 +5773,9 @@ function compilerMacroExecutionTablesAreStructurallyValid(tables: CompilerSyntax
         let dependencyObservationSecond: Int(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 17))
         if compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 0) != row
             || dependencyInvocationRow < 0 || dependencyInvocationRow >= invocationCount
-            || (dependencyOperation != compilerMacroGraphOperationDeclarationCount()
-                && dependencyOperation != compilerMacroTargetOperationMemberCount()
-                && dependencyOperation != compilerMacroTargetOperationDeclarationMemberCount()
-                && dependencyOperation != compilerMacroTargetOperationDeclarationMemberName()
-                && dependencyOperation != compilerMacroTargetOperationDeclarationMemberTypeMatches())
+            || (dependencyOperation != compilerMacroGraphOperationDeclarationCount() && dependencyOperation != compilerMacroTargetOperationMemberCount())
             || (dependencyOperation == compilerMacroGraphOperationDeclarationCount() && dependencyKind != compilerSyntaxKindConstruct() && dependencyKind != compilerSyntaxKindFunction())
-            || ((dependencyOperation == compilerMacroTargetOperationMemberCount()
-                    || dependencyOperation == compilerMacroTargetOperationDeclarationMemberCount()
-                    || dependencyOperation == compilerMacroTargetOperationDeclarationMemberName()
-                    || dependencyOperation == compilerMacroTargetOperationDeclarationMemberTypeMatches())
-                && dependencyKind != compilerSyntaxKindConstruct())
+            || (dependencyOperation == compilerMacroTargetOperationMemberCount() && dependencyKind != compilerSyntaxKindConstruct())
             || dependencyFileID < 0 || dependencyFileID >= compilerSourceStoreFileCount(store: tables.sourceStore)
             || !compilerMacroLocalRangeIsValid(tables: tables, fileID: dependencyFileID, start: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 5), end: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 6), optional: false)
             || !compilerMacroLocalRangeIsValid(tables: tables, fileID: dependencyFileID, start: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 7), end: compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 8), optional: false)
@@ -6399,109 +6388,6 @@ function compilerMacroExecutionTargetMemberObservation(tables: CompilerSyntaxTab
     return observation
 }
 
-function compilerMacroExecutionDeclarationMemberKind(kind: String): Int {
-    if kind == String("let") { return compilerSyntaxMemberKindLet() }
-    if kind == String("state") { return compilerSyntaxMemberKindState() }
-    return 0
-}
-
-function compilerMacroExecutionDeclarationMemberRow(tables: CompilerSyntaxTables, targetSyntaxID: Int, kind: String, ordinal: Int): Int {
-    let memberKind: Int(compilerMacroExecutionDeclarationMemberKind(kind: kind))
-    if memberKind == 0 || ordinal < 0 { return 0 - 1 }
-    state matchedOrdinal: Int(0)
-    state row: Int(0)
-    while row < compilerIntTableRowCount(table: tables.members) {
-        if compilerIntTableValue(table: tables.members, row: row, column: 2) == targetSyntaxID
-            && compilerIntTableValue(table: tables.members, row: row, column: 12) == memberKind {
-            if matchedOrdinal == ordinal { return row }
-            matchedOrdinal: matchedOrdinal + 1
-        }
-        row: row + 1
-    }
-    return 0 - 1
-}
-
-function compilerMacroExecutionDeclarationMemberCount(tables: CompilerSyntaxTables, targetSyntaxID: Int, kind: String): Int {
-    let memberKind: Int(compilerMacroExecutionDeclarationMemberKind(kind: kind))
-    if memberKind == 0 { return 0 - 1 }
-    state count: Int(0)
-    state row: Int(0)
-    while row < compilerIntTableRowCount(table: tables.members) {
-        if compilerIntTableValue(table: tables.members, row: row, column: 2) == targetSyntaxID
-            && compilerIntTableValue(table: tables.members, row: row, column: 12) == memberKind { count: count + 1 }
-        row: row + 1
-    }
-    return count
-}
-
-function compilerMacroExecutionDeclarationMemberName(tables: CompilerSyntaxTables, targetSyntaxID: Int, kind: String, ordinal: Int): String {
-    let row: Int(compilerMacroExecutionDeclarationMemberRow(tables: tables, targetSyntaxID: targetSyntaxID, kind: kind, ordinal: ordinal))
-    if row < 0 { return String("") }
-    let fileID: Int(compilerIntTableValue(table: tables.members, row: row, column: 1))
-    return compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: row, column: 6), localEnd: compilerIntTableValue(table: tables.members, row: row, column: 7))
-}
-
-function compilerMacroExecutionDeclarationMemberType(tables: CompilerSyntaxTables, targetSyntaxID: Int, kind: String, ordinal: Int): String {
-    let row: Int(compilerMacroExecutionDeclarationMemberRow(tables: tables, targetSyntaxID: targetSyntaxID, kind: kind, ordinal: ordinal))
-    if row < 0 { return String("") }
-    let fileID: Int(compilerIntTableValue(table: tables.members, row: row, column: 1))
-    return compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: row, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: row, column: 9))
-}
-
-function compilerMacroExecutionApplicationGenericArgument(tables: CompilerSyntaxTables, applicationRow: Int, ordinal: Int): String {
-    if applicationRow < 0 || applicationRow >= compilerIntTableRowCount(table: tables.macroApplications) || ordinal < 0 { return String("") }
-    let fileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
-    let genericStart: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 6))
-    let genericEnd: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 7))
-    if genericStart < 0 || genericEnd <= genericStart { return String("") }
-    let genericText: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: genericStart, localEnd: genericEnd))
-    return compilerBodyArenaGenericArgumentText(typeName: genericText, ordinal: ordinal)
-}
-
-function compilerMacroExecutionApplicationGenericArgumentForParameter(tables: CompilerSyntaxTables, applicationRow: Int, declarationRow: Int, parameterName: String): String {
-    if declarationRow < 0 || declarationRow >= compilerIntTableRowCount(table: tables.macroDeclarations)
-        || parameterName == String("") { return String("") }
-    let declarationFileID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 1))
-    let genericStart: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 7))
-    let genericEnd: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 8))
-    if genericStart < 0 || genericEnd <= genericStart { return String("") }
-    state genericOrdinal: Int(0)
-    state parameterRow: Int(0)
-    while parameterRow < compilerIntTableRowCount(table: tables.macroParameters) {
-        if compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 1) == declarationRow {
-            let parameterStart: Int(compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 3))
-            let parameterEnd: Int(compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 4))
-            if parameterStart >= genericStart && parameterEnd <= genericEnd {
-                let candidateName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: declarationFileID, localStart: compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 5), localEnd: compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 6)))
-                if candidateName == parameterName {
-                    return compilerMacroExecutionApplicationGenericArgument(tables: tables, applicationRow: applicationRow, ordinal: genericOrdinal)
-                }
-                genericOrdinal: genericOrdinal + 1
-            }
-        }
-        parameterRow: parameterRow + 1
-    }
-    return String("")
-}
-
-function compilerMacroExecutionDeclarationMemberObservation(tables: CompilerSyntaxTables, targetSyntaxID: Int, kind: String): CompilerFingerprint {
-    state observation: CompilerFingerprint(compilerFingerprintInitial())
-    observation: compilerFingerprintAppendInt(fingerprint: observation, value: 7161)
-    observation: compilerFingerprintAppendText(fingerprint: observation, tag: 7162, text: kind)
-    let memberKind: Int(compilerMacroExecutionDeclarationMemberKind(kind: kind))
-    state row: Int(0)
-    while row < compilerIntTableRowCount(table: tables.members) {
-        if compilerIntTableValue(table: tables.members, row: row, column: 2) == targetSyntaxID
-            && compilerIntTableValue(table: tables.members, row: row, column: 12) == memberKind {
-            observation: compilerFingerprintAppendInt(fingerprint: observation, value: compilerIntTableValue(table: tables.members, row: row, column: 10))
-            observation: compilerFingerprintAppendInt(fingerprint: observation, value: compilerIntTableValue(table: tables.members, row: row, column: 11))
-            observation: compilerFingerprintAppendInt(fingerprint: observation, value: compilerIntTableValue(table: tables.members, row: row, column: 12))
-        }
-        row: row + 1
-    }
-    return observation
-}
-
 function compilerMacroExecutionScalarValue(arena: CompilerBodyArena, valueID: Int): Int {
     if valueID < 0 || valueID >= compilerIntTableRowCount(table: arena.mirValues) { return 0 }
     let sourceNodeID: Int(compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueSourceColumn()))
@@ -6528,110 +6414,6 @@ function compilerMacroExecutionScalarValue(arena: CompilerBodyArena, valueID: In
         cursor: cursor + 1
     }
     return value * sign
-}
-
-function compilerMacroExecutionLiteralTextForValueAtDepth(arena: CompilerBodyArena, valueID: Int, depth: Int): String {
-    if valueID < 0 || valueID >= compilerIntTableRowCount(table: arena.mirValues)
-        || depth > compilerIntTableRowCount(table: arena.mirValues) { return String("") }
-    let sourceNodeID: Int(compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueSourceColumn()))
-    if sourceNodeID >= 0 && sourceNodeID < compilerIntTableRowCount(table: arena.nodes)
-        && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) == compilerSyntaxKindStringLiteral() {
-        return compilerCoreStringLiteralContent(text: compilerBodyArenaNodeText(arena: arena, nodeID: sourceNodeID))
-    }
-    state operationRow: Int(0)
-    while operationRow < compilerIntTableRowCount(table: arena.mirOperations) {
-        if compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()) == valueID {
-            let operationKind: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationKindColumn()))
-            if operationKind == compilerBodyMIROperationLocalValue() || operationKind == compilerBodyMIROperationAssignVersion() {
-                return compilerMacroExecutionLiteralTextForValueAtDepth(arena: arena, valueID: compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0), depth: depth + 1)
-            }
-        }
-        operationRow: operationRow + 1
-    }
-    return String("")
-}
-
-function compilerMacroExecutionLiteralTextForValue(arena: CompilerBodyArena, valueID: Int): String {
-    return compilerMacroExecutionLiteralTextForValueAtDepth(arena: arena, valueID: valueID, depth: 0)
-}
-
-function compilerMacroExecutionTrimText(text: String): String {
-    let range: CompilerSourceRange(compilerSemanticTrimStringRange(text: text, start: 0, end: stringLength(value: text)))
-    return text.substring(start: range.start, end: range.end)
-}
-
-function compilerMacroExecutionArgumentValueText(argument: String): String {
-    let trimmed: String(compilerMacroExecutionTrimText(text: argument))
-    state colon: Int(stringIndexOf(source: trimmed, needle: String(":"), start: 0))
-    if colon >= 0 { return compilerMacroExecutionTrimText(text: trimmed.substring(start: colon + 1, end: stringLength(value: trimmed))) }
-    return trimmed
-}
-
-function compilerMacroExecutionParameterGenericOrdinal(tables: CompilerSyntaxTables, declarationRow: Int, parameterRow: Int): Int {
-    if declarationRow < 0 || declarationRow >= compilerIntTableRowCount(table: tables.macroDeclarations)
-        || parameterRow < 0 || parameterRow >= compilerIntTableRowCount(table: tables.macroParameters) { return 0 - 1 }
-    let genericStart: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 7))
-    let genericEnd: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 8))
-    let parameterStart: Int(compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 3))
-    let parameterEnd: Int(compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 4))
-    if genericStart < 0 || genericEnd <= genericStart || parameterStart < genericStart || parameterEnd > genericEnd { return 0 - 1 }
-    state ordinal: Int(0)
-    state row: Int(0)
-    while row < parameterRow {
-        if compilerIntTableValue(table: tables.macroParameters, row: row, column: 1) == declarationRow {
-            let priorStart: Int(compilerIntTableValue(table: tables.macroParameters, row: row, column: 3))
-            let priorEnd: Int(compilerIntTableValue(table: tables.macroParameters, row: row, column: 4))
-            if priorStart >= genericStart && priorEnd <= genericEnd { ordinal: ordinal + 1 }
-        }
-        row: row + 1
-    }
-    return ordinal
-}
-
-function compilerMacroExecutionParameterDefaultText(tables: CompilerSyntaxTables, declarationRow: Int, parameterRow: Int): String {
-    let fileID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 1))
-    let parameterText: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 3), localEnd: compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 4)))
-    let equals: Int(stringIndexOf(source: parameterText, needle: String("="), start: 0))
-    if equals < 0 { return String("") }
-    return compilerMacroExecutionTrimText(text: parameterText.substring(start: equals + 1, end: stringLength(value: parameterText)))
-}
-
-function compilerMacroExecutionParameterArgumentText(tables: CompilerSyntaxTables, applicationRow: Int, declarationRow: Int, parameterRow: Int): String {
-    let ordinal: Int(compilerMacroExecutionParameterGenericOrdinal(tables: tables, declarationRow: declarationRow, parameterRow: parameterRow))
-    if ordinal < 0 { return String("") }
-    let actual: String(compilerMacroExecutionApplicationGenericArgument(tables: tables, applicationRow: applicationRow, ordinal: ordinal))
-    if actual != String("") { return compilerMacroExecutionArgumentValueText(argument: actual) }
-    return compilerMacroExecutionParameterDefaultText(tables: tables, declarationRow: declarationRow, parameterRow: parameterRow)
-}
-
-function compilerMacroExecutionInitializeParameterValues(tables: CompilerSyntaxTables, arena: CompilerBodyArena, evaluationValues: RawBuffer, applicationRow: Int, declarationRow: Int): Int {
-    state valueID: Int(0)
-    while valueID < compilerIntTableRowCount(table: arena.mirValues) {
-        if compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueKindColumn()) == compilerBodyMIRValueParameter()
-            && compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueProvenanceKindColumn()) == compilerBodyMemorySubjectSymbol() {
-            let symbolID: Int(compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueProvenanceIDColumn()))
-            if symbolID >= 0 && symbolID < compilerIntTableRowCount(table: arena.symbols)
-                && compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolKindColumn()) == compilerBodySymbolParameter()
-                && !compilerBodyArenaSymbolIsCapturedMacroParameter(arena: arena, symbolID: symbolID) {
-                let parameterRow: Int(compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolDeclarationColumn()))
-                if parameterRow >= 0 && parameterRow < compilerIntTableRowCount(table: tables.macroParameters)
-                    && compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 1) == declarationRow {
-                    let argument: String(compilerMacroExecutionParameterArgumentText(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow, parameterRow: parameterRow))
-                    let fileID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 1))
-                    let typeName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 7), localEnd: compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 8)))
-                    state scalar: Int(0)
-                    if compilerBodyArenaTypeOuterName(typeName: typeName) == String("Optional") {
-                        if argument != String("") && argument != String("nil") { scalar: 1 }
-                    } else if compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeString() {
-                        scalar: compilerDeclarationNameHash(name: compilerCoreStringLiteralContent(text: argument))
-                    }
-                    if rawBufferStoreInt(buffer: evaluationValues, index: valueID, value: scalar) != 0 { return 0 - 1 }
-                }
-            }
-        }
-        valueID: valueID + 1
-    }
-    return 0
 }
 
 function compilerMacroExecutionPhiOperandOrdinal(arena: CompilerBodyArena, blockID: Int, previousBlockID: Int, operandCount: Int): Int {
@@ -7420,54 +7202,22 @@ function compilerMacroExecutionEvaluateReadOperation(tables: CompilerSyntaxTable
             }
         }
     } else if operationKind == compilerBodyMIROperationMacroTargetQuery() {
-        let targetOperation: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationTargetIDColumn()))
-        let kindValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 1))
-        let memberKind: String(compilerMacroExecutionLiteralForValue(arena: arena, valueID: kindValueID))
+        let nameValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 1))
+        let memberName: String(compilerMacroExecutionLiteralForValue(arena: arena, valueID: nameValueID))
         let targetIsConstruct: Bool(targetSyntaxID >= 0 && targetSyntaxID < compilerIntTableRowCount(table: tables.syntaxIndex)
             && compilerIntTableValue(table: tables.syntaxIndex, row: targetSyntaxID, column: 0) == compilerSyntaxKindConstruct())
         let targetQueryOperandCount: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()))
-        state expectedOperandCount: Int(2)
-        if targetOperation == compilerMacroTargetOperationDeclarationMemberName() { expectedOperandCount: 3 }
-        if targetOperation == compilerMacroTargetOperationDeclarationMemberTypeMatches() { expectedOperandCount: 4 }
-        if !targetIsConstruct || targetQueryOperandCount != expectedOperandCount || memberKind == String("") {
+        if !targetIsConstruct || targetQueryOperandCount != 2 || memberName == String("") {
             operationStatus: 0 - compilerMacroDiagnosticGraphQueryInvalid()
         } else {
             let targetApplicationIdentity: CompilerFingerprint(compilerMacroExecutionApplicationIdentity(tables: tables, applicationRow: applicationRow))
             let targetIdentity: CompilerFingerprint(compilerMacroExecutionTargetIdentity(tables: tables, targetSyntaxID: targetSyntaxID))
-            state queryKey: String(memberKind)
-            state targetObservedValue: Int(0 - 1)
-            state targetObservation: CompilerFingerprint(compilerMacroExecutionDeclarationMemberObservation(tables: tables, targetSyntaxID: targetSyntaxID, kind: memberKind))
-            if targetOperation == compilerMacroTargetOperationMemberCount() {
-                targetObservedValue: compilerMacroExecutionTargetMemberCount(tables: tables, targetSyntaxID: targetSyntaxID, name: memberKind)
-                targetObservation: compilerMacroExecutionTargetMemberObservation(tables: tables, targetSyntaxID: targetSyntaxID, name: memberKind)
-            } else if targetOperation == compilerMacroTargetOperationDeclarationMemberCount() {
-                targetObservedValue: compilerMacroExecutionDeclarationMemberCount(tables: tables, targetSyntaxID: targetSyntaxID, kind: memberKind)
-            } else {
-                let indexValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 2))
-                state memberIndex: Int(0 - 1)
-                if indexValueID >= 0 && indexValueID < rawBufferCount(buffer: evaluationValues) { memberIndex: rawBufferLoadInt(buffer: evaluationValues, index: indexValueID) }
-                queryKey: "\(memberKind):\(memberIndex)"
-                if targetOperation == compilerMacroTargetOperationDeclarationMemberName() {
-                    let reflectedName: String(compilerMacroExecutionDeclarationMemberName(tables: tables, targetSyntaxID: targetSyntaxID, kind: memberKind, ordinal: memberIndex))
-                    if reflectedName != String("") { targetObservedValue: compilerDeclarationNameHash(name: reflectedName) }
-                } else if targetOperation == compilerMacroTargetOperationDeclarationMemberTypeMatches() {
-                    let reflectedType: String(compilerMacroExecutionDeclarationMemberType(tables: tables, targetSyntaxID: targetSyntaxID, kind: memberKind, ordinal: memberIndex))
-                    let genericNameValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 3))
-                    let genericName: String(compilerMacroExecutionLiteralForValue(arena: arena, valueID: genericNameValueID))
-                    let declarationRow: Int(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 2))
-                    let expectedType: String(compilerMacroExecutionApplicationGenericArgumentForParameter(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow, parameterName: genericName))
-                    queryKey: "\(memberKind):\(memberIndex):\(genericName)"
-                    if reflectedType != String("") && expectedType != String("") {
-                        targetObservedValue: 0
-                        if reflectedType == expectedType { targetObservedValue: 1 }
-                    }
-                }
-            }
-            let targetQueryIdentity: CompilerFingerprint(compilerMacroExecutionReadIdentity(applicationIdentity: targetApplicationIdentity, targetIdentity: targetIdentity, operation: targetOperation, keyKindTag: compilerSyntaxKindConstruct(), key: queryKey))
+            let targetQueryIdentity: CompilerFingerprint(compilerMacroExecutionReadIdentity(applicationIdentity: targetApplicationIdentity, targetIdentity: targetIdentity, operation: compilerMacroTargetOperationMemberCount(), keyKindTag: compilerSyntaxKindConstruct(), key: memberName))
+            let targetObservedCount: Int(compilerMacroExecutionTargetMemberCount(tables: tables, targetSyntaxID: targetSyntaxID, name: memberName))
+            let targetObservation: CompilerFingerprint(compilerMacroExecutionTargetMemberObservation(tables: tables, targetSyntaxID: targetSyntaxID, name: memberName))
             let targetQueryResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
-            if targetObservedValue < 0
-                || compilerMacroExecutionAppendReadDependency(tables: tables, invocationRow: invocationRow, operation: targetOperation, arena: arena, operationRow: operationRow, kindValueID: kindValueID, nameValueID: kindValueID, kindTag: compilerSyntaxKindConstruct(), observedCount: targetObservedValue, applicationIdentity: targetApplicationIdentity, targetIdentity: targetIdentity, queryIdentity: targetQueryIdentity, observation: targetObservation) < 0
-                || rawBufferStoreInt(buffer: evaluationValues, index: targetQueryResultValueID, value: targetObservedValue) != 0 {
+            if compilerMacroExecutionAppendReadDependency(tables: tables, invocationRow: invocationRow, operation: compilerMacroTargetOperationMemberCount(), arena: arena, operationRow: operationRow, kindValueID: nameValueID, nameValueID: nameValueID, kindTag: compilerSyntaxKindConstruct(), observedCount: targetObservedCount, applicationIdentity: targetApplicationIdentity, targetIdentity: targetIdentity, queryIdentity: targetQueryIdentity, observation: targetObservation) < 0
+                || rawBufferStoreInt(buffer: evaluationValues, index: targetQueryResultValueID, value: targetObservedCount) != 0 {
                 operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
             }
         }
@@ -7484,26 +7234,6 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
         let scalarValue: Int(compilerMacroExecutionScalarValue(arena: arena, valueID: constantResultValueID))
         if rawBufferStoreInt(buffer: evaluationValues, index: constantResultValueID, value: scalarValue) != 0 {
             operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
-        }
-    } else if operationKind == compilerBodyMIROperationOptionalNone() {
-        let noneResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
-        if rawBufferStoreInt(buffer: evaluationValues, index: noneResultValueID, value: 0) != 0 {
-            operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
-        }
-    } else if operationKind == compilerBodyMIROperationOptionalSome() || operationKind == compilerBodyMIROperationOptionalHasValue() || operationKind == compilerBodyMIROperationOptionalPayload() {
-        let optionalOperandValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
-        let optionalResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
-        if compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()) != 1
-            || optionalOperandValueID < 0 || optionalOperandValueID >= rawBufferCount(buffer: evaluationValues) {
-            operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
-        } else {
-            state optionalScalar: Int(rawBufferLoadInt(buffer: evaluationValues, index: optionalOperandValueID))
-            if operationKind == compilerBodyMIROperationOptionalHasValue() {
-                if optionalScalar != 0 { optionalScalar: 1 }
-            }
-            if rawBufferStoreInt(buffer: evaluationValues, index: optionalResultValueID, value: optionalScalar) != 0 {
-                operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
-            }
         }
     } else if operationKind == compilerBodyMIROperationLocalValue() || operationKind == compilerBodyMIROperationAssignVersion() || operationKind == compilerBodyMIROperationPhi() {
         let copyResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
@@ -7570,18 +7300,6 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
                 operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
             }
         }
-    } else if operationKind == compilerBodyMIROperationStringCount() {
-        let stringValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
-        let countResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
-        if compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()) != 1
-            || stringValueID < 0 || stringValueID >= compilerIntTableRowCount(table: arena.mirValues) {
-            operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
-        } else {
-            let stringValue: String(compilerMacroExecutionLiteralTextForValue(arena: arena, valueID: stringValueID))
-            if rawBufferStoreInt(buffer: evaluationValues, index: countResultValueID, value: stringLength(value: stringValue)) != 0 {
-                operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
-            }
-        }
     } else {
         operationStatus: 0
     }
@@ -7605,11 +7323,7 @@ function compilerMacroExecutionEvaluateInvocation(tables: CompilerSyntaxTables, 
     state invocationSteps: Int(0)
     state currentBlockID: Int(0)
     state previousBlockID: Int(0 - 1)
-    state pathRunning: Bool(compilerMacroExecutionInitializeParameterValues(tables: tables, arena: arena, evaluationValues: evaluationValues, applicationRow: applicationRow, declarationRow: declarationRow) == 0)
-    if !pathRunning {
-        status: 0 - 1
-        diagnosticCode: compilerMacroDiagnosticBodyInvalid()
-    }
+    state pathRunning: Bool(true)
     state failureOperationRow: Int(0 - 1)
     while pathRunning && status == 0 {
         state blockValid: Bool(currentBlockID >= 0 && currentBlockID < compilerIntTableRowCount(table: arena.mirBlocks))
@@ -12686,10 +12400,7 @@ function compilerMacroRenderReadDependencies(tables: CompilerSyntaxTables): Stri
         let nameEnd: Int(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 8))
         state kindName: String(compilerCoreStringLiteralContent(text: compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: kindStart, localEnd: kindEnd)))
         let operation: Int(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 2))
-        if operation == compilerMacroTargetOperationMemberCount()
-            || operation == compilerMacroTargetOperationDeclarationMemberCount()
-            || operation == compilerMacroTargetOperationDeclarationMemberName()
-            || operation == compilerMacroTargetOperationDeclarationMemberTypeMatches() { kindName: String("Construct") }
+        if operation == compilerMacroTargetOperationMemberCount() { kindName: String("Construct") }
         let declarationName: String(compilerCoreStringLiteralContent(text: compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: nameStart, localEnd: nameEnd)))
         rawBufferAppendText(buffer: outputBuffer, text: "macroReadDependency\(tab)row=\(row)\(tab)invocationRow=\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 1))\(tab)operation=\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 2))\(tab)kind=\(kindName)\(tab)name=\(declarationName)\(tab)observedCount=\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 9))\(tab)applicationIdentity=\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 10)):\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 11))\(tab)targetIdentity=\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 12)):\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 13))\(tab)queryIdentity=\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 14)):\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 15))\(tab)observation=\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 16)):\(compilerIntTableValue(table: tables.macroReadDependencies, row: row, column: 17))\(newline)")
         row: row + 1
@@ -17557,7 +17268,6 @@ function compilerBodyResolutionEnumCase(): Int { return 14 }
 function compilerBodyResolutionEnum(): Int { return 15 }
 function compilerBodyResolutionArrayLiteral(): Int { return 16 }
 function compilerBodyResolutionArrayCount(): Int { return 17 }
-function compilerBodyResolutionStringCount(): Int { return 18 }
 function compilerBodyBuiltinArraySyntaxID(): Int { return 0 - 2 }
 function compilerBodyBuiltinString(): Int { return 1 }
 function compilerBodyBuiltinFloat(): Int { return 2 }
@@ -18593,8 +18303,7 @@ function compilerBodyMIROperationArrayCount(): Int { return 46 }
 function compilerBodyMIROperationArrayStore(): Int { return 47 }
 function compilerBodyMIROperationStringOwnedCopy(): Int { return 48 }
 function compilerBodyMIROperationStringAppendOwned(): Int { return 49 }
-function compilerBodyMIROperationStringCount(): Int { return 50 }
-function compilerBodyMIROperationLast(): Int { return compilerBodyMIROperationStringCount() }
+function compilerBodyMIROperationLast(): Int { return compilerBodyMIROperationStringAppendOwned() }
 
 function compilerBodyMIROperandColumnCount(): Int { return 4 }
 function compilerBodyMIROperandOperationColumn(): Int { return 0 }
@@ -19817,9 +19526,6 @@ function compilerMacroGraphOperationForName(name: String): Int {
 function compilerMacroTargetOperationForName(name: String): Int {
     if name == String("omit") { return compilerMacroTargetOperationOmit() }
     if name == String("memberCount") { return compilerMacroTargetOperationMemberCount() }
-    if name == String("declarationMemberCount") { return compilerMacroTargetOperationDeclarationMemberCount() }
-    if name == String("declarationMemberName") { return compilerMacroTargetOperationDeclarationMemberName() }
-    if name == String("declarationMemberTypeMatches") { return compilerMacroTargetOperationDeclarationMemberTypeMatches() }
     return 0
 }
 
@@ -21261,18 +20967,6 @@ function compilerBodyArenaResolveCapabilityExpression(arena: CompilerBodyArena, 
                 resultTypeKind: compilerBodyTypeInt()
                 if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 1 { invalidTargetQuery: true }
             }
-            if applicationTargetOperation == compilerMacroTargetOperationDeclarationMemberCount() {
-                resultTypeKind: compilerBodyTypeInt()
-                if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 1 { invalidTargetQuery: true }
-            }
-            if applicationTargetOperation == compilerMacroTargetOperationDeclarationMemberName() {
-                resultTypeKind: compilerBodyTypeString()
-                if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 2 { invalidTargetQuery: true }
-            }
-            if applicationTargetOperation == compilerMacroTargetOperationDeclarationMemberTypeMatches() {
-                resultTypeKind: compilerBodyTypeBool()
-                if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 3 { invalidTargetQuery: true }
-            }
         } else if applicationCapabilityKind == compilerMacroCapabilityGraph() && applicationGraphOperation > 0 {
             targetKind: compilerBodyResolutionMacroGraphQuery()
             targetID: applicationGraphOperation
@@ -21288,18 +20982,6 @@ function compilerBodyArenaResolveCapabilityExpression(arena: CompilerBodyArena, 
             if (targetKind == compilerBodyResolutionMacroCapability() || targetKind == compilerBodyResolutionMacroGraphQuery())
                 && compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID) != compilerBodyTypeString() { return 0 - 1 }
             if applicationTargetOperation == compilerMacroTargetOperationMemberCount()
-                && compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID) != compilerBodyTypeString() { invalidTargetQuery: true }
-            if (applicationTargetOperation == compilerMacroTargetOperationDeclarationMemberCount()
-                    || applicationTargetOperation == compilerMacroTargetOperationDeclarationMemberName()
-                    || applicationTargetOperation == compilerMacroTargetOperationDeclarationMemberTypeMatches())
-                && argumentOrdinal == 0
-                && compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID) != compilerBodyTypeString() { invalidTargetQuery: true }
-            if (applicationTargetOperation == compilerMacroTargetOperationDeclarationMemberName()
-                    || applicationTargetOperation == compilerMacroTargetOperationDeclarationMemberTypeMatches())
-                && argumentOrdinal == 1
-                && compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID) != compilerBodyTypeInt() { invalidTargetQuery: true }
-            if applicationTargetOperation == compilerMacroTargetOperationDeclarationMemberTypeMatches()
-                && argumentOrdinal == 2
                 && compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID) != compilerBodyTypeString() { invalidTargetQuery: true }
             argumentOrdinal: argumentOrdinal + 1
         }
@@ -21528,13 +21210,8 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
         let receiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
         if receiverNodeID < 0 || compilerBodyArenaResolveExpression(arena: arena, index: index, nodeID: receiverNodeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
         let receiverResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: receiverNodeID))
-        if receiverResolutionRow < 0 { return 0 - 1 }
-        let receiverTypeKind: Int(compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTypeKindColumn()))
+        if receiverResolutionRow < 0 || compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTypeKindColumn()) != compilerBodyTypeConstruct() { return 0 - 1 }
         let memberName: String(compilerBodyArenaNodeText(arena: arena, nodeID: nodeID))
-        if receiverTypeKind == compilerBodyTypeString() && memberName == String("count") {
-            return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: nodeID, targetKind: compilerBodyResolutionStringCount(), targetID: compilerBodyRuntimeBuiltinStringLength(), typeKind: compilerBodyTypeInt(), typeID: 0 - 1, regionNodeID: regionNodeID)
-        }
-        if receiverTypeKind != compilerBodyTypeConstruct() { return 0 - 1 }
         let receiverTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTypeIDColumn()))
         if receiverTypeID < 0 || receiverTypeID >= compilerIntTableRowCount(table: arena.typeInstances) { return 0 - 1 }
         let receiverConstructSyntaxID: Int(compilerIntTableValue(table: arena.typeInstances, row: receiverTypeID, column: compilerBodyTypeInstanceNominalSyntaxColumn()))
@@ -22888,7 +22565,7 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindEnumCaseValue()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindArrayLiteral()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindIndex())
-            || targetKind < compilerBodyResolutionLocalSymbol() || targetKind > compilerBodyResolutionStringCount() { return false }
+            || targetKind < compilerBodyResolutionLocalSymbol() || targetKind > compilerBodyResolutionArrayCount() { return false }
         if targetKind == compilerBodyResolutionLocalSymbol() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.symbols)) { return false }
         if targetKind == compilerBodyResolutionFunction() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.functions)) { return false }
         if targetKind == compilerBodyResolutionBuiltin() && targetID != compilerBodyBuiltinString() && targetID != compilerBodyBuiltinFloat() && targetID != compilerBodyBuiltinRuntimeCall() && targetID != compilerBodyBuiltinNil() { return false }
@@ -22908,15 +22585,9 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
         if targetKind == compilerBodyResolutionMacroTargetOperation()
             && targetID != compilerMacroTargetOperationOmit()
             && targetID != compilerMacroTargetOperationMemberCount()
-            && targetID != compilerMacroTargetOperationExpand()
-            && targetID != compilerMacroTargetOperationDeclarationMemberCount()
-            && targetID != compilerMacroTargetOperationDeclarationMemberName()
-            && targetID != compilerMacroTargetOperationDeclarationMemberTypeMatches() { return false }
+            && targetID != compilerMacroTargetOperationExpand() { return false }
         if targetKind == compilerBodyResolutionMacroTargetQueryInvalid()
-            && targetID != compilerMacroTargetOperationMemberCount()
-            && targetID != compilerMacroTargetOperationDeclarationMemberCount()
-            && targetID != compilerMacroTargetOperationDeclarationMemberName()
-            && targetID != compilerMacroTargetOperationDeclarationMemberTypeMatches() { return false }
+            && targetID != compilerMacroTargetOperationMemberCount() { return false }
         if targetKind == compilerBodyResolutionConstruct() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.syntaxIndex)
             || compilerIntTableValue(table: arena.tables.syntaxIndex, row: targetID, column: 0) != compilerSyntaxKindConstruct()) { return false }
         if targetKind == compilerBodyResolutionEnumCase() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.members)
@@ -22926,7 +22597,6 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
         if targetKind == compilerBodyResolutionArrayLiteral()
             && (targetID != compilerBodyArenaArrayDeclarationSyntaxID(arena: arena) || !compilerBodyArenaTypeIDIsArray(arena: arena, typeID: resolutionTypeID)) { return false }
         if targetKind == compilerBodyResolutionArrayCount() && (targetID != 0 || compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindMemberRead()) { return false }
-        if targetKind == compilerBodyResolutionStringCount() && (targetID != compilerBodyRuntimeBuiltinStringLength() || compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindMemberRead()) { return false }
         if (targetKind == compilerBodyResolutionLocalSymbol() || targetKind == compilerBodyResolutionFunction() || targetKind == compilerBodyResolutionMember() || targetKind == compilerBodyResolutionConstruct()
             || targetKind == compilerBodyResolutionEnumCase() || targetKind == compilerBodyResolutionEnum() || targetKind == compilerBodyResolutionArrayLiteral())
             && (resolutionTypeID < 0 || resolutionTypeID >= compilerIntTableRowCount(table: arena.typeInstances)) { return false }
@@ -27808,17 +27478,6 @@ function compilerBodyMIRBuildArrayCount(arena: CompilerBodyArena, nodeID: Int, r
     return CompilerBodyMIRValueResult(valueID: countValueID, isValid: true)
 }
 
-function compilerBodyMIRBuildStringCount(arena: CompilerBodyArena, nodeID: Int, receiverNodeID: Int, blockID: Int): CompilerBodyMIRValueResult {
-    let receiverValue: CompilerBodyMIRValueResult(compilerBodyMIRBuildExpression(arena: arena, nodeID: receiverNodeID, blockID: blockID))
-    let countValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueLocal(), typeKind: compilerBodyTypeInt(), typeID: 0 - 1, sourceNodeID: nodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: nodeID))
-    let operationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
-    let firstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
-    if !receiverValue.isValid || countValueID < 0
-        || compilerBodyMIRAppendOperand(arena: arena, operationID: operationID, ordinal: 0, valueID: receiverValue.valueID, role: compilerBodyMIROperandArgument()) != 0
-        || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: compilerBodyMIROperationStringCount(), resultValueID: countValueID, sourceNodeID: nodeID, firstOperand: firstOperand, operandCount: 1, targetKind: compilerBodyMIROperationTargetNone(), targetID: 0 - 1) != operationID { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
-    return CompilerBodyMIRValueResult(valueID: countValueID, isValid: true)
-}
-
 function compilerBodyMIRBuildNativeEnumTagValue(arena: CompilerBodyArena, sourceNodeID: Int, enumValueID: Int, blockID: Int): CompilerBodyMIRValueResult {
     if enumValueID < 0 || enumValueID >= compilerIntTableRowCount(table: arena.mirValues)
         || compilerIntTableValue(table: arena.mirValues, row: enumValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeEnum() { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
@@ -27882,7 +27541,6 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         if receiverNodeID < 0 || resolutionRow < 0 { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
         let resolutionTargetKind: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()))
         if resolutionTargetKind == compilerBodyResolutionArrayCount() { return compilerBodyMIRBuildArrayCount(arena: arena, nodeID: nodeID, receiverNodeID: receiverNodeID, blockID: blockID) }
-        if resolutionTargetKind == compilerBodyResolutionStringCount() { return compilerBodyMIRBuildStringCount(arena: arena, nodeID: nodeID, receiverNodeID: receiverNodeID, blockID: blockID) }
         if resolutionTargetKind != compilerBodyResolutionMember() { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
         let memberRow: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
         if !compilerBodyMemoryHasFact(arena: arena, kind: compilerBodyMemoryFactMemberRead(), sourceNodeID: nodeID, subjectID: nodeID) { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
@@ -28071,10 +27729,7 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         if resolutionTargetKind == compilerBodyResolutionMacroTargetOperation()
             || resolutionTargetKind == compilerBodyResolutionMacroTargetQueryInvalid() {
             callOperationKind: compilerBodyMIROperationMacroTargetExpansion()
-            if targetID == compilerMacroTargetOperationMemberCount()
-                || targetID == compilerMacroTargetOperationDeclarationMemberCount()
-                || targetID == compilerMacroTargetOperationDeclarationMemberName()
-                || targetID == compilerMacroTargetOperationDeclarationMemberTypeMatches() { callOperationKind: compilerBodyMIROperationMacroTargetQuery() }
+            if targetID == compilerMacroTargetOperationMemberCount() { callOperationKind: compilerBodyMIROperationMacroTargetQuery() }
         }
         state callInstanceID: Int(0 - 1)
         if resolutionTargetKind == compilerBodyResolutionFunction() {
@@ -28954,32 +28609,13 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                     || compilerIntTableValue(table: arena.mirValues, row: queryKindValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString()
                     || compilerIntTableValue(table: arena.mirValues, row: queryNameValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString() { return 320400 + operationRow }
             } else {
-                let targetQueryKindValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 1))
-                let targetQueryIndexValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 2))
-                let targetQueryTypeValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 3))
-                state targetQueryValid: Bool(compilerIntTableValue(table: arena.mirValues, row: macroReceiverValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeMacroTarget()
-                    && targetQueryKindValueID >= 0 && targetQueryKindValueID < valueCount
-                    && compilerIntTableValue(table: arena.mirValues, row: targetQueryKindValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeString())
-                if validationTargetID == compilerMacroTargetOperationMemberCount()
-                    || validationTargetID == compilerMacroTargetOperationDeclarationMemberCount() {
-                    targetQueryValid: targetQueryValid && macroOperandCount == 2
-                        && compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeInt()
-                } else if validationTargetID == compilerMacroTargetOperationDeclarationMemberName() {
-                    targetQueryValid: targetQueryValid && macroOperandCount == 3
-                        && targetQueryIndexValueID >= 0 && targetQueryIndexValueID < valueCount
-                        && compilerIntTableValue(table: arena.mirValues, row: targetQueryIndexValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeInt()
-                        && compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeString()
-                } else if validationTargetID == compilerMacroTargetOperationDeclarationMemberTypeMatches() {
-                    targetQueryValid: targetQueryValid && macroOperandCount == 4
-                        && targetQueryIndexValueID >= 0 && targetQueryIndexValueID < valueCount
-                        && targetQueryTypeValueID >= 0 && targetQueryTypeValueID < valueCount
-                        && compilerIntTableValue(table: arena.mirValues, row: targetQueryIndexValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeInt()
-                        && compilerIntTableValue(table: arena.mirValues, row: targetQueryTypeValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeString()
-                        && compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeBool()
-                } else {
-                    targetQueryValid: false
-                }
-                if !targetQueryValid { return compilerBodyMIRValidationMacroTargetQueryInvalidBase() + operationRow }
+                let targetQueryNameValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 1))
+                if validationTargetID != compilerMacroTargetOperationMemberCount()
+                    || macroOperandCount != 2
+                    || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeInt()
+                    || compilerIntTableValue(table: arena.mirValues, row: macroReceiverValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeMacroTarget()
+                    || targetQueryNameValueID < 0 || targetQueryNameValueID >= valueCount
+                    || compilerIntTableValue(table: arena.mirValues, row: targetQueryNameValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString() { return compilerBodyMIRValidationMacroTargetQueryInvalidBase() + operationRow }
             }
         }
         if operationKind == compilerBodyMIROperationConstruct() {
@@ -29044,16 +28680,6 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                         && compilerIntTableValue(table: arena.mirValues, row: arrayOperandValueID, column: compilerBodyMIRValueTypeIDColumn()) != arrayElementTypeID) { return 300000 + operationRow * 100 + operationKind }
                 arrayOperandOrdinal: arrayOperandOrdinal + 1
             }
-        }
-        if operationKind == compilerBodyMIROperationStringCount() {
-            let stringValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
-            if stringValueID < 0 || stringValueID >= valueCount
-                || validationTargetKind != compilerBodyMIROperationTargetNone()
-                || validationTargetID != 0 - 1
-                || validationStorageID != 0 - 1
-                || compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()) != 1
-                || compilerIntTableValue(table: arena.mirValues, row: stringValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString()
-                || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeInt() { return 300000 + operationRow * 100 + operationKind }
         }
         if operationKind == compilerBodyMIROperationArrayIndex() || operationKind == compilerBodyMIROperationArrayCount() {
             let arrayValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
@@ -30398,13 +30024,6 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         if assignmentRow < 0 || arrayValue.text == String("") { return 0 - 1 }
         let resultTemporary: Int(compilerIntTableValue(table: emitter.valueAssignments, row: assignmentRow, column: compilerBodyLLVMValueAssignmentNumberColumn()))
         return rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(resultTemporary) = extractvalue \(arrayValue.typeName) \(arrayValue.text), 1\n")
-    }
-    if operationKind == compilerBodyMIROperationStringCount() {
-        let assignmentRow: Int(compilerBodyLLVMValueAssignmentRow(emitter: emitter, valueID: resultValueID))
-        let stringValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0)))
-        if assignmentRow < 0 || stringValue.text == String("") || stringValue.typeName != String("ptr") { return 0 - 1 }
-        let resultTemporary: Int(compilerIntTableValue(table: emitter.valueAssignments, row: assignmentRow, column: compilerBodyLLVMValueAssignmentNumberColumn()))
-        return rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(resultTemporary) = call i32 @stringLength(ptr \(stringValue.text))\n")
     }
     if operationKind == compilerBodyMIROperationEnumTag() || operationKind == compilerBodyMIROperationEnumPayload() {
         let enumAssignmentRow: Int(compilerBodyLLVMValueAssignmentRow(emitter: emitter, valueID: resultValueID))
