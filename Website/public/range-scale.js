@@ -2,7 +2,7 @@ import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profi
 
 const defaults = {
   endpointGap: 8,
-  endpointGapEnd: 14,
+  endpointGapEnd: 16,
   divisionBase: 3,
   divisionLevels: 3,
   pinch: 0.27,

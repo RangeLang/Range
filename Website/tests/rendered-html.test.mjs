@@ -32,7 +32,7 @@ test("renders the Range landing page", async () => {
   assert.match(html, /src="\/range-spline-nav\.js\?version=2"/);
   assert.match(
     html,
-    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*endpoint-gap-end="14")(?=[^>]*division-base="3")(?=[^>]*division-levels="3")(?=[^>]*pinch="0.27")(?=[^>]*pinch-core="10")(?=[^>]*pinch-falloff="0.16")(?=[^>]*pinch-inner-edge="0.68")(?=[^>]*pinch-strength="0.9")(?=[^>]*measure-minimum="0.7")(?=[^>]*invisible-collapse-power="1.35")(?=[^>]*invisible-measure-minimum="0.1")(?=[^>]*invisible-stroke-minimum="0.06")(?=[^>]*marker-capture-division-weight="0.48")(?=[^>]*marker-capture-falloff="0.14")(?=[^>]*marker-capture-strength="0.9")(?=[^>]*stroke-minimum="0.65")(?=[^>]*snap-hysteresis="0.08")(?=[^>]*snap-to-marks="true")(?=[^>]*tone-falloff="0.12")(?=[^>]*tone-intensity="0.16")[^>]*>/,
+    /<range-scale(?=[^>]*endpoint-gap="8")(?=[^>]*endpoint-gap-end="16")(?=[^>]*division-base="3")(?=[^>]*division-levels="3")(?=[^>]*pinch="0.27")(?=[^>]*pinch-core="10")(?=[^>]*pinch-falloff="0.16")(?=[^>]*pinch-inner-edge="0.68")(?=[^>]*pinch-strength="0.9")(?=[^>]*measure-minimum="0.7")(?=[^>]*invisible-collapse-power="1.35")(?=[^>]*invisible-measure-minimum="0.1")(?=[^>]*invisible-stroke-minimum="0.06")(?=[^>]*marker-capture-division-weight="0.48")(?=[^>]*marker-capture-falloff="0.14")(?=[^>]*marker-capture-strength="0.9")(?=[^>]*stroke-minimum="0.65")(?=[^>]*snap-hysteresis="0.08")(?=[^>]*snap-to-marks="true")(?=[^>]*tone-falloff="0.12")(?=[^>]*tone-intensity="0.16")[^>]*>/,
   );
   assert.match(html, /<script[^>]*type="module"[^>]*src="\/range-scale\.js\?profile=pinch-canvas-v5"/);
   assert.match(html, /class="rangeWord">Range<\/span>/);
