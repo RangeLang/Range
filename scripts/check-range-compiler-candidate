@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
 DEFAULT_COMPILER_DIR="$REPO_ROOT/RangeCompiler/Range/Programs/Compiler"
+COMPILER_OPTIMIZATION="-O2"
+COMPILER_LTO="-flto=thin"
 
 usage() {
     cat <<'USAGE'
@@ -237,7 +239,7 @@ link_llvm() {
     local executable="$2"
     local temporary="$WORK_ROOT/$(basename "$executable").tmp"
 
-    clang -Wno-override-module "$llvm" "${RUNTIME_INPUTS[@]}" -o "$temporary"
+    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module "$llvm" "${RUNTIME_INPUTS[@]}" -o "$temporary"
     /bin/mkdir -p "$(dirname "$executable")"
     /bin/mv "$temporary" "$executable"
 }
@@ -5188,7 +5190,7 @@ main() {
     local seed seed_executable
     seed="$REPO_ROOT/$(manifest_value seed.path)"
     seed_executable="$WORK_ROOT/RangeCompilerSeed"
-    clang -Wno-override-module -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
+    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
     echo "bootstrap seed link: pass"
 
     local stage2_producer="$seed_executable"

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 void *stringTransientAllocate(size_t size);
 
@@ -49,6 +50,76 @@ typedef struct RangeCompilerMetrics {
 } RangeCompilerMetrics;
 
 static RangeCompilerMetrics metrics;
+static bool phaseTraceInitialized;
+static struct timespec phaseTraceStart;
+static struct timespec phaseTracePrior;
+
+static void initializeTraceClock(void) {
+    if (phaseTraceInitialized) return;
+    if (clock_gettime(CLOCK_MONOTONIC, &phaseTraceStart) != 0) return;
+    phaseTracePrior = phaseTraceStart;
+    phaseTraceInitialized = true;
+}
+
+__attribute__((constructor))
+static void initializeCompilerTrace(void) {
+    const char *phaseEnabled = getenv("RANGE_COMPILER_PHASE_TRACE");
+    const char *functionEnabled = getenv("RANGE_COMPILER_FUNCTION_TRACE");
+    if ((phaseEnabled && strcmp(phaseEnabled, "1") == 0)
+        || (functionEnabled && strcmp(functionEnabled, "1") == 0)) {
+        initializeTraceClock();
+    }
+}
+
+static uint64_t elapsedMilliseconds(struct timespec start, struct timespec end) {
+    uint64_t seconds = end.tv_sec >= start.tv_sec ? (uint64_t)(end.tv_sec - start.tv_sec) : 0;
+    int64_t nanoseconds = (int64_t)end.tv_nsec - (int64_t)start.tv_nsec;
+    if (nanoseconds < 0 && seconds > 0) {
+        seconds -= 1;
+        nanoseconds += 1000000000;
+    }
+    return seconds * 1000 + (uint64_t)(nanoseconds > 0 ? nanoseconds : 0) / 1000000;
+}
+
+static int32_t tracePhase(char *name) {
+    const char *enabled = getenv("RANGE_COMPILER_PHASE_TRACE");
+    if (!enabled || strcmp(enabled, "1") != 0) return 0;
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) return -1;
+    if (!name) name = "";
+    if (!phaseTraceInitialized) {
+        initializeTraceClock();
+        if (!phaseTraceInitialized) return -1;
+        fprintf(stderr, "compilerPhase\tname=%s\telapsedMilliseconds=0\ttotalMilliseconds=0\n", name);
+    } else {
+        fprintf(stderr, "compilerPhase\tname=%s\telapsedMilliseconds=%llu\ttotalMilliseconds=%llu\n",
+            name,
+            (unsigned long long)elapsedMilliseconds(phaseTracePrior, now),
+            (unsigned long long)elapsedMilliseconds(phaseTraceStart, now));
+        phaseTracePrior = now;
+    }
+    fflush(stderr);
+    return 0;
+}
+
+static int32_t traceFunction(int32_t functionID, char *name) {
+    const char *enabled = getenv("RANGE_COMPILER_FUNCTION_TRACE");
+    if (!enabled || strcmp(enabled, "1") != 0) return 0;
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) return -1;
+    if (!phaseTraceInitialized) {
+        initializeTraceClock();
+        if (!phaseTraceInitialized) return -1;
+    }
+    if (!name) name = "";
+    fprintf(stderr, "compilerFunction\tfunctionID=%d\tname=%s\telapsedMilliseconds=%llu\ttotalMilliseconds=%llu\n",
+        functionID, name,
+        (unsigned long long)elapsedMilliseconds(phaseTracePrior, now),
+        (unsigned long long)elapsedMilliseconds(phaseTraceStart, now));
+    phaseTracePrior = now;
+    fflush(stderr);
+    return 0;
+}
 
 static void freeFunctions(void) {
     for (size_t index = 0; index < metrics.functionCount; index += 1) {
@@ -60,6 +131,7 @@ static void freeFunctions(void) {
 int32_t compilerMetricsReset(void) {
     freeFunctions();
     memset(&metrics, 0, sizeof(metrics));
+    phaseTraceInitialized = false;
     return 0;
 }
 
@@ -74,6 +146,8 @@ static uint64_t delta(uint64_t value, uint64_t baseline) {
 }
 
 int32_t compilerMetricsFunctionBegin(int32_t functionID, char *name) {
+    if (functionID < 0) return tracePhase(name);
+    if (traceFunction(functionID, name) != 0) return -1;
     if (!metrics.enabled || metrics.activeFunction) return metrics.enabled ? -1 : 0;
     if (metrics.functionCount == metrics.functionCapacity) {
         size_t capacity = metrics.functionCapacity > 0 ? metrics.functionCapacity * 2 : 64;

@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+COMPILER_OPTIMIZATION="-O2"
+COMPILER_LTO="-flto=thin"
 
 mode="${1:-}"
 if [[ $# -gt 1 || ( -n "$mode" && "$mode" != "--integrity-only" ) ]]; then
@@ -92,7 +94,7 @@ for ((index = 0; index < runtime_source_count; index += 1)); do
     runtime_inputs+=("$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")")
 done
 
-clang -Wno-override-module -x ir "$seed" -x c "${runtime_inputs[@]}" -o "$seed_executable"
+clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module -x ir "$seed" -x c "${runtime_inputs[@]}" -o "$seed_executable"
 
 /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$bundle"
 for ((index = 0; index < compiler_source_count; index += 1)); do

@@ -12785,7 +12785,9 @@ function compilerSourceNextMarkerCandidateFromCandidate(source: String, marker: 
 }
 
 function compilerNativeSourceSetLLVMTextForValidIndex(source: String, declarationTables: CompilerSyntaxTables, executionIndex: CompilerDeclarationIndex): String {
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("macroExecution.begin"))
     let execution: CompilerMacroExecutionResult(compilerMacroExecution(tables: declarationTables, index: executionIndex))
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("macroExecution.end"))
     let familyMemory: CompilerMemoryGraph(compilerMemoryGraphCreate())
     state output: String("")
     if execution.status != 0 {
@@ -12804,8 +12806,10 @@ function compilerNativeSourceSetLLVMTextForValidIndex(source: String, declaratio
                 || !compilerMemoryMacroFamilyRepresentationsAreValid(tables: declarationTables, memory: familyMemory) {
                 output: compilerNativeDiagnostic(kind: String("invalidMacroFamilyMemoryGraph"))
             } else {
+                compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("llvmPipeline.begin"))
                 let combinedProgram: CompilerProgram(compilerNativeSourceSetProgramForLLVM(source: source))
                 output: compilerCoreLLVMNativeEntryTextForProgram(program: combinedProgram, declarationTables: declarationTables, expansionDelta: execution.graphDelta)
+                compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("llvmPipeline.end"))
             }
             compilerGraphDeltaDestroy(delta: execution.graphDelta)
         }
@@ -12827,13 +12831,16 @@ function compilerNativeSourceSetLLVMTextForLinkedTables(source: String, declarat
 }
 
 function compilerNativeSourceSetLLVMText(source: String): String {
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("sourceSet.begin"))
     let declarationTables: CompilerSyntaxTables(compilerSyntaxTablesCreate(source: source))
     let captureStatus: Int(compilerTypedDeclarationsCapture(source: source, tables: declarationTables))
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("declarationCapture.end"))
     state output: String("")
     if captureStatus != 0 || !compilerSyntaxTablesIsValid(tables: declarationTables) {
         output: compilerInvalidTypedDeclarationsDiagnostic(tables: declarationTables)
     } else {
         let macroLinkStatus: Int(compilerMacroLink(tables: declarationTables))
+        compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("macroLink.end"))
         if macroLinkStatus != 0 || compilerIntTableRowCount(table: declarationTables.macroDiagnostics) != 0 {
             output: compilerMacroRenderDiagnostics(tables: declarationTables)
         } else {
@@ -12841,6 +12848,7 @@ function compilerNativeSourceSetLLVMText(source: String): String {
         }
     }
     compilerSyntaxTablesDestroy(tables: declarationTables)
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("sourceSet.end"))
     return output
 }
 
@@ -15566,8 +15574,10 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
         entryClosureChanged: rawBufferCount(buffer: reachability.worklist) != worklistCountBeforeEntryRefresh
         entryClosureIteration: entryClosureIteration + 1
     }
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("reachabilityDiscovery.end"))
     let effectBuildStatus: Int(compilerReachableLLVMStateBuildFunctionInstanceEffects(reachability: reachability))
     if effectBuildStatus != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 0 - effectBuildStatus) }
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("functionEffects.end"))
     state abiComponentStatus: Int(0)
     state abiComponentIteration: Int(0)
     state abiComponentChanged: Bool(true)
@@ -15583,6 +15593,7 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
     }
     if abiComponentStatus < 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 41) }
     if abiComponentStatus > 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 200000 + abiComponentStatus - 1) }
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("abiComponents.end"))
     if compilerReachableLLVMStateRefreshCapabilityCounter(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 42) }
     let entryOwnedPathStatus: Int(compilerReachableLLVMStateValidateEntryOwnedPaths(reachability: reachability))
     if entryOwnedPathStatus != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 300000 + entryOwnedPathStatus) }
@@ -15720,6 +15731,7 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
     }
     stringTransientRegionReset(mark: closureTransientMark)
     if compilerReachableLLVMStateFreezeABIPlan(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("abiPlan.end"))
     if rawBufferStoreInt(buffer: reachability.counters, index: compilerReachableLLVMNextTemporary(), value: 0) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
     let emissionEdgeOwners: RawBuffer(rawBufferCreate(capacity: rawBufferCount(buffer: reachability.edgeOwners), stride: 4))
     let emissionEdgeTargets: RawBuffer(rawBufferCreate(capacity: rawBufferCount(buffer: reachability.edgeTargets), stride: 4))
@@ -15755,6 +15767,7 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
     let emissionEdgeTargetsDestroyStatus: Int(rawBufferDestroy(buffer: emissionEdgeTargets))
     if emissionEdgeOwnersDestroyStatus != 0 || emissionEdgeTargetsDestroyStatus != 0 { emissionStatus: 33 }
     if emissionStatus != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: emissionStatus) }
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("functionEmission.end"))
     return 0
 }
 

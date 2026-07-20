@@ -53,11 +53,11 @@
     },
     {
       "path": "RangeCompiler/Runtime/RangeRawBuffer.c",
-      "sha256": "f63e39fd8080a820069fa8c37b6d2e463a0515fce02cb7656732306d54c82f7a"
+      "sha256": "1033a4030b9f53934f6bdc0c6988de081e9346dc38b34f68eb2c5532b9f623ab"
     },
     {
       "path": "RangeCompiler/Runtime/RangeCompilerMetrics.c",
-      "sha256": "7e5202cbcae7e8c45da09ca8fff24b49efdd1606b4844c2a102123d25ef974c8"
+      "sha256": "096268bdd5ba83755662b6f8f889a520f06581880686346444f3bc8fe9605746"
     }
   ],
   "target": {

@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+COMPILER_OPTIMIZATION="-O2"
+COMPILER_LTO="-flto=thin"
 
 usage() {
     cat >&2 <<'USAGE'
@@ -310,7 +312,7 @@ ensure_seed_compiler() {
     local -a runtimes
     seed_hash="$(manifest_value seed.sha256)"
     manifest_hash="$(sha256 "$MANIFEST")"
-    cache_root="$REPO_ROOT/.range/NativeSeed/$seed_hash-$manifest_hash"
+    cache_root="$REPO_ROOT/.range/NativeSeed/$seed_hash-$manifest_hash-${COMPILER_OPTIMIZATION#-}-${COMPILER_LTO#-}"
     executable="$cache_root/RangeCompiler"
     seed="$REPO_ROOT/$(manifest_value seed.path)"
     if [[ ! -x "$executable" ]]; then
@@ -319,7 +321,7 @@ ensure_seed_compiler() {
         while IFS= read -r runtime; do
             runtimes+=("$runtime")
         done < <(runtime_inputs)
-        clang -Wno-override-module -x ir "$seed" -x c "${runtimes[@]}" -o "$executable.tmp"
+        clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module -x ir "$seed" -x c "${runtimes[@]}" -o "$executable.tmp"
         /bin/mv "$executable.tmp" "$executable"
     fi
     /usr/bin/printf '%s\n' "$executable"
@@ -473,6 +475,8 @@ compiler_next() {
         for runtime in "${runtimes[@]}"; do
             /usr/bin/printf 'runtime\t%s\t%s\n' "${runtime#"$REPO_ROOT/"}" "$(sha256 "$runtime")"
         done
+        /usr/bin/printf 'compilerOptimization=%s\n' "$COMPILER_OPTIMIZATION"
+        /usr/bin/printf 'compilerLTO=%s\n' "$COMPILER_LTO"
         clang --version | /usr/bin/head -1
     } | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
 
@@ -544,7 +548,7 @@ compiler_next() {
         /bin/rm -rf "$temporary"
         return 65
     fi
-    if ! clang -Wno-override-module "$temporary/RangeCompiler.ll" "${runtimes[@]}" -o "$temporary/RangeCompiler"; then
+    if ! clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module "$temporary/RangeCompiler.ll" "${runtimes[@]}" -o "$temporary/RangeCompiler"; then
         /bin/rm -rf "$temporary"
         return 65
     fi
@@ -633,6 +637,8 @@ compiler_progression() {
         for runtime in "${runtimes[@]}"; do
             /usr/bin/printf 'runtime\t%s\t%s\n' "${runtime#"$REPO_ROOT/"}" "$(sha256 "$runtime")"
         done
+        /usr/bin/printf 'compilerOptimization=%s\n' "$COMPILER_OPTIMIZATION"
+        /usr/bin/printf 'compilerLTO=%s\n' "$COMPILER_LTO"
         clang --version | /usr/bin/head -1
     } | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
 
@@ -701,7 +707,7 @@ compiler_progression() {
         /bin/rm -rf "$temporary"
         return 65
     fi
-    if ! clang -Wno-override-module "$temporary/RangeCompiler.ll" "${runtimes[@]}" -o "$temporary/RangeCompiler"; then
+    if ! clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module "$temporary/RangeCompiler.ll" "${runtimes[@]}" -o "$temporary/RangeCompiler"; then
         /bin/rm -rf "$temporary"
         return 65
     fi
