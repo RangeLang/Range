@@ -2,6 +2,7 @@ import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profi
 
 const defaults = {
   endpointGap: 8,
+  endpointGapEnd: 14,
   divisionBase: 3,
   divisionLevels: 3,
   pinch: 0.27,
@@ -31,6 +32,7 @@ function finiteAttribute(element, name, fallback) {
 class RangeScale extends HTMLElement {
   static observedAttributes = [
     "endpoint-gap",
+    "endpoint-gap-end",
     "division-base",
     "division-levels",
     "pinch",
@@ -132,6 +134,7 @@ class RangeScale extends HTMLElement {
   #config() {
     return {
       endpointGap: Math.max(0, finiteAttribute(this, "endpoint-gap", defaults.endpointGap)),
+      endpointGapEnd: Math.max(0, finiteAttribute(this, "endpoint-gap-end", defaults.endpointGapEnd)),
       divisionBase: Math.max(2, Math.round(finiteAttribute(this, "division-base", defaults.divisionBase))),
       divisionLevels: Math.min(6, Math.max(1, Math.round(finiteAttribute(this, "division-levels", defaults.divisionLevels)))),
       pinch: Math.min(1, Math.max(0, finiteAttribute(this, "pinch", defaults.pinch))),
@@ -270,7 +273,7 @@ class RangeScale extends HTMLElement {
     const endRect = end.getBoundingClientRect();
     const startX = zeroRect.left + zeroRect.width / 2 - sequenceRect.left;
     const startY = zeroRect.bottom - sequenceRect.top + endpointGap;
-    const endY = endRect.top - sequenceRect.top - endpointGap;
+    const endY = endRect.top - sequenceRect.top - this.#config().endpointGapEnd;
 
     this.style.left = `${startX}px`;
     this.style.top = `${startY}px`;
