@@ -3044,6 +3044,7 @@ Current branch:
 - `RangeCompiler/Range/Programs/Compiler/CompilerCore.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerFrontend.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerGraph.range`
+- `RangeCompiler/Range/Programs/Compiler/CompilerLLVMPlan.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerMemory.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerParsing.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerSources.range`

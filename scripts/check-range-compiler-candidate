@@ -5036,20 +5036,20 @@ audit_no_body_syntax_sink() {
 }
 
 audit_typed_only_lowering_invariant() {
-    local source="$1"
+    local directory="$1"
     local label="$2"
     local marker
 
-    [[ -f "$source" ]] || fail "missing $label CompilerCore source"
+    [[ -d "$directory" ]] || fail "missing $label compiler source directory"
     for marker in \
         'function compilerBodyTelemetryIsTypedOnly' \
         'kind=nonTypedLowering' \
         'scope: String("entry")' \
         'scope: String("reachableFunctions")'; do
-        rg -n -F "$marker" "$source" >/dev/null \
+        rg -n -F "$marker" "$directory" -g '*.range' -g '!**/.range/**' -g '!**/.build/**' >/dev/null \
             || fail "$label is missing the typed-only lowering invariant: $marker"
     done
-    if rg -n 'legacyParses: [1-9]|recordBytes: [1-9]' "$source" >/dev/null; then
+    if rg -n 'legacyParses: [1-9]|recordBytes: [1-9]' "$directory" -g '*.range' -g '!**/.range/**' -g '!**/.build/**' >/dev/null; then
         fail "$label contains a literal legacy-record lowering producer"
     fi
 }
@@ -5129,7 +5129,7 @@ main() {
     if [[ "$checkpoint_mode" != stage2-plan ]]; then
         audit_no_temporary_debug_probes "$compiler_directory/CompilerCore.range" "final compiler"
         audit_no_body_syntax_sink "$compiler_directory/CompilerCore.range" "final compiler"
-        audit_typed_only_lowering_invariant "$compiler_directory/CompilerCore.range" "final compiler"
+        audit_typed_only_lowering_invariant "$compiler_directory" "final compiler"
         audit_no_legacy_record_lowering "$compiler_directory"
         if [[ -n "$bootstrap_bridge_source_directory" ]]; then
             audit_no_temporary_debug_probes "$bootstrap_bridge_source_directory/CompilerCore.range" "bootstrap bridge"
