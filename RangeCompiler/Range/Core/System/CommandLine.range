@@ -1,2 +1,0 @@
-function commandLineArgumentCount(): Int
-function commandLineArgument(index: Int): Optional<String>

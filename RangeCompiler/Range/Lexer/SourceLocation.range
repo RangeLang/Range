@@ -1,5 +1,0 @@
-@syntax
-construct SourceLocation {
-    let line: Int
-    let character: Int
-}

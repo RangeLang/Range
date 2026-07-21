@@ -1,5 +1,0 @@
-construct Versioned<Value> {
-    let current: Value
-    let next: Value?
-    let version: Version
-}

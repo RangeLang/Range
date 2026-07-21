@@ -1,4 +1,0 @@
-@main {
-    state prefersNumber: true
-    state selected: Optional<Int>(prefersNumber ? 1 : nil)
-}

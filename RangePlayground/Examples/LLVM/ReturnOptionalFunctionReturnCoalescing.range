@@ -1,8 +1,0 @@
-function maybe(): Optional<Int> {
-    let value: Optional<Int>(7)
-    return value
-}
-
-@main {
-    return maybe() ?? 3
-}

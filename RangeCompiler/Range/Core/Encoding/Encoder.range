@@ -1,6 +1,0 @@
-construct Encoder {
-    function keyedContainer(): KeyedEncodingContainer
-
-    function unkeyedContainer(): UnkeyedEncodingContainer
-    function singleValueContainer(): SingleValueEncodingContainer
-}

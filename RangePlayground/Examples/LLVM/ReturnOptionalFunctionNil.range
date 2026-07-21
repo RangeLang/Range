@@ -1,7 +1,0 @@
-function maybe(): Optional<Int> {
-    return nil
-}
-
-@main {
-    return maybe() ?? 3
-}

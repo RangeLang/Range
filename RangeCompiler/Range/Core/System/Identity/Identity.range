@@ -1,6 +1,0 @@
-construct Identity {
-}
-
-macro identity(): Construct -> String { target, diagnostics in
-    return "identity"
-}

@@ -1,7 +1,0 @@
-function isSmall(value: Int): Bool {
-    return value < 10
-}
-
-@main {
-    return isSmall(value: 5)
-}

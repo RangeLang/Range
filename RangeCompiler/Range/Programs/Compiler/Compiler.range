@@ -1,16 +1,5 @@
 function compileRangeSource(source: String): String {
-    let sourceSetOutput: String(compileRangeSourceSetDirectiveOutput(source: source))
-    if sourceSetOutput != String("") {
-        return sourceSetOutput
-    }
-
-    let program: CompilerProgram(parseCompilerProgram(source: source))
-    let coreOutput: String(compileRangeCoreDirectiveOutput(source: source, program: program))
-    if coreOutput != String("") {
-        return coreOutput
-    }
-
-    return compileRangeNativeProgramOutput(source: source)
+    return compileRangeNativeSource(source: source)
 }
 
 function compileRangeNativeSource(source: String): String {
@@ -63,10 +52,6 @@ function compileRangeNativeSourceDirectiveOutput(source: String): String {
         return compilerNativeSourceSetLLVMText(source: source)
     }
 
-    if compilerSourceRequestsProjectSourceSetLLVMText(source: source) {
-        return compilerSourceSetLLVMText(source: source)
-    }
-
     if compilerSourceRequestsSourceSetLLVMText(source: source) {
         return compilerNativeSourceSetLLVMText(source: source)
     }
@@ -76,96 +61,4 @@ function compileRangeNativeSourceDirectiveOutput(source: String): String {
 
 function compileRangeNativeProgramOutput(source: String): String {
     return compilerCoreLLVMNativeProgramText(source: source)
-}
-
-function compileRangeSourceSetDirectiveOutput(source: String): String {
-    if compilerSourceRequestsNativeSourceSetLLVMText(source: source) {
-        return compilerNativeSourceSetLLVMText(source: source)
-    }
-
-    if compilerSourceRequestsProjectSourceSetLLVMText(source: source) {
-        return compilerSourceSetLLVMText(source: source)
-    }
-
-    if compilerSourceRequestsSourceSetAST(source: source) {
-        return compilerSourceSetASTSummary(source: source)
-    }
-
-    if compilerSourceRequestsSourceSetTypes(source: source) {
-        return compilerSourceSetTypesSummary(source: source)
-    }
-
-    if compilerSourceRequestsSourceSetLLVMText(source: source) {
-        return compilerSourceSetLLVMText(source: source)
-    }
-
-    if compilerSourceRequestsSourceSetLLVM(source: source) {
-        return compilerSourceSetLLVMSummary(source: source)
-    }
-
-    if compilerSourceRequestsSourceInventory(source: source) {
-        return compilerSourceInventorySummary(source: source)
-    }
-
-    if compilerSourceRequestsSourceIdentity(source: source) {
-        return compilerSourceIdentitySummary(source: source)
-    }
-
-    if compilerSourceRequestsTypedSyntax(source: source) {
-        return compilerTypedSyntaxSummary(source: source)
-    }
-
-    if compilerSourceRequestsMacroSnapshot(source: source) {
-        return compilerMacroSummary(source: source)
-    }
-
-    if compilerSourceRequestsPlotter(source: source) {
-        return compilerPlotterSummary(source: source)
-    }
-
-    if compilerSourceRequestsSemantics(source: source) {
-        return compilerSemanticSummary(source: source)
-    }
-
-    if compilerSourceRequestsMemoryGraph(source: source) {
-        return compilerMemorySummary(source: source)
-    }
-
-    if compilerSourceRequestsTypedIR(source: source) {
-        return compilerTypedIRSummary(source: source)
-    }
-
-    if compilerSourceRequestsMemoryLLVMText(source: source) {
-        return compilerTypedIRFixedLLVMText(source: source)
-    }
-
-    return String("")
-}
-
-function compileRangeCoreDirectiveOutput(source: String, program: CompilerProgram): String {
-    if compilerSourceRequestsCoreAST(source: source) {
-        let astProgram: CompilerProgram(parseCompilerProgramWithFunctionBodies(source: source))
-        return compilerCoreASTSummaryForProgram(program: astProgram)
-    }
-
-    if compilerSourceRequestsCoreSymbols(source: source) {
-        return compilerCoreSymbolSummaryForProgram(program: program)
-    }
-
-    if compilerSourceRequestsCoreTypes(source: source) {
-        let typedProgram: CompilerProgram(parseCompilerProgramWithFunctionBodies(source: source))
-        return compilerCoreTypeSummaryForProgram(program: typedProgram)
-    }
-
-    if compilerSourceRequestsCoreLLVM(source: source) {
-        let llvmProgram: CompilerProgram(parseCompilerProgramWithFunctionBodies(source: source))
-        return compilerCoreLLVMForProgram(program: llvmProgram)
-    }
-
-    if compilerSourceRequestsCompilerLLVMText(source: source) {
-        let llvmTextProgram: CompilerProgram(parseCompilerProgramWithFunctionBodies(source: source))
-        return compilerCoreLLVMTextForProgram(program: llvmTextProgram)
-    }
-
-    return String("")
 }

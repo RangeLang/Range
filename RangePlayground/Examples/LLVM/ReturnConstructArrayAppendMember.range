@@ -1,9 +1,0 @@
-construct Bag {
-    let items: [Int]
-}
-
-@main {
-    let bag: Bag(items: [1, 2])
-    bag.items.append(element: 3)
-    return bag.items.count == 3 && bag.items.element(index: 2) == 3 ? 0 : 1
-}

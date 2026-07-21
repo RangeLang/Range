@@ -1,3 +1,0 @@
-macro Description(@capture markdown: Expression): Construct -> String { target, diagnostics in
-    return markdown
-}

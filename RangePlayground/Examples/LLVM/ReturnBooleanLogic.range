@@ -1,6 +1,0 @@
-@main {
-    if !Bool(false) && (Bool(false) || Bool(true)) {
-        return 1
-    }
-    return 0
-}

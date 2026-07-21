@@ -5,27 +5,21 @@ on:
   push:
     branches:
       - main
+      - development
   workflow_dispatch:
 
 jobs:
   check:
-    name: Active LLVM path
+    name: Native compiler proof
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
-      - uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: "6.2"
+      - name: Validate native scripts
+        run: bash -n scripts/range scripts/range-native scripts/check-range-compiler-candidate scripts/verify-range-compiler-seed
 
-      - name: Validate script syntax
-        run: bash -n scripts/range
+      - name: Verify accepted seed
+        run: scripts/range check-stage2-compiler
 
-      - name: Build range compiler host
-        run: swift build --package-path RangeCompiler --product range
-
-      - name: Test Range script contract
-        run: swift test --package-path RangeCompiler --filter RangeScriptTests
-
-      - name: Check active LLVM executable path
-        run: scripts/range check
+      - name: Verify self-hosted fixed point
+        run: scripts/range compiler progression

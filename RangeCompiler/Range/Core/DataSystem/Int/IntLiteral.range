@@ -1,7 +1,0 @@
-@literal
-@builtin
-construct IntLiteral { }
-
-extension IntLiteral {
-    function storage(): IntStorage
-}

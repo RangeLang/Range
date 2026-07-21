@@ -1,4 +1,0 @@
-@main {
-    let values: [Int]([])
-    return values.isEmpty ? 0 : 1
-}

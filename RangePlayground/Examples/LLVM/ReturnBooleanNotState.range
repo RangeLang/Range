@@ -1,4 +1,0 @@
-@main {
-    state value: !false
-    return value ? 0 : 1
-}

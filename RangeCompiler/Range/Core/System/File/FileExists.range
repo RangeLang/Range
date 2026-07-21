@@ -1,1 +1,0 @@
-function fileExists(path: String): Bool

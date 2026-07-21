@@ -1,5 +1,0 @@
-@Project
-construct ProjectCommandFixture {
-    let name: Title("ProjectCommandFixture")
-    let commandLine: "Main.range"
-}

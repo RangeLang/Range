@@ -1,7 +1,0 @@
-@literal
-@builtin
-construct BoolLiteral { }
-
-extension BoolLiteral {
-    function storage(): BoolStorage
-}

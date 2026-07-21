@@ -1,7 +1,0 @@
-macro badStringify(_ value: Expression): Expression { target, diagnostics in
-    target.replace(with: "\(value)")
-}
-
-@main {
-    let text: @badStringify(1 + 2)
-}

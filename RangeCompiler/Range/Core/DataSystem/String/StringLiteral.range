@@ -1,7 +1,0 @@
-@literal
-@builtin
-construct StringLiteral { }
-
-extension StringLiteral {
-    function storage(): StringStorage
-}

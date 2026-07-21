@@ -1,4 +1,0 @@
-@main {
-    print(value: String("ready \(true)"))
-    return 0
-}

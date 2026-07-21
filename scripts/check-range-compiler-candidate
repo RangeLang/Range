@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
 DEFAULT_COMPILER_DIR="$REPO_ROOT/RangeCompiler/Range/Programs/Compiler"
+COMPILER_OPTIMIZATION="-O2"
+COMPILER_LTO="-flto=thin"
 
 usage() {
     cat <<'USAGE'
@@ -237,7 +239,7 @@ link_llvm() {
     local executable="$2"
     local temporary="$WORK_ROOT/$(basename "$executable").tmp"
 
-    clang -Wno-override-module "$llvm" "${RUNTIME_INPUTS[@]}" -o "$temporary"
+    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module "$llvm" "${RUNTIME_INPUTS[@]}" -o "$temporary"
     /bin/mkdir -p "$(dirname "$executable")"
     /bin/mv "$temporary" "$executable"
 }
@@ -614,12 +616,18 @@ audit_recursive_enum_declarations() {
         || fail "$stage_label recursive enum typed snapshot omitted indirect payload policy"
     /usr/bin/grep -Fq $'kind=casePayload\tstorage=direct' "$snapshot" \
         || fail "$stage_label recursive enum typed snapshot omitted direct payload policy"
-    /usr/bin/grep -Eq $'name=value.*type=BindingList.*kind=casePayload\tstorage=binding\ttypeTargetKind=declaration\ttypeTargetID=0' "$snapshot" \
-        || fail "$stage_label recursive enum typed snapshot omitted the BindingList payload type ID edge"
-    /usr/bin/grep -Eq $'name=value.*type=IndirectList.*kind=casePayload\tstorage=indirect\ttypeTargetKind=declaration\ttypeTargetID=4' "$snapshot" \
-        || fail "$stage_label recursive enum typed snapshot omitted the IndirectList payload type ID edge"
-    /usr/bin/grep -Eq $'name=value.*type=Int.*kind=casePayload\tstorage=direct\ttypeTargetKind=builtin\ttypeTargetID=1' "$snapshot" \
-        || fail "$stage_label recursive enum typed snapshot omitted the Int payload builtin type ID"
+    /usr/bin/grep -Eq $'name=value.*type=BindingList.*kind=casePayload\tstorage=binding\ttypeTargetKind=typeReference\ttypeTargetID=0' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the BindingList payload type-reference edge"
+    /usr/bin/grep -Eq $'typeReference\tid=0\townerMemberRow=.*kind=named\ttargetKind=declaration\ttargetID=0\tchildCount=0\tdepth=0' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the BindingList nominal type node"
+    /usr/bin/grep -Eq $'name=value.*type=IndirectList.*kind=casePayload\tstorage=indirect\ttypeTargetKind=typeReference\ttypeTargetID=1' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the IndirectList payload type-reference edge"
+    /usr/bin/grep -Eq $'typeReference\tid=1\townerMemberRow=.*kind=named\ttargetKind=declaration\ttargetID=4\tchildCount=0\tdepth=0' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the IndirectList nominal type node"
+    /usr/bin/grep -Eq $'name=value.*type=Int.*kind=casePayload\tstorage=direct\ttypeTargetKind=typeReference\ttypeTargetID=2' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the Int payload type-reference edge"
+    /usr/bin/grep -Eq $'typeReference\tid=2\townerMemberRow=.*kind=named\ttargetKind=builtin\ttargetID=1\tchildCount=0\tdepth=0' "$snapshot" \
+        || fail "$stage_label recursive enum typed snapshot omitted the Int builtin type node"
 
     local negative_kind negative_source negative_output negative_error
     for negative_kind in direct-self direct-mutual unknown duplicate-payload; do
@@ -972,6 +980,8 @@ write_role_bundle() {
         'construct RoleCore {}' \
         'compilerSourceFile\trole=foundation\tpath=Foundation.range' \
         'construct RoleFoundation {}' \
+        'compilerSourceFile\trole=framework\tpath=Framework.range' \
+        'construct RoleFramework {}' \
         'compilerSourceFile\trole=generated\tpath=Generated.range' \
         'construct RoleGenerated {}' \
         'compilerSourceFile\trole=project\tpath=Project.range' \
@@ -2203,9 +2213,10 @@ assert_role_identity() {
     for expected in \
         $'sourceFile\tid=0\trole=core\tpath=Core.range' \
         $'sourceFile\tid=1\trole=foundation\tpath=Foundation.range' \
-        $'sourceFile\tid=2\trole=generated\tpath=Generated.range' \
-        $'sourceFile\tid=3\trole=project\tpath=Project.range' \
-        $'sourceFile\tid=4\trole=project\tpath=Legacy.range'; do
+        $'sourceFile\tid=2\trole=framework\tpath=Framework.range' \
+        $'sourceFile\tid=3\trole=generated\tpath=Generated.range' \
+        $'sourceFile\tid=4\trole=project\tpath=Project.range' \
+        $'sourceFile\tid=5\trole=project\tpath=Legacy.range'; do
         /usr/bin/grep -Fq "$expected" "$output" || fail "role identity missing: $expected"
     done
 }
@@ -2244,10 +2255,11 @@ audit_role_markers() {
     /usr/bin/printf 'sourceInventory\\tprogram\\n' > "$expected_inventory"
     /usr/bin/printf 'sourceFile\\tindex=0\\trole=core\\tpath=Core.range\\n' >> "$expected_inventory"
     /usr/bin/printf 'sourceFile\\tindex=1\\trole=foundation\\tpath=Foundation.range\\n' >> "$expected_inventory"
-    /usr/bin/printf 'sourceFile\\tindex=2\\trole=generated\\tpath=Generated.range\\n' >> "$expected_inventory"
-    /usr/bin/printf 'sourceFile\\tindex=3\\trole=project\\tpath=Project.range\\n' >> "$expected_inventory"
-    /usr/bin/printf 'sourceFile\\tindex=4\\trole=project\\tpath=Legacy.range\\n' >> "$expected_inventory"
-    /usr/bin/printf 'sourceFileCount\\t5\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFile\\tindex=2\\trole=framework\\tpath=Framework.range\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFile\\tindex=3\\trole=generated\\tpath=Generated.range\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFile\\tindex=4\\trole=project\\tpath=Project.range\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFile\\tindex=5\\trole=project\\tpath=Legacy.range\\n' >> "$expected_inventory"
+    /usr/bin/printf 'sourceFileCount\\t6\\n' >> "$expected_inventory"
     /usr/bin/printf '\n' >> "$expected_inventory"
     run_capture "$executable" "$inventory_bundle" "$inventory_output" "$inventory_error"
     require_successful_output "$stage_label role inventory" "$inventory_output" "$inventory_error"
@@ -2273,7 +2285,49 @@ audit_role_markers() {
     run_capture "$executable" "$fingerprint_core_bundle" "$fingerprint_core_output" "$fingerprint_core_error"
     require_successful_output "$stage_label core fingerprint" "$fingerprint_core_output" "$fingerprint_core_error"
     /usr/bin/cmp -s "$fingerprint_project_first" "$fingerprint_core_output" && fail "$stage_label role-only fingerprint change was not observed"
-    echo "$stage_label roles: pass (four explicit roles, legacy project, malformed rejection, deterministic role-sensitive fingerprint)"
+    echo "$stage_label roles: pass (five explicit roles, legacy project, malformed rejection, deterministic role-sensitive fingerprint)"
+}
+
+audit_driver_source_graph() {
+    local stage_label="$1"
+    local executable="$2"
+    local source="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnInteger.range"
+    local graph="$WORK_ROOT/$stage_label.source-graph.range"
+    local repeated="$WORK_ROOT/$stage_label.source-graph.repeat.range"
+    local inventory="$WORK_ROOT/$stage_label.source-graph.inventory.range"
+    local output="$WORK_ROOT/$stage_label.source-graph.inventory.out"
+    local decoded="$WORK_ROOT/$stage_label.source-graph.inventory.decoded"
+    local error="$WORK_ROOT/$stage_label.source-graph.inventory.err"
+    local role expected_count actual_count
+
+    "$REPO_ROOT/scripts/range-native" source-graph "$source" "$graph"
+    "$REPO_ROOT/scripts/range-native" source-graph "$source" "$repeated"
+    /usr/bin/cmp -s "$graph" "$repeated" || fail "$stage_label driver SourceGraph was not deterministic"
+    {
+        /usr/bin/printf '%s\n' 'compilerSourceInventory'
+        /bin/cat "$graph"
+    } > "$inventory"
+    run_capture "$executable" "$inventory" "$output" "$error"
+    require_successful_output "$stage_label driver SourceGraph inventory" "$output" "$error"
+    /usr/bin/perl -pe 's/\\t/\t/g; s/\\n/\n/g' "$output" > "$decoded"
+    for role in core foundation framework project; do
+        expected_count="$(/usr/bin/grep -Fc "compilerSourceFile\\trole=$role\\t" "$graph" || true)"
+        actual_count="$(/usr/bin/grep -Fc "role=$role" "$decoded" || true)"
+        [[ "$actual_count" -eq "$expected_count" ]] \
+            || fail "$stage_label driver SourceGraph $role count $actual_count; expected $expected_count"
+    done
+    /usr/bin/awk -F '\t' '
+        BEGIN { last = -1 }
+        $1 == "sourceFile" {
+            split($3, field, "=")
+            role = field[2]
+            rank = role == "core" ? 0 : role == "foundation" ? 1 : role == "framework" ? 2 : role == "project" ? 3 : -1
+            if (rank < last || rank < 0) { exit 1 }
+            last = rank
+        }
+        END { if (last != 3) exit 1 }
+    ' "$decoded" || fail "$stage_label driver SourceGraph role order changed"
+    echo "$stage_label driver SourceGraph: pass (deterministic ordered role inventory, including empty roles)"
 }
 
 audit_canonical_core() {
@@ -4638,6 +4692,7 @@ audit_stage() {
 
     audit_inventory "$stage_label" "$executable"
     audit_role_markers "$stage_label" "$executable"
+    audit_driver_source_graph "$stage_label" "$executable"
     audit_canonical_core "$stage_label" "$executable" "$stage_directory"
     audit_binding_references "$stage_label" "$executable" "$stage_directory"
     audit_root_values "$stage_label" "$executable" "$stage_directory"
@@ -4705,6 +4760,44 @@ audit_no_body_syntax_sink() {
     done
 }
 
+audit_typed_only_lowering_invariant() {
+    local source="$1"
+    local label="$2"
+    local marker
+
+    [[ -f "$source" ]] || fail "missing $label CompilerCore source"
+    for marker in \
+        'function compilerBodyTelemetryIsTypedOnly' \
+        'kind=nonTypedLowering' \
+        'scope: String("entry")' \
+        'scope: String("reachableFunctions")'; do
+        rg -n -F "$marker" "$source" >/dev/null \
+            || fail "$label is missing the typed-only lowering invariant: $marker"
+    done
+    if rg -n 'legacyParses: [1-9]|recordBytes: [1-9]' "$source" >/dev/null; then
+        fail "$label contains a literal legacy-record lowering producer"
+    fi
+}
+
+audit_no_legacy_record_lowering() {
+    local directory="$1"
+    local marker
+
+    [[ -d "$directory" ]] || fail "missing compiler source directory: $directory"
+    for marker in \
+        'function compileRangeCoreDirectiveOutput(' \
+        'function compileRangeSourceSetDirectiveOutput(' \
+        'function compilerCoreLLVMLowerExpressionRecord(' \
+        'function compilerCoreLLVMLowerHelperFunction(' \
+        'function compilerCoreLLVMLowerBlockWithControlLegacy(' \
+        'function compilerCoreLLVMInstructionRecord(' \
+        'function compilerCoreStatementFromRecord('; do
+        if rg -n -F "$marker" "$directory" -g '*.range' >/dev/null; then
+            fail "legacy serialized lowering remains reachable in compiler source: $marker"
+        fi
+    done
+}
+
 audit_raw_buffer_substrate() {
     local raw="$REPO_ROOT/RangeCompiler/Runtime/RangeRawBuffer.c"
     [[ -f "$raw" ]] || fail "missing shared RawBuffer runtime substrate"
@@ -4754,6 +4847,8 @@ main() {
     verify_manifest
     audit_no_temporary_debug_probes "$compiler_directory/CompilerCore.range" "final compiler"
     audit_no_body_syntax_sink "$compiler_directory/CompilerCore.range" "final compiler"
+    audit_typed_only_lowering_invariant "$compiler_directory/CompilerCore.range" "final compiler"
+    audit_no_legacy_record_lowering "$compiler_directory"
     if [[ -n "$bootstrap_bridge_source_directory" ]]; then
         audit_no_temporary_debug_probes "$bootstrap_bridge_source_directory/CompilerCore.range" "bootstrap bridge"
         audit_no_body_syntax_sink "$bootstrap_bridge_source_directory/CompilerCore.range" "bootstrap bridge"
@@ -5095,7 +5190,7 @@ main() {
     local seed seed_executable
     seed="$REPO_ROOT/$(manifest_value seed.path)"
     seed_executable="$WORK_ROOT/RangeCompilerSeed"
-    clang -Wno-override-module -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
+    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
     echo "bootstrap seed link: pass"
 
     local stage2_producer="$seed_executable"
@@ -5261,6 +5356,7 @@ main() {
     report_artifact stage3_macro_expansion_executable "$stage3_directory/MacroExpansion"
     echo "stage2_stage3_llvm=byte-identical"
     echo "stage2_stage3_executable=byte-identical"
+    echo "typed_only_lowering=pass"
     echo "swift_invocation=none"
     echo "candidate_fixed_point=pass"
 }

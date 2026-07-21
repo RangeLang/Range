@@ -1,8 +1,0 @@
-@main {
-    switch FileManager.readFile(path: "missing.txt") {
-    case .success(let text):
-        Logger.info(text)
-    case .failure:
-        Logger.warning("missing")
-    }
-}

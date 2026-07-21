@@ -1,4 +1,0 @@
-precedencegroup ComparisonPrecedence {
-    associativity: none
-    higherThan: LogicalConjunctionPrecedence
-}

@@ -2,12 +2,12 @@
   "formatVersion": 1,
   "seed": {
     "path": "RangeCompiler/Bootstrap/RangeCompilerSeed.ll",
-    "bytes": 5798382,
-    "sha256": "0951eaeb8c3b24b532fac3513dd98cf5ec5ee4d628d8767aa67f240440aafb78"
+    "bytes": 5353820,
+    "sha256": "c8f40d7adefd530e0b609e927b3b3c6073298768ab358943bc51cbe3aa8ad42b"
   },
   "expectedStage3LLVM": {
-    "bytes": 5798382,
-    "sha256": "0951eaeb8c3b24b532fac3513dd98cf5ec5ee4d628d8767aa67f240440aafb78"
+    "bytes": 5353820,
+    "sha256": "c8f40d7adefd530e0b609e927b3b3c6073298768ab358943bc51cbe3aa8ad42b"
   },
   "compilerSources": [
     {
@@ -18,17 +18,17 @@
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Compiler.range",
       "role": "project",
-      "sha256": "dd1aa8cadffb3d36a8902df325946b43658fdabb22c040d972e0b17a576de831"
+      "sha256": "0ec349e4b6954784a69ce0cfcfcd6e355d64ee69c2703da03b1e038ca7af9cb2"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerCore.range",
       "role": "project",
-      "sha256": "ec09fb93f530f3b9fe1309ae07322e2556edf65dea486a90e8a399ef6e4ac87a"
+      "sha256": "79629160efe092728874e477ff2920ab3de86c8d633811bbf51ec5fdd3a3c029"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerDirectives.range",
       "role": "project",
-      "sha256": "8fd707d26ed6b092ad4a758f0db65e934c8f35ae9e260e5b5aabb9e706fa069d"
+      "sha256": "62cc99f6ca3f3e866436732e1cc065e6c053e5e9e487d54550fb2fbf0fda069a"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Lexer.range",
@@ -41,11 +41,11 @@
       "sha256": "5c80572c020d98b0f052c6a781761e1357b687664fabb8c2f3e140f65ab6db99"
     }
   ],
-  "runtimeABI": 3,
+  "runtimeABI": 2,
   "runtimeSources": [
     {
       "path": "RangeCompiler/Runtime/RangeCompilerHost.c",
-      "sha256": "efa86b3e8280625a614e8fff2a2c3e85d1282d0a31656f2e803b57142073c4e5"
+      "sha256": "7654485f95f7a6d73c12a744542afa6628b25c46859dc07c239c896f111e660e"
     },
     {
       "path": "RangeCompiler/Runtime/RangeString.c",
@@ -53,11 +53,11 @@
     },
     {
       "path": "RangeCompiler/Runtime/RangeRawBuffer.c",
-      "sha256": "f63e39fd8080a820069fa8c37b6d2e463a0515fce02cb7656732306d54c82f7a"
+      "sha256": "1033a4030b9f53934f6bdc0c6988de081e9346dc38b34f68eb2c5532b9f623ab"
     },
     {
       "path": "RangeCompiler/Runtime/RangeCompilerMetrics.c",
-      "sha256": "7e5202cbcae7e8c45da09ca8fff24b49efdd1606b4844c2a102123d25ef974c8"
+      "sha256": "096268bdd5ba83755662b6f8f889a520f06581880686346444f3bc8fe9605746"
     }
   ],
   "target": {

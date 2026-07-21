@@ -1,5 +1,0 @@
-@main {
-    let values: [4, 5, 6]
-    let last: Optional<Int>(values.last())
-    return (last ?? 0) == 6 && values.count == 3 ? 0 : 1
-}

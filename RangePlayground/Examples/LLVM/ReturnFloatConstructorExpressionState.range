@@ -1,4 +1,0 @@
-@main {
-    state value: Float(2.5) + Float(1.5)
-    return value > Float(3.0) ? 0 : 1
-}

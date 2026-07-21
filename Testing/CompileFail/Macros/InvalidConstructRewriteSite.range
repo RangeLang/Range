@@ -1,8 +1,0 @@
-macro badConstructRewrite(): Construct { target, diagnostics in
-    target.replace(with: target)
-}
-
-@badConstructRewrite
-construct BrokenConstruct {
-    let number: Int
-}

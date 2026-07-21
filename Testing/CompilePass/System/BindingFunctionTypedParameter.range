@@ -1,6 +1,0 @@
-function replace(_ task: binding () -> Int, _ replacement: () -> Int) {
-    set task   replacement
-}
-
-@main {
-}

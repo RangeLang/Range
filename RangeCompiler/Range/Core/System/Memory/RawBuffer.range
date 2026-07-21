@@ -7,6 +7,9 @@ function rawBufferCreate(capacity: Int, stride: Int): RawBuffer
 @builtin(.write)
 function rawBufferAppendInt(buffer: RawBuffer, value: Int): Int
 
+@builtin(.write)
+function rawBufferAppendRandomBytes(buffer: RawBuffer, count: Int): Int
+
 @builtin(.read)
 function rawBufferCount(buffer: RawBuffer): Int
 

@@ -1,4 +1,0 @@
-@main {
-    state value: String("a") == String("a")
-    return value ? 0 : 1
-}

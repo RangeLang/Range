@@ -4,17 +4,34 @@ default:
   @just --list
 
 compiler-build:
-  swift build --package-path RangeCompiler
+  scripts/range compiler next
 
 compiler-test:
-  swift build --package-path RangeCompiler --product range
-  swift test --package-path RangeCompiler --filter RangeScriptTests
+  scripts/range compiler progression
 
-range-run:
-  scripts/range run RangePlayground/Examples/LLVM/EmptyMain.range
+compiler-build-cached:
+  scripts/range compiler next --cached-only
+
+compiler-test-cached:
+  scripts/range compiler progression --cached-only
+
+candidate:
+  scripts/range check-compiler-candidate
 
 check:
-  bash -n scripts/range
-  swift build --package-path RangeCompiler --product range
-  swift test --package-path RangeCompiler --filter RangeScriptTests
-  scripts/range check
+  bash -n scripts/range scripts/range-native scripts/check-range-compiler-cache scripts/check-range-compiler-candidate scripts/verify-range-compiler-seed
+  scripts/range check-stage2-compiler
+  scripts/range compiler progression
+
+check-fast:
+  bash -n scripts/range scripts/range-native scripts/check-range-unsigned8 scripts/check-range-float-widths scripts/check-range-compiler-cache scripts/check-range-compiler-candidate scripts/verify-range-compiler-seed
+  scripts/check-range-unsigned8
+  scripts/check-range-float-widths
+  scripts/check-range-compiler-cache
+  scripts/range check-seed-integrity
+
+check-unsigned8 candidate="":
+  scripts/check-range-unsigned8 {{candidate}}
+
+check-float-widths candidate="":
+  scripts/check-range-float-widths {{candidate}}

@@ -1,4 +1,0 @@
-precedencegroup LogicalDisjunctionPrecedence {
-    associativity: left
-    higherThan: AssignmentPrecedence
-}

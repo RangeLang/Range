@@ -1,7 +1,0 @@
-@main {
-    let text: String(readFile(path: String("RangePlayground/Examples/LLVM/ReadFileInput.txt")))
-    if text < String("zzzz") {
-        return 1
-    }
-    return 0
-}
