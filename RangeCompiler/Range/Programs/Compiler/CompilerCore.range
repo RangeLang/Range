@@ -15966,7 +15966,9 @@ function compilerBodyRuntimeBuiltinRawBufferAppendRandomBytes(): Int { return 35
 function compilerBodyRuntimeBuiltinRawBufferAppendUnsigned8(): Int { return 36 }
 function compilerBodyRuntimeBuiltinRawBufferLoadUnsigned8(): Int { return 37 }
 function compilerBodyRuntimeBuiltinRawBufferStoreUnsigned8(): Int { return 38 }
-function compilerBodyRuntimeBuiltinCount(): Int { return 38 }
+function compilerBodyRuntimeBuiltinRunProcess(): Int { return 39 }
+function compilerBodyRuntimeBuiltinRunProcessBatch(): Int { return 40 }
+function compilerBodyRuntimeBuiltinCount(): Int { return 40 }
 
 function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("stringTransientRegionMark") { return compilerBodyRuntimeBuiltinStringTransientRegionMark() }
@@ -16007,6 +16009,8 @@ function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("rawBufferAppendUnsigned8") { return compilerBodyRuntimeBuiltinRawBufferAppendUnsigned8() }
     if name == String("rawBufferLoadUnsigned8") { return compilerBodyRuntimeBuiltinRawBufferLoadUnsigned8() }
     if name == String("rawBufferStoreUnsigned8") { return compilerBodyRuntimeBuiltinRawBufferStoreUnsigned8() }
+    if name == String("runProcess") { return compilerBodyRuntimeBuiltinRunProcess() }
+    if name == String("runProcessBatch") { return compilerBodyRuntimeBuiltinRunProcessBatch() }
     return compilerBodyRuntimeBuiltinNone()
 }
 
@@ -16049,6 +16053,8 @@ function compilerBodyRuntimeBuiltinName(id: Int): String {
     if id == compilerBodyRuntimeBuiltinRawBufferAppendUnsigned8() { return String("rawBufferAppendUnsigned8") }
     if id == compilerBodyRuntimeBuiltinRawBufferLoadUnsigned8() { return String("rawBufferLoadUnsigned8") }
     if id == compilerBodyRuntimeBuiltinRawBufferStoreUnsigned8() { return String("rawBufferStoreUnsigned8") }
+    if id == compilerBodyRuntimeBuiltinRunProcess() { return String("runProcess") }
+    if id == compilerBodyRuntimeBuiltinRunProcessBatch() { return String("runProcessBatch") }
     return String("")
 }
 
@@ -16094,6 +16100,8 @@ function compilerBodyRuntimeBuiltinParameterCount(id: Int): Int {
     if id == compilerBodyRuntimeBuiltinStringFindByteOf() { return 5 }
     if id == compilerBodyRuntimeBuiltinCompilerMetricsFunctionBegin()
         || id == compilerBodyRuntimeBuiltinCompilerMetricsFunctionEnd() { return 2 }
+    if id == compilerBodyRuntimeBuiltinRunProcess()
+        || id == compilerBodyRuntimeBuiltinRunProcessBatch() { return 2 }
     if id > compilerBodyRuntimeBuiltinNone() && id <= compilerBodyRuntimeBuiltinCount() { return 2 }
     return 0 - 1
 }
@@ -16122,6 +16130,10 @@ function compilerBodyRuntimeBuiltinParameterType(id: Int, ordinal: Int): String 
         if ordinal == 0 { return String("ptr") }
         if ordinal == 1 { return String("i32") }
         return String("i8")
+    }
+    if id == compilerBodyRuntimeBuiltinRunProcessBatch() {
+        if ordinal == 0 { return String("ptr") }
+        return String("i32")
     }
     if id == compilerBodyRuntimeBuiltinStringHasPrefix()
         || id == compilerBodyRuntimeBuiltinStringFindFrom()
@@ -29937,7 +29949,7 @@ function compilerCoreRawBufferMaterializeAndDestroy(buffer: RawBuffer): String {
 }
 
 function compilerCoreRenderLLVMRuntimeDeclarations(records: String, renderedFunctions: String): String {
-    let baseDeclarations: String("declare i32 @puts(ptr)\ndeclare i32 @stringLength(ptr)\ndeclare i32 @stringIndexOf(ptr, ptr, i32)\ndeclare i32 @stringEqual(ptr, ptr)\ndeclare i32 @stringCompare(ptr, ptr)\ndeclare i1 @stringHasPrefix(ptr, i32, ptr)\ndeclare i32 @stringFindFrom(ptr, i32, ptr)\ndeclare i32 @stringFindFirstOf(ptr, i32, ptr)\ndeclare ptr @stringViewFrom(ptr, i32)\ndeclare ptr @stringSliceUnchecked(ptr, i32, i32)\ndeclare ptr @stringCharacterAt(ptr, i32)\ndeclare i32 @stringByteAt(ptr, i32)\ndeclare i32 @stringFindByteOf(ptr, i32, i32, i32, i32)\ndeclare i32 @stringTransientRegionMark()\ndeclare i32 @stringTransientRegionReset(i32)\ndeclare ptr @commandLineArgument(i32)\ndeclare i32 @commandLineArgumentCount()\ndeclare ptr @readFile(ptr)\ndeclare i32 @writeFile(ptr, ptr)\ndeclare ptr @stringCharacter(ptr, i32)\ndeclare ptr @stringSubstring(ptr, i32, i32)\ndeclare ptr @stringConcat(ptr, ptr)\ndeclare ptr @stringOwnedCopy(ptr)\ndeclare ptr @stringAppendOwned(ptr, ptr)\ndeclare ptr @stringFromInt(i32)\ndeclare ptr @stringFromBool(i1)\ndeclare ptr @rawBufferCreate(i32, i32)\ndeclare i32 @rawBufferAppendInt(ptr, i32)\ndeclare i32 @rawBufferAppendRandomBytes(ptr, i32)\ndeclare i32 @rawBufferAppendUnsigned8(ptr, i8)\ndeclare i8 @rawBufferLoadUnsigned8(ptr, i32)\ndeclare i32 @rawBufferStoreUnsigned8(ptr, i32, i8)\ndeclare i32 @rawBufferCount(ptr)\ndeclare i32 @rawBufferLoadInt(ptr, i32)\ndeclare i32 @rawBufferStoreInt(ptr, i32, i32)\ndeclare i32 @rawBufferAppendText(ptr, ptr)\ndeclare i32 @rawBufferAppendTextInt(ptr, i32)\ndeclare i32 @rawBufferAppendTextCharacter(ptr, ptr, i32)\ndeclare ptr @rawBufferMaterializeText(ptr)\ndeclare i32 @rawBufferDestroy(ptr)\n")
+    let baseDeclarations: String("declare i32 @puts(ptr)\ndeclare i32 @stringLength(ptr)\ndeclare i32 @stringIndexOf(ptr, ptr, i32)\ndeclare i32 @stringEqual(ptr, ptr)\ndeclare i32 @stringCompare(ptr, ptr)\ndeclare i1 @stringHasPrefix(ptr, i32, ptr)\ndeclare i32 @stringFindFrom(ptr, i32, ptr)\ndeclare i32 @stringFindFirstOf(ptr, i32, ptr)\ndeclare ptr @stringViewFrom(ptr, i32)\ndeclare ptr @stringSliceUnchecked(ptr, i32, i32)\ndeclare ptr @stringCharacterAt(ptr, i32)\ndeclare i32 @stringByteAt(ptr, i32)\ndeclare i32 @stringFindByteOf(ptr, i32, i32, i32, i32)\ndeclare i32 @stringTransientRegionMark()\ndeclare i32 @stringTransientRegionReset(i32)\ndeclare ptr @commandLineArgument(i32)\ndeclare i32 @commandLineArgumentCount()\ndeclare ptr @readFile(ptr)\ndeclare i32 @writeFile(ptr, ptr)\ndeclare i32 @runProcess(ptr, ptr)\ndeclare i32 @runProcessBatch(ptr, i32)\ndeclare ptr @stringCharacter(ptr, i32)\ndeclare ptr @stringSubstring(ptr, i32, i32)\ndeclare ptr @stringConcat(ptr, ptr)\ndeclare ptr @stringOwnedCopy(ptr)\ndeclare ptr @stringAppendOwned(ptr, ptr)\ndeclare ptr @stringFromInt(i32)\ndeclare ptr @stringFromBool(i1)\ndeclare ptr @rawBufferCreate(i32, i32)\ndeclare i32 @rawBufferAppendInt(ptr, i32)\ndeclare i32 @rawBufferAppendRandomBytes(ptr, i32)\ndeclare i32 @rawBufferAppendUnsigned8(ptr, i8)\ndeclare i8 @rawBufferLoadUnsigned8(ptr, i32)\ndeclare i32 @rawBufferStoreUnsigned8(ptr, i32, i8)\ndeclare i32 @rawBufferCount(ptr)\ndeclare i32 @rawBufferLoadInt(ptr, i32)\ndeclare i32 @rawBufferStoreInt(ptr, i32, i32)\ndeclare i32 @rawBufferAppendText(ptr, ptr)\ndeclare i32 @rawBufferAppendTextInt(ptr, i32)\ndeclare i32 @rawBufferAppendTextCharacter(ptr, ptr, i32)\ndeclare ptr @rawBufferMaterializeText(ptr)\ndeclare i32 @rawBufferDestroy(ptr)\n")
     state trapDeclaration: String("")
     if compilerCoreRecordContains(record: renderedFunctions, text: String("@llvm.trap()"))
         || compilerCoreRecordContains(record: records, text: String("@llvm.trap()")) {

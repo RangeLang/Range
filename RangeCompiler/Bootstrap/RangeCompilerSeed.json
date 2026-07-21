@@ -2,18 +2,28 @@
   "formatVersion": 1,
   "seed": {
     "path": "RangeCompiler/Bootstrap/RangeCompilerSeed.ll",
-    "bytes": 5353820,
-    "sha256": "c8f40d7adefd530e0b609e927b3b3c6073298768ab358943bc51cbe3aa8ad42b"
+    "bytes": 5408484,
+    "sha256": "aa4def0d4ac70f3b5a8f26ca22ca94f5edb02a94154c1875bf96eeda604581a5"
   },
   "expectedStage3LLVM": {
-    "bytes": 5353820,
-    "sha256": "c8f40d7adefd530e0b609e927b3b3c6073298768ab358943bc51cbe3aa8ad42b"
+    "bytes": 5408484,
+    "sha256": "aa4def0d4ac70f3b5a8f26ca22ca94f5edb02a94154c1875bf96eeda604581a5"
   },
   "compilerSources": [
     {
+      "path": "RangeCompiler/Range/Core/Package/LinkPlan.range",
+      "role": "core",
+      "sha256": "7fb719d38b6e29e7176fd87d2c21db3982bd2ea7e740f1f23e04b52433c44c07"
+    },
+    {
       "path": "RangeCompiler/Range/Core/System/Memory/RawBuffer.range",
       "role": "core",
-      "sha256": "cd8af86b951d45fbba7f8f9c4a152ff5951b9078a21dca9a5e205b76131127fe"
+      "sha256": "452a1fa2207bd0957a4a88a112614b99a6b1753873ada8621adf927d4b943ee8"
+    },
+    {
+      "path": "RangeCompiler/Range/Core/System/Process.range",
+      "role": "core",
+      "sha256": "6aa1e67f4e7fadf88d7305d27f37079bd1990d8079296fb6b6b45fe2617a1b41"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Compiler.range",
@@ -23,7 +33,7 @@
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerCore.range",
       "role": "project",
-      "sha256": "79629160efe092728874e477ff2920ab3de86c8d633811bbf51ec5fdd3a3c029"
+      "sha256": "ab539ef31493ff9fd9828200f0ea05226e856ab9434148ba39361585a883e028"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerDirectives.range",
@@ -38,14 +48,14 @@
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Main.range",
       "role": "project",
-      "sha256": "5c80572c020d98b0f052c6a781761e1357b687664fabb8c2f3e140f65ab6db99"
+      "sha256": "5d58dd3218c646dd29feb5ac79c4ba44afa1e7c88e0a9a39bdc5c7d53550bc41"
     }
   ],
   "runtimeABI": 2,
   "runtimeSources": [
     {
       "path": "RangeCompiler/Runtime/RangeCompilerHost.c",
-      "sha256": "7654485f95f7a6d73c12a744542afa6628b25c46859dc07c239c896f111e660e"
+      "sha256": "e0384af2228a850289cdb77fae4561ffc899ae739e9efb78bc46ab1d1e3de393"
     },
     {
       "path": "RangeCompiler/Runtime/RangeString.c",

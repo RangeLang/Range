@@ -1,5 +1,24 @@
 construct LinkPlan {
-    let executable: String
-    let arguments: String
-    let output: String
+    let process: ProcessPlan
+    let inputLLVM: String
+    let outputExecutable: String
+}
+
+function nativeLinkPlan(inputLLVM: String, outputExecutable: String, hostRuntime: String, stringRuntime: String, rawBufferRuntime: String, metricsRuntime: String): LinkPlan {
+    state process: ProcessPlan(processPlan(executable: String("clang")))
+    process: processPlanAppendingArgument(plan: process, argument: String("-O2"))
+    process: processPlanAppendingArgument(plan: process, argument: String("-flto=thin"))
+    process: processPlanAppendingArgument(plan: process, argument: String("-Wno-override-module"))
+    process: processPlanAppendingArgument(plan: process, argument: inputLLVM)
+    process: processPlanAppendingArgument(plan: process, argument: hostRuntime)
+    process: processPlanAppendingArgument(plan: process, argument: stringRuntime)
+    process: processPlanAppendingArgument(plan: process, argument: rawBufferRuntime)
+    process: processPlanAppendingArgument(plan: process, argument: metricsRuntime)
+    process: processPlanAppendingArgument(plan: process, argument: String("-o"))
+    process: processPlanAppendingArgument(plan: process, argument: outputExecutable)
+    return LinkPlan(process: process, inputLLVM: inputLLVM, outputExecutable: outputExecutable)
+}
+
+function linkPlanRun(plan: LinkPlan): Int {
+    return processPlanRun(plan: plan.process)
 }
