@@ -45,13 +45,14 @@ the Range-loaded bundle as the Stage 3 input.
 The transitional compiler source layout keeps source-marker decoding, source
 roles, stable `FileID` mapping, source-store access, and inventory/identity
 snapshots in `CompilerSources.range`. `CompilerCore.range` retains shared model
-types plus the typed IR and backend phases. The contiguous pre-graph typed
+types plus the general parser and backend phases. The contiguous pre-graph typed
 syntax, body capture, macro linking, and macro-execution implementation lives
 in `CompilerFrontend.range`. Graph construction, Plotter, and semantic
 settlement live in `CompilerGraph.range`. MemoryGraph construction, ownership
 decisions, layout, placement, and validation live in `CompilerMemory.range`.
-These temporary boundaries are accepted only at individually verified fixed
-points.
+Decision-citing typed IR and its fixed-aggregate LLVM proof renderer live in
+`CompilerTypedIR.range`. These temporary boundaries are accepted only at
+individually verified fixed points.
 
 Each gate prints explicit checkpoint edges. A reported edge proves only that
 edge and its prerequisites; it must not be interpreted as evidence that later
