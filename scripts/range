@@ -25,6 +25,7 @@ Usage:
   scripts/range check-stage2-compiler
   scripts/range check-llvm-examples [DIR]
   scripts/range check-llvm-runs [MANIFEST]
+  scripts/range test
 USAGE
 }
 
@@ -189,6 +190,10 @@ case "$command" in
         else
             range_normal_command run "$input" -- "$@"
         fi
+        ;;
+    test)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/range-native" test "$REPO_ROOT"
         ;;
     *)
         "$REPO_ROOT/scripts/range-native" project-run "$command" "$@"

@@ -1,0 +1,34 @@
+open macro inspect(owner: String, requiresBody: Bool): Construct { target, diagnostics in
+    let bodies: [Derived](
+        target.declaration.deriveds.filter { property in
+            property.identifier.name == "body"
+        }
+    )
+    let componentBodies: [Derived](
+        bodies.filter { property in
+            property.type.name == "@component"
+        }
+    )
+
+    if requiresBody {
+        if bodies.count != 1 {
+            diagnostics.error("@\(owner) requires exactly one derived body.")
+        }
+    } else if bodies.count > 1 {
+        diagnostics.error("@\(owner) allows at most one derived body.")
+    }
+
+    if bodies.count == 1 {
+        if componentBodies.count != 1 {
+            diagnostics.error("@\(owner) derived body must be declared @component.")
+        }
+    }
+}
+
+open macro component(element: String = "div", text: String = ""): Construct -> Void { target, diagnostics in
+    @inspect(owner: "component", requiresBody: false)
+}
+
+open macro page(path: String): Construct -> Void { target, diagnostics in
+    @inspect(owner: "page", requiresBody: true)
+}

@@ -1,0 +1,9 @@
+@page(path: "/")
+construct HomePage {
+    derived body: @component {
+        Header()
+    }
+}
+
+@component(element: "header", text: "Range")
+construct Header {}

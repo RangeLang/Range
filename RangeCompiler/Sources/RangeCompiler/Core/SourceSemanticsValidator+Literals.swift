@@ -95,6 +95,30 @@ extension SourceSemanticsValidator {
         )
         let accessibleTypes = stateTypes
 
+        for derived in declarationGraph.deriveds(onConstruct: declaration.name) {
+            guard let expression = exactDerivedResultExpression(derived.body) else { continue }
+            var typeParser = try Parser(source: derived.typeName)
+            let expectedType = try typeParser.parseTypeReferenceNode()
+            try typeParser.consume(.eof)
+            let inferred = try ExpressionTypeSemantics.inferType(
+                of: expression,
+                accessibleTypes: accessibleTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            )
+            guard ExpressionTypeSemantics.isCompatible(
+                actual: inferred,
+                expected: expectedType,
+                resolver: resolver,
+                typeCompatibilityResolver: typeCompatibilityResolver
+            ) else {
+                throw SemanticValidationError(
+                    "Derived \(derived.name) in \(fileName) expects \(expectedType.displayName), got \(inferred.displayName)."
+                )
+            }
+        }
+
         for callable in declarationGraph.callables(onConstruct: declaration.name) {
             try validateLiteralBridgeCompatibility(
                 in: callable,
@@ -105,6 +129,16 @@ extension SourceSemanticsValidator {
                 typeCompatibilityResolver: typeCompatibilityResolver,
                 fileName: fileName
             )
+        }
+    }
+
+    private func exactDerivedResultExpression(_ body: [Statement]?) -> Expression? {
+        guard let body, body.count == 1 else { return nil }
+        switch body[0] {
+        case .expression(let expression), .return(let expression?):
+            return expression
+        default:
+            return nil
         }
     }
 

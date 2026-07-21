@@ -1,0 +1,5 @@
+construct LinkPlan {
+    let executable: String
+    let arguments: String
+    let output: String
+}

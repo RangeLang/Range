@@ -139,6 +139,7 @@ public struct DeclarationGraph {
                 protocolsByName: protocolsByName,
                 constructsByName: constructsByName,
                 enumsByName: enumsByName,
+                macrosByName: macrosByName,
                 extensionsByTargetName: extensionsByTargetName
             ),
             registryView: DeclarationRegistryView(
@@ -1351,10 +1352,32 @@ private struct SemanticGraphCollector {
     private var syntaxByID: [String: SyntaxProjectionAccumulator] = [:]
 
     mutating func build() -> ProgramGraph {
-        ProgramGraph(
+        let resolvedRelations = relations.compactMap(resolveConcreteCall)
+        return ProgramGraph(
             entities: Array(entitiesByID.values),
-            relations: Array(relations),
+            relations: resolvedRelations,
             syntax: syntaxByID.values.map(\.syntax)
+        )
+    }
+
+    /// Convert a nominal result call into a concrete construct identity only
+    /// when the graph has exactly one matching declaration. Unknown and
+    /// ambiguous calls are withheld instead of being represented as resolved.
+    private func resolveConcreteCall(_ relation: SemanticGraphRelation)
+        -> SemanticGraphRelation?
+    {
+        guard relation.kind == .calls, relation.targetID.hasPrefix("type:") else {
+            return relation
+        }
+        let name = String(relation.targetID.dropFirst("type:".count))
+        let targets = entitiesByID.values.filter {
+            $0.kind == .construct && $0.label == name
+        }
+        guard targets.count == 1, let target = targets.first else { return nil }
+        return SemanticGraphRelation(
+            sourceID: relation.sourceID,
+            targetID: target.id,
+            kind: relation.kind
         )
     }
 
@@ -1557,6 +1580,27 @@ private struct SyntaxProjectionAccumulator {
         if let builderName = declaration.builderName {
             addTypeReference(.named(builderName), from: derivedID, kind: .referencesType)
         }
+        if let result = exactDerivedResultExpression(declaration.body),
+            case .call(let name, _) = result
+        {
+            addTypeReference(.named(name), from: derivedID, kind: .calls)
+        }
+    }
+
+    /// A derived body has a concrete graph result only when its authored body
+    /// resolves to one unconditional expression. Branches and multi-statement
+    /// bodies remain unresolved until control/data-flow lowering can prove a
+    /// single result. `build()` then resolves the nominal call to one concrete
+    /// construct identity or withholds the relation when resolution is not
+    /// unique.
+    private func exactDerivedResultExpression(_ body: [Statement]?) -> Expression? {
+        guard let body, body.count == 1 else { return nil }
+        switch body[0] {
+        case .expression(let expression), .return(let expression?):
+            return expression
+        default:
+            return nil
+        }
     }
 
     private mutating func addValue(_ declaration: ValueDeclaration, parentID: String) {
@@ -1637,7 +1681,12 @@ private struct SyntaxProjectionAccumulator {
     private mutating func addMacroApplications(_ macros: [MacroApplication], parentID: String) {
         for macro in macros {
             let macroID = "\(parentID)/macro-application:#\(macro.name)"
-            addEntity(id: macroID, kind: .macroApplication, label: "@\(macro.name)")
+            let argumentLabel = macro.argumentClause.map { "(\($0))" } ?? ""
+            addEntity(
+                id: macroID,
+                kind: .macroApplication,
+                label: "@\(macro.name)\(argumentLabel)"
+            )
             addRelation(from: parentID, to: macroID, kind: .appliesMacro)
         }
     }

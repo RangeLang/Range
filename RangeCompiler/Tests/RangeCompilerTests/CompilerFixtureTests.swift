@@ -2476,6 +2476,269 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         _ = try compile(fixture: fixture, expectedRole: .pass)
     }
 
+    @Test("RangeView page body resolves to its concrete component")
+    func rangeViewPageBodyResolvesToConcreteComponent() throws {
+        let root = try repositoryRoot()
+        let sources = [
+            root.appendingPathComponent(
+                "RangeCompiler/Range/Frameworks/RangeView/RangeView.range"
+            ),
+            root.appendingPathComponent("Development/RangeView/Examples/HomePage.range"),
+        ]
+        let parsedFiles = try sources.map { sourceURL in
+            let source = try String(contentsOf: sourceURL, encoding: .utf8)
+            var parser = try Parser(source: source)
+            return ParsedSourceFile(
+                path: sourceURL.path,
+                source: source,
+                sourceFile: try parser.parseSourceFile()
+            )
+        }
+        let graph = DeclarationGraph(files: parsedFiles).programGraph
+        let declarations = DeclarationGraph(files: parsedFiles)
+        let compatibility = declarations.typeCompatibilityResolver
+
+        let homePage = try #require(graph.entities.first {
+            $0.kind == .construct && $0.label == "HomePage"
+        })
+        let header = try #require(graph.entities.first {
+            $0.kind == .construct && $0.label == "Header"
+        })
+        let body = try #require(graph.entities.first {
+            $0.kind == .derived && $0.label == "body"
+        })
+
+        #expect(graph.relations.contains {
+            $0.sourceID == homePage.id && $0.targetID == body.id && $0.kind == .contains
+        })
+        #expect(graph.relations.contains {
+            $0.sourceID == body.id && $0.targetID == header.id && $0.kind == .calls
+        })
+        #expect(graph.relations.contains {
+            $0.sourceID == homePage.id && $0.kind == .appliesMacro
+                && $0.targetID.hasSuffix("macro-application:#page")
+        })
+        #expect(graph.relations.contains {
+            $0.sourceID == header.id && $0.kind == .appliesMacro
+                && $0.targetID.hasSuffix("macro-application:#component")
+        })
+        #expect(graph.entities.contains {
+            $0.kind == .macroApplication && $0.id.hasSuffix("macro-application:#page")
+                && $0.label.contains("\"/\"")
+        })
+        #expect(compatibility.isKnownNominalType(.named("Header")))
+        #expect(compatibility.isKnownNominalType(.named("@component")))
+        #expect(compatibility.isAssignable(
+            actual: .named("Header"),
+            expected: .named("@component")
+        ))
+        #expect(!compatibility.isAssignable(
+            actual: .named("HomePage"),
+            expected: .named("@component")
+        ))
+    }
+
+    @Test("Derived graph does not speculate across multiple statements")
+    func derivedGraphDoesNotSpeculateAcrossMultipleStatements() throws {
+        let source = """
+        construct ConditionalPage {
+            derived body: Header {
+                let selected: Header(Header())
+                selected
+            }
+        }
+
+        construct Header {}
+        """
+        var parser = try Parser(source: source)
+        let sourceFile = try parser.parseSourceFile()
+        let graph = DeclarationGraph(
+            files: [
+                ParsedSourceFile(
+                    path: "/RangeView/ConditionalPage.range",
+                    source: source,
+                    sourceFile: sourceFile
+                )
+            ]
+        ).programGraph
+        let body = try #require(graph.entities.first {
+            $0.kind == .derived && $0.label == "body"
+        })
+
+        #expect(!graph.relations.contains {
+            $0.sourceID == body.id && $0.kind == .calls
+        })
+    }
+
+    @Test("Derived graph withholds unknown and ambiguous targets")
+    func derivedGraphWithholdsUnknownAndAmbiguousTargets() throws {
+        let sources = [
+            ("/RangeView/Pages.range", """
+            construct UnknownPage {
+                derived body: @component { Missing() }
+            }
+            construct AmbiguousPage {
+                derived body: @component { Header() }
+            }
+            """),
+            ("/RangeView/FirstHeader.range", "construct Header {}"),
+            ("/RangeView/SecondHeader.range", "construct Header {}"),
+        ]
+        let parsedFiles = try sources.map { path, source in
+            var parser = try Parser(source: source)
+            return ParsedSourceFile(
+                path: path,
+                source: source,
+                sourceFile: try parser.parseSourceFile()
+            )
+        }
+        let graph = DeclarationGraph(files: parsedFiles).programGraph
+        let bodyIDs = Set(graph.entities.filter { $0.kind == .derived }.map(\.id))
+
+        #expect(bodyIDs.count == 2)
+        #expect(!graph.relations.contains {
+            bodyIDs.contains($0.sourceID) && $0.kind == .calls
+        })
+    }
+
+    @Test("RangeView macro families validate as nominal types")
+    func rangeViewMacroFamiliesValidateAsNominalTypes() throws {
+        let framework = """
+        macro inspect(owner: String, requiresBody: Bool): Construct { target, diagnostics in
+            let bodies: [Derived](
+                target.declaration.deriveds.filter { property in
+                    property.identifier.name == "body"
+                }
+            )
+            let componentBodies: [Derived](
+                bodies.filter { property in
+                    property.type.name == "@component"
+                }
+            )
+            if requiresBody {
+                if bodies.count != 1 {
+                    diagnostics.error("@\\(owner) requires exactly one derived body.")
+                }
+            } else if bodies.count > 1 {
+                diagnostics.error("@\\(owner) allows at most one derived body.")
+            }
+            if bodies.count == 1 {
+                if componentBodies.count != 1 {
+                    diagnostics.error("@\\(owner) derived body must be declared @component.")
+                }
+            }
+        }
+        macro component(): Construct -> Void { target, diagnostics in
+            @inspect(owner: "component", requiresBody: false)
+        }
+        macro page(path: String): Construct -> Void { target, diagnostics in
+            @inspect(owner: "page", requiresBody: true)
+        }
+        """
+        let valid = framework + """
+        @page(path: "/")
+        construct HomePage {
+            derived body: @component { Header() }
+        }
+        @component
+        construct Header {}
+        """
+        let invalid = framework + """
+        @page(path: "/")
+        construct HomePage {
+            derived body: @component { Unmarked() }
+        }
+        construct Unmarked {}
+        """
+
+        _ = try CompilerPipeline().buildValidated(inputs: [
+            SourceInput(path: "/RangeView/Valid.range", source: valid, role: .project)
+        ])
+        do {
+            _ = try CompilerPipeline().buildValidated(inputs: [
+                SourceInput(path: "/RangeView/Invalid.range", source: invalid, role: .project)
+            ])
+            Issue.record("Expected an unmarked construct to be rejected as @component.")
+        } catch {
+            #expect(String(describing: error).contains("expects @component, got Unmarked"))
+        }
+    }
+
+    @Test("RangeView inspect macro enforces the shared body contract")
+    func rangeViewInspectMacroEnforcesBodyContract() throws {
+        let framework = """
+        macro inspect(owner: String, requiresBody: Bool): Construct { target, diagnostics in
+            let bodies: [Derived](
+                target.declaration.deriveds.filter { property in
+                    property.identifier.name == "body"
+                }
+            )
+            let componentBodies: [Derived](
+                bodies.filter { property in
+                    property.type.name == "@component"
+                }
+            )
+            if requiresBody {
+                if bodies.count != 1 {
+                    diagnostics.error("@\\(owner) requires exactly one derived body.")
+                }
+            } else if bodies.count > 1 {
+                diagnostics.error("@\\(owner) allows at most one derived body.")
+            }
+            if bodies.count == 1 {
+                if componentBodies.count != 1 {
+                    diagnostics.error("@\\(owner) derived body must be declared @component.")
+                }
+            }
+        }
+        macro component(): Construct -> Void { target, diagnostics in
+            @inspect(owner: "component", requiresBody: false)
+        }
+        macro page(path: String): Construct -> Void { target, diagnostics in
+            @inspect(owner: "page", requiresBody: true)
+        }
+        """
+        let leafDiagnostics = CompilerPipeline().diagnostics(inputs: [
+            SourceInput(
+                path: "/RangeView/LeafComponent.range",
+                source: framework + """
+                @component
+                construct Header {}
+                """,
+                role: .project
+            )
+        ])
+        #expect(!leafDiagnostics.contains { $0.severity == .error })
+
+        for (source, expectedMessage) in [
+            (
+                framework + """
+                @page(path: "/")
+                construct MissingBody {}
+                """,
+                "@page requires exactly one derived body."
+            ),
+            (
+                framework + """
+                @page(path: "/")
+                construct WrongBodyType {
+                    derived body: Int { 0 }
+                }
+                """,
+                "@page derived body must be declared @component."
+            ),
+        ] {
+            let diagnostics = CompilerPipeline().diagnostics(inputs: [
+                SourceInput(path: "/RangeView/InvalidBody.range", source: source, role: .project)
+            ])
+            #expect(diagnostics.contains {
+                $0.severity == .error
+                    && $0.source == "range-macro"
+                    && $0.message == expectedMessage
+            })
+        }
+    }
+
 }
 
 private enum FixtureRole {

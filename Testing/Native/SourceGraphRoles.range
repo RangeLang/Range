@@ -1,0 +1,17 @@
+compilerSourceIdentity
+compilerSourceFile\trole=core\tpath=Core/Value.range
+function coreValue(): Int {
+    return 1
+}
+compilerSourceFile\trole=foundation\tpath=Foundation/Value.range
+function foundationValue(): Int {
+    return 2
+}
+compilerSourceFile\trole=framework\tpath=Frameworks/Value.range
+function frameworkValue(): Int {
+    return 3
+}
+compilerSourceFile\trole=project\tpath=Project/Main.range
+@main {
+    return coreValue() + foundationValue() + frameworkValue()
+}

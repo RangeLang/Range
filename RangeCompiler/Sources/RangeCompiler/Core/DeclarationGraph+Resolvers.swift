@@ -507,6 +507,7 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
         protocolsByName: [:],
         constructsByName: [:],
         enumsByName: [:],
+        macrosByName: [:],
         extensionsByTargetName: [:]
     )
 
@@ -523,6 +524,8 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
     }
 
     private let protocolNames: Set<String>
+    private let nominalTypeNames: Set<String>
+    private let macroFamilyMembersByName: [String: Set<String>]
     private let constructMemberNamesByName: [String: Set<String>]
     private let conformancesByNominalName: [String: [NominalConformance]]
 
@@ -530,9 +533,21 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
         protocolsByName: [String: ProtocolDeclaration],
         constructsByName: [String: ConstructDeclaration],
         enumsByName: [String: EnumDeclaration],
+        macrosByName: [String: MacroDeclaration],
         extensionsByTargetName: [String: [ExtensionDeclaration]]
     ) {
         self.protocolNames = Set(protocolsByName.keys)
+        self.nominalTypeNames = Set(protocolsByName.keys)
+            .union(constructsByName.keys)
+            .union(enumsByName.keys)
+            .union(macrosByName.keys.map { "@\($0)" })
+        var macroFamilyMembers: [String: Set<String>] = [:]
+        for construct in constructsByName.values {
+            for application in construct.macros where macrosByName[application.name] != nil {
+                macroFamilyMembers[application.name, default: []].insert(construct.name)
+            }
+        }
+        self.macroFamilyMembersByName = macroFamilyMembers
         self.constructMemberNamesByName = constructsByName.mapValues {
             Set($0.values.map(\.name)).union($0.callables.map(\.name))
         }
@@ -618,11 +633,42 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
             return true
         }
 
+        if let family = macroFamilyName(of: expected),
+            let actualName = nominalName(of: actual)
+        {
+            return macroFamilyMembersByName[family, default: []].contains(actualName)
+        }
+
         guard isKnownProtocol(expected) else {
             return false
         }
 
         return conforms(actual: actual, expectedProtocol: expected, visited: [])
+    }
+
+    public func isKnownNominalType(_ type: TypeReference) -> Bool {
+        guard let name = nominalName(of: type) else { return false }
+        return nominalTypeNames.contains(name)
+    }
+
+    private func macroFamilyName(of type: TypeReference) -> String? {
+        guard case .named(let name) = type, name.hasPrefix("@"), name.count > 1 else {
+            return nil
+        }
+        return String(name.dropFirst())
+    }
+
+    private func nominalName(of type: TypeReference) -> String? {
+        switch type {
+        case .named(let name):
+            return name
+        case .member:
+            return type.displayName
+        case .generic(let base, _):
+            return nominalName(of: base)
+        case .array, .function, .optional, .variadic:
+            return nil
+        }
     }
 
     private func structurallyAssignable(actual: TypeReference, expected: TypeReference) -> Bool {

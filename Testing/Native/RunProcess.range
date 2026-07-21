@@ -1,0 +1,3 @@
+@main {
+    return runProcess(executable: String("/usr/bin/true"), arguments: String(""))
+}

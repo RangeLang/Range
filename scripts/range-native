@@ -4,6 +4,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+RANGE_NATIVE_COMPILER="${RANGE_NATIVE_COMPILER:-}"
+RANGE_SOURCE_GRAPH_LOAD_CORE="${RANGE_SOURCE_GRAPH_LOAD_CORE:-1}"
+RANGE_SOURCE_GRAPH_LOAD_FOUNDATION="${RANGE_SOURCE_GRAPH_LOAD_FOUNDATION:-1}"
+RANGE_SOURCE_GRAPH_LOAD_LEXER="${RANGE_SOURCE_GRAPH_LOAD_LEXER:-1}"
+RANGE_SOURCE_GRAPH_LOAD_FRAMEWORKS="${RANGE_SOURCE_GRAPH_LOAD_FRAMEWORKS:-1}"
+RANGE_SOURCE_GRAPH_CORE_ROOT="${RANGE_SOURCE_GRAPH_CORE_ROOT:-$REPO_ROOT/RangeCompiler/Range/Core}"
+RANGE_SOURCE_GRAPH_FOUNDATION_ROOT="${RANGE_SOURCE_GRAPH_FOUNDATION_ROOT:-$REPO_ROOT/RangeCompiler/Range/Foundation}"
+RANGE_SOURCE_GRAPH_LEXER_ROOT="${RANGE_SOURCE_GRAPH_LEXER_ROOT:-$REPO_ROOT/RangeCompiler/Range/Lexer}"
+RANGE_SOURCE_GRAPH_FRAMEWORKS_ROOT="${RANGE_SOURCE_GRAPH_FRAMEWORKS_ROOT:-$REPO_ROOT/RangeCompiler/Range/Frameworks}"
 
 usage() {
     cat >&2 <<'USAGE'
@@ -17,9 +26,10 @@ Usage:
   scripts/range-native compiler-progression
   scripts/range-native compile-executable INPUT
   scripts/range-native run INPUT [-- ARGS...]
+  scripts/range-native test [REPOSITORY_ROOT]
 
-Directory inputs are bundled recursively in bytewise relative-path order using
-Range's compilerSourceFile transport markers.
+Inputs are loaded into one deterministic native SourceGraph. Core, Foundation,
+framework, and project files retain distinct Range-owned source roles.
 USAGE
 }
 
@@ -166,6 +176,14 @@ compiler_project_command() {
 }
 
 ensure_seed_compiler() {
+    if [[ -n "$RANGE_NATIVE_COMPILER" ]]; then
+        if [[ ! -x "$RANGE_NATIVE_COMPILER" ]]; then
+            echo "RANGE_NATIVE_COMPILER is not executable: $RANGE_NATIVE_COMPILER" >&2
+            return 66
+        fi
+        /usr/bin/printf '%s\n' "$RANGE_NATIVE_COMPILER"
+        return 0
+    fi
     verify_manifest_inputs
     local seed_hash manifest_hash cache_root executable seed runtime
     local -a runtimes
@@ -198,28 +216,62 @@ require_source_input() {
     fi
 }
 
-project_bundle() {
-    local directory="$1"
-    local bundle="$2"
-    local absolute relative count
-    directory="$(cd "$directory" && pwd)"
-    /usr/bin/printf '%s\n' 'compilerProjectSourceSetLLVMText' > "$bundle"
-    count=0
+append_source_graph_role() {
+    local root="$1"
+    local role="$2"
+    local bundle="$3"
+    local path_prefix="$4"
+    local absolute relative
+    if [[ ! -d "$root" ]]; then return 0; fi
     while IFS= read -r absolute; do
-        relative="${absolute#"$directory/"}"
+        relative="${absolute#"$root/"}"
         if [[ "$relative" == *$'\t'* || "$relative" == *$'\n'* || "$relative" == *' '* ]]; then
             echo "Range source paths may not contain whitespace: $relative" >&2
             return 64
         fi
-        /usr/bin/printf 'compilerSourceFile\\t%s\n' "$relative" >> "$bundle"
+        /usr/bin/printf 'compilerSourceFile\\trole=%s\\tpath=%s/%s\n' "$role" "$path_prefix" "$relative" >> "$bundle"
         /bin/cat "$absolute" >> "$bundle"
         if [[ -n "$(/usr/bin/tail -c 1 "$absolute")" ]]; then
             /usr/bin/printf '\n' >> "$bundle"
         fi
-        count=$((count + 1))
-    done < <(/usr/bin/find "$directory" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print | LC_ALL=C /usr/bin/sort)
+    done < <(/usr/bin/find "$root" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print | LC_ALL=C /usr/bin/sort)
+}
+
+source_graph_bundle() {
+    local input="$1"
+    local bundle="$2"
+    local input_root absolute relative count
+    /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$bundle"
+    if [[ "$RANGE_SOURCE_GRAPH_LOAD_CORE" == 1 ]]; then append_source_graph_role "$RANGE_SOURCE_GRAPH_CORE_ROOT" core "$bundle" Core; fi
+    if [[ "$RANGE_SOURCE_GRAPH_LOAD_FOUNDATION" == 1 ]]; then append_source_graph_role "$RANGE_SOURCE_GRAPH_FOUNDATION_ROOT" foundation "$bundle" Foundation; fi
+    if [[ "$RANGE_SOURCE_GRAPH_LOAD_LEXER" == 1 ]]; then append_source_graph_role "$RANGE_SOURCE_GRAPH_LEXER_ROOT" core "$bundle" Lexer; fi
+    if [[ "$RANGE_SOURCE_GRAPH_LOAD_FRAMEWORKS" == 1 ]]; then append_source_graph_role "$RANGE_SOURCE_GRAPH_FRAMEWORKS_ROOT" framework "$bundle" Frameworks; fi
+
+    count=0
+    if [[ -d "$input" ]]; then
+        input_root="$(cd "$input" && pwd)"
+        while IFS= read -r absolute; do
+            relative="${absolute#"$input_root/"}"
+            if [[ "$relative" == *$'\t'* || "$relative" == *$'\n'* || "$relative" == *' '* ]]; then
+                echo "Range source paths may not contain whitespace: $relative" >&2
+                return 64
+            fi
+            /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "$relative" >> "$bundle"
+            /bin/cat "$absolute" >> "$bundle"
+            if [[ -n "$(/usr/bin/tail -c 1 "$absolute")" ]]; then /usr/bin/printf '\n' >> "$bundle"; fi
+            count=$((count + 1))
+        done < <(/usr/bin/find "$input_root" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print | LC_ALL=C /usr/bin/sort)
+    else
+        input_root="$(cd "$(dirname "$input")" && pwd)"
+        absolute="$input_root/$(basename "$input")"
+        relative="$(basename "$input")"
+        /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "$relative" >> "$bundle"
+        /bin/cat "$absolute" >> "$bundle"
+        if [[ -n "$(/usr/bin/tail -c 1 "$absolute")" ]]; then /usr/bin/printf '\n' >> "$bundle"; fi
+        count=1
+    fi
     if [[ "$count" -eq 0 ]]; then
-        echo "No .range source files found in: $directory" >&2
+        echo "No .range source files found in: $input" >&2
         return 66
     fi
 }
@@ -230,19 +282,15 @@ range_compiler_command() {
     local compiler compiler_input bundle command_exit_code
     require_source_input "$input"
     compiler="$(ensure_seed_compiler)"
-    compiler_input="$input"
-    bundle=""
-    if [[ -d "$input" ]]; then
-        bundle="${TMPDIR:-/tmp}/range-project-bundle.$$.range"
-        project_bundle "$input" "$bundle"
-        compiler_input="$bundle"
-    fi
+    bundle="${TMPDIR:-/tmp}/range-source-graph.$$.range"
+    source_graph_bundle "$input" "$bundle"
+    compiler_input="$bundle"
     if "$compiler" "$command" "$compiler_input"; then
         command_exit_code=0
     else
         command_exit_code=$?
     fi
-    if [[ -n "$bundle" ]]; then /bin/rm -f "$bundle"; fi
+    /bin/rm -f "$bundle"
     return "$command_exit_code"
 }
 
@@ -261,20 +309,16 @@ emit_llvm() {
     temporary="$output.tmp.$$"
     object="$output.o.$$"
     diagnostic="$output.diagnostic.$$"
-    compiler_input="$input"
-    bundle=""
-    if [[ -d "$input" ]]; then
-        bundle="${TMPDIR:-/tmp}/range-project-bundle.$$.range"
-        project_bundle "$input" "$bundle"
-        compiler_input="$bundle"
-    fi
+    bundle="${TMPDIR:-/tmp}/range-source-graph.$$.range"
+    source_graph_bundle "$input" "$bundle"
+    compiler_input="$bundle"
     local compiler_exit_code clang_exit_code
     if "$compiler" emit-llvm "$compiler_input" "$temporary" > "$diagnostic"; then
         compiler_exit_code=0
     else
         compiler_exit_code=$?
     fi
-    if [[ -n "$bundle" ]]; then /bin/rm -f "$bundle"; fi
+    /bin/rm -f "$bundle"
     if [[ "$compiler_exit_code" -ne 0 ]]; then
         if [[ -s "$diagnostic" ]]; then /bin/cat "$diagnostic" >&2; fi
         /bin/rm -f "$temporary" "$object" "$diagnostic"
@@ -681,6 +725,96 @@ run_project_command_line() {
     "$executable" "$@"
 }
 
+native_test_corpus() {
+    local root="${1:-$REPO_ROOT}"
+    local pass_root="$root/Testing/CompilePass"
+    local fail_root="$root/Testing/CompileFail"
+    local runtime_root="$root/RangePlayground/Examples/LLVM"
+    local manifest="$runtime_root/run-manifest.tsv"
+    local source diagnostic executable expected_exit stdin_text argument_text expected_stdout
+    local actual_exit passed failed runtime count
+    local -a arguments
+    local temporary
+
+    passed="$(/usr/bin/find "$pass_root" -type f -name '*.range' | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
+    failed="$(/usr/bin/find "$fail_root" -type f -name '*.range' | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
+    runtime="$(/usr/bin/find "$runtime_root" -maxdepth 1 -type f -name '*.range' | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
+    if [[ "$passed" != 102 || "$failed" != 53 || "$runtime" != 158 ]]; then
+        echo "Native corpus inventory changed: pass=$passed fail=$failed runtime=$runtime" >&2
+        return 65
+    fi
+
+    temporary="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-native-tests.XXXXXX")"
+    count=0
+    while IFS= read -r source; do
+        count=$((count + 1))
+        diagnostic="$temporary/pass-$count.txt"
+        echo "[pass $count/102] ${source#"$pass_root/"}"
+        if ! range_compiler_command check "$source" >"$diagnostic" 2>&1; then
+            /bin/cat "$diagnostic" >&2
+            /bin/rm -rf "$temporary"
+            return 65
+        fi
+    done < <(/usr/bin/find "$pass_root" -type f -name '*.range' -print | LC_ALL=C /usr/bin/sort)
+
+    count=0
+    while IFS= read -r source; do
+        count=$((count + 1))
+        diagnostic="$temporary/fail-$count.txt"
+        echo "[fail $count/53] ${source#"$fail_root/"}"
+        if range_compiler_command check "$source" >"$diagnostic" 2>&1; then
+            echo "Expected native compile failure: $source" >&2
+            /bin/rm -rf "$temporary"
+            return 65
+        fi
+    done < <(/usr/bin/find "$fail_root" -type f -name '*.range' -print | LC_ALL=C /usr/bin/sort)
+
+    count=0
+    while IFS=$'\t' read -r source expected_exit stdin_text argument_text expected_stdout; do
+        if [[ -z "$source" || "$source" == \#* ]]; then continue; fi
+        count=$((count + 1))
+        echo "[run $count/158] $source"
+        executable="$(compile_executable "$runtime_root/$source")" || {
+            /bin/rm -rf "$temporary"
+            return 65
+        }
+        arguments=()
+        if [[ "$argument_text" != "-" ]]; then read -r -a arguments <<< "$argument_text"; fi
+        set +e
+        if [[ "$stdin_text" == "-" ]]; then
+            "$executable" "${arguments[@]}" >"$temporary/stdout" 2>"$temporary/stderr"
+            actual_exit=$?
+        else
+            /usr/bin/printf '%b' "$stdin_text" | "$executable" "${arguments[@]}" >"$temporary/stdout" 2>"$temporary/stderr"
+            actual_exit=${PIPESTATUS[1]}
+        fi
+        set -e
+        if [[ "$actual_exit" != "$expected_exit" ]]; then
+            echo "Expected exit $expected_exit, got $actual_exit: $source" >&2
+            /bin/cat "$temporary/stdout" >&2
+            /bin/cat "$temporary/stderr" >&2
+            /bin/rm -rf "$temporary"
+            return 65
+        fi
+        if [[ "$expected_stdout" != "-" ]]; then
+            /usr/bin/printf '%b' "$expected_stdout" >"$temporary/expected-stdout"
+            if ! /usr/bin/cmp -s "$temporary/expected-stdout" "$temporary/stdout"; then
+                echo "Stdout mismatch: $source" >&2
+                /usr/bin/diff -u "$temporary/expected-stdout" "$temporary/stdout" >&2 || true
+                /bin/rm -rf "$temporary"
+                return 65
+            fi
+        fi
+    done < "$manifest"
+    if [[ "$count" != 158 ]]; then
+        echo "Native runtime manifest has $count entries; expected 158." >&2
+        /bin/rm -rf "$temporary"
+        return 65
+    fi
+    /bin/rm -rf "$temporary"
+    echo "Native Range corpus passed: 102 compile-pass, 53 compile-fail, 158 runtime."
+}
+
 command="${1:-}"
 if [[ -z "$command" ]]; then
     usage
@@ -726,6 +860,10 @@ case "$command" in
         if [[ "${1:-}" == "--" ]]; then shift; fi
         executable="$(compile_executable "$input")"
         "$executable" "$@"
+        ;;
+    test)
+        if [[ $# -gt 1 ]]; then usage; exit 1; fi
+        native_test_corpus "${1:-$REPO_ROOT}"
         ;;
     *)
         usage

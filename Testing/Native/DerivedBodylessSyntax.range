@@ -1,0 +1,6 @@
+compilerTypedSyntax
+compilerSourceFile\trole=core\tpath=Core/Derived.range
+construct Counter {
+    let value: Int
+    derived doubled: Int
+}

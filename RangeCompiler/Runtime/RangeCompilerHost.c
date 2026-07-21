@@ -1,10 +1,15 @@
 #include <stdbool.h>
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <crt_externs.h>
+#include <spawn.h>
+#include <sys/wait.h>
+
+extern char **environ;
 
 void *stringTransientAllocate(size_t size);
 void *stringTransientReallocate(void *allocation, size_t size);
@@ -94,6 +99,65 @@ int32_t writeFile(char *path, char *text) {
     }
     free(temporaryPath);
     return 0;
+}
+
+int32_t runProcess(char *executable, char *arguments) {
+    if (!executable || !arguments || executable[0] == 0) {
+        return 64;
+    }
+
+    size_t argumentLength = strlen(arguments);
+    size_t argumentCount = argumentLength == 0 ? 0 : 1;
+    for (size_t index = 0; index < argumentLength; index += 1) {
+        if (arguments[index] == '\n') {
+            argumentCount += 1;
+        }
+    }
+
+    char *storage = strdup(arguments);
+    char **argv = calloc(argumentCount + 2, sizeof(char *));
+    if (!storage || !argv) {
+        free(storage);
+        free(argv);
+        return 71;
+    }
+
+    argv[0] = executable;
+    size_t ordinal = 1;
+    if (argumentLength != 0) {
+        argv[ordinal++] = storage;
+        for (size_t index = 0; index < argumentLength; index += 1) {
+            if (storage[index] == '\n') {
+                storage[index] = 0;
+                argv[ordinal++] = storage + index + 1;
+            }
+        }
+    }
+    argv[ordinal] = NULL;
+
+    pid_t process = 0;
+    int spawnStatus = posix_spawnp(&process, executable, NULL, NULL, argv, environ);
+    free(argv);
+    if (spawnStatus != 0) {
+        free(storage);
+        return spawnStatus;
+    }
+
+    int status = 0;
+    while (waitpid(process, &status, 0) < 0) {
+        if (errno != EINTR) {
+            free(storage);
+            return 71;
+        }
+    }
+    free(storage);
+    if (WIFEXITED(status)) {
+        return WEXITSTATUS(status);
+    }
+    if (WIFSIGNALED(status)) {
+        return 128 + WTERMSIG(status);
+    }
+    return 71;
 }
 
 int32_t stringLength(char *value) {

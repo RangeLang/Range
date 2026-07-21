@@ -1,0 +1,9 @@
+compilerTypedSyntax
+compilerSourceFile\trole=project\tpath=Project/Derived.range
+construct Counter {
+    let value: Int
+
+    derived doubled: Int {
+        self.value + self.value
+    }
+}

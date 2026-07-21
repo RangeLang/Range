@@ -1,4 +1,8 @@
 # file	expected-exit	stdin	args	expected-stdout
+PerlinNoise.range	1	-	-	-
+ReturnBoolSwitch.range	7	-	-	-
+ReturnMemberIntegerSwitch.range	7	-	-	-
+ReturnStateIntegerSwitch.range	7	-	-	-
 EmptyMain.range	0	-	-	-
 PrintString.range	0	-	-	Hello from Range\n
 PrintInterpolatedString.range	0	-	-	ready true\n
@@ -53,6 +57,7 @@ ReturnWhile.range	3	-	-	-
 ReturnBreak.range	4	-	-	-
 ReturnContinue.range	3	-	-	-
 ReturnIf.range	6	-	-	-
+ReturnNestedIf.range	57	-	-	-
 ReturnStringSubstring.range	0	-	-	-
 ReturnStringCharacter.range	0	-	-	-
 ReturnStringIsEmpty.range	0	-	-	-

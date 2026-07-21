@@ -2058,7 +2058,8 @@ extension MacroExpander {
         targetValue: CompileTimeValue?,
         graphBinding: String?,
         context: MacroExpansionContext,
-        localBindings: [String: Expression]
+        localBindings: [String: Expression],
+        expansionDepth: Int = 0
     ) throws -> [RangeDiagnostic] {
         try macroDiagnosticsAndLocals(
             in: statements,
@@ -2068,7 +2069,8 @@ extension MacroExpander {
             targetValue: targetValue,
             graphBinding: graphBinding,
             context: context,
-            localBindings: localBindings
+            localBindings: localBindings,
+            expansionDepth: expansionDepth
         ).diagnostics
     }
 
@@ -2080,7 +2082,8 @@ extension MacroExpander {
         targetValue: CompileTimeValue?,
         graphBinding: String?,
         context: MacroExpansionContext,
-        localBindings: [String: Expression]
+        localBindings: [String: Expression],
+        expansionDepth: Int
     ) throws -> (diagnostics: [RangeDiagnostic], locals: [String: Expression]) {
         var diagnostics: [RangeDiagnostic] = []
         var locals = localBindings
@@ -2090,6 +2093,34 @@ extension MacroExpander {
             case .localBinding(let declaration):
                 locals[declaration.name] = declaration.expression
             case .expression(let expression):
+                if case .macroInvocation(let name, let arguments) = expression {
+                    guard expansionDepth < 64 else {
+                        throw ParseError("Macro diagnostic expansion exceeded 64 nested invocations at @\(name).")
+                    }
+                    guard let invokedMacro = context.macroDeclarationsByName[name] else {
+                        throw ParseError("Unknown nested diagnostic macro @\(name).")
+                    }
+                    guard let invokedBindings = invokedMacro.bindings else {
+                        continue
+                    }
+                    let argumentBindings = try expressionMacroArgumentBindings(
+                        for: invokedMacro,
+                        arguments: arguments
+                    )
+                    let nestedLocals = locals.merging(argumentBindings) { _, argument in argument }
+                    diagnostics.append(contentsOf: try macroDiagnostics(
+                        in: invokedMacro.body,
+                        diagnosticOwnerName: invokedMacro.name,
+                        diagnosticsBinding: invokedBindings.diagnostics,
+                        targetBinding: invokedBindings.target,
+                        targetValue: targetValue,
+                        graphBinding: invokedBindings.graph,
+                        context: context,
+                        localBindings: nestedLocals,
+                        expansionDepth: expansionDepth + 1
+                    ))
+                    continue
+                }
                 if let diagnostic = try macroDiagnostic(
                     from: expression,
                     diagnosticOwnerName: diagnosticOwnerName,
@@ -2126,7 +2157,8 @@ extension MacroExpander {
                         targetValue: targetValue,
                         graphBinding: graphBinding,
                         context: context,
-                        localBindings: locals
+                        localBindings: locals,
+                        expansionDepth: expansionDepth
                     )
                     diagnostics.append(contentsOf: branchResult.diagnostics)
                     locals = branchResult.locals
@@ -2158,7 +2190,8 @@ extension MacroExpander {
                         targetValue: targetValue,
                         graphBinding: graphBinding,
                         context: context,
-                        localBindings: locals
+                        localBindings: locals,
+                        expansionDepth: expansionDepth
                     )
                     diagnostics.append(contentsOf: bodyResult.diagnostics)
                     locals = bodyResult.locals
@@ -2173,7 +2206,8 @@ extension MacroExpander {
                     targetValue: targetValue,
                     graphBinding: graphBinding,
                     context: context,
-                    localBindings: locals
+                    localBindings: locals,
+                    expansionDepth: expansionDepth
                 )
                 diagnostics.append(contentsOf: bodyResult.diagnostics)
                 locals = bodyResult.locals
@@ -2186,7 +2220,8 @@ extension MacroExpander {
                     targetValue: targetValue,
                     graphBinding: graphBinding,
                     context: context,
-                    localBindings: locals
+                    localBindings: locals,
+                    expansionDepth: expansionDepth
                 )
                 diagnostics.append(contentsOf: bodyResult.diagnostics)
                 locals = bodyResult.locals
@@ -2199,7 +2234,8 @@ extension MacroExpander {
                     targetValue: targetValue,
                     graphBinding: graphBinding,
                     context: context,
-                    localBindings: locals
+                    localBindings: locals,
+                    expansionDepth: expansionDepth
                 )
                 diagnostics.append(contentsOf: bodyResult.diagnostics)
                 locals = bodyResult.locals
@@ -2212,7 +2248,8 @@ extension MacroExpander {
                     targetValue: targetValue,
                     graphBinding: graphBinding,
                     context: context,
-                    localBindings: locals
+                    localBindings: locals,
+                    expansionDepth: expansionDepth
                 )
                 diagnostics.append(contentsOf: bodyResult.diagnostics)
                 locals = bodyResult.locals
@@ -2226,7 +2263,8 @@ extension MacroExpander {
                         targetValue: targetValue,
                         graphBinding: graphBinding,
                         context: context,
-                        localBindings: locals
+                        localBindings: locals,
+                        expansionDepth: expansionDepth
                     )
                     diagnostics.append(contentsOf: caseResult.diagnostics)
                     locals = caseResult.locals
@@ -2240,7 +2278,8 @@ extension MacroExpander {
                         targetValue: targetValue,
                         graphBinding: graphBinding,
                         context: context,
-                        localBindings: locals
+                        localBindings: locals,
+                        expansionDepth: expansionDepth
                     )
                     diagnostics.append(contentsOf: defaultResult.diagnostics)
                     locals = defaultResult.locals
@@ -2259,7 +2298,33 @@ extension MacroExpander {
                     context: context
                 )
                 locals[name] = evaluator.evaluate(expression, with: locals)?.expression ?? expression
-            case .expand, .macroInvocation, .return, .break, .continue:
+            case .macroInvocation(let name, let argumentClause, _):
+                guard expansionDepth < 64 else {
+                    throw ParseError("Macro diagnostic expansion exceeded 64 nested invocations at @\(name).")
+                }
+                guard let invokedMacro = context.macroDeclarationsByName[name] else {
+                    throw ParseError("Unknown nested diagnostic macro @\(name).")
+                }
+                guard let invokedBindings = invokedMacro.bindings else {
+                    continue
+                }
+                let argumentBindings = try parseMacroArgumentBindings(
+                    for: invokedMacro,
+                    argumentClause: argumentClause
+                )
+                let nestedLocals = locals.merging(argumentBindings) { _, argument in argument }
+                diagnostics.append(contentsOf: try macroDiagnostics(
+                    in: invokedMacro.body,
+                    diagnosticOwnerName: invokedMacro.name,
+                    diagnosticsBinding: invokedBindings.diagnostics,
+                    targetBinding: invokedBindings.target,
+                    targetValue: targetValue,
+                    graphBinding: invokedBindings.graph,
+                    context: context,
+                    localBindings: nestedLocals,
+                    expansionDepth: expansionDepth + 1
+                ))
+            case .expand, .return, .break, .continue:
                 continue
             }
         }

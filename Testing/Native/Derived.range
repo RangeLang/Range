@@ -1,0 +1,12 @@
+construct Counter {
+    let value: Int
+
+    derived doubled: Int {
+        self.value + self.value
+    }
+}
+
+@main {
+    let counter: Counter(Counter(value: 3))
+    return counter.doubled
+}

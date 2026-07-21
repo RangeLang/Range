@@ -4,6 +4,7 @@ from __future__ import annotations
 import filecmp
 import json
 import os
+import platform
 import plistlib
 import shutil
 import statistics
@@ -13,12 +14,15 @@ import tempfile
 import textwrap
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
 BENCH = ROOT / "Development" / "Benchmarks" / "Speed"
 BUILD = BENCH / ".build"
+RESULTS = BENCH / "results"
+SITE_RESULTS = BENCH / "Site" / "public" / "benchmarks.json"
 SEED_MANIFEST = ROOT / "RangeCompiler" / "Bootstrap" / "RangeCompilerSeed.json"
 STAGE2_COMPILER = (
     ROOT / "RangeCompiler" / "Range" / "Programs" / "Compiler" / ".range" / "Build" / "stage2" / "RangeCompiler"
@@ -40,6 +44,9 @@ VERBOSE = os.environ.get("VERBOSE") == "1"
 class BenchmarkCase:
     name: str
     category: str
+    subcategory: str
+    leaf: str
+    unit: str
     description: str
     expected_output: str
     expected_exit_code: int
@@ -218,6 +225,24 @@ def integer_loop_output(n: int) -> str:
     return str(acc)
 
 
+def if_loop_output(n: int) -> str:
+    acc = 1
+    for i in range(n):
+        if i % 4 != 0:
+            acc = (acc + i * 3 + 1) % 1_000_003
+    return str(acc)
+
+
+def if_else_loop_output(n: int) -> str:
+    acc = 1
+    for i in range(n):
+        if i % 2 == 0:
+            acc = (acc + i * 3 + 1) % 1_000_003
+        else:
+            acc = (acc + i * 5 + 2) % 1_000_003
+    return str(acc)
+
+
 def generic_calls_output(n: int) -> str:
     pairs = n // 2
     return str(2 * pairs * pairs + (2 * pairs + 1 if n % 2 else 0))
@@ -228,6 +253,34 @@ def collections_output(n: int) -> str:
     return str(sum(value * 2 for value in (values[index % 8] for index in range(n)) if value % 2 == 0))
 
 
+def convolution_output(n: int) -> str:
+    values = (1, 3, 5, 7, 11, 13, 17, 19)
+    acc = 0
+    for i in range(n):
+        center = i % len(values)
+        left = (center - 1) % len(values)
+        right = (center + 1) % len(values)
+        acc = (acc + values[left] + values[center] * 2 + values[right]) % 1_000_003
+    return str(acc)
+
+
+def constructs_output(n: int) -> str:
+    return str((n * n) % 1_000_003)
+
+
+def fibonacci(value: int) -> int:
+    if value < 2:
+        return value
+    return fibonacci(value - 1) + fibonacci(value - 2)
+
+
+def recursion_output(repeats: int, depth: int) -> str:
+    even_count = (repeats + 1) // 2
+    odd_count = repeats // 2
+    total = fibonacci(depth) * even_count + fibonacci(depth + 1) * odd_count
+    return str(total % 1_000_003)
+
+
 def selected_cases() -> list[BenchmarkCase]:
     available = cases()
     if not CASE_FILTER:
@@ -236,7 +289,9 @@ def selected_cases() -> list[BenchmarkCase]:
     selected = [
         case
         for case in available
-        if case.name.lower() in CASE_FILTER or case.category.lower() in CASE_FILTER
+        if case.name.lower() in CASE_FILTER
+        or case.category.lower() in CASE_FILTER
+        or case.subcategory.lower() in CASE_FILTER
     ]
     if selected:
         return selected
@@ -248,11 +303,16 @@ def selected_cases() -> list[BenchmarkCase]:
 def cases() -> list[BenchmarkCase]:
     n = ITERATIONS
     small = max(1, n // 10)
+    recursion_repeats = max(1, n // 10_000)
+    recursion_depth = 20
 
     return [
         BenchmarkCase(
             name="integer_loop",
             category="Loops",
+            subcategory="While",
+            leaf="Sequential modulo",
+            unit="iterations",
             description="Sequential integer arithmetic and modulo dependency chain",
             expected_output=integer_loop_output(n),
             expected_exit_code=0,
@@ -337,9 +397,222 @@ def cases() -> list[BenchmarkCase]:
             """,
         ),
         BenchmarkCase(
-            name="float_noise",
+            name="loop_if",
+            category="Loops",
+            subcategory="If",
+            leaf="75% taken",
+            unit="iterations",
+            description="Repeated one-sided conditional with a 75% taken branch",
+            expected_output=if_loop_output(n),
+            expected_exit_code=0,
+            range_expected_exit_code=int(if_loop_output(n)) % 251,
+            n=n,
+            c=rf"""
+                #include <inttypes.h>
+                #include <stdint.h>
+                #include <stdio.h>
+                #include <stdlib.h>
+                int main(int argc, char **argv) {{
+                    int64_t n = argc > 1 ? atoll(argv[1]) : {n};
+                    int64_t i = 0, acc = 1;
+                    while (i < n) {{
+                        if (i % 4 != 0) acc = (acc + i * 3 + 1) % 1000003;
+                        i += 1;
+                    }}
+                    printf("%" PRId64 "\n", acc);
+                }}
+            """,
+            cxx=rf"""
+                #include <cstdint>
+                #include <cstdlib>
+                #include <iostream>
+                int main(int argc, char **argv) {{
+                    std::int64_t n = argc > 1 ? std::atoll(argv[1]) : {n};
+                    std::int64_t i = 0, acc = 1;
+                    while (i < n) {{
+                        if (i % 4 != 0) acc = (acc + i * 3 + 1) % 1000003;
+                        ++i;
+                    }}
+                    std::cout << acc << '\n';
+                }}
+            """,
+            rust=rf"""
+                fn main() {{
+                    let n: i64 = std::env::args().nth(1).and_then(|v| v.parse().ok()).unwrap_or({n});
+                    let mut i: i64 = 0;
+                    let mut acc: i64 = 1;
+                    while i < n {{
+                        if i % 4 != 0 {{ acc = (acc + i * 3 + 1) % 1_000_003; }}
+                        i += 1;
+                    }}
+                    println!("{{acc}}");
+                }}
+            """,
+            go=rf"""
+                package main
+                import ("fmt"; "os"; "strconv")
+                func main() {{
+                    n := int64({n}); if len(os.Args) > 1 {{ n, _ = strconv.ParseInt(os.Args[1], 10, 64) }}
+                    var i int64; acc := int64(1)
+                    for i < n {{
+                        if i%4 != 0 {{ acc = (acc + i*3 + 1) % 1000003 }}
+                        i++
+                    }}
+                    fmt.Println(acc)
+                }}
+            """,
+            swift=rf"""
+                let n = CommandLine.arguments.dropFirst().first.flatMap(Int64.init) ?? {n}
+                var i: Int64 = 0
+                var acc: Int64 = 1
+                while i < n {{
+                    if i % 4 != 0 {{
+                        acc = (acc + i * 3 + 1) % 1_000_003
+                    }}
+                    i += 1
+                }}
+                print(acc)
+            """,
+            typescript=rf"""
+                const n = Number((globalThis as any).Bun.argv[2] ?? {n});
+                let i = 0, acc = 1;
+                while (i < n) {{
+                    if (i % 4 !== 0) acc = (acc + i * 3 + 1) % 1000003;
+                    i++;
+                }}
+                console.log(acc);
+            """,
+            range_source=rf"""
+                @main {{
+                    let n: Int({n})
+                    state i: Int(0)
+                    state acc: Int(1)
+                    while i < n {{
+                        if i % 4 != 0 {{
+                            acc: (acc + i * 3 + 1) % 1000003
+                        }}
+                        i: i + 1
+                    }}
+                    return acc % 251
+                }}
+            """,
+        ),
+        BenchmarkCase(
+            name="loop_if_else",
+            category="Loops",
+            subcategory="If Else",
+            leaf="Balanced alternating",
+            unit="iterations",
+            description="Repeated balanced two-outcome conditional",
+            expected_output=if_else_loop_output(n),
+            expected_exit_code=0,
+            range_expected_exit_code=int(if_else_loop_output(n)) % 251,
+            n=n,
+            c=rf"""
+                #include <inttypes.h>
+                #include <stdint.h>
+                #include <stdio.h>
+                #include <stdlib.h>
+                int main(int argc, char **argv) {{
+                    int64_t n = argc > 1 ? atoll(argv[1]) : {n};
+                    int64_t i = 0, acc = 1;
+                    while (i < n) {{
+                        if (i % 2 == 0) acc = (acc + i * 3 + 1) % 1000003;
+                        else acc = (acc + i * 5 + 2) % 1000003;
+                        i += 1;
+                    }}
+                    printf("%" PRId64 "\n", acc);
+                }}
+            """,
+            cxx=rf"""
+                #include <cstdint>
+                #include <cstdlib>
+                #include <iostream>
+                int main(int argc, char **argv) {{
+                    std::int64_t n = argc > 1 ? std::atoll(argv[1]) : {n};
+                    std::int64_t i = 0, acc = 1;
+                    while (i < n) {{
+                        if (i % 2 == 0) acc = (acc + i * 3 + 1) % 1000003;
+                        else acc = (acc + i * 5 + 2) % 1000003;
+                        ++i;
+                    }}
+                    std::cout << acc << '\n';
+                }}
+            """,
+            rust=rf"""
+                fn main() {{
+                    let n: i64 = std::env::args().nth(1).and_then(|v| v.parse().ok()).unwrap_or({n});
+                    let mut i: i64 = 0;
+                    let mut acc: i64 = 1;
+                    while i < n {{
+                        if i % 2 == 0 {{ acc = (acc + i * 3 + 1) % 1_000_003; }}
+                        else {{ acc = (acc + i * 5 + 2) % 1_000_003; }}
+                        i += 1;
+                    }}
+                    println!("{{acc}}");
+                }}
+            """,
+            go=rf"""
+                package main
+                import ("fmt"; "os"; "strconv")
+                func main() {{
+                    n := int64({n}); if len(os.Args) > 1 {{ n, _ = strconv.ParseInt(os.Args[1], 10, 64) }}
+                    var i int64; acc := int64(1)
+                    for i < n {{
+                        if i%2 == 0 {{ acc = (acc + i*3 + 1) % 1000003 }} else {{ acc = (acc + i*5 + 2) % 1000003 }}
+                        i++
+                    }}
+                    fmt.Println(acc)
+                }}
+            """,
+            swift=rf"""
+                let n = CommandLine.arguments.dropFirst().first.flatMap(Int64.init) ?? {n}
+                var i: Int64 = 0
+                var acc: Int64 = 1
+                while i < n {{
+                    if i % 2 == 0 {{
+                        acc = (acc + i * 3 + 1) % 1_000_003
+                    }} else {{
+                        acc = (acc + i * 5 + 2) % 1_000_003
+                    }}
+                    i += 1
+                }}
+                print(acc)
+            """,
+            typescript=rf"""
+                const n = Number((globalThis as any).Bun.argv[2] ?? {n});
+                let i = 0, acc = 1;
+                while (i < n) {{
+                    if (i % 2 === 0) acc = (acc + i * 3 + 1) % 1000003;
+                    else acc = (acc + i * 5 + 2) % 1000003;
+                    i++;
+                }}
+                console.log(acc);
+            """,
+            range_source=rf"""
+                @main {{
+                    let n: Int({n})
+                    state i: Int(0)
+                    state acc: Int(1)
+                    while i < n {{
+                        if i % 2 == 0 {{
+                            acc: (acc + i * 3 + 1) % 1000003
+                        }} else {{
+                            acc: (acc + i * 5 + 2) % 1000003
+                        }}
+                        i: i + 1
+                    }}
+                    return acc % 251
+                }}
+            """,
+        ),
+        BenchmarkCase(
+            name="perlin_noise",
             category="Noise",
-            description="Floating-point arithmetic and an N-sample dependency chain",
+            subcategory="Perlin",
+            leaf="2D single cell",
+            unit="samples",
+            description="Two-dimensional single-cell Perlin gradient interpolation",
             expected_output="exit:1" if n > 0 else "exit:0",
             expected_exit_code=1 if n > 0 else 0,
             range_expected_exit_code=1 if n > 0 else 0,
@@ -351,18 +624,23 @@ def cases() -> list[BenchmarkCase]:
                 static inline double fade(double value) {{
                     return value * value * value * (value * (value * 6.0 - 15.0) + 10.0);
                 }}
-                static inline double noise(double x, double y, double z) {{
-                    double xy = x * y, yz = y * z, zx = z * x;
-                    double u = fade(x), v = fade(y), w = fade(z);
-                    double first = xy + yz, second = yz + zx, third = zx + xy;
-                    return (first * (1.0 - u) + second * u) * (1.0 - w) + third * w + v;
+                static inline double noise(double x, double y) {{
+                    double u = fade(x), v = fade(y);
+                    double n00 = x * 0.8 + y * 0.6;
+                    double n10 = (x - 1.0) * -0.6 + y * 0.8;
+                    double n01 = x * 0.3 + (y - 1.0) * -0.95;
+                    double n11 = (x - 1.0) * -0.8 + (y - 1.0) * -0.6;
+                    double lower = n00 * (1.0 - u) + n10 * u;
+                    double upper = n01 * (1.0 - u) + n11 * u;
+                    return lower * (1.0 - v) + upper * v;
                 }}
                 int main(int argc, char **argv) {{
                     int64_t n = argc > 1 ? atoll(argv[1]) : {n};
-                    double total = 0.0, x = 0.37;
+                    double total = 0.0, x = 0.37, y = 0.61;
                     for (int64_t i = 0; i < n; ++i) {{
-                        total += noise(x, 0.61, 0.23);
-                        x += 0.00001;
+                        total += noise(x, y);
+                        x += 0.000013; if (x > 1.0) x -= 1.0;
+                        y += 0.000017; if (y > 1.0) y -= 1.0;
                     }}
                     return total != 0.0 ? 1 : 0;
                 }}
@@ -374,18 +652,23 @@ def cases() -> list[BenchmarkCase]:
                 static inline double fade(double value) {{
                     return value * value * value * (value * (value * 6.0 - 15.0) + 10.0);
                 }}
-                static inline double noise(double x, double y, double z) {{
-                    double xy = x * y, yz = y * z, zx = z * x;
-                    double u = fade(x), v = fade(y), w = fade(z);
-                    double first = xy + yz, second = yz + zx, third = zx + xy;
-                    return (first * (1.0 - u) + second * u) * (1.0 - w) + third * w + v;
+                static inline double noise(double x, double y) {{
+                    double u = fade(x), v = fade(y);
+                    double n00 = x * 0.8 + y * 0.6;
+                    double n10 = (x - 1.0) * -0.6 + y * 0.8;
+                    double n01 = x * 0.3 + (y - 1.0) * -0.95;
+                    double n11 = (x - 1.0) * -0.8 + (y - 1.0) * -0.6;
+                    double lower = n00 * (1.0 - u) + n10 * u;
+                    double upper = n01 * (1.0 - u) + n11 * u;
+                    return lower * (1.0 - v) + upper * v;
                 }}
                 int main(int argc, char **argv) {{
                     std::int64_t n = argc > 1 ? std::atoll(argv[1]) : {n};
-                    double total = 0.0, x = 0.37;
+                    double total = 0.0, x = 0.37, y = 0.61;
                     for (std::int64_t i = 0; i < n; ++i) {{
-                        total += noise(x, 0.61, 0.23);
-                        x += 0.00001;
+                        total += noise(x, y);
+                        x += 0.000013; if (x > 1.0) x -= 1.0;
+                        y += 0.000017; if (y > 1.0) y -= 1.0;
                     }}
                     return total != 0.0 ? 1 : 0;
                 }}
@@ -394,17 +677,25 @@ def cases() -> list[BenchmarkCase]:
                 fn fade(value: f64) -> f64 {{
                     value * value * value * (value * (value * 6.0 - 15.0) + 10.0)
                 }}
-                fn noise(x: f64, y: f64, z: f64) -> f64 {{
-                    let (xy, yz, zx) = (x * y, y * z, z * x);
-                    let (u, v, w) = (fade(x), fade(y), fade(z));
-                    let (first, second, third) = (xy + yz, yz + zx, zx + xy);
-                    (first * (1.0 - u) + second * u) * (1.0 - w) + third * w + v
+                fn noise(x: f64, y: f64) -> f64 {{
+                    let (u, v) = (fade(x), fade(y));
+                    let n00 = x * 0.8 + y * 0.6;
+                    let n10 = (x - 1.0) * -0.6 + y * 0.8;
+                    let n01 = x * 0.3 + (y - 1.0) * -0.95;
+                    let n11 = (x - 1.0) * -0.8 + (y - 1.0) * -0.6;
+                    let lower = n00 * (1.0 - u) + n10 * u;
+                    let upper = n01 * (1.0 - u) + n11 * u;
+                    lower * (1.0 - v) + upper * v
                 }}
                 fn main() {{
                     let n: i64 = std::env::args().nth(1).and_then(|v| v.parse().ok()).unwrap_or({n});
                     let mut total = 0.0;
-                    let mut x = 0.37;
-                    for _ in 0..n {{ total += noise(x, 0.61, 0.23); x += 0.00001; }}
+                    let (mut x, mut y) = (0.37, 0.61);
+                    for _ in 0..n {{
+                        total += noise(x, y);
+                        x += 0.000013; if x > 1.0 {{ x -= 1.0; }}
+                        y += 0.000017; if y > 1.0 {{ y -= 1.0; }}
+                    }}
                     std::process::exit(if total != 0.0 {{ 1 }} else {{ 0 }});
                 }}
             """,
@@ -416,13 +707,15 @@ def cases() -> list[BenchmarkCase]:
                 }}
                 func main() {{
                     n := int64({n}); if len(os.Args) > 1 {{ n, _ = strconv.ParseInt(os.Args[1], 10, 64) }}
-                    total, x := 0.0, 0.37
+                    total, x, y := 0.0, 0.37, 0.61
                     for i := int64(0); i < n; i++ {{
-                        xy, yz, zx := x*0.61, 0.61*0.23, 0.23*x
-                        u, v, w := fade(x), fade(0.61), fade(0.23)
-                        first, second, third := xy+yz, yz+zx, zx+xy
-                        total += (first*(1.0-u)+second*u)*(1.0-w)+third*w+v
-                        x += 0.00001
+                        u, v := fade(x), fade(y)
+                        n00, n10 := x*0.8+y*0.6, (x-1.0)*-0.6+y*0.8
+                        n01, n11 := x*0.3+(y-1.0)*-0.95, (x-1.0)*-0.8+(y-1.0)*-0.6
+                        lower, upper := n00*(1.0-u)+n10*u, n01*(1.0-u)+n11*u
+                        total += lower*(1.0-v)+upper*v
+                        x += 0.000013; if x > 1.0 {{ x -= 1.0 }}
+                        y += 0.000017; if y > 1.0 {{ y -= 1.0 }}
                     }}
                     if total != 0.0 {{ os.Exit(1) }}
                 }}
@@ -432,31 +725,44 @@ def cases() -> list[BenchmarkCase]:
                 @inline(__always) func fade(_ value: Double) -> Double {{
                     value * value * value * (value * (value * 6.0 - 15.0) + 10.0)
                 }}
-                @inline(__always) func noise(_ x: Double, _ y: Double, _ z: Double) -> Double {{
-                    let (xy, yz, zx) = (x * y, y * z, z * x)
-                    let (u, v, w) = (fade(x), fade(y), fade(z))
-                    let (first, second, third) = (xy + yz, yz + zx, zx + xy)
-                    return (first * (1.0 - u) + second * u) * (1.0 - w) + third * w + v
+                @inline(__always) func noise(_ x: Double, _ y: Double) -> Double {{
+                    let (u, v) = (fade(x), fade(y))
+                    let n00 = x * 0.8 + y * 0.6
+                    let n10 = (x - 1.0) * -0.6 + y * 0.8
+                    let n01 = x * 0.3 + (y - 1.0) * -0.95
+                    let n11 = (x - 1.0) * -0.8 + (y - 1.0) * -0.6
+                    let lower = n00 * (1.0 - u) + n10 * u
+                    let upper = n01 * (1.0 - u) + n11 * u
+                    return lower * (1.0 - v) + upper * v
                 }}
                 let n = CommandLine.arguments.dropFirst().first.flatMap(Int.init) ?? {n}
                 var total = 0.0
-                var x = 0.37
-                for _ in 0..<n {{ total += noise(x, 0.61, 0.23); x += 0.00001 }}
+                var x = 0.37, y = 0.61
+                for _ in 0..<n {{
+                    total += noise(x, y)
+                    x += 0.000013; if x > 1.0 {{ x -= 1.0 }}
+                    y += 0.000017; if y > 1.0 {{ y -= 1.0 }}
+                }}
                 exit(total != 0.0 ? 1 : 0)
             """,
             typescript=rf"""
                 function fade(value: number): number {{
                     return value * value * value * (value * (value * 6.0 - 15.0) + 10.0);
                 }}
-                function noise(x: number, y: number, z: number): number {{
-                    const xy = x*y, yz = y*z, zx = z*x;
-                    const u = fade(x), v = fade(y), w = fade(z);
-                    const first = xy+yz, second = yz+zx, third = zx+xy;
-                    return (first*(1.0-u)+second*u)*(1.0-w)+third*w+v;
+                function noise(x: number, y: number): number {{
+                    const u = fade(x), v = fade(y);
+                    const n00 = x*0.8+y*0.6, n10 = (x-1.0)*-0.6+y*0.8;
+                    const n01 = x*0.3+(y-1.0)*-0.95, n11 = (x-1.0)*-0.8+(y-1.0)*-0.6;
+                    const lower = n00*(1.0-u)+n10*u, upper = n01*(1.0-u)+n11*u;
+                    return lower*(1.0-v)+upper*v;
                 }}
                 const n = Number((globalThis as any).Bun.argv[2] ?? {n});
-                let total = 0.0, x = 0.37;
-                for (let i = 0; i < n; i++) {{ total += noise(x, 0.61, 0.23); x += 0.00001; }}
+                let total = 0.0, x = 0.37, y = 0.61;
+                for (let i = 0; i < n; i++) {{
+                    total += noise(x, y);
+                    x += 0.000013; if (x > 1.0) x -= 1.0;
+                    y += 0.000017; if (y > 1.0) y -= 1.0;
+                }}
                 (globalThis as any).process.exit(total !== 0.0 ? 1 : 0);
             """,
             range_source=rf"""
@@ -464,28 +770,31 @@ def cases() -> list[BenchmarkCase]:
                     return value * value * value * (value * (value * Float(6.0) - Float(15.0)) + Float(10.0))
                 }}
 
-                function gradientNoise(x: Float, y: Float, z: Float): Float {{
-                    let xy: Float(x * y)
-                    let yz: Float(y * z)
-                    let zx: Float(z * x)
+                function perlinNoise(x: Float, y: Float): Float {{
                     let u: Float(fade(value: x))
                     let v: Float(fade(value: y))
-                    let w: Float(fade(value: z))
-                    let first: Float(xy + yz)
-                    let second: Float(yz + zx)
-                    let third: Float(zx + xy)
-                    return (first * (Float(1.0) - u) + second * u) * (Float(1.0) - w) + third * w + v
+                    let n00: Float(x * Float(0.8) + y * Float(0.6))
+                    let n10: Float((x - Float(1.0)) * Float(0.0 - 0.6) + y * Float(0.8))
+                    let n01: Float(x * Float(0.3) + (y - Float(1.0)) * Float(0.0 - 0.95))
+                    let n11: Float((x - Float(1.0)) * Float(0.0 - 0.8) + (y - Float(1.0)) * Float(0.0 - 0.6))
+                    let lower: Float(n00 * (Float(1.0) - u) + n10 * u)
+                    let upper: Float(n01 * (Float(1.0) - u) + n11 * u)
+                    return lower * (Float(1.0) - v) + upper * v
                 }}
 
                 @main {{
                     state total: Float(0.0)
                     state index: Int(0)
                     state x: Float(0.37)
+                    state y: Float(0.61)
                     while index < {n} {{
-                        let sample: Float(gradientNoise(x: x, y: Float(0.61), z: Float(0.23)))
+                        let sample: Float(perlinNoise(x: x, y: y))
                         total: total + sample
                         index: index + 1
-                        x: x + Float(0.00001)
+                        x: x + Float(0.000013)
+                        if x > Float(1.0) {{ x: x - Float(1.0) }}
+                        y: y + Float(0.000017)
+                        if y > Float(1.0) {{ y: y - Float(1.0) }}
                     }}
                     if total != Float(0.0) {{
                         return 1
@@ -495,8 +804,277 @@ def cases() -> list[BenchmarkCase]:
             """,
         ),
         BenchmarkCase(
+            name="voronoi_noise",
+            category="Noise",
+            subcategory="Voronoi",
+            leaf="Three feature points",
+            unit="samples",
+            description="Squared distance to the nearest of three two-dimensional feature points",
+            expected_output="exit:1" if n > 0 else "exit:0",
+            expected_exit_code=1 if n > 0 else 0,
+            range_expected_exit_code=1 if n > 0 else 0,
+            n=n,
+            c=rf"""
+                #include <stdint.h>
+                #include <stdlib.h>
+                int main(int argc, char **argv) {{
+                    int64_t n = argc > 1 ? atoll(argv[1]) : {n};
+                    double total = 0.0, x = 0.13, y = 0.27;
+                    for (int64_t i = 0; i < n; ++i) {{
+                        double ax=x-0.20, ay=y-0.30, bx=x-0.70, by=y-0.80, cx=x-0.40, cy=y-0.65;
+                        double best=ax*ax+ay*ay, second=bx*bx+by*by, third=cx*cx+cy*cy;
+                        if (second < best) best = second;
+                        if (third < best) best = third;
+                        total += best;
+                        x += 0.000013; if (x > 1.0) x -= 1.0;
+                        y += 0.000017; if (y > 1.0) y -= 1.0;
+                    }}
+                    return total != 0.0 ? 1 : 0;
+                }}
+            """,
+            cxx=rf"""
+                #include <cstdint>
+                #include <cstdlib>
+                int main(int argc, char **argv) {{
+                    std::int64_t n = argc > 1 ? std::atoll(argv[1]) : {n};
+                    double total = 0.0, x = 0.13, y = 0.27;
+                    for (std::int64_t i = 0; i < n; ++i) {{
+                        double ax=x-0.20, ay=y-0.30, bx=x-0.70, by=y-0.80, cx=x-0.40, cy=y-0.65;
+                        double best=ax*ax+ay*ay, second=bx*bx+by*by, third=cx*cx+cy*cy;
+                        if (second < best) best = second;
+                        if (third < best) best = third;
+                        total += best;
+                        x += 0.000013; if (x > 1.0) x -= 1.0;
+                        y += 0.000017; if (y > 1.0) y -= 1.0;
+                    }}
+                    return total != 0.0 ? 1 : 0;
+                }}
+            """,
+            rust=rf"""
+                fn main() {{
+                    let n: i64 = std::env::args().nth(1).and_then(|v| v.parse().ok()).unwrap_or({n});
+                    let (mut total, mut x, mut y) = (0.0, 0.13, 0.27);
+                    for _ in 0..n {{
+                        let (ax, ay, bx, by, cx, cy) = (x-0.20, y-0.30, x-0.70, y-0.80, x-0.40, y-0.65);
+                        let (mut best, second, third) = (ax*ax+ay*ay, bx*bx+by*by, cx*cx+cy*cy);
+                        if second < best {{ best = second; }}
+                        if third < best {{ best = third; }}
+                        total += best;
+                        x += 0.000013; if x > 1.0 {{ x -= 1.0; }}
+                        y += 0.000017; if y > 1.0 {{ y -= 1.0; }}
+                    }}
+                    std::process::exit(if total != 0.0 {{ 1 }} else {{ 0 }});
+                }}
+            """,
+            go=rf"""
+                package main
+                import ("os"; "strconv")
+                func main() {{
+                    n := int64({n}); if len(os.Args) > 1 {{ n, _ = strconv.ParseInt(os.Args[1], 10, 64) }}
+                    total, x, y := 0.0, 0.13, 0.27
+                    for i := int64(0); i < n; i++ {{
+                        ax, ay, bx, by, cx, cy := x-0.20, y-0.30, x-0.70, y-0.80, x-0.40, y-0.65
+                        best, second, third := ax*ax+ay*ay, bx*bx+by*by, cx*cx+cy*cy
+                        if second < best {{ best = second }}
+                        if third < best {{ best = third }}
+                        total += best
+                        x += 0.000013; if x > 1.0 {{ x -= 1.0 }}
+                        y += 0.000017; if y > 1.0 {{ y -= 1.0 }}
+                    }}
+                    if total != 0.0 {{ os.Exit(1) }}
+                }}
+            """,
+            swift=rf"""
+                import Darwin
+                let n = CommandLine.arguments.dropFirst().first.flatMap(Int.init) ?? {n}
+                var total = 0.0, x = 0.13, y = 0.27
+                for _ in 0..<n {{
+                    let (ax, ay, bx, by, cx, cy) = (x-0.20, y-0.30, x-0.70, y-0.80, x-0.40, y-0.65)
+                    var best = ax*ax+ay*ay
+                    let second = bx*bx+by*by, third = cx*cx+cy*cy
+                    if second < best {{ best = second }}
+                    if third < best {{ best = third }}
+                    total += best
+                    x += 0.000013; if x > 1.0 {{ x -= 1.0 }}
+                    y += 0.000017; if y > 1.0 {{ y -= 1.0 }}
+                }}
+                exit(total != 0.0 ? 1 : 0)
+            """,
+            typescript=rf"""
+                const n = Number((globalThis as any).Bun.argv[2] ?? {n});
+                let total = 0.0, x = 0.13, y = 0.27;
+                for (let i = 0; i < n; i++) {{
+                    const ax=x-0.20, ay=y-0.30, bx=x-0.70, by=y-0.80, cx=x-0.40, cy=y-0.65;
+                    let best=ax*ax+ay*ay; const second=bx*bx+by*by, third=cx*cx+cy*cy;
+                    if (second < best) best = second;
+                    if (third < best) best = third;
+                    total += best;
+                    x += 0.000013; if (x > 1.0) x -= 1.0;
+                    y += 0.000017; if (y > 1.0) y -= 1.0;
+                }}
+                (globalThis as any).process.exit(total !== 0.0 ? 1 : 0);
+            """,
+            range_source=rf"""
+                @main {{
+                    state total: Float(0.0)
+                    state index: Int(0)
+                    state x: Float(0.13)
+                    state y: Float(0.27)
+                    while index < {n} {{
+                        let ax: Float(x - Float(0.20))
+                        let ay: Float(y - Float(0.30))
+                        let bx: Float(x - Float(0.70))
+                        let by: Float(y - Float(0.80))
+                        let cx: Float(x - Float(0.40))
+                        let cy: Float(y - Float(0.65))
+                        state best: Float(ax * ax + ay * ay)
+                        let second: Float(bx * bx + by * by)
+                        let third: Float(cx * cx + cy * cy)
+                        if second < best {{ best: second }}
+                        if third < best {{ best: third }}
+                        total: total + best
+                        index: index + 1
+                        x: x + Float(0.000013)
+                        if x > Float(1.0) {{ x: x - Float(1.0) }}
+                        y: y + Float(0.000017)
+                        if y > Float(1.0) {{ y: y - Float(1.0) }}
+                    }}
+                    if total != Float(0.0) {{ return 1 }}
+                    return 0
+                }}
+            """,
+        ),
+        BenchmarkCase(
+            name="value_noise",
+            category="Noise",
+            subcategory="Value Noise",
+            leaf="Four lattice values",
+            unit="samples",
+            description="Two-dimensional smooth bilinear interpolation of four lattice values",
+            expected_output="exit:1" if n > 0 else "exit:0",
+            expected_exit_code=1 if n > 0 else 0,
+            range_expected_exit_code=1 if n > 0 else 0,
+            n=n,
+            c=rf"""
+                #include <stdint.h>
+                #include <stdlib.h>
+                static inline double fade(double value) {{ return value * value * (3.0 - 2.0 * value); }}
+                int main(int argc, char **argv) {{
+                    int64_t n = argc > 1 ? atoll(argv[1]) : {n};
+                    double total=0.0, x=0.37, y=0.61;
+                    for (int64_t i=0; i<n; ++i) {{
+                        double u=fade(x), v=fade(y);
+                        double lower=0.15*(1.0-u)+0.82*u, upper=0.44*(1.0-u)+0.67*u;
+                        total += lower*(1.0-v)+upper*v;
+                        x += 0.000013; if (x > 1.0) x -= 1.0;
+                        y += 0.000017; if (y > 1.0) y -= 1.0;
+                    }}
+                    return total != 0.0 ? 1 : 0;
+                }}
+            """,
+            cxx=rf"""
+                #include <cstdint>
+                #include <cstdlib>
+                static inline double fade(double value) {{ return value * value * (3.0 - 2.0 * value); }}
+                int main(int argc, char **argv) {{
+                    std::int64_t n = argc > 1 ? std::atoll(argv[1]) : {n};
+                    double total=0.0, x=0.37, y=0.61;
+                    for (std::int64_t i=0; i<n; ++i) {{
+                        double u=fade(x), v=fade(y);
+                        double lower=0.15*(1.0-u)+0.82*u, upper=0.44*(1.0-u)+0.67*u;
+                        total += lower*(1.0-v)+upper*v;
+                        x += 0.000013; if (x > 1.0) x -= 1.0;
+                        y += 0.000017; if (y > 1.0) y -= 1.0;
+                    }}
+                    return total != 0.0 ? 1 : 0;
+                }}
+            """,
+            rust=rf"""
+                #[inline(always)] fn fade(value: f64) -> f64 {{ value * value * (3.0 - 2.0 * value) }}
+                fn main() {{
+                    let n: i64 = std::env::args().nth(1).and_then(|v| v.parse().ok()).unwrap_or({n});
+                    let (mut total, mut x, mut y) = (0.0, 0.37, 0.61);
+                    for _ in 0..n {{
+                        let (u,v)=(fade(x),fade(y));
+                        let lower=0.15*(1.0-u)+0.82*u; let upper=0.44*(1.0-u)+0.67*u;
+                        total += lower*(1.0-v)+upper*v;
+                        x += 0.000013; if x > 1.0 {{ x -= 1.0; }}
+                        y += 0.000017; if y > 1.0 {{ y -= 1.0; }}
+                    }}
+                    std::process::exit(if total != 0.0 {{1}} else {{0}});
+                }}
+            """,
+            go=rf"""
+                package main
+                import ("os"; "strconv")
+                func fade(value float64) float64 {{ return value*value*(3.0-2.0*value) }}
+                func main() {{
+                    n := int64({n}); if len(os.Args)>1 {{ n,_=strconv.ParseInt(os.Args[1],10,64) }}
+                    total,x,y := 0.0,0.37,0.61
+                    for i:=int64(0); i<n; i++ {{
+                        u,v:=fade(x),fade(y); lower:=0.15*(1.0-u)+0.82*u; upper:=0.44*(1.0-u)+0.67*u
+                        total += lower*(1.0-v)+upper*v
+                        x += 0.000013; if x>1.0 {{ x-=1.0 }}
+                        y += 0.000017; if y>1.0 {{ y-=1.0 }}
+                    }}
+                    if total != 0.0 {{ os.Exit(1) }}
+                }}
+            """,
+            swift=rf"""
+                import Darwin
+                @inline(__always) func fade(_ value: Double) -> Double {{ value*value*(3.0-2.0*value) }}
+                let n=CommandLine.arguments.dropFirst().first.flatMap(Int.init) ?? {n}
+                var total=0.0, x=0.37, y=0.61
+                for _ in 0..<n {{
+                    let u=fade(x), v=fade(y), lower=0.15*(1.0-u)+0.82*u, upper=0.44*(1.0-u)+0.67*u
+                    total += lower*(1.0-v)+upper*v
+                    x += 0.000013; if x>1.0 {{ x-=1.0 }}
+                    y += 0.000017; if y>1.0 {{ y-=1.0 }}
+                }}
+                exit(total != 0.0 ? 1 : 0)
+            """,
+            typescript=rf"""
+                function fade(value:number):number {{ return value*value*(3.0-2.0*value); }}
+                const n=Number((globalThis as any).Bun.argv[2] ?? {n}); let total=0.0,x=0.37,y=0.61;
+                for(let i=0;i<n;i++){{
+                    const u=fade(x),v=fade(y),lower=0.15*(1.0-u)+0.82*u,upper=0.44*(1.0-u)+0.67*u;
+                    total += lower*(1.0-v)+upper*v;
+                    x+=0.000013;if(x>1.0)x-=1.0;y+=0.000017;if(y>1.0)y-=1.0;
+                }}
+                (globalThis as any).process.exit(total!==0.0?1:0);
+            """,
+            range_source=rf"""
+                function valueFade(value: Float): Float {{
+                    return value * value * (Float(3.0) - Float(2.0) * value)
+                }}
+                @main {{
+                    state total: Float(0.0)
+                    state index: Int(0)
+                    state x: Float(0.37)
+                    state y: Float(0.61)
+                    while index < {n} {{
+                        let u: Float(valueFade(value: x))
+                        let v: Float(valueFade(value: y))
+                        let lower: Float(Float(0.15)*(Float(1.0)-u)+Float(0.82)*u)
+                        let upper: Float(Float(0.44)*(Float(1.0)-u)+Float(0.67)*u)
+                        total: total + lower*(Float(1.0)-v)+upper*v
+                        index: index + 1
+                        x: x + Float(0.000013)
+                        if x > Float(1.0) {{ x: x - Float(1.0) }}
+                        y: y + Float(0.000017)
+                        if y > Float(1.0) {{ y: y - Float(1.0) }}
+                    }}
+                    if total != Float(0.0) {{ return 1 }}
+                    return 0
+                }}
+            """,
+        ),
+        BenchmarkCase(
             name="strings",
             category="Strings",
+            subcategory="Append",
+            leaf="Incremental owned growth",
+            unit="appends",
             description="Incremental string growth and length tracking",
             expected_output=str(((small * (small + 1) // 2) % 1000003 + small) % 1000003),
             expected_exit_code=0,
@@ -591,6 +1169,9 @@ def cases() -> list[BenchmarkCase]:
         BenchmarkCase(
             name="collections",
             category="Collections",
+            subcategory="Indexed Read",
+            leaf="Eight-value reduction",
+            unit="reads",
             description="Repeated indexed array reads, branching, and reduction",
             expected_output=collections_output(small),
             expected_exit_code=0,
@@ -669,7 +1250,7 @@ def cases() -> list[BenchmarkCase]:
                     state index: Int(0)
                     state acc: Int(0)
                     while index < n {{
-                        let value: Int(values.element(index: index % 8))
+                        let value: Int(values[index % 8])
                         if value % 2 == 0 {{
                             acc: acc + value * 2
                         }}
@@ -680,12 +1261,96 @@ def cases() -> list[BenchmarkCase]:
             """,
         ),
         BenchmarkCase(
+            name="convolution_1d",
+            category="Convolution",
+            subcategory="1D Three Tap",
+            leaf="Circular eight sample",
+            unit="windows",
+            description="Circular one-dimensional three-tap stencil over eight integer samples",
+            expected_output=convolution_output(small),
+            expected_exit_code=0,
+            range_expected_exit_code=int(convolution_output(small)) % 251,
+            n=small,
+            c=rf"""
+                #include <inttypes.h>
+                #include <stdint.h>
+                #include <stdio.h>
+                #include <stdlib.h>
+                int main(int argc, char **argv) {{
+                    int64_t n=argc>1?atoll(argv[1]):{small}, values[8]={{1,3,5,7,11,13,17,19}}, acc=0;
+                    for(int64_t i=0;i<n;++i){{
+                        int64_t center=i%8,left=(center+7)%8,right=(center+1)%8;
+                        acc=(acc+values[left]+values[center]*2+values[right])%1000003;
+                    }}
+                    printf("%" PRId64 "\n",acc);
+                }}
+            """,
+            cxx=rf"""
+                #include <array>
+                #include <cstdint>
+                #include <cstdlib>
+                #include <iostream>
+                int main(int argc,char**argv){{
+                    std::int64_t n=argc>1?std::atoll(argv[1]):{small},acc=0; std::array<std::int64_t,8> values{{1,3,5,7,11,13,17,19}};
+                    for(std::int64_t i=0;i<n;++i){{auto center=i%8,left=(center+7)%8,right=(center+1)%8;acc=(acc+values[left]+values[center]*2+values[right])%1000003;}}
+                    std::cout<<acc<<'\n';
+                }}
+            """,
+            rust=rf"""
+                fn main(){{
+                    let n:i64=std::env::args().nth(1).and_then(|v|v.parse().ok()).unwrap_or({small});
+                    let values:[i64;8]=[1,3,5,7,11,13,17,19];let mut acc=0i64;
+                    for i in 0..n{{let center=(i%8)as usize;let left=(center+7)%8;let right=(center+1)%8;acc=(acc+values[left]+values[center]*2+values[right])%1_000_003;}}
+                    println!("{{acc}}");
+                }}
+            """,
+            go=rf"""
+                package main
+                import("fmt";"os";"strconv")
+                func main(){{
+                    n:=int64({small});if len(os.Args)>1{{n,_=strconv.ParseInt(os.Args[1],10,64)}}
+                    values:=[8]int64{{1,3,5,7,11,13,17,19}};var acc int64
+                    for i:=int64(0);i<n;i++{{center:=i%8;left:=(center+7)%8;right:=(center+1)%8;acc=(acc+values[left]+values[center]*2+values[right])%1000003}}
+                    fmt.Println(acc)
+                }}
+            """,
+            swift=rf"""
+                let n=CommandLine.arguments.dropFirst().first.flatMap(Int.init) ?? {small}
+                let values=[1,3,5,7,11,13,17,19];var acc=0
+                for i in 0..<n{{let center=i%8,left=(center+7)%8,right=(center+1)%8;acc=(acc+values[left]+values[center]*2+values[right])%1_000_003}}
+                print(acc)
+            """,
+            typescript=rf"""
+                const n=Number((globalThis as any).Bun.argv[2]??{small}),values=[1,3,5,7,11,13,17,19];let acc=0;
+                for(let i=0;i<n;i++){{const center=i%8,left=(center+7)%8,right=(center+1)%8;acc=(acc+values[left]+values[center]*2+values[right])%1000003;}}
+                console.log(acc);
+            """,
+            range_source=rf"""
+                @main {{
+                    let values: [1, 3, 5, 7, 11, 13, 17, 19]
+                    state i: Int(0)
+                    state acc: Int(0)
+                    while i < {small} {{
+                        let center: Int(i % 8)
+                        let left: Int((center + 7) % 8)
+                        let right: Int((center + 1) % 8)
+                        acc: (acc + values[left] + values[center] * 2 + values[right]) % 1000003
+                        i: i + 1
+                    }}
+                    return acc % 251
+                }}
+            """,
+        ),
+        BenchmarkCase(
             name="constructs",
             category="Constructs",
+            subcategory="Value Construction",
+            leaf="Pair construction",
+            unit="constructions",
             description="Short-lived value construction and member access",
-            expected_output=str(small * small),
+            expected_output=constructs_output(small),
             expected_exit_code=0,
-            range_expected_exit_code=(small * small) % 251,
+            range_expected_exit_code=int(constructs_output(small)) % 251,
             n=small,
             c=rf"""
                 #include <stdint.h>
@@ -697,7 +1362,7 @@ def cases() -> list[BenchmarkCase]:
                     int64_t acc = 0;
                     for (int i = 0; i < n; i++) {{
                         Pair pair = (Pair){{i, i + 1}};
-                        acc += pair.x + pair.y;
+                        acc = (acc + pair.x + pair.y) % 1000003;
                     }}
                     printf("%lld\n", (long long)acc);
                 }}
@@ -708,7 +1373,7 @@ def cases() -> list[BenchmarkCase]:
                 struct Pair {{ long long x; long long y; }};
                 int main(int argc, char **argv) {{
                     int n = argc > 1 ? std::atoi(argv[1]) : {small}; long long acc = 0;
-                    for (int i = 0; i < n; ++i) {{ Pair pair{{i, i + 1}}; acc += pair.x + pair.y; }}
+                    for (int i = 0; i < n; ++i) {{ Pair pair{{i, i + 1}}; acc = (acc + pair.x + pair.y) % 1000003; }}
                     std::cout << acc << '\n';
                 }}
             """,
@@ -719,7 +1384,7 @@ def cases() -> list[BenchmarkCase]:
                     let mut acc: i64 = 0;
                     for i in 0..n {{
                         let pair = Pair {{ x: i, y: i + 1 }};
-                        acc += pair.x + pair.y;
+                        acc = (acc + pair.x + pair.y) % 1_000_003;
                     }}
                     println!("{{acc}}");
                 }}
@@ -730,7 +1395,7 @@ def cases() -> list[BenchmarkCase]:
                 type Pair struct {{ x, y int64 }}
                 func main() {{
                     n := {small}; if len(os.Args) > 1 {{ n, _ = strconv.Atoi(os.Args[1]) }}
-                    var acc int64; for i := 0; i < n; i++ {{ pair := Pair{{int64(i), int64(i+1)}}; acc += pair.x + pair.y }}
+                    var acc int64; for i := 0; i < n; i++ {{ pair := Pair{{int64(i), int64(i+1)}}; acc = (acc + pair.x + pair.y) % 1000003 }}
                     fmt.Println(acc)
                 }}
             """,
@@ -741,7 +1406,7 @@ def cases() -> list[BenchmarkCase]:
                 var acc = 0
                 while i < n {{
                     let pair = Pair(x: i, y: i + 1)
-                    acc += pair.x + pair.y
+                    acc = (acc + pair.x + pair.y) % 1_000_003
                     i += 1
                 }}
                 print(acc)
@@ -749,7 +1414,7 @@ def cases() -> list[BenchmarkCase]:
             typescript=rf"""
                 type Pair = {{ x: number; y: number }};
                 const n = Number((globalThis as any).Bun.argv[2] ?? {small}); let acc = 0;
-                for (let i = 0; i < n; i++) {{ const pair: Pair = {{ x: i, y: i + 1 }}; acc += pair.x + pair.y; }}
+                for (let i = 0; i < n; i++) {{ const pair: Pair = {{ x: i, y: i + 1 }}; acc = (acc + pair.x + pair.y) % 1000003; }}
                 console.log(acc);
             """,
             range_source=rf"""
@@ -764,7 +1429,69 @@ def cases() -> list[BenchmarkCase]:
                     state acc: Int(0)
                     while i < n {{
                         let pair: Pair(x: i, y: i + 1)
-                        acc: acc + pair.x + pair.y
+                        acc: (acc + pair.x + pair.y) % 1000003
+                        i: i + 1
+                    }}
+                    return acc % 251
+                }}
+            """,
+        ),
+        BenchmarkCase(
+            name="fibonacci_recursion",
+            category="Recursion",
+            subcategory="Fibonacci",
+            leaf="Depth 20 and 21",
+            unit="root calls",
+            description="Repeated binary recursion alternating depths 20 and 21",
+            expected_output=recursion_output(recursion_repeats, recursion_depth),
+            expected_exit_code=0,
+            range_expected_exit_code=int(recursion_output(recursion_repeats, recursion_depth)) % 251,
+            n=recursion_repeats,
+            c=rf"""
+                #include <inttypes.h>
+                #include <stdint.h>
+                #include <stdio.h>
+                #include <stdlib.h>
+                static int64_t fibonacci(int64_t value){{if(value<2)return value;return fibonacci(value-1)+fibonacci(value-2);}}
+                int main(int argc,char**argv){{int64_t n=argc>1?atoll(argv[1]):{recursion_repeats},acc=0;for(int64_t i=0;i<n;++i)acc=(acc+fibonacci({recursion_depth}+i%2))%1000003;printf("%" PRId64 "\n",acc);}}
+            """,
+            cxx=rf"""
+                #include <cstdint>
+                #include <cstdlib>
+                #include <iostream>
+                static std::int64_t fibonacci(std::int64_t value){{if(value<2)return value;return fibonacci(value-1)+fibonacci(value-2);}}
+                int main(int argc,char**argv){{std::int64_t n=argc>1?std::atoll(argv[1]):{recursion_repeats},acc=0;for(std::int64_t i=0;i<n;++i)acc=(acc+fibonacci({recursion_depth}+i%2))%1000003;std::cout<<acc<<'\n';}}
+            """,
+            rust=rf"""
+                fn fibonacci(value:i64)->i64{{if value<2{{value}}else{{fibonacci(value-1)+fibonacci(value-2)}}}}
+                fn main(){{let n:i64=std::env::args().nth(1).and_then(|v|v.parse().ok()).unwrap_or({recursion_repeats});let mut acc=0;for i in 0..n{{acc=(acc+fibonacci({recursion_depth}+i%2))%1_000_003;}}println!("{{acc}}");}}
+            """,
+            go=rf"""
+                package main
+                import("fmt";"os";"strconv")
+                func fibonacci(value int64)int64{{if value<2{{return value}};return fibonacci(value-1)+fibonacci(value-2)}}
+                func main(){{n:=int64({recursion_repeats});if len(os.Args)>1{{n,_=strconv.ParseInt(os.Args[1],10,64)}};var acc int64;for i:=int64(0);i<n;i++{{acc=(acc+fibonacci({recursion_depth}+i%2))%1000003}};fmt.Println(acc)}}
+            """,
+            swift=rf"""
+                @inline(never) func fibonacci(_ value:Int)->Int{{if value<2{{return value}};return fibonacci(value-1)+fibonacci(value-2)}}
+                let n=CommandLine.arguments.dropFirst().first.flatMap(Int.init) ?? {recursion_repeats};var acc=0
+                for i in 0..<n{{acc=(acc+fibonacci({recursion_depth}+i%2))%1_000_003}}
+                print(acc)
+            """,
+            typescript=rf"""
+                function fibonacci(value:number):number{{if(value<2)return value;return fibonacci(value-1)+fibonacci(value-2);}}
+                const n=Number((globalThis as any).Bun.argv[2]??{recursion_repeats});let acc=0;for(let i=0;i<n;i++)acc=(acc+fibonacci({recursion_depth}+i%2))%1000003;console.log(acc);
+            """,
+            range_source=rf"""
+                function fibonacci(value: Int): Int {{
+                    if value < 2 {{ return value }}
+                    return fibonacci(value: value - 1) + fibonacci(value: value - 2)
+                }}
+                @main {{
+                    state i: Int(0)
+                    state acc: Int(0)
+                    while i < {recursion_repeats} {{
+                        acc: (acc + fibonacci(value: {recursion_depth} + i % 2)) % 1000003
                         i: i + 1
                     }}
                     return acc % 251
@@ -774,6 +1501,9 @@ def cases() -> list[BenchmarkCase]:
         BenchmarkCase(
             name="function_calls",
             category="Function Calls",
+            subcategory="Direct Call",
+            leaf="Choose",
+            unit="calls",
             description="Small reusable function calls and predictable branching",
             expected_output=str(int(generic_calls_output(n)) % 1000003),
             expected_exit_code=0,
@@ -1094,6 +1824,198 @@ def measure_targets(targets: list[BenchTarget]) -> list[Measurement]:
     ]
 
 
+def identifier(value: str) -> str:
+    return "-".join(part for part in "".join(character.lower() if character.isalnum() else " " for character in value).split())
+
+
+def normalized_source(value: str) -> str:
+    return textwrap.dedent(value).strip() + "\n"
+
+
+def benchmark_artifact(
+    catalog_cases: list[BenchmarkCase],
+    run_results: dict[str, list[tuple[str, Measurement, float, float, float, str]]],
+) -> dict[str, object]:
+    categories: list[dict[str, object]] = []
+    category_index: dict[str, dict[str, object]] = {}
+    observed_languages: set[str] = set()
+    range_passed = 0
+    range_not_emitted = 0
+
+    for case in catalog_cases:
+        category_id = identifier(case.category)
+        category = category_index.get(category_id)
+        if category is None:
+            category = {
+                "id": category_id,
+                "name": case.category,
+                "subcategories": [],
+            }
+            category_index[category_id] = category
+            categories.append(category)
+
+        subcategories = category["subcategories"]
+        assert isinstance(subcategories, list)
+        subcategory_id = identifier(case.subcategory)
+        subcategory = next(
+            (item for item in subcategories if item["id"] == subcategory_id),
+            None,
+        )
+        if subcategory is None:
+            subcategory = {
+                "id": subcategory_id,
+                "name": case.subcategory,
+                "leaves": [],
+            }
+            subcategories.append(subcategory)
+
+        case_results = run_results.get(case.name, [])
+        fastest_wall = min(
+            (row[1].wall_seconds for row in case_results),
+            default=0.0,
+        )
+        measurements: list[dict[str, object]] = []
+        for language, measurement, wall_relative, cpu_relative, rss_relative, output in sorted(
+            case_results,
+            key=lambda row: row[1].wall_seconds,
+        ):
+            observed_languages.add(language)
+            measurements.append(
+                {
+                    "language": language,
+                    "status": "passed",
+                    "wallMilliseconds": round(measurement.wall_seconds * 1000, 4),
+                    "cpuMilliseconds": round(measurement.cpu_seconds * 1000, 4),
+                    "peakRssKilobytes": measurement.peak_rss_kb,
+                    "relativeToFastest": round(
+                        measurement.wall_seconds / fastest_wall if fastest_wall else 1.0,
+                        4,
+                    ),
+                    "relativeToC": round(wall_relative, 4),
+                    "cpuRelativeToC": round(cpu_relative, 4),
+                    "memoryRelativeToC": round(rss_relative, 4),
+                    "output": output,
+                }
+            )
+
+        range_result = next(
+            (measurement for measurement in measurements if measurement["language"] == "Range"),
+            None,
+        )
+        if case_results and range_result is None:
+            range_status = "notEmitted"
+            range_not_emitted += 1
+        elif range_result is not None:
+            range_status = "passed"
+            range_passed += 1
+        else:
+            range_status = "notRun"
+
+        leaves = subcategory["leaves"]
+        assert isinstance(leaves, list)
+        leaves.append(
+            {
+                "id": case.name,
+                "name": case.leaf,
+                "description": case.description,
+                "workload": {"count": case.n, "unit": case.unit},
+                "runStatus": "passed" if case_results else "notRun",
+                "rangeStatus": range_status,
+                "axisMaxMilliseconds": round(
+                    max((measurement["wallMilliseconds"] for measurement in measurements), default=0.0) * 1.08,
+                    4,
+                ),
+                "implementations": [
+                    {
+                        "language": "C",
+                        "syntax": "c",
+                        "filename": "main.c",
+                        "source": normalized_source(case.c),
+                    },
+                    {
+                        "language": "Range",
+                        "syntax": "range",
+                        "filename": "Playground.range",
+                        "source": normalized_source(case.range_source),
+                    },
+                ],
+                "results": measurements,
+            }
+        )
+
+    generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return {
+        "schemaVersion": 2,
+        "generatedAt": generated_at,
+        "configuration": {
+            "baseIterations": ITERATIONS,
+            "runs": RUNS,
+            "caseFilter": sorted(CASE_FILTER),
+        },
+        "environment": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "architecture": platform.machine(),
+            "python": platform.python_version(),
+        },
+        "procedure": {
+            "steps": [
+                "Write the generated implementation for each language into an isolated case directory.",
+                "Compile every native implementation with its release optimization settings. Compilation time is excluded from the measurement.",
+                "Emit Range to LLVM with the verified self-hosted compiler, then link the emitted module and runtime sources with clang -O3 -mcpu=native.",
+                "Run every language once per round, rotating the starting language to reduce thermal, frequency, and background-load bias.",
+                "Require the expected exit code and identical output on every run, then report median wall time, median CPU time, and median peak RSS.",
+            ],
+            "commands": {
+                "c": [
+                    "cc -O3 -mcpu=native main.c -o speed-c",
+                    "./speed-c <iterations>",
+                ],
+                "range": [
+                    "RangeCompiler emit-llvm Playground.range Main.ll",
+                    "clang -O3 -mcpu=native -Wno-override-module Main.ll <runtime-sources> -o speed-range",
+                    "./speed-range",
+                ],
+                "suite": [
+                    "N=<base-iterations> RUNS=<sample-count> npm run benchmarks",
+                ],
+            },
+            "notes": [
+                "The workload count is specialized per leaf; some leaves intentionally scale it down to keep total work comparable.",
+                "Wall time includes process execution but excludes source generation and compilation.",
+                "A result is published only when output remains stable across every measured run.",
+                "Bun and TypeScript rows are omitted when their local toolchains are unavailable.",
+            ],
+        },
+        "languages": sorted(observed_languages),
+        "summary": {
+            "leafCount": len(catalog_cases),
+            "runLeafCount": len(run_results),
+            "rangePassed": range_passed,
+            "rangeNotEmitted": range_not_emitted,
+            "rangeFailed": 0,
+        },
+        "categories": categories,
+    }
+
+
+def write_benchmark_artifact(artifact: dict[str, object]) -> list[Path]:
+    output = Path(os.environ.get("RESULTS_FILE", str(RESULTS / "latest.json"))).expanduser()
+    destinations = [output]
+    if os.environ.get("WRITE_SITE_RESULTS", "1") != "0":
+        destinations.append(Path(os.environ.get("SITE_RESULTS_FILE", str(SITE_RESULTS))).expanduser())
+
+    rendered = json.dumps(artifact, indent=2, sort_keys=False) + "\n"
+    written: list[Path] = []
+    for destination in destinations:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_name(destination.name + ".tmp")
+        temporary.write_text(rendered, encoding="utf-8")
+        temporary.replace(destination)
+        written.append(destination)
+    return written
+
+
 def main() -> int:
     require_tool("cc")
     require_tool("c++")
@@ -1112,10 +2034,11 @@ def main() -> int:
     print()
 
     results: dict[str, list[tuple[str, Measurement, float, float, float, str]]] = {}
+    benchmark_cases = selected_cases()
 
-    for case in selected_cases():
+    for case in benchmark_cases:
         print()
-        print(f"== {case.category}: {case.name} (N={case.n}) ==")
+        print(f"== {case.category} / {case.subcategory}: {case.name} (N={case.n}) ==")
         print(case.description)
         targets = build_case(case, range_cli, range_env, bun, tsgo)
         wall_baselines: dict[str, float] = {}
@@ -1204,6 +2127,12 @@ def main() -> int:
             )
         else:
             print(f"{case_name:>14}: Range skipped")
+
+    artifact = benchmark_artifact(cases(), results)
+    written_artifacts = write_benchmark_artifact(artifact)
+    print()
+    for artifact_path in written_artifacts:
+        print(f"results: {artifact_path}")
 
     return 0
 
