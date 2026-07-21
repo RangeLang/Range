@@ -3041,6 +3041,7 @@ Current branch:
 - `Development/GPT56RangeSelfHostingHandoff.md` (historical operational
   snapshot; chunk guidance is superseded)
 - `RangeCompiler/Range/Programs/Compiler/Compiler.range`
+- `RangeCompiler/Range/Programs/Compiler/CompilerBodyModel.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerCore.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerFrontend.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerGraph.range`
