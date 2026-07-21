@@ -1,0 +1,236 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Source the candidate harness so this checkpoint uses its canonical source
+# discovery, RootValue fixture writer, compiler invocation, and LLVM helpers.
+source "$SCRIPT_DIR/check-range-compiler-candidate"
+
+CACHE_ROOT="${RANGE_STAGE2_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Library/Caches}/Range/stage2-compiler}"
+CACHE_SCHEMA=1
+
+usage() {
+    cat <<'USAGE'
+Usage:
+  scripts/check-range-root-value [DIR]
+  scripts/check-range-root-value --controls [DIR]
+  scripts/check-range-root-value --help
+
+DIR defaults to RangeCompiler/Range/Programs/Compiler. The command resolves a
+content-addressed Stage 2 compiler for the current accepted seed, runtime, and
+compiler sources, then validates only RootValue boundary-forward-mixed.
+The controls mode runs the complete neighboring RootValue positive and negative
+fixture set against the same cached Stage 2 compiler.
+USAGE
+}
+
+write_stage2_cache_key_material() {
+    local output="$1"
+    local seed_relative seed index
+
+    seed_relative="$(manifest_value seed.path)"
+    seed="$REPO_ROOT/$seed_relative"
+    /usr/bin/printf 'schema=%s\n' "$CACHE_SCHEMA" > "$output"
+    /usr/bin/printf 'compilerOptimization=%s\n' "$COMPILER_OPTIMIZATION" >> "$output"
+    /usr/bin/printf 'compilerLTO=%s\n' "$COMPILER_LTO" >> "$output"
+    /usr/bin/printf 'clang=%s\n' "$(clang --version | /usr/bin/head -1)" >> "$output"
+    /usr/bin/printf 'seedPath=%s\nseedHash=%s\nseedBytes=%s\n' \
+        "$seed_relative" "$(sha256 "$seed")" "$(bytes "$seed")" >> "$output"
+    for index in "${!RUNTIME_INPUTS[@]}"; do
+        /usr/bin/printf 'runtime=%s\tpath=%s\tsha256=%s\tbytes=%s\n' \
+            "$index" "${RUNTIME_INPUTS[$index]#"$REPO_ROOT/"}" \
+            "$(sha256 "${RUNTIME_INPUTS[$index]}")" "$(bytes "${RUNTIME_INPUTS[$index]}")" >> "$output"
+    done
+    /usr/bin/printf 'sourceBundleHash=%s\nsourceBundleBytes=%s\n' \
+        "$(sha256 "$SOURCE_BUNDLE")" "$(bytes "$SOURCE_BUNDLE")" >> "$output"
+    for index in "${!SOURCE_FILES[@]}"; do
+        /usr/bin/printf 'source=%s\trole=%s\troot=%s\tpath=%s\tsha256=%s\tbytes=%s\n' \
+            "$index" "${SOURCE_ROLES[$index]}" "${SOURCE_ROOTS[$index]}" \
+            "${SOURCE_RELATIVE_PATHS[$index]}" "$(sha256 "${SOURCE_FILES[$index]}")" \
+            "$(bytes "${SOURCE_FILES[$index]}")" >> "$output"
+    done
+}
+
+stage2_cache_entry_is_valid() {
+    local directory="$1"
+    local expected_key="$2"
+    local executable="$directory/RangeCompiler"
+    local metadata="$directory/Metadata.txt"
+    local expected_hash expected_bytes
+
+    [[ -x "$executable" && -f "$metadata" ]] || return 1
+    /usr/bin/grep -Fxq "schema=$CACHE_SCHEMA" "$metadata" || return 1
+    /usr/bin/grep -Fxq "cacheKey=$expected_key" "$metadata" || return 1
+    expected_hash="$(/usr/bin/awk -F= '$1 == "executableHash" { print $2 }' "$metadata")"
+    expected_bytes="$(/usr/bin/awk -F= '$1 == "executableBytes" { print $2 }' "$metadata")"
+    [[ -n "$expected_hash" && -n "$expected_bytes" ]] || return 1
+    [[ "$(sha256 "$executable")" == "$expected_hash" ]] || return 1
+    [[ "$(bytes "$executable")" == "$expected_bytes" ]] || return 1
+}
+
+resolve_stage2_compiler() {
+    local key_material="$WORK_ROOT/stage2-cache-key"
+    local cache_key cache_directory cached_executable
+    local build_directory seed seed_executable stage2_llvm stage2_executable
+
+    write_stage2_cache_key_material "$key_material"
+    cache_key="$(sha256 "$key_material")"
+    cache_directory="$CACHE_ROOT/$cache_key"
+    cached_executable="$cache_directory/RangeCompiler"
+
+    if stage2_cache_entry_is_valid "$cache_directory" "$cache_key"; then
+        echo "checkpoint root-value:stage2-cache-hit: pass"
+        STAGE2_EXECUTABLE="$cached_executable"
+        STAGE2_CACHE_KEY="$cache_key"
+        echo "checkpoint root-value:stage2-resolved: pass"
+        return 0
+    fi
+
+    echo "checkpoint root-value:stage2-cache-miss: pass"
+    build_directory="$WORK_ROOT/stage2-cache-entry"
+    /bin/mkdir -p "$build_directory"
+    seed="$REPO_ROOT/$(manifest_value seed.path)"
+    seed_executable="$WORK_ROOT/RangeCompilerSeed"
+    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module \
+        -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
+    echo "checkpoint root-value:seed-linked: pass"
+
+    stage2_llvm="$build_directory/RangeCompiler.ll"
+    stage2_executable="$build_directory/RangeCompiler"
+    emit_candidate_llvm "$seed_executable" "$SOURCE_BUNDLE" "$stage2_llvm" focused-stage2
+    echo "checkpoint root-value:stage2-emitted: pass"
+    validate_llvm "$stage2_llvm"
+    echo "checkpoint root-value:stage2-validated: pass"
+    link_llvm "$stage2_llvm" "$stage2_executable"
+    echo "checkpoint root-value:stage2-linked: pass"
+
+    /usr/bin/printf 'schema=%s\ncacheKey=%s\nexecutableHash=%s\nexecutableBytes=%s\n' \
+        "$CACHE_SCHEMA" "$cache_key" "$(sha256 "$stage2_executable")" \
+        "$(bytes "$stage2_executable")" > "$build_directory/Metadata.txt"
+    /bin/mkdir -p "$CACHE_ROOT"
+    if /bin/mkdir "$cache_directory" 2>/dev/null; then
+        /bin/cp "$stage2_executable" "$cached_executable"
+        /bin/chmod +x "$cached_executable"
+        /bin/cp "$build_directory/Metadata.txt" "$cache_directory/Metadata.txt"
+    elif ! stage2_cache_entry_is_valid "$cache_directory" "$cache_key"; then
+        fail "concurrent Stage 2 cache population did not produce a valid executable"
+    fi
+    stage2_cache_entry_is_valid "$cache_directory" "$cache_key" \
+        || fail "published Stage 2 cache entry failed integrity validation"
+    echo "checkpoint root-value:stage2-cached: pass"
+    STAGE2_EXECUTABLE="$cached_executable"
+    STAGE2_CACHE_KEY="$cache_key"
+    echo "checkpoint root-value:stage2-resolved: pass"
+}
+
+check_boundary_forward_mixed() {
+    local bundle="$WORK_ROOT/boundary-forward-mixed.range"
+    local first="$WORK_ROOT/boundary-forward-mixed.first.ll"
+    local second="$WORK_ROOT/boundary-forward-mixed.repeat.ll"
+    local first_error="$WORK_ROOT/boundary-forward-mixed.first.err"
+    local second_error="$WORK_ROOT/boundary-forward-mixed.repeat.err"
+    local linked="$WORK_ROOT/RootValueBoundaryForwardMixed"
+    local run_output="$WORK_ROOT/boundary-forward-mixed.run.out"
+    local run_error="$WORK_ROOT/boundary-forward-mixed.run.err"
+    local actual_create_count actual_destroy_count forbidden
+
+    write_root_value_bundle "$bundle" boundary-forward-mixed
+    echo "checkpoint root-value:fixture-authored: pass"
+    run_capture "$STAGE2_EXECUTABLE" "$bundle" "$first" "$first_error"
+    require_successful_output "focused RootValue boundary-forward-mixed" "$first" "$first_error"
+    echo "checkpoint root-value:first-emitted: pass"
+    run_capture "$STAGE2_EXECUTABLE" "$bundle" "$second" "$second_error"
+    require_successful_output "focused repeated RootValue boundary-forward-mixed" "$second" "$second_error"
+    echo "checkpoint root-value:repeat-emitted: pass"
+    /usr/bin/cmp -s "$first" "$second" \
+        || fail "focused RootValue boundary-forward-mixed LLVM was not deterministic"
+    echo "checkpoint root-value:deterministic: pass"
+
+    /usr/bin/grep -Fq 'define void @makeRootBoundaryForwardMixedResult(ptr %returnDestination' "$first" \
+        || fail "focused RootValue omitted the mixed-result definition"
+    /usr/bin/grep -Fq 'call void @makeRootBoundaryForwardMixedResult(' "$first" \
+        || fail "focused RootValue omitted the mixed-result call"
+    /usr/bin/grep -Fq '%Range.RootBoundaryForwardMixedResult = type { ptr, ptr, ptr }' "$first" \
+        || fail "focused RootValue omitted the forward/alias/local layout"
+    actual_create_count="$(/usr/bin/grep -F -c 'call ptr @rawBufferCreate(' "$first" || true)"
+    actual_destroy_count="$(/usr/bin/grep -F -c 'call i32 @rawBufferDestroy(ptr' "$first" || true)"
+    [[ "$actual_create_count" -eq 3 ]] || fail "focused RootValue emitted $actual_create_count creates; expected 3"
+    [[ "$actual_destroy_count" -eq 3 ]] || fail "focused RootValue emitted $actual_destroy_count destructions; expected 3"
+    for forbidden in rangeConstruct malloc calloc realloc free; do
+        ! /usr/bin/grep -Fq "$forbidden" "$first" \
+            || fail "focused RootValue emitted forbidden dynamic/allocator symbol: $forbidden"
+    done
+    echo "checkpoint root-value:shape-audited: pass"
+
+    validate_llvm "$first"
+    echo "checkpoint root-value:llvm-validated: pass"
+    link_llvm "$first" "$linked"
+    echo "checkpoint root-value:linked: pass"
+    if "$linked" > "$run_output" 2> "$run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "focused RootValue executable exited $RUN_STATUS"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "focused RootValue executable wrote output"
+    echo "checkpoint root-value:executed-exit-7: pass"
+    echo "checkpoint root-value:complete: pass"
+    echo "Focused RootValue boundary-forward-mixed check succeeded."
+    printf 'stage2_cache_key=%s\n' "$STAGE2_CACHE_KEY"
+}
+
+main_root_value() {
+    local compiler_input="$DEFAULT_COMPILER_DIR"
+    local compiler_directory canonical_core_source_path
+    local controls=0
+
+    if [[ "$#" -eq 1 && ( "$1" == "--help" || "$1" == "-h" ) ]]; then
+        usage
+        return 0
+    elif [[ "$#" -eq 1 && "$1" == "--controls" ]]; then
+        controls=1
+    elif [[ "$#" -eq 2 && "$1" == "--controls" ]]; then
+        controls=1
+        compiler_input="$2"
+    elif [[ "$#" -eq 1 ]]; then
+        compiler_input="$1"
+    elif [[ "$#" -ne 0 ]]; then
+        usage >&2
+        return 64
+    fi
+    [[ -d "$compiler_input" ]] || fail "missing compiler directory: $compiler_input"
+    compiler_directory="$(cd "$compiler_input" && pwd)"
+
+    verify_manifest
+    echo "checkpoint root-value:manifest: pass"
+    WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-root-value.XXXXXX")"
+    if [[ "${RANGE_KEEP_ROOT_VALUE_WORK_ROOT:-0}" == "1" ]]; then
+        echo "root-value work root: $WORK_ROOT"
+    else
+        trap '/bin/rm -rf "$WORK_ROOT"' EXIT
+    fi
+
+    canonical_core_source_path="$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/RawBuffer.range"
+    [[ -f "$canonical_core_source_path" ]] || fail "missing canonical Core proof input: $canonical_core_source_path"
+    CORE_SOURCE_MARKER_PATH="${canonical_core_source_path#"$REPO_ROOT/"}"
+    CORE_SOURCE_PATH="$WORK_ROOT/RawBuffer.range"
+    /bin/cp "$canonical_core_source_path" "$CORE_SOURCE_PATH"
+    RUNTIME_INPUTS=()
+    while IFS= read -r runtime; do
+        RUNTIME_INPUTS+=("$runtime")
+    done < <(runtime_inputs)
+
+    discover_sources "$compiler_directory" "$WORK_ROOT"
+    SOURCE_BUNDLE="$WORK_ROOT/RangeCompilerSourceSet.range"
+    write_source_bundle "$SOURCE_BUNDLE"
+    echo "checkpoint root-value:source-snapshot: pass"
+    resolve_stage2_compiler
+    if [[ "$controls" -eq 1 ]]; then
+        audit_root_values Controls "$STAGE2_EXECUTABLE" "$WORK_ROOT/controls"
+        echo "checkpoint root-value:controls-complete: pass"
+    else
+        check_boundary_forward_mixed
+    fi
+}
+
+main_root_value "$@"

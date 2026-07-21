@@ -5676,4 +5676,6 @@ main() {
     echo "candidate_fixed_point=pass"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

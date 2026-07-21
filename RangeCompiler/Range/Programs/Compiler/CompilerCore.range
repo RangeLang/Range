@@ -22539,7 +22539,8 @@ function compilerBodyArenaRuntimeBuiltinRoleForApplication(arena: CompilerBodyAr
 function compilerBodyArenaSymbolForDeclaration(arena: CompilerBodyArena, declarationNodeID: Int): Int {
     state symbolRow: Int(0)
     while symbolRow < compilerIntTableRowCount(table: arena.symbols) {
-        if compilerIntTableValue(table: arena.symbols, row: symbolRow, column: compilerBodySymbolDeclarationColumn()) == declarationNodeID { return symbolRow }
+        if compilerBodySymbolOwnsLocalStorage(kind: compilerIntTableValue(table: arena.symbols, row: symbolRow, column: compilerBodySymbolKindColumn()))
+            && compilerIntTableValue(table: arena.symbols, row: symbolRow, column: compilerBodySymbolDeclarationColumn()) == declarationNodeID { return symbolRow }
         symbolRow: symbolRow + 1
     }
     return 0 - 1

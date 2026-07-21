@@ -18,6 +18,12 @@ broadest:
 # Focused, low-memory Range-authored build-plan reader; cached after first build.
 scripts/range check-build-plan
 
+# Focused RootValue ownership regression using a content-addressed Stage 2 cache.
+scripts/range check-root-value
+
+# Complete neighboring RootValue positive and rejection controls, same cache.
+scripts/range check-root-value --controls
+
 # Manifest, candidate source plan, seed link, Stage 2 build/link, and plan read.
 scripts/range check-compiler-smoke
 
@@ -31,9 +37,12 @@ scripts/range compiler progression
 
 Each gate prints explicit checkpoint edges. A reported edge proves only that
 edge and its prerequisites; it must not be interpreted as evidence that later
-edges in the ladder ran or passed. The focused gate stores its content-addressed
-reader executable under the user cache directory (override with
-`RANGE_BUILD_PLAN_CACHE_DIR`) and does not run full candidate audits.
+edges in the ladder ran or passed. The build-plan gate stores its
+content-addressed reader executable under the user cache directory (override
+with `RANGE_BUILD_PLAN_CACHE_DIR`). The RootValue gate similarly stores a Stage
+2 compiler keyed by the accepted seed, runtime, tool, and complete compiler
+source snapshot (override with `RANGE_STAGE2_CACHE_DIR`). Neither focused gate
+runs the full candidate audits.
 
 Add a fixture only when it protects behavior implemented by the Range-authored
 compiler and is wired into a native proof command.
