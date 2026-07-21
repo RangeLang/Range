@@ -170,6 +170,12 @@ construct CompilerSourceStore {
     let isValid: Bool
 }
 
+construct CompilerSourceScheduleResult {
+    let output: String
+    let trace: String
+    let isValid: Bool
+}
+
 construct CompilerFingerprint {
     let first: Int
     let second: Int
@@ -12660,6 +12666,224 @@ function compilerSourceInventorySummary(source: String): String {
     return "sourceInventory\(tab)program\(newline)\(files)sourceFileCount\(tab)\(count)\(newline)"
 }
 
+function compilerSourceWorkTableColumnCount(): Int { return 7 }
+function compilerSourceWorkIdentityColumn(): Int { return 0 }
+function compilerSourceWorkPrerequisiteCountColumn(): Int { return 1 }
+function compilerSourceWorkUnresolvedCountColumn(): Int { return 2 }
+function compilerSourceWorkLifecycleColumn(): Int { return 3 }
+function compilerSourceWorkMemoryReservationColumn(): Int { return 4 }
+function compilerSourceWorkCommitIdentityColumn(): Int { return 5 }
+function compilerSourceWorkStatusColumn(): Int { return 6 }
+
+function compilerSourceWorkLifecycleWaiting(): Int { return 0 }
+function compilerSourceWorkLifecycleReady(): Int { return 1 }
+function compilerSourceWorkLifecycleRunning(): Int { return 2 }
+function compilerSourceWorkLifecycleParked(): Int { return 3 }
+function compilerSourceWorkLifecycleCompleted(): Int { return 4 }
+function compilerSourceWorkLifecycleCancelled(): Int { return 5 }
+
+function compilerSourceWorkStatusPending(): Int { return 0 }
+function compilerSourceWorkStatusRendered(): Int { return 1 }
+function compilerSourceWorkStatusCommitted(): Int { return 2 }
+function compilerSourceWorkStatusFailed(): Int { return 3 }
+
+function compilerSourceWorkLifecycleName(lifecycle: Int): String {
+    if lifecycle == compilerSourceWorkLifecycleWaiting() { return String("waiting") }
+    if lifecycle == compilerSourceWorkLifecycleReady() { return String("ready") }
+    if lifecycle == compilerSourceWorkLifecycleRunning() { return String("running") }
+    if lifecycle == compilerSourceWorkLifecycleParked() { return String("parked") }
+    if lifecycle == compilerSourceWorkLifecycleCompleted() { return String("completed") }
+    if lifecycle == compilerSourceWorkLifecycleCancelled() { return String("cancelled") }
+    return String("unknown")
+}
+
+function compilerSourceWorkStatusName(status: Int): String {
+    if status == compilerSourceWorkStatusPending() { return String("pending") }
+    if status == compilerSourceWorkStatusRendered() { return String("rendered") }
+    if status == compilerSourceWorkStatusCommitted() { return String("committed") }
+    if status == compilerSourceWorkStatusFailed() { return String("failed") }
+    return String("unknown")
+}
+
+function compilerSourceInventoryFileRecordForValidStore(source: String, store: CompilerSourceStore, fileID: Int): String {
+    let slashPair: String("\\")
+    let slash: String(slashPair.substring(start: 0, end: 1))
+    let tab: String("\(slash)t")
+    let newline: String("\(slash)n")
+    let pathStart: Int(compilerSourceStoreFilePathStart(store: store, fileID: fileID))
+    let pathEnd: Int(compilerSourceStoreFilePathEnd(store: store, fileID: fileID))
+    state path: String("")
+    if pathEnd > pathStart {
+        path: stringSubstring(source: source, start: pathStart, end: pathEnd)
+    }
+    return "sourceFile\(tab)index=\(fileID)\(tab)role=\(compilerSourceRoleName(role: compilerSourceStoreFileRole(store: store, fileID: fileID)))\(tab)path=\(path)\(newline)"
+}
+
+function compilerSourceWorkTableAppend(work: CompilerIntTable, identity: Int, memoryReservation: Int): Int {
+    if work.columnCount != compilerSourceWorkTableColumnCount() { return 0 - 1 }
+    if compilerIntTableAppend(table: work, value: identity) != 0 { return 0 - 1 }
+    if compilerIntTableAppend(table: work, value: 0) != 0 { return 0 - 1 }
+    if compilerIntTableAppend(table: work, value: 0) != 0 { return 0 - 1 }
+    if compilerIntTableAppend(table: work, value: compilerSourceWorkLifecycleWaiting()) != 0 { return 0 - 1 }
+    if compilerIntTableAppend(table: work, value: memoryReservation) != 0 { return 0 - 1 }
+    if compilerIntTableAppend(table: work, value: identity) != 0 { return 0 - 1 }
+    return compilerIntTableAppend(table: work, value: compilerSourceWorkStatusPending())
+}
+
+function compilerSourceWorkTableCreate(source: String, store: CompilerSourceStore): CompilerIntTable {
+    let fileCount: Int(compilerSourceStoreFileCount(store: store))
+    let work: CompilerIntTable(compilerIntTableCreate(columnCount: compilerSourceWorkTableColumnCount(), estimatedRowCount: fileCount))
+    state fileID: Int(0)
+    while fileID < fileCount {
+        let record: String(compilerSourceInventoryFileRecordForValidStore(source: source, store: store, fileID: fileID))
+        if compilerSourceWorkTableAppend(work: work, identity: fileID, memoryReservation: stringLength(value: record)) != 0 {
+            return work
+        }
+        fileID: fileID + 1
+    }
+    return work
+}
+
+function compilerSourceWorkTableStore(work: CompilerIntTable, row: Int, column: Int, value: Int): Int {
+    if row < 0 || row >= compilerIntTableRowCount(table: work) || column < 0 || column >= work.columnCount { return 0 - 1 }
+    return rawBufferStoreInt(buffer: work.values, index: row * work.columnCount + column, value: value)
+}
+
+function compilerSourceWorkTableIsInitial(work: CompilerIntTable, fileCount: Int): Bool {
+    if work.columnCount != compilerSourceWorkTableColumnCount() || !compilerIntTableIsComplete(table: work) || compilerIntTableRowCount(table: work) != fileCount { return false }
+    state row: Int(0)
+    while row < fileCount {
+        if compilerIntTableValue(table: work, row: row, column: compilerSourceWorkIdentityColumn()) != row
+            || compilerIntTableValue(table: work, row: row, column: compilerSourceWorkPrerequisiteCountColumn()) != 0
+            || compilerIntTableValue(table: work, row: row, column: compilerSourceWorkUnresolvedCountColumn()) != 0
+            || compilerIntTableValue(table: work, row: row, column: compilerSourceWorkLifecycleColumn()) != compilerSourceWorkLifecycleWaiting()
+            || compilerIntTableValue(table: work, row: row, column: compilerSourceWorkMemoryReservationColumn()) < 0
+            || compilerIntTableValue(table: work, row: row, column: compilerSourceWorkCommitIdentityColumn()) != row
+            || compilerIntTableValue(table: work, row: row, column: compilerSourceWorkStatusColumn()) != compilerSourceWorkStatusPending() { return false }
+        row: row + 1
+    }
+    return true
+}
+
+function compilerSourceWorkLowestReadyRow(work: CompilerIntTable): Int {
+    state selectedRow: Int(0 - 1)
+    state selectedIdentity: Int(0 - 1)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: work) {
+        let identity: Int(compilerIntTableValue(table: work, row: row, column: compilerSourceWorkIdentityColumn()))
+        if compilerIntTableValue(table: work, row: row, column: compilerSourceWorkLifecycleColumn()) == compilerSourceWorkLifecycleReady()
+            && (selectedRow < 0 || identity < selectedIdentity) {
+            selectedRow: row
+            selectedIdentity: identity
+        }
+        row: row + 1
+    }
+    return selectedRow
+}
+
+function compilerSourceWorkLowestCommitRow(work: CompilerIntTable): Int {
+    state selectedRow: Int(0 - 1)
+    state selectedIdentity: Int(0 - 1)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: work) {
+        let identity: Int(compilerIntTableValue(table: work, row: row, column: compilerSourceWorkCommitIdentityColumn()))
+        if compilerIntTableValue(table: work, row: row, column: compilerSourceWorkLifecycleColumn()) == compilerSourceWorkLifecycleCompleted()
+            && compilerIntTableValue(table: work, row: row, column: compilerSourceWorkStatusColumn()) == compilerSourceWorkStatusRendered()
+            && (selectedRow < 0 || identity < selectedIdentity) {
+            selectedRow: row
+            selectedIdentity: identity
+        }
+        row: row + 1
+    }
+    return selectedRow
+}
+
+function compilerSourceInventoryScheduleForValidStore(source: String, store: CompilerSourceStore): CompilerSourceScheduleResult {
+    let fileCount: Int(compilerSourceStoreFileCount(store: store))
+    let work: CompilerIntTable(compilerSourceWorkTableCreate(source: source, store: store))
+    let projectedRecords: RawBuffer(rawBufferCreate(capacity: fileCount * 64, stride: 1))
+    let committedRecords: RawBuffer(rawBufferCreate(capacity: fileCount * 64, stride: 1))
+    let traceBuffer: RawBuffer(rawBufferCreate(capacity: fileCount * 256 + 128, stride: 1))
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    state valid: Bool(compilerSourceWorkTableIsInitial(work: work, fileCount: fileCount))
+    if rawBufferAppendText(buffer: traceBuffer, text: "compilerSourceScheduleTrace\(tab)version=1\(tab)boundary=sourceInventoryFileRecord\(tab)laneCount=1\(tab)workCount=\(fileCount)\(newline)") != 0 { valid: false }
+
+    state row: Int(0)
+    while row < fileCount {
+        let identity: Int(compilerIntTableValue(table: work, row: row, column: compilerSourceWorkIdentityColumn()))
+        if rawBufferAppendText(buffer: traceBuffer, text: "work\(tab)identity=\(identity)\(tab)prerequisiteCount=\(compilerIntTableValue(table: work, row: row, column: compilerSourceWorkPrerequisiteCountColumn()))\(tab)unresolvedCount=\(compilerIntTableValue(table: work, row: row, column: compilerSourceWorkUnresolvedCountColumn()))\(tab)lifecycle=\(compilerSourceWorkLifecycleName(lifecycle: compilerIntTableValue(table: work, row: row, column: compilerSourceWorkLifecycleColumn())))\(tab)memoryReservation=\(compilerIntTableValue(table: work, row: row, column: compilerSourceWorkMemoryReservationColumn()))\(tab)commitIdentity=\(compilerIntTableValue(table: work, row: row, column: compilerSourceWorkCommitIdentityColumn()))\(tab)status=\(compilerSourceWorkStatusName(status: compilerIntTableValue(table: work, row: row, column: compilerSourceWorkStatusColumn())))\(newline)") != 0 { valid: false }
+        row: row + 1
+    }
+
+    row: 0
+    while row < fileCount {
+        if compilerIntTableValue(table: work, row: row, column: compilerSourceWorkPrerequisiteCountColumn()) == 0
+            && compilerIntTableValue(table: work, row: row, column: compilerSourceWorkUnresolvedCountColumn()) == 0
+            && compilerIntTableValue(table: work, row: row, column: compilerSourceWorkLifecycleColumn()) == compilerSourceWorkLifecycleWaiting() {
+            let identity: Int(compilerIntTableValue(table: work, row: row, column: compilerSourceWorkIdentityColumn()))
+            if compilerSourceWorkTableStore(work: work, row: row, column: compilerSourceWorkLifecycleColumn(), value: compilerSourceWorkLifecycleReady()) != 0 { valid: false }
+            if rawBufferAppendText(buffer: traceBuffer, text: "transition\(tab)identity=\(identity)\(tab)from=waiting\(tab)to=ready\(newline)") != 0 { valid: false }
+        }
+        row: row + 1
+    }
+
+    state renderedCount: Int(0)
+    state readyRow: Int(compilerSourceWorkLowestReadyRow(work: work))
+    while valid && readyRow >= 0 {
+        let identity: Int(compilerIntTableValue(table: work, row: readyRow, column: compilerSourceWorkIdentityColumn()))
+        if compilerSourceWorkTableStore(work: work, row: readyRow, column: compilerSourceWorkLifecycleColumn(), value: compilerSourceWorkLifecycleRunning()) != 0 { valid: false }
+        if rawBufferAppendText(buffer: traceBuffer, text: "transition\(tab)identity=\(identity)\(tab)from=ready\(tab)to=running\(newline)") != 0 { valid: false }
+        let record: String(compilerSourceInventoryFileRecordForValidStore(source: source, store: store, fileID: identity))
+        if stringLength(value: record) != compilerIntTableValue(table: work, row: readyRow, column: compilerSourceWorkMemoryReservationColumn())
+            || rawBufferAppendText(buffer: projectedRecords, text: record) != 0 {
+            compilerSourceWorkTableStore(work: work, row: readyRow, column: compilerSourceWorkStatusColumn(), value: compilerSourceWorkStatusFailed())
+            compilerSourceWorkTableStore(work: work, row: readyRow, column: compilerSourceWorkLifecycleColumn(), value: compilerSourceWorkLifecycleCancelled())
+            valid: false
+        } else {
+            if compilerSourceWorkTableStore(work: work, row: readyRow, column: compilerSourceWorkStatusColumn(), value: compilerSourceWorkStatusRendered()) != 0 { valid: false }
+            if compilerSourceWorkTableStore(work: work, row: readyRow, column: compilerSourceWorkLifecycleColumn(), value: compilerSourceWorkLifecycleCompleted()) != 0 { valid: false }
+            if rawBufferAppendText(buffer: traceBuffer, text: "transition\(tab)identity=\(identity)\(tab)from=running\(tab)to=completed\(newline)") != 0 { valid: false }
+            renderedCount: renderedCount + 1
+        }
+        readyRow: compilerSourceWorkLowestReadyRow(work: work)
+    }
+    if renderedCount != fileCount { valid: false }
+
+    state committedCount: Int(0)
+    state commitRow: Int(compilerSourceWorkLowestCommitRow(work: work))
+    while valid && commitRow >= 0 {
+        let identity: Int(compilerIntTableValue(table: work, row: commitRow, column: compilerSourceWorkIdentityColumn()))
+        let commitIdentity: Int(compilerIntTableValue(table: work, row: commitRow, column: compilerSourceWorkCommitIdentityColumn()))
+        if commitIdentity != committedCount { valid: false }
+        let record: String(compilerSourceInventoryFileRecordForValidStore(source: source, store: store, fileID: identity))
+        if valid && rawBufferAppendText(buffer: committedRecords, text: record) != 0 { valid: false }
+        if valid && compilerSourceWorkTableStore(work: work, row: commitRow, column: compilerSourceWorkStatusColumn(), value: compilerSourceWorkStatusCommitted()) != 0 { valid: false }
+        if valid && rawBufferAppendText(buffer: traceBuffer, text: "commit\(tab)identity=\(identity)\(tab)commitIdentity=\(commitIdentity)\(tab)status=committed\(newline)") != 0 { valid: false }
+        if valid { committedCount: committedCount + 1 }
+        commitRow: compilerSourceWorkLowestCommitRow(work: work)
+    }
+    if committedCount != fileCount { valid: false }
+
+    let projectedOutput: String(compilerCoreRawBufferMaterializeAndDestroy(buffer: projectedRecords))
+    let committedOutput: String(compilerCoreRawBufferMaterializeAndDestroy(buffer: committedRecords))
+    let trace: String(compilerCoreRawBufferMaterializeAndDestroy(buffer: traceBuffer))
+    if projectedOutput != committedOutput { valid: false }
+    if compilerIntTableDestroy(table: work) != 0 { valid: false }
+    return CompilerSourceScheduleResult(output: committedOutput, trace: trace, isValid: valid)
+}
+
+function compilerSourceInventoryFileRecordsDirectForValidStore(source: String, store: CompilerSourceStore): String {
+    state output: String("")
+    state fileID: Int(0)
+    let fileCount: Int(compilerSourceStoreFileCount(store: store))
+    while fileID < fileCount {
+        output: "\(output)\(compilerSourceInventoryFileRecordForValidStore(source: source, store: store, fileID: fileID))"
+        fileID: fileID + 1
+    }
+    return output
+}
+
 function compilerSourceInventoryFileRecords(source: String): String {
     let store: CompilerSourceStore(compilerSourceStoreCreate(source: source))
     if !store.isValid || !compilerIntTableIsComplete(table: store.files) {
@@ -12667,25 +12891,26 @@ function compilerSourceInventoryFileRecords(source: String): String {
         return compilerNativeDiagnostic(kind: String("invalidSourceFileTable"))
     }
 
-    let slashPair: String("\\")
-    let slash: String(slashPair.substring(start: 0, end: 1))
-    let tab: String("\(slash)t")
-    let newline: String("\(slash)n")
-    state output: String("")
-    state fileID: Int(0)
-    let fileCount: Int(compilerSourceStoreFileCount(store: store))
-    while fileID < fileCount {
-        let pathStart: Int(compilerSourceStoreFilePathStart(store: store, fileID: fileID))
-        let pathEnd: Int(compilerSourceStoreFilePathEnd(store: store, fileID: fileID))
-        state path: String("")
-        if pathEnd > pathStart {
-            path: stringSubstring(source: source, start: pathStart, end: pathEnd)
-        }
-        output: "\(output)sourceFile\(tab)index=\(fileID)\(tab)role=\(compilerSourceRoleName(role: compilerSourceStoreFileRole(store: store, fileID: fileID)))\(tab)path=\(path)\(newline)"
-        fileID: fileID + 1
+    let scheduled: CompilerSourceScheduleResult(compilerSourceInventoryScheduleForValidStore(source: source, store: store))
+    let direct: String(compilerSourceInventoryFileRecordsDirectForValidStore(source: source, store: store))
+    let destroyStatus: Int(compilerSourceStoreDestroy(store: store))
+    if destroyStatus != 0 { return compilerNativeDiagnostic(kind: String("sourceInventoryOwnershipFailure")) }
+    if !scheduled.isValid { return compilerNativeDiagnostic(kind: String("invalidSourceInventorySchedule")) }
+    if scheduled.output != direct { return compilerNativeDiagnostic(kind: String("sourceInventoryScheduleMismatch")) }
+    return scheduled.output
+}
+
+function compilerSourceScheduleTrace(source: String): String {
+    let store: CompilerSourceStore(compilerSourceStoreCreate(source: source))
+    if !store.isValid || !compilerIntTableIsComplete(table: store.files) {
+        compilerSourceStoreDestroy(store: store)
+        return compilerNativeDiagnostic(kind: String("invalidSourceFileTable"))
     }
-    compilerSourceStoreDestroy(store: store)
-    return output
+    let scheduled: CompilerSourceScheduleResult(compilerSourceInventoryScheduleForValidStore(source: source, store: store))
+    let destroyStatus: Int(compilerSourceStoreDestroy(store: store))
+    if destroyStatus != 0 { return compilerNativeDiagnostic(kind: String("sourceInventoryOwnershipFailure")) }
+    if !scheduled.isValid { return compilerNativeDiagnostic(kind: String("invalidSourceInventorySchedule")) }
+    return scheduled.trace
 }
 
 function compilerSourceInventoryFileCount(source: String): Int {

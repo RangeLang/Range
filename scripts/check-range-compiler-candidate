@@ -102,7 +102,8 @@ discover_sources() {
     local work_root="$2"
     local raw_list="$work_root/source-paths.raw"
     local sorted_list="$work_root/source-paths.sorted"
-    local absolute relative
+    local include_linking_core="${3:-1}"
+    local absolute relative link_plan_source process_source
 
     [[ -d "$directory" ]] || fail "missing compiler directory: $directory"
     directory="$(cd "$directory" && pwd)"
@@ -111,9 +112,23 @@ discover_sources() {
     SOURCE_ROLES=()
 
     [[ -f "$CORE_SOURCE_PATH" ]] || fail "missing compiler Core source: $CORE_SOURCE_PATH"
+    if [[ "$include_linking_core" == "1" ]]; then
+        link_plan_source="$REPO_ROOT/RangeCompiler/Range/Core/Package/LinkPlan.range"
+        process_source="$REPO_ROOT/RangeCompiler/Range/Core/System/Process.range"
+        [[ -f "$link_plan_source" ]] || fail "missing compiler Core source: $link_plan_source"
+        [[ -f "$process_source" ]] || fail "missing compiler Core source: $process_source"
+        SOURCE_FILES+=("$link_plan_source")
+        SOURCE_RELATIVE_PATHS+=("${link_plan_source#"$REPO_ROOT/"}")
+        SOURCE_ROLES+=("core")
+    fi
     SOURCE_FILES+=("$CORE_SOURCE_PATH")
     SOURCE_RELATIVE_PATHS+=("$CORE_SOURCE_MARKER_PATH")
     SOURCE_ROLES+=("core")
+    if [[ "$include_linking_core" == "1" ]]; then
+        SOURCE_FILES+=("$process_source")
+        SOURCE_RELATIVE_PATHS+=("${process_source#"$REPO_ROOT/"}")
+        SOURCE_ROLES+=("core")
+    fi
 
     /usr/bin/find "$directory" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print0 > "$raw_list"
     : > "$sorted_list"
@@ -2231,6 +2246,11 @@ audit_role_markers() {
     local inventory_output="$WORK_ROOT/$stage_label.roles.inventory.out"
     local inventory_error="$WORK_ROOT/$stage_label.roles.inventory.err"
     local expected_inventory="$WORK_ROOT/$stage_label.roles.inventory.expected"
+    local schedule_bundle="$WORK_ROOT/$stage_label.roles.schedule.range"
+    local schedule_output="$WORK_ROOT/$stage_label.roles.schedule.out"
+    local schedule_repeat_output="$WORK_ROOT/$stage_label.roles.schedule.repeat.out"
+    local schedule_error="$WORK_ROOT/$stage_label.roles.schedule.err"
+    local schedule_repeat_error="$WORK_ROOT/$stage_label.roles.schedule.repeat.err"
     local malformed_bundle="$WORK_ROOT/$stage_label.roles.malformed.range"
     local malformed_output="$WORK_ROOT/$stage_label.roles.malformed.out"
     local malformed_error="$WORK_ROOT/$stage_label.roles.malformed.err"
@@ -2242,6 +2262,7 @@ audit_role_markers() {
     local fingerprint_core_bundle="$WORK_ROOT/$stage_label.roles.fingerprint.core.range"
     local fingerprint_core_output="$WORK_ROOT/$stage_label.roles.fingerprint.core.out"
     local fingerprint_core_error="$WORK_ROOT/$stage_label.roles.fingerprint.core.err"
+    local index
 
     write_role_bundle "$identity_bundle" compilerSourceIdentity
     run_capture "$executable" "$identity_bundle" "$identity_output" "$identity_error"
@@ -2265,6 +2286,37 @@ audit_role_markers() {
     require_successful_output "$stage_label role inventory" "$inventory_output" "$inventory_error"
     /usr/bin/cmp -s "$inventory_output" "$expected_inventory" || fail "$stage_label role inventory differs from expected roles"
 
+    write_role_bundle "$schedule_bundle" compilerSourceScheduleTrace
+    run_capture "$executable" "$schedule_bundle" "$schedule_output" "$schedule_error"
+    require_successful_output "$stage_label source schedule trace" "$schedule_output" "$schedule_error"
+    run_capture "$executable" "$schedule_bundle" "$schedule_repeat_output" "$schedule_repeat_error"
+    require_successful_output "$stage_label repeated source schedule trace" "$schedule_repeat_output" "$schedule_repeat_error"
+    /usr/bin/cmp -s "$schedule_output" "$schedule_repeat_output" \
+        || fail "$stage_label source schedule trace was not deterministic"
+    /usr/bin/grep -Fq $'compilerSourceScheduleTrace\tversion=1\tboundary=sourceInventoryFileRecord\tlaneCount=1\tworkCount=6' "$schedule_output" \
+        || fail "$stage_label source schedule trace header changed"
+    [[ "$(/usr/bin/grep -Fc $'work\t' "$schedule_output" || true)" -eq 6 ]] \
+        || fail "$stage_label source schedule trace did not describe six work records"
+    [[ "$(/usr/bin/grep -Fc $'transition\t' "$schedule_output" || true)" -eq 18 ]] \
+        || fail "$stage_label source schedule trace did not describe eighteen lifecycle transitions"
+    [[ "$(/usr/bin/grep -Fc $'commit\t' "$schedule_output" || true)" -eq 6 ]] \
+        || fail "$stage_label source schedule trace did not describe six commits"
+    for index in 0 1 2 3 4 5; do
+        /usr/bin/grep -Fq "work"$'\t'"identity=$index"$'\t'"prerequisiteCount=0"$'\t'"unresolvedCount=0" "$schedule_output" \
+            || fail "$stage_label source schedule trace omitted ready work identity $index"
+        /usr/bin/grep -Fq "transition"$'\t'"identity=$index"$'\t'"from=waiting"$'\t'"to=ready" "$schedule_output" \
+            || fail "$stage_label source schedule trace omitted waiting-to-ready transition $index"
+        /usr/bin/grep -Fq "transition"$'\t'"identity=$index"$'\t'"from=ready"$'\t'"to=running" "$schedule_output" \
+            || fail "$stage_label source schedule trace omitted ready-to-running transition $index"
+        /usr/bin/grep -Fq "transition"$'\t'"identity=$index"$'\t'"from=running"$'\t'"to=completed" "$schedule_output" \
+            || fail "$stage_label source schedule trace omitted running-to-completed transition $index"
+        /usr/bin/grep -Fq "commit"$'\t'"identity=$index"$'\t'"commitIdentity=$index"$'\t'"status=committed" "$schedule_output" \
+            || fail "$stage_label source schedule trace omitted stable commit $index"
+    done
+    if /usr/bin/grep -Eq '(^|[[:space:]])(pid|time|timestamp|duration|pointer)=' "$schedule_output"; then
+        fail "$stage_label source schedule trace exposed nondeterministic runtime data"
+    fi
+
     write_invalid_role_bundle "$malformed_bundle" 'compilerSourceFile\trole=unknown\tpath=Bad.range'
     run_capture "$executable" "$malformed_bundle" "$malformed_output" "$malformed_error"
     [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label malformed role exited $RUN_STATUS"
@@ -2285,7 +2337,7 @@ audit_role_markers() {
     run_capture "$executable" "$fingerprint_core_bundle" "$fingerprint_core_output" "$fingerprint_core_error"
     require_successful_output "$stage_label core fingerprint" "$fingerprint_core_output" "$fingerprint_core_error"
     /usr/bin/cmp -s "$fingerprint_project_first" "$fingerprint_core_output" && fail "$stage_label role-only fingerprint change was not observed"
-    echo "$stage_label roles: pass (five explicit roles, legacy project, malformed rejection, deterministic role-sensitive fingerprint)"
+    echo "$stage_label roles: pass (five explicit roles, deterministic one-lane source schedule, stable commits, malformed rejection, role-sensitive fingerprint)"
 }
 
 audit_driver_source_graph() {
@@ -4792,7 +4844,7 @@ audit_no_legacy_record_lowering() {
         'function compilerCoreLLVMLowerBlockWithControlLegacy(' \
         'function compilerCoreLLVMInstructionRecord(' \
         'function compilerCoreStatementFromRecord('; do
-        if rg -n -F "$marker" "$directory" -g '*.range' >/dev/null; then
+        if rg -n -F "$marker" "$directory" -g '*.range' -g '!**/.range/**' -g '!**/.build/**' >/dev/null; then
             fail "legacy serialized lowering remains reachable in compiler source: $marker"
         fi
     done
@@ -4878,7 +4930,7 @@ main() {
     if [[ -n "$bootstrap_bridge_source_directory" ]]; then
         local bootstrap_bridge_discovery_root="$WORK_ROOT/bootstrap-bridge-source-discovery"
         /bin/mkdir -p "$bootstrap_bridge_discovery_root"
-        discover_sources "$bootstrap_bridge_source_directory" "$bootstrap_bridge_discovery_root"
+        discover_sources "$bootstrap_bridge_source_directory" "$bootstrap_bridge_discovery_root" 0
         bootstrap_bridge_source_bundle="$WORK_ROOT/BootstrapBridgeSourceSet.range"
         write_source_bundle "$bootstrap_bridge_source_bundle"
         bootstrap_bridge_source_inventory_count="${#SOURCE_FILES[@]}"

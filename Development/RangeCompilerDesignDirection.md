@@ -564,13 +564,19 @@ Foundation declarations repeatedly.
 
 ## Concurrency And Determinism
 
-Range already intends to provide Go-like structured concurrency with a
-C/Rust-class memory model. TypeScript 7 validates that direction, but its most
-useful compiler lesson is where ownership boundaries are placed.
+Range concurrency is derived from the same value, control, ownership, and
+effect graph that defines program meaning. Authors do not need to restate those
+dependencies with tasks, workers, channels, `async`, or `await`. The compiler
+proves which graph applications may execute concurrently without changing
+behavior; one runtime scheduler adaptively chooses how much of that legal
+parallelism to use.
+
+The complete implementation plan is tracked in
+`Development/RangeGraphDerivedConcurrencyPlan.md`.
 
 ### Work units
 
-Use semantic work units:
+Use semantic graph applications:
 
 - one source/file parse;
 - one file or declaration plot;
@@ -581,33 +587,38 @@ Use semantic work units:
 - one module/object emission;
 - one project in a dependency DAG.
 
-Do not divide work by arbitrary byte counts or gigabyte chunks.
+Do not divide work by arbitrary byte counts or gigabyte chunks. A function or
+collection transformation needs no concurrency annotation when existing graph
+facts already prove its applications independent.
 
 ### Ownership model
 
 - Authored source, AST snapshots, Foundation data, and committed graph facts
   are immutable and shared.
-- Each worker owns its scratch arena, semantic caches, and uncommitted delta.
-- A raw worker-local `TypeID` or mutable semantic handle never crosses into
-  another worker context without canonicalization.
-- Results cross boundaries as stable IDs, diagnostics, hashes, and graph
-  deltas.
-- Deltas are committed in deterministic `FileID`/`NodeID`/phase order.
+- Each running application owns its scratch arena, semantic caches, and
+  uncommitted delta.
+- A raw application-local `TypeID` or mutable semantic handle never crosses
+  into another application context without canonicalization.
+- Results cross boundaries as ordinary values, stable IDs, diagnostics, hashes,
+  and graph deltas.
+- Deltas are committed in deterministic `FileID`/`NodeID`/phase order, never
+  completion order.
 
 ### Scheduler
 
-Use one bounded, memory-aware compiler scheduler with:
+Use one bounded, memory-aware, adaptive scheduler with:
 
-- a global concurrency limit;
+- ready, running, parked, completed, and cancelled application states;
+- a global concurrency ceiling and adaptive active width;
 - a global outstanding-memory budget;
-- backpressure when queued deltas or IR exceed that budget;
+- backpressure when queued deltas, results, or IR exceed that budget;
 - cancellation and request-scoped cleanup;
 - phase priorities for interactive/LSP requests;
-- a single-threaded deterministic/debug mode.
+- a single-lane deterministic/reference mode.
 
 Whether the executor uses stable fixed partitions, work stealing, or a hybrid
-is benchmark-driven. The invariant is deterministic ownership/commit plus a
-bounded live set, not one scheduling algorithm.
+is benchmark-driven. The invariant is single-lane equivalence, deterministic
+ownership and commit, and a bounded live set—not one scheduling algorithm.
 
 Avoid nested `builder × checker × macro × emitter` pools whose counts multiply
 peak memory.
@@ -1190,17 +1201,22 @@ emitted independently.
 Gate: a body-only edit does not reparse or revalidate unrelated files and does
 not invalidate unchanged public dependents.
 
-### Step 10: Enable Bounded Parallelism
+### Step 10: Enable Graph-Derived Adaptive Parallelism
 
-- parallelize per-file Lexer/Parser/Plotter work;
+- first execute stable semantic work records through a one-lane ready graph;
+- prove that readiness derives from dependencies, ownership, and effects rather
+  than completion timing;
+- parallelize per-file Lexer/Parser/Plotter applications;
 - parallelize macro applications whose read/write sets do not conflict;
 - process independent dependency SCCs concurrently;
-- analyze/lower/emit functions concurrently;
-- enforce one global concurrency and memory budget;
-- commit all outputs in stable order.
+- analyze/lower/emit independent functions concurrently;
+- enforce one global adaptive scheduler and memory budget;
+- park known blocking runtime applications without occupying execution lanes;
+- commit all outputs in stable authored order.
 
-Gate: changing worker count never changes graph hashes, diagnostics, LLVM, or
-program behavior; peak memory stays within the configured budget.
+Gate: changing scheduler width or completion order never changes graph hashes,
+diagnostics, LLVM, or program behavior; peak memory stays within the configured
+budget.
 
 ### Step 11: Complete Memory And Reactivity Graph Views
 
@@ -1221,7 +1237,10 @@ Gate: no memory or reactivity rule depends directly on raw parser structures.
 
 ## Immediate Recommended Slice For The Next Agent
 
-Do not begin with concurrency or a universal macro conversion.
+Do not begin with parallel execution or a universal macro conversion. First
+materialize stable work identities and readiness through a one-lane graph, as
+specified in `Development/RangeGraphDerivedConcurrencyPlan.md`; only then enable
+adaptive scheduling.
 
 The next work is three vertical milestones:
 

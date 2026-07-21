@@ -1,3 +1,7 @@
+function compilerSourceRequestsSourceScheduleTrace(source: String): Bool {
+    return hasRangePrefix(source: source, start: 0, prefix: String("compilerSourceScheduleTrace"))
+}
+
 function compilerSourceRequestsSourceInventory(source: String): Bool {
     return hasRangePrefix(source: source, start: 0, prefix: String("compilerSourceInventory"))
 }

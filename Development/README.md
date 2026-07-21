@@ -12,6 +12,10 @@ implementation tracking surface.
 The current self-hosting direction is tracked in
 `Development/RangeAuthoredCompilerPlan.md`.
 
+Graph-derived concurrency and its next implementation slice are tracked in
+`Development/RangeGraphDerivedConcurrencyPlan.md`. A short explanatory post is
+available at `Development/GraphDerivedConcurrencyPost.md`.
+
 ## Where We Stand
 
 ### Implemented Enough To Treat As Current Baseline
