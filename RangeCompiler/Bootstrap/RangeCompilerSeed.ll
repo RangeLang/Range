@@ -84,13 +84,13 @@
 %Range.CompilerLLVMFunction = type { ptr, ptr, ptr, ptr, %Range.CompilerLLVMBasicBlock }
 %Range.CompilerLLVMBasicBlock = type { ptr, ptr, %Range.CompilerLLVMTerminator }
 %Range.RangeLexedToken = type { i32, i32, i32, ptr }
-%Range.Optional.CompilerSourceRange = type { i1, %Range.CompilerSourceRange }
-%Range.Optional.CompilerFunctionDeclarationParts = type { i1, %Range.CompilerFunctionDeclarationParts }
 %Range.Optional.RangeLexedToken = type { i1, %Range.RangeLexedToken }
+%Range.Optional.CompilerSourceRange = type { i1, %Range.CompilerSourceRange }
 %Range.Optional.CompilerTypeReference = type { i1, %Range.CompilerTypeReference }
 %Range.Optional.CompilerMacroApplicationParts = type { i1, %Range.CompilerMacroApplicationParts }
 %Range.Optional.CompilerMacroDeclarationParts = type { i1, %Range.CompilerMacroDeclarationParts }
 %Range.Optional.CompilerConstructDeclarationParts = type { i1, %Range.CompilerConstructDeclarationParts }
+%Range.Optional.CompilerFunctionDeclarationParts = type { i1, %Range.CompilerFunctionDeclarationParts }
 %Range.Optional.CompilerMainBlock = type { i1, %Range.CompilerMainBlock }
 %Range.Optional.CompilerStatement = type { i1, %Range.CompilerStatement }
 %Range.Optional.CompilerExpression = type { i1, %Range.CompilerExpression }
@@ -115093,21 +115093,6 @@ declare ptr @processBatch(i32 %maximumParallelism)
 declare ptr @processBatchAppendingPlan(ptr %batch, ptr %plan)
 declare i32 @processBatchRun(ptr %batch)
 declare ptr @compilerCoreASTSummary(ptr %source)
-declare i32 @compilerMacroCapabilityAuthorityRead()
-declare i32 @compilerDeclarationIndexAnyMemberFunctionLookup(ptr %tables, ptr %index, ptr %name)
-declare i32 @compilerFunctionSelectionCount(ptr %selection)
-declare i32 @compilerFunctionSelectionFirstDifference(ptr %left, ptr %right)
-declare i32 @compilerFunctionReachabilityRecordTarget(ptr %tables, ptr %index, ptr %selection, ptr %worklist, ptr %edgeOwners, ptr %edgeTargets, i32 %ownerFunctionRow, ptr %targetName)
-declare i32 @compilerFunctionReachabilityScanRange(ptr %source, i32 %start, i32 %end, ptr %tables, ptr %index, ptr %selection, ptr %worklist, ptr %edgeOwners, ptr %edgeTargets, i32 %ownerFunctionRow, i1 %scanInterpolations)
-declare i32 @compilerFunctionReachabilityScanInterpolations(ptr %content, ptr %tables, ptr %index, ptr %selection, ptr %worklist, ptr %edgeOwners, ptr %edgeTargets, i32 %ownerFunctionRow)
-declare i32 @compilerFunctionReachabilitySeedRoots(ptr %tables, ptr %index, ptr %selection, ptr %worklist, ptr %rootNames)
-declare i32 @compilerFunctionReachabilityExpand(ptr %tables, ptr %index, ptr %selection, ptr %worklist, ptr %edgeOwners, ptr %edgeTargets)
-declare ptr @compilerFunctionReachabilityCreate(ptr %tables, ptr %index, ptr %rootNames)
-declare i32 @compilerFunctionReachabilityDestroy(ptr %reachability)
-declare i1 @compilerMacroTargetKindAccepts(i32 %surfaceKind, i32 %targetKind)
-declare ptr @compilerTypedSyntaxCaptureTopLevelToken(ptr %source, ptr %tables, i32 %declarationOrdinal, ptr %token)
-declare ptr @compilerTypedSyntaxCaptureConstruct(ptr %source, ptr %tables, i32 %declarationOrdinal, ptr %keyword)
-declare ptr @compilerTypedSyntaxCaptureFunction(ptr %source, ptr %tables, i32 %declarationOrdinal, ptr %keyword)
 declare i32 @compilerSemanticNamedDeclarationByText(ptr %tables, ptr %name, i32 %requiredKind)
 declare ptr @compilerSemanticTrimTypeName(ptr %typeName)
 declare i32 @compilerMemoryRepresentationChangeValueRemoved()
@@ -115207,6 +115192,21 @@ declare ptr @compilerCoreSimpleExpressionFromToken(ptr %token)
 declare ptr @compilerCoreSimpleNameExpressionFromToken(ptr %token, ptr %tokenKind)
 declare ptr @compilerCoreIdentifierOrBoolExpressionFromToken(ptr %token)
 declare ptr @parseCompilerStatementLegacy(ptr %program, i32 %start, i32 %bodyEnd)
+declare i32 @compilerMacroCapabilityAuthorityRead()
+declare i32 @compilerDeclarationIndexAnyMemberFunctionLookup(ptr %tables, ptr %index, ptr %name)
+declare i32 @compilerFunctionSelectionCount(ptr %selection)
+declare i32 @compilerFunctionSelectionFirstDifference(ptr %left, ptr %right)
+declare i32 @compilerFunctionReachabilityRecordTarget(ptr %tables, ptr %index, ptr %selection, ptr %worklist, ptr %edgeOwners, ptr %edgeTargets, i32 %ownerFunctionRow, ptr %targetName)
+declare i32 @compilerFunctionReachabilityScanRange(ptr %source, i32 %start, i32 %end, ptr %tables, ptr %index, ptr %selection, ptr %worklist, ptr %edgeOwners, ptr %edgeTargets, i32 %ownerFunctionRow, i1 %scanInterpolations)
+declare i32 @compilerFunctionReachabilityScanInterpolations(ptr %content, ptr %tables, ptr %index, ptr %selection, ptr %worklist, ptr %edgeOwners, ptr %edgeTargets, i32 %ownerFunctionRow)
+declare i32 @compilerFunctionReachabilitySeedRoots(ptr %tables, ptr %index, ptr %selection, ptr %worklist, ptr %rootNames)
+declare i32 @compilerFunctionReachabilityExpand(ptr %tables, ptr %index, ptr %selection, ptr %worklist, ptr %edgeOwners, ptr %edgeTargets)
+declare ptr @compilerFunctionReachabilityCreate(ptr %tables, ptr %index, ptr %rootNames)
+declare i32 @compilerFunctionReachabilityDestroy(ptr %reachability)
+declare i1 @compilerMacroTargetKindAccepts(i32 %surfaceKind, i32 %targetKind)
+declare ptr @compilerTypedSyntaxCaptureTopLevelToken(ptr %source, ptr %tables, i32 %declarationOrdinal, ptr %token)
+declare ptr @compilerTypedSyntaxCaptureConstruct(ptr %source, ptr %tables, i32 %declarationOrdinal, ptr %keyword)
+declare ptr @compilerTypedSyntaxCaptureFunction(ptr %source, ptr %tables, i32 %declarationOrdinal, ptr %keyword)
 declare ptr @rangeTokenKindName(ptr %kind)
 declare ptr @lexRangeSource(ptr %source)
 declare ptr @rangeLexerSingleBackslash()

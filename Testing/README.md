@@ -45,7 +45,9 @@ the Range-loaded bundle as the Stage 3 input.
 The transitional compiler source layout keeps source-marker decoding, source
 roles, stable `FileID` mapping, source-store access, and inventory/identity
 snapshots in `CompilerSources.range`. `CompilerCore.range` retains shared model
-types and the remaining compiler phases while those phases are extracted at
+types and the remaining graph/backend phases. The contiguous pre-graph typed
+syntax, body capture, macro linking, and macro-execution implementation lives
+in `CompilerFrontend.range`. These temporary boundaries are accepted only at
 individually verified fixed points.
 
 Each gate prints explicit checkpoint edges. A reported edge proves only that
