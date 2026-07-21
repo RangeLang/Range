@@ -84,16 +84,16 @@
 %Range.CompilerLLVMFunction = type { ptr, ptr, ptr, ptr, %Range.CompilerLLVMBasicBlock }
 %Range.CompilerLLVMBasicBlock = type { ptr, ptr, %Range.CompilerLLVMTerminator }
 %Range.RangeLexedToken = type { i32, i32, i32, ptr }
+%Range.Optional.CompilerMainBlock = type { i1, %Range.CompilerMainBlock }
 %Range.Optional.RangeLexedToken = type { i1, %Range.RangeLexedToken }
 %Range.Optional.CompilerSourceRange = type { i1, %Range.CompilerSourceRange }
+%Range.Optional.CompilerStatement = type { i1, %Range.CompilerStatement }
+%Range.Optional.CompilerExpression = type { i1, %Range.CompilerExpression }
+%Range.Optional.CompilerFunctionDeclarationParts = type { i1, %Range.CompilerFunctionDeclarationParts }
 %Range.Optional.CompilerTypeReference = type { i1, %Range.CompilerTypeReference }
 %Range.Optional.CompilerMacroApplicationParts = type { i1, %Range.CompilerMacroApplicationParts }
 %Range.Optional.CompilerMacroDeclarationParts = type { i1, %Range.CompilerMacroDeclarationParts }
 %Range.Optional.CompilerConstructDeclarationParts = type { i1, %Range.CompilerConstructDeclarationParts }
-%Range.Optional.CompilerFunctionDeclarationParts = type { i1, %Range.CompilerFunctionDeclarationParts }
-%Range.Optional.CompilerMainBlock = type { i1, %Range.CompilerMainBlock }
-%Range.Optional.CompilerStatement = type { i1, %Range.CompilerStatement }
-%Range.Optional.CompilerExpression = type { i1, %Range.CompilerExpression }
 
 @.str.11 = private unnamed_addr constant [2 x i8] c"\0A\00"
 @.str.15 = private unnamed_addr constant [24 x i8] c"range: unable to write \00"
@@ -115093,21 +115093,6 @@ declare ptr @processBatch(i32 %maximumParallelism)
 declare ptr @processBatchAppendingPlan(ptr %batch, ptr %plan)
 declare i32 @processBatchRun(ptr %batch)
 declare ptr @compilerCoreASTSummary(ptr %source)
-declare ptr @parseCompilerProgramForLLVMNamedBodies(ptr %source, ptr %bodyFunctionNames)
-declare ptr @compilerCoreSymbolSummary(ptr %source)
-declare ptr @compilerCoreTypeSummary(ptr %source)
-declare ptr @parseCompilerTopLevelDeclarations(ptr %source)
-declare ptr @compilerCoreDeclarationSummary(ptr %source)
-declare ptr @compilerCoreFunctionDeclarationSummary(ptr %source)
-declare ptr @compilerCoreParseBalancedRangeScanningToken(ptr %cursor, i32 %rangeStart, ptr %leftKind, ptr %rightKind, i32 %depth, ptr %token)
-declare ptr @compilerCoreParseBalancedRangeScanningTokenWithDepth(ptr %cursor, i32 %rangeStart, ptr %leftKind, ptr %rightKind, i32 %nextDepth, ptr %token)
-declare ptr @compilerCoreParseBalancedRangeClosingToken(ptr %cursor, i32 %rangeStart, ptr %leftKind, ptr %rightKind, i32 %nextDepth, ptr %token)
-declare ptr @compilerCoreParseBalancedRangeContinue(ptr %cursor, i32 %rangeStart, ptr %leftKind, ptr %rightKind, i32 %nextDepth, ptr %token)
-declare i32 @compilerCoreBalancedRangeNextDepth(ptr %token, ptr %leftKind, ptr %rightKind, i32 %depth)
-declare ptr @compilerCoreParseTypeReferenceScanning(ptr %parseState)
-declare ptr @compilerCoreParseBodyRangeAfterName(ptr %source, ptr %nameToken)
-declare ptr @compilerCoreParseParameterRangeAfterName(ptr %source, ptr %nameToken)
-declare ptr @compilerCoreParseReturnTypeAfterParameters(ptr %source, ptr %parameterRange)
 declare ptr @compilerCoreLLVM(ptr %source)
 declare ptr @compilerCoreMainLLVM(ptr %block)
 declare ptr @compilerCoreRenderLLVMFunctionDeclarations(ptr %program)
@@ -115206,6 +115191,21 @@ declare i32 @compilerSemanticNamedDeclarationByText(ptr %tables, ptr %name, i32 
 declare ptr @compilerSemanticTrimTypeName(ptr %typeName)
 declare i32 @compilerMemoryRepresentationChangeValueRemoved()
 declare i32 @compilerMemoryLastReturnInRegion(ptr %tables, ptr %delta, i32 %regionNodeID)
+declare ptr @parseCompilerProgramForLLVMNamedBodies(ptr %source, ptr %bodyFunctionNames)
+declare ptr @compilerCoreSymbolSummary(ptr %source)
+declare ptr @compilerCoreTypeSummary(ptr %source)
+declare ptr @parseCompilerTopLevelDeclarations(ptr %source)
+declare ptr @compilerCoreDeclarationSummary(ptr %source)
+declare ptr @compilerCoreFunctionDeclarationSummary(ptr %source)
+declare ptr @compilerCoreParseBalancedRangeScanningToken(ptr %cursor, i32 %rangeStart, ptr %leftKind, ptr %rightKind, i32 %depth, ptr %token)
+declare ptr @compilerCoreParseBalancedRangeScanningTokenWithDepth(ptr %cursor, i32 %rangeStart, ptr %leftKind, ptr %rightKind, i32 %nextDepth, ptr %token)
+declare ptr @compilerCoreParseBalancedRangeClosingToken(ptr %cursor, i32 %rangeStart, ptr %leftKind, ptr %rightKind, i32 %nextDepth, ptr %token)
+declare ptr @compilerCoreParseBalancedRangeContinue(ptr %cursor, i32 %rangeStart, ptr %leftKind, ptr %rightKind, i32 %nextDepth, ptr %token)
+declare i32 @compilerCoreBalancedRangeNextDepth(ptr %token, ptr %leftKind, ptr %rightKind, i32 %depth)
+declare ptr @compilerCoreParseTypeReferenceScanning(ptr %parseState)
+declare ptr @compilerCoreParseBodyRangeAfterName(ptr %source, ptr %nameToken)
+declare ptr @compilerCoreParseParameterRangeAfterName(ptr %source, ptr %nameToken)
+declare ptr @compilerCoreParseReturnTypeAfterParameters(ptr %source, ptr %parameterRange)
 declare ptr @compilerTypedIRFixedLLVMIfSupported(ptr %source)
 declare ptr @rangeTokenKindName(ptr %kind)
 declare ptr @lexRangeSource(ptr %source)
