@@ -428,6 +428,24 @@ audit_candidate_build_plan_snapshot() {
 
     assert_candidate_build_plan_unchanged
 }
+
+materialize_candidate_source_bundle() {
+    local stage_label="$1"
+    local executable="$2"
+    local output_bundle="$3"
+    local command_output="$WORK_ROOT/$stage_label.source-load.out"
+    local command_error="$WORK_ROOT/$stage_label.source-load.err"
+
+    run_capture_arguments "$command_output" "$command_error" \
+        "$executable" load-plan-sources "$CANDIDATE_BUILD_PLAN" "$REPO_ROOT" "$compiler_directory" "$output_bundle"
+    [[ "$RUN_STATUS" -eq 0 ]] || fail "$stage_label source load exited $RUN_STATUS: $(/usr/bin/head -c 240 "$command_output")"
+    [[ ! -s "$command_output" ]] || fail "$stage_label source load wrote stdout: $(/usr/bin/head -c 240 "$command_output")"
+    [[ ! -s "$command_error" ]] || fail "$stage_label source load wrote stderr: $(/usr/bin/head -c 240 "$command_error")"
+    [[ -s "$output_bundle" ]] || fail "$stage_label source load produced an empty bundle"
+    /usr/bin/cmp -s "$SOURCE_BUNDLE" "$output_bundle" \
+        || fail "$stage_label Range-loaded source bundle differs from the shell-authored bundle"
+    echo "$stage_label Range-loaded source bundle: byte-identical to shell-authored bundle"
+}
 run_capture() {
     local executable="$1"
     local input="$2"
@@ -5524,6 +5542,9 @@ main() {
     audit_candidate_build_plan_snapshot Stage2 "$stage2_executable"
     echo "checkpoint compiler-candidate:stage2-plan-read: pass"
     echo "Stage 2 build plan snapshot: deterministic"
+    local stage2_loaded_source_bundle="$WORK_ROOT/Stage2.RangeLoadedSourceSet.range"
+    materialize_candidate_source_bundle Stage2 "$stage2_executable" "$stage2_loaded_source_bundle"
+    echo "checkpoint compiler-candidate:stage2-source-loaded: pass"
     if [[ "$checkpoint_mode" == stage2-plan ]]; then
         echo "Range compiler Stage 2 plan checkpoint succeeded."
         printf 'compiler_directory=%s\n' "$compiler_directory"
@@ -5538,12 +5559,17 @@ main() {
     echo "checkpoint compiler-candidate:stage2-audited: pass"
     assert_candidate_build_plan_unchanged
 
-    emit_candidate_llvm "$stage2_executable" "$SOURCE_BUNDLE" "$stage3_llvm" stage3
+    emit_candidate_llvm "$stage2_executable" "$stage2_loaded_source_bundle" "$stage3_llvm" stage3
     echo "checkpoint compiler-candidate:stage3-emitted: pass"
     validate_llvm "$stage3_llvm"
     echo "checkpoint compiler-candidate:stage3-validated: pass"
     link_llvm "$stage3_llvm" "$stage3_executable"
     echo "checkpoint compiler-candidate:stage3-linked: pass"
+    local stage3_loaded_source_bundle="$WORK_ROOT/Stage3.RangeLoadedSourceSet.range"
+    materialize_candidate_source_bundle Stage3 "$stage3_executable" "$stage3_loaded_source_bundle"
+    /usr/bin/cmp -s "$stage2_loaded_source_bundle" "$stage3_loaded_source_bundle" \
+        || fail "Stage 2 and Stage 3 Range-loaded source bundles differ"
+    echo "checkpoint compiler-candidate:stage3-source-loaded: pass"
     /usr/bin/cmp -s "$stage2_llvm" "$stage3_llvm" || fail "Stage 2 and Stage 3 LLVM are not byte-identical"
     /usr/bin/cmp -s "$stage2_executable" "$stage3_executable" || fail "Stage 2 and Stage 3 executables are not byte-identical"
     echo "checkpoint compiler-candidate:stage3-fixed-point: pass"

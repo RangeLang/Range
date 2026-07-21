@@ -19,6 +19,16 @@
             return rangeCompilerCLIEmitLLVM(input: commandLineArgument(index: 1), outputPath: commandLineArgument(index: 2))
         }
     }
+    if argumentCount == 5 {
+        let command: String(commandLineArgument(index: 0))
+        if command == String("load-plan-sources") {
+            return rangeCompilerCLILoadPlanSources(
+                plan: commandLineArgument(index: 1),
+                repoRoot: commandLineArgument(index: 2),
+                candidateRoot: commandLineArgument(index: 3),
+                outputPath: commandLineArgument(index: 4))
+        }
+    }
     if argumentCount == 7 {
         let command: String(commandLineArgument(index: 0))
         if command == String("link") {
@@ -45,7 +55,22 @@
 }
 
 function rangeCompilerCLIUsage(): String {
-    return "usage:\n  range compile <input.range>\n  range check <input.range>\n  range emit-llvm <input.range> <output.ll>\n  range link <input.ll> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>\n  range build <input.range> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>"
+    return "usage:\n  range compile <input.range>\n  range check <input.range>\n  range emit-llvm <input.range> <output.ll>\n  range load-plan-sources <plan.tsv> <repo-root> <candidate-root> <output.range>\n  range link <input.ll> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>\n  range build <input.range> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>"
+}
+
+function rangeCompilerCLILoadPlanSources(plan: String, repoRoot: String, candidateRoot: String, outputPath: String): Int {
+    let source: String(readFile(path: plan))
+    let bundle: String(compilerBuildPlanLoadSourceBundle(source: source, repoRoot: repoRoot, candidateRoot: candidateRoot))
+    if hasRangePrefix(source: bundle, start: 0, prefix: String("compilerError")) {
+        print(value: bundle)
+        return 65
+    }
+    let writeStatus: Int(writeFile(path: outputPath, text: bundle))
+    if writeStatus != 0 {
+        print(value: "range: unable to write \(outputPath)")
+        return writeStatus
+    }
+    return 0
 }
 
 function rangeCompilerCLICompile(input: String, printOutput: Bool): Int {

@@ -15,7 +15,7 @@ surface is operational. Run the supported validation ladder from cheapest to
 broadest:
 
 ```sh
-# Focused, low-memory Range-authored build-plan reader; cached after first build.
+# Focused, low-memory Range-authored build-plan reader/source loader; cached after first build.
 scripts/range check-build-plan
 
 # Focused RootValue ownership regression using a content-addressed Stage 2 cache.
@@ -34,6 +34,13 @@ scripts/range check-compiler-candidate
 scripts/range check-stage2-compiler
 scripts/range compiler progression
 ```
+
+The focused build-plan gate also proves that Range resolves the plan's logical
+`repo` and `candidate` roots, loads sources in contiguous plan/FileID order,
+checks their declared byte lengths, and materializes a source bundle that is
+byte-identical to the shell-authored bundle. The candidate smoke gate repeats
+that comparison with the real compiler source set; the full candidate then uses
+the Range-loaded bundle as the Stage 3 input.
 
 Each gate prints explicit checkpoint edges. A reported edge proves only that
 edge and its prerequisites; it must not be interpreted as evidence that later

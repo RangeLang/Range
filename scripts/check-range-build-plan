@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
 READER="$REPO_ROOT/RangeCompiler/Range/Programs/Compiler/CompilerBuildPlan.range"
-SCHEMA_VERSION="focused-build-plan-harness-v1"
+SCHEMA_VERSION="focused-build-plan-harness-v2"
 CACHE_ROOT="${RANGE_BUILD_PLAN_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Library/Caches}/Range/build-plan}"
 
 fail() {
@@ -83,16 +83,27 @@ function compilerCoreParseDecimalInt(value: String): Int {
 }
 
 @main {
-    if commandLineArgumentCount() != 1 {
-        print(value: "usage: range-build-plan-reader <plan>")
-        return 64
+    if commandLineArgumentCount() == 1 {
+        let snapshot: String(compilerBuildPlanSnapshot(source: readFile(path: commandLineArgument(index: 0))))
+        print(value: snapshot)
+        if hasRangePrefix(source: snapshot, start: 0, prefix: String("compilerError")) {
+            return 65
+        }
+        return 0
     }
-    let snapshot: String(compilerBuildPlanSnapshot(source: readFile(path: commandLineArgument(index: 0))))
-    print(value: snapshot)
-    if hasRangePrefix(source: snapshot, start: 0, prefix: String("compilerError")) {
-        return 65
+    if commandLineArgumentCount() == 5 && commandLineArgument(index: 0) == String("load-plan-sources") {
+        let bundle: String(compilerBuildPlanLoadSourceBundle(
+            source: readFile(path: commandLineArgument(index: 1)),
+            repoRoot: commandLineArgument(index: 2),
+            candidateRoot: commandLineArgument(index: 3)))
+        if hasRangePrefix(source: bundle, start: 0, prefix: String("compilerError")) {
+            print(value: bundle)
+            return 65
+        }
+        return writeFile(path: commandLineArgument(index: 4), text: bundle)
     }
-    return 0
+    print(value: "usage: range-build-plan-reader <plan> | load-plan-sources <plan> <repo-root> <candidate-root> <output>")
+    return 64
 }
 RANGE
 }
@@ -110,6 +121,9 @@ write_bundle() {
 
 write_positive_plan() {
     local output="$1"
+    local repo_source="$2"
+    local candidate_source="$3"
+    local source_bundle="$4"
     local hash=0000000000000000000000000000000000000000000000000000000000000000
     local index runtime_count path
     /usr/bin/printf 'rangeBuildPlan\tversion=1\n' > "$output"
@@ -123,17 +137,41 @@ write_positive_plan() {
         /usr/bin/printf 'runtime\tindex=%s\tid=runtime-%s\tpath=repo/%s\tsha256=%s\tbytes=%s\n' \
             "$index" "$index" "$path" "$(manifest_value "runtimeSources.$index.sha256")" "$(bytes "$REPO_ROOT/$path")" >> "$output"
     done
-    /usr/bin/printf 'sourceSet\tid=focused-sources\tpath=candidate/FocusedSourceSet.range\tsha256=%s\tbytes=1\n' "$hash" >> "$output"
-    /usr/bin/printf 'source\tindex=0\tid=source-0\tsourceSet=focused-sources\trole=project\troot=candidate\tpath=CompilerBuildPlan.range\tsha256=%s\tbytes=%s\n' "$hash" "$(bytes "$READER")" >> "$output"
+    /usr/bin/printf 'sourceSet\tid=focused-sources\tpath=candidate/FocusedSourceSet.range\tsha256=%s\tbytes=%s\n' "$(sha256 "$source_bundle")" "$(bytes "$source_bundle")" >> "$output"
+    /usr/bin/printf 'source\tindex=0\tid=source-0\tsourceSet=focused-sources\trole=core\troot=repo\tpath=Core.range\tsha256=%s\tbytes=%s\n' "$(sha256 "$repo_source")" "$(bytes "$repo_source")" >> "$output"
+    /usr/bin/printf 'source\tindex=1\tid=source-1\tsourceSet=focused-sources\trole=project\troot=candidate\tpath=Project.range\tsha256=%s\tbytes=%s\n' "$(sha256 "$candidate_source")" "$(bytes "$candidate_source")" >> "$output"
     /usr/bin/printf 'artifact\tid=focused-snapshot\tpath=candidate/.range/Build/Focused.snapshot\tsha256=%s\tbytes=1\n' "$hash" >> "$output"
     /usr/bin/printf 'application\tindex=0\tid=focused-read\tkind=read\tinput=focused-sources\tartifact=focused-snapshot\n' >> "$output"
     /usr/bin/printf 'gate\tid=focused-valid\tkind=validate\tleft=focused-read\tright=focused-snapshot\n' >> "$output"
     /usr/bin/printf 'assert\tid=focused-repeat\tkind=byte-identical\tsubject=focused-snapshot\texpected=focused-snapshot\n' >> "$output"
 }
 
+write_expected_source_bundle() {
+    local output="$1"
+    local repo_source="$2"
+    local candidate_source="$3"
+    /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=Core.range\n' >> "$output"
+    /bin/cat "$repo_source" >> "$output"
+    [[ -z "$(/usr/bin/tail -c 1 "$repo_source")" ]] || /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=Project.range\n' >> "$output"
+    /bin/cat "$candidate_source" >> "$output"
+    [[ -z "$(/usr/bin/tail -c 1 "$candidate_source")" ]] || /usr/bin/printf '\n' >> "$output"
+}
+
 run_reader() {
     local executable="$1" input="$2" output="$3" error="$4"
     if "$executable" "$input" > "$output" 2> "$error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+}
+
+run_capture_arguments() {
+    local output="$1" error="$2"
+    shift 2
+    if "$@" > "$output" 2> "$error"; then
         RUN_STATUS=0
     else
         RUN_STATUS=$?
@@ -210,7 +248,14 @@ main() {
     local positive="$WORK_ROOT/positive.tsv"
     local first="$WORK_ROOT/positive.first.snapshot" second="$WORK_ROOT/positive.second.snapshot"
     local first_error="$WORK_ROOT/positive.first.err" second_error="$WORK_ROOT/positive.second.err"
-    write_positive_plan "$positive"
+    local repo_source_root="$WORK_ROOT/repo-root" candidate_source_root="$WORK_ROOT/candidate-root"
+    local repo_source="$repo_source_root/Core.range" candidate_source="$candidate_source_root/Project.range"
+    local expected_source_bundle="$WORK_ROOT/expected-source-bundle.range"
+    /bin/mkdir -p "$repo_source_root" "$candidate_source_root"
+    /usr/bin/printf '%s\n' 'function focusedCore(): Int { return 3 }' > "$repo_source"
+    /usr/bin/printf '%s\n' '@main { return focusedCore() + 4 }' > "$candidate_source"
+    write_expected_source_bundle "$expected_source_bundle" "$repo_source" "$candidate_source"
+    write_positive_plan "$positive" "$repo_source" "$candidate_source" "$expected_source_bundle"
     run_reader "$cached_executable" "$positive" "$first" "$first_error"
     [[ "$RUN_STATUS" -eq 0 && ! -s "$first_error" ]] || fail "positive plan failed"
     run_reader "$cached_executable" "$positive" "$second" "$second_error"
@@ -218,13 +263,30 @@ main() {
     /usr/bin/cmp -s "$first" "$second" || fail "positive snapshots are not byte-identical"
     local expected="$WORK_ROOT/positive.expected"
     {
-        /usr/bin/printf 'buildPlan\tversion=1\tvalid=true\ttargetCount=1\ttoolCount=1\tinputCount=1\truntimeCount=%s\tsourceSetCount=1\tsourceCount=1\tartifactCount=1\tapplicationCount=1\tgateCount=1\tassertCount=1\n' "$runtime_count"
+        /usr/bin/printf 'buildPlan\tversion=1\tvalid=true\ttargetCount=1\ttoolCount=1\tinputCount=1\truntimeCount=%s\tsourceSetCount=1\tsourceCount=2\tartifactCount=1\tapplicationCount=1\tgateCount=1\tassertCount=1\n' "$runtime_count"
         /usr/bin/tail -n +2 "$positive"
         /usr/bin/printf '\n'
     } > "$expected"
     /usr/bin/cmp -s "$first" "$expected" \
         || fail "positive snapshot differs from the exact canonical snapshot (actual $(bytes "$first") bytes, expected $(bytes "$expected") bytes)"
     echo "checkpoint build-plan:positive-snapshot: pass"
+
+    local loaded_first="$WORK_ROOT/loaded.first.range" loaded_second="$WORK_ROOT/loaded.second.range"
+    local loaded_output="$WORK_ROOT/loaded.out" loaded_error="$WORK_ROOT/loaded.err"
+    run_capture_arguments "$loaded_output" "$loaded_error" "$cached_executable" load-plan-sources "$positive" "$repo_source_root" "$candidate_source_root" "$loaded_first"
+    [[ "$RUN_STATUS" -eq 0 && ! -s "$loaded_output" && ! -s "$loaded_error" ]] || fail "positive source load failed"
+    run_capture_arguments "$loaded_output" "$loaded_error" "$cached_executable" load-plan-sources "$positive" "$repo_source_root/" "$candidate_source_root/" "$loaded_second"
+    [[ "$RUN_STATUS" -eq 0 && ! -s "$loaded_output" && ! -s "$loaded_error" ]] || fail "repeated source load failed"
+    /usr/bin/cmp -s "$loaded_first" "$loaded_second" || fail "loaded source bundles are not byte-identical"
+    /usr/bin/cmp -s "$loaded_first" "$expected_source_bundle" || fail "Range-loaded bundle differs from shell-authored bundle"
+    echo "checkpoint build-plan:source-bundle-byte-identical: pass"
+
+    local bad_source_bytes="$WORK_ROOT/source-bytes-mismatch.tsv"
+    /usr/bin/awk -F '\t' 'BEGIN { OFS="\t" } $1 == "source" && $2 == "index=1" { sub(/^bytes=[0-9]+$/, "bytes=1", $9) } { print }' "$positive" > "$bad_source_bytes"
+    run_capture_arguments "$loaded_output" "$loaded_error" "$cached_executable" load-plan-sources "$bad_source_bytes" "$repo_source_root" "$candidate_source_root" "$WORK_ROOT/rejected.range"
+    [[ "$RUN_STATUS" -eq 65 && ! -s "$loaded_error" ]] || fail "source byte mismatch did not reject"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidBuildPlan\treason=sourceBytesMismatch\tline=' "$loaded_output" || fail "source byte mismatch diagnostic changed"
+    echo "checkpoint build-plan:source-bytes-mismatch: pass"
 
     local unsupported="$WORK_ROOT/unsupported-version.tsv"
     /usr/bin/printf 'rangeBuildPlan\tversion=2\n' > "$unsupported"

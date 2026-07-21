@@ -11,6 +11,66 @@ construct CompilerBuildPlanRecordValidation {
     let index: Int
 }
 
+function compilerBuildPlanLoadSourceBundle(source: String, repoRoot: String, candidateRoot: String): String {
+    let planSnapshot: String(compilerBuildPlanSnapshot(source: source))
+    if hasRangePrefix(source: planSnapshot, start: 0, prefix: String("compilerError")) {
+        return planSnapshot
+    }
+
+    let sourceLength: Int(stringLength(value: source))
+    let newline: String(compilerCoreNewlineCharacter())
+    let slashPair: String("\\")
+    let slash: String(slashPair.substring(start: 0, end: 1))
+    state bundle: String("compilerNativeSourceSetLLVMText\(newline)")
+    state lineStart: Int(0)
+    state lineNumber: Int(1)
+    state fileID: Int(0)
+
+    while lineStart < sourceLength {
+        let lineEnd: Int(compilerBuildPlanLineEnd(source: source, start: lineStart))
+        let recordType: String(compilerBuildPlanFieldText(source: source, start: lineStart, end: lineEnd, ordinal: 0))
+        if recordType == String("source") {
+            let role: String(compilerBuildPlanFieldValue(source: source, start: lineStart, end: lineEnd, ordinal: 4))
+            let root: String(compilerBuildPlanFieldValue(source: source, start: lineStart, end: lineEnd, ordinal: 5))
+            let path: String(compilerBuildPlanFieldValue(source: source, start: lineStart, end: lineEnd, ordinal: 6))
+            let expectedBytesText: String(compilerBuildPlanFieldValue(source: source, start: lineStart, end: lineEnd, ordinal: 8))
+            let expectedBytes: Int(compilerCoreParseDecimalInt(value: expectedBytesText))
+            state rootPath: String(repoRoot)
+            if root == String("candidate") {
+                rootPath: candidateRoot
+            }
+            if stringLength(value: rootPath) == 0 {
+                return compilerBuildPlanError(reason: String("missingSourceRoot"), line: lineNumber)
+            }
+            let resolvedPath: String(compilerBuildPlanResolvedPath(root: rootPath, path: path))
+            let fileSource: String(readFile(path: resolvedPath))
+            if stringLength(value: fileSource) != expectedBytes {
+                return compilerBuildPlanError(reason: String("sourceBytesMismatch"), line: lineNumber)
+            }
+            bundle: "\(bundle)compilerSourceFile\(slash)trole=\(role)\(slash)tpath=\(path)\(newline)\(fileSource)"
+            if stringByteAt(source: fileSource, index: expectedBytes - 1) != 10 {
+                bundle: "\(bundle)\(newline)"
+            }
+            fileID: fileID + 1
+        }
+        lineStart: lineEnd + 1
+        lineNumber: lineNumber + 1
+    }
+
+    if fileID == 0 {
+        return compilerBuildPlanError(reason: String("sourceCount"), line: lineNumber)
+    }
+    return bundle
+}
+
+function compilerBuildPlanResolvedPath(root: String, path: String): String {
+    let rootLength: Int(stringLength(value: root))
+    if rootLength > 0 && stringByteAt(source: root, index: rootLength - 1) == 47 {
+        return "\(root)\(path)"
+    }
+    return "\(root)/\(path)"
+}
+
 function compilerBuildPlanSnapshot(source: String): String {
     let sourceLength: Int(stringLength(value: source))
     if sourceLength == 0 {
