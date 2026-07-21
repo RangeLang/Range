@@ -19,12 +19,33 @@
             return rangeCompilerCLIEmitLLVM(input: commandLineArgument(index: 1), outputPath: commandLineArgument(index: 2))
         }
     }
+    if argumentCount == 7 {
+        let command: String(commandLineArgument(index: 0))
+        if command == String("link") {
+            return rangeCompilerCLILink(
+                inputLLVM: commandLineArgument(index: 1),
+                outputExecutable: commandLineArgument(index: 2),
+                hostRuntime: commandLineArgument(index: 3),
+                stringRuntime: commandLineArgument(index: 4),
+                rawBufferRuntime: commandLineArgument(index: 5),
+                metricsRuntime: commandLineArgument(index: 6))
+        }
+        if command == String("build") {
+            return rangeCompilerCLIBuild(
+                input: commandLineArgument(index: 1),
+                outputExecutable: commandLineArgument(index: 2),
+                hostRuntime: commandLineArgument(index: 3),
+                stringRuntime: commandLineArgument(index: 4),
+                rawBufferRuntime: commandLineArgument(index: 5),
+                metricsRuntime: commandLineArgument(index: 6))
+        }
+    }
     print(value: rangeCompilerCLIUsage())
     return 64
 }
 
 function rangeCompilerCLIUsage(): String {
-    return "usage:\n  range compile <input.range>\n  range check <input.range>\n  range emit-llvm <input.range> <output.ll>"
+    return "usage:\n  range compile <input.range>\n  range check <input.range>\n  range emit-llvm <input.range> <output.ll>\n  range link <input.ll> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>\n  range build <input.range> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>"
 }
 
 function rangeCompilerCLICompile(input: String, printOutput: Bool): Int {
@@ -51,4 +72,20 @@ function rangeCompilerCLIEmitLLVM(input: String, outputPath: String): Int {
         return writeStatus
     }
     return 0
+}
+
+function rangeCompilerCLILink(inputLLVM: String, outputExecutable: String, hostRuntime: String, stringRuntime: String, rawBufferRuntime: String, metricsRuntime: String): Int {
+    let plan: LinkPlan(nativeLinkPlan(inputLLVM: inputLLVM, outputExecutable: outputExecutable, hostRuntime: hostRuntime, stringRuntime: stringRuntime, rawBufferRuntime: rawBufferRuntime, metricsRuntime: metricsRuntime))
+    let linkStatus: Int(linkPlanRun(plan: plan))
+    if linkStatus != 0 {
+        print(value: "range: linker exited with status \(linkStatus)")
+    }
+    return linkStatus
+}
+
+function rangeCompilerCLIBuild(input: String, outputExecutable: String, hostRuntime: String, stringRuntime: String, rawBufferRuntime: String, metricsRuntime: String): Int {
+    let llvmPath: String("\(outputExecutable).ll")
+    let emissionStatus: Int(rangeCompilerCLIEmitLLVM(input: input, outputPath: llvmPath))
+    if emissionStatus != 0 { return emissionStatus }
+    return rangeCompilerCLILink(inputLLVM: llvmPath, outputExecutable: outputExecutable, hostRuntime: hostRuntime, stringRuntime: stringRuntime, rawBufferRuntime: rawBufferRuntime, metricsRuntime: metricsRuntime)
 }

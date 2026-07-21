@@ -1,0 +1,5 @@
+@main {
+    return runProcessBatch(
+        planRecords: String("16\n2\nsh2\n-c6\nexit 016\n2\nsh2\n-c6\nexit 7"),
+        maximumParallelism: 2)
+}
