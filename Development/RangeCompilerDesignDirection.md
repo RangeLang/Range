@@ -3042,6 +3042,7 @@ Current branch:
   snapshot; chunk guidance is superseded)
 - `RangeCompiler/Range/Programs/Compiler/Compiler.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerCore.range`
+- `RangeCompiler/Range/Programs/Compiler/CompilerSources.range`
 - development commits `85947e19` and `3a309a8d`
 
 Useful design-branch material, to be adapted rather than copied wholesale:

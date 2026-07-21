@@ -42,6 +42,12 @@ byte-identical to the shell-authored bundle. The candidate smoke gate repeats
 that comparison with the real compiler source set; the full candidate then uses
 the Range-loaded bundle as the Stage 3 input.
 
+The transitional compiler source layout keeps source-marker decoding, source
+roles, stable `FileID` mapping, source-store access, and inventory/identity
+snapshots in `CompilerSources.range`. `CompilerCore.range` retains shared model
+types and the remaining compiler phases while those phases are extracted at
+individually verified fixed points.
+
 Each gate prints explicit checkpoint edges. A reported edge proves only that
 edge and its prerequisites; it must not be interpreted as evidence that later
 edges in the ladder ran or passed. The build-plan gate stores its

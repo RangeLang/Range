@@ -38,12 +38,17 @@
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerCore.range",
       "role": "project",
-      "sha256": "ec9df18153838be60267a458fac7579f3c38b89e81fe402f480f3d5fca6b563f"
+      "sha256": "0f926bdbedfb56de266cff1fb0393d6511a9a0c93c698282cc675ca8e8e06a6f"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerDirectives.range",
       "role": "project",
       "sha256": "2f0a69e0186298a292dd430165be2de8031d31fba0e5ddbe873d1f1075b99300"
+    },
+    {
+      "path": "RangeCompiler/Range/Programs/Compiler/CompilerSources.range",
+      "role": "project",
+      "sha256": "724ae33a855ec998d5d53e23d77f13c7af4f1d999ef3321f61f691e72eeeaff2"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/Lexer.range",
