@@ -84,16 +84,16 @@
 %Range.CompilerLLVMFunction = type { ptr, ptr, ptr, ptr, %Range.CompilerLLVMBasicBlock }
 %Range.CompilerLLVMBasicBlock = type { ptr, ptr, %Range.CompilerLLVMTerminator }
 %Range.RangeLexedToken = type { i32, i32, i32, ptr }
-%Range.Optional.CompilerMainBlock = type { i1, %Range.CompilerMainBlock }
-%Range.Optional.RangeLexedToken = type { i1, %Range.RangeLexedToken }
 %Range.Optional.CompilerSourceRange = type { i1, %Range.CompilerSourceRange }
-%Range.Optional.CompilerStatement = type { i1, %Range.CompilerStatement }
-%Range.Optional.CompilerExpression = type { i1, %Range.CompilerExpression }
 %Range.Optional.CompilerFunctionDeclarationParts = type { i1, %Range.CompilerFunctionDeclarationParts }
+%Range.Optional.RangeLexedToken = type { i1, %Range.RangeLexedToken }
 %Range.Optional.CompilerTypeReference = type { i1, %Range.CompilerTypeReference }
 %Range.Optional.CompilerMacroApplicationParts = type { i1, %Range.CompilerMacroApplicationParts }
 %Range.Optional.CompilerMacroDeclarationParts = type { i1, %Range.CompilerMacroDeclarationParts }
 %Range.Optional.CompilerConstructDeclarationParts = type { i1, %Range.CompilerConstructDeclarationParts }
+%Range.Optional.CompilerMainBlock = type { i1, %Range.CompilerMainBlock }
+%Range.Optional.CompilerStatement = type { i1, %Range.CompilerStatement }
+%Range.Optional.CompilerExpression = type { i1, %Range.CompilerExpression }
 
 @.str.11 = private unnamed_addr constant [2 x i8] c"\0A\00"
 @.str.15 = private unnamed_addr constant [24 x i8] c"range: unable to write \00"
@@ -115092,6 +115092,17 @@ declare ptr @processPlanRecord(ptr %plan)
 declare ptr @processBatch(i32 %maximumParallelism)
 declare ptr @processBatchAppendingPlan(ptr %batch, ptr %plan)
 declare i32 @processBatchRun(ptr %batch)
+declare i1 @compilerBodyArenaControlGraphIsValid(ptr %arena, i1 %requiresBoundOperations)
+declare ptr @compilerBodyArenaTypeStructuralFingerprint(ptr %arena, i32 %typeID)
+declare ptr @compilerBodyLLVMFunctionNameForReceiver(ptr %arena, i32 %functionID, i32 %receiverTypeID)
+declare i32 @compilerBodyLLVMConditionContinuationBlock(ptr %arena, i32 %blockID)
+declare i32 @compilerBodyLLVMEmitterInitializeLabelsDepthFirst(ptr %emitter, i32 %blockID, ptr %visited)
+declare i32 @compilerBodyLLVMConditionMergeTarget(ptr %arena, i32 %blockID)
+declare i1 @compilerBodyArenaCanLowerFunction(ptr %arena)
+declare ptr @compilerCoreLLVMLowerBodyArenaExpression(ptr %arena, i32 %nodeID, i32 %initialTemporaryIndex)
+declare ptr @compilerCoreLLVMLowerBodyArena(ptr %context, ptr %arena, i32 %functionRow, i32 %initialTemporaryIndex)
+declare i1 @compilerCoreLLVMRecordsContainOperation(ptr %records, ptr %operation)
+declare i1 @compilerCoreLLVMRecordsContainCall(ptr %records, ptr %name)
 declare i1 @compilerBodyRuntimeBuiltinABIIsValid()
 declare i32 @compilerBodyCFGEdgeOrdinalColumn()
 declare i32 @compilerBodyGraphZeroCFGRegionIDColumn()
@@ -115123,12 +115134,6 @@ declare i32 @compilerBodyLLVMBlockLabelElse()
 declare i32 @compilerBodyLLVMEmitterValid()
 declare ptr @compilerBodyTelemetryEmpty()
 declare ptr @compilerBodyTelemetryAppending(ptr %left, ptr %right)
-declare ptr @compilerCoreASTSummary(ptr %source)
-declare ptr @compilerBodyArenaCreate(ptr %tables, ptr %index, i32 %functionRow)
-declare i32 @compilerReachableTypeKeyIDColumn()
-declare i32 @compilerReachableTypeKeyFirstArgumentColumn()
-declare i1 @compilerReachableTypeKeysAreValid(ptr %typeKeys, ptr %typeKeyArguments, ptr %tables)
-declare i1 @compilerBodyArenaControlGraphIsValid(ptr %arena, i1 %requiresBoundOperations)
 declare i32 @compilerBodyArenaOwnedFieldTypeID(ptr %arena, i32 %receiverTypeID, i32 %memberRow)
 declare i32 @compilerBodyArenaFirstArgumentValue(ptr %arena, i32 %applicationNodeID)
 declare i32 @compilerBodyArenaTypeOwnedStorageStatus(ptr %arena, i32 %typeID)
@@ -115140,32 +115145,11 @@ declare i1 @compilerBodyArenaOwnedPathOpaqueLeafCanDeactivateAt(ptr %arena, ptr 
 declare i1 @compilerBodyArenaOwnedPathSubtreeCanDeactivateAt(ptr %arena, ptr %states, ptr %origins, i32 %rootPathID, i32 %blockID, i32 %pathCount)
 declare i32 @compilerBodyArenaOwnedPathSetSubtreeAbsent(ptr %arena, ptr %states, ptr %origins, i32 %rootPathID)
 declare i32 @compilerBodyArenaOwnedPathApplyEffectPath(ptr %arena, ptr %states, ptr %origins, i32 %basePathID, ptr %effectPaths, i32 %effectPathID, i32 %effectKind)
-declare ptr @compilerBodyArenaTypeStructuralFingerprint(ptr %arena, i32 %typeID)
-declare ptr @compilerBodyLLVMFunctionNameForReceiver(ptr %arena, i32 %functionID, i32 %receiverTypeID)
-declare i32 @compilerBodyLLVMConditionContinuationBlock(ptr %arena, i32 %blockID)
-declare i32 @compilerBodyLLVMEmitterInitializeLabelsDepthFirst(ptr %emitter, i32 %blockID, ptr %visited)
-declare i32 @compilerBodyLLVMConditionMergeTarget(ptr %arena, i32 %blockID)
-declare i1 @compilerBodyArenaCanLowerFunction(ptr %arena)
-declare ptr @compilerCoreLLVMLowerBodyArenaExpression(ptr %arena, i32 %nodeID, i32 %initialTemporaryIndex)
-declare ptr @compilerCoreLLVMLowerBodyArena(ptr %context, ptr %arena, i32 %functionRow, i32 %initialTemporaryIndex)
-declare i1 @compilerCoreLLVMRecordsContainOperation(ptr %records, ptr %operation)
-declare i1 @compilerCoreLLVMRecordsContainCall(ptr %records, ptr %name)
-declare ptr @compilerCoreMissingParsedExpression(i32 %start)
-declare ptr @compilerParsedExpressionValue(ptr %parsed)
-declare i32 @compilerParsedExpressionSyntaxID(ptr %parsed)
-declare ptr @compilerCoreLLVMLocalRecord(ptr %name, ptr %operand, ptr %typeName)
-declare i1 @compilerCoreDeclarationRecordsContainsFunction(ptr %records, ptr %name)
-declare i1 @compilerCoreDeclarationRecordsContainsConstruct(ptr %records, ptr %name)
-declare ptr @compilerCoreDeclarationRecordsFunctionParameterSummary(ptr %records, ptr %name)
-declare ptr @compilerCoreBlockStatementSummary(ptr %program, ptr %block)
-declare i1 @compilerCoreStatementRecordsContainReturn(ptr %records)
-declare ptr @compilerCoreStatementRecordsWithoutExpressionRecords(ptr %records)
-declare ptr @parseCompilerBlock(ptr %program, ptr %block)
-declare ptr @parseCompilerSimpleExpression(ptr %source, i32 %start, i32 %limit)
-declare ptr @compilerCoreSimpleExpressionFromToken(ptr %token)
-declare ptr @compilerCoreSimpleNameExpressionFromToken(ptr %token, ptr %tokenKind)
-declare ptr @compilerCoreIdentifierOrBoolExpressionFromToken(ptr %token)
-declare ptr @parseCompilerStatementLegacy(ptr %program, i32 %start, i32 %bodyEnd)
+declare ptr @compilerBodyArenaCreate(ptr %tables, ptr %index, i32 %functionRow)
+declare i32 @compilerReachableTypeKeyIDColumn()
+declare i32 @compilerReachableTypeKeyFirstArgumentColumn()
+declare i1 @compilerReachableTypeKeysAreValid(ptr %typeKeys, ptr %typeKeyArguments, ptr %tables)
+declare ptr @compilerCoreASTSummary(ptr %source)
 declare i32 @compilerMacroCapabilityAuthorityRead()
 declare i32 @compilerDeclarationIndexAnyMemberFunctionLookup(ptr %tables, ptr %index, ptr %name)
 declare i32 @compilerFunctionSelectionCount(ptr %selection)
@@ -115206,6 +115190,22 @@ declare ptr @compilerCoreParseTypeReferenceScanning(ptr %parseState)
 declare ptr @compilerCoreParseBodyRangeAfterName(ptr %source, ptr %nameToken)
 declare ptr @compilerCoreParseParameterRangeAfterName(ptr %source, ptr %nameToken)
 declare ptr @compilerCoreParseReturnTypeAfterParameters(ptr %source, ptr %parameterRange)
+declare ptr @compilerCoreMissingParsedExpression(i32 %start)
+declare ptr @compilerParsedExpressionValue(ptr %parsed)
+declare i32 @compilerParsedExpressionSyntaxID(ptr %parsed)
+declare ptr @compilerCoreLLVMLocalRecord(ptr %name, ptr %operand, ptr %typeName)
+declare i1 @compilerCoreDeclarationRecordsContainsFunction(ptr %records, ptr %name)
+declare i1 @compilerCoreDeclarationRecordsContainsConstruct(ptr %records, ptr %name)
+declare ptr @compilerCoreDeclarationRecordsFunctionParameterSummary(ptr %records, ptr %name)
+declare ptr @compilerCoreBlockStatementSummary(ptr %program, ptr %block)
+declare i1 @compilerCoreStatementRecordsContainReturn(ptr %records)
+declare ptr @compilerCoreStatementRecordsWithoutExpressionRecords(ptr %records)
+declare ptr @parseCompilerBlock(ptr %program, ptr %block)
+declare ptr @parseCompilerSimpleExpression(ptr %source, i32 %start, i32 %limit)
+declare ptr @compilerCoreSimpleExpressionFromToken(ptr %token)
+declare ptr @compilerCoreSimpleNameExpressionFromToken(ptr %token, ptr %tokenKind)
+declare ptr @compilerCoreIdentifierOrBoolExpressionFromToken(ptr %token)
+declare ptr @parseCompilerStatementLegacy(ptr %program, i32 %start, i32 %bodyEnd)
 declare ptr @compilerTypedIRFixedLLVMIfSupported(ptr %source)
 declare ptr @rangeTokenKindName(ptr %kind)
 declare ptr @lexRangeSource(ptr %source)

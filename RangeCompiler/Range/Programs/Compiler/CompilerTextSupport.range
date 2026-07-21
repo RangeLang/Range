@@ -1,0 +1,1793 @@
+function compilerCoreRecordField(record: String, prefix: String): String {
+    return compilerCoreDelimitedRecordField(record: record, prefix: prefix)
+}
+
+function compilerCoreExpressionRecord(kind: String, value: String, left: String, right: String, arguments: String, start: Int, end: Int): String {
+    return "kind=\(kind)|value=\(compilerCoreStatementRecordEncodeValue(value: value))|left=\(compilerCoreStatementRecordEncodeValue(value: left))|right=\(compilerCoreStatementRecordEncodeValue(value: right))|arguments=\(compilerCoreStatementRecordEncodeValue(value: arguments))|start=\(start)|end=\(end)~"
+}
+
+function compilerCoreMissingExpression(start: Int): CompilerExpression {
+    let record: String(compilerCoreExpressionRecord(kind: String("missing"), value: String(""), left: String(""), right: String(""), arguments: String(""), start: start, end: start))
+    return CompilerExpression(kind: String("missing"), value: String(""), summary: String("missing"), record: record, start: start, end: start)
+}
+
+function compilerCoreMissingParsedExpression(start: Int): CompilerParsedExpression {
+    return CompilerParsedExpression(expression: compilerCoreMissingExpression(start: start), syntaxID: 0 - 1)
+}
+
+function compilerParsedExpressionValue(parsed: CompilerParsedExpression): CompilerExpression {
+    return parsed.expression
+}
+
+function compilerParsedExpressionSyntaxID(parsed: CompilerParsedExpression): Int {
+    return parsed.syntaxID
+}
+
+function compilerCoreExpressionRecordField(record: String, prefix: String): String {
+    return compilerCoreDelimitedRecordField(record: record, prefix: prefix)
+}
+
+function compilerCoreDelimitedRecordField(record: String, prefix: String): String {
+    let prefixLength: Int(stringLength(value: prefix))
+    let separators: String("|~")
+    state fieldStart: Int(0)
+    fieldStart: 0 - 1
+    if stringHasPrefix(source: record, start: 0, prefix: prefix) {
+        fieldStart: 0
+    } else {
+        state scanIndex: Int(0)
+        while fieldStart < 0 {
+            let separatorIndex: Int(stringFindFirstOf(source: record, start: scanIndex, characters: separators))
+            if separatorIndex < 0 || stringHasPrefix(source: record, start: separatorIndex, prefix: String("~")) {
+                return String("")
+            }
+            let candidateStart: Int(separatorIndex + 1)
+            if stringHasPrefix(source: record, start: candidateStart, prefix: prefix) {
+                fieldStart: candidateStart
+            } else {
+                scanIndex: candidateStart
+            }
+        }
+    }
+    let valueStart: Int(fieldStart + prefixLength)
+    state valueEnd: Int(stringFindFirstOf(source: record, start: valueStart, characters: separators))
+    if valueEnd < 0 {
+        valueEnd: stringLength(value: record)
+    }
+    return stringSliceUnchecked(source: record, start: valueStart, end: valueEnd)
+}
+
+function compilerCoreExpressionRecordKind(record: String): String {
+    return compilerCoreExpressionRecordField(record: record, prefix: String("kind="))
+}
+
+function compilerCoreExpressionRecordValue(record: String): String {
+    return compilerCoreStatementRecordDecodeValue(value: compilerCoreExpressionRecordField(record: record, prefix: String("value=")))
+}
+
+function compilerCoreExpressionRecordLeft(record: String): String {
+    return compilerCoreStatementRecordDecodeValue(value: compilerCoreExpressionRecordField(record: record, prefix: String("left=")))
+}
+
+function compilerCoreExpressionRecordRight(record: String): String {
+    return compilerCoreStatementRecordDecodeValue(value: compilerCoreExpressionRecordField(record: record, prefix: String("right=")))
+}
+
+function compilerCoreExpressionRecordArguments(record: String): String {
+    return compilerCoreStatementRecordDecodeValue(value: compilerCoreExpressionRecordField(record: record, prefix: String("arguments=")))
+}
+
+function compilerCoreExpressionRecordStart(record: String): Int {
+    return compilerCoreParseDecimalInt(value: compilerCoreExpressionRecordField(record: record, prefix: String("start=")))
+}
+
+function compilerCoreExpressionRecordEnd(record: String): Int {
+    return compilerCoreParseDecimalInt(value: compilerCoreExpressionRecordField(record: record, prefix: String("end=")))
+}
+
+function compilerCoreCallArgumentRecord(index: Int, label: String, expressionRecord: String, expressionSummary: String): String {
+    state storedSummary: String("")
+    storedSummary: expressionSummary
+    if expressionRecord != String("") {
+        storedSummary: String("")
+    }
+    return "index=\(index)|label=\(compilerCoreStatementRecordEncodeValue(value: label))|expression=\(compilerCoreStatementRecordEncodeValue(value: expressionRecord))|summary=\(compilerCoreStatementRecordEncodeValue(value: storedSummary))~"
+}
+
+function compilerCoreCallArgumentRecordAt(records: String, start: Int): String {
+    let recordsLength: Int(stringLength(value: records))
+    state recordEnd: Int(0)
+    recordEnd: start
+
+    while recordEnd < recordsLength && records.substring(start: recordEnd, end: recordEnd + 1) != String("~") {
+        recordEnd: recordEnd + 1
+    }
+
+    return records.substring(start: start, end: recordEnd)
+}
+
+function compilerCoreCallArgumentRecordNextIndex(records: String, start: Int): Int {
+    let recordsLength: Int(stringLength(value: records))
+    state sourceIndex: Int(0)
+    sourceIndex: start
+
+    while sourceIndex < recordsLength {
+        if records.substring(start: sourceIndex, end: sourceIndex + 1) == String("~") {
+            return sourceIndex + 1
+        }
+        sourceIndex: sourceIndex + 1
+    }
+
+    return recordsLength
+}
+
+function compilerCoreCallArgumentExpressionRecord(record: String): String {
+    return compilerCoreStatementRecordDecodeValue(value: compilerCoreDelimitedRecordField(record: record, prefix: String("expression=")))
+}
+
+function compilerCoreCallArgumentLabel(record: String): String {
+    return compilerCoreStatementRecordDecodeValue(value: compilerCoreDelimitedRecordField(record: record, prefix: String("label=")))
+}
+
+function compilerCoreLLVMGlobalStringRenderedText(text: String): String {
+    let decodedText: String(compilerCoreStatementRecordDecodeValue(value: text))
+    return compilerCoreLLVMGlobalStringRenderedTextFromIndex(text: decodedText, sourceIndex: 0, output: String(""))
+}
+
+function compilerCoreLLVMGlobalStringRenderedTextFromIndex(text: String, sourceIndex: Int, output: String): String {
+    let textLength: Int(stringLength(value: text))
+    if sourceIndex >= textLength {
+        return output
+    }
+
+    let character: String(text.character(index: sourceIndex))
+    if character == compilerCoreNewlineCharacter() {
+        return compilerCoreLLVMGlobalStringRenderedTextFromIndex(text: text, sourceIndex: sourceIndex + 1, output: "\(output)\\0A")
+    }
+    if character == compilerCoreTabCharacter() {
+        return compilerCoreLLVMGlobalStringRenderedTextFromIndex(text: text, sourceIndex: sourceIndex + 1, output: "\(output)\\09")
+    }
+    if isRangeQuote(character: character) {
+        return compilerCoreLLVMGlobalStringRenderedTextFromIndex(text: text, sourceIndex: sourceIndex + 1, output: "\(output)\\22")
+    }
+    if character == compilerCoreSingleBackslash() {
+        return compilerCoreLLVMGlobalStringRenderedTextFromIndex(text: text, sourceIndex: sourceIndex + 1, output: "\(output)\\5C")
+    }
+
+    return compilerCoreLLVMGlobalStringRenderedTextFromIndex(text: text, sourceIndex: sourceIndex + 1, output: "\(output)\(character)")
+}
+
+function compilerCoreLLVMLocalRecord(name: String, operand: String, typeName: String): String {
+    return "\(name):\(operand)@TYPE@\(typeName);"
+}
+
+function compilerCoreSingleBackslash(): String {
+    let pair: String("\\")
+    return pair.substring(start: 0, end: 1)
+}
+
+function compilerCoreNewlineCharacter(): String {
+    let value: String("
+")
+    return value.substring(start: 0, end: 1)
+}
+
+function compilerCoreTabCharacter(): String {
+    let value: String("	")
+    return value.substring(start: 0, end: 1)
+}
+
+function compilerCoreMaterializeLLVMText(text: String): String {
+    let textLength: Int(stringLength(value: text))
+    let backslash: String(compilerCoreSingleBackslash())
+    let outputBuffer: RawBuffer(rawBufferCreate(capacity: textLength, stride: 1))
+    state sourceIndex: Int(0)
+
+    while sourceIndex < textLength {
+        if stringHasPrefix(source: text, start: sourceIndex, prefix: backslash) && sourceIndex + 1 < textLength {
+            let escaped: String(text.character(index: sourceIndex + 1))
+            if escaped == String("n") {
+                rawBufferAppendText(buffer: outputBuffer, text: compilerCoreNewlineCharacter())
+                sourceIndex: sourceIndex + 2
+            } else if escaped == String("t") {
+                rawBufferAppendText(buffer: outputBuffer, text: compilerCoreTabCharacter())
+                sourceIndex: sourceIndex + 2
+            } else if isRangeQuote(character: escaped) {
+                rawBufferAppendText(buffer: outputBuffer, text: escaped)
+                sourceIndex: sourceIndex + 2
+            } else if escaped == backslash {
+                rawBufferAppendText(buffer: outputBuffer, text: backslash)
+                sourceIndex: sourceIndex + 2
+            } else {
+                rawBufferAppendTextCharacter(buffer: outputBuffer, source: text, index: sourceIndex)
+                sourceIndex: sourceIndex + 1
+            }
+        } else {
+            rawBufferAppendTextCharacter(buffer: outputBuffer, source: text, index: sourceIndex)
+            sourceIndex: sourceIndex + 1
+        }
+    }
+
+    return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
+}
+
+function compilerCoreStringContentHasInterpolation(content: String): Bool {
+    let contentLength: Int(stringLength(value: content))
+    let backslash: String(compilerCoreSingleBackslash())
+    state sourceIndex: Int(0)
+
+    while sourceIndex + 1 < contentLength {
+        if content.character(index: sourceIndex) == backslash && content.character(index: sourceIndex + 1) == String("(") {
+            return true
+        }
+        sourceIndex: sourceIndex + 1
+    }
+
+    return false
+}
+
+function compilerCoreWrappedExpressionValue(summary: String, prefixLength: Int): String {
+    state summaryLength: Int(0)
+    summaryLength: stringLength(value: summary)
+    if summaryLength <= prefixLength {
+        return String("")
+    }
+
+    return summary.substring(start: prefixLength, end: summaryLength - 1)
+}
+
+function compilerCoreStringLiteralContent(text: String): String {
+    let textLength: Int(stringLength(value: text))
+    if textLength >= 2 {
+        state contentEnd: Int(0)
+        contentEnd: textLength - 1
+        let lastCharacter: String(text.substring(start: textLength - 1, end: textLength))
+        if textLength >= 3 && lastCharacter == String(")") {
+            let beforeLastCharacter: String(text.substring(start: textLength - 2, end: textLength - 1))
+            if isRangeQuote(character: beforeLastCharacter) {
+                contentEnd: textLength - 2
+            }
+        }
+        return compilerCoreDecodeStringLiteralContent(content: text.substring(start: 1, end: contentEnd))
+    }
+
+    return String("")
+}
+
+function compilerCoreDecodeStringLiteralContent(content: String): String {
+    let contentLength: Int(stringLength(value: content))
+    let backslash: String(compilerCoreSingleBackslash())
+    let outputBuffer: RawBuffer(rawBufferCreate(capacity: contentLength, stride: 1))
+    state sourceIndex: Int(0)
+
+    while sourceIndex < contentLength {
+        if stringHasPrefix(source: content, start: sourceIndex, prefix: backslash) && sourceIndex + 1 < contentLength {
+            let escaped: String(content.character(index: sourceIndex + 1))
+            if escaped == String("n") {
+                rawBufferAppendText(buffer: outputBuffer, text: compilerCoreNewlineCharacter())
+                sourceIndex: sourceIndex + 2
+            } else if escaped == String("t") {
+                rawBufferAppendText(buffer: outputBuffer, text: compilerCoreTabCharacter())
+                sourceIndex: sourceIndex + 2
+            } else if isRangeQuote(character: escaped) {
+                rawBufferAppendText(buffer: outputBuffer, text: escaped)
+                sourceIndex: sourceIndex + 2
+            } else if escaped == backslash {
+                rawBufferAppendText(buffer: outputBuffer, text: backslash)
+                sourceIndex: sourceIndex + 2
+            } else {
+                rawBufferAppendTextCharacter(buffer: outputBuffer, source: content, index: sourceIndex)
+                sourceIndex: sourceIndex + 1
+            }
+        } else {
+            rawBufferAppendTextCharacter(buffer: outputBuffer, source: content, index: sourceIndex)
+            sourceIndex: sourceIndex + 1
+        }
+    }
+
+    return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
+}
+
+function compilerCoreIdentifierExpressionName(summary: String): String {
+    if hasRangePrefix(source: summary, start: 0, prefix: String("identifier(")) {
+        return compilerCoreWrappedExpressionValue(summary: summary, prefixLength: 11)
+    }
+
+    return String("")
+}
+
+function compilerCoreIdentifierExpressionRecordName(record: String, fallbackSummary: String): String {
+    if record != String("") && compilerCoreExpressionRecordKind(record: record) == String("identifier") {
+        return compilerCoreExpressionRecordValue(record: record)
+    }
+
+    return compilerCoreIdentifierExpressionName(summary: fallbackSummary)
+}
+
+function compilerCoreDeclarationRecordsContainsFunction(records: String, name: String): Bool {
+    return compilerCoreDeclarationRecordsFunctionReturnType(records: records, name: name) != String("")
+}
+
+function compilerCoreDeclarationRecordsContainsConstruct(records: String, name: String): Bool {
+    state sourceIndex: Int(0)
+    let recordsLength: Int(stringLength(value: records))
+
+    while sourceIndex < recordsLength {
+        let record: String(compilerCoreTopLevelDeclarationRecordAt(records: records, start: sourceIndex))
+        if record == String("") {
+            return false
+        }
+
+        let declarationKind: String(compilerCoreRecordField(record: record, prefix: String("kind=")))
+        let declarationName: String(compilerCoreRecordField(record: record, prefix: String("name=")))
+        if declarationKind == String("construct") && declarationName == name {
+            return true
+        }
+        sourceIndex: compilerCoreTopLevelDeclarationRecordNextIndex(records: records, start: sourceIndex)
+    }
+
+    return false
+}
+
+function compilerCoreDeclarationRecordsFunctionParameterSummary(records: String, name: String): String {
+    state sourceIndex: Int(0)
+    let recordsLength: Int(stringLength(value: records))
+
+    while sourceIndex < recordsLength {
+        let record: String(compilerCoreTopLevelDeclarationRecordAt(records: records, start: sourceIndex))
+        if record == String("") {
+            return String("")
+        }
+
+        let declarationKind: String(compilerCoreRecordField(record: record, prefix: String("kind=")))
+        let declarationName: String(compilerCoreRecordField(record: record, prefix: String("name=")))
+        if declarationKind == String("function") && declarationName == name {
+            return compilerCoreRecordField(record: record, prefix: String("parameters="))
+        }
+        sourceIndex: compilerCoreTopLevelDeclarationRecordNextIndex(records: records, start: sourceIndex)
+    }
+
+    return String("")
+}
+
+function compilerCoreLLVMTypeNameForRangeType(typeName: String): String {
+    if typeName == String("Bool") {
+        return String("i1")
+    }
+
+    if typeName == String("Optional<String>") {
+        return String("ptr")
+    }
+
+    if typeName == String("String") {
+        return String("ptr")
+    }
+
+    if typeName == String("Int") {
+        return String("i32")
+    }
+
+    if compilerIntegerTypeIsUnsigned8(typeName: typeName) {
+        return String("i8")
+    }
+
+    if compilerFloatTypeIs32(typeName: typeName) {
+        return String("float")
+    }
+
+    if typeName == String("Float") || compilerFloatTypeIs64(typeName: typeName) {
+        return String("double")
+    }
+
+    return String("ptr")
+}
+
+function compilerCoreParseMainBlock(source: String): Optional<CompilerMainBlock> {
+    let maybeToken: Optional<RangeLexedToken>(compilerCoreFindMainAttributeToken(source: source))
+    if maybeToken == nil {
+        return nil
+    }
+
+    let fallbackCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: 0))
+    let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: fallbackCursor))
+    let token: RangeLexedToken(maybeToken ?? fallbackToken)
+    return compilerCoreParseMainBlockBody(source: source, token: token)
+}
+
+function compilerCoreFindMainAttributeToken(source: String): Optional<RangeLexedToken> {
+    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: 0))
+    while true {
+        let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+        if maybeToken == nil {
+            return nil
+        }
+        let fallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+        let token: RangeLexedToken(maybeToken ?? fallback)
+        if compilerCoreTokenIsMainAttribute(token: token) {
+            return token
+        }
+        if token.end <= cursor.index {
+            return nil
+        }
+        cursor: compilerCursorAdvance(cursor: cursor, token: token)
+    }
+    return nil
+}
+
+function compilerCoreMainAttributeText(): String {
+    let atSign: String("@")
+    return "\(atSign)main"
+}
+
+function compilerCoreTokenIsMainAttribute(token: RangeLexedToken): Bool {
+    if token.kind != .macroAttribute {
+        return false
+    }
+    return token.text == compilerCoreMainAttributeText()
+}
+
+function compilerCoreParseMainBlockBody(source: String, token: RangeLexedToken): Optional<CompilerMainBlock> {
+    let maybeBody: Optional<CompilerSourceRange>(compilerCoreParseMainBraceRange(source: source, start: token.end))
+    if maybeBody == nil {
+        return nil
+    }
+
+    let bodyFallback: CompilerSourceRange(CompilerSourceRange(start: token.end, end: token.end, next: token.end))
+    let body: CompilerSourceRange(maybeBody ?? bodyFallback)
+    return compilerCoreMainBlockFromRange(attributeStart: token.start, body: body)
+}
+
+function compilerCoreParseMainBraceRange(source: String, start: Int): Optional<CompilerSourceRange> {
+    let sourceLength: Int(stringLength(value: source))
+    let leftBrace: Int(stringIndexOf(source: source, needle: String("{"), start: start))
+    if leftBrace >= sourceLength {
+        return nil
+    }
+
+    return compilerCoreParseBraceRangeFromDepth(source: source, bodyStart: leftBrace + 1, searchStart: leftBrace + 1, depth: 1)
+}
+
+function compilerCoreParseBraceRangeFromDepth(source: String, bodyStart: Int, searchStart: Int, depth: Int): Optional<CompilerSourceRange> {
+    let sourceLength: Int(stringLength(value: source))
+    let nextLeft: Int(stringIndexOf(source: source, needle: String("{"), start: searchStart))
+    let nextRight: Int(stringIndexOf(source: source, needle: String("}"), start: searchStart))
+    if nextRight >= sourceLength {
+        return nil
+    }
+
+    if nextLeft < nextRight {
+        return compilerCoreParseBraceRangeFromDepth(source: source, bodyStart: bodyStart, searchStart: nextLeft + 1, depth: depth + 1)
+    }
+
+    return compilerCoreParseBraceRangeClosing(source: source, bodyStart: bodyStart, closingBrace: nextRight, depth: depth)
+}
+
+function compilerCoreParseBraceRangeClosing(source: String, bodyStart: Int, closingBrace: Int, depth: Int): Optional<CompilerSourceRange> {
+    if depth == 1 {
+        return CompilerSourceRange(start: bodyStart, end: closingBrace, next: closingBrace + 1)
+    }
+
+    return compilerCoreParseBraceRangeFromDepth(source: source, bodyStart: bodyStart, searchStart: closingBrace + 1, depth: depth - 1)
+}
+
+function compilerCoreMainBlockFromRange(attributeStart: Int, body: CompilerSourceRange): CompilerMainBlock {
+    return CompilerMainBlock(
+        attributeStart: attributeStart,
+        bodyStart: body.start,
+        bodyEnd: body.end
+    )
+}
+
+function compilerCoreBlockStatementSummary(program: CompilerProgram, block: CompilerBlock): String {
+    let parsedBlock: CompilerParsedBlock(parseCompilerBlock(program: program, block: block))
+    return parsedBlock.statementSummary
+}
+
+function compilerCoreParseStatements(program: CompilerProgram, block: CompilerBlock): CompilerParsedStatements {
+    let recordsBuffer: RawBuffer(rawBufferCreate(capacity: 4096, stride: 1))
+    let summaryBuffer: RawBuffer(rawBufferCreate(capacity: 1024, stride: 1))
+    return compilerCoreParseStatementsIntoRawBuffers(program: program, block: block, recordsBuffer: recordsBuffer, summaryBuffer: summaryBuffer)
+}
+
+function compilerCoreParseStatementsIntoRawBuffers(program: CompilerProgram, block: CompilerBlock, recordsBuffer: RawBuffer, summaryBuffer: RawBuffer): CompilerParsedStatements {
+    state sourceIndex: Int(compilerCoreBlockStart(block: block))
+    state statementCount: Int(0)
+    let blockEnd: Int(compilerCoreBlockEnd(block: block))
+    while sourceIndex < blockEnd {
+        sourceIndex: compilerCoreFirstNonWhitespaceIndex(source: program.source, start: sourceIndex, end: blockEnd)
+        if sourceIndex < blockEnd {
+            let maybeStatement: Optional<CompilerStatement>(parseCompilerStatement(program: program, start: sourceIndex, bodyEnd: blockEnd))
+            if maybeStatement == nil {
+                sourceIndex: sourceIndex + 1
+            } else {
+                let fallback: CompilerStatement(compilerCoreMissingStatement(start: sourceIndex, end: sourceIndex + 1))
+                let statement: CompilerStatement(maybeStatement ?? fallback)
+                rawBufferAppendText(buffer: recordsBuffer, text: compilerCoreStatementRecord(statement: statement))
+                rawBufferAppendText(buffer: summaryBuffer, text: String("statement"))
+                rawBufferAppendTextInt(buffer: summaryBuffer, value: statementCount)
+                rawBufferAppendText(buffer: summaryBuffer, text: String("="))
+                rawBufferAppendText(buffer: summaryBuffer, text: statement.summary)
+                rawBufferAppendText(buffer: summaryBuffer, text: String(";"))
+                sourceIndex: statement.end
+                statementCount: statementCount + 1
+            }
+        }
+    }
+    return compilerCoreParsedStatementsFromRawBuffers(block: block, recordsBuffer: recordsBuffer, summaryBuffer: summaryBuffer, statementCount: statementCount)
+}
+
+function compilerCoreParsedStatementsFromRawBuffers(block: CompilerBlock, recordsBuffer: RawBuffer, summaryBuffer: RawBuffer, statementCount: Int): CompilerParsedStatements {
+    let records: String(rawBufferMaterializeText(buffer: recordsBuffer))
+    let summary: String(rawBufferMaterializeText(buffer: summaryBuffer))
+    rawBufferDestroy(buffer: recordsBuffer)
+    rawBufferDestroy(buffer: summaryBuffer)
+    return CompilerParsedStatements(records: records, summary: summary, count: statementCount, start: compilerCoreBlockStart(block: block), end: compilerCoreBlockEnd(block: block))
+}
+
+function compilerCoreBlockStart(block: CompilerBlock): Int {
+    return block.start
+}
+
+function compilerCoreBlockEnd(block: CompilerBlock): Int {
+    return block.end
+}
+
+function compilerCoreFirstNonWhitespaceIndex(source: String, start: Int, end: Int): Int {
+    if start >= end {
+        return end
+    }
+    if isRangeLexerWhitespace(character: source.character(index: start)) {
+        return compilerCoreFirstNonWhitespaceIndex(source: source, start: start + 1, end: end)
+    }
+    return start
+}
+
+function compilerCoreMissingStatement(start: Int, end: Int): CompilerStatement {
+    let missingExpression: CompilerExpression(compilerCoreMissingExpression(start: start))
+    return CompilerStatement(kind: String("missing"), name: String(""), typeName: String(""), targetSummary: String(""), targetRecord: String(""), expressionKind: String("missing"), expressionValue: String(""), expressionSummary: String("missing"), expressionRecord: missingExpression.record, bodyStart: 0, bodyEnd: 0, elseBodyStart: 0, elseBodyEnd: 0, bodyStatementRecords: String(""), elseStatementRecords: String(""), summary: String(""), start: start, end: end)
+}
+
+function compilerCoreStatementRecord(statement: CompilerStatement): String {
+    let head: String(compilerCoreStatementRecordHead(statement: statement))
+    let expression: String(compilerCoreStatementRecordExpression(statement: statement))
+    let ranges: String(compilerCoreStatementRecordRanges(statement: statement))
+    let outputBuffer: RawBuffer(rawBufferCreate(capacity: 1024, stride: 1))
+    rawBufferAppendText(buffer: outputBuffer, text: head)
+    rawBufferAppendText(buffer: outputBuffer, text: expression)
+    rawBufferAppendText(buffer: outputBuffer, text: ranges)
+    return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
+}
+
+function compilerCoreStatementRecordHead(statement: CompilerStatement): String {
+    let targetRecord: String(compilerCoreStatementRecordEncodeValue(value: statement.targetRecord))
+    let expressionValue: String(compilerCoreStatementRecordEncodeValue(value: statement.expressionValue))
+    state targetSummary: String("")
+    targetSummary: statement.targetSummary
+    if statement.targetRecord != String("") {
+        targetSummary: String("")
+    }
+    let outputBuffer: RawBuffer(rawBufferCreate(capacity: 512, stride: 1))
+    rawBufferAppendText(buffer: outputBuffer, text: "kind=\(statement.kind)|name=\(statement.name)|type=\(statement.typeName)|target=\(targetSummary)|targetRecord=")
+    rawBufferAppendText(buffer: outputBuffer, text: targetRecord)
+    rawBufferAppendText(buffer: outputBuffer, text: "|expressionKind=\(statement.expressionKind)|expressionValue=\(expressionValue)|")
+    return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
+}
+
+function compilerCoreStatementRecordExpression(statement: CompilerStatement): String {
+    let expressionRecord: String(compilerCoreStatementRecordEncodeValue(value: statement.expressionRecord))
+    state expressionSummary: String("")
+    expressionSummary: statement.expressionSummary
+    if statement.expressionRecord != String("") {
+        expressionSummary: String("")
+    }
+    let outputBuffer: RawBuffer(rawBufferCreate(capacity: 512, stride: 1))
+    rawBufferAppendText(buffer: outputBuffer, text: "expression=\(expressionSummary)|expressionRecord=")
+    rawBufferAppendText(buffer: outputBuffer, text: expressionRecord)
+    rawBufferAppendText(buffer: outputBuffer, text: String("|bodyStart="))
+    rawBufferAppendTextInt(buffer: outputBuffer, value: statement.bodyStart)
+    rawBufferAppendText(buffer: outputBuffer, text: String("|bodyEnd="))
+    rawBufferAppendTextInt(buffer: outputBuffer, value: statement.bodyEnd)
+    rawBufferAppendText(buffer: outputBuffer, text: String("|elseBodyStart="))
+    rawBufferAppendTextInt(buffer: outputBuffer, value: statement.elseBodyStart)
+    rawBufferAppendText(buffer: outputBuffer, text: String("|elseBodyEnd="))
+    rawBufferAppendTextInt(buffer: outputBuffer, value: statement.elseBodyEnd)
+    rawBufferAppendText(buffer: outputBuffer, text: String("|"))
+    return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
+}
+
+function compilerCoreStatementRecordRanges(statement: CompilerStatement): String {
+    let bodyRecords: String(compilerCoreStatementRecordEncodeValue(value: statement.bodyStatementRecords))
+    let elseRecords: String(compilerCoreStatementRecordEncodeValue(value: statement.elseStatementRecords))
+    let outputBuffer: RawBuffer(rawBufferCreate(capacity: 1024, stride: 1))
+    rawBufferAppendText(buffer: outputBuffer, text: String("start="))
+    rawBufferAppendTextInt(buffer: outputBuffer, value: statement.start)
+    rawBufferAppendText(buffer: outputBuffer, text: String("|end="))
+    rawBufferAppendTextInt(buffer: outputBuffer, value: statement.end)
+    rawBufferAppendText(buffer: outputBuffer, text: String("|bodyRecords="))
+    rawBufferAppendText(buffer: outputBuffer, text: bodyRecords)
+    rawBufferAppendText(buffer: outputBuffer, text: String("|elseRecords="))
+    rawBufferAppendText(buffer: outputBuffer, text: elseRecords)
+    rawBufferAppendText(buffer: outputBuffer, text: String("|summary=~"))
+    return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
+}
+
+function compilerCoreStatementRecordEncodeValue(value: String): String {
+    let valueLength: Int(stringLength(value: value))
+    state encodedLength: Int(valueLength)
+    state sizingIndex: Int(0)
+    while sizingIndex < valueLength {
+        let sizingByte: Int(stringByteAt(source: value, index: sizingIndex))
+        if sizingByte == 64 { encodedLength: encodedLength + 3 }
+        if sizingByte == 124 { encodedLength: encodedLength + 5 }
+        if sizingByte == 126 { encodedLength: encodedLength + 6 }
+        if sizingByte == 10 { encodedLength: encodedLength + 8 }
+        if sizingByte == 59 { encodedLength: encodedLength + 10 }
+        sizingIndex: sizingIndex + 1
+    }
+    let outputBuffer: RawBuffer(rawBufferCreate(capacity: encodedLength, stride: 1))
+    state sourceIndex: Int(0)
+
+    while sourceIndex < valueLength {
+        let byte: Int(stringByteAt(source: value, index: sourceIndex))
+        if byte == 64 {
+            if rawBufferAppendText(buffer: outputBuffer, text: String("@AT@")) != 0 {
+                rawBufferDestroy(buffer: outputBuffer)
+                return String("")
+            }
+        } else if byte == 124 {
+            if rawBufferAppendText(buffer: outputBuffer, text: String("@PIPE@")) != 0 {
+                rawBufferDestroy(buffer: outputBuffer)
+                return String("")
+            }
+        } else if byte == 126 {
+            if rawBufferAppendText(buffer: outputBuffer, text: String("@TILDE@")) != 0 {
+                rawBufferDestroy(buffer: outputBuffer)
+                return String("")
+            }
+        } else if byte == 10 {
+            if rawBufferAppendText(buffer: outputBuffer, text: String("@NEWLINE@")) != 0 {
+                rawBufferDestroy(buffer: outputBuffer)
+                return String("")
+            }
+        } else if byte == 59 {
+            if rawBufferAppendText(buffer: outputBuffer, text: String("@SEMICOLON@")) != 0 {
+                rawBufferDestroy(buffer: outputBuffer)
+                return String("")
+            }
+        } else {
+            if rawBufferAppendTextCharacter(buffer: outputBuffer, source: value, index: sourceIndex) != 0 {
+                rawBufferDestroy(buffer: outputBuffer)
+                return String("")
+            }
+        }
+        sourceIndex: sourceIndex + 1
+    }
+
+    return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
+}
+
+function compilerCoreStatementRecordDecodeValue(value: String): String {
+    let outputBuffer: RawBuffer(rawBufferCreate(capacity: 1024, stride: 1))
+    state sourceIndex: Int(0)
+    let valueLength: Int(stringLength(value: value))
+
+    while sourceIndex < valueLength {
+        let byte: Int(stringByteAt(source: value, index: sourceIndex))
+        if byte != 64 {
+            if rawBufferAppendTextCharacter(buffer: outputBuffer, source: value, index: sourceIndex) != 0 {
+                rawBufferDestroy(buffer: outputBuffer)
+                return String("")
+            }
+            sourceIndex: sourceIndex + 1
+        } else if hasRangePrefix(source: value, start: sourceIndex, prefix: String("@PIPE@")) {
+            if rawBufferAppendText(buffer: outputBuffer, text: String("|")) != 0 {
+                rawBufferDestroy(buffer: outputBuffer)
+                return String("")
+            }
+            sourceIndex: sourceIndex + 6
+        } else if hasRangePrefix(source: value, start: sourceIndex, prefix: String("@TILDE@")) {
+            if rawBufferAppendText(buffer: outputBuffer, text: String("~")) != 0 {
+                rawBufferDestroy(buffer: outputBuffer)
+                return String("")
+            }
+            sourceIndex: sourceIndex + 7
+        } else if hasRangePrefix(source: value, start: sourceIndex, prefix: String("@NEWLINE@")) {
+            if rawBufferAppendText(buffer: outputBuffer, text: compilerCoreNewlineCharacter()) != 0 {
+                rawBufferDestroy(buffer: outputBuffer)
+                return String("")
+            }
+            sourceIndex: sourceIndex + 9
+        } else if hasRangePrefix(source: value, start: sourceIndex, prefix: String("@SEMICOLON@")) {
+            if rawBufferAppendText(buffer: outputBuffer, text: String(";")) != 0 {
+                rawBufferDestroy(buffer: outputBuffer)
+                return String("")
+            }
+            sourceIndex: sourceIndex + 11
+        } else if hasRangePrefix(source: value, start: sourceIndex, prefix: String("@AT@")) {
+            if rawBufferAppendText(buffer: outputBuffer, text: String("@")) != 0 {
+                rawBufferDestroy(buffer: outputBuffer)
+                return String("")
+            }
+            sourceIndex: sourceIndex + 4
+        } else {
+            if rawBufferAppendTextCharacter(buffer: outputBuffer, source: value, index: sourceIndex) != 0 {
+                rawBufferDestroy(buffer: outputBuffer)
+                return String("")
+            }
+            sourceIndex: sourceIndex + 1
+        }
+    }
+
+    return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
+}
+
+function compilerCoreParseDecimalInt(value: String): Int {
+    state result: Int(0)
+    state sourceIndex: Int(0)
+    let valueLength: Int(stringLength(value: value))
+
+    while sourceIndex < valueLength {
+        let character: String(value.substring(start: sourceIndex, end: sourceIndex + 1))
+        result: (result * 10) + compilerCoreDecimalDigitValue(character: character)
+        sourceIndex: sourceIndex + 1
+    }
+
+    return result
+}
+
+function compilerCoreDecimalDigitValue(character: String): Int {
+    if character == String("1") {
+        return 1
+    }
+    if character == String("2") {
+        return 2
+    }
+    if character == String("3") {
+        return 3
+    }
+    if character == String("4") {
+        return 4
+    }
+    if character == String("5") {
+        return 5
+    }
+    if character == String("6") {
+        return 6
+    }
+    if character == String("7") {
+        return 7
+    }
+    if character == String("8") {
+        return 8
+    }
+    if character == String("9") {
+        return 9
+    }
+
+    return 0
+}
+
+function compilerCoreStatementRecordsContainReturn(records: String): Bool {
+    state statementIndex: Int(0)
+    let recordsLength: Int(stringLength(value: records))
+
+    while statementIndex < recordsLength {
+        let statementRecord: String(compilerCoreStatementRecordAt(records: records, start: statementIndex))
+        if statementRecord == String("") {
+            return false
+        }
+
+        let statement: CompilerStatement(compilerCoreStatementFromRecord(record: statementRecord))
+        if statement.kind == String("return") {
+            return true
+        }
+        if compilerCoreStatementRecordsContainReturn(records: statement.bodyStatementRecords) {
+            return true
+        }
+        if compilerCoreStatementRecordsContainReturn(records: statement.elseStatementRecords) {
+            return true
+        }
+        statementIndex: compilerCoreStatementRecordNextIndex(records: records, start: statementIndex)
+    }
+
+    return false
+}
+
+function compilerCoreStatementRecordsWithoutExpressionRecords(records: String): String {
+    state output: String("")
+    state statementIndex: Int(0)
+    let recordsLength: Int(stringLength(value: records))
+
+    while statementIndex < recordsLength {
+        let statementRecord: String(compilerCoreStatementRecordAt(records: records, start: statementIndex))
+        if statementRecord == String("") {
+            return output
+        }
+
+        let statement: CompilerStatement(compilerCoreStatementFromRecord(record: statementRecord))
+        let strippedBodyRecords: String(compilerCoreStatementRecordsWithoutExpressionRecords(records: statement.bodyStatementRecords))
+        let strippedElseRecords: String(compilerCoreStatementRecordsWithoutExpressionRecords(records: statement.elseStatementRecords))
+        let strippedStatement: CompilerStatement(CompilerStatement(
+            kind: statement.kind,
+            name: statement.name,
+            typeName: statement.typeName,
+            targetSummary: statement.targetSummary,
+            targetRecord: String(""),
+            expressionKind: statement.expressionKind,
+            expressionValue: statement.expressionValue,
+            expressionSummary: statement.expressionSummary,
+            expressionRecord: String(""),
+            bodyStart: statement.bodyStart,
+            bodyEnd: statement.bodyEnd,
+            elseBodyStart: statement.elseBodyStart,
+            elseBodyEnd: statement.elseBodyEnd,
+            bodyStatementRecords: strippedBodyRecords,
+            elseStatementRecords: strippedElseRecords,
+            summary: statement.summary,
+            start: statement.start,
+            end: statement.end
+        ))
+        output: "\(output)\(compilerCoreStatementRecord(statement: strippedStatement))"
+        statementIndex: compilerCoreStatementRecordNextIndex(records: records, start: statementIndex)
+    }
+
+    return output
+}
+
+function parseCompilerBlock(program: CompilerProgram, block: CompilerBlock): CompilerParsedBlock {
+    let parsedStatements: CompilerParsedStatements(compilerCoreParseStatements(program: program, block: block))
+    return CompilerParsedBlock(
+        block: block,
+        statementRecords: parsedStatements.records,
+        statementSummary: compilerCoreStatementRecordsASTSummary(records: parsedStatements.records)
+    )
+}
+
+function parseCompilerStatement(program: CompilerProgram, start: Int, bodyEnd: Int): Optional<CompilerStatement> {
+    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: program.source, index: start))
+    let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    return parseCompilerStatementWithToken(program: program, cursor: cursor, maybeToken: maybeToken, bodyEnd: bodyEnd)
+}
+
+function parseCompilerStatementWithToken(program: CompilerProgram, cursor: CompilerTokenCursor, maybeToken: Optional<RangeLexedToken>, bodyEnd: Int): Optional<CompilerStatement> {
+    if maybeToken == nil {
+        return nil
+    }
+
+    let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let token: RangeLexedToken(maybeToken ?? fallbackToken)
+    let tokenStart: Int(compilerCoreRangeTokenStart(token: token))
+    if tokenStart >= bodyEnd {
+        return nil
+    }
+
+    return parseCompilerStatementFromToken(program: program, cursor: cursor, token: token, bodyEnd: bodyEnd)
+}
+
+function parseCompilerStatementFromToken(program: CompilerProgram, cursor: CompilerTokenCursor, token: RangeLexedToken, bodyEnd: Int): Optional<CompilerStatement> {
+    if compilerCoreTokenKindEquals(token: token, kind: .keyword) {
+        return parseCompilerKeywordStatement(program: program, cursor: cursor, keyword: token, bodyEnd: bodyEnd)
+    }
+
+    if compilerCoreTokenKindEquals(token: token, kind: .identifier) {
+        return parseCompilerIdentifierStatement(program: program, cursor: cursor, token: token, bodyEnd: bodyEnd)
+    }
+
+    return nil
+}
+
+function parseCompilerKeywordStatement(program: CompilerProgram, cursor: CompilerTokenCursor, keyword: RangeLexedToken, bodyEnd: Int): Optional<CompilerStatement> {
+    let keywordText: String(compilerCoreRangeTokenText(token: keyword))
+    if keywordText == String("return") {
+        return parseCompilerReturnStatement(cursor: cursor, keyword: keyword, bodyEnd: bodyEnd)
+    }
+
+    return parseCompilerNonReturnKeywordStatement(program: program, cursor: cursor, keyword: keyword, keywordText: keywordText, bodyEnd: bodyEnd)
+}
+
+function parseCompilerNonReturnKeywordStatement(program: CompilerProgram, cursor: CompilerTokenCursor, keyword: RangeLexedToken, keywordText: String, bodyEnd: Int): Optional<CompilerStatement> {
+    if keywordText == String("if") {
+        return parseCompilerControlKeywordStatement(program: program, cursor: cursor, keyword: keyword, bodyEnd: bodyEnd)
+    }
+
+    if keywordText == String("while") {
+        return parseCompilerControlKeywordStatement(program: program, cursor: cursor, keyword: keyword, bodyEnd: bodyEnd)
+    }
+
+    return parseCompilerNonControlKeywordStatement(cursor: cursor, keyword: keyword, keywordText: keywordText, bodyEnd: bodyEnd)
+}
+
+function parseCompilerControlKeywordStatement(program: CompilerProgram, cursor: CompilerTokenCursor, keyword: RangeLexedToken, bodyEnd: Int): Optional<CompilerStatement> {
+    return parseCompilerControlBlockStatement(program: program, cursor: cursor, keyword: keyword, bodyEnd: bodyEnd)
+}
+
+function parseCompilerNonControlKeywordStatement(cursor: CompilerTokenCursor, keyword: RangeLexedToken, keywordText: String, bodyEnd: Int): Optional<CompilerStatement> {
+    if keywordText == String("break") {
+        return parseCompilerJumpStatement(keyword: keyword)
+    }
+
+    if keywordText == String("continue") {
+        return parseCompilerJumpStatement(keyword: keyword)
+    }
+
+    return parseCompilerBindingKeywordStatement(cursor: cursor, keyword: keyword, keywordText: keywordText, bodyEnd: bodyEnd)
+}
+
+function parseCompilerBindingKeywordStatement(cursor: CompilerTokenCursor, keyword: RangeLexedToken, keywordText: String, bodyEnd: Int): Optional<CompilerStatement> {
+    if keywordText == String("let") {
+        return parseCompilerLocalBindingStatement(cursor: cursor, keyword: keyword, bodyEnd: bodyEnd)
+    }
+
+    if keywordText == String("state") {
+        return parseCompilerLocalBindingStatement(cursor: cursor, keyword: keyword, bodyEnd: bodyEnd)
+    }
+
+    return nil
+}
+
+function parseCompilerJumpStatement(keyword: RangeLexedToken): Optional<CompilerStatement> {
+    return CompilerStatement(
+        kind: keyword.text,
+        name: String(""),
+        typeName: String(""),
+        targetSummary: String(""),
+        targetRecord: String(""),
+        expressionKind: String(""),
+        expressionValue: String(""),
+        expressionSummary: String(""),
+        expressionRecord: String(""),
+        bodyStart: 0,
+        bodyEnd: 0,
+        elseBodyStart: 0,
+        elseBodyEnd: 0,
+        bodyStatementRecords: String(""),
+        elseStatementRecords: String(""),
+        summary: "kind=\(keyword.text)",
+        start: keyword.start,
+        end: keyword.end
+    )
+}
+
+function parseCompilerReturnStatement(cursor: CompilerTokenCursor, keyword: RangeLexedToken, bodyEnd: Int): Optional<CompilerStatement> {
+    let expressionCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: cursor, token: keyword))
+    let expressionStart: Int(compilerCoreFirstNonWhitespaceIndex(source: cursor.source, start: expressionCursor.index, end: bodyEnd))
+    return parseCompilerReturnStatementExpressionCore(source: cursor.source, keyword: keyword, expressionStart: expressionStart, bodyEnd: bodyEnd)
+}
+
+function parseCompilerReturnStatementExpressionCore(source: String, keyword: RangeLexedToken, expressionStart: Int, bodyEnd: Int): Optional<CompilerStatement> {
+    let maybeExpression: Optional<CompilerExpression>(parseCompilerExpression(source: source, start: expressionStart, limit: bodyEnd))
+    if maybeExpression == nil { return nil }
+    let expressionFallback: CompilerExpression(compilerCoreMissingExpression(start: expressionStart))
+    let expression: CompilerExpression(maybeExpression ?? expressionFallback)
+    return compilerCoreReturnStatementFromExpression(keyword: keyword, expression: expression)
+}
+
+function compilerCoreReturnStatementFromExpression(keyword: RangeLexedToken, expression: CompilerExpression): CompilerStatement {
+    return CompilerStatement(
+        kind: String("return"),
+        name: String(""),
+        typeName: String(""),
+        targetSummary: String(""),
+        targetRecord: String(""),
+        expressionKind: expression.kind,
+        expressionValue: expression.value,
+        expressionSummary: expression.summary,
+        expressionRecord: expression.record,
+        bodyStart: 0,
+        bodyEnd: 0,
+        elseBodyStart: 0,
+        elseBodyEnd: 0,
+        bodyStatementRecords: String(""),
+        elseStatementRecords: String(""),
+        summary: "kind=return\texpression=\(expression.summary)",
+        start: keyword.start,
+        end: expression.end
+    )
+}
+
+function parseCompilerSimpleExpression(source: String, start: Int, limit: Int): Optional<CompilerExpression> {
+    return parseCompilerExpression(source: source, start: start, limit: limit)
+}
+
+function compilerCoreSimpleExpressionFromToken(token: RangeLexedToken): Optional<CompilerExpression> {
+    if token.kind == .integer {
+        return compilerCoreTokenExpression(token: token, kind: String("integerLiteral"), value: token.text, summaryPrefix: String("integerLiteral"))
+    }
+
+    if token.kind == .stringLiteral {
+        return compilerCoreTokenExpression(token: token, kind: String("stringLiteral"), value: token.text, summaryPrefix: String("stringLiteral"))
+    }
+
+    return compilerCoreSimpleNameExpressionFromToken(token: token, tokenKind: token.kind)
+}
+
+function compilerCoreSimpleNameExpressionFromToken(token: RangeLexedToken, tokenKind: RangeTokenKind): Optional<CompilerExpression> {
+    if tokenKind == .identifier {
+        return compilerCoreIdentifierOrBoolExpressionFromToken(token: token)
+    }
+
+    if tokenKind == .keyword {
+        return compilerCoreIdentifierOrBoolExpressionFromToken(token: token)
+    }
+
+    return nil
+}
+
+function compilerCoreIdentifierOrBoolExpressionFromToken(token: RangeLexedToken): Optional<CompilerExpression> {
+    if token.text == String("true") {
+        return compilerCoreTokenExpression(token: token, kind: String("boolLiteral"), value: token.text, summaryPrefix: String("boolLiteral"))
+    }
+
+    if token.text == String("false") {
+        return compilerCoreTokenExpression(token: token, kind: String("boolLiteral"), value: token.text, summaryPrefix: String("boolLiteral"))
+    }
+
+    return compilerCoreTokenExpression(token: token, kind: String("identifier"), value: token.text, summaryPrefix: String("identifier"))
+}
+
+function compilerCoreTokenExpression(token: RangeLexedToken, kind: String, value: String, summaryPrefix: String): CompilerExpression {
+    let record: String(compilerCoreExpressionRecord(kind: kind, value: value, left: String(""), right: String(""), arguments: String(""), start: token.start, end: token.end))
+    return CompilerExpression(
+        kind: kind,
+        value: value,
+        summary: "\(summaryPrefix)(\(value))",
+        record: record,
+        start: token.start,
+        end: token.end
+    )
+}
+
+function parseCompilerIdentifierStatement(program: CompilerProgram, cursor: CompilerTokenCursor, token: RangeLexedToken, bodyEnd: Int): Optional<CompilerStatement> {
+    let tokenColonStart: Int(compilerCoreFirstNonWhitespaceIndex(source: cursor.source, start: token.end, end: bodyEnd))
+    if tokenColonStart < bodyEnd && stringSubstring(source: cursor.source, start: tokenColonStart, end: tokenColonStart + 1) == String(":") {
+        let tokenTarget: CompilerExpression(compilerCoreTokenExpression(token: token, kind: String("identifier"), value: token.text, summaryPrefix: String("identifier")))
+        return parseCompilerIdentifierStatementWithTarget(cursor: cursor, token: token, target: tokenTarget, bodyEnd: bodyEnd)
+    }
+
+    let maybeTarget: Optional<CompilerExpression>(parseCompilerExpression(source: cursor.source, start: token.start, limit: bodyEnd))
+    if maybeTarget == nil {
+        return nil
+    }
+
+    let targetFallback: CompilerExpression(compilerCoreMissingExpression(start: token.start))
+    let target: CompilerExpression(maybeTarget ?? targetFallback)
+    return parseCompilerIdentifierStatementWithTarget(cursor: cursor, token: token, target: target, bodyEnd: bodyEnd)
+}
+
+function parseCompilerIdentifierStatementWithTarget(cursor: CompilerTokenCursor, token: RangeLexedToken, target: CompilerExpression, bodyEnd: Int): Optional<CompilerStatement> {
+    let colonStart: Int(compilerCoreFirstNonWhitespaceIndex(source: cursor.source, start: target.end, end: bodyEnd))
+    if colonStart >= bodyEnd {
+        return compilerCoreExpressionStatement(expression: target)
+    }
+
+    let colonText: String(stringSubstring(source: cursor.source, start: colonStart, end: colonStart + 1))
+    if colonText != String(":") {
+        return compilerCoreExpressionStatement(expression: target)
+    }
+
+    let valueStart: Int(colonStart + 1)
+    let maybeValue: Optional<CompilerExpression>(parseCompilerExpression(source: cursor.source, start: valueStart, limit: bodyEnd))
+    if maybeValue == nil {
+        return nil
+    }
+    let valueFallback: CompilerExpression(compilerCoreMissingExpression(start: valueStart))
+    let value: CompilerExpression(maybeValue ?? valueFallback)
+    return parseCompilerAssignmentStatement(token: token, target: target, value: value)
+}
+
+function parseCompilerAssignmentStatement(token: RangeLexedToken, target: CompilerExpression, value: CompilerExpression): CompilerStatement {
+    let targetName: String(compilerCoreIdentifierExpressionRecordName(record: target.record, fallbackSummary: target.summary))
+    return CompilerStatement(
+        kind: String("assignment"),
+        name: targetName,
+        typeName: String(""),
+        targetSummary: target.summary,
+        targetRecord: target.record,
+        expressionKind: value.kind,
+        expressionValue: value.value,
+        expressionSummary: value.summary,
+        expressionRecord: value.record,
+        bodyStart: 0,
+        bodyEnd: 0,
+        elseBodyStart: 0,
+        elseBodyEnd: 0,
+        bodyStatementRecords: String(""),
+        elseStatementRecords: String(""),
+        summary: "kind=assignment\ttarget=\(target.summary)\texpression=\(value.summary)",
+        start: token.start,
+        end: value.end
+    )
+}
+
+function compilerCoreExpressionStatement(expression: CompilerExpression): CompilerStatement {
+    return CompilerStatement(
+        kind: String("expression"),
+        name: String(""),
+        typeName: String(""),
+        targetSummary: String(""),
+        targetRecord: String(""),
+        expressionKind: expression.kind,
+        expressionValue: expression.value,
+        expressionSummary: expression.summary,
+        expressionRecord: expression.record,
+        bodyStart: 0,
+        bodyEnd: 0,
+        elseBodyStart: 0,
+        elseBodyEnd: 0,
+        bodyStatementRecords: String(""),
+        elseStatementRecords: String(""),
+        summary: "kind=expression\texpression=\(expression.summary)",
+        start: expression.start,
+        end: expression.end
+    )
+}
+
+function parseCompilerStatementLegacy(program: CompilerProgram, start: Int, bodyEnd: Int): Optional<CompilerStatement> {
+    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: program.source, index: start))
+    let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeToken == nil {
+        return nil
+    }
+    let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let token: RangeLexedToken(maybeToken ?? fallbackToken)
+    if token.start >= bodyEnd {
+        return nil
+    }
+
+    if token.kind == .keyword && (token.text == String("if") || token.text == String("while")) {
+        return parseCompilerControlBlockStatement(program: program, cursor: cursor, keyword: token, bodyEnd: bodyEnd)
+    }
+
+    if token.kind == .keyword && (token.text == String("break") || token.text == String("continue")) {
+        return CompilerStatement(
+            kind: token.text,
+            name: String(""),
+            typeName: String(""),
+            targetSummary: String(""),
+            targetRecord: String(""),
+            expressionKind: String(""),
+            expressionValue: String(""),
+            expressionSummary: String(""),
+            expressionRecord: String(""),
+            bodyStart: 0,
+            bodyEnd: 0,
+            elseBodyStart: 0,
+            elseBodyEnd: 0,
+            bodyStatementRecords: String(""),
+            elseStatementRecords: String(""),
+            summary: "kind=\(token.text)",
+            start: token.start,
+            end: token.end
+        )
+    }
+
+    if token.kind == .keyword && token.text == String("return") {
+        let expressionCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: cursor, token: token))
+        let maybeExpression: Optional<CompilerExpression>(parseCompilerExpression(source: cursor.source, start: expressionCursor.index, limit: bodyEnd))
+        if maybeExpression == nil {
+            return nil
+        }
+        let expressionFallback: CompilerExpression(compilerCoreMissingExpression(start: expressionCursor.index))
+        let expression: CompilerExpression(maybeExpression ?? expressionFallback)
+        return CompilerStatement(
+            kind: String("return"),
+            name: String(""),
+            typeName: String(""),
+            targetSummary: String(""),
+            targetRecord: String(""),
+            expressionKind: expression.kind,
+            expressionValue: expression.value,
+            expressionSummary: expression.summary,
+            expressionRecord: expression.record,
+            bodyStart: 0,
+            bodyEnd: 0,
+            elseBodyStart: 0,
+            elseBodyEnd: 0,
+            bodyStatementRecords: String(""),
+            elseStatementRecords: String(""),
+            summary: "kind=return\texpression=\(expression.summary)",
+            start: token.start,
+            end: expression.end
+        )
+    }
+
+    if token.kind == .keyword && (token.text == String("let") || token.text == String("state")) {
+        return parseCompilerLocalBindingStatement(cursor: cursor, keyword: token, bodyEnd: bodyEnd)
+    }
+
+    if token.kind == .identifier {
+        let maybeTarget: Optional<CompilerExpression>(parseCompilerExpression(source: cursor.source, start: token.start, limit: bodyEnd))
+        if maybeTarget == nil {
+            return nil
+        }
+        let targetFallback: CompilerExpression(compilerCoreMissingExpression(start: token.start))
+        let target: CompilerExpression(maybeTarget ?? targetFallback)
+        let colonCursor: CompilerTokenCursor(CompilerTokenCursor(source: cursor.source, index: target.end))
+        let maybeColon: Optional<RangeLexedToken>(compilerCursorPeek(cursor: colonCursor))
+        if maybeColon == nil {
+            return CompilerStatement(
+                kind: String("expression"),
+                name: String(""),
+                typeName: String(""),
+                targetSummary: String(""),
+                targetRecord: String(""),
+                expressionKind: target.kind,
+                expressionValue: target.value,
+                expressionSummary: target.summary,
+                expressionRecord: target.record,
+                bodyStart: 0,
+                bodyEnd: 0,
+                elseBodyStart: 0,
+                elseBodyEnd: 0,
+                bodyStatementRecords: String(""),
+                elseStatementRecords: String(""),
+                summary: "kind=expression\texpression=\(target.summary)",
+                start: token.start,
+                end: target.end
+            )
+        }
+        let colonFallback: RangeLexedToken(compilerFallbackToken(cursor: colonCursor))
+        let colonToken: RangeLexedToken(maybeColon ?? colonFallback)
+        if colonToken.kind != .colon {
+            return CompilerStatement(
+                kind: String("expression"),
+                name: String(""),
+                typeName: String(""),
+                targetSummary: String(""),
+                targetRecord: String(""),
+                expressionKind: target.kind,
+                expressionValue: target.value,
+                expressionSummary: target.summary,
+                expressionRecord: target.record,
+                bodyStart: 0,
+                bodyEnd: 0,
+                elseBodyStart: 0,
+                elseBodyEnd: 0,
+                bodyStatementRecords: String(""),
+                elseStatementRecords: String(""),
+                summary: "kind=expression\texpression=\(target.summary)",
+                start: token.start,
+                end: target.end
+            )
+        }
+        let valueCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: colonCursor, token: colonToken))
+        let maybeValue: Optional<CompilerExpression>(parseCompilerExpression(source: cursor.source, start: valueCursor.index, limit: bodyEnd))
+        if maybeValue == nil {
+            return nil
+        }
+        let valueFallback: CompilerExpression(compilerCoreMissingExpression(start: valueCursor.index))
+        let value: CompilerExpression(maybeValue ?? valueFallback)
+        let targetName: String(compilerCoreIdentifierExpressionRecordName(record: target.record, fallbackSummary: target.summary))
+        return CompilerStatement(
+            kind: String("assignment"),
+            name: targetName,
+            typeName: String(""),
+            targetSummary: target.summary,
+            targetRecord: target.record,
+            expressionKind: value.kind,
+            expressionValue: value.value,
+            expressionSummary: value.summary,
+            expressionRecord: value.record,
+            bodyStart: 0,
+            bodyEnd: 0,
+            elseBodyStart: 0,
+            elseBodyEnd: 0,
+            bodyStatementRecords: String(""),
+            elseStatementRecords: String(""),
+            summary: "kind=assignment\ttarget=\(target.summary)\texpression=\(value.summary)",
+            start: token.start,
+            end: value.end
+        )
+    }
+
+    return nil
+}
+
+function parseCompilerControlBlockStatement(program: CompilerProgram, cursor: CompilerTokenCursor, keyword: RangeLexedToken, bodyEnd: Int): Optional<CompilerStatement> {
+    let conditionCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: cursor, token: keyword))
+    let maybeCondition: Optional<CompilerExpression>(parseCompilerExpression(source: cursor.source, start: conditionCursor.index, limit: bodyEnd))
+    if maybeCondition == nil {
+        return nil
+    }
+
+    let conditionFallback: CompilerExpression(compilerCoreMissingExpression(start: conditionCursor.index))
+    let condition: CompilerExpression(maybeCondition ?? conditionFallback)
+    state blockCursor: CompilerTokenCursor(CompilerTokenCursor(source: cursor.source, index: condition.end))
+    state sawLeftBrace: Bool(false)
+    state blockStart: Int(0)
+    state blockEnd: Int(0)
+    state nextIndex: Int(0)
+    state elseBlockStart: Int(0)
+    state elseBlockEnd: Int(0)
+    state nestedElseStatementRecords: String("")
+
+    while blockCursor.index < bodyEnd && !sawLeftBrace {
+        let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: blockCursor))
+        if maybeToken == nil {
+            return nil
+        }
+
+        let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: blockCursor))
+        let token: RangeLexedToken(maybeToken ?? fallbackToken)
+        if token.kind == .leftBrace {
+            let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: blockCursor, leftKind: .leftBrace, rightKind: .rightBrace))
+            if maybeRange == nil {
+                return nil
+            }
+            let rangeFallback: CompilerSourceRange(CompilerSourceRange(start: token.end, end: token.end, next: token.end))
+            let range: CompilerSourceRange(maybeRange ?? rangeFallback)
+            blockStart: range.start
+            blockEnd: range.end
+            nextIndex: range.next
+            sawLeftBrace: true
+        } else {
+            blockCursor: compilerCursorAdvance(cursor: blockCursor, token: token)
+        }
+    }
+
+    if !sawLeftBrace {
+        return nil
+    }
+
+    let elseCursor: CompilerTokenCursor(CompilerTokenCursor(source: cursor.source, index: nextIndex))
+    let maybeElseToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: elseCursor))
+    if maybeElseToken != nil && keyword.text == String("if") {
+        let elseTokenFallback: RangeLexedToken(compilerFallbackToken(cursor: elseCursor))
+        let elseToken: RangeLexedToken(maybeElseToken ?? elseTokenFallback)
+        if elseToken.kind == .keyword && elseToken.text == String("else") {
+            let elseBlockCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: elseCursor, token: elseToken))
+            let maybeElseBodyToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: elseBlockCursor))
+            if maybeElseBodyToken != nil {
+                let elseBodyTokenFallback: RangeLexedToken(compilerFallbackToken(cursor: elseBlockCursor))
+                let elseBodyToken: RangeLexedToken(maybeElseBodyToken ?? elseBodyTokenFallback)
+                if elseBodyToken.kind == .leftBrace {
+                    let maybeElseRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: elseBlockCursor, leftKind: .leftBrace, rightKind: .rightBrace))
+                    if maybeElseRange != nil {
+                        let elseRangeFallback: CompilerSourceRange(CompilerSourceRange(start: elseToken.end, end: elseToken.end, next: elseToken.end))
+                        let elseRange: CompilerSourceRange(maybeElseRange ?? elseRangeFallback)
+                        elseBlockStart: elseRange.start
+                        elseBlockEnd: elseRange.end
+                        nextIndex: elseRange.next
+                    }
+                }
+                if elseBodyToken.kind == .keyword && elseBodyToken.text == String("if") {
+                    let maybeNestedIf: Optional<CompilerStatement>(parseCompilerControlBlockStatement(program: program, cursor: elseBlockCursor, keyword: elseBodyToken, bodyEnd: bodyEnd))
+                    if maybeNestedIf != nil {
+                        let nestedIfFallback: CompilerStatement(compilerCoreMissingStatement(start: elseBodyToken.start, end: elseBodyToken.end))
+                        let nestedIf: CompilerStatement(maybeNestedIf ?? nestedIfFallback)
+                        elseBlockStart: nestedIf.start
+                        elseBlockEnd: nestedIf.end
+                        nextIndex: nestedIf.end
+                        nestedElseStatementRecords: compilerCoreStatementRecord(statement: nestedIf)
+                    }
+                }
+            }
+        }
+    }
+
+    let bodyStatements: CompilerParsedStatements(compilerCoreParseStatements(program: program, block: CompilerBlock(start: blockStart, end: blockEnd)))
+    let elseStatements: CompilerParsedStatements(compilerCoreParseStatements(program: program, block: CompilerBlock(start: elseBlockStart, end: elseBlockEnd)))
+    state elseStatementRecords: String("")
+    elseStatementRecords: elseStatements.records
+    if nestedElseStatementRecords != String("") {
+        elseStatementRecords: nestedElseStatementRecords
+    }
+    return CompilerStatement(
+        kind: keyword.text,
+        name: String(""),
+        typeName: String(""),
+        targetSummary: String(""),
+        targetRecord: String(""),
+        expressionKind: condition.kind,
+        expressionValue: condition.value,
+        expressionSummary: condition.summary,
+        expressionRecord: condition.record,
+        bodyStart: blockStart,
+        bodyEnd: blockEnd,
+        elseBodyStart: elseBlockStart,
+        elseBodyEnd: elseBlockEnd,
+        bodyStatementRecords: bodyStatements.records,
+        elseStatementRecords: elseStatementRecords,
+        summary: "kind=\(keyword.text)\tcondition=\(condition.summary)\tbodyStart=\(blockStart)\tbodyEnd=\(blockEnd)\tbodyStatements=[\(bodyStatements.summary)]\telseBodyStart=\(elseBlockStart)\telseBodyEnd=\(elseBlockEnd)\telseStatements=[\(elseStatements.summary)]",
+        start: keyword.start,
+        end: nextIndex
+    )
+}
+
+function parseCompilerLocalBindingStatement(cursor: CompilerTokenCursor, keyword: RangeLexedToken, bodyEnd: Int): Optional<CompilerStatement> {
+    return parseCompilerLocalBindingStatementCore(cursor: cursor, keyword: keyword, bodyEnd: bodyEnd)
+}
+
+function compilerCoreCallArgumentsStartWithLabel(source: String, start: Int, end: Int): Bool {
+    let labelCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    let maybeLabelToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: labelCursor))
+    if maybeLabelToken == nil { return false }
+    let labelFallbackToken: RangeLexedToken(compilerFallbackToken(cursor: labelCursor))
+    let labelToken: RangeLexedToken(maybeLabelToken ?? labelFallbackToken)
+    if labelToken.start >= end || (labelToken.kind != .identifier && labelToken.kind != .keyword) { return false }
+    let afterLabelCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: labelCursor, token: labelToken))
+    let maybeLabelColon: Optional<RangeLexedToken>(compilerCursorPeek(cursor: afterLabelCursor))
+    if maybeLabelColon == nil { return false }
+    let labelColonFallback: RangeLexedToken(compilerFallbackToken(cursor: afterLabelCursor))
+    let labelColon: RangeLexedToken(maybeLabelColon ?? labelColonFallback)
+    return labelColon.start < end && labelColon.kind == .colon
+}
+
+function parseCompilerLocalBindingStatementCore(cursor: CompilerTokenCursor, keyword: RangeLexedToken, bodyEnd: Int): Optional<CompilerStatement> {
+    state cursorState: CompilerTokenCursor(compilerCursorAdvance(cursor: cursor, token: keyword))
+    let maybeName: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursorState))
+    if maybeName == nil {
+        return nil
+    }
+    let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursorState))
+    let nameToken: RangeLexedToken(maybeName ?? fallbackToken)
+    if nameToken.kind != .identifier {
+        return nil
+    }
+    cursorState: compilerCursorAdvance(cursor: cursorState, token: nameToken)
+
+    let maybeColon: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursorState))
+    if maybeColon == nil {
+        return nil
+    }
+    let colonFallback: RangeLexedToken(compilerFallbackToken(cursor: cursorState))
+    let colonToken: RangeLexedToken(maybeColon ?? colonFallback)
+    if colonToken.kind != .colon {
+        return nil
+    }
+    cursorState: compilerCursorAdvance(cursor: cursorState, token: colonToken)
+
+    let maybeType: Optional<CompilerTypeReference>(compilerCoreParseTypeReference(cursor: cursorState))
+    if maybeType == nil {
+        return nil
+    }
+    let typeFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: cursorState.index, end: cursorState.index))
+    let typeReference: CompilerTypeReference(maybeType ?? typeFallback)
+    cursorState: CompilerTokenCursor(source: cursor.source, index: typeReference.end)
+
+    let maybeLeftParen: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursorState))
+    if maybeLeftParen == nil {
+        return nil
+    }
+    let leftParenFallback: RangeLexedToken(compilerFallbackToken(cursor: cursorState))
+    let leftParenToken: RangeLexedToken(maybeLeftParen ?? leftParenFallback)
+    if leftParenToken.kind != .leftParen {
+        return nil
+    }
+    let initializerOpenCursor: CompilerTokenCursor(cursorState)
+    let maybeInitializerRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: initializerOpenCursor, leftKind: .leftParen, rightKind: .rightParen))
+    if maybeInitializerRange == nil { return nil }
+    let initializerRangeFallback: CompilerSourceRange(CompilerSourceRange(start: leftParenToken.end, end: leftParenToken.end, next: leftParenToken.end))
+    let initializerRange: CompilerSourceRange(maybeInitializerRange ?? initializerRangeFallback)
+    cursorState: compilerCursorAdvance(cursor: cursorState, token: leftParenToken)
+
+    state expression: CompilerExpression(compilerCoreMissingExpression(start: cursorState.index))
+    state bindingEnd: Int(0)
+    if compilerCoreCallArgumentsStartWithLabel(source: cursor.source, start: initializerRange.start, end: initializerRange.end) {
+        let implicitCalleeRecord: String(compilerCoreExpressionRecord(kind: String("identifier"), value: typeReference.text, left: String(""), right: String(""), arguments: String(""), start: typeReference.start, end: typeReference.end))
+        let implicitArguments: CompilerCallArguments(parseCompilerCallArgumentsCore(source: cursor.source, start: initializerRange.start, end: initializerRange.end))
+        let implicitSummary: String("call(identifier(\(typeReference.text)),arguments=[\(implicitArguments.summary)])")
+        let implicitRecord: String(compilerCoreExpressionRecord(kind: String("call"), value: typeReference.text, left: implicitCalleeRecord, right: String(""), arguments: implicitArguments.records, start: typeReference.start, end: initializerRange.next))
+        expression: CompilerExpression(kind: String("call"), value: typeReference.text, summary: implicitSummary, record: implicitRecord, start: typeReference.start, end: initializerRange.next)
+        bindingEnd: initializerRange.next
+    } else {
+        let maybeBindingExpression: Optional<CompilerExpression>(parseCompilerExpression(source: cursor.source, start: cursorState.index, limit: bodyEnd))
+        if maybeBindingExpression == nil {
+            return nil
+        }
+        let bindingExpressionFallback: CompilerExpression(compilerCoreMissingExpression(start: cursorState.index))
+        expression: maybeBindingExpression ?? bindingExpressionFallback
+        cursorState: CompilerTokenCursor(source: cursor.source, index: expression.end)
+        let maybeBindingRightParen: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursorState))
+        if maybeBindingRightParen == nil { return nil }
+        let bindingRightParenFallback: RangeLexedToken(compilerFallbackToken(cursor: cursorState))
+        let bindingRightParenToken: RangeLexedToken(maybeBindingRightParen ?? bindingRightParenFallback)
+        if bindingRightParenToken.kind != .rightParen { return nil }
+        bindingEnd: bindingRightParenToken.end
+    }
+
+    return CompilerStatement(
+        kind: keyword.text,
+        name: nameToken.text,
+        typeName: typeReference.text,
+        targetSummary: String(""),
+        targetRecord: String(""),
+        expressionKind: expression.kind,
+        expressionValue: expression.value,
+        expressionSummary: expression.summary,
+        expressionRecord: expression.record,
+        bodyStart: 0,
+        bodyEnd: 0,
+        elseBodyStart: 0,
+        elseBodyEnd: 0,
+        bodyStatementRecords: String(""),
+        elseStatementRecords: String(""),
+        summary: "kind=\(keyword.text)\tname=\(nameToken.text)\ttype=\(typeReference.text)\texpression=\(expression.summary)",
+        start: keyword.start,
+        end: bindingEnd
+    )
+}
+
+function compilerCoreIsBinaryOperator(token: RangeLexedToken): Bool {
+    return token.kind == .equalEqual
+        || token.kind == .bangEqual
+        || token.kind == .less
+        || token.kind == .lessEqual
+        || token.kind == .greater
+        || token.kind == .greaterEqual
+        || token.kind == .plus
+        || token.kind == .minus
+        || token.kind == .asterisk
+        || token.kind == .slash
+        || token.kind == .percent
+        || token.kind == .andAnd
+        || token.kind == .orOr
+        || token.kind == .questionQuestion
+}
+
+function compilerCoreIsPrefixOperator(token: RangeLexedToken): Bool {
+    return token.kind == .bang
+        || token.kind == .minus
+}
+
+function compilerCoreBinaryPrecedence(token: RangeLexedToken): Int {
+    if token.kind == .orOr {
+        return 1
+    }
+
+    if token.kind == .andAnd {
+        return 2
+    }
+
+    if token.kind == .equalEqual
+        || token.kind == .bangEqual
+        || token.kind == .less
+        || token.kind == .lessEqual
+        || token.kind == .greater
+        || token.kind == .greaterEqual
+    {
+        return 3
+    }
+
+    if token.kind == .questionQuestion {
+        return 4
+    }
+
+    if token.kind == .plus || token.kind == .minus {
+        return 5
+    }
+
+    if token.kind == .asterisk || token.kind == .slash || token.kind == .percent {
+        return 6
+    }
+
+    return 0
+}
+
+function compilerCoreBinaryIsRightAssociative(token: RangeLexedToken): Bool {
+    return token.kind == .questionQuestion
+}
+
+function parseCompilerExpression(source: String, start: Int, limit: Int): Optional<CompilerExpression> {
+    return parseCompilerExpressionAtPrecedenceCore(source: source, start: start, limit: limit, minimumPrecedence: 0)
+}
+
+function parseCompilerExpressionAtPrecedenceCore(source: String, start: Int, limit: Int, minimumPrecedence: Int): Optional<CompilerExpression> {
+    let maybeLeftExpression: Optional<CompilerExpression>(parseCompilerPrefixExpressionCore(source: source, start: start, limit: limit))
+    if maybeLeftExpression == nil { return nil }
+    let leftFallback: CompilerExpression(compilerCoreMissingExpression(start: start))
+    state leftExpression: CompilerExpression(maybeLeftExpression ?? leftFallback)
+    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: leftExpression.end))
+
+    while cursor.index < limit {
+        let maybeOperator: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+        if maybeOperator == nil {
+            return leftExpression
+        }
+
+        let operatorFallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+        let operatorToken: RangeLexedToken(maybeOperator ?? operatorFallback)
+        if !compilerCoreIsBinaryOperator(token: operatorToken) {
+            return leftExpression
+        }
+
+        let precedence: Int(compilerCoreBinaryPrecedence(token: operatorToken))
+        if precedence < minimumPrecedence {
+            return leftExpression
+        }
+
+        state rightMinimumPrecedence: Int(0)
+        rightMinimumPrecedence: precedence + 1
+        if compilerCoreBinaryIsRightAssociative(token: operatorToken) {
+            rightMinimumPrecedence: precedence
+        }
+
+        let maybeRightExpression: Optional<CompilerExpression>(parseCompilerExpressionAtPrecedenceCore(source: source, start: operatorToken.end, limit: limit, minimumPrecedence: rightMinimumPrecedence))
+        if maybeRightExpression == nil { return nil }
+        let rightFallback: CompilerExpression(compilerCoreMissingExpression(start: operatorToken.end))
+        let rightExpression: CompilerExpression(maybeRightExpression ?? rightFallback)
+        let binaryRecord: String(compilerCoreExpressionRecord(kind: String("binary"), value: operatorToken.text, left: leftExpression.record, right: rightExpression.record, arguments: String(""), start: leftExpression.start, end: rightExpression.end))
+        leftExpression: CompilerExpression(
+            kind: String("binary"),
+            value: operatorToken.text,
+            summary: String("binary"),
+            record: binaryRecord,
+            start: leftExpression.start,
+            end: rightExpression.end
+        )
+        cursor: CompilerTokenCursor(source: source, index: rightExpression.end)
+    }
+
+    return leftExpression
+}
+
+function parseCompilerPrefixExpressionCore(source: String, start: Int, limit: Int): Optional<CompilerExpression> {
+    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeToken == nil {
+        return nil
+    }
+    let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let token: RangeLexedToken(maybeToken ?? fallbackToken)
+    if token.start >= limit {
+        return nil
+    }
+
+    if token.kind == .leftParen {
+        let maybeGroupedExpression: Optional<CompilerExpression>(parseCompilerExpressionAtPrecedenceCore(source: source, start: token.end, limit: limit, minimumPrecedence: 0))
+        if maybeGroupedExpression == nil { return nil }
+        let groupedFallback: CompilerExpression(compilerCoreMissingExpression(start: token.end))
+        let groupedExpression: CompilerExpression(maybeGroupedExpression ?? groupedFallback)
+        let maybeRightParen: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: groupedExpression.end))
+        if maybeRightParen == nil {
+            return nil
+        }
+        let rightParenFallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+        let rightParenToken: RangeLexedToken(maybeRightParen ?? rightParenFallback)
+        if rightParenToken.kind != .rightParen {
+            return nil
+        }
+        let groupedLegacyExpression: CompilerExpression(CompilerExpression(kind: groupedExpression.kind, value: groupedExpression.value, summary: groupedExpression.summary, record: groupedExpression.record, start: token.start, end: rightParenToken.end))
+        return groupedLegacyExpression
+    }
+
+    if compilerCoreIsPrefixOperator(token: token) {
+        let maybeOperand: Optional<CompilerExpression>(parseCompilerExpressionAtPrecedenceCore(source: source, start: token.end, limit: limit, minimumPrecedence: 7))
+        if maybeOperand == nil { return nil }
+        let operandFallback: CompilerExpression(compilerCoreMissingExpression(start: token.end))
+        let operand: CompilerExpression(maybeOperand ?? operandFallback)
+        let prefixRecord: String(compilerCoreExpressionRecord(kind: String("prefix"), value: token.text, left: operand.record, right: String(""), arguments: String(""), start: token.start, end: operand.end))
+        let prefixLegacyExpression: CompilerExpression(CompilerExpression(
+            kind: String("prefix"),
+            value: token.text,
+            summary: "prefix(\(token.text),\(operand.summary))",
+            record: prefixRecord,
+            start: token.start,
+            end: operand.end
+        ))
+        return prefixLegacyExpression
+    }
+
+    return parseCompilerPostfixExpressionCore(source: source, start: token.start, limit: limit)
+}
+
+function parseCompilerPostfixExpressionCore(source: String, start: Int, limit: Int): Optional<CompilerExpression> {
+    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeToken == nil {
+        return nil
+    }
+    let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let token: RangeLexedToken(maybeToken ?? fallbackToken)
+    if token.start >= limit {
+        return nil
+    }
+
+    state summary: String("")
+    state kind: String("")
+    state value: String("")
+    state record: String("")
+    state expressionEnd: Int(token.end)
+    state suffixCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: cursor, token: token))
+    if token.kind == .dollar {
+        let nameCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: cursor, token: token))
+        let maybeName: Optional<RangeLexedToken>(compilerCursorPeek(cursor: nameCursor))
+        if maybeName == nil { return nil }
+        let nameFallback: RangeLexedToken(compilerFallbackToken(cursor: nameCursor))
+        let nameToken: RangeLexedToken(maybeName ?? nameFallback)
+        if nameToken.kind != .identifier { return nil }
+        let bindingRecord: String(compilerCoreExpressionRecord(kind: String("bindingReference"), value: nameToken.text, left: String(""), right: String(""), arguments: String(""), start: token.start, end: nameToken.end))
+        return CompilerExpression(kind: String("bindingReference"), value: nameToken.text, summary: String("bindingReference((nameToken.text))"), record: bindingRecord, start: token.start, end: nameToken.end)
+    } else if token.kind == .integer {
+        kind: String("integerLiteral")
+        value: token.text
+        summary: "integerLiteral(\(token.text))"
+        record: compilerCoreExpressionRecord(kind: kind, value: value, left: String(""), right: String(""), arguments: String(""), start: token.start, end: token.end)
+    } else if token.kind == .stringLiteral {
+        kind: String("stringLiteral")
+        value: token.text
+        summary: "stringLiteral(\(token.text))"
+        record: compilerCoreExpressionRecord(kind: kind, value: value, left: String(""), right: String(""), arguments: String(""), start: token.start, end: token.end)
+    } else if (token.kind == .identifier || token.kind == .keyword) && (token.text == String("true") || token.text == String("false")) {
+        kind: String("boolLiteral")
+        value: token.text
+        summary: "boolLiteral(\(token.text))"
+        record: compilerCoreExpressionRecord(kind: kind, value: value, left: String(""), right: String(""), arguments: String(""), start: token.start, end: token.end)
+    } else if token.kind == .identifier || token.kind == .keyword {
+        kind: String("identifier")
+        value: token.text
+        summary: "identifier(\(token.text))"
+        record: compilerCoreExpressionRecord(kind: kind, value: value, left: String(""), right: String(""), arguments: String(""), start: token.start, end: token.end)
+    } else {
+        return nil
+    }
+
+    while suffixCursor.index < limit {
+        let maybeSuffix: Optional<RangeLexedToken>(compilerCursorPeek(cursor: suffixCursor))
+        if maybeSuffix == nil {
+            let completedPostfixExpression: CompilerExpression(CompilerExpression(kind: kind, value: value, summary: summary, record: record, start: token.start, end: expressionEnd))
+            return completedPostfixExpression
+        }
+        let suffixFallback: RangeLexedToken(compilerFallbackToken(cursor: suffixCursor))
+        let suffixToken: RangeLexedToken(maybeSuffix ?? suffixFallback)
+        if suffixToken.kind == .dot {
+            let memberCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: suffixCursor, token: suffixToken))
+            let maybeMember: Optional<RangeLexedToken>(compilerCursorPeek(cursor: memberCursor))
+            if maybeMember == nil {
+                return nil
+            }
+            let memberFallback: RangeLexedToken(compilerFallbackToken(cursor: memberCursor))
+            let memberToken: RangeLexedToken(maybeMember ?? memberFallback)
+            if memberToken.kind != .identifier && memberToken.kind != .keyword {
+                return nil
+            }
+            let baseRecord: String(record)
+            kind: String("member")
+            value: memberToken.text
+            summary: "member(\(summary),\(memberToken.text))"
+            expressionEnd: memberToken.end
+            record: compilerCoreExpressionRecord(kind: kind, value: value, left: baseRecord, right: String(""), arguments: String(""), start: token.start, end: expressionEnd)
+            suffixCursor: compilerCursorAdvance(cursor: memberCursor, token: memberToken)
+        } else if suffixToken.kind == .leftParen {
+            let maybeArguments: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: suffixCursor, leftKind: .leftParen, rightKind: .rightParen))
+            if maybeArguments == nil {
+                return nil
+            }
+            let argumentsFallback: CompilerSourceRange(CompilerSourceRange(start: suffixToken.end, end: suffixToken.end, next: suffixToken.end))
+            let argumentsRange: CompilerSourceRange(maybeArguments ?? argumentsFallback)
+            let calleeRecord: String(record)
+            let arguments: CompilerCallArguments(parseCompilerCallArgumentsCore(source: source, start: argumentsRange.start, end: argumentsRange.end))
+            kind: String("call")
+            summary: "call(\(summary),arguments=[\(arguments.summary)])"
+            expressionEnd: argumentsRange.next
+            record: compilerCoreExpressionRecord(kind: kind, value: value, left: calleeRecord, right: String(""), arguments: arguments.records, start: token.start, end: expressionEnd)
+            suffixCursor: CompilerTokenCursor(source: source, index: argumentsRange.next)
+        } else if suffixToken.kind == .leftBracket {
+            let maybeIndex: Optional<CompilerExpression>(parseCompilerExpression(source: source, start: suffixToken.end, limit: limit))
+            if maybeIndex == nil { return nil }
+            let indexFallback: CompilerExpression(compilerCoreMissingExpression(start: suffixToken.end))
+            let index: CompilerExpression(maybeIndex ?? indexFallback)
+            let maybeRightBracket: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: index.end))
+            if maybeRightBracket == nil {
+                return nil
+            }
+            let rightBracketToken: RangeLexedToken(maybeRightBracket ?? fallbackToken)
+            if rightBracketToken.kind != .rightBracket {
+                return nil
+            }
+            let baseRecord: String(record)
+            kind: String("index")
+            value: index.value
+            summary: "index(\(summary),\(index.summary))"
+            expressionEnd: rightBracketToken.end
+            record: compilerCoreExpressionRecord(kind: kind, value: value, left: baseRecord, right: index.record, arguments: String(""), start: token.start, end: expressionEnd)
+            suffixCursor: CompilerTokenCursor(source: source, index: rightBracketToken.end)
+        } else {
+            let stoppedPostfixExpression: CompilerExpression(CompilerExpression(kind: kind, value: value, summary: summary, record: record, start: token.start, end: expressionEnd))
+            return stoppedPostfixExpression
+        }
+    }
+
+    let finalPostfixExpression: CompilerExpression(CompilerExpression(kind: kind, value: value, summary: summary, record: record, start: token.start, end: expressionEnd))
+    return finalPostfixExpression
+}

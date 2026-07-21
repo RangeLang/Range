@@ -3041,7 +3041,13 @@ Current branch:
 - `Development/GPT56RangeSelfHostingHandoff.md` (historical operational
   snapshot; chunk guidance is superseded)
 - `RangeCompiler/Range/Programs/Compiler/Compiler.range`
+- `RangeCompiler/Range/Programs/Compiler/CompilerBodyCFG.range`
+- `RangeCompiler/Range/Programs/Compiler/CompilerBodyLLVM.range`
+- `RangeCompiler/Range/Programs/Compiler/CompilerBodyMIR.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerBodyModel.range`
+- `RangeCompiler/Range/Programs/Compiler/CompilerBodyOwnership.range`
+- `RangeCompiler/Range/Programs/Compiler/CompilerBodyParsing.range`
+- `RangeCompiler/Range/Programs/Compiler/CompilerBodyTypes.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerCore.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerFrontend.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerGraph.range`
@@ -3049,6 +3055,7 @@ Current branch:
 - `RangeCompiler/Range/Programs/Compiler/CompilerMemory.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerParsing.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerSources.range`
+- `RangeCompiler/Range/Programs/Compiler/CompilerTextSupport.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerTypedIR.range`
 - development commits `85947e19` and `3a309a8d`
 

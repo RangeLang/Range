@@ -45,10 +45,18 @@ the Range-loaded bundle as the Stage 3 input.
 The transitional compiler source layout keeps source-marker decoding, source
 roles, stable `FileID` mapping, source-store access, and inventory/identity
 snapshots in `CompilerSources.range`. `CompilerCore.range` retains shared model
-types plus body parsing, analysis, and lower backend phases. BodyArena table
+types and the generic integer-table substrate. BodyArena table
 schemas, CFG/storage/ownership/MIR records, ABI/type-layout interpretation,
 GraphZero validation, and typed-only telemetry live in
-`CompilerBodyModel.range`. The contiguous pre-graph typed
+`CompilerBodyModel.range`. Arena construction and syntax parsing live in
+`CompilerBodyParsing.range`; type interning and semantic resolution in
+`CompilerBodyTypes.range`; CFG construction and validation in
+`CompilerBodyCFG.range`; memory, alias, ownership, and cross-function effect
+analysis in `CompilerBodyOwnership.range`; MIR construction and validation in
+`CompilerBodyMIR.range`; and typed-body LLVM lowering and emission in
+`CompilerBodyLLVM.range`. Remaining text, record, literal, main-block, and
+statement/expression parser support lives in `CompilerTextSupport.range`.
+The contiguous pre-graph typed
 syntax, body capture, macro linking, and macro-execution implementation lives
 in `CompilerFrontend.range`. Graph construction, Plotter, and semantic
 settlement live in `CompilerGraph.range`. MemoryGraph construction, ownership

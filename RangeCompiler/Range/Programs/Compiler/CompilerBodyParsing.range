@@ -1,0 +1,1020 @@
+function compilerBodyArenaStatementKind(token: RangeLexedToken): Int {
+    if token.kind != .keyword { return 0 - 1 }
+    if token.text == String("return") { return compilerSyntaxKindReturn() }
+    if token.text == String("let") || token.text == String("state") { return compilerSyntaxKindLocalBinding() }
+    if token.text == String("if") { return compilerSyntaxKindIf() }
+    if token.text == String("while") { return compilerSyntaxKindWhile() }
+    if token.text == String("switch") { return compilerSyntaxKindSwitch() }
+    return 0 - 1
+}
+
+function compilerBodyArenaOwnerFunction(): Int { return 1 }
+function compilerBodyArenaOwnerEntry(): Int { return 2 }
+function compilerBodyArenaOwnerMacro(): Int { return 3 }
+
+function compilerBodyArenaIsEntry(arena: CompilerBodyArena): Bool {
+    return arena.ownerKind == compilerBodyArenaOwnerEntry()
+}
+
+function compilerBodyArenaAppendNode(arena: CompilerBodyArena, kind: Int, ordinal: Int, start: Int, end: Int, firstStart: Int, firstEnd: Int, secondStart: Int, secondEnd: Int, aux: Int): Int {
+    let nodeID: Int(compilerIntTableRowCount(table: arena.nodes))
+    if compilerIntTableAppend(table: arena.nodes, value: nodeID) != 0
+        || compilerIntTableAppend(table: arena.nodes, value: kind) != 0
+        || compilerIntTableAppend(table: arena.nodes, value: arena.fileID) != 0
+        || compilerIntTableAppend(table: arena.nodes, value: ordinal) != 0
+        || compilerIntTableAppend(table: arena.nodes, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: start)) != 0
+        || compilerIntTableAppend(table: arena.nodes, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: end)) != 0
+        || compilerIntTableAppend(table: arena.nodes, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: firstStart)) != 0
+        || compilerIntTableAppend(table: arena.nodes, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: firstEnd)) != 0
+        || compilerIntTableAppend(table: arena.nodes, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: secondStart)) != 0
+        || compilerIntTableAppend(table: arena.nodes, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: secondEnd)) != 0
+        || compilerIntTableAppend(table: arena.nodes, value: aux) != 0
+        || rawBufferAppendInt(buffer: arena.parentNodes, value: 0 - 1) != 0
+        || rawBufferAppendInt(buffer: arena.parentRoles, value: 0 - 1) != 0 {
+        rawBufferAppendInt(buffer: arena.failures, value: 1)
+        return 0 - 1
+    }
+    return nodeID
+}
+
+function compilerBodyArenaAppendEdge(arena: CompilerBodyArena, ownerNodeID: Int, childNodeID: Int, role: Int, ordinal: Int): Int {
+    if compilerIntTableAppend(table: arena.edges, value: ownerNodeID) != 0
+        || compilerIntTableAppend(table: arena.edges, value: childNodeID) != 0
+        || compilerIntTableAppend(table: arena.edges, value: role) != 0
+        || compilerIntTableAppend(table: arena.edges, value: ordinal) != 0 {
+        rawBufferAppendInt(buffer: arena.failures, value: 1)
+        return 0 - 1
+    }
+    if childNodeID >= 0 && childNodeID < rawBufferCount(buffer: arena.parentNodes) {
+        if rawBufferLoadInt(buffer: arena.parentNodes, index: childNodeID) == 0 - 1 {
+            if rawBufferStoreInt(buffer: arena.parentNodes, index: childNodeID, value: ownerNodeID) != 0
+                || rawBufferStoreInt(buffer: arena.parentRoles, index: childNodeID, value: role) != 0 { return 0 - 1 }
+        } else {
+            if rawBufferStoreInt(buffer: arena.parentNodes, index: childNodeID, value: 0 - 2) != 0
+                || rawBufferStoreInt(buffer: arena.parentRoles, index: childNodeID, value: 0 - 2) != 0 { return 0 - 1 }
+        }
+    }
+    return 0
+}
+
+function compilerBodyArenaCreateForBodyWithTypeTables(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, typeInstances: CompilerIntTable, typeArguments: CompilerIntTable, ownerKind: Int, ownerSyntaxID: Int, ownerFunctionRow: Int, ownerFunctionInstanceID: Int, ownerReceiverTypeKeyID: Int, ownerReceiverTypeID: Int, fileID: Int, bodyStart: Int, bodyEnd: Int): CompilerBodyArena {
+    let memoryState: RawBuffer(rawBufferCreate(capacity: compilerBodyMemoryStateCount(), stride: 4))
+    rawBufferAppendInt(buffer: memoryState, value: 0)
+    rawBufferAppendInt(buffer: memoryState, value: 0)
+    rawBufferAppendInt(buffer: memoryState, value: 1)
+    let nodes: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyArenaNodeColumnCount(), estimatedRowCount: 64))
+    let edges: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyArenaEdgeColumnCount(), estimatedRowCount: 96))
+    let parentNodes: RawBuffer(rawBufferCreate(capacity: 64, stride: 4))
+    let parentRoles: RawBuffer(rawBufferCreate(capacity: 64, stride: 4))
+    let symbols: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodySymbolColumnCount(), estimatedRowCount: 16))
+    let resolutions: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyResolutionColumnCount(), estimatedRowCount: 32))
+    let cfgBlocks: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyCFGBlockColumnCount(), estimatedRowCount: 16))
+    let cfgEdges: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyCFGEdgeColumnCount(), estimatedRowCount: 24))
+    let cfgSchedule: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyCFGScheduleColumnCount(), estimatedRowCount: 64))
+    let controlDecisions: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyControlDecisionColumnCount(), estimatedRowCount: 8))
+    let controlRegions: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyControlRegionColumnCount(), estimatedRowCount: 8))
+    let graphZeroCFGRegions: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyGraphZeroCFGRegionColumnCount(), estimatedRowCount: 16))
+    let storages: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyStorageColumnCount(), estimatedRowCount: 8))
+    let ownedPaths: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyOwnedPathColumnCount(), estimatedRowCount: 8))
+    let bindingAliases: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyBindingAliasColumnCount(), estimatedRowCount: 8))
+    let runtimeCallContracts: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyRuntimeCallContractColumnCount(), estimatedRowCount: 16))
+    let ownedReturnTransfers: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyOwnedReturnTransferColumnCount(), estimatedRowCount: 8))
+    let memoryFacts: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyMemoryFactColumnCount(), estimatedRowCount: 32))
+    let mirValues: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyMIRValueColumnCount(), estimatedRowCount: 64))
+    let mirBlocks: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyMIRBlockColumnCount(), estimatedRowCount: 32))
+    let mirOperations: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyMIROperationColumnCount(), estimatedRowCount: 64))
+    let mirOperands: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyMIROperandColumnCount(), estimatedRowCount: 128))
+    let mirVersions: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyMIRVersionColumnCount(), estimatedRowCount: 32))
+    let mirExpressionValues: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyMIRExpressionValueColumnCount(), estimatedRowCount: 64))
+    let graphZeroMIRDependencies: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyGraphZeroMIRDependencyColumnCount(), estimatedRowCount: 128))
+    let graphZeroMIRFrontiers: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyGraphZeroMIRFrontierColumnCount(), estimatedRowCount: 64))
+    let graphZeroState: RawBuffer(rawBufferCreate(capacity: compilerBodyGraphZeroStateCount(), stride: 4))
+    rawBufferAppendInt(buffer: graphZeroState, value: 0)
+    rawBufferAppendInt(buffer: graphZeroState, value: 1)
+    let mirTraversal: RawBuffer(rawBufferCreate(capacity: 32, stride: 4))
+    let failures: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let created: CompilerBodyArena(CompilerBodyArena(
+        tables: $tables,
+        declarationIndex: $index,
+        ownerKind: ownerKind,
+        ownerDeclarationSyntaxID: ownerSyntaxID,
+        ownerFunctionRow: ownerFunctionRow,
+        ownerFunctionInstanceID: ownerFunctionInstanceID,
+        ownerReceiverTypeKeyID: ownerReceiverTypeKeyID,
+        ownerReceiverTypeID: ownerReceiverTypeID,
+        fileID: fileID,
+        bodyStart: bodyStart,
+        bodyEnd: bodyEnd,
+        rootNodeID: 0,
+        nodes: nodes,
+        edges: edges,
+        parentNodes: parentNodes,
+        parentRoles: parentRoles,
+        symbols: symbols,
+        resolutions: resolutions,
+        typeInstances: typeInstances,
+        typeArguments: typeArguments,
+        cfgBlocks: cfgBlocks,
+        cfgEdges: cfgEdges,
+        cfgSchedule: cfgSchedule,
+        controlDecisions: controlDecisions,
+        controlRegions: controlRegions,
+        graphZeroCFGRegions: graphZeroCFGRegions,
+        storages: storages,
+        ownedPaths: ownedPaths,
+        bindingAliases: bindingAliases,
+        runtimeCallContracts: runtimeCallContracts,
+        ownedReturnTransfers: ownedReturnTransfers,
+        memoryFacts: memoryFacts,
+        memoryState: memoryState,
+        mirValues: mirValues,
+        mirBlocks: mirBlocks,
+        mirOperations: mirOperations,
+        mirOperands: mirOperands,
+        mirVersions: mirVersions,
+        mirExpressionValues: mirExpressionValues,
+        graphZeroMIRDependencies: graphZeroMIRDependencies,
+        graphZeroMIRFrontiers: graphZeroMIRFrontiers,
+        graphZeroState: graphZeroState,
+        mirTraversal: mirTraversal,
+        failures: failures
+    ))
+    return created
+}
+
+function compilerBodyArenaCreateForBody(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, ownerKind: Int, ownerSyntaxID: Int, ownerFunctionRow: Int, ownerFunctionInstanceID: Int, ownerReceiverTypeKeyID: Int, ownerReceiverTypeID: Int, fileID: Int, bodyStart: Int, bodyEnd: Int): CompilerBodyArena {
+    let typeInstances: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyTypeInstanceColumnCount(), estimatedRowCount: 16))
+    let typeArguments: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyTypeArgumentColumnCount(), estimatedRowCount: 24))
+    return compilerBodyArenaCreateForBodyWithTypeTables(tables: tables, index: index, typeInstances: typeInstances, typeArguments: typeArguments, ownerKind: ownerKind, ownerSyntaxID: ownerSyntaxID, ownerFunctionRow: ownerFunctionRow, ownerFunctionInstanceID: ownerFunctionInstanceID, ownerReceiverTypeKeyID: ownerReceiverTypeKeyID, ownerReceiverTypeID: ownerReceiverTypeID, fileID: fileID, bodyStart: bodyStart, bodyEnd: bodyEnd)
+}
+
+function compilerBodyArenaCreate(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, functionRow: Int): CompilerBodyArena {
+    let fileID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 1))
+    let bodyStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.functions, row: functionRow, column: 8)))
+    let bodyEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.functions, row: functionRow, column: 9)))
+    return compilerBodyArenaCreateForBody(tables: tables, index: index, ownerKind: compilerBodyArenaOwnerFunction(), ownerSyntaxID: compilerIntTableValue(table: tables.functions, row: functionRow, column: 0), ownerFunctionRow: functionRow, ownerFunctionInstanceID: 0 - 1, ownerReceiverTypeKeyID: 0 - 1, ownerReceiverTypeID: 0 - 1, fileID: fileID, bodyStart: bodyStart, bodyEnd: bodyEnd)
+}
+
+function compilerBodyArenaCreateForFunctionInstance(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, functionRow: Int, functionInstanceID: Int, receiverTypeKeyID: Int, typeKeys: CompilerIntTable, typeKeyArguments: CompilerIntTable): CompilerBodyArena {
+    let fileID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 1))
+    let bodyStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.functions, row: functionRow, column: 8)))
+    let bodyEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.functions, row: functionRow, column: 9)))
+    let typeInstances: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyTypeInstanceColumnCount(), estimatedRowCount: 16))
+    let typeArguments: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyTypeArgumentColumnCount(), estimatedRowCount: 24))
+    state receiverTypeID: Int(0 - 1)
+    if receiverTypeKeyID >= 0 {
+        receiverTypeID: compilerBodyArenaImportTypeKeyIntoTables(typeInstances: typeInstances, typeArguments: typeArguments, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, typeKeyID: receiverTypeKeyID)
+    }
+    let arena: CompilerBodyArena(compilerBodyArenaCreateForBodyWithTypeTables(tables: tables, index: index, typeInstances: typeInstances, typeArguments: typeArguments, ownerKind: compilerBodyArenaOwnerFunction(), ownerSyntaxID: compilerIntTableValue(table: tables.functions, row: functionRow, column: 0), ownerFunctionRow: functionRow, ownerFunctionInstanceID: functionInstanceID, ownerReceiverTypeKeyID: receiverTypeKeyID, ownerReceiverTypeID: receiverTypeID, fileID: fileID, bodyStart: bodyStart, bodyEnd: bodyEnd))
+    let ownerSyntaxID: Int(rawBufferLoadInt(buffer: tables.functionOwners, index: functionRow))
+    if receiverTypeKeyID >= 0 && receiverTypeID < 0 { rawBufferAppendInt(buffer: arena.failures, value: 0 - 1) }
+    if receiverTypeKeyID < 0 && ownerSyntaxID >= 0 && compilerSyntaxGenericParameterCountForOwner(tables: tables, ownerSyntaxID: ownerSyntaxID) > 0 { rawBufferAppendInt(buffer: arena.failures, value: 0 - 1) }
+    return arena
+}
+
+function compilerBodyArenaCreateEntry(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex): CompilerBodyArena {
+    let maybeMain: Optional<CompilerMainBlock>(compilerCoreParseMainBlock(source: tables.sourceStore.source))
+    state isValid: Bool(false)
+    state ownerSyntaxID: Int(0 - 1)
+    state fileID: Int(0)
+    state bodyStart: Int(0 - 1)
+    state bodyEnd: Int(0 - 1)
+    if maybeMain != nil {
+        isValid: true
+        let fallbackMain: CompilerMainBlock(CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
+        let mainBlock: CompilerMainBlock(maybeMain ?? fallbackMain)
+        ownerSyntaxID: mainBlock.attributeStart
+        fileID: compilerSourceStoreFileIDAtGlobalOffset(store: tables.sourceStore, globalOffset: mainBlock.attributeStart)
+        bodyStart: mainBlock.bodyStart
+        bodyEnd: mainBlock.bodyEnd
+    }
+    let arena: CompilerBodyArena(compilerBodyArenaCreateForBody(tables: tables, index: index, ownerKind: compilerBodyArenaOwnerEntry(), ownerSyntaxID: ownerSyntaxID, ownerFunctionRow: 0 - 1, ownerFunctionInstanceID: 0 - 1, ownerReceiverTypeKeyID: 0 - 1, ownerReceiverTypeID: 0 - 1, fileID: fileID, bodyStart: bodyStart, bodyEnd: bodyEnd))
+    if !isValid { rawBufferAppendInt(buffer: arena.failures, value: 0 - 1) }
+    return arena
+}
+
+function compilerBodyArenaCreateMacro(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, macroDeclarationRow: Int): CompilerBodyArena {
+    let fileID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: macroDeclarationRow, column: 1))
+    let bodyStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.macroDeclarations, row: macroDeclarationRow, column: 27)))
+    let bodyEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.macroDeclarations, row: macroDeclarationRow, column: 28)))
+    return compilerBodyArenaCreateForBody(tables: tables, index: index, ownerKind: compilerBodyArenaOwnerMacro(), ownerSyntaxID: macroDeclarationRow, ownerFunctionRow: 0 - 1, ownerFunctionInstanceID: 0 - 1, ownerReceiverTypeKeyID: 0 - 1, ownerReceiverTypeID: 0 - 1, fileID: fileID, bodyStart: bodyStart, bodyEnd: bodyEnd)
+}
+
+function compilerBodyParseFailure(index: Int): CompilerBodyParseResult {
+    return CompilerBodyParseResult(nodeID: 0 - 1, nextIndex: index, isValid: false)
+}
+
+function compilerBodyParseSuccess(nodeID: Int, nextIndex: Int): CompilerBodyParseResult {
+    return CompilerBodyParseResult(nodeID: nodeID, nextIndex: nextIndex, isValid: true)
+}
+
+function compilerBodyArenaInterpolationEnd(arena: CompilerBodyArena, start: Int, limit: Int): Int {
+    state cursor: Int(start)
+    state depth: Int(0)
+    while cursor < limit {
+        let character: String(stringCharacterAt(source: arena.tables.sourceStore.source, index: cursor))
+        if character == String("(") { depth: depth + 1 }
+        if character == String(")") {
+            if depth == 0 { return cursor }
+            depth: depth - 1
+        }
+        cursor: cursor + 1
+    }
+    return 0 - 1
+}
+
+function compilerBodyArenaAppendInterpolationPart(arena: CompilerBodyArena, interpolationNodeID: Int, kind: Int, start: Int, end: Int, ordinal: Int): Int {
+    let partNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: kind, ordinal: ordinal, start: start, end: end, firstStart: start, firstEnd: end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if partNodeID < 0 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: interpolationNodeID, childNodeID: partNodeID, role: compilerSyntaxRoleInterpolationPart(), ordinal: ordinal) != 0 { return 0 - 1 }
+    return partNodeID
+}
+
+function compilerBodyArenaParseInterpolatedString(arena: CompilerBodyArena, token: RangeLexedToken): CompilerBodyParseResult {
+    state tokenStart: Int(0)
+    tokenStart: token.start
+    state tokenEnd: Int(0)
+    tokenEnd: token.end
+    let interpolationNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindInterpolatedString(), ordinal: 0, start: tokenStart, end: tokenEnd, firstStart: tokenStart, firstEnd: tokenEnd, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if interpolationNodeID < 0 { return compilerBodyParseFailure(index: tokenStart) }
+    let contentStart: Int(tokenStart + 1)
+    let contentEnd: Int(tokenEnd - 1)
+    let backslash: String(compilerCoreSingleBackslash())
+    state cursor: Int(0)
+    cursor: contentStart
+    state segmentStart: Int(0)
+    segmentStart: contentStart
+    state ordinal: Int(0)
+    while cursor + 1 < contentEnd {
+        if stringCharacterAt(source: arena.tables.sourceStore.source, index: cursor) == backslash
+            && stringCharacterAt(source: arena.tables.sourceStore.source, index: cursor + 1) == String("(") {
+            if segmentStart < cursor {
+                if compilerBodyArenaAppendInterpolationPart(arena: arena, interpolationNodeID: interpolationNodeID, kind: compilerSyntaxKindStringSegment(), start: segmentStart, end: cursor, ordinal: ordinal) < 0 { return compilerBodyParseFailure(index: cursor) }
+                ordinal: ordinal + 1
+            }
+            let expressionStart: Int(cursor + 2)
+            let expressionEnd: Int(compilerBodyArenaInterpolationEnd(arena: arena, start: expressionStart, limit: contentEnd))
+            if expressionEnd < expressionStart { return compilerBodyParseFailure(index: cursor) }
+            let expression: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: expressionStart, limit: expressionEnd, minimumPrecedence: 0))
+            if !expression.isValid || expression.nextIndex < expressionEnd
+                || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: interpolationNodeID, childNodeID: expression.nodeID, role: compilerSyntaxRoleInterpolationPart(), ordinal: ordinal) != 0 { return compilerBodyParseFailure(index: expressionStart) }
+            ordinal: ordinal + 1
+            cursor: expressionEnd + 1
+            segmentStart: cursor
+        } else {
+            cursor: cursor + 1
+        }
+    }
+    if segmentStart < contentEnd {
+        if compilerBodyArenaAppendInterpolationPart(arena: arena, interpolationNodeID: interpolationNodeID, kind: compilerSyntaxKindStringSegment(), start: segmentStart, end: contentEnd, ordinal: ordinal) < 0 { return compilerBodyParseFailure(index: segmentStart) }
+        ordinal: ordinal + 1
+    }
+    if ordinal == 0 { return compilerBodyParseFailure(index: tokenStart) }
+    return compilerBodyParseSuccess(nodeID: interpolationNodeID, nextIndex: tokenEnd)
+}
+
+function compilerBodyArenaBinaryKind(token: RangeLexedToken): Int {
+    if token.kind == .equalEqual || token.kind == .bangEqual { return compilerSyntaxKindEquality() }
+    if token.kind == .andAnd { return compilerSyntaxKindBooleanAnd() }
+    if token.kind == .orOr { return compilerSyntaxKindBooleanOr() }
+    if token.kind == .plus { return compilerSyntaxKindAddition() }
+    if token.kind == .minus { return compilerSyntaxKindSubtraction() }
+    if token.kind == .asterisk { return compilerSyntaxKindMultiplication() }
+    if token.kind == .slash { return compilerSyntaxKindDivision() }
+    if token.kind == .percent { return compilerSyntaxKindRemainder() }
+    if token.kind == .less { return compilerSyntaxKindLessThan() }
+    if token.kind == .lessEqual { return compilerSyntaxKindLessEqual() }
+    if token.kind == .greater { return compilerSyntaxKindGreaterThan() }
+    if token.kind == .greaterEqual { return compilerSyntaxKindGreaterEqual() }
+    if token.kind == .questionQuestion { return compilerSyntaxKindOptionalCoalescing() }
+    return 0 - 1
+}
+
+function compilerBodyArenaParseArrayLiteral(arena: CompilerBodyArena, left: RangeLexedToken, limit: Int): CompilerBodyParseResult {
+    let arrayNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindArrayLiteral(), ordinal: 0, start: left.start, end: left.end, firstStart: left.start, firstEnd: left.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if arrayNodeID < 0 { return compilerBodyParseFailure(index: left.start) }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: left.end, end: left.end, text: String("")))
+    state cursor: Int(left.end)
+    state ordinal: Int(0)
+    while cursor < limit {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
+        if maybeToken == nil { return compilerBodyParseFailure(index: cursor) }
+        let token: RangeLexedToken(maybeToken ?? fallback)
+        if token.kind == .rightBracket {
+            if rawBufferStoreInt(buffer: arena.nodes.values, index: arrayNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: token.end)) != 0 { return compilerBodyParseFailure(index: token.start) }
+            return compilerBodyParseSuccess(nodeID: arrayNodeID, nextIndex: token.end)
+        }
+        let element: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: token.start, limit: limit, minimumPrecedence: 0))
+        if !element.isValid
+            || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: arrayNodeID, childNodeID: element.nodeID, role: compilerSyntaxRoleArrayElement(), ordinal: ordinal) != 0 { return compilerBodyParseFailure(index: token.start) }
+        let maybeSeparator: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: element.nextIndex))
+        if maybeSeparator == nil { return compilerBodyParseFailure(index: element.nextIndex) }
+        let separator: RangeLexedToken(maybeSeparator ?? fallback)
+        if separator.kind == .rightBracket {
+            if rawBufferStoreInt(buffer: arena.nodes.values, index: arrayNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: separator.end)) != 0 { return compilerBodyParseFailure(index: separator.start) }
+            return compilerBodyParseSuccess(nodeID: arrayNodeID, nextIndex: separator.end)
+        }
+        if separator.kind != .comma { return compilerBodyParseFailure(index: separator.start) }
+        cursor: separator.end
+        ordinal: ordinal + 1
+    }
+    return compilerBodyParseFailure(index: cursor)
+}
+
+function compilerBodyArenaParsePrimary(arena: CompilerBodyArena, start: Int, limit: Int): CompilerBodyParseResult {
+    let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: start))
+    if maybeToken == nil { return compilerBodyParseFailure(index: start) }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: start, end: start, text: String("")))
+    let token: RangeLexedToken(maybeToken ?? fallback)
+    if token.start >= limit { return compilerBodyParseFailure(index: start) }
+    if token.kind == .leftBracket { return compilerBodyArenaParseArrayLiteral(arena: arena, left: token, limit: limit) }
+    if token.kind == .dot {
+        let maybeName: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: token.end))
+        if maybeName == nil { return compilerBodyParseFailure(index: token.end) }
+        let name: RangeLexedToken(maybeName ?? fallback)
+        if (name.kind != .identifier && name.kind != .keyword) || name.end > limit { return compilerBodyParseFailure(index: token.end) }
+        let caseNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindEnumCaseValue(), ordinal: 0, start: token.start, end: name.end, firstStart: name.start, firstEnd: name.end, secondStart: token.start, secondEnd: token.end, aux: 0))
+        if caseNodeID < 0 { return compilerBodyParseFailure(index: start) }
+        return compilerBodyParseSuccess(nodeID: caseNodeID, nextIndex: name.end)
+    }
+    if token.kind == .dollar {
+        let maybeName: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: token.end))
+        if maybeName == nil { return compilerBodyParseFailure(index: token.end) }
+        let name: RangeLexedToken(maybeName ?? fallback)
+        if name.kind != .identifier || name.end > limit { return compilerBodyParseFailure(index: token.end) }
+        let bindingReferenceNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindBindingReference(), ordinal: 0, start: token.start, end: name.end, firstStart: name.start, firstEnd: name.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+        if bindingReferenceNodeID < 0 { return compilerBodyParseFailure(index: start) }
+        return compilerBodyParseSuccess(nodeID: bindingReferenceNodeID, nextIndex: name.end)
+    }
+    if token.kind == .leftParen {
+        let grouped: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: token.end, limit: limit, minimumPrecedence: 0))
+        if !grouped.isValid { return grouped }
+        let maybeRight: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: grouped.nextIndex))
+        if maybeRight == nil { return compilerBodyParseFailure(index: grouped.nextIndex) }
+        let right: RangeLexedToken(maybeRight ?? fallback)
+        if right.kind != .rightParen || right.end > limit { return compilerBodyParseFailure(index: grouped.nextIndex) }
+        let groupingNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindGrouping(), ordinal: 0, start: token.start, end: right.end, firstStart: token.start, firstEnd: token.end, secondStart: right.start, secondEnd: right.end, aux: 0))
+        if groupingNodeID < 0 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: groupingNodeID, childNodeID: grouped.nodeID, role: compilerSyntaxRoleGroupedValue(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: start) }
+        return compilerBodyParseSuccess(nodeID: groupingNodeID, nextIndex: right.end)
+    }
+    state kind: Int(0 - 1)
+    if token.kind == .integer { kind: compilerSyntaxKindIntegerLiteral() }
+    if token.kind == .double { kind: compilerSyntaxKindDoubleLiteral() }
+    if token.kind == .stringLiteral {
+        if compilerCoreStringContentHasInterpolation(content: compilerCoreStringLiteralContent(text: token.text)) { return compilerBodyArenaParseInterpolatedString(arena: arena, token: token) }
+        kind: compilerSyntaxKindStringLiteral()
+    }
+    if (token.kind == .identifier || token.kind == .keyword) && (token.text == String("true") || token.text == String("false")) { kind: compilerSyntaxKindBoolLiteral() }
+    if kind < 0 && (token.kind == .identifier || token.kind == .keyword) { kind: compilerSyntaxKindIdentifier() }
+    if kind < 0 { return compilerBodyParseFailure(index: start) }
+    let primaryNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: kind, ordinal: 0, start: token.start, end: token.end, firstStart: token.start, firstEnd: token.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    return compilerBodyParseSuccess(nodeID: primaryNodeID, nextIndex: token.end)
+}
+
+function compilerBodyArenaParseCallArguments(arena: CompilerBodyArena, callNodeID: Int, start: Int, limit: Int): CompilerBodyParseResult {
+    state cursor: Int(start)
+    state ordinal: Int(0)
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: start, end: start, text: String("")))
+    while cursor < limit {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
+        if maybeToken == nil { return compilerBodyParseFailure(index: cursor) }
+        let token: RangeLexedToken(maybeToken ?? fallback)
+        if token.kind == .rightParen { return compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: token.end) }
+        state valueStart: Int(0)
+        valueStart: token.start
+        state labelStart: Int(0 - 1)
+        state labelEnd: Int(0 - 1)
+        if token.kind == .identifier || token.kind == .keyword {
+            let maybeColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: token.end))
+            if maybeColon != nil {
+                let colon: RangeLexedToken(maybeColon ?? fallback)
+                if colon.kind == .colon {
+                    labelStart: token.start
+                    labelEnd: token.end
+                    valueStart: colon.end
+                }
+            }
+        }
+        let value: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: valueStart, limit: limit, minimumPrecedence: 0))
+        if !value.isValid { return value }
+        let argumentNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindArgument(), ordinal: ordinal, start: token.start, end: value.nextIndex, firstStart: labelStart, firstEnd: labelEnd, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+        if argumentNodeID < 0
+            || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: callNodeID, childNodeID: argumentNodeID, role: compilerSyntaxRoleArgument(), ordinal: ordinal) != 0
+            || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: argumentNodeID, childNodeID: value.nodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: cursor) }
+        let maybeSeparator: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: value.nextIndex))
+        if maybeSeparator == nil { return compilerBodyParseFailure(index: value.nextIndex) }
+        let separator: RangeLexedToken(maybeSeparator ?? fallback)
+        if separator.kind == .rightParen { return compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: separator.end) }
+        if separator.kind != .comma { return compilerBodyParseFailure(index: value.nextIndex) }
+        cursor: separator.end
+        ordinal: ordinal + 1
+    }
+    return compilerBodyParseFailure(index: cursor)
+}
+
+function compilerBodyArenaParseSwitchPatternArguments(arena: CompilerBodyArena, callNodeID: Int, start: Int, limit: Int): CompilerBodyParseResult {
+    state cursor: Int(start)
+    state ordinal: Int(0)
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: start, end: start, text: String("")))
+    while cursor < limit {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
+        if maybeToken == nil { return compilerBodyParseFailure(index: cursor) }
+        let token: RangeLexedToken(maybeToken ?? fallback)
+        if token.kind == .rightParen { return compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: token.end) }
+        state labelStart: Int(0 - 1)
+        state labelEnd: Int(0 - 1)
+        state bindingToken: RangeLexedToken(token)
+        if token.kind == .identifier || token.kind == .keyword {
+            let maybeColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: token.end))
+            if maybeColon != nil {
+                let colon: RangeLexedToken(maybeColon ?? fallback)
+                if colon.kind == .colon {
+                    labelStart: token.start
+                    labelEnd: token.end
+                    let maybeBinding: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: colon.end))
+                    if maybeBinding == nil { return compilerBodyParseFailure(index: colon.end) }
+                    bindingToken: maybeBinding ?? fallback
+                }
+            }
+        }
+        if bindingToken.kind != .keyword || bindingToken.text != String("let") { return compilerBodyParseFailure(index: bindingToken.start) }
+        let maybeName: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: bindingToken.end))
+        if maybeName == nil { return compilerBodyParseFailure(index: bindingToken.end) }
+        let name: RangeLexedToken(maybeName ?? fallback)
+        if name.kind != .identifier { return compilerBodyParseFailure(index: name.start) }
+        let bindingNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindIdentifier(), ordinal: ordinal, start: bindingToken.start, end: name.end, firstStart: name.start, firstEnd: name.end, secondStart: bindingToken.start, secondEnd: bindingToken.end, aux: compilerBodyEnumPatternBindingAux()))
+        let argumentNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindArgument(), ordinal: ordinal, start: token.start, end: name.end, firstStart: labelStart, firstEnd: labelEnd, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+        if bindingNodeID < 0 || argumentNodeID < 0
+            || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: callNodeID, childNodeID: argumentNodeID, role: compilerSyntaxRoleArgument(), ordinal: ordinal) != 0
+            || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: argumentNodeID, childNodeID: bindingNodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: cursor) }
+        let maybeSeparator: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: name.end))
+        if maybeSeparator == nil { return compilerBodyParseFailure(index: name.end) }
+        let separator: RangeLexedToken(maybeSeparator ?? fallback)
+        if separator.kind == .rightParen { return compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: separator.end) }
+        if separator.kind != .comma { return compilerBodyParseFailure(index: separator.start) }
+        cursor: separator.end
+        ordinal: ordinal + 1
+    }
+    return compilerBodyParseFailure(index: cursor)
+}
+
+function compilerBodyArenaParseSwitchPattern(arena: CompilerBodyArena, start: Int, limit: Int): CompilerBodyParseResult {
+    let primary: CompilerBodyParseResult(compilerBodyArenaParsePrimary(arena: arena, start: start, limit: limit))
+    if !primary.isValid { return compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: start, limit: limit, minimumPrecedence: 0) }
+    if compilerIntTableValue(table: arena.nodes, row: primary.nodeID, column: 1) != compilerSyntaxKindEnumCaseValue() {
+        return compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: start, limit: limit, minimumPrecedence: 0)
+    }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: primary.nextIndex, end: primary.nextIndex, text: String("")))
+    let maybeLeft: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: primary.nextIndex))
+    if maybeLeft == nil { return primary }
+    let left: RangeLexedToken(maybeLeft ?? fallback)
+    if left.kind != .leftParen { return primary }
+    let caseStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.nodes, row: primary.nodeID, column: 4)))
+    let callNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindApplication(), ordinal: 0, start: caseStart, end: left.end, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if callNodeID < 0
+        || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: callNodeID, childNodeID: primary.nodeID, role: compilerSyntaxRoleCallee(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: start) }
+    let arguments: CompilerBodyParseResult(compilerBodyArenaParseSwitchPatternArguments(arena: arena, callNodeID: callNodeID, start: left.end, limit: limit))
+    if !arguments.isValid { return arguments }
+    if rawBufferStoreInt(buffer: arena.nodes.values, index: callNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: arguments.nextIndex)) != 0 { return compilerBodyParseFailure(index: start) }
+    return compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: arguments.nextIndex)
+}
+
+function compilerBodyArenaParsePostfix(arena: CompilerBodyArena, start: Int, limit: Int): CompilerBodyParseResult {
+    state result: CompilerBodyParseResult(compilerBodyArenaParsePrimary(arena: arena, start: start, limit: limit))
+    if !result.isValid { return result }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: start, end: start, text: String("")))
+    state keepScanning: Bool(true)
+    while keepScanning && result.nextIndex < limit {
+        let maybeSuffix: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: result.nextIndex))
+        if maybeSuffix == nil { return result }
+        let suffix: RangeLexedToken(maybeSuffix ?? fallback)
+        if suffix.kind == .dot {
+            let maybeMember: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: suffix.end))
+            if maybeMember == nil { return compilerBodyParseFailure(index: suffix.end) }
+            let member: RangeLexedToken(maybeMember ?? fallback)
+            if member.kind != .identifier && member.kind != .keyword { return compilerBodyParseFailure(index: suffix.end) }
+            let receiverNodeID: Int(result.nodeID)
+            let receiverStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.nodes, row: receiverNodeID, column: 4)))
+            let memberNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindMemberRead(), ordinal: 0, start: receiverStart, end: member.end, firstStart: member.start, firstEnd: member.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+            if memberNodeID < 0 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: memberNodeID, childNodeID: receiverNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: suffix.end) }
+            result: compilerBodyParseSuccess(nodeID: memberNodeID, nextIndex: member.end)
+        } else if suffix.kind == .leftParen {
+            let calleeNodeID: Int(result.nodeID)
+            let calleeStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.nodes, row: calleeNodeID, column: 4)))
+            let callNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindApplication(), ordinal: 0, start: calleeStart, end: suffix.end, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+            if callNodeID < 0 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: callNodeID, childNodeID: calleeNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: result.nextIndex) }
+            let arguments: CompilerBodyParseResult(compilerBodyArenaParseCallArguments(arena: arena, callNodeID: callNodeID, start: suffix.end, limit: limit))
+            if !arguments.isValid { return arguments }
+            if rawBufferStoreInt(buffer: arena.nodes.values, index: callNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: arguments.nextIndex)) != 0 { return compilerBodyParseFailure(index: result.nextIndex) }
+            result: compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: arguments.nextIndex)
+        } else if suffix.kind == .leftBracket {
+            let indexValue: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: suffix.end, limit: limit, minimumPrecedence: 0))
+            if !indexValue.isValid { return indexValue }
+            let maybeRightBracket: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: indexValue.nextIndex))
+            if maybeRightBracket == nil { return compilerBodyParseFailure(index: indexValue.nextIndex) }
+            let rightBracket: RangeLexedToken(maybeRightBracket ?? fallback)
+            if rightBracket.kind != .rightBracket { return compilerBodyParseFailure(index: rightBracket.start) }
+            let receiverNodeID: Int(result.nodeID)
+            let receiverStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.nodes, row: receiverNodeID, column: 4)))
+            let indexNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindIndex(), ordinal: 0, start: receiverStart, end: rightBracket.end, firstStart: suffix.start, firstEnd: suffix.end, secondStart: rightBracket.start, secondEnd: rightBracket.end, aux: 0))
+            if indexNodeID < 0
+                || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: indexNodeID, childNodeID: receiverNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0) != 0
+                || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: indexNodeID, childNodeID: indexValue.nodeID, role: compilerSyntaxRoleIndex(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: suffix.start) }
+            result: compilerBodyParseSuccess(nodeID: indexNodeID, nextIndex: rightBracket.end)
+        } else {
+            keepScanning: false
+        }
+    }
+    return result
+}
+
+function compilerBodyArenaParsePrefix(arena: CompilerBodyArena, start: Int, limit: Int): CompilerBodyParseResult {
+    let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: start))
+    if maybeToken == nil { return compilerBodyParseFailure(index: start) }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: start, end: start, text: String("")))
+    let token: RangeLexedToken(maybeToken ?? fallback)
+    if token.kind != .bang && token.kind != .minus { return compilerBodyArenaParsePostfix(arena: arena, start: start, limit: limit) }
+    let operand: CompilerBodyParseResult(compilerBodyArenaParsePrefix(arena: arena, start: token.end, limit: limit))
+    if !operand.isValid { return operand }
+    state prefixKind: Int(compilerSyntaxKindPrefixNot())
+    if token.kind == .minus { prefixKind: compilerSyntaxKindPrefixNegate() }
+    let nodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: prefixKind, ordinal: 0, start: token.start, end: operand.nextIndex, firstStart: token.start, firstEnd: token.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if nodeID < 0 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: nodeID, childNodeID: operand.nodeID, role: compilerSyntaxRoleOperand(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: start) }
+    return compilerBodyParseSuccess(nodeID: nodeID, nextIndex: operand.nextIndex)
+}
+
+function compilerBodyArenaParseExpressionAtPrecedence(arena: CompilerBodyArena, start: Int, limit: Int, minimumPrecedence: Int): CompilerBodyParseResult {
+    state left: CompilerBodyParseResult(compilerBodyArenaParsePrefix(arena: arena, start: start, limit: limit))
+    if !left.isValid { return left }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: start, end: start, text: String("")))
+    state keepScanning: Bool(true)
+    while keepScanning && left.nextIndex < limit {
+        let maybeOperator: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: left.nextIndex))
+        if maybeOperator == nil { return left }
+        let operatorToken: RangeLexedToken(maybeOperator ?? fallback)
+        let binaryKind: Int(compilerBodyArenaBinaryKind(token: operatorToken))
+        let precedence: Int(compilerCoreBinaryPrecedence(token: operatorToken))
+        if binaryKind < 0 || precedence < minimumPrecedence {
+            keepScanning: false
+        } else {
+            state rightPrecedence: Int(precedence + 1)
+            if binaryKind == compilerSyntaxKindOptionalCoalescing() { rightPrecedence: precedence }
+            let right: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: operatorToken.end, limit: limit, minimumPrecedence: rightPrecedence))
+            if !right.isValid { return right }
+            let leftStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.nodes, row: left.nodeID, column: 4)))
+            let nodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: binaryKind, ordinal: 0, start: leftStart, end: right.nextIndex, firstStart: operatorToken.start, firstEnd: operatorToken.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: precedence))
+            if nodeID < 0
+                || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: nodeID, childNodeID: left.nodeID, role: compilerSyntaxRoleLeftOperand(), ordinal: 0) != 0
+                || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: nodeID, childNodeID: right.nodeID, role: compilerSyntaxRoleRightOperand(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: left.nextIndex) }
+            left: compilerBodyParseSuccess(nodeID: nodeID, nextIndex: right.nextIndex)
+        }
+    }
+    return left
+}
+
+function compilerBodyArenaParseReturnStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
+    let statementNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindReturn(), ordinal: ordinal, start: keyword.start, end: keyword.end, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if statementNodeID < 0 { return compilerBodyParseFailure(index: keyword.start) }
+    let value: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: keyword.end, limit: limit, minimumPrecedence: 0))
+    if !value.isValid { return value }
+    if rawBufferStoreInt(buffer: arena.nodes.values, index: statementNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: value.nextIndex)) != 0 { return compilerBodyParseFailure(index: keyword.end) }
+    if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: statementNodeID, childNodeID: value.nodeID, role: compilerSyntaxRoleReturnValue(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: value.nextIndex) }
+    return compilerBodyParseSuccess(nodeID: statementNodeID, nextIndex: value.nextIndex)
+}
+
+function compilerBodyArenaAppendArrayLocal(arena: CompilerBodyArena, keyword: RangeLexedToken, name: RangeLexedToken, typeStart: Int, typeEnd: Int, initializerNodeID: Int, localEnd: Int, ordinal: Int): CompilerBodyParseResult {
+    state localKind: Int(compilerSyntaxLocalKindLet())
+    if keyword.text == String("state") { localKind: compilerSyntaxLocalKindState() }
+    let localNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindLocalBinding(), ordinal: ordinal, start: keyword.start, end: localEnd, firstStart: name.start, firstEnd: name.end, secondStart: typeStart, secondEnd: typeEnd, aux: localKind))
+    if localNodeID < 0 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: localNodeID, childNodeID: initializerNodeID, role: compilerSyntaxRoleInitializer(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: keyword.start) }
+    return compilerBodyParseSuccess(nodeID: localNodeID, nextIndex: localEnd)
+}
+
+function compilerBodyArenaParseInferredArrayLetStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, name: RangeLexedToken, leftBracket: RangeLexedToken, bracketNext: Int, limit: Int, ordinal: Int): CompilerBodyParseResult {
+    let initializer: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: leftBracket.start, limit: limit, minimumPrecedence: 0))
+    if !initializer.isValid || compilerIntTableValue(table: arena.nodes, row: initializer.nodeID, column: 1) != compilerSyntaxKindArrayLiteral() { return compilerBodyParseFailure(index: leftBracket.start) }
+    return compilerBodyArenaAppendArrayLocal(arena: arena, keyword: keyword, name: name, typeStart: leftBracket.start, typeEnd: bracketNext, initializerNodeID: initializer.nodeID, localEnd: initializer.nextIndex, ordinal: ordinal)
+}
+
+function compilerBodyArenaParseExplicitArrayLetStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, name: RangeLexedToken, leftBracket: RangeLexedToken, bracketRange: CompilerSourceRange, leftParen: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
+    let maybeElementType: Optional<CompilerTypeReference>(compilerCoreParseTypeReference(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: bracketRange.start)))
+    if maybeElementType == nil { return compilerBodyParseFailure(index: bracketRange.start) }
+    let elementTypeFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: bracketRange.start, end: bracketRange.start))
+    let elementType: CompilerTypeReference(maybeElementType ?? elementTypeFallback)
+    if elementType.end != bracketRange.end { return compilerBodyParseFailure(index: elementType.end) }
+    let initializer: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: leftParen.end, limit: limit, minimumPrecedence: 0))
+    if !initializer.isValid { return compilerBodyParseFailure(index: leftParen.end) }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: initializer.nextIndex, end: initializer.nextIndex, text: String("")))
+    let maybeRightParen: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: initializer.nextIndex))
+    if maybeRightParen == nil { return compilerBodyParseFailure(index: initializer.nextIndex) }
+    let rightParen: RangeLexedToken(maybeRightParen ?? fallback)
+    if rightParen.kind != .rightParen { return compilerBodyParseFailure(index: rightParen.start) }
+    return compilerBodyArenaAppendArrayLocal(arena: arena, keyword: keyword, name: name, typeStart: leftBracket.start, typeEnd: bracketRange.next, initializerNodeID: initializer.nodeID, localEnd: rightParen.end, ordinal: ordinal)
+}
+
+function compilerBodyArenaParseArrayLetStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, name: RangeLexedToken, leftBracket: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
+    let maybeBracketRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: leftBracket.start), leftKind: .leftBracket, rightKind: .rightBracket))
+    if maybeBracketRange == nil { return compilerBodyParseFailure(index: leftBracket.start) }
+    let bracketFallback: CompilerSourceRange(CompilerSourceRange(start: leftBracket.end, end: leftBracket.end, next: leftBracket.end))
+    let bracketRange: CompilerSourceRange(maybeBracketRange ?? bracketFallback)
+    let maybeAfterBracket: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: bracketRange.next))
+    if maybeAfterBracket != nil {
+        let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: bracketRange.next, end: bracketRange.next, text: String("")))
+        let afterBracket: RangeLexedToken(maybeAfterBracket ?? fallback)
+        if afterBracket.kind == .leftParen { return compilerBodyArenaParseExplicitArrayLetStatement(arena: arena, keyword: keyword, name: name, leftBracket: leftBracket, bracketRange: bracketRange, leftParen: afterBracket, limit: limit, ordinal: ordinal) }
+    }
+    return compilerBodyArenaParseInferredArrayLetStatement(arena: arena, keyword: keyword, name: name, leftBracket: leftBracket, bracketNext: bracketRange.next, limit: limit, ordinal: ordinal)
+}
+
+function compilerBodyArenaParseLetStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: keyword.end, end: keyword.end, text: String("")))
+    let maybeName: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: keyword.end))
+    if maybeName == nil { return compilerBodyParseFailure(index: keyword.end) }
+    let name: RangeLexedToken(maybeName ?? fallback)
+    let maybeColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: name.end))
+    if maybeColon == nil { return compilerBodyParseFailure(index: name.end) }
+    let colon: RangeLexedToken(maybeColon ?? fallback)
+    let maybeAfterColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: colon.end))
+    if maybeAfterColon == nil { return compilerBodyParseFailure(index: colon.end) }
+    let afterColon: RangeLexedToken(maybeAfterColon ?? fallback)
+    if name.kind != .identifier || colon.kind != .colon { return compilerBodyParseFailure(index: keyword.end) }
+    if afterColon.kind == .leftBracket { return compilerBodyArenaParseArrayLetStatement(arena: arena, keyword: keyword, name: name, leftBracket: afterColon, limit: limit, ordinal: ordinal) }
+    let maybeType: Optional<CompilerTypeReference>(compilerCoreParseTypeReference(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: colon.end)))
+    if maybeType == nil { return compilerBodyParseFailure(index: colon.end) }
+    let typeFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: colon.end, end: colon.end))
+    let typeReference: CompilerTypeReference(maybeType ?? typeFallback)
+    let maybeLeftParen: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: typeReference.end))
+    if maybeLeftParen == nil { return compilerBodyParseFailure(index: typeReference.end) }
+    let leftParen: RangeLexedToken(maybeLeftParen ?? fallback)
+    if leftParen.kind != .leftParen { return compilerBodyParseFailure(index: keyword.end) }
+    state initializer: CompilerBodyParseResult(compilerBodyParseFailure(index: leftParen.end))
+    state localEnd: Int(leftParen.end)
+    let maybeFirstInitializerToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: leftParen.end))
+    state hasLabeledConstructArguments: Bool(false)
+    if maybeFirstInitializerToken != nil {
+        let firstInitializerToken: RangeLexedToken(maybeFirstInitializerToken ?? fallback)
+        if firstInitializerToken.kind == .identifier || firstInitializerToken.kind == .keyword {
+            let maybeFirstInitializerColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: firstInitializerToken.end))
+            if maybeFirstInitializerColon != nil {
+                let firstInitializerColon: RangeLexedToken(maybeFirstInitializerColon ?? fallback)
+                if firstInitializerColon.kind == .colon { hasLabeledConstructArguments: true }
+            }
+        }
+    }
+    if hasLabeledConstructArguments {
+        let calleeNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindIdentifier(), ordinal: 0, start: afterColon.start, end: afterColon.end, firstStart: afterColon.start, firstEnd: afterColon.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+        let callNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindApplication(), ordinal: 0, start: typeReference.start, end: leftParen.end, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+        if calleeNodeID < 0 || callNodeID < 0
+            || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: callNodeID, childNodeID: calleeNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: leftParen.start) }
+        let arguments: CompilerBodyParseResult(compilerBodyArenaParseCallArguments(arena: arena, callNodeID: callNodeID, start: leftParen.end, limit: limit))
+        if !arguments.isValid { return arguments }
+        if rawBufferStoreInt(buffer: arena.nodes.values, index: callNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: arguments.nextIndex)) != 0 { return compilerBodyParseFailure(index: leftParen.start) }
+        initializer: arguments
+        localEnd: arguments.nextIndex
+    } else {
+        let wrappedInitializer: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: leftParen.end, limit: limit, minimumPrecedence: 0))
+        if !wrappedInitializer.isValid { return wrappedInitializer }
+        let maybeRightParen: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: wrappedInitializer.nextIndex))
+        if maybeRightParen == nil { return compilerBodyParseFailure(index: wrappedInitializer.nextIndex) }
+        let rightParen: RangeLexedToken(maybeRightParen ?? fallback)
+        if rightParen.kind != .rightParen { return compilerBodyParseFailure(index: wrappedInitializer.nextIndex) }
+        initializer: wrappedInitializer
+        localEnd: rightParen.end
+    }
+    state localKind: Int(compilerSyntaxLocalKindLet())
+    if keyword.text == String("state") { localKind: compilerSyntaxLocalKindState() }
+    let localNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindLocalBinding(), ordinal: ordinal, start: keyword.start, end: localEnd, firstStart: name.start, firstEnd: name.end, secondStart: typeReference.start, secondEnd: typeReference.end, aux: localKind))
+    if localNodeID < 0 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: localNodeID, childNodeID: initializer.nodeID, role: compilerSyntaxRoleInitializer(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: keyword.start) }
+    return compilerBodyParseSuccess(nodeID: localNodeID, nextIndex: localEnd)
+}
+
+function compilerBodyArenaParseRegionInto(arena: CompilerBodyArena, regionNodeID: Int, start: Int, limit: Int): CompilerBodyParseResult {
+    state cursor: Int(start)
+    state ordinal: Int(0)
+    while cursor < limit {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
+        if maybeToken == nil { return compilerBodyParseSuccess(nodeID: regionNodeID, nextIndex: limit) }
+        let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: cursor, end: cursor, text: String("")))
+        let token: RangeLexedToken(maybeToken ?? fallback)
+        if token.start >= limit || token.kind == .rightBrace { return compilerBodyParseSuccess(nodeID: regionNodeID, nextIndex: token.start) }
+        let statement: CompilerBodyParseResult(compilerBodyArenaParseStatement(arena: arena, start: token.start, limit: limit, ordinal: ordinal))
+        if !statement.isValid { return statement }
+        if statement.nextIndex <= cursor { return compilerBodyParseFailure(index: cursor) }
+        if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: regionNodeID, childNodeID: statement.nodeID, role: compilerSyntaxRoleStatement(), ordinal: ordinal) != 0 { return compilerBodyParseFailure(index: cursor) }
+        cursor: statement.nextIndex
+        ordinal: ordinal + 1
+    }
+    return compilerBodyParseSuccess(nodeID: regionNodeID, nextIndex: cursor)
+}
+
+function compilerBodyArenaParseIfStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
+    let condition: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: keyword.end, limit: limit, minimumPrecedence: 0))
+    if !condition.isValid { return condition }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: condition.nextIndex, end: condition.nextIndex, text: String("")))
+    let maybeLeftBrace: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: condition.nextIndex))
+    if maybeLeftBrace == nil { return compilerBodyParseFailure(index: condition.nextIndex) }
+    let leftBrace: RangeLexedToken(maybeLeftBrace ?? fallback)
+    if leftBrace.kind != .leftBrace { return compilerBodyParseFailure(index: condition.nextIndex) }
+    let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: leftBrace.start), leftKind: .leftBrace, rightKind: .rightBrace))
+    if maybeRange == nil { return compilerBodyParseFailure(index: leftBrace.start) }
+    let rangeFallback: CompilerSourceRange(CompilerSourceRange(start: leftBrace.end, end: leftBrace.end, next: leftBrace.end))
+    let range: CompilerSourceRange(maybeRange ?? rangeFallback)
+    let ifNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindIf(), ordinal: ordinal, start: keyword.start, end: range.next, firstStart: keyword.start, firstEnd: keyword.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    let regionNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindLexicalRegion(), ordinal: 0, start: range.start, end: range.end, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if ifNodeID < 0 { return compilerBodyParseFailure(index: keyword.end) }
+    if regionNodeID < 0 { return compilerBodyParseFailure(index: leftBrace.start) }
+    if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: ifNodeID, childNodeID: condition.nodeID, role: compilerSyntaxRoleCondition(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: condition.nextIndex) }
+    if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: ifNodeID, childNodeID: regionNodeID, role: compilerSyntaxRoleThenRegion(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: range.end) }
+    let parsedRegion: CompilerBodyParseResult(compilerBodyArenaParseRegionInto(arena: arena, regionNodeID: regionNodeID, start: range.start, limit: range.end))
+    if !parsedRegion.isValid { return parsedRegion }
+    let maybeElse: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: range.next))
+    if maybeElse == nil { return compilerBodyParseSuccess(nodeID: ifNodeID, nextIndex: range.next) }
+    let elseToken: RangeLexedToken(maybeElse ?? fallback)
+    if elseToken.text != String("else") { return compilerBodyParseSuccess(nodeID: ifNodeID, nextIndex: range.next) }
+    let maybeElseStart: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: elseToken.end))
+    if maybeElseStart == nil { return compilerBodyParseFailure(index: elseToken.end) }
+    let elseStart: RangeLexedToken(maybeElseStart ?? fallback)
+    state elseRegionNodeID: Int(0 - 1)
+    state elseNext: Int(0)
+    elseNext: elseStart.end
+    if elseStart.text == String("if") {
+        let nestedIf: CompilerBodyParseResult(compilerBodyArenaParseIfStatement(arena: arena, keyword: elseStart, limit: limit, ordinal: 0))
+        if !nestedIf.isValid { return nestedIf }
+        elseNext: nestedIf.nextIndex
+        elseRegionNodeID: compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindLexicalRegion(), ordinal: 1, start: elseStart.start, end: elseNext, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0)
+        if elseRegionNodeID < 0 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: elseRegionNodeID, childNodeID: nestedIf.nodeID, role: compilerSyntaxRoleStatement(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: elseStart.start) }
+    } else {
+        if elseStart.kind != .leftBrace { return compilerBodyParseFailure(index: elseStart.start) }
+        let maybeElseRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: elseStart.start), leftKind: .leftBrace, rightKind: .rightBrace))
+        if maybeElseRange == nil { return compilerBodyParseFailure(index: elseStart.start) }
+        let elseRange: CompilerSourceRange(maybeElseRange ?? rangeFallback)
+        elseNext: elseRange.next
+        elseRegionNodeID: compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindLexicalRegion(), ordinal: 1, start: elseRange.start, end: elseRange.end, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0)
+        let parsedElse: CompilerBodyParseResult(compilerBodyArenaParseRegionInto(arena: arena, regionNodeID: elseRegionNodeID, start: elseRange.start, limit: elseRange.end))
+        if !parsedElse.isValid { return parsedElse }
+    }
+    if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: ifNodeID, childNodeID: elseRegionNodeID, role: compilerSyntaxRoleElseRegion(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: elseToken.start) }
+    if rawBufferStoreInt(buffer: arena.nodes.values, index: ifNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: elseNext)) != 0 { return compilerBodyParseFailure(index: elseToken.start) }
+    return compilerBodyParseSuccess(nodeID: ifNodeID, nextIndex: elseNext)
+}
+
+function compilerBodyArenaParseWhileStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
+    let condition: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: keyword.end, limit: limit, minimumPrecedence: 0))
+    if !condition.isValid { return condition }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: condition.nextIndex, end: condition.nextIndex, text: String("")))
+    let maybeLeftBrace: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: condition.nextIndex))
+    if maybeLeftBrace == nil { return compilerBodyParseFailure(index: condition.nextIndex) }
+    let leftBrace: RangeLexedToken(maybeLeftBrace ?? fallback)
+    if leftBrace.kind != .leftBrace { return compilerBodyParseFailure(index: condition.nextIndex) }
+    let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: leftBrace.start), leftKind: .leftBrace, rightKind: .rightBrace))
+    if maybeRange == nil { return compilerBodyParseFailure(index: leftBrace.start) }
+    let rangeFallback: CompilerSourceRange(CompilerSourceRange(start: leftBrace.end, end: leftBrace.end, next: leftBrace.end))
+    let range: CompilerSourceRange(maybeRange ?? rangeFallback)
+    let whileNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindWhile(), ordinal: ordinal, start: keyword.start, end: range.next, firstStart: keyword.start, firstEnd: keyword.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    let regionNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindLexicalRegion(), ordinal: 0, start: range.start, end: range.end, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if whileNodeID < 0 || regionNodeID < 0
+        || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: whileNodeID, childNodeID: condition.nodeID, role: compilerSyntaxRoleCondition(), ordinal: 0) != 0
+        || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: whileNodeID, childNodeID: regionNodeID, role: compilerSyntaxRoleWhileBody(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: keyword.start) }
+    let parsedRegion: CompilerBodyParseResult(compilerBodyArenaParseRegionInto(arena: arena, regionNodeID: regionNodeID, start: range.start, limit: range.end))
+    if !parsedRegion.isValid { return parsedRegion }
+    return compilerBodyParseSuccess(nodeID: whileNodeID, nextIndex: range.next)
+}
+
+function compilerBodyArenaSwitchClauseEnd(arena: CompilerBodyArena, start: Int, limit: Int): Int {
+    state cursor: Int(start)
+    state braceDepth: Int(0)
+    state parenthesisDepth: Int(0)
+    state bracketDepth: Int(0)
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: start, end: start, text: String("")))
+    while cursor < limit {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
+        if maybeToken == nil { return limit }
+        let token: RangeLexedToken(maybeToken ?? fallback)
+        if token.start >= limit { return limit }
+        if braceDepth == 0 && parenthesisDepth == 0 && bracketDepth == 0
+            && token.kind == .keyword && (token.text == String("case") || token.text == String("default")) { return token.start }
+        if token.kind == .leftBrace { braceDepth: braceDepth + 1 }
+        if token.kind == .rightBrace {
+            if braceDepth <= 0 { return token.start }
+            braceDepth: braceDepth - 1
+        }
+        if token.kind == .leftParen { parenthesisDepth: parenthesisDepth + 1 }
+        if token.kind == .rightParen {
+            if parenthesisDepth <= 0 { return token.start }
+            parenthesisDepth: parenthesisDepth - 1
+        }
+        if token.kind == .leftBracket { bracketDepth: bracketDepth + 1 }
+        if token.kind == .rightBracket {
+            if bracketDepth <= 0 { return token.start }
+            bracketDepth: bracketDepth - 1
+        }
+        cursor: token.end
+    }
+    return limit
+}
+
+function compilerBodyArenaParseSwitchStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
+    let subject: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: keyword.end, limit: limit, minimumPrecedence: 0))
+    if !subject.isValid { return subject }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: subject.nextIndex, end: subject.nextIndex, text: String("")))
+    let maybeLeftBrace: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: subject.nextIndex))
+    if maybeLeftBrace == nil { return compilerBodyParseFailure(index: subject.nextIndex) }
+    let leftBrace: RangeLexedToken(maybeLeftBrace ?? fallback)
+    if leftBrace.kind != .leftBrace { return compilerBodyParseFailure(index: subject.nextIndex) }
+    let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: leftBrace.start), leftKind: .leftBrace, rightKind: .rightBrace))
+    if maybeRange == nil { return compilerBodyParseFailure(index: leftBrace.start) }
+    let rangeFallback: CompilerSourceRange(CompilerSourceRange(start: leftBrace.end, end: leftBrace.end, next: leftBrace.end))
+    let range: CompilerSourceRange(maybeRange ?? rangeFallback)
+    let switchNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindSwitch(), ordinal: ordinal, start: keyword.start, end: range.next, firstStart: keyword.start, firstEnd: keyword.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if switchNodeID < 0 { return compilerBodyParseFailure(index: keyword.start) }
+    if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: switchNodeID, childNodeID: subject.nodeID, role: compilerSyntaxRoleSwitchSubject(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: keyword.start) }
+    state cursor: Int(range.start)
+    state caseOrdinal: Int(0)
+    state defaultCount: Int(0)
+    while cursor < range.end {
+        let maybeCaseToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
+        if maybeCaseToken == nil { return compilerBodyParseFailure(index: cursor) }
+        let caseToken: RangeLexedToken(maybeCaseToken ?? fallback)
+        if caseToken.start >= range.end {
+            cursor: range.end
+        } else {
+            if caseToken.kind != .keyword || (caseToken.text != String("case") && caseToken.text != String("default")) { return compilerBodyParseFailure(index: caseToken.start) }
+            let isDefault: Bool(caseToken.text == String("default"))
+            state patternNodeID: Int(0 - 1)
+            state colonSearchStart: Int(caseToken.end)
+            if !isDefault {
+                let pattern: CompilerBodyParseResult(compilerBodyArenaParseSwitchPattern(arena: arena, start: caseToken.end, limit: range.end))
+                if !pattern.isValid { return pattern }
+                patternNodeID: pattern.nodeID
+                colonSearchStart: pattern.nextIndex
+            } else {
+                defaultCount: defaultCount + 1
+                if defaultCount > 1 { return compilerBodyParseFailure(index: caseToken.start) }
+            }
+            let maybeColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: colonSearchStart))
+            if maybeColon == nil { return compilerBodyParseFailure(index: colonSearchStart) }
+            let colon: RangeLexedToken(maybeColon ?? fallback)
+            if colon.kind != .colon { return compilerBodyParseFailure(index: colonSearchStart) }
+            let clauseEnd: Int(compilerBodyArenaSwitchClauseEnd(arena: arena, start: colon.end, limit: range.end))
+            if clauseEnd < colon.end { return compilerBodyParseFailure(index: colon.end) }
+            state defaultAux: Int(0)
+            if isDefault { defaultAux: 1 }
+            let caseNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindSwitchCase(), ordinal: caseOrdinal, start: caseToken.start, end: clauseEnd, firstStart: caseToken.start, firstEnd: caseToken.end, secondStart: colon.start, secondEnd: colon.end, aux: defaultAux))
+            let regionNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindLexicalRegion(), ordinal: caseOrdinal, start: colon.end, end: clauseEnd, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+            if caseNodeID < 0 || regionNodeID < 0 { return compilerBodyParseFailure(index: caseToken.start) }
+            if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: switchNodeID, childNodeID: caseNodeID, role: compilerSyntaxRoleSwitchCase(), ordinal: caseOrdinal) != 0 { return compilerBodyParseFailure(index: caseToken.start) }
+            if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: caseNodeID, childNodeID: regionNodeID, role: compilerSyntaxRoleSwitchBody(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: caseToken.start) }
+            if !isDefault {
+                if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: caseNodeID, childNodeID: patternNodeID, role: compilerSyntaxRoleSwitchPattern(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: caseToken.start) }
+            }
+            let parsedRegion: CompilerBodyParseResult(compilerBodyArenaParseRegionInto(arena: arena, regionNodeID: regionNodeID, start: colon.end, limit: clauseEnd))
+            if !parsedRegion.isValid { return parsedRegion }
+            cursor: clauseEnd
+            caseOrdinal: caseOrdinal + 1
+        }
+    }
+    if caseOrdinal == 0 { return compilerBodyParseFailure(index: range.start) }
+    return compilerBodyParseSuccess(nodeID: switchNodeID, nextIndex: range.next)
+}
+
+function compilerBodyArenaParsedPostfixIsApplication(arena: CompilerBodyArena, nodeID: Int, start: Int, end: Int): Bool {
+    return compilerIntTableValue(table: arena.nodes, row: nodeID, column: 1) == compilerSyntaxKindApplication()
+}
+
+function compilerBodyArenaParseAssignmentStatement(arena: CompilerBodyArena, start: Int, limit: Int, ordinal: Int): CompilerBodyParseResult {
+    let target: CompilerBodyParseResult(compilerBodyArenaParsePostfix(arena: arena, start: start, limit: limit))
+    if !target.isValid { return target }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: target.nextIndex, end: target.nextIndex, text: String("")))
+    let maybeColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: target.nextIndex))
+    if maybeColon == nil {
+        if compilerBodyArenaParsedPostfixIsApplication(arena: arena, nodeID: target.nodeID, start: start, end: target.nextIndex) { return target }
+        return compilerBodyParseFailure(index: target.nextIndex)
+    }
+    let colon: RangeLexedToken(maybeColon ?? fallback)
+    if colon.start >= limit || colon.kind != .colon {
+        if compilerBodyArenaParsedPostfixIsApplication(arena: arena, nodeID: target.nodeID, start: start, end: target.nextIndex) { return target }
+        return compilerBodyParseFailure(index: target.nextIndex)
+    }
+    let value: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: colon.end, limit: limit, minimumPrecedence: 0))
+    if !value.isValid { return value }
+    let assignmentNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindAssignment(), ordinal: ordinal, start: start, end: value.nextIndex, firstStart: colon.start, firstEnd: colon.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if assignmentNodeID < 0
+        || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: assignmentNodeID, childNodeID: target.nodeID, role: compilerSyntaxRoleAssignmentTarget(), ordinal: 0) != 0
+        || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: assignmentNodeID, childNodeID: value.nodeID, role: compilerSyntaxRoleAssignedValue(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: start) }
+    return compilerBodyParseSuccess(nodeID: assignmentNodeID, nextIndex: value.nextIndex)
+}
+
+function compilerBodyArenaAppendExpandStatement(arena: CompilerBodyArena, statementStart: Int, nameStart: Int, nameEnd: Int, expansion: CompilerSourceRange, limit: Int): CompilerBodyParseResult {
+    if expansion.next > limit { return compilerBodyParseFailure(index: expansion.next) }
+    let calleeNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindIdentifier(), ordinal: 0, start: nameStart, end: nameEnd, firstStart: nameStart, firstEnd: nameEnd, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    let applicationNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindApplication(), ordinal: 0, start: statementStart, end: expansion.next, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if calleeNodeID < 0 || applicationNodeID < 0
+        || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: applicationNodeID, childNodeID: calleeNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: statementStart) }
+    let trailingStart: Int(compilerCoreFirstNonWhitespaceIndex(source: arena.tables.sourceStore.source, start: expansion.next, end: limit))
+    if trailingStart >= limit {
+        let returnNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindReturn(), ordinal: 0, start: statementStart, end: expansion.next, firstStart: nameStart, firstEnd: nameEnd, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+        if returnNodeID < 0
+            || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: returnNodeID, childNodeID: applicationNodeID, role: compilerSyntaxRoleReturnValue(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: statementStart) }
+        return compilerBodyParseSuccess(nodeID: returnNodeID, nextIndex: expansion.next)
+    }
+    return compilerBodyParseSuccess(nodeID: applicationNodeID, nextIndex: expansion.next)
+}
+
+function compilerBodyArenaParseContextualExpandStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, limit: Int): CompilerBodyParseResult {
+    let maybeBrace: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: keyword.end))
+    if maybeBrace == nil { return compilerBodyParseFailure(index: keyword.end) }
+    let fallback: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: keyword.end)))
+    let brace: RangeLexedToken(maybeBrace ?? fallback)
+    if brace.kind != .leftBrace { return compilerBodyParseFailure(index: keyword.end) }
+    let maybeExpansion: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: brace.start), leftKind: .leftBrace, rightKind: .rightBrace))
+    if maybeExpansion == nil { return compilerBodyParseFailure(index: brace.start) }
+    let expansionFallback: CompilerSourceRange(CompilerSourceRange(start: brace.end, end: brace.end, next: brace.end))
+    let expansion: CompilerSourceRange(maybeExpansion ?? expansionFallback)
+    return compilerBodyArenaAppendExpandStatement(arena: arena, statementStart: keyword.start, nameStart: keyword.start + 1, nameEnd: keyword.end, expansion: expansion, limit: limit)
+}
+
+function compilerBodyArenaParseTargetDeclarationExpandStatement(arena: CompilerBodyArena, target: RangeLexedToken, limit: Int): CompilerBodyParseResult {
+    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: arena.tables.sourceStore.source, index: target.end))
+    let fallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let maybeDot1: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeDot1 == nil { return compilerBodyParseFailure(index: target.end) }
+    let dot1: RangeLexedToken(maybeDot1 ?? fallback)
+    if dot1.kind != .dot { return compilerBodyParseFailure(index: target.end) }
+    cursor: compilerCursorAdvance(cursor: cursor, token: dot1)
+    let maybeDeclaration: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeDeclaration == nil { return compilerBodyParseFailure(index: dot1.end) }
+    let declaration: RangeLexedToken(maybeDeclaration ?? fallback)
+    if declaration.kind != .identifier || declaration.text != String("declaration") { return compilerBodyParseFailure(index: declaration.start) }
+    cursor: compilerCursorAdvance(cursor: cursor, token: declaration)
+    let maybeDot2: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeDot2 == nil { return compilerBodyParseFailure(index: declaration.end) }
+    let dot2: RangeLexedToken(maybeDot2 ?? fallback)
+    if dot2.kind != .dot { return compilerBodyParseFailure(index: declaration.end) }
+    cursor: compilerCursorAdvance(cursor: cursor, token: dot2)
+    let maybeExpand: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeExpand == nil { return compilerBodyParseFailure(index: dot2.end) }
+    let expand: RangeLexedToken(maybeExpand ?? fallback)
+    if expand.kind != .identifier || expand.text != String("expand") { return compilerBodyParseFailure(index: expand.start) }
+    cursor: compilerCursorAdvance(cursor: cursor, token: expand)
+    let maybeBrace: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeBrace == nil { return compilerBodyParseFailure(index: expand.end) }
+    let brace: RangeLexedToken(maybeBrace ?? fallback)
+    if brace.kind != .leftBrace { return compilerBodyParseFailure(index: brace.start) }
+    let maybeExpansion: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: brace.start), leftKind: .leftBrace, rightKind: .rightBrace))
+    if maybeExpansion == nil { return compilerBodyParseFailure(index: brace.start) }
+    let expansionFallback: CompilerSourceRange(CompilerSourceRange(start: brace.end, end: brace.end, next: brace.end))
+    let expansion: CompilerSourceRange(maybeExpansion ?? expansionFallback)
+    return compilerBodyArenaAppendExpandStatement(arena: arena, statementStart: target.start, nameStart: expand.start, nameEnd: expand.end, expansion: expansion, limit: limit)
+}
+
+function compilerBodyArenaParseSetStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
+    let target: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: keyword.end, limit: limit, minimumPrecedence: 0))
+    if !target.isValid { return target }
+    let value: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: target.nextIndex, limit: limit, minimumPrecedence: 0))
+    if !value.isValid { return value }
+    let assignmentNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindAssignment(), ordinal: ordinal, start: keyword.start, end: value.nextIndex, firstStart: keyword.start, firstEnd: keyword.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if assignmentNodeID < 0
+        || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: assignmentNodeID, childNodeID: target.nodeID, role: compilerSyntaxRoleAssignmentTarget(), ordinal: 0) != 0
+        || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: assignmentNodeID, childNodeID: value.nodeID, role: compilerSyntaxRoleAssignedValue(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: keyword.start) }
+    return compilerBodyParseSuccess(nodeID: assignmentNodeID, nextIndex: value.nextIndex)
+}
+
+function compilerBodyArenaParseStatement(arena: CompilerBodyArena, start: Int, limit: Int, ordinal: Int): CompilerBodyParseResult {
+    let maybeKeyword: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: start))
+    if maybeKeyword == nil { return compilerBodyParseFailure(index: start) }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: start, end: start, text: String("")))
+    let keyword: RangeLexedToken(maybeKeyword ?? fallback)
+    if arena.ownerKind == compilerBodyArenaOwnerMacro() && keyword.kind == .macroAttribute && keyword.text == String("@expand") {
+        return compilerBodyArenaParseContextualExpandStatement(arena: arena, keyword: keyword, limit: limit)
+    }
+    if arena.ownerKind == compilerBodyArenaOwnerMacro() && keyword.kind == .identifier && keyword.text == String("target")
+        && compilerMacroTargetDeclarationExpansion(source: arena.tables.sourceStore.source, start: keyword.start) != nil {
+        return compilerBodyArenaParseTargetDeclarationExpandStatement(arena: arena, target: keyword, limit: limit)
+    }
+    if keyword.text == String("set") { return compilerBodyArenaParseSetStatement(arena: arena, keyword: keyword, limit: limit, ordinal: ordinal) }
+    let statementKind: Int(compilerBodyArenaStatementKind(token: keyword))
+    if statementKind == compilerSyntaxKindReturn() { return compilerBodyArenaParseReturnStatement(arena: arena, keyword: keyword, limit: limit, ordinal: ordinal) }
+    if statementKind == compilerSyntaxKindLocalBinding() { return compilerBodyArenaParseLetStatement(arena: arena, keyword: keyword, limit: limit, ordinal: ordinal) }
+    if statementKind == compilerSyntaxKindIf() { return compilerBodyArenaParseIfStatement(arena: arena, keyword: keyword, limit: limit, ordinal: ordinal) }
+    if statementKind == compilerSyntaxKindWhile() { return compilerBodyArenaParseWhileStatement(arena: arena, keyword: keyword, limit: limit, ordinal: ordinal) }
+    if statementKind == compilerSyntaxKindSwitch() { return compilerBodyArenaParseSwitchStatement(arena: arena, keyword: keyword, limit: limit, ordinal: ordinal) }
+    if keyword.kind == .identifier { return compilerBodyArenaParseAssignmentStatement(arena: arena, start: start, limit: limit, ordinal: ordinal) }
+    return compilerBodyParseFailure(index: start)
+}
+
+function compilerBodyArenaParseFunction(arena: CompilerBodyArena): CompilerBodyArena {
+    state bodyStart: Int(0)
+    bodyStart: arena.bodyStart
+    state bodyEnd: Int(0)
+    bodyEnd: arena.bodyEnd
+    if bodyStart < 0 || bodyEnd <= bodyStart {
+        rawBufferAppendInt(buffer: arena.failures, value: bodyStart)
+        return arena
+    }
+    let rootNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindLexicalRegion(), ordinal: 0, start: bodyStart, end: bodyEnd, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    let parsedRegion: CompilerBodyParseResult(compilerBodyArenaParseRegionInto(arena: arena, regionNodeID: rootNodeID, start: bodyStart, limit: bodyEnd))
+    if rootNodeID != arena.rootNodeID || !parsedRegion.isValid || parsedRegion.nextIndex < bodyEnd {
+        rawBufferAppendInt(buffer: arena.failures, value: parsedRegion.nextIndex)
+    }
+    return arena
+}
+
