@@ -195,40 +195,97 @@ faster on representative multicore workloads.
 Gate: emitted programs pass the same corpus at multiple scheduler widths with
 identical observable behavior.
 
-## First Sequential Checkpoint
+## Current Decision Checkpoint
 
-Implemented on 2026-07-21 at the per-file source-inventory projection boundary:
+The first implementation experiment placed stable work records around
+source-inventory rendering. It proved that lifecycle traces and stable commits
+fit the native compiler, but it selected a synthetic boundary: inventory
+projection is already ordered formatting, not the real source-loading or build
+work that the shell currently owns. That experiment has been removed rather
+than adopted into the seed.
 
-- stable work and commit identity is `FileID`;
-- work records carry prerequisite, unresolved, lifecycle, memory-reservation,
-  commit, and status fields;
-- lifecycle constants cover waiting, ready, running, parked, completed, and
-  cancelled applications;
-- zero-prerequisite work becomes ready explicitly;
-- a one-lane scheduler selects the lowest stable ready identity;
-- projected records commit in stable identity order;
-- the scheduled result is checked against the retained direct-loop oracle;
-- `compilerSourceScheduleTrace` exposes a versioned deterministic trace without
-  timestamps, PIDs, pointers, or completion-time data.
+The stronger boundary is the existing shell-to-seed protocol. The shell is the
+external executable template for the graph Range will progressively internalize:
 
-The clean eight-file Stage 2 candidate compiled and passed inventory, repeated
-schedule trace, role, SourceGraph, canonical Core, binding, and multiple native
-ownership gates. Repeated focused traces were byte-identical. The broader gate
-then stopped at the pre-existing `RootValue boundary-forward-mixed`
-`invalidFunctionReachability` failure, so full-corpus equivalence and seed
-rollover are not yet claimed.
+```text
+shell discovers sources       -> Range project/source graph
+shell constructs bundles      -> Range immutable source snapshot
+shell invokes stages          -> Range build applications
+shell compares artifacts      -> Range deterministic equivalence gates
+shell limits processes        -> Range global adaptive scheduler
+```
+
+The shell should remain the reference executor while each responsibility moves
+behind the seed. It must not be replaced all at once, and its current behavior
+must remain the equivalence oracle.
+
+## First Build-Plan Checkpoint
+
+Implemented on 2026-07-21 without changing execution ownership:
+
+- Bash emits a canonical LF-terminated `rangeBuildPlan` version 1 artifact;
+- the plan records target/runtime ABI, tool identity, accepted seed, ordered
+  runtime inputs, ordered source roles/roots/paths/hashes/bytes, the source set,
+  four Stage 2/Stage 3 artifacts, applications, dependency gates, and fixed-point
+  assertions;
+- all paths use logical `repo` or `candidate` roots, never absolute or temporary
+  paths;
+- Bash validates record order, indexes, hashes, byte counts, required graph
+  shape, path safety, and plan immutability while remaining the executor;
+- the Range-authored compiler strictly parses and validates the same plan and
+  emits an authored-order normalized snapshot;
+- repeated Stage 2 snapshots are byte-identical;
+- unsupported versions and duplicate logical IDs reject deterministically;
+- the existing shell-built source bundle remains the compilation input and
+  equivalence oracle.
+
+The candidate builds and the plan checkpoint passes before the broader audit
+reaches the pre-existing `RootValue boundary-forward-mixed`
+`invalidFunctionReachability` failure. Stage 3 plan equality and full
+fixed-point adoption are therefore not yet claimed.
+
+## Validation Ladder And Checkpoint Edges
+
+Validation is intentionally split at graph edges so a local reader change does
+not require an immediate full compiler audit:
+
+1. `scripts/range check-build-plan` manifests the accepted seed and runtime,
+   builds only `CompilerBuildPlan.range` plus seed-compatible support/CLI, and
+   verifies the exact deterministic snapshot and focused rejection matrix. Its
+   content-addressed executable cache is keyed by seed, runtime, reader, and
+   harness/schema identities.
+2. `scripts/range check-compiler-smoke [DIR]` discovers the real candidate
+   sources, authors and validates their canonical plan, links the manifested
+   seed, emits/validates/links Stage 2, and requires Stage 2 to read that plan.
+   It exits before `audit_stage`.
+3. `scripts/range check-compiler-candidate [DIR]` retains the complete Stage 2
+   and Stage 3 audits and fixed-point comparisons.
+4. Accepted-seed and progression commands remain the broad release proofs.
+
+Every completed dependency edge emits an explicit checkpoint. A checkpoint is
+narrow evidence: `stage2-linked`, for example, proves its preceding manifest,
+plan, emission, and validation edges, but does not imply that Stage 2 plan read,
+`audit_stage`, Stage 3, or fixed point ran. Automation and reports must name the
+last passed edge rather than collapsing partial progress into a whole-gate
+claim. This edge principle also supplies the future scheduler with stable units
+of readiness, execution, and deterministic commit.
 
 ## Immediate Next Slice
 
-1. Restore a green full-corpus sequential baseline for the existing
-   `boundary-forward-mixed` fixture without weakening its ownership proof.
-2. Rerun the complete candidate and fixed-point gates with the one-lane source
-   scheduler active.
-3. Record hashes, diagnostics, LLVM, exits, elapsed time, and peak memory.
-4. Only after complete equivalence is proven, place these work records behind
-   the adaptive C scheduler.
+1. Restore and record a green full-corpus sequential baseline by resolving the
+   existing `boundary-forward-mixed` failure without weakening ownership proof.
+2. Complete Stage 2/Stage 3 plan-snapshot equality and fixed-point gates.
+3. Extend the Range plan reader into a loader that resolves logical roots, reads
+   the listed source files, assigns stable `FileID`s, and materializes the same
+   immutable source snapshot now assembled by Bash.
+4. Run the old shell-bundled path and the Range-loaded plan path sequentially
+   and require identical inventories, diagnostics, graph hashes, LLVM, exits,
+   and fixed-point results.
+5. Only after that real boundary is internalized should source-load applications
+   gain lifecycle records and move behind the adaptive scheduler.
 
-This order proves the semantic model before introducing races.
+This order grows the seed from the shell template while proving one real
+cutover boundary at a time.
 
 ## Explicit Non-Goals
 

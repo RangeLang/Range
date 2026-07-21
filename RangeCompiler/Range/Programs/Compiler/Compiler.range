@@ -12,8 +12,8 @@ function compileRangeNativeSource(source: String): String {
 }
 
 function compileRangeNativeSourceDirectiveOutput(source: String): String {
-    if compilerSourceRequestsSourceScheduleTrace(source: source) {
-        return compilerSourceScheduleTrace(source: source)
+    if compilerSourceRequestsBuildPlan(source: source) {
+        return compilerBuildPlanSnapshot(source: source)
     }
 
     if compilerSourceRequestsSourceInventory(source: source) {

@@ -12,10 +12,13 @@ usage() {
     cat <<'USAGE'
 Usage:
   scripts/check-range-compiler-candidate [DIR]
+  scripts/check-range-compiler-candidate --checkpoint stage2-plan [DIR]
   scripts/check-range-compiler-candidate --bootstrap-bridge-source PHASE1_DIR FINAL_DIR
   scripts/check-range-compiler-candidate --help
 
-DIR defaults to RangeCompiler/Range/Programs/Compiler.
+DIR defaults to RangeCompiler/Range/Programs/Compiler. The stage2-plan checkpoint
+stops after the manifested seed has emitted, validated, and linked Stage 2 and
+Stage 2 has read the canonical candidate build plan.
 
 The bootstrap bridge mode uses the manifested seed to compile an immutable
 old-syntax Phase1 source bundle, audits that one-shot bridge, and uses it only
@@ -38,6 +41,14 @@ sha256() {
 
 bytes() {
     /usr/bin/stat -f %z "$1"
+}
+
+sha256_text() {
+    /usr/bin/printf '%s' "$1" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}'
+}
+
+bytes_text() {
+    /usr/bin/printf '%s' "$1" | /usr/bin/wc -c | /usr/bin/tr -d ' '
 }
 
 verify_manifest_file() {
@@ -96,38 +107,47 @@ runtime_inputs() {
 SOURCE_FILES=()
 SOURCE_RELATIVE_PATHS=()
 SOURCE_ROLES=()
+SOURCE_ROOTS=()
+SOURCE_MARKERS=()
 
 discover_sources() {
     local directory="$1"
     local work_root="$2"
+    local core_mode="${3:-manifest}"
     local raw_list="$work_root/source-paths.raw"
     local sorted_list="$work_root/source-paths.sorted"
-    local include_linking_core="${3:-1}"
-    local absolute relative link_plan_source process_source
+    local absolute relative index compiler_source_count role
 
     [[ -d "$directory" ]] || fail "missing compiler directory: $directory"
     directory="$(cd "$directory" && pwd)"
     SOURCE_FILES=()
     SOURCE_RELATIVE_PATHS=()
     SOURCE_ROLES=()
+    SOURCE_ROOTS=()
+    SOURCE_MARKERS=()
 
-    [[ -f "$CORE_SOURCE_PATH" ]] || fail "missing compiler Core source: $CORE_SOURCE_PATH"
-    if [[ "$include_linking_core" == "1" ]]; then
-        link_plan_source="$REPO_ROOT/RangeCompiler/Range/Core/Package/LinkPlan.range"
-        process_source="$REPO_ROOT/RangeCompiler/Range/Core/System/Process.range"
-        [[ -f "$link_plan_source" ]] || fail "missing compiler Core source: $link_plan_source"
-        [[ -f "$process_source" ]] || fail "missing compiler Core source: $process_source"
-        SOURCE_FILES+=("$link_plan_source")
-        SOURCE_RELATIVE_PATHS+=("${link_plan_source#"$REPO_ROOT/"}")
+    if [[ "$core_mode" == compatibility ]]; then
+        [[ -f "$CORE_SOURCE_PATH" ]] || fail "missing compiler Core source: $CORE_SOURCE_PATH"
+        SOURCE_FILES+=("$CORE_SOURCE_PATH")
+        SOURCE_RELATIVE_PATHS+=("$CORE_SOURCE_MARKER_PATH")
         SOURCE_ROLES+=("core")
-    fi
-    SOURCE_FILES+=("$CORE_SOURCE_PATH")
-    SOURCE_RELATIVE_PATHS+=("$CORE_SOURCE_MARKER_PATH")
-    SOURCE_ROLES+=("core")
-    if [[ "$include_linking_core" == "1" ]]; then
-        SOURCE_FILES+=("$process_source")
-        SOURCE_RELATIVE_PATHS+=("${process_source#"$REPO_ROOT/"}")
-        SOURCE_ROLES+=("core")
+        SOURCE_ROOTS+=("repo")
+        SOURCE_MARKERS+=("compilerSourceFile")
+    else
+        [[ "$core_mode" == manifest ]] || fail "unsupported source discovery core mode: $core_mode"
+        compiler_source_count="$(manifest_value compilerSources)"
+        for ((index = 0; index < compiler_source_count; index += 1)); do
+            role="$(manifest_value "compilerSources.$index.role")"
+            [[ "$role" == core ]] || continue
+            relative="$(manifest_value "compilerSources.$index.path")"
+            absolute="$REPO_ROOT/$relative"
+            [[ -f "$absolute" ]] || fail "missing manifested compiler Core source: $relative"
+            SOURCE_FILES+=("$absolute")
+            SOURCE_RELATIVE_PATHS+=("$relative")
+            SOURCE_ROLES+=("core")
+            SOURCE_ROOTS+=("repo")
+            SOURCE_MARKERS+=("compilerSourceFile")
+        done
     fi
 
     /usr/bin/find "$directory" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print0 > "$raw_list"
@@ -145,6 +165,8 @@ discover_sources() {
         SOURCE_FILES+=("$absolute")
         SOURCE_RELATIVE_PATHS+=("${absolute#"$directory/"}")
         SOURCE_ROLES+=("project")
+        SOURCE_ROOTS+=("candidate")
+        SOURCE_MARKERS+=("compilerSourceFile")
     done < <(LC_ALL=C /usr/bin/sort "$sorted_list")
 
     [[ "${#SOURCE_FILES[@]}" -gt 0 ]] || fail "no .range source files found in: $directory"
@@ -185,6 +207,226 @@ write_expected_inventory() {
     done
     /usr/bin/printf 'sourceFileCount\\t%s\\n' "${#SOURCE_FILES[@]}" >> "$output"
     /usr/bin/printf '\n' >> "$output"
+}
+
+write_candidate_build_plan() {
+    local output="$1"
+    local stage2_producer_id="$2"
+    local seed_relative seed_path runtime_count index path identity logical_path
+
+    seed_relative="$(manifest_value seed.path)"
+    seed_path="$REPO_ROOT/$seed_relative"
+    runtime_count="$(manifest_value runtimeSources)"
+    identity="$(manifest_value producer.clang) $COMPILER_OPTIMIZATION $COMPILER_LTO"
+
+    /usr/bin/printf 'rangeBuildPlan\tversion=1\n' > "$output"
+    /usr/bin/printf 'target\tplatform=%s\tarchitecture=%s\tpointerBits=%s\truntimeABI=%s\n' \
+        "$(manifest_value target.platform)" "$(manifest_value target.architecture)" \
+        "$(manifest_value target.pointerBits)" "$(manifest_value runtimeABI)" >> "$output"
+    /usr/bin/printf 'tool\tid=clang\tpath=repo/tool/clang\tsha256=%s\tbytes=%s\n' \
+        "$(sha256_text "$identity")" "$(bytes_text "$identity")" >> "$output"
+    /usr/bin/printf 'input\tid=accepted-seed\tpath=repo/%s\tsha256=%s\tbytes=%s\n' \
+        "$seed_relative" "$(sha256 "$seed_path")" "$(bytes "$seed_path")" >> "$output"
+    for ((index = 0; index < runtime_count; index += 1)); do
+        path="$(manifest_value "runtimeSources.$index.path")"
+        /usr/bin/printf 'runtime\tindex=%s\tid=runtime-%s\tpath=repo/%s\tsha256=%s\tbytes=%s\n' \
+            "$index" "$index" "$path" "$(sha256 "$REPO_ROOT/$path")" "$(bytes "$REPO_ROOT/$path")" >> "$output"
+    done
+    /usr/bin/printf 'sourceSet\tid=candidate-sources\tpath=candidate/RangeCompilerSourceSet.range\tsha256=%s\tbytes=%s\n' \
+        "$(sha256 "$SOURCE_BUNDLE")" "$(bytes "$SOURCE_BUNDLE")" >> "$output"
+    for index in "${!SOURCE_FILES[@]}"; do
+        /usr/bin/printf 'source\tindex=%s\tid=source-%s\tsourceSet=candidate-sources\trole=%s\troot=%s\tpath=%s\tsha256=%s\tbytes=%s\n' \
+            "$index" "$index" "${SOURCE_ROLES[$index]}" "${SOURCE_ROOTS[$index]}" \
+            "${SOURCE_RELATIVE_PATHS[$index]}" "$(sha256 "${SOURCE_FILES[$index]}")" \
+            "$(bytes "${SOURCE_FILES[$index]}")" >> "$output"
+    done
+    for logical_path in \
+        candidate/.range/Build/stage2/RangeCompiler.ll \
+        candidate/.range/Build/stage2/RangeCompiler \
+        candidate/.range/Build/stage3/RangeCompiler.ll \
+        candidate/.range/Build/stage3/RangeCompiler; do
+        case "$logical_path" in
+            *stage2/RangeCompiler.ll) identity=stage2-llvm ;;
+            *stage2/RangeCompiler) identity=stage2-executable ;;
+            *stage3/RangeCompiler.ll) identity=stage3-llvm ;;
+            *) identity=stage3-executable ;;
+        esac
+        /usr/bin/printf 'artifact\tid=%s\tpath=%s\tsha256=%s\tbytes=%s\n' \
+            "$identity" "$logical_path" "$(sha256_text "$logical_path")" "$(bytes_text "$logical_path")" >> "$output"
+    done
+    /usr/bin/printf 'application\tindex=0\tid=stage2\tkind=compile\tinput=%s\tartifact=stage2-llvm\n' "$stage2_producer_id" >> "$output"
+    /usr/bin/printf '%s\n' \
+        $'application\tindex=1\tid=stage3\tkind=compile\tinput=stage2-executable\tartifact=stage3-llvm' >> "$output"
+    /usr/bin/printf 'gate\tid=stage2-producer-dependency\tkind=dependency\tleft=stage2\tright=%s\n' "$stage2_producer_id" >> "$output"
+    /usr/bin/printf '%s\n' \
+        $'gate\tid=stage2-source-dependency\tkind=dependency\tleft=stage2\tright=candidate-sources' \
+        $'gate\tid=stage2-runtime-dependency\tkind=dependency\tleft=stage2\tright=runtime-set' \
+        $'gate\tid=stage2-validate\tkind=llvm-validate\tleft=stage2\tright=stage2-llvm' \
+        $'gate\tid=stage2-link\tkind=link\tleft=stage2-llvm\tright=stage2-executable' \
+        $'gate\tid=stage3-source-dependency\tkind=dependency\tleft=stage3\tright=candidate-sources' \
+        $'gate\tid=stage3-runtime-dependency\tkind=dependency\tleft=stage3\tright=runtime-set' \
+        $'gate\tid=stage3-validate\tkind=llvm-validate\tleft=stage3\tright=stage3-llvm' \
+        $'gate\tid=stage3-link\tkind=link\tleft=stage3-llvm\tright=stage3-executable' \
+        $'assert\tid=llvm-byte-identity\tkind=byte-identical\tsubject=stage2-llvm\texpected=stage3-llvm' \
+        $'assert\tid=executable-byte-identity\tkind=byte-identical\tsubject=stage2-executable\texpected=stage3-executable' >> "$output"
+}
+
+validate_candidate_build_plan() {
+    local plan="$1"
+    local stage2_producer_id="$2"
+    local runtime_count index path expected actual_count final_byte identity artifact_id
+
+    [[ -s "$plan" ]] || fail "candidate build plan is empty"
+    [[ "$(/usr/bin/head -1 "$plan")" == $'rangeBuildPlan\tversion=1' ]] || fail "candidate build plan header is invalid"
+    ! LC_ALL=C /usr/bin/grep -q $'\r' "$plan" || fail "candidate build plan contains CR bytes"
+    final_byte="$(/usr/bin/tail -c 1 "$plan" | /usr/bin/od -An -t u1 | /usr/bin/tr -d ' ')"
+    [[ "$final_byte" == 10 ]] || fail "candidate build plan is not LF-terminated"
+    /usr/bin/awk -F '\t' '
+        {
+            for (field = 2; field <= NF; field += 1) {
+                value = $field
+                sub(/^[^=]*=/, "", value)
+                if (value ~ /^\// || value ~ /(^|\/)\.\.($|\/)/) exit 1
+            }
+        }
+    ' "$plan" || fail "candidate build plan contains an absolute or parent-relative value"
+
+    [[ "$(/usr/bin/grep -c $'^target\t' "$plan")" -eq 1 ]] || fail "candidate build plan target count is invalid"
+    [[ "$(/usr/bin/grep -c $'^tool\t' "$plan")" -eq 1 ]] || fail "candidate build plan tool count is invalid"
+    [[ "$(/usr/bin/grep -c $'^input\t' "$plan")" -eq 1 ]] || fail "candidate build plan seed input count is invalid"
+    expected="$(/usr/bin/printf 'target\tplatform=%s\tarchitecture=%s\tpointerBits=%s\truntimeABI=%s' \
+        "$(manifest_value target.platform)" "$(manifest_value target.architecture)" \
+        "$(manifest_value target.pointerBits)" "$(manifest_value runtimeABI)")"
+    /usr/bin/grep -Fqx "$expected" "$plan" || fail "candidate build plan target is invalid"
+    identity="$(manifest_value producer.clang) $COMPILER_OPTIMIZATION $COMPILER_LTO"
+    expected="$(/usr/bin/printf 'tool\tid=clang\tpath=repo/tool/clang\tsha256=%s\tbytes=%s' \
+        "$(sha256_text "$identity")" "$(bytes_text "$identity")")"
+    /usr/bin/grep -Fqx "$expected" "$plan" || fail "candidate build plan tool is invalid"
+    path="$(manifest_value seed.path)"
+    expected="$(/usr/bin/printf 'input\tid=accepted-seed\tpath=repo/%s\tsha256=%s\tbytes=%s' \
+        "$path" "$(sha256 "$REPO_ROOT/$path")" "$(bytes "$REPO_ROOT/$path")")"
+    /usr/bin/grep -Fqx "$expected" "$plan" || fail "candidate build plan accepted seed is missing or stale"
+    runtime_count="$(manifest_value runtimeSources)"
+    actual_count="$(/usr/bin/grep -c $'^runtime\t' "$plan")"
+    [[ "$actual_count" -eq "$runtime_count" ]] || fail "candidate build plan runtime count is $actual_count, expected $runtime_count"
+    for ((index = 0; index < runtime_count; index += 1)); do
+        path="$(manifest_value "runtimeSources.$index.path")"
+        expected="$(/usr/bin/printf 'runtime\tindex=%s\tid=runtime-%s\tpath=repo/%s\tsha256=%s\tbytes=%s' \
+            "$index" "$index" "$path" "$(sha256 "$REPO_ROOT/$path")" "$(bytes "$REPO_ROOT/$path")")"
+        /usr/bin/grep -Fqx "$expected" "$plan" || fail "candidate build plan runtime $index is missing or stale"
+    done
+    expected="$(/usr/bin/printf 'sourceSet\tid=candidate-sources\tpath=candidate/RangeCompilerSourceSet.range\tsha256=%s\tbytes=%s' \
+        "$(sha256 "$SOURCE_BUNDLE")" "$(bytes "$SOURCE_BUNDLE")")"
+    /usr/bin/grep -Fqx "$expected" "$plan" || fail "candidate build plan sourceSet is missing or stale"
+    actual_count="$(/usr/bin/grep -c $'^source\t' "$plan")"
+    [[ "$actual_count" -eq "${#SOURCE_FILES[@]}" ]] || fail "candidate build plan source count is $actual_count, expected ${#SOURCE_FILES[@]}"
+    for index in "${!SOURCE_FILES[@]}"; do
+        expected="$(/usr/bin/printf 'source\tindex=%s\tid=source-%s\tsourceSet=candidate-sources\trole=%s\troot=%s\tpath=%s\tsha256=%s\tbytes=%s' \
+            "$index" "$index" "${SOURCE_ROLES[$index]}" "${SOURCE_ROOTS[$index]}" \
+            "${SOURCE_RELATIVE_PATHS[$index]}" "$(sha256 "${SOURCE_FILES[$index]}")" "$(bytes "${SOURCE_FILES[$index]}")")"
+        /usr/bin/grep -Fqx "$expected" "$plan" || fail "candidate build plan source $index role/root/path/marker/hash/bytes are missing or stale"
+    done
+    [[ "$(/usr/bin/grep -c $'^artifact\t' "$plan")" -eq 4 ]] || fail "candidate build plan must contain four artifacts"
+    [[ "$(/usr/bin/grep -c $'^application\t' "$plan")" -eq 2 ]] || fail "candidate build plan must contain Stage2 and Stage3 applications"
+    [[ "$(/usr/bin/grep -c $'^gate\t' "$plan")" -eq 9 ]] || fail "candidate build plan gate/dependency count is invalid"
+    [[ "$(/usr/bin/grep -c $'^assert\t' "$plan")" -eq 2 ]] || fail "candidate build plan fixed-point assertion count is invalid"
+    /usr/bin/grep -Fqx "application"$'\t'"index=0"$'\t'"id=stage2"$'\t'"kind=compile"$'\t'"input=$stage2_producer_id"$'\t'"artifact=stage2-llvm" "$plan" \
+        || fail "candidate build plan Stage2 application is invalid"
+    for expected in \
+        $'application\tindex=1\tid=stage3\tkind=compile\tinput=stage2-executable\tartifact=stage3-llvm' \
+        $'gate\tid=stage2-source-dependency\tkind=dependency\tleft=stage2\tright=candidate-sources' \
+        $'gate\tid=stage2-runtime-dependency\tkind=dependency\tleft=stage2\tright=runtime-set' \
+        $'gate\tid=stage2-validate\tkind=llvm-validate\tleft=stage2\tright=stage2-llvm' \
+        $'gate\tid=stage2-link\tkind=link\tleft=stage2-llvm\tright=stage2-executable' \
+        $'gate\tid=stage3-source-dependency\tkind=dependency\tleft=stage3\tright=candidate-sources' \
+        $'gate\tid=stage3-runtime-dependency\tkind=dependency\tleft=stage3\tright=runtime-set' \
+        $'gate\tid=stage3-validate\tkind=llvm-validate\tleft=stage3\tright=stage3-llvm' \
+        $'gate\tid=stage3-link\tkind=link\tleft=stage3-llvm\tright=stage3-executable' \
+        $'assert\tid=llvm-byte-identity\tkind=byte-identical\tsubject=stage2-llvm\texpected=stage3-llvm' \
+        $'assert\tid=executable-byte-identity\tkind=byte-identical\tsubject=stage2-executable\texpected=stage3-executable'; do
+        /usr/bin/grep -Fqx "$expected" "$plan" || fail "candidate build plan is missing required record: $expected"
+    done
+    /usr/bin/grep -Fqx "gate"$'\t'"id=stage2-producer-dependency"$'\t'"kind=dependency"$'\t'"left=stage2"$'\t'"right=$stage2_producer_id" "$plan" \
+        || fail "candidate build plan Stage2 producer dependency is invalid"
+    for artifact_id in stage2-llvm stage2-executable stage3-llvm stage3-executable; do
+        case "$artifact_id" in
+            stage2-llvm) path=candidate/.range/Build/stage2/RangeCompiler.ll ;;
+            stage2-executable) path=candidate/.range/Build/stage2/RangeCompiler ;;
+            stage3-llvm) path=candidate/.range/Build/stage3/RangeCompiler.ll ;;
+            *) path=candidate/.range/Build/stage3/RangeCompiler ;;
+        esac
+        expected="$(/usr/bin/printf 'artifact\tid=%s\tpath=%s\tsha256=%s\tbytes=%s' \
+            "$artifact_id" "$path" "$(sha256_text "$path")" "$(bytes_text "$path")")"
+        /usr/bin/grep -Fqx "$expected" "$plan" || fail "candidate build plan artifact $artifact_id is invalid"
+    done
+}
+
+assert_candidate_build_plan_unchanged() {
+    [[ -n "${CANDIDATE_BUILD_PLAN:-}" && -n "${CANDIDATE_BUILD_PLAN_SHA256:-}" ]] || return 0
+    [[ -f "$CANDIDATE_BUILD_PLAN" ]] || fail "candidate build plan disappeared during execution"
+    [[ "$(sha256 "$CANDIDATE_BUILD_PLAN")" == "$CANDIDATE_BUILD_PLAN_SHA256" ]] \
+        || fail "candidate build plan changed during execution"
+}
+
+validate_build_plan_snapshot() {
+    local label="$1"
+    local snapshot="$2"
+    local runtime_count="$(manifest_value runtimeSources)"
+    local expected_header
+
+    expected_header="buildPlan"$'\t'"version=1"$'\t'"valid=true"$'\t'"targetCount=1"$'\t'"toolCount=1"$'\t'"inputCount=1"$'\t'"runtimeCount=$runtime_count"$'\t'"sourceSetCount=1"$'\t'"sourceCount=${#SOURCE_FILES[@]}"$'\t'"artifactCount=4"$'\t'"applicationCount=2"$'\t'"gateCount=9"$'\t'"assertCount=2"
+    /usr/bin/grep -Fqx "$expected_header" "$snapshot" \
+        || fail "$label build plan snapshot header or record counts are invalid"
+    ! LC_ALL=C /usr/bin/grep -Eq '(timestamp|generatedAt|duration|elapsed|processID|pid|temporaryPath|absolutePath)=' "$snapshot" \
+        || fail "$label build plan snapshot contains nondeterministic fields"
+    ! /usr/bin/grep -Eq '(^|[=[:space:]])/|(^|/)\.\.($|/)' "$snapshot" \
+        || fail "$label build plan snapshot contains an absolute or parent-relative path"
+    [[ "$(/usr/bin/grep -c $'^runtime\t' "$snapshot")" -eq "$runtime_count" ]] \
+        || fail "$label build plan snapshot runtime records are incomplete"
+    [[ "$(/usr/bin/grep -c $'^source\t' "$snapshot")" -eq "${#SOURCE_FILES[@]}" ]] \
+        || fail "$label build plan snapshot source records are incomplete"
+    [[ "$(/usr/bin/grep -c $'^application\t' "$snapshot")" -eq 2 ]] \
+        || fail "$label build plan snapshot application records are incomplete"
+    [[ "$(/usr/bin/grep -c $'^artifact\t' "$snapshot")" -eq 4 ]] \
+        || fail "$label build plan snapshot artifact records are incomplete"
+}
+
+audit_candidate_build_plan_snapshot() {
+    local stage_label="$1"
+    local executable="$2"
+    local first="$WORK_ROOT/$stage_label.build-plan.first.snapshot"
+    local second="$WORK_ROOT/$stage_label.build-plan.repeat.snapshot"
+    local first_error="$WORK_ROOT/$stage_label.build-plan.first.err"
+    local second_error="$WORK_ROOT/$stage_label.build-plan.repeat.err"
+    local unsupported="$WORK_ROOT/$stage_label.build-plan.unsupported.tsv"
+    local unsupported_output="$WORK_ROOT/$stage_label.build-plan.unsupported.out"
+    local unsupported_error="$WORK_ROOT/$stage_label.build-plan.unsupported.err"
+    local duplicate="$WORK_ROOT/$stage_label.build-plan.duplicate.tsv"
+    local duplicate_output="$WORK_ROOT/$stage_label.build-plan.duplicate.out"
+    local duplicate_error="$WORK_ROOT/$stage_label.build-plan.duplicate.err"
+
+    run_capture "$executable" "$CANDIDATE_BUILD_PLAN" "$first" "$first_error"
+    require_successful_output "$stage_label build plan snapshot" "$first" "$first_error"
+    run_capture "$executable" "$CANDIDATE_BUILD_PLAN" "$second" "$second_error"
+    require_successful_output "$stage_label repeated build plan snapshot" "$second" "$second_error"
+    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label build plan snapshot was not deterministic"
+    validate_build_plan_snapshot "$stage_label" "$first"
+
+    /usr/bin/printf 'rangeBuildPlan\tversion=2\n' > "$unsupported"
+    run_capture "$executable" "$unsupported" "$unsupported_output" "$unsupported_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label unsupported build plan version exited $RUN_STATUS"
+    [[ ! -s "$unsupported_error" ]] || fail "$stage_label unsupported build plan version wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidBuildPlan\treason=unsupportedVersion\tline=1' "$unsupported_output" \
+        || fail "$stage_label unsupported build plan version diagnostic changed"
+
+    /usr/bin/awk -F '\t' 'BEGIN { duplicated = 0 } { print; if (!duplicated && $1 == "artifact") { print; duplicated = 1 } }' "$CANDIDATE_BUILD_PLAN" > "$duplicate"
+    run_capture "$executable" "$duplicate" "$duplicate_output" "$duplicate_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label duplicate build plan ID exited $RUN_STATUS"
+    [[ ! -s "$duplicate_error" ]] || fail "$stage_label duplicate build plan ID wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidBuildPlan\treason=duplicateLogicalID' "$duplicate_output" \
+        || fail "$stage_label duplicate build plan ID diagnostic changed"
+
+    assert_candidate_build_plan_unchanged
 }
 run_capture() {
     local executable="$1"
@@ -2246,11 +2488,6 @@ audit_role_markers() {
     local inventory_output="$WORK_ROOT/$stage_label.roles.inventory.out"
     local inventory_error="$WORK_ROOT/$stage_label.roles.inventory.err"
     local expected_inventory="$WORK_ROOT/$stage_label.roles.inventory.expected"
-    local schedule_bundle="$WORK_ROOT/$stage_label.roles.schedule.range"
-    local schedule_output="$WORK_ROOT/$stage_label.roles.schedule.out"
-    local schedule_repeat_output="$WORK_ROOT/$stage_label.roles.schedule.repeat.out"
-    local schedule_error="$WORK_ROOT/$stage_label.roles.schedule.err"
-    local schedule_repeat_error="$WORK_ROOT/$stage_label.roles.schedule.repeat.err"
     local malformed_bundle="$WORK_ROOT/$stage_label.roles.malformed.range"
     local malformed_output="$WORK_ROOT/$stage_label.roles.malformed.out"
     local malformed_error="$WORK_ROOT/$stage_label.roles.malformed.err"
@@ -2262,7 +2499,6 @@ audit_role_markers() {
     local fingerprint_core_bundle="$WORK_ROOT/$stage_label.roles.fingerprint.core.range"
     local fingerprint_core_output="$WORK_ROOT/$stage_label.roles.fingerprint.core.out"
     local fingerprint_core_error="$WORK_ROOT/$stage_label.roles.fingerprint.core.err"
-    local index
 
     write_role_bundle "$identity_bundle" compilerSourceIdentity
     run_capture "$executable" "$identity_bundle" "$identity_output" "$identity_error"
@@ -2286,37 +2522,6 @@ audit_role_markers() {
     require_successful_output "$stage_label role inventory" "$inventory_output" "$inventory_error"
     /usr/bin/cmp -s "$inventory_output" "$expected_inventory" || fail "$stage_label role inventory differs from expected roles"
 
-    write_role_bundle "$schedule_bundle" compilerSourceScheduleTrace
-    run_capture "$executable" "$schedule_bundle" "$schedule_output" "$schedule_error"
-    require_successful_output "$stage_label source schedule trace" "$schedule_output" "$schedule_error"
-    run_capture "$executable" "$schedule_bundle" "$schedule_repeat_output" "$schedule_repeat_error"
-    require_successful_output "$stage_label repeated source schedule trace" "$schedule_repeat_output" "$schedule_repeat_error"
-    /usr/bin/cmp -s "$schedule_output" "$schedule_repeat_output" \
-        || fail "$stage_label source schedule trace was not deterministic"
-    /usr/bin/grep -Fq $'compilerSourceScheduleTrace\tversion=1\tboundary=sourceInventoryFileRecord\tlaneCount=1\tworkCount=6' "$schedule_output" \
-        || fail "$stage_label source schedule trace header changed"
-    [[ "$(/usr/bin/grep -Fc $'work\t' "$schedule_output" || true)" -eq 6 ]] \
-        || fail "$stage_label source schedule trace did not describe six work records"
-    [[ "$(/usr/bin/grep -Fc $'transition\t' "$schedule_output" || true)" -eq 18 ]] \
-        || fail "$stage_label source schedule trace did not describe eighteen lifecycle transitions"
-    [[ "$(/usr/bin/grep -Fc $'commit\t' "$schedule_output" || true)" -eq 6 ]] \
-        || fail "$stage_label source schedule trace did not describe six commits"
-    for index in 0 1 2 3 4 5; do
-        /usr/bin/grep -Fq "work"$'\t'"identity=$index"$'\t'"prerequisiteCount=0"$'\t'"unresolvedCount=0" "$schedule_output" \
-            || fail "$stage_label source schedule trace omitted ready work identity $index"
-        /usr/bin/grep -Fq "transition"$'\t'"identity=$index"$'\t'"from=waiting"$'\t'"to=ready" "$schedule_output" \
-            || fail "$stage_label source schedule trace omitted waiting-to-ready transition $index"
-        /usr/bin/grep -Fq "transition"$'\t'"identity=$index"$'\t'"from=ready"$'\t'"to=running" "$schedule_output" \
-            || fail "$stage_label source schedule trace omitted ready-to-running transition $index"
-        /usr/bin/grep -Fq "transition"$'\t'"identity=$index"$'\t'"from=running"$'\t'"to=completed" "$schedule_output" \
-            || fail "$stage_label source schedule trace omitted running-to-completed transition $index"
-        /usr/bin/grep -Fq "commit"$'\t'"identity=$index"$'\t'"commitIdentity=$index"$'\t'"status=committed" "$schedule_output" \
-            || fail "$stage_label source schedule trace omitted stable commit $index"
-    done
-    if /usr/bin/grep -Eq '(^|[[:space:]])(pid|time|timestamp|duration|pointer)=' "$schedule_output"; then
-        fail "$stage_label source schedule trace exposed nondeterministic runtime data"
-    fi
-
     write_invalid_role_bundle "$malformed_bundle" 'compilerSourceFile\trole=unknown\tpath=Bad.range'
     run_capture "$executable" "$malformed_bundle" "$malformed_output" "$malformed_error"
     [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label malformed role exited $RUN_STATUS"
@@ -2337,7 +2542,7 @@ audit_role_markers() {
     run_capture "$executable" "$fingerprint_core_bundle" "$fingerprint_core_output" "$fingerprint_core_error"
     require_successful_output "$stage_label core fingerprint" "$fingerprint_core_output" "$fingerprint_core_error"
     /usr/bin/cmp -s "$fingerprint_project_first" "$fingerprint_core_output" && fail "$stage_label role-only fingerprint change was not observed"
-    echo "$stage_label roles: pass (five explicit roles, deterministic one-lane source schedule, stable commits, malformed rejection, role-sensitive fingerprint)"
+    echo "$stage_label roles: pass (five explicit roles, legacy project, malformed rejection, deterministic role-sensitive fingerprint)"
 }
 
 audit_driver_source_graph() {
@@ -4869,6 +5074,7 @@ audit_raw_buffer_substrate() {
 main() {
     local compiler_input="$DEFAULT_COMPILER_DIR"
     local bootstrap_bridge_input=""
+    local checkpoint_mode=""
     if [[ "$#" -eq 1 && ( "$1" == "--help" || "$1" == "-h" ) ]]; then
         usage
         return 0
@@ -4877,6 +5083,11 @@ main() {
         :
     elif [[ "$#" -eq 1 && "$1" != -* ]]; then
         compiler_input="$1"
+    elif [[ ( "$#" -eq 2 || "$#" -eq 3 ) && "$1" == "--checkpoint" && "$2" == "stage2-plan" ]]; then
+        checkpoint_mode=stage2-plan
+        if [[ "$#" -eq 3 ]]; then
+            compiler_input="$3"
+        fi
     elif [[ "$#" -eq 3 && "$1" == "--bootstrap-bridge-source" ]]; then
         bootstrap_bridge_input="$2"
         compiler_input="$3"
@@ -4897,15 +5108,17 @@ main() {
     fi
 
     verify_manifest
-    audit_no_temporary_debug_probes "$compiler_directory/CompilerCore.range" "final compiler"
-    audit_no_body_syntax_sink "$compiler_directory/CompilerCore.range" "final compiler"
-    audit_typed_only_lowering_invariant "$compiler_directory/CompilerCore.range" "final compiler"
-    audit_no_legacy_record_lowering "$compiler_directory"
-    if [[ -n "$bootstrap_bridge_source_directory" ]]; then
-        audit_no_temporary_debug_probes "$bootstrap_bridge_source_directory/CompilerCore.range" "bootstrap bridge"
-        audit_no_body_syntax_sink "$bootstrap_bridge_source_directory/CompilerCore.range" "bootstrap bridge"
+    if [[ "$checkpoint_mode" != stage2-plan ]]; then
+        audit_no_temporary_debug_probes "$compiler_directory/CompilerCore.range" "final compiler"
+        audit_no_body_syntax_sink "$compiler_directory/CompilerCore.range" "final compiler"
+        audit_typed_only_lowering_invariant "$compiler_directory/CompilerCore.range" "final compiler"
+        audit_no_legacy_record_lowering "$compiler_directory"
+        if [[ -n "$bootstrap_bridge_source_directory" ]]; then
+            audit_no_temporary_debug_probes "$bootstrap_bridge_source_directory/CompilerCore.range" "bootstrap bridge"
+            audit_no_body_syntax_sink "$bootstrap_bridge_source_directory/CompilerCore.range" "bootstrap bridge"
+        fi
+        audit_raw_buffer_substrate
     fi
-    audit_raw_buffer_substrate
 
     WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compiler-candidate.XXXXXX")"
     if [[ "${RANGE_KEEP_CANDIDATE_WORK_ROOT:-0}" == "1" ]]; then
@@ -4930,7 +5143,7 @@ main() {
     if [[ -n "$bootstrap_bridge_source_directory" ]]; then
         local bootstrap_bridge_discovery_root="$WORK_ROOT/bootstrap-bridge-source-discovery"
         /bin/mkdir -p "$bootstrap_bridge_discovery_root"
-        discover_sources "$bootstrap_bridge_source_directory" "$bootstrap_bridge_discovery_root" 0
+        discover_sources "$bootstrap_bridge_source_directory" "$bootstrap_bridge_discovery_root" compatibility
         bootstrap_bridge_source_bundle="$WORK_ROOT/BootstrapBridgeSourceSet.range"
         write_source_bundle "$bootstrap_bridge_source_bundle"
         bootstrap_bridge_source_inventory_count="${#SOURCE_FILES[@]}"
@@ -5239,10 +5452,37 @@ main() {
         '    return 0' \
         '}' > "$LEGACY_LANGUAGE_SOURCE"
 
+    local build_root stage2_directory stage3_directory
+    local stage2_llvm stage2_executable stage3_llvm stage3_executable
+    build_root="$compiler_directory/.range/Build"
+    stage2_directory="$build_root/stage2"
+    stage3_directory="$build_root/stage3"
+    stage2_llvm="$stage2_directory/RangeCompiler.ll"
+    stage2_executable="$stage2_directory/RangeCompiler"
+    stage3_llvm="$stage3_directory/RangeCompiler.ll"
+    stage3_executable="$stage3_directory/RangeCompiler"
+
+    if [[ -d "$build_root" ]]; then
+        /bin/chmod -R u+w "$build_root"
+    fi
+    /bin/rm -rf "$build_root"
+    /bin/mkdir -p "$build_root"
+    CANDIDATE_BUILD_PLAN="$build_root/RangeCompiler.build-plan.tsv"
+    local stage2_producer_id=accepted-seed
+    if [[ -n "$bootstrap_bridge_source_directory" ]]; then
+        stage2_producer_id=bootstrap-bridge
+    fi
+    write_candidate_build_plan "$CANDIDATE_BUILD_PLAN" "$stage2_producer_id"
+    validate_candidate_build_plan "$CANDIDATE_BUILD_PLAN" "$stage2_producer_id"
+    CANDIDATE_BUILD_PLAN_SHA256="$(sha256 "$CANDIDATE_BUILD_PLAN")"
+    echo "checkpoint compiler-candidate:plan-authored: pass"
+    echo "candidate build plan: pass (version 1, deterministic logical paths)"
+
     local seed seed_executable
     seed="$REPO_ROOT/$(manifest_value seed.path)"
     seed_executable="$WORK_ROOT/RangeCompilerSeed"
     clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
+    echo "checkpoint compiler-candidate:seed-linked: pass"
     echo "bootstrap seed link: pass"
 
     local stage2_producer="$seed_executable"
@@ -5273,31 +5513,50 @@ main() {
         echo "bootstrap bridge ownership capability: pass (binding aliases, RootValue, placement guard, one-shot producer only)"
     fi
 
-    local build_root stage2_directory stage3_directory
-    local stage2_llvm stage2_executable stage3_llvm stage3_executable
-    build_root="$compiler_directory/.range/Build"
-    stage2_directory="$build_root/stage2"
-    stage3_directory="$build_root/stage3"
-    stage2_llvm="$stage2_directory/RangeCompiler.ll"
-    stage2_executable="$stage2_directory/RangeCompiler"
-    stage3_llvm="$stage3_directory/RangeCompiler.ll"
-    stage3_executable="$stage3_directory/RangeCompiler"
-
-    /bin/rm -rf "$stage2_directory" "$stage3_directory"
-
     emit_candidate_llvm "$stage2_producer" "$SOURCE_BUNDLE" "$stage2_llvm" stage2
+    echo "checkpoint compiler-candidate:stage2-emitted: pass"
+    assert_candidate_build_plan_unchanged
     validate_llvm "$stage2_llvm"
+    echo "checkpoint compiler-candidate:stage2-validated: pass"
     link_llvm "$stage2_llvm" "$stage2_executable"
+    echo "checkpoint compiler-candidate:stage2-linked: pass"
     echo "Stage 2 candidate validate/link: pass"
+    audit_candidate_build_plan_snapshot Stage2 "$stage2_executable"
+    echo "checkpoint compiler-candidate:stage2-plan-read: pass"
+    echo "Stage 2 build plan snapshot: deterministic"
+    if [[ "$checkpoint_mode" == stage2-plan ]]; then
+        echo "Range compiler Stage 2 plan checkpoint succeeded."
+        printf 'compiler_directory=%s\n' "$compiler_directory"
+        printf 'source_inventory_count=%s\n' "${#SOURCE_FILES[@]}"
+        report_artifact candidate_build_plan "$CANDIDATE_BUILD_PLAN"
+        report_artifact stage2_llvm "$stage2_llvm"
+        report_artifact stage2_executable "$stage2_executable"
+        echo "checkpoint compiler-candidate:stage2-plan-complete: pass"
+        return 0
+    fi
     audit_stage Stage2 "$stage2_executable" "$stage2_directory"
+    echo "checkpoint compiler-candidate:stage2-audited: pass"
+    assert_candidate_build_plan_unchanged
 
     emit_candidate_llvm "$stage2_executable" "$SOURCE_BUNDLE" "$stage3_llvm" stage3
+    echo "checkpoint compiler-candidate:stage3-emitted: pass"
     validate_llvm "$stage3_llvm"
+    echo "checkpoint compiler-candidate:stage3-validated: pass"
     link_llvm "$stage3_llvm" "$stage3_executable"
+    echo "checkpoint compiler-candidate:stage3-linked: pass"
     /usr/bin/cmp -s "$stage2_llvm" "$stage3_llvm" || fail "Stage 2 and Stage 3 LLVM are not byte-identical"
     /usr/bin/cmp -s "$stage2_executable" "$stage3_executable" || fail "Stage 2 and Stage 3 executables are not byte-identical"
+    echo "checkpoint compiler-candidate:stage3-fixed-point: pass"
     echo "Stage 3 candidate validate/link and fixed point: pass"
+    assert_candidate_build_plan_unchanged
+    audit_candidate_build_plan_snapshot Stage3 "$stage3_executable"
+    /usr/bin/cmp -s "$WORK_ROOT/Stage2.build-plan.first.snapshot" "$WORK_ROOT/Stage3.build-plan.first.snapshot" \
+        || fail "Stage 2 and Stage 3 build plan snapshots differ"
+    echo "checkpoint compiler-candidate:stage3-plan-read: pass"
+    echo "Stage 2/Stage 3 build plan snapshot: deterministic and byte-identical"
     audit_stage Stage3 "$stage3_executable" "$stage3_directory"
+    echo "checkpoint compiler-candidate:stage3-audited: pass"
+    assert_candidate_build_plan_unchanged
 
     compare_binding_reference_stages Stage2 "$stage2_directory" Stage3 "$stage3_directory"
     compare_root_value_stages Stage2 "$stage2_directory" Stage3 "$stage3_directory"
@@ -5368,7 +5627,10 @@ main() {
     /usr/bin/cmp -s "$WORK_ROOT/Stage2.builtin.legacy.out" "$WORK_ROOT/Stage3.builtin.legacy.out" \
         || fail "Stage 2 and Stage 3 legacy builtin-marker rejection differs"
     echo "Stage 2/Stage 3 builtin marker rejection: byte-identical"
+    assert_candidate_build_plan_unchanged
+    validate_candidate_build_plan "$CANDIDATE_BUILD_PLAN" "$stage2_producer_id"
 
+    echo "checkpoint compiler-candidate:complete: pass"
     echo "Range compiler candidate check succeeded."
     printf 'compiler_directory=%s\n' "$compiler_directory"
     if [[ -n "$bootstrap_bridge_source_directory" ]]; then
@@ -5390,6 +5652,7 @@ main() {
     for index in "${!SOURCE_RELATIVE_PATHS[@]}"; do
         printf 'source_inventory_path_%s=%s\n' "$index" "${SOURCE_RELATIVE_PATHS[$index]}"
     done
+    report_artifact candidate_build_plan "$CANDIDATE_BUILD_PLAN"
     report_artifact stage2_llvm "$stage2_llvm"
     report_artifact stage3_llvm "$stage3_llvm"
     report_artifact stage2_executable "$stage2_executable"

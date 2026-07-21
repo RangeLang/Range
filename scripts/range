@@ -12,6 +12,8 @@ Usage:
   scripts/range compiler progression
   scripts/range compiler progression --cached-only
   scripts/range compiler COMMAND [ARGS...]
+  scripts/range check-build-plan
+  scripts/range check-compiler-smoke [DIR]
   scripts/range check-compiler-candidate [DIR]
   scripts/range check-seed-integrity
   scripts/range check-stage2-compiler
@@ -59,6 +61,18 @@ case "$command" in
                 "$REPO_ROOT/scripts/range-native" compiler-command "$compiler_command" "$@"
                 ;;
         esac
+        ;;
+    check-build-plan)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/check-range-build-plan"
+        ;;
+    check-compiler-smoke)
+        if [[ $# -gt 1 ]]; then usage; exit 1; fi
+        if [[ $# -eq 1 ]]; then
+            "$REPO_ROOT/scripts/check-range-compiler-candidate" --checkpoint stage2-plan "$1"
+        else
+            "$REPO_ROOT/scripts/check-range-compiler-candidate" --checkpoint stage2-plan
+        fi
         ;;
     check-compiler-candidate)
         if [[ $# -gt 1 ]]; then usage; exit 1; fi

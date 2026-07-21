@@ -1,5 +1,5 @@
-function compilerSourceRequestsSourceScheduleTrace(source: String): Bool {
-    return hasRangePrefix(source: source, start: 0, prefix: String("compilerSourceScheduleTrace"))
+function compilerSourceRequestsBuildPlan(source: String): Bool {
+    return hasRangePrefix(source: source, start: 0, prefix: String("rangeBuildPlan"))
 }
 
 function compilerSourceRequestsSourceInventory(source: String): Bool {

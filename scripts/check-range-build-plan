@@ -1,0 +1,252 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+READER="$REPO_ROOT/RangeCompiler/Range/Programs/Compiler/CompilerBuildPlan.range"
+SCHEMA_VERSION="focused-build-plan-harness-v1"
+CACHE_ROOT="${RANGE_BUILD_PLAN_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Library/Caches}/Range/build-plan}"
+
+fail() {
+    echo "Range build-plan check failed: $*" >&2
+    exit 1
+}
+
+manifest_value() {
+    /usr/bin/plutil -extract "$1" raw -o - "$MANIFEST"
+}
+
+sha256() {
+    /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'
+}
+
+bytes() {
+    /usr/bin/stat -f %z "$1"
+}
+
+verify_manifest_file() {
+    local key="$1"
+    local label="$2"
+    local relative expected path
+    relative="$(manifest_value "$key.path")"
+    expected="$(manifest_value "$key.sha256")"
+    path="$REPO_ROOT/$relative"
+    [[ -f "$path" ]] || fail "missing $label: $relative"
+    [[ "$(sha256 "$path")" == "$expected" ]] || fail "$label hash mismatch: $relative"
+}
+
+verify_manifest() {
+    [[ -f "$MANIFEST" ]] || fail "missing seed manifest"
+    [[ "$(manifest_value formatVersion)" == 1 ]] || fail "unsupported seed manifest format"
+    [[ "$(manifest_value target.platform)" == macOS ]] || fail "unsupported seed platform"
+    [[ "$(manifest_value target.pointerBits)" == 64 ]] || fail "unsupported seed pointer width"
+    [[ "$(manifest_value runtimeABI)" == 2 ]] || fail "unsupported runtime ABI"
+    [[ "$(uname -m)" == "$(manifest_value target.architecture)" ]] || fail "seed architecture mismatch"
+    verify_manifest_file seed "compiler seed"
+    local seed_path="$REPO_ROOT/$(manifest_value seed.path)"
+    [[ "$(bytes "$seed_path")" == "$(manifest_value seed.bytes)" ]] || fail "compiler seed byte length mismatch"
+    local index runtime_count
+    runtime_count="$(manifest_value runtimeSources)"
+    for ((index = 0; index < runtime_count; index += 1)); do
+        verify_manifest_file "runtimeSources.$index" "runtime input $index"
+    done
+    [[ -f "$READER" ]] || fail "missing build-plan reader"
+}
+
+write_harness() {
+    local output="$1"
+    /bin/cat > "$output" <<'RANGE'
+function hasRangePrefix(source: String, start: Int, prefix: String): Bool {
+    return stringHasPrefix(source: source, start: start, prefix: prefix)
+}
+
+function compilerCoreNewlineCharacter(): String {
+    let value: String("
+")
+    return value.substring(start: 0, end: 1)
+}
+
+function compilerCoreTabCharacter(): String {
+    let value: String("	")
+    return value.substring(start: 0, end: 1)
+}
+
+function compilerCoreParseDecimalInt(value: String): Int {
+    state result: Int(0)
+    state index: Int(0)
+    while index < stringLength(value: value) {
+        result: result * 10 + stringByteAt(source: value, index: index) - 48
+        index: index + 1
+    }
+    return result
+}
+
+@main {
+    if commandLineArgumentCount() != 1 {
+        print(value: "usage: range-build-plan-reader <plan>")
+        return 64
+    }
+    let snapshot: String(compilerBuildPlanSnapshot(source: readFile(path: commandLineArgument(index: 0))))
+    print(value: snapshot)
+    if hasRangePrefix(source: snapshot, start: 0, prefix: String("compilerError")) {
+        return 65
+    }
+    return 0
+}
+RANGE
+}
+
+write_bundle() {
+    local harness="$1"
+    local output="$2"
+    /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=CompilerBuildPlan.range\n' >> "$output"
+    /bin/cat "$READER" >> "$output"
+    [[ -z "$(/usr/bin/tail -c 1 "$READER")" ]] || /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=BuildPlanHarness.range\n' >> "$output"
+    /bin/cat "$harness" >> "$output"
+}
+
+write_positive_plan() {
+    local output="$1"
+    local hash=0000000000000000000000000000000000000000000000000000000000000000
+    local index runtime_count path
+    /usr/bin/printf 'rangeBuildPlan\tversion=1\n' > "$output"
+    /usr/bin/printf 'target\tplatform=macOS\tarchitecture=%s\tpointerBits=64\truntimeABI=2\n' "$(manifest_value target.architecture)" >> "$output"
+    /usr/bin/printf 'tool\tid=clang\tpath=repo/tool/clang\tsha256=%s\tbytes=1\n' "$hash" >> "$output"
+    /usr/bin/printf 'input\tid=accepted-seed\tpath=repo/%s\tsha256=%s\tbytes=%s\n' \
+        "$(manifest_value seed.path)" "$(manifest_value seed.sha256)" "$(manifest_value seed.bytes)" >> "$output"
+    runtime_count="$(manifest_value runtimeSources)"
+    for ((index = 0; index < runtime_count; index += 1)); do
+        path="$(manifest_value "runtimeSources.$index.path")"
+        /usr/bin/printf 'runtime\tindex=%s\tid=runtime-%s\tpath=repo/%s\tsha256=%s\tbytes=%s\n' \
+            "$index" "$index" "$path" "$(manifest_value "runtimeSources.$index.sha256")" "$(bytes "$REPO_ROOT/$path")" >> "$output"
+    done
+    /usr/bin/printf 'sourceSet\tid=focused-sources\tpath=candidate/FocusedSourceSet.range\tsha256=%s\tbytes=1\n' "$hash" >> "$output"
+    /usr/bin/printf 'source\tindex=0\tid=source-0\tsourceSet=focused-sources\trole=project\troot=candidate\tpath=CompilerBuildPlan.range\tsha256=%s\tbytes=%s\n' "$hash" "$(bytes "$READER")" >> "$output"
+    /usr/bin/printf 'artifact\tid=focused-snapshot\tpath=candidate/.range/Build/Focused.snapshot\tsha256=%s\tbytes=1\n' "$hash" >> "$output"
+    /usr/bin/printf 'application\tindex=0\tid=focused-read\tkind=read\tinput=focused-sources\tartifact=focused-snapshot\n' >> "$output"
+    /usr/bin/printf 'gate\tid=focused-valid\tkind=validate\tleft=focused-read\tright=focused-snapshot\n' >> "$output"
+    /usr/bin/printf 'assert\tid=focused-repeat\tkind=byte-identical\tsubject=focused-snapshot\texpected=focused-snapshot\n' >> "$output"
+}
+
+run_reader() {
+    local executable="$1" input="$2" output="$3" error="$4"
+    if "$executable" "$input" > "$output" 2> "$error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+}
+
+expect_rejection() {
+    local executable="$1" input="$2" reason="$3" label="$4"
+    local output="$WORK_ROOT/$label.out" error="$WORK_ROOT/$label.err"
+    run_reader "$executable" "$input" "$output" "$error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$label exited $RUN_STATUS instead of 65"
+    [[ ! -s "$error" ]] || fail "$label wrote stderr"
+    /usr/bin/grep -Fq "compilerError"$'\t'"kind=invalidBuildPlan"$'\t'"reason=$reason"$'\t' "$output" \
+        || fail "$label did not reject with $reason"
+    echo "checkpoint build-plan:$label: pass"
+}
+
+main() {
+    [[ "$#" -eq 0 ]] || fail "usage: scripts/check-range-build-plan"
+    verify_manifest
+    echo "checkpoint build-plan:manifest: pass"
+
+    WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-build-plan.XXXXXX")"
+    trap '/bin/rm -rf "$WORK_ROOT"' EXIT
+    local harness="$WORK_ROOT/BuildPlanHarness.range"
+    local bundle="$WORK_ROOT/FocusedBuildPlanSourceSet.range"
+    write_harness "$harness"
+    write_bundle "$harness" "$bundle"
+
+    local key_material="$WORK_ROOT/cache-key"
+    /usr/bin/printf 'schema=%s\nseed=%s\nreader=%s\n' "$SCHEMA_VERSION" "$(manifest_value seed.sha256)" "$(sha256 "$READER")" > "$key_material"
+    local index runtime_count
+    runtime_count="$(manifest_value runtimeSources)"
+    for ((index = 0; index < runtime_count; index += 1)); do
+        /usr/bin/printf 'runtime-%s=%s\n' "$index" "$(manifest_value "runtimeSources.$index.sha256")" >> "$key_material"
+    done
+    /usr/bin/printf 'harness=%s\n' "$(sha256 "$harness")" >> "$key_material"
+    local cache_key cache_directory cached_executable
+    cache_key="$(sha256 "$key_material")"
+    cache_directory="$CACHE_ROOT/$cache_key"
+    cached_executable="$cache_directory/range-build-plan-reader"
+
+    if [[ -x "$cached_executable" ]]; then
+        echo "checkpoint build-plan:cache-hit: pass"
+    else
+        local build_cache="$WORK_ROOT/cache-entry"
+        local seed="$REPO_ROOT/$(manifest_value seed.path)"
+        local seed_executable="$WORK_ROOT/RangeCompilerSeed"
+        local reader_llvm="$WORK_ROOT/RangeBuildPlanReader.ll"
+        local -a runtimes=()
+        for ((index = 0; index < runtime_count; index += 1)); do
+            runtimes+=("$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")")
+        done
+        clang -O2 -flto=thin -Wno-override-module -x ir "$seed" -x c "${runtimes[@]}" -o "$seed_executable"
+        if ! "$seed_executable" "$bundle" > "$reader_llvm"; then
+            fail "seed rejected focused reader bundle: $(/usr/bin/head -c 400 "$reader_llvm")"
+        fi
+        [[ -s "$reader_llvm" ]] || fail "seed emitted empty focused reader LLVM"
+        clang -Wno-override-module -x ir -c "$reader_llvm" -o "$WORK_ROOT/reader.o"
+        /bin/rm -f "$WORK_ROOT/reader.o"
+        /bin/mkdir -p "$build_cache"
+        clang -O2 -flto=thin -Wno-override-module "$reader_llvm" "${runtimes[@]}" -o "$build_cache/range-build-plan-reader"
+        /usr/bin/printf '%s\n' "$cache_key" > "$build_cache/cache-key"
+        /bin/mkdir -p "$CACHE_ROOT"
+        if /bin/mkdir "$cache_directory" 2>/dev/null; then
+            /bin/cp "$build_cache/range-build-plan-reader" "$cached_executable"
+            /bin/cp "$build_cache/cache-key" "$cache_directory/cache-key"
+        elif [[ ! -x "$cached_executable" ]]; then
+            fail "concurrent cache population did not produce an executable"
+        fi
+        echo "checkpoint build-plan:reader-build: pass"
+    fi
+
+    local positive="$WORK_ROOT/positive.tsv"
+    local first="$WORK_ROOT/positive.first.snapshot" second="$WORK_ROOT/positive.second.snapshot"
+    local first_error="$WORK_ROOT/positive.first.err" second_error="$WORK_ROOT/positive.second.err"
+    write_positive_plan "$positive"
+    run_reader "$cached_executable" "$positive" "$first" "$first_error"
+    [[ "$RUN_STATUS" -eq 0 && ! -s "$first_error" ]] || fail "positive plan failed"
+    run_reader "$cached_executable" "$positive" "$second" "$second_error"
+    [[ "$RUN_STATUS" -eq 0 && ! -s "$second_error" ]] || fail "repeated positive plan failed"
+    /usr/bin/cmp -s "$first" "$second" || fail "positive snapshots are not byte-identical"
+    local expected="$WORK_ROOT/positive.expected"
+    {
+        /usr/bin/printf 'buildPlan\tversion=1\tvalid=true\ttargetCount=1\ttoolCount=1\tinputCount=1\truntimeCount=%s\tsourceSetCount=1\tsourceCount=1\tartifactCount=1\tapplicationCount=1\tgateCount=1\tassertCount=1\n' "$runtime_count"
+        /usr/bin/tail -n +2 "$positive"
+        /usr/bin/printf '\n'
+    } > "$expected"
+    /usr/bin/cmp -s "$first" "$expected" \
+        || fail "positive snapshot differs from the exact canonical snapshot (actual $(bytes "$first") bytes, expected $(bytes "$expected") bytes)"
+    echo "checkpoint build-plan:positive-snapshot: pass"
+
+    local unsupported="$WORK_ROOT/unsupported-version.tsv"
+    /usr/bin/printf 'rangeBuildPlan\tversion=2\n' > "$unsupported"
+    expect_rejection "$cached_executable" "$unsupported" unsupportedVersion unsupported-version
+
+    local duplicate="$WORK_ROOT/duplicate-logical-id.tsv"
+    /usr/bin/awk -F '\t' '{ print; if (!done && $1 == "artifact") { print; done = 1 } }' "$positive" > "$duplicate"
+    expect_rejection "$cached_executable" "$duplicate" duplicateLogicalID duplicate-logical-id
+
+    local malformed="$WORK_ROOT/malformed-field-count.tsv"
+    /usr/bin/awk -F '\t' 'BEGIN { OFS="\t" } $1 == "target" { NF = NF - 1 } { print }' "$positive" > "$malformed"
+    expect_rejection "$cached_executable" "$malformed" malformedFieldCount malformed-field-count
+
+    local unsafe="$WORK_ROOT/unsafe-path.tsv"
+    /usr/bin/sed 's#path=repo/tool/clang#path=../tool/clang#' "$positive" > "$unsafe"
+    expect_rejection "$cached_executable" "$unsafe" invalidPath unsafe-path
+
+    local noncontiguous="$WORK_ROOT/noncontiguous-source-index.tsv"
+    /usr/bin/sed 's/source\tindex=0\tid=source-0/source\tindex=1\tid=source-0/' "$positive" > "$noncontiguous"
+    expect_rejection "$cached_executable" "$noncontiguous" noncontiguousSourceIndex noncontiguous-source-index
+
+    echo "checkpoint build-plan:complete: pass"
+}
+
+main "$@"
