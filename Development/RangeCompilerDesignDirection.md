@@ -3044,6 +3044,7 @@ Current branch:
 - `RangeCompiler/Range/Programs/Compiler/CompilerCore.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerFrontend.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerGraph.range`
+- `RangeCompiler/Range/Programs/Compiler/CompilerMemory.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerSources.range`
 - development commits `85947e19` and `3a309a8d`
 
