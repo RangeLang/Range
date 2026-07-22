@@ -1,0 +1,23 @@
+construct Array<Element> {
+    state storage: Buffer<Element>
+
+    function count(): Int {
+        return rawBufferCount(buffer: self.storage.storage)
+    }
+
+    function append(element: Element): Int {
+        return rawBufferAppendInt(buffer: self.storage.storage, value: element)
+    }
+
+    function element(index: Int): Element {
+        return rawBufferLoadInt(buffer: self.storage.storage, index: index)
+    }
+
+    function update(element: Element, index: Int): Int {
+        return rawBufferStoreInt(buffer: self.storage.storage, index: index, value: element)
+    }
+
+    function destroy(): Int {
+        return rawBufferDestroy(buffer: self.storage.storage)
+    }
+}

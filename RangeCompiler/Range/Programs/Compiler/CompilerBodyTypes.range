@@ -1440,10 +1440,16 @@ function compilerBodyArenaCallLabelsMatchMemberRuntimeBuiltin(arena: CompilerBod
 }
 
 function compilerBodyArenaConstructMemberRowAtOrdinal(arena: CompilerBodyArena, constructSyntaxID: Int, ordinal: Int): Int {
+    state storedOrdinal: Int(0)
     state memberRow: Int(0)
     while memberRow < compilerIntTableRowCount(table: arena.tables.members) {
-        if compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 2) == constructSyntaxID
-            && compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 3) == ordinal { return memberRow }
+        if compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 2) == constructSyntaxID {
+            let memberKind: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 12))
+            if memberKind == compilerSyntaxMemberKindLet() || memberKind == compilerSyntaxMemberKindState() || memberKind == compilerSyntaxMemberKindBinding() {
+                if storedOrdinal == ordinal { return memberRow }
+                storedOrdinal: storedOrdinal + 1
+            }
+        }
         memberRow: memberRow + 1
     }
     return 0 - 1
@@ -1453,7 +1459,10 @@ function compilerBodyArenaConstructMemberCount(arena: CompilerBodyArena, constru
     state count: Int(0)
     state memberRow: Int(0)
     while memberRow < compilerIntTableRowCount(table: arena.tables.members) {
-        if compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 2) == constructSyntaxID { count: count + 1 }
+        if compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 2) == constructSyntaxID {
+            let memberKind: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 12))
+            if memberKind == compilerSyntaxMemberKindLet() || memberKind == compilerSyntaxMemberKindState() || memberKind == compilerSyntaxMemberKindBinding() { count: count + 1 }
+        }
         memberRow: memberRow + 1
     }
     return count
@@ -1465,7 +1474,11 @@ function compilerBodyArenaConstructMemberRowForArgument(arena: CompilerBodyArena
     let labelEnd: Int(compilerIntTableValue(table: arena.nodes, row: argumentNodeID, column: 7))
     if labelStart < 0 || labelEnd <= labelStart { return 0 - 1 }
     let label: String(compilerTypedSyntaxLocalText(tables: arena.tables, fileID: arena.fileID, localStart: labelStart, localEnd: labelEnd))
-    return compilerDeclarationIndexMemberLookup(tables: arena.tables, index: arena.declarationIndex, parentSyntaxID: constructSyntaxID, name: label)
+    let memberRow: Int(compilerDeclarationIndexMemberLookup(tables: arena.tables, index: arena.declarationIndex, parentSyntaxID: constructSyntaxID, name: label))
+    if memberRow < 0 { return 0 - 1 }
+    let memberKind: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 12))
+    if memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState() && memberKind != compilerSyntaxMemberKindBinding() { return 0 - 1 }
+    return memberRow
 }
 
 function compilerBodyArenaConstructArgumentOrdinalForMemberOrdinal(arena: CompilerBodyArena, applicationNodeID: Int, constructSyntaxID: Int, memberOrdinal: Int): Int {

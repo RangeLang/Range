@@ -1700,8 +1700,6 @@ function compilerBodyArenaTypeTrackedStorageStatus(arena: CompilerBodyArena, typ
                                 } else if rawBufferAppendInt(buffer: pending, value: fieldTypeID) != 0 { status: 0 - 1 }
                                 if status == 0 { pendingCount: pendingCount + 1 }
                             }
-                        } else {
-                            status: 0 - 1
                         }
                     }
                     memberRow: memberRow + 1
@@ -1737,7 +1735,7 @@ function compilerBodyArenaAppendOwnedPathDescendants(arena: CompilerBodyArena, r
                     if childPathID < 0 { return 0 - 1 }
                     if compilerBodyArenaAppendOwnedPathDescendants(arena: arena, rootKind: rootKind, rootID: rootID, parentPathID: childPathID, typeID: fieldTypeID, policy: childPolicy, depth: depth + 1) != 0 { return 0 - 1 }
                 }
-            } else { return 0 - 1 }
+            }
         }
         memberRow: memberRow + 1
     }
@@ -2828,11 +2826,11 @@ function compilerBodyArenaOwnedPathApplyConstructMoveCommit(arena: CompilerBodyA
     while memberRow < compilerIntTableRowCount(table: arena.tables.members) {
         if compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 2) == constructSyntaxID {
             let memberKind: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 12))
-            if memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState() && memberKind != compilerSyntaxMemberKindBinding() { return 0 - 1 }
-            let memberTypeID: Int(compilerBodyArenaTypeIDForMemberRow(arena: arena, receiverTypeID: resultTypeID, memberRow: memberRow))
-            let memberTrackedStatus: Int(compilerBodyArenaTypeTrackedStorageStatus(arena: arena, typeID: memberTypeID))
-            if memberTypeID < 0 || memberTrackedStatus < 0 { return 0 - 1 }
-            if memberTrackedStatus == 1 {
+            if memberKind == compilerSyntaxMemberKindLet() || memberKind == compilerSyntaxMemberKindState() || memberKind == compilerSyntaxMemberKindBinding() {
+                let memberTypeID: Int(compilerBodyArenaTypeIDForMemberRow(arena: arena, receiverTypeID: resultTypeID, memberRow: memberRow))
+                let memberTrackedStatus: Int(compilerBodyArenaTypeTrackedStorageStatus(arena: arena, typeID: memberTypeID))
+                if memberTypeID < 0 || memberTrackedStatus < 0 { return 0 - 1 }
+                if memberTrackedStatus == 1 {
                 let destinationPathID: Int(compilerBodyOwnedPathFindChild(paths: arena.ownedPaths, parentPathID: resultRootPathID, memberRow: memberRow))
                 let valueNodeID: Int(compilerBodyArenaConstructArgumentValueForMember(arena: arena, applicationNodeID: applicationNodeID, memberRow: memberRow))
                 let sourcePathID: Int(compilerBodyArenaOwnedPathForValue(arena: arena, valueNodeID: valueNodeID))
@@ -2868,6 +2866,7 @@ function compilerBodyArenaOwnedPathApplyConstructMoveCommit(arena: CompilerBodyA
                     return 0 - 1
                 }
                 movedAny: true
+                }
             }
         }
         memberRow: memberRow + 1

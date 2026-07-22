@@ -1,0 +1,16 @@
+function makeArray(): Array<Int> {
+    state storage: Buffer<Int>(storage: rawBufferCreate(capacity: 1, stride: 4))
+    state numbers: Array<Int>(storage: storage)
+    numbers.append(element: 2)
+    numbers.append(element: 4)
+    numbers.append(element: 8)
+    return numbers
+}
+
+@main {
+    state numbers: Array<Int>(makeArray())
+    numbers.update(element: 6, index: 1)
+    let result: Int(numbers.count() + numbers.element(index: 1))
+    numbers.destroy()
+    return result
+}

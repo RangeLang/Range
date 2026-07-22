@@ -414,7 +414,7 @@ function compilerReachableLLVMStateRenderModule(reachability: CompilerReachableL
     runtimeRequirements: typedSelected.runtimeRequirements
     if extraRuntimeRequirements > runtimeRequirements { runtimeRequirements: extraRuntimeRequirements }
     let allRenderedFunctions: String("\(selected.renderedFunctions)\(mainText)")
-    let nominalLayouts: String(compilerCoreRenderLLVMNominalLayouts(tables: reachability.context.tables, index: reachability.context.declarationIndex, includeBuiltinArray: compilerCoreRecordContains(record: allRenderedFunctions, text: String("%Range.Array"))))
+    let nominalLayouts: String(compilerCoreRenderLLVMNominalLayouts(tables: reachability.context.tables, index: reachability.context.declarationIndex, includeBuiltinArray: compilerCoreShouldRenderBuiltinArrayLayout(tables: reachability.context.tables, index: reachability.context.declarationIndex, renderedFunctions: allRenderedFunctions)))
     let runtimeDeclarations: String(compilerCoreRenderLLVMRuntimeDeclarationsTyped(records: selected.instructionRecords, renderedFunctions: allRenderedFunctions, runtimeRequirements: runtimeRequirements))
     let declarations: String(compilerCoreRenderLLVMFunctionDeclarationsExcludingTyped(tables: reachability.context.tables, index: reachability.context.declarationIndex, selection: reachability.selection))
     let text: String(compilerCoreLLVMNativeEntryTextFromParts(usage: usage, globals: "\(nominalLayouts)\(typedSelected.renderedGlobals)\(extraGlobals)", runtime: runtimeDeclarations, helpers: selected.renderedFunctions, declarations: declarations, main: mainText))

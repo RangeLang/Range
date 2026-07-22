@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+COMPILER="${1:-}"
+WORK_ROOT="$(mktemp -d)"
+trap '/bin/rm -rf "$WORK_ROOT"' EXIT
+
+BUNDLE="$WORK_ROOT/BufferIntLifecycle.range"
+LLVM="$WORK_ROOT/BufferIntLifecycle.ll"
+EXECUTABLE="$WORK_ROOT/BufferIntLifecycle"
+RUN_OUTPUT="$WORK_ROOT/BufferIntLifecycle.out"
+RUN_ERROR="$WORK_ROOT/BufferIntLifecycle.err"
+COMPILE_ERROR="$WORK_ROOT/BufferIntLifecycle.compile.err"
+
+append_source() {
+    local role="$1"
+    local marker="$2"
+    local source="$3"
+    /usr/bin/printf 'compilerSourceFile\\trole=%s\\tpath=%s\n' "$role" "$marker" >> "$BUNDLE"
+    /bin/cat "$source" >> "$BUNDLE"
+    /usr/bin/printf '\n' >> "$BUNDLE"
+}
+
+/usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$BUNDLE"
+append_source core RangeCompiler/Range/Core/System/Memory/RawBuffer.range "$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/RawBuffer.range"
+append_source core RangeCompiler/Range/Core/System/Memory/Buffer.range "$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/Buffer.range"
+append_source project Testing/Collections/Pass/BufferIntLifecycle.range "$REPO_ROOT/Testing/Collections/Pass/BufferIntLifecycle.range"
+
+if [[ -n "$COMPILER" ]]; then
+    compile_status=0
+    "$COMPILER" "$BUNDLE" > "$LLVM" 2> "$COMPILE_ERROR" || compile_status=$?
+else
+    compile_status=0
+    RANGE_CACHE_DISABLE=1 "$REPO_ROOT/scripts/range" compiler compile "$BUNDLE" > "$LLVM" 2> "$COMPILE_ERROR" || compile_status=$?
+fi
+if [[ "$compile_status" -ne 0 ]]; then
+    /bin/cat "$LLVM"
+    /bin/cat "$COMPILE_ERROR" >&2
+    failure_offset="$(/usr/bin/grep -Eo 'failureCode=[0-9]+' "$LLVM" | /usr/bin/cut -d= -f2 || true)"
+    if [[ -n "$failure_offset" ]]; then
+        /usr/bin/printf 'failure source offset %s:\n' "$failure_offset" >&2
+        /bin/dd if="$BUNDLE" bs=1 skip="$failure_offset" count=160 2>/dev/null >&2
+        /usr/bin/printf '\n' >&2
+    fi
+    exit 1
+fi
+if ! clang -O2 -flto=thin -Wno-override-module "$LLVM" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerHost.c" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeString.c" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeRawBuffer.c" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerMetrics.c" \
+    -o "$EXECUTABLE"; then
+    /usr/bin/grep -E '^%.* = type' "$LLVM" >&2 || true
+    exit 1
+fi
+
+set +e
+"$EXECUTABLE" > "$RUN_OUTPUT" 2> "$RUN_ERROR"
+run_status=$?
+set -e
+
+[[ "$run_status" -eq 7 ]] || { echo "Buffer<Int> lifecycle exited $run_status, expected 7" >&2; exit 1; }
+[[ ! -s "$RUN_OUTPUT" && ! -s "$RUN_ERROR" ]] || { echo "Buffer<Int> lifecycle wrote output" >&2; exit 1; }
+/usr/bin/grep -Fq 'rawBufferCreate' "$LLVM" || { echo "Buffer<Int> omitted storage creation" >&2; exit 1; }
+/usr/bin/grep -Fq 'rawBufferAppendInt' "$LLVM" || { echo "Buffer<Int> omitted append" >&2; exit 1; }
+/usr/bin/grep -Fq 'rawBufferStoreInt' "$LLVM" || { echo "Buffer<Int> omitted update" >&2; exit 1; }
+/usr/bin/grep -Fq 'rawBufferDestroy' "$LLVM" || { echo "Buffer<Int> omitted destruction" >&2; exit 1; }
+
+echo "Canonical Buffer<Int> lifecycle verified."
