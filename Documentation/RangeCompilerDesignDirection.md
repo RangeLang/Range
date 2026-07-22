@@ -2502,7 +2502,7 @@ fixed-point command.
 
 `/usr/bin/time -l scripts/range check-stage2-compiler` verified every manifest
 input, linked the seed with the shared five-file runtime, rebuilt the canonical
-four-source bundle without invoking Swift, and reproduced the seed byte for
+four-source bundle through the Range-authored native path, and reproduced the seed byte for
 byte.  It completed in `27.81 s` real time with `71,286,784` bytes maximum RSS
 and reported SHA-256 `9771e9668e939b06cb58f05f5b0774597e81669c6c67ddcc85e29328722ddfa9`
 at `2,971,047` bytes.  The normal native run of
@@ -2539,8 +2539,8 @@ boundaries, and those boundaries feed source inventory, identity, typed syntax,
 fingerprints, and source-set handling. Unknown or malformed roles fail closed.
 
 The authoritative `/usr/bin/time -l scripts/range check-compiler-candidate`
-run completed in `61.31 s` real time with `73,580,544` bytes maximum RSS and no
-Swift invocation. Stage 2 and Stage 3 both passed the explicit-role, legacy
+run completed in `61.31 s` real time with `73,580,544` bytes maximum RSS. Stage
+2 and Stage 3 both passed the explicit-role, legacy
 project, malformed-marker, deterministic identity/fingerprint, and ordinary
 smoke audits. The canonical proof read the checked-in
 `RangeCompiler/Range/Core/System/Memory/IntBuffer.range` as `role=core`, loaded
@@ -2623,7 +2623,7 @@ point checks remain green.
 
 `/usr/bin/time -l bash scripts/check-range-compiler-candidate
 RangeCompiler/Range/Programs/Compiler` completed in `76.08 s` real time with
-`91,635,712` bytes maximum RSS and `swift_invocation=none`. Stage 2 and Stage 3
+`91,635,712` bytes maximum RSS. Stage 2 and Stage 3
 LLVM are byte-identical at SHA-256
 `126e50b67b99113bfd23d119d1debedecc17a1152f9e3740f35933db66f94a0f` and
 `3,388,196` bytes. Their linked executables are byte-identical at SHA-256
@@ -2668,7 +2668,7 @@ zero-result dependencies, invalid-query rejection before LLVM, combined query
 plus omission, transactional duplicate rejection, and denied unknown target
 operations. The ordinary native integration also executes a graph query
 before LLVM validation/link and still exits `7`. The complete fixed-point
-gate passes with no Swift invocation.
+gate passes through the Range-authored native path.
 
 Successful omission deltas are now committed for ordinary compilation through
 a second declaration index that owns a compact omission overlay. Authored
@@ -2775,8 +2775,8 @@ same gate.
 
 The final bounded command, `/usr/bin/time -l scripts/range
 check-compiler-candidate`, passed in `87.54 s` real time (`83.57 s` user,
-`2.20 s` system) with `93,372,416` bytes maximum RSS and
-`swift_invocation=none`. The four-file inventory passed. Stage 2 and Stage 3
+`2.20 s` system) with `93,372,416` bytes maximum RSS. The four-file inventory
+passed. Stage 2 and Stage 3
 compiler LLVM are byte-identical at SHA-256
 `5896a802f4bf44c5cb2e7ec06782e9615314639b41e8a64ab290f38fe4c77cae` and
 `3,541,481` bytes; their linked executables are byte-identical at SHA-256
@@ -2865,8 +2865,8 @@ syntax/validation.
 
 The final accepted command, `/usr/bin/time -l
 scripts/check-range-compiler-candidate`, passed in `102.26 s` real time
-(`95.15 s` user, `3.52 s` system) with `104,611,840` bytes maximum RSS and
-`swift_invocation=none`. The four-file inventory, Stage 2/Stage 3 fixed point,
+(`95.15 s` user, `3.52 s` system) with `104,611,840` bytes maximum RSS. The
+four-file inventory, Stage 2/Stage 3 fixed point,
 focused mixed-placement snapshots, LLVM validation/linking, executable exit
 checks, root/member collision transactionality, malformed-splice rejection,
 and outside-macro rejection all passed. Stage 2 and Stage 3 compiler LLVM are
@@ -2909,7 +2909,7 @@ SHA-256 `4fa86bd0120fff38a6e1722f8dd0498edac89427de31b79c63cb0c120a552766`
 and `3,984,520` bytes while linked to the shared substrate. The complete
 `/usr/bin/time -l scripts/check-range-compiler-candidate` gate passed in
 `202.80 s` real time (`193.43 s` user, `5.53 s` system) at `112,263,168` bytes
-maximum RSS with `swift_invocation=none`. Stage 2 and Stage 3 LLVM remain
+maximum RSS. Stage 2 and Stage 3 LLVM remain
 byte-identical to the seed; their linked executables are byte-identical at
 SHA-256 `1b9964e7496560a1615055b32cd1cd3d52957dcdff74b923bc7e9c374febccb2`
 and `2,492,912` bytes.
@@ -2951,8 +2951,8 @@ and `3,992,587` bytes. Their executables are byte-identical at SHA-256
 `14f1b9eeca50411ec9b597c642aaef550d40fb5129661ac2b712e5817ee2ee59`
 and `2,492,848` bytes. The five-file inventory, role checks, canonical Core
 execution, macro suites, aggregate smoke, mixed-ABI rejection, LLVM
-validation/linking, and focused Stage 2/Stage 3 artifacts passed with
-`swift_invocation=none`. The checked-in seed contains no IntBuffer/TextBuffer
+validation/linking, and focused Stage 2/Stage 3 artifacts passed. The checked-in
+seed contains no IntBuffer/TextBuffer
 type or function symbols. The accepted full gate completed in `142.01 s` real
 time (`133.58 s` user, `4.20 s` system) with `184,991,744` bytes maximum RSS;
 the focused RawBuffer ownership/lowering suite completes in about `1.4 s` once
@@ -3507,7 +3507,7 @@ the linked executables are both 4,299,168 bytes with SHA-256
 Both artifact fixed-point checks are byte-identical.
 
 The complete candidate gate then passed in `1,227.63 s` with `175,177,728`
-bytes maximum RSS and `swift_invocation=none`. Stage 2 and Stage 3 LLVM are
+bytes maximum RSS. Stage 2 and Stage 3 LLVM are
 byte-identical at the same 5,667,115-byte hash above. Their gate-linked
 executables are both 4,299,168 bytes with SHA-256
 `59fd557227df244b45a1d13791a6fa8d3bf32ce407ac2ccd4b2036e7e9df159f`.
@@ -3538,7 +3538,7 @@ does not admit nested member chains, borrowed/shared owners, bindings, slices,
 growth, escaping lexical backing storage, or owned opaque Array elements.
 
 The complete candidate gate passed in `363.21 s` with `569,458,688` bytes
-maximum RSS and `swift_invocation=none`. Stage 2 and Stage 3 LLVM are
+maximum RSS. Stage 2 and Stage 3 LLVM are
 byte-identical at 5,504,129 bytes with SHA-256
 `5317f0f40aec05c3d3f2fd31cfb4981e0d57c89d6f297979be38834e461157b8`;
 their linked executables are byte-identical at 3,472,944 bytes with SHA-256
@@ -3567,7 +3567,7 @@ Permanent positive coverage stores `7` through `root.leaf.values[1]`, reads it
 back, and exits `7`. Permanent negative coverage makes the intermediate `leaf`
 field immutable and requires deterministic semantic rejection with no LLVM
 definition. The complete candidate gate passed in `364.47 s` with
-`570,048,512` bytes maximum RSS and `swift_invocation=none`. Stage 2 and Stage 3
+`570,048,512` bytes maximum RSS. Stage 2 and Stage 3
 LLVM are byte-identical at 5,503,762 bytes with SHA-256
 `68db0983014046fee2e13a6d6aad4993c7051a9c4d9b50befcd432aab9756252`;
 their executables are byte-identical at 3,472,944 bytes with SHA-256

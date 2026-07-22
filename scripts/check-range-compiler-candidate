@@ -5729,7 +5729,6 @@ main() {
     echo "stage2_stage3_llvm=byte-identical"
     echo "stage2_stage3_executable=byte-identical"
     echo "typed_only_lowering=pass"
-    echo "swift_invocation=none"
     echo "candidate_fixed_point=pass"
 }
 
