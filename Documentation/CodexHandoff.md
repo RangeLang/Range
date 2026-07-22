@@ -574,8 +574,8 @@ scripts/range compiler progression --cached-only
 
 The accepted compiler has advanced beyond the older validation snapshot above.
 It is still a 24-source Range compiler, and the accepted seed is now
-5,507,013-byte LLVM with SHA-256
-`2b12f5ad37d7e2b1b4903243b537e6252c06d382e7eab7fce21a35fd3740042d`.
+5,515,622-byte LLVM with SHA-256
+`0b60ed747cd1a116c4c1eb990f2fba849ba6c7759305f32868fc6c8259c42805`.
 
 Construct initialization now has one canonical spelling. A typed local creates
 its construct value directly from labeled fields:
@@ -594,12 +594,36 @@ when its containing construct is initialized.
 
 The full candidate gate passed through Stage 2 and Stage 3 with byte-identical
 LLVM and executables and `typed_only_lowering=pass`. Their LLVM is the accepted
-5,507,013-byte artifact above; both executables are 3,473,008 bytes with SHA-256
-`e07a6235e7098361e015c440f9c7917e8e80dd74d71f987ee4228d65c91f275c`.
-Accepted-seed integrity and the independent accepted-seed fixed-point check also
-pass.
+5,515,622-byte artifact above; both executables are 3,473,088 bytes with SHA-256
+`b2c5e76a8e84165f27d910ab46c11f53f307d8ba993c15cf665782f306350cf2`.
+Accepted-seed integrity passes, and the promoted seed independently reproduced
+the same LLVM hash in `139.98 s` with `567,984,128` bytes maximum RSS.
 
 Bounds-checked indexed mutation already follows arbitrary-depth mutable
-construct fields such as `root.leaf.values[index]: value`. Binding-based Array
-mutation remains the next separate proof boundary and should use the canonical
-single-name initialization form.
+construct fields such as `root.leaf.values[index]: value`. It now also crosses
+one direct binding Array field initialized from a mutable source:
+
+```range
+construct MutableArrayView {
+    binding values: [Int]
+}
+
+@main {
+    state numbers: [1, 2, 3]
+    let view: MutableArrayView(values: $numbers)
+    view.values[1]: 7
+    return numbers[1]
+}
+```
+
+The write is attributed to the original `state numbers` symbol and updates its
+lexical Array backing. Initializing the same binding from a `let` source is
+rejected at semantic stage 2 before LLVM. Both generations permanently compile,
+link, and execute the positive fixture with exit `7`, and permanently require
+the immutable-source fixture to exit `65` without an LLVM definition.
+
+This proof is intentionally narrow: it covers one direct binding Array member
+whose initializer is a direct `$source` reference. It does not yet prove deeper
+binding/member paths, binding forwarding, or the full shared/unique alias
+conflict matrix for Array writes. Those are the next binding-mutation boundary;
+do not generalize this source-provenance shortcut into a second storage model.

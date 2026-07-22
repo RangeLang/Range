@@ -606,7 +606,7 @@ audit_native_arrays() {
     local stage_directory="$3"
     local kind source expected first second first_error second_error llvm linked run_output run_error
 
-    for kind in index count enum-payload argument mutation-int mutation-enum mutation-member mutation-nested-member; do
+    for kind in index count enum-payload argument binding-read mutation-int mutation-enum mutation-member mutation-nested-member mutation-binding; do
         source="$ARRAY_INDEX_SOURCE"
         expected=2
         if [[ "$kind" == count ]]; then
@@ -617,6 +617,9 @@ audit_native_arrays() {
             expected=6
         elif [[ "$kind" == argument ]]; then
             source="$ARRAY_ARGUMENT_SOURCE"
+            expected=2
+        elif [[ "$kind" == binding-read ]]; then
+            source="$ARRAY_BINDING_READ_SOURCE"
             expected=2
         elif [[ "$kind" == mutation-int ]]; then
             source="$ARRAY_MUTATION_SOURCE"
@@ -629,6 +632,9 @@ audit_native_arrays() {
             expected=7
         elif [[ "$kind" == mutation-nested-member ]]; then
             source="$ARRAY_NESTED_MEMBER_MUTATION_SOURCE"
+            expected=7
+        elif [[ "$kind" == mutation-binding ]]; then
+            source="$ARRAY_BINDING_MUTATION_SOURCE"
             expected=7
         fi
         first="$WORK_ROOT/$stage_label.array.$kind.first.ll"
@@ -667,7 +673,7 @@ audit_native_arrays() {
             /usr/bin/grep -Eq 'alloca %Range\.(NumberToken|MutableNumberToken)' "$first" \
                 || fail "$stage_label native enum Array did not specialize backing storage to its element layout"
         fi
-        if [[ "$kind" == mutation-int || "$kind" == mutation-enum || "$kind" == mutation-member || "$kind" == mutation-nested-member ]]; then
+        if [[ "$kind" == mutation-int || "$kind" == mutation-enum || "$kind" == mutation-member || "$kind" == mutation-nested-member || "$kind" == mutation-binding ]]; then
             /usr/bin/grep -Fq 'array.store.' "$first" \
                 || fail "$stage_label native Array $kind omitted the indexed store operation"
             /usr/bin/grep -Eq 'store (i32|%Range\.MutableNumberToken) .*ptr %array\.store\.' "$first" \
@@ -691,6 +697,17 @@ audit_native_arrays() {
         [[ "$RUN_STATUS" -eq "$expected" ]] || fail "$stage_label native Array $kind exited $RUN_STATUS"
         [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label native Array $kind wrote output"
     done
+
+    local immutable_binding_output="$WORK_ROOT/$stage_label.array.immutable-binding-source.out"
+    local immutable_binding_error="$WORK_ROOT/$stage_label.array.immutable-binding-source.err"
+    run_capture "$executable" "$ARRAY_IMMUTABLE_BINDING_SOURCE" "$immutable_binding_output" "$immutable_binding_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label immutable binding Array source mutation exited $RUN_STATUS"
+    [[ ! -s "$immutable_binding_error" ]] || fail "$stage_label immutable binding Array source mutation wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$immutable_binding_output" \
+        || fail "$stage_label immutable binding Array source mutation missed the semantic diagnostic"
+    if /usr/bin/grep -Fq 'define ' "$immutable_binding_output"; then
+        fail "$stage_label immutable binding Array source mutation emitted LLVM"
+    fi
 
     local oob_first="$WORK_ROOT/$stage_label.array.out-of-bounds.first.ll"
     local oob_second="$WORK_ROOT/$stage_label.array.out-of-bounds.repeat.ll"
@@ -775,7 +792,7 @@ audit_native_arrays() {
     if /usr/bin/grep -Fq 'define ' "$escape_output"; then
         fail "$stage_label native Array return escape emitted LLVM"
     fi
-    echo "$stage_label native Array: pass (generic pointer/count value, typed lexical storage, count/index/store, enum payload and arbitrary-depth mutable-member mutation, executable read/write bounds traps, immutable field/intermediate/owner and return-escape rejection, deterministic)"
+    echo "$stage_label native Array: pass (generic pointer/count value, typed lexical storage, count/index/store, enum payload, arbitrary-depth mutable-member and direct binding-source mutation, executable read/write bounds traps, immutable field/intermediate/owner/binding-source and return-escape rejection, deterministic)"
 }
 
 audit_storage_switches() {
@@ -5270,10 +5287,13 @@ main() {
     ARRAY_ENUM_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ReturnEnumArrayStateIndexedAssignment.range"
     ARRAY_MEMBER_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ConstructMemberArrayIndexedAssignment.range"
     ARRAY_NESTED_MEMBER_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/NestedConstructMemberArrayIndexedAssignment.range"
+    ARRAY_BINDING_READ_SOURCE="$REPO_ROOT/Testing/Collections/Pass/BindingArrayRead.range"
+    ARRAY_BINDING_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/BindingArrayIndexedAssignment.range"
     ARRAY_IMMUTABLE_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableArrayIndexedAssignment.range"
     ARRAY_IMMUTABLE_MEMBER_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableConstructArrayMemberIndexedAssignment.range"
     ARRAY_IMMUTABLE_MEMBER_OWNER_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableConstructContainingArrayIndexedAssignment.range"
     ARRAY_IMMUTABLE_MEMBER_INTERMEDIATE_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableIntermediateConstructArrayIndexedAssignment.range"
+    ARRAY_IMMUTABLE_BINDING_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableBindingArraySourceIndexedAssignment.range"
     ARRAY_WRITE_OUT_OF_BOUNDS_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ArrayWriteOutOfBounds.range"
     REDUNDANT_CONSTRUCT_INITIALIZATION_SOURCE="$REPO_ROOT/Testing/Types/Fail/RedundantConstructInitialization.range"
     ARRAY_ARGUMENT_SOURCE="$WORK_ROOT/ArrayArgument.range"

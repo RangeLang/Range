@@ -2,12 +2,12 @@
   "formatVersion": 1,
   "seed": {
     "path": "RangeCompiler/Bootstrap/RangeCompilerSeed.ll",
-    "bytes": 5507013,
-    "sha256": "2b12f5ad37d7e2b1b4903243b537e6252c06d382e7eab7fce21a35fd3740042d"
+    "bytes": 5515622,
+    "sha256": "0b60ed747cd1a116c4c1eb990f2fba849ba6c7759305f32868fc6c8259c42805"
   },
   "expectedStage3LLVM": {
-    "bytes": 5507013,
-    "sha256": "2b12f5ad37d7e2b1b4903243b537e6252c06d382e7eab7fce21a35fd3740042d"
+    "bytes": 5515622,
+    "sha256": "0b60ed747cd1a116c4c1eb990f2fba849ba6c7759305f32868fc6c8259c42805"
   },
   "compilerSources": [
     {
@@ -63,7 +63,7 @@
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerBodyTypes.range",
       "role": "project",
-      "sha256": "02aa19512f02d335ddeb8879bd92ad93156d7eaa57ce6c01e3c2e935760140ab"
+      "sha256": "bdfd58fc32892651b27772c222dfd61b91f3a67129437c8306976d1e981286be"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerBuildPlan.range",

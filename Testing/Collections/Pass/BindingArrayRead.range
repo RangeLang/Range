@@ -1,0 +1,9 @@
+construct ArrayView {
+    binding values: [Int]
+}
+
+@main {
+    state numbers: [1, 2, 3]
+    let view: ArrayView(values: $numbers)
+    return view.values[1]
+}

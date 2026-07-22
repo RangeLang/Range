@@ -3602,3 +3602,42 @@ their executables are byte-identical at 3,473,008 bytes with SHA-256
 After promotion, accepted-seed integrity passed and the promoted seed
 independently reproduced the same LLVM hash in `150.40 s` with `569,606,144`
 bytes maximum RSS. Binding-based Array mutation remains the next proof boundary.
+
+### Direct binding-source `Array<Element>` mutation checkpoint (2026-07-22)
+
+Indexed Array mutation now crosses one direct binding field. A construct such as
+`MutableArrayView` may declare `binding values: [Int]`, initialize it canonically
+with `let view: MutableArrayView(values: $numbers)`, and write through
+`view.values[index]: value`. Semantic resolution traces that binding argument
+back to its original local source symbol and admits the write only when that
+source is `state` with the exact Array type. A `let` source is rejected before
+LLVM emission.
+
+This adds no binding-specific Array representation or store operation. The
+original source symbol supplies MemoryGraph's unique-write provenance; MIR and
+LLVM continue to use the existing bounds-checked `ArrayStore` against the same
+lexical pointer/count value. The construct application resolution is consumed
+from its callee node, matching the compiler's canonical body-resolution model.
+
+Permanent positive coverage reads through a binding, stores `7` through that
+binding, then observes `7` through the original state Array. Permanent negative
+coverage requires an immutable binding source to exit `65` with
+`invalidEntryReachability stage=2`, empty stderr, and no LLVM definition. Both
+Stage 2 and Stage 3 compile, validate, link, and execute the positive cases and
+produce byte-identical artifacts.
+
+The complete candidate gate passed in `389.76 s` with `572,243,968` bytes
+maximum RSS. Stage 2 and Stage 3 LLVM are byte-identical at 5,515,622 bytes with
+SHA-256
+`0b60ed747cd1a116c4c1eb990f2fba849ba6c7759305f32868fc6c8259c42805`;
+their executables are byte-identical at 3,473,088 bytes with SHA-256
+`b2c5e76a8e84165f27d910ab46c11f53f307d8ba993c15cf665782f306350cf2`.
+After promotion, accepted-seed integrity passed and the promoted seed
+independently reproduced the same LLVM hash in `139.98 s` with `567,984,128`
+bytes maximum RSS.
+
+This checkpoint proves only a direct binding Array member initialized by one
+direct `$source` reference. Deeper binding/member paths, binding forwarding,
+and shared/unique alias conflicts remain separate proof obligations. They must
+extend the canonical provenance model rather than introduce a parallel storage
+or mutation mechanism.
