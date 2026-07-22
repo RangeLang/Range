@@ -1,0 +1,26 @@
+construct Counter {
+    state value: Int
+
+    derived doubled: Int {
+        value + value
+    }
+
+    function update(newValue: Int): Int {
+        value: newValue
+        return value
+    }
+}
+
+construct Projection {
+    state counter: Counter
+
+    derived quadrupled: Int {
+        counter.doubled + counter.doubled
+    }
+}
+
+@main {
+    state projection: Projection(counter: Counter(value: 3))
+    projection.counter.update(newValue: 4)
+    return projection.quadrupled
+}

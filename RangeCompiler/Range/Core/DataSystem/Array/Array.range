@@ -1,8 +1,8 @@
 construct Array<Element> {
     state storage: Buffer<Element>
 
-    function count(): Int {
-        return rawBufferCount(buffer: self.storage.storage)
+    derived count: Int {
+        storage.count
     }
 
     function append(element: Element): Int {

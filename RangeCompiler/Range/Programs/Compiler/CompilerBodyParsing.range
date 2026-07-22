@@ -1022,6 +1022,17 @@ function compilerBodyArenaParseFunction(arena: CompilerBodyArena): CompilerBodyA
         return arena
     }
     let rootNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindLexicalRegion(), ordinal: 0, start: bodyStart, end: bodyEnd, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if arena.ownerKind == compilerBodyArenaOwnerFunction() && arena.ownerFunctionRow >= 0
+        && compilerIntTableValue(table: arena.tables.functions, row: arena.ownerFunctionRow, column: compilerSyntaxFunctionDerivedColumn()) == 1 {
+        let value: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: bodyStart, limit: bodyEnd, minimumPrecedence: 0))
+        let returnNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindReturn(), ordinal: 0, start: bodyStart, end: value.nextIndex, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+        if rootNodeID != arena.rootNodeID || !value.isValid || compilerCoreFirstNonWhitespaceIndex(source: arena.tables.sourceStore.source, start: value.nextIndex, end: bodyEnd) < bodyEnd || returnNodeID < 0
+            || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: returnNodeID, childNodeID: value.nodeID, role: compilerSyntaxRoleReturnValue(), ordinal: 0) != 0
+            || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: rootNodeID, childNodeID: returnNodeID, role: compilerSyntaxRoleStatement(), ordinal: 0) != 0 {
+            rawBufferAppendInt(buffer: arena.failures, value: value.nextIndex)
+        }
+        return arena
+    }
     let parsedRegion: CompilerBodyParseResult(compilerBodyArenaParseRegionInto(arena: arena, regionNodeID: rootNodeID, start: bodyStart, limit: bodyEnd))
     if rootNodeID != arena.rootNodeID || !parsedRegion.isValid || parsedRegion.nextIndex < bodyEnd {
         rawBufferAppendInt(buffer: arena.failures, value: parsedRegion.nextIndex)

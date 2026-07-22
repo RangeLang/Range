@@ -10,7 +10,7 @@ function makeArray(): Array<Int> {
 @main {
     state numbers: Array<Int>(makeArray())
     numbers.update(element: 6, index: 1)
-    let result: Int(numbers.count() + numbers.element(index: 1))
+    let result: Int(numbers.count + numbers.element(index: 1))
     numbers.destroy()
     return result
 }

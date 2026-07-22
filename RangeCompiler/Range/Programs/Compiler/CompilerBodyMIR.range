@@ -138,17 +138,59 @@ function compilerBodyMIRBuildOptionalInjection(arena: CompilerBodyArena, sourceN
     return CompilerBodyMIRValueResult(valueID: resultValueID, isValid: true)
 }
 
-function compilerBodyMIRBuildMemberReceiverAddress(arena: CompilerBodyArena, receiverNodeID: Int): Int {
-    let resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: receiverNodeID))
-    if resolutionRow < 0
-        || compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionLocalSymbol()
-        || compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) != compilerBodyTypeConstruct() { return 0 - 1 }
+function compilerBodyMIRBuildMemberReceiverAddress(arena: CompilerBodyArena, receiverNodeID: Int, blockID: Int): Int {
+    let memberPath: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
+    state currentNodeID: Int(receiverNodeID)
+    state resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: currentNodeID))
+    state targetKind: Int(0 - 1)
+    if resolutionRow >= 0 { targetKind: compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) }
+    while resolutionRow >= 0 && targetKind == compilerBodyResolutionMember() {
+        if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) != compilerBodyTypeConstruct()
+            || rawBufferAppendInt(buffer: memberPath, value: currentNodeID) != 0 {
+            rawBufferDestroy(buffer: memberPath)
+            return 0 - 1
+        }
+        currentNodeID: compilerBodyArenaChild(arena: arena, ownerNodeID: currentNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0)
+        resolutionRow: compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: currentNodeID)
+        targetKind: 0 - 1
+        if resolutionRow >= 0 { targetKind: compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) }
+    }
+    if resolutionRow < 0 || targetKind != compilerBodyResolutionLocalSymbol()
+        || compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) != compilerBodyTypeConstruct() {
+        rawBufferDestroy(buffer: memberPath)
+        return 0 - 1
+    }
     let symbolID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
     let symbolKind: Int(compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolKindColumn()))
     state storageID: Int(0 - 1)
     if symbolKind != compilerBodySymbolReceiver() { storageID: compilerBodyStorageForSymbol(arena: arena, symbolID: symbolID) }
-    if symbolKind != compilerBodySymbolReceiver() && storageID < 0 { return 0 - 1 }
-    let addressValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueReceiverAddress(), typeKind: compilerBodyTypeConstruct(), typeID: compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeIDColumn()), sourceNodeID: receiverNodeID, provenanceKind: compilerBodyMemorySubjectSymbol(), provenanceID: symbolID))
+    if symbolKind != compilerBodySymbolReceiver() && storageID < 0 {
+        rawBufferDestroy(buffer: memberPath)
+        return 0 - 1
+    }
+    state addressValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueReceiverAddress(), typeKind: compilerBodyTypeConstruct(), typeID: compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeIDColumn()), sourceNodeID: currentNodeID, provenanceKind: compilerBodyMemorySubjectSymbol(), provenanceID: symbolID))
+    state pathIndex: Int(rawBufferCount(buffer: memberPath) - 1)
+    while addressValueID >= 0 && pathIndex >= 0 {
+        let memberNodeID: Int(rawBufferLoadInt(buffer: memberPath, index: pathIndex))
+        let memberResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: memberNodeID))
+        if memberResolutionRow < 0 {
+            addressValueID: 0 - 1
+        } else {
+            let baseAddressValueID: Int(addressValueID)
+            let projectedAddressValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueReceiverAddress(), typeKind: compilerBodyTypeConstruct(), typeID: compilerIntTableValue(table: arena.resolutions, row: memberResolutionRow, column: compilerBodyResolutionTypeIDColumn()), sourceNodeID: memberNodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: baseAddressValueID))
+            let operationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
+            let firstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
+            if projectedAddressValueID < 0
+                || compilerBodyMIRAppendOperand(arena: arena, operationID: operationID, ordinal: 0, valueID: baseAddressValueID, role: compilerBodyMIROperandArgument()) != 0
+                || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: compilerBodyMIROperationMemberAddress(), resultValueID: projectedAddressValueID, sourceNodeID: memberNodeID, firstOperand: firstOperand, operandCount: 1, targetKind: compilerBodyMIROperationTargetNone(), targetID: compilerIntTableValue(table: arena.resolutions, row: memberResolutionRow, column: compilerBodyResolutionTargetIDColumn())) != operationID {
+                addressValueID: 0 - 1
+            } else {
+                addressValueID: projectedAddressValueID
+            }
+        }
+        pathIndex: pathIndex - 1
+    }
+    if rawBufferDestroy(buffer: memberPath) != 0 { return 0 - 1 }
     return addressValueID
 }
 
@@ -459,7 +501,7 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
                 return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
             }
             if ordinaryMemberFunctionCall {
-                let memberCallReceiverAddressID: Int(compilerBodyMIRBuildMemberReceiverAddress(arena: arena, receiverNodeID: memberCallReceiverNodeID))
+                let memberCallReceiverAddressID: Int(compilerBodyMIRBuildMemberReceiverAddress(arena: arena, receiverNodeID: memberCallReceiverNodeID, blockID: blockID))
                 if memberCallReceiverAddressID < 0 || rawBufferAppendInt(buffer: argumentValues, value: memberCallReceiverAddressID) != 0 {
                     rawBufferDestroy(buffer: argumentValues)
                     return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
@@ -739,7 +781,7 @@ function compilerBodyMIRCommitMemberAssignment(arena: CompilerBodyArena, stateme
     if assignedValueID < 0 || assignedValueID >= compilerIntTableRowCount(table: arena.mirValues)
         || compilerIntTableValue(table: arena.mirValues, row: assignedValueID, column: compilerBodyMIRValueTypeColumn()) != memberTypeKind
         || (memberTypeKind == compilerBodyTypeConstruct() && compilerIntTableValue(table: arena.mirValues, row: assignedValueID, column: compilerBodyMIRValueTypeIDColumn()) != memberTypeID) { return 0 - 1 }
-    let receiverAddressValueID: Int(compilerBodyMIRBuildMemberReceiverAddress(arena: arena, receiverNodeID: receiverNodeID))
+    let receiverAddressValueID: Int(compilerBodyMIRBuildMemberReceiverAddress(arena: arena, receiverNodeID: receiverNodeID, blockID: blockID))
     let resultValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueReceiverAddress(), typeKind: compilerBodyTypeConstruct(), typeID: receiverTypeID, sourceNodeID: statementNodeID, provenanceKind: compilerBodyMemorySubjectSymbol(), provenanceID: receiverSymbolID))
     let operationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
     let firstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
@@ -1564,6 +1606,21 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                 || compilerIntTableValue(table: arena.resolutions, row: assignmentResolutionRow, column: compilerBodyResolutionTargetIDColumn()) != validationTargetID
                 || !compilerBodyMemoryHasFact(arena: arena, kind: compilerBodyMemoryFactMemberWrite(), sourceNodeID: assignmentTargetNodeID, subjectID: assignmentTargetNodeID)
                 || validationStorageID != 0 - 1 { return 300000 + operationRow * 100 + operationKind }
+        }
+        if operationKind == compilerBodyMIROperationMemberAddress() {
+            let baseValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
+            let sourceNodeID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationSourceColumn()))
+            let sourceResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: sourceNodeID))
+            if validationTargetKind != compilerBodyMIROperationTargetNone()
+                || validationTargetID < 0 || validationTargetID >= compilerIntTableRowCount(table: arena.tables.members)
+                || validationStorageID != 0 - 1
+                || compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()) != 1
+                || baseValueID < 0 || baseValueID >= valueCount
+                || compilerIntTableValue(table: arena.mirValues, row: baseValueID, column: compilerBodyMIRValueKindColumn()) != compilerBodyMIRValueReceiverAddress()
+                || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueKindColumn()) != compilerBodyMIRValueReceiverAddress()
+                || sourceResolutionRow < 0
+                || compilerIntTableValue(table: arena.resolutions, row: sourceResolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionMember()
+                || compilerIntTableValue(table: arena.resolutions, row: sourceResolutionRow, column: compilerBodyResolutionTargetIDColumn()) != validationTargetID { return 300000 + operationRow * 100 + operationKind }
         }
         if operationKind == compilerBodyMIROperationLocalValue() {
             let localOperandValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))

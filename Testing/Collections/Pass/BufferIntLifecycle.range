@@ -9,7 +9,7 @@ function makeNumbers(): Buffer<Int> {
 @main {
     state numbers: Buffer<Int>(makeNumbers())
     numbers.update(element: 4, index: 1)
-    let result: Int(3 + numbers.element(index: 1))
+    let result: Int(numbers.count + numbers.element(index: 1))
     numbers.destroy()
     return result
 }

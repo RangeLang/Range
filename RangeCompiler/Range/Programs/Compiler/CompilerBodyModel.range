@@ -1184,7 +1184,8 @@ function compilerBodyMIROperationArrayCount(): Int { return 46 }
 function compilerBodyMIROperationArrayStore(): Int { return 47 }
 function compilerBodyMIROperationStringOwnedCopy(): Int { return 48 }
 function compilerBodyMIROperationStringAppendOwned(): Int { return 49 }
-function compilerBodyMIROperationLast(): Int { return compilerBodyMIROperationStringAppendOwned() }
+function compilerBodyMIROperationMemberAddress(): Int { return 50 }
+function compilerBodyMIROperationLast(): Int { return compilerBodyMIROperationMemberAddress() }
 
 function compilerBodyMIROperandColumnCount(): Int { return 4 }
 function compilerBodyMIROperandOperationColumn(): Int { return 0 }
