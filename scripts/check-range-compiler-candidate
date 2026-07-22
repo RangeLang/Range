@@ -606,7 +606,7 @@ audit_native_arrays() {
     local stage_directory="$3"
     local kind source expected first second first_error second_error llvm linked run_output run_error
 
-    for kind in index count enum-payload argument mutation-int mutation-enum mutation-member; do
+    for kind in index count enum-payload argument mutation-int mutation-enum mutation-member mutation-nested-member; do
         source="$ARRAY_INDEX_SOURCE"
         expected=2
         if [[ "$kind" == count ]]; then
@@ -626,6 +626,9 @@ audit_native_arrays() {
             expected=7
         elif [[ "$kind" == mutation-member ]]; then
             source="$ARRAY_MEMBER_MUTATION_SOURCE"
+            expected=7
+        elif [[ "$kind" == mutation-nested-member ]]; then
+            source="$ARRAY_NESTED_MEMBER_MUTATION_SOURCE"
             expected=7
         fi
         first="$WORK_ROOT/$stage_label.array.$kind.first.ll"
@@ -664,7 +667,7 @@ audit_native_arrays() {
             /usr/bin/grep -Eq 'alloca %Range\.(NumberToken|MutableNumberToken)' "$first" \
                 || fail "$stage_label native enum Array did not specialize backing storage to its element layout"
         fi
-        if [[ "$kind" == mutation-int || "$kind" == mutation-enum || "$kind" == mutation-member ]]; then
+        if [[ "$kind" == mutation-int || "$kind" == mutation-enum || "$kind" == mutation-member || "$kind" == mutation-nested-member ]]; then
             /usr/bin/grep -Fq 'array.store.' "$first" \
                 || fail "$stage_label native Array $kind omitted the indexed store operation"
             /usr/bin/grep -Eq 'store (i32|%Range\.MutableNumberToken) .*ptr %array\.store\.' "$first" \
@@ -743,10 +746,12 @@ audit_native_arrays() {
     fi
 
     local immutable_member_kind immutable_member_source immutable_member_output immutable_member_error
-    for immutable_member_kind in field owner; do
+    for immutable_member_kind in field owner intermediate; do
         immutable_member_source="$ARRAY_IMMUTABLE_MEMBER_SOURCE"
         if [[ "$immutable_member_kind" == owner ]]; then
             immutable_member_source="$ARRAY_IMMUTABLE_MEMBER_OWNER_SOURCE"
+        elif [[ "$immutable_member_kind" == intermediate ]]; then
+            immutable_member_source="$ARRAY_IMMUTABLE_MEMBER_INTERMEDIATE_SOURCE"
         fi
         immutable_member_output="$WORK_ROOT/$stage_label.array.immutable-member-$immutable_member_kind.out"
         immutable_member_error="$WORK_ROOT/$stage_label.array.immutable-member-$immutable_member_kind.err"
@@ -770,7 +775,7 @@ audit_native_arrays() {
     if /usr/bin/grep -Fq 'define ' "$escape_output"; then
         fail "$stage_label native Array return escape emitted LLVM"
     fi
-    echo "$stage_label native Array: pass (generic pointer/count value, typed lexical storage, count/index/store, enum payload and mutable-member mutation, executable read/write bounds traps, immutable member/owner and return-escape rejection, deterministic)"
+    echo "$stage_label native Array: pass (generic pointer/count value, typed lexical storage, count/index/store, enum payload and arbitrary-depth mutable-member mutation, executable read/write bounds traps, immutable field/intermediate/owner and return-escape rejection, deterministic)"
 }
 
 audit_storage_switches() {
@@ -5232,9 +5237,11 @@ main() {
     ARRAY_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ReturnArrayStateIndexedAssignment.range"
     ARRAY_ENUM_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ReturnEnumArrayStateIndexedAssignment.range"
     ARRAY_MEMBER_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ConstructMemberArrayIndexedAssignment.range"
+    ARRAY_NESTED_MEMBER_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/NestedConstructMemberArrayIndexedAssignment.range"
     ARRAY_IMMUTABLE_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableArrayIndexedAssignment.range"
     ARRAY_IMMUTABLE_MEMBER_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableConstructArrayMemberIndexedAssignment.range"
     ARRAY_IMMUTABLE_MEMBER_OWNER_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableConstructContainingArrayIndexedAssignment.range"
+    ARRAY_IMMUTABLE_MEMBER_INTERMEDIATE_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableIntermediateConstructArrayIndexedAssignment.range"
     ARRAY_WRITE_OUT_OF_BOUNDS_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ArrayWriteOutOfBounds.range"
     ARRAY_ARGUMENT_SOURCE="$WORK_ROOT/ArrayArgument.range"
     /usr/bin/printf '%s\n' \

@@ -1,0 +1,13 @@
+construct MutableArrayLeaf {
+    state values: [Int]
+}
+
+construct MutableArrayRoot {
+    state leaf: MutableArrayLeaf
+}
+
+@main {
+    state root: MutableArrayRoot(MutableArrayRoot(leaf: MutableArrayLeaf(values: [1, 2, 3])))
+    root.leaf.values[1]: 7
+    return root.leaf.values[1]
+}

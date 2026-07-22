@@ -3546,3 +3546,32 @@ their linked executables are byte-identical at 3,472,944 bytes with SHA-256
 After promotion, accepted-seed integrity passed and the seed independently
 reproduced the same LLVM hash in `134.82 s` with `567,787,520` bytes maximum
 RSS.
+
+### Arbitrary-depth construct-field `Array<Element>` mutation checkpoint (2026-07-22)
+
+Indexed Array mutation now follows an arbitrary-depth ordinary construct-field
+path from one local owner. An assignment such as
+`root.leaf.values[index]: value` is writable only when the root local and every
+projected field are `state`. A `let` at the Array field, any intermediate
+construct field, or the root rejects the assignment during semantic stage 2
+before LLVM emission.
+
+The check walks the already-resolved member receiver chain and returns the root
+local symbol to the existing MemoryGraph unique-write access. MIR and LLVM still
+use the same bounds-checked `ArrayStore`; no path-specific storage operation,
+alias model, allocation, or compatibility representation was added. Bindings
+remain outside this checkpoint because their writable path must be proven from
+alias provenance and lifetime rather than local-state reachability.
+
+Permanent positive coverage stores `7` through `root.leaf.values[1]`, reads it
+back, and exits `7`. Permanent negative coverage makes the intermediate `leaf`
+field immutable and requires deterministic semantic rejection with no LLVM
+definition. The complete candidate gate passed in `364.47 s` with
+`570,048,512` bytes maximum RSS and `swift_invocation=none`. Stage 2 and Stage 3
+LLVM are byte-identical at 5,503,762 bytes with SHA-256
+`68db0983014046fee2e13a6d6aad4993c7051a9c4d9b50befcd432aab9756252`;
+their executables are byte-identical at 3,472,944 bytes with SHA-256
+`8b9a4082a04b2bbdca8e06c00a3e9e139ac3244744841214ae5e6c7754fadeea`.
+After promotion, accepted-seed integrity passed and the promoted seed
+independently reproduced the same LLVM hash in `137.86 s` with `569,425,920`
+bytes maximum RSS.

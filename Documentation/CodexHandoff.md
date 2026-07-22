@@ -587,5 +587,13 @@ structural type-reference identities; macro-family fields such as
 The full candidate gate passed through Stage 2 and Stage 3 with byte-identical
 LLVM and executables, `typed_only_lowering=pass`, and `swift_invocation=none`.
 Accepted-seed integrity and the independent accepted-seed fixed-point check also
-pass. The next Array mutation slice must therefore start from this seed rather
-than rebuilding the same field projection or adding a compatibility bridge.
+pass.
+
+The next accepted slice extends that same operation through arbitrary-depth
+mutable construct fields. `root.leaf.values[index]: value` succeeds only when
+the root and every field are `state`; an immutable intermediate field rejects
+before LLVM. Stage 2 and Stage 3 reproduce byte-identical 5,503,762-byte LLVM
+with SHA-256
+`68db0983014046fee2e13a6d6aad4993c7051a9c4d9b50befcd432aab9756252`,
+`typed_only_lowering=pass`, and `swift_invocation=none`. Binding-based mutation
+remains the next separate proof boundary.
