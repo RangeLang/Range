@@ -380,8 +380,8 @@ source_graph_bundle() {
     local input_root absolute relative count
     require_source_input "$input"
     : > "$bundle"
-    source_graph_append_tree core Core "$REPO_ROOT/RangeCompiler/Range/Core" "$bundle"
-    source_graph_append_tree foundation Foundation "$REPO_ROOT/RangeCompiler/Range/Foundation" "$bundle"
+    source_graph_append_tree core Core "$REPO_ROOT/RangeCompiler/Sources/Core" "$bundle"
+    source_graph_append_tree foundation Foundation "$REPO_ROOT/RangeCompiler/Sources/Foundation" "$bundle"
     if [[ -f "$input" ]]; then
         absolute="$(cd "$(dirname "$input")" && pwd)/$(basename "$input")"
         source_graph_append_file project "Project/$(basename "$absolute")" "$absolute" "$bundle"

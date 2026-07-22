@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
-READER="$REPO_ROOT/RangeCompiler/Range/Programs/Compiler/CompilerBuildPlan.range"
+READER="$REPO_ROOT/RangeCompiler/Sources/Compiler/Driver/CompilerBuildPlan.range"
 SCHEMA_VERSION="focused-build-plan-harness-v2"
 CACHE_ROOT="${RANGE_BUILD_PLAN_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Library/Caches}/Range/build-plan}"
 

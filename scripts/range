@@ -81,7 +81,7 @@ case "$command" in
         ;;
     check-compiler-candidate)
         if [[ $# -gt 1 ]]; then usage; exit 1; fi
-        compiler_dir="${1:-$REPO_ROOT/RangeCompiler/Range/Programs/Compiler}"
+        compiler_dir="${1:-$REPO_ROOT/RangeCompiler/Sources/Compiler}"
         "$REPO_ROOT/scripts/check-range-compiler-candidate" "$compiler_dir"
         ;;
     check-stage2-compiler)

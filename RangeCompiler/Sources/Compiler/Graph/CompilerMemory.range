@@ -581,7 +581,12 @@ function compilerRuntimeABIConstructKind(tables: CompilerSyntaxTables, construct
     state runtimeMemberRow: Int(0)
     let runtimeMemberCount: Int(compilerIntTableRowCount(table: tables.members))
     while runtimeMemberRow < runtimeMemberCount {
-        if compilerIntTableValue(table: tables.members, row: runtimeMemberRow, column: 2) == constructNodeID { return compilerRuntimeABINone() }
+        if compilerIntTableValue(table: tables.members, row: runtimeMemberRow, column: 2) == constructNodeID {
+            let runtimeMemberKind: Int(compilerIntTableValue(table: tables.members, row: runtimeMemberRow, column: 12))
+            if runtimeMemberKind == compilerSyntaxMemberKindLet()
+                || runtimeMemberKind == compilerSyntaxMemberKindState()
+                || runtimeMemberKind == compilerSyntaxMemberKindBinding() { return compilerRuntimeABINone() }
+        }
         runtimeMemberRow: runtimeMemberRow + 1
     }
     return compilerRuntimeABIOpaqueStorage()

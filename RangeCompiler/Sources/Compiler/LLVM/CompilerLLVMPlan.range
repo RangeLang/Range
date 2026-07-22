@@ -421,13 +421,14 @@ function compilerReachableLLVMStateRenderModule(reachability: CompilerReachableL
     let materialized: String(compilerCoreMaterializeLLVMText(text: text))
     let signatureAuditCode: Int(compilerCoreLLVMDirectCallSignatureAudit(tables: reachability.context.tables, index: reachability.context.declarationIndex, selection: reachability.selection, functionInstances: reachability.functionInstances, functionInstanceSignatures: reachability.functionInstanceSignatures, functionInstanceSignatureParameters: reachability.functionInstanceSignatureParameters, abiPlan: compilerReachableLLVMStateABIPlan(reachability: reachability), text: materialized))
     if signatureAuditCode != 0 {
-        let signatureAuditInstanceID: Int(signatureAuditCode - 1)
+        let signatureAuditInstanceID: Int(signatureAuditCode / 1000)
+        let signatureAuditDetail: Int(signatureAuditCode % 1000)
         let signatureAuditFunctionRow: Int(compilerIntTableValue(table: reachability.functionInstances, row: signatureAuditInstanceID, column: compilerReachableFunctionInstanceFunctionColumn()))
         let signatureAuditSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: signatureAuditFunctionRow, column: 0))
         let signatureAuditDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: signatureAuditSyntaxID))
         let signatureAuditFileID: Int(compilerIntTableValue(table: reachability.context.tables.declarations, row: signatureAuditDeclarationRow, column: 1))
         let signatureAuditFunctionName: String(compilerTypedSyntaxLocalText(tables: reachability.context.tables, fileID: signatureAuditFileID, localStart: compilerIntTableValue(table: reachability.context.tables.declarations, row: signatureAuditDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: reachability.context.tables.declarations, row: signatureAuditDeclarationRow, column: 8)))
-        return "compilerError\tkind=directCallSignatureAudit\tinstanceID=\(signatureAuditInstanceID)\tfunctionRow=\(signatureAuditFunctionRow)\tfunction=\(signatureAuditFunctionName)"
+        return "compilerError\tkind=directCallSignatureAudit\tinstanceID=\(signatureAuditInstanceID)\tfunctionRow=\(signatureAuditFunctionRow)\tfunction=\(signatureAuditFunctionName)\tdetail=\(signatureAuditDetail)"
     }
     return materialized
 }
@@ -436,11 +437,11 @@ function compilerCoreLLVMDirectCallSignatureAudit(tables: CompilerSyntaxTables, 
     state instanceID: Int(0)
     while instanceID < compilerIntTableRowCount(table: functionInstances) {
         let functionRow: Int(compilerIntTableValue(table: functionInstances, row: instanceID, column: compilerReachableFunctionInstanceFunctionColumn()))
-        if !compilerFunctionSelectionContains(selection: selection, functionRow: functionRow) { return instanceID + 1 }
+        if !compilerFunctionSelectionContains(selection: selection, functionRow: functionRow) { return instanceID * 1000 + 1 }
         let syntaxID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 0))
         let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: syntaxID))
         let signatureRow: Int(compilerReachableFunctionInstanceSignatureRow(signatures: functionInstanceSignatures, instanceID: instanceID))
-        if declarationRow < 0 || signatureRow < 0 { return instanceID + 1 }
+        if declarationRow < 0 || signatureRow < 0 { return instanceID * 1000 + 2 }
         let fileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
         let baseName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
         let receiverKeyID: Int(compilerIntTableValue(table: functionInstances, row: instanceID, column: compilerReachableFunctionInstanceReceiverKeyColumn()))
@@ -450,17 +451,17 @@ function compilerCoreLLVMDirectCallSignatureAudit(tables: CompilerSyntaxTables, 
         }
         let parameterCount: Int(compilerIntTableValue(table: functionInstanceSignatures, row: signatureRow, column: compilerReachableFunctionInstanceSignatureParameterCountColumn()))
         let parameterStart: Int(compilerIntTableValue(table: functionInstanceSignatures, row: signatureRow, column: compilerReachableFunctionInstanceSignatureParameterFirstRowColumn()))
-        if parameterCount < 0 || parameterStart < 0 || parameterStart + parameterCount > compilerIntTableRowCount(table: functionInstanceSignatureParameters) { return instanceID + 1 }
+        if parameterCount < 0 || parameterStart < 0 || parameterStart + parameterCount > compilerIntTableRowCount(table: functionInstanceSignatureParameters) { return instanceID * 1000 + 3 }
         state parameterOrdinal: Int(0)
         while parameterOrdinal < parameterCount {
             let parameterRow: Int(parameterStart + parameterOrdinal)
             if compilerIntTableValue(table: functionInstanceSignatureParameters, row: parameterRow, column: compilerReachableFunctionInstanceSignatureParameterInstanceColumn()) != instanceID
                 || compilerIntTableValue(table: functionInstanceSignatureParameters, row: parameterRow, column: compilerReachableFunctionInstanceSignatureParameterOrdinalColumn()) != parameterOrdinal
-                || compilerIntTableValue(table: functionInstanceSignatureParameters, row: parameterRow, column: compilerReachableFunctionInstanceSignatureParameterABICategoryColumn()) == compilerBodyFunctionSignatureABICategoryNone() && receiverKeyID >= 0 { return instanceID + 1 }
+                || compilerIntTableValue(table: functionInstanceSignatureParameters, row: parameterRow, column: compilerReachableFunctionInstanceSignatureParameterABICategoryColumn()) == compilerBodyFunctionSignatureABICategoryNone() && receiverKeyID >= 0 { return instanceID * 1000 + 4 }
             parameterOrdinal: parameterOrdinal + 1
         }
         let returnCategory: Int(compilerIntTableValue(table: functionInstanceSignatures, row: signatureRow, column: compilerReachableFunctionInstanceSignatureReturnABICategoryColumn()))
-        if receiverKeyID >= 0 && returnCategory == compilerBodyFunctionSignatureABICategoryNone() { return instanceID + 1 }
+        if receiverKeyID >= 0 && returnCategory == compilerBodyFunctionSignatureABICategoryNone() { return instanceID * 1000 + 5 }
         let returnType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.functions, row: functionRow, column: 6), localEnd: compilerIntTableValue(table: tables.functions, row: functionRow, column: 7)))
         state llvmReturnType: String(compilerCoreLLVMTypeNameForRangeType(typeName: returnType))
         if returnCategory == compilerBodyFunctionSignatureABICategoryInt() { llvmReturnType: String("i32") }
@@ -492,13 +493,13 @@ function compilerCoreLLVMDirectCallSignatureAudit(tables: CompilerSyntaxTables, 
                 recognized: true
                 if returnCategory == compilerBodyFunctionSignatureABICategoryNone() && returnMode == compilerFunctionReturnABIIndirect() {
                     let firstArgumentStart: Int(occurrence + symbolNeedleLength)
-                    if !stringHasPrefix(source: text, start: firstArgumentStart, prefix: String("ptr ")) { return instanceID + 1 }
+                    if !stringHasPrefix(source: text, start: firstArgumentStart, prefix: String("ptr ")) { return instanceID * 1000 + 6 }
                 }
             }
-            if !recognized { return instanceID + 1 }
+            if !recognized { return instanceID * 1000 + 7 }
             occurrence: stringFindFrom(source: text, start: occurrence + symbolNeedleLength, needle: symbolNeedle)
         }
-        if definitionCount != 1 { return instanceID + 1 }
+        if definitionCount != 1 { return instanceID * 1000 + 8 }
         instanceID: instanceID + 1
     }
     return 0
@@ -1338,7 +1339,7 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
     if capable {
         let mirBuildStatus: Int(compilerBodyMIRBuild(arena: arena))
         if mirBuildStatus != 0 {
-            failureStage: 7
+            failureStage: 700000 + (0 - mirBuildStatus)
             capable: false
         }
     }
@@ -2057,4 +2058,3 @@ function compilerCoreLLVMSelectedHelperFunctionTyped(context: CompilerLLVMLoweri
     }
     return CompilerTypedLLVMHelpers(helpers: CompilerLLVMHelperFunctions(renderedFunctions: renderedFunction, instructionRecords: String(""), nextTemporary: lowering.block.nextTemporary), renderedGlobals: renderedGlobals, runtimeRequirements: lowering.runtimeRequirements, telemetry: lowering.telemetry)
 }
-

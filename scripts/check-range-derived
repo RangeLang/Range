@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-COMPILER="${1:-$REPO_ROOT/RangeCompiler/Range/Programs/Compiler/.range/Build/stage2/RangeCompiler}"
+COMPILER="${1:-$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/stage2/RangeCompiler}"
 WORK_ROOT="$(mktemp -d)"
 trap '/bin/rm -rf "$WORK_ROOT"' EXIT
 

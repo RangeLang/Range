@@ -999,6 +999,26 @@ function compilerBodyRuntimeBuiltinForElementLayout(arena: CompilerBodyArena, bu
     return compilerBodyRuntimeBuiltinNone()
 }
 
+function compilerBodyRuntimeBuiltinUsesElementStorageReceiver(arena: CompilerBodyArena, builtinID: Int): Bool {
+    if compilerBodyArenaReceiverElementTypeID(arena: arena) < 0 { return false }
+    return builtinID == compilerBodyRuntimeBuiltinRawBufferAppendInt()
+        || builtinID == compilerBodyRuntimeBuiltinRawBufferCount()
+        || builtinID == compilerBodyRuntimeBuiltinRawBufferLoadInt()
+        || builtinID == compilerBodyRuntimeBuiltinRawBufferStoreInt()
+        || builtinID == compilerBodyRuntimeBuiltinRawBufferDestroy()
+}
+
+function compilerBodyBufferCreateBuiltinForTypeID(arena: CompilerBodyArena, bufferTypeID: Int): Int {
+    if bufferTypeID < 0 || compilerBodyArenaTypeArgumentCountForTypeID(arena: arena, typeID: bufferTypeID) != 1 { return compilerBodyRuntimeBuiltinNone() }
+    let elementTypeID: Int(compilerBodyArenaTypeArgumentValueForTypeID(arena: arena, typeID: bufferTypeID, ordinal: 0))
+    let elementTypeKind: Int(compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: elementTypeID))
+    if compilerBodyElementLayoutByteSize(typeKind: elementTypeKind) < 0
+        || compilerBodyElementLayoutAlignment(typeKind: elementTypeKind) < 0 { return compilerBodyRuntimeBuiltinNone() }
+    if elementTypeKind == compilerBodyTypeInt() { return compilerBodyRuntimeBuiltinBufferCreateInt() }
+    if elementTypeKind == compilerBodyTypeUnsigned8() { return compilerBodyRuntimeBuiltinBufferCreateUnsigned8() }
+    return compilerBodyRuntimeBuiltinNone()
+}
+
 function compilerBodyArenaGenericParameterOrdinal(arena: CompilerBodyArena, ownerSyntaxID: Int, fileID: Int, start: Int, end: Int): Int {
     if ownerSyntaxID < 0 { return 0 - 1 }
     let normalizedRange: CompilerSourceRange(compilerBodyArenaNormalizedTypeRange(arena: arena, fileID: fileID, start: start, end: end))
@@ -1601,6 +1621,16 @@ function compilerBodyArenaCallLabelsMatchConstruct(arena: CompilerBodyArena, app
     return true
 }
 
+function compilerBodyArenaCallLabelsMatchCanonicalBufferCreate(arena: CompilerBodyArena, applicationNodeID: Int): Bool {
+    if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: applicationNodeID) != 1 { return false }
+    let argumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: applicationNodeID, role: compilerSyntaxRoleArgument(), ordinal: 0))
+    if argumentNodeID < 0 { return false }
+    let labelStart: Int(compilerIntTableValue(table: arena.nodes, row: argumentNodeID, column: 6))
+    let labelEnd: Int(compilerIntTableValue(table: arena.nodes, row: argumentNodeID, column: 7))
+    if labelStart < 0 || labelEnd <= labelStart { return false }
+    return compilerTypedSyntaxLocalText(tables: arena.tables, fileID: arena.fileID, localStart: labelStart, localEnd: labelEnd) == String("capacity")
+}
+
 function compilerBodyArenaResolveCapabilityExpression(arena: CompilerBodyArena, index: CompilerDeclarationIndex, nodeID: Int, regionNodeID: Int): Int {
     let kind: Int(compilerIntTableValue(table: arena.nodes, row: nodeID, column: 1))
     if kind == compilerSyntaxKindMemberRead() {
@@ -2076,8 +2106,7 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
                 let constructDeclarationRow: Int(compilerDeclarationIndexLookup(tables: arena.tables, index: index, name: calleeName, kindTag: compilerSyntaxKindConstruct()))
                 if constructDeclarationRow >= 0 {
                     let calledConstructSyntaxID: Int(compilerIntTableValue(table: arena.tables.declarations, row: constructDeclarationRow, column: 0))
-                    if !compilerNominalLLVMLayoutIsSupported(tables: arena.tables, declarationRow: constructDeclarationRow)
-                        || !compilerBodyArenaCallLabelsMatchConstruct(arena: arena, applicationNodeID: nodeID, constructSyntaxID: calledConstructSyntaxID) { return 0 - 1 }
+                    if !compilerNominalLLVMLayoutIsSupported(tables: arena.tables, declarationRow: constructDeclarationRow) { return 0 - 1 }
                     targetKind: compilerBodyResolutionConstruct()
                     targetID: calledConstructSyntaxID
                     returnTypeKind: compilerBodyTypeConstruct()
@@ -2091,6 +2120,13 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
                         returnTypeID: compilerBodyArenaTypeIDForSpan(arena: arena, fileID: arena.fileID, start: compilerIntTableValue(table: arena.nodes, row: calleeNodeID, column: 6), end: compilerIntTableValue(table: arena.nodes, row: calleeNodeID, column: 7))
                     }
                     if returnTypeID < 0 { return 0 - 1 }
+                    let constructBuiltinPolicy: Int(compilerIntTableValue(table: arena.tables.declarations, row: constructDeclarationRow, column: 13))
+                    if constructBuiltinPolicy == compilerBuiltinPolicyStorage() && genericCount == 1 {
+                        if !compilerBodyArenaCallLabelsMatchCanonicalBufferCreate(arena: arena, applicationNodeID: nodeID) { return 0 - 1 }
+                        targetKind: compilerBodyResolutionRuntimeBuiltin()
+                        targetID: compilerBodyBufferCreateBuiltinForTypeID(arena: arena, bufferTypeID: returnTypeID)
+                        if targetID == compilerBodyRuntimeBuiltinNone() { return 0 - 1 }
+                    } else if !compilerBodyArenaCallLabelsMatchConstruct(arena: arena, applicationNodeID: nodeID, constructSyntaxID: calledConstructSyntaxID) { return 0 - 1 }
                 } else {
                     let enumDeclarationRow: Int(compilerDeclarationIndexLookup(tables: arena.tables, index: index, name: calleeName, kindTag: compilerSyntaxKindEnum()))
                     if enumDeclarationRow >= 0 {
@@ -2135,7 +2171,8 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
                     if runtimeBuiltinID == compilerBodyRuntimeBuiltinNone()
                         || compilerBodyRuntimeBuiltinReturnType(id: runtimeBuiltinID) == String("")
                         || compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != compilerBodyRuntimeBuiltinParameterCount(id: runtimeBuiltinID) { return 0 - 1 }
-                    if runtimeBuiltinID != declaredRuntimeBuiltinID {
+                    if runtimeBuiltinID != declaredRuntimeBuiltinID
+                        || compilerBodyRuntimeBuiltinUsesElementStorageReceiver(arena: arena, builtinID: declaredRuntimeBuiltinID) {
                         declarationBuiltinABI: 2
                         returnTypeKind: compilerBodyRuntimeBuiltinReturnTypeKind(id: runtimeBuiltinID)
                         if runtimeBuiltinID == compilerBodyRuntimeBuiltinRawBufferLoadUnsigned8() {

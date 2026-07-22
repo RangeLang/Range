@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
-DEFAULT_COMPILER_DIR="$REPO_ROOT/RangeCompiler/Range/Programs/Compiler"
+DEFAULT_COMPILER_DIR="$REPO_ROOT/RangeCompiler/Sources/Compiler"
 COMPILER_OPTIMIZATION="-O2"
 COMPILER_LTO="-flto=thin"
 
@@ -16,7 +16,7 @@ Usage:
   scripts/check-range-compiler-candidate --bootstrap-bridge-source PHASE1_DIR FINAL_DIR
   scripts/check-range-compiler-candidate --help
 
-DIR defaults to RangeCompiler/Range/Programs/Compiler. The stage2-plan checkpoint
+DIR defaults to RangeCompiler/Sources/Compiler. The stage2-plan checkpoint
 stops after the manifested seed has emitted, validated, and linked Stage 2 and
 Stage 2 has read the canonical candidate build plan.
 
@@ -1337,7 +1337,7 @@ write_core_bundle() {
     else
         /usr/bin/printf '%s' '' > "$output"
     fi
-    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=RangeCompiler/Range/Core/System/Memory/RawBuffer.range' >> "$output"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/System/Memory/RawBuffer.range' >> "$output"
     /bin/cat "$CORE_SOURCE_PATH" >> "$output"
     if [[ -n "$(/usr/bin/tail -c 1 "$CORE_SOURCE_PATH")" ]]; then
         /usr/bin/printf '\n' >> "$output"
@@ -1393,7 +1393,7 @@ write_binding_reference_bundle() {
     local output="$1"
     local kind="$2"
 
-    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=RangeCompiler/Range/Core/System/Memory/RawBuffer.range' > "$output"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/System/Memory/RawBuffer.range' > "$output"
     /bin/cat "$CORE_SOURCE_PATH" >> "$output"
     if [[ -n "$(/usr/bin/tail -c 1 "$CORE_SOURCE_PATH")" ]]; then
         /usr/bin/printf '\n' >> "$output"
@@ -1839,7 +1839,7 @@ write_root_value_bundle() {
     local output="$1"
     local kind="$2"
 
-    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=RangeCompiler/Range/Core/System/Memory/RawBuffer.range' > "$output"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/System/Memory/RawBuffer.range' > "$output"
     /bin/cat "$CORE_SOURCE_PATH" >> "$output"
     if [[ -n "$(/usr/bin/tail -c 1 "$CORE_SOURCE_PATH")" ]]; then
         /usr/bin/printf '\n' >> "$output"
@@ -2665,7 +2665,7 @@ audit_canonical_core() {
     write_core_bundle "$identity_bundle" compilerSourceIdentity
     run_capture "$executable" "$identity_bundle" "$identity_output" "$identity_error"
     require_successful_output "$stage_label canonical Core identity" "$identity_output" "$identity_error"
-    /usr/bin/grep -Fq $'sourceFile\tid=0\trole=core\tpath=RangeCompiler/Range/Core/System/Memory/RawBuffer.range' "$identity_output" \
+    /usr/bin/grep -Fq $'sourceFile\tid=0\trole=core\tpath=RangeCompiler/Sources/Core/System/Memory/RawBuffer.range' "$identity_output" \
         || fail "$stage_label canonical Core was not stored as role=core"
     /usr/bin/grep -Fq $'sourceFile\tid=1\trole=project\tpath=CoreUse.range' "$identity_output" \
         || fail "$stage_label canonical Core project file was not stored as role=project"
@@ -4054,8 +4054,8 @@ write_macro_registrable_bundle() {
     fi
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=foundation\tpath=Foundation/Macros/Registrable.range' >> "$output"
-    /bin/cat "$REPO_ROOT/RangeCompiler/Range/Foundation/Macros/Registrable.range" >> "$output"
-    if [[ -n "$(/usr/bin/tail -c 1 "$REPO_ROOT/RangeCompiler/Range/Foundation/Macros/Registrable.range")" ]]; then
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Foundation/Macros/Registrable.range" >> "$output"
+    if [[ -n "$(/usr/bin/tail -c 1 "$REPO_ROOT/RangeCompiler/Sources/Foundation/Macros/Registrable.range")" ]]; then
         /usr/bin/printf '\n' >> "$output"
     fi
     /usr/bin/printf '%b\n' \
@@ -5219,8 +5219,8 @@ main() {
 
     verify_manifest
     if [[ "$checkpoint_mode" != stage2-plan ]]; then
-        audit_no_temporary_debug_probes "$compiler_directory/CompilerCore.range" "final compiler"
-        audit_no_body_syntax_sink "$compiler_directory/CompilerCore.range" "final compiler"
+        audit_no_temporary_debug_probes "$compiler_directory/Driver/CompilerCore.range" "final compiler"
+        audit_no_body_syntax_sink "$compiler_directory/Driver/CompilerCore.range" "final compiler"
         audit_typed_only_lowering_invariant "$compiler_directory" "final compiler"
         audit_canonical_construct_initialization "$compiler_directory" "final compiler"
         audit_canonical_construct_initialization "$REPO_ROOT/Testing" "permanent fixture"
@@ -5239,7 +5239,7 @@ main() {
     else
         trap '/bin/rm -rf "$WORK_ROOT"' EXIT
     fi
-    local canonical_core_source_path="$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/RawBuffer.range"
+    local canonical_core_source_path="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range"
     [[ -f "$canonical_core_source_path" ]] || fail "missing canonical Core proof input: $canonical_core_source_path"
     CORE_SOURCE_MARKER_PATH="${canonical_core_source_path#"$REPO_ROOT/"}"
     CORE_SOURCE_PATH="$WORK_ROOT/RawBuffer.range"

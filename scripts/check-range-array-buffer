@@ -22,9 +22,9 @@ append_source() {
 }
 
 /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$BUNDLE"
-append_source core RangeCompiler/Range/Core/System/Memory/RawBuffer.range "$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/RawBuffer.range"
-append_source core RangeCompiler/Range/Core/System/Memory/Buffer.range "$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/Buffer.range"
-append_source core RangeCompiler/Range/Core/DataSystem/Array/Array.range "$REPO_ROOT/RangeCompiler/Range/Core/DataSystem/Array/Array.range"
+append_source core RangeCompiler/Sources/Core/System/Memory/RawBuffer.range "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range"
+append_source core RangeCompiler/Sources/Core/System/Memory/Buffer.range "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/Buffer.range"
+append_source core RangeCompiler/Sources/Core/DataSystem/Array/Array.range "$REPO_ROOT/RangeCompiler/Sources/Core/DataSystem/Array/Array.range"
 append_source project Testing/Collections/Pass/ArrayIntBufferLifecycle.range "$REPO_ROOT/Testing/Collections/Pass/ArrayIntBufferLifecycle.range"
 
 if [[ -n "$COMPILER" ]]; then

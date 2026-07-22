@@ -138,6 +138,7 @@ function compilerBodyStorageForCall(arena: CompilerBodyArena, callNodeID: Int): 
 
 function compilerBodyArenaTypeIDHasNativeNominalLayout(arena: CompilerBodyArena, typeID: Int): Bool {
     if typeID < 0 || typeID >= compilerIntTableRowCount(table: arena.typeInstances) { return false }
+    if compilerBodyArenaTypeIDIsOpaqueStorage(arena: arena, typeID: typeID) { return false }
     let nominalSyntaxID: Int(compilerIntTableValue(table: arena.typeInstances, row: typeID, column: compilerBodyTypeInstanceNominalSyntaxColumn()))
     if nominalSyntaxID == compilerBodyBuiltinArraySyntaxID() { return compilerBodyArenaTypeArgumentCountForTypeID(arena: arena, typeID: typeID) == 1 }
     let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: arena.tables, syntaxID: nominalSyntaxID))
@@ -930,7 +931,8 @@ function compilerBodyArenaRuntimeBuiltinRoleForApplication(arena: CompilerBodyAr
     if calleeNodeID < 0 || resolutionRow < 0
         || compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionRuntimeBuiltin()
         || compilerIntTableValue(table: arena.nodes, row: calleeNodeID, column: 1) != compilerSyntaxKindIdentifier() { return compilerRuntimeABIFunctionNone() }
-    let functionName: String(compilerBodyArenaNodeText(arena: arena, nodeID: calleeNodeID))
+    let runtimeBuiltinID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+    let functionName: String(compilerBodyRuntimeBuiltinName(id: runtimeBuiltinID))
     let declarationRow: Int(compilerDeclarationIndexLookup(tables: arena.tables, index: arena.declarationIndex, name: functionName, kindTag: compilerSyntaxKindFunction()))
     if declarationRow < 0 { return compilerRuntimeABIFunctionNone() }
     let functionSyntaxID: Int(compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 0))
@@ -1502,7 +1504,8 @@ function compilerBodyArenaRuntimeBuiltinFunctionIDForApplication(arena: Compiler
     let resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: calleeNodeID))
     if calleeNodeID < 0 || resolutionRow < 0
         || compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionRuntimeBuiltin() { return 0 - 1 }
-    let functionName: String(compilerBodyArenaNodeText(arena: arena, nodeID: calleeNodeID))
+    let runtimeBuiltinID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+    let functionName: String(compilerBodyRuntimeBuiltinName(id: runtimeBuiltinID))
     let declarationRow: Int(compilerDeclarationIndexLookup(tables: arena.tables, index: arena.declarationIndex, name: functionName, kindTag: compilerSyntaxKindFunction()))
     if declarationRow < 0 { return 0 - 1 }
     let functionSyntaxID: Int(compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 0))
@@ -3912,11 +3915,11 @@ function compilerReachableLLVMStateAppendReachableEffectCandidatesAndCallsForAre
                     let storageArgumentOrdinal: Int(compilerIntTableValue(table: arena.runtimeCallContracts, row: contractRow, column: compilerBodyRuntimeCallContractStorageArgumentColumn()))
                     let argumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: applicationNodeID, role: compilerSyntaxRoleArgument(), ordinal: storageArgumentOrdinal))
                     let valueNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: argumentNodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0))
-                    if argumentNodeID < 0 || valueNodeID < 0 { return 0 - 1 }
+                    if argumentNodeID < 0 || valueNodeID < 0 { return 0 - 101 }
                     let pathID: Int(compilerBodyArenaOwnedPathForValue(arena: arena, valueNodeID: valueNodeID))
-                    if pathID < 0 { return 0 - 1 }
+                    if pathID < 0 { return 0 - 102 }
                     let canonicalPathID: Int(compilerBodyArenaBindingAliasCanonicalPath(arena: arena, pathID: pathID))
-                    if canonicalPathID < 0 { return 0 - 1 }
+                    if canonicalPathID < 0 { return 0 - 103 }
                     let rootClass: Int(compilerBodyArenaOwnedPathSummaryRootClass(arena: arena, pathID: canonicalPathID))
                     if rootClass == compilerBodyOwnedSummaryRootBoundary() {
                         let baseKind: Int(compilerBodyArenaOwnedPathBaseKind(arena: arena, pathID: canonicalPathID))
@@ -3925,31 +3928,31 @@ function compilerReachableLLVMStateAppendReachableEffectCandidatesAndCallsForAre
                         let storageKeyID: Int(compilerReachableTypeKeyInternFromArena(typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments, arena: arena, typeID: storageTypeID))
                         let effectPathID: Int(compilerBodyArenaOwnedPathToEffectPath(arena: arena, ownedPathID: canonicalPathID, effectPaths: reachability.functionInstanceEffectPaths))
                         let effectKind: Int(compilerBodyArenaOwnedEffectForRuntimeRole(role: role))
-                        if baseKind < 0 || baseOrdinal < 0 || storageKeyID < 0 || effectPathID == 0 - 2 || effectKind == compilerBodyOwnedEffectNone() { return 0 - 1 }
-                        if compilerBodyFunctionInstanceEffectAppend(effects: reachability.functionInstanceEffects, paths: reachability.functionInstanceEffectPaths, instanceID: instanceID, baseKind: baseKind, ordinal: baseOrdinal, memberPathID: effectPathID, storageKeyID: storageKeyID, effectKind: effectKind) < 0 { return 0 - 1 }
+                        if baseKind < 0 || baseOrdinal < 0 || storageKeyID < 0 || effectPathID == 0 - 2 || effectKind == compilerBodyOwnedEffectNone() { return 0 - 104 }
+                        if compilerBodyFunctionInstanceEffectAppend(effects: reachability.functionInstanceEffects, paths: reachability.functionInstanceEffectPaths, instanceID: instanceID, baseKind: baseKind, ordinal: baseOrdinal, memberPathID: effectPathID, storageKeyID: storageKeyID, effectKind: effectKind) < 0 { return 0 - 105 }
                     } else if rootClass != compilerBodyOwnedSummaryRootLocalCreate() {
-                        return 0 - 1
+                        return 0 - 106
                     }
                 }
             }
             let calleeNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: applicationNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0))
             let resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: calleeNodeID))
-            if calleeNodeID < 0 || resolutionRow < 0 { return 0 - 1 }
+            if calleeNodeID < 0 || resolutionRow < 0 { return 0 - 107 }
             if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) == compilerBodyResolutionFunction() {
                 let targetInstanceID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionInstanceIDColumn()))
-                if targetInstanceID < 0 || targetInstanceID >= compilerIntTableRowCount(table: reachability.functionInstances) { return 0 - 1 }
+                if targetInstanceID < 0 || targetInstanceID >= compilerIntTableRowCount(table: reachability.functionInstances) { return 0 - 108 }
                 let receiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: calleeNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
                 if receiverNodeID >= 0 {
-                    if compilerReachableLLVMStateAppendEffectCallMappingForValue(reachability: reachability, arena: arena, callerInstanceID: instanceID, targetInstanceID: targetInstanceID, calleeBaseKind: compilerBodyOwnedBaseReceiver(), calleeOrdinal: 0, valueNodeID: receiverNodeID) != 0 { return 0 - 1 }
+                    if compilerReachableLLVMStateAppendEffectCallMappingForValue(reachability: reachability, arena: arena, callerInstanceID: instanceID, targetInstanceID: targetInstanceID, calleeBaseKind: compilerBodyOwnedBaseReceiver(), calleeOrdinal: 0, valueNodeID: receiverNodeID) != 0 { return 0 - 109 }
                 }
                 let argumentCount: Int(compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: applicationNodeID))
-                if argumentCount < 0 { return 0 - 1 }
+                if argumentCount < 0 { return 0 - 110 }
                 state argumentOrdinal: Int(0)
                 while argumentOrdinal < argumentCount {
                     let argumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: applicationNodeID, role: compilerSyntaxRoleArgument(), ordinal: argumentOrdinal))
                     let valueNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: argumentNodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0))
                     if argumentNodeID < 0 || valueNodeID < 0
-                        || compilerReachableLLVMStateAppendEffectCallMappingForValue(reachability: reachability, arena: arena, callerInstanceID: instanceID, targetInstanceID: targetInstanceID, calleeBaseKind: compilerBodyOwnedBaseParameter(), calleeOrdinal: argumentOrdinal, valueNodeID: valueNodeID) != 0 { return 0 - 1 }
+                        || compilerReachableLLVMStateAppendEffectCallMappingForValue(reachability: reachability, arena: arena, callerInstanceID: instanceID, targetInstanceID: targetInstanceID, calleeBaseKind: compilerBodyOwnedBaseParameter(), calleeOrdinal: argumentOrdinal, valueNodeID: valueNodeID) != 0 { return 0 - 111 }
                     argumentOrdinal: argumentOrdinal + 1
                 }
             }
@@ -3982,7 +3985,10 @@ function compilerReachableLLVMStateClassifyReturnAndCollectDirectEffectsForWorkI
             || compilerIntTableValue(table: reachability.functionInstanceSignatures, row: signatureRow, column: compilerReachableFunctionInstanceSignatureReturnTypeKeyColumn()) != returnTypeKeyID
             || compilerIntTableValue(table: reachability.functionInstanceSignatures, row: signatureRow, column: compilerReachableFunctionInstanceSignatureReturnTypeKindColumn()) != returnTypeKind { status: 6 }
     }
-    if status == 0 && compilerReachableLLVMStateAppendReachableEffectCandidatesAndCallsForArena(reachability: reachability, arena: arena, instanceID: instanceID) != 0 { status: 7 }
+    if status == 0 {
+        let effectStatus: Int(compilerReachableLLVMStateAppendReachableEffectCandidatesAndCallsForArena(reachability: reachability, arena: arena, instanceID: instanceID))
+        if effectStatus != 0 { status: 700 + (0 - effectStatus) }
+    }
     if status == 0 {
         let trackedStatus: Int(compilerBodyArenaTypeTrackedStorageStatus(arena: arena, typeID: returnTypeID))
         if trackedStatus < 0 {

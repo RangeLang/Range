@@ -1,5 +1,5 @@
 @main {
-    state values: Buffer<Float>(storage: rawBufferCreate(capacity: 1, stride: 8))
+    state values: Buffer<Float>(capacity: 1)
     let value: Float(1.0)
     values.append(element: value)
     values.destroy()

@@ -42,7 +42,7 @@ LLVM="$BUILD_ROOT/IntegerUnsigned8.ll"
 
 /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$SOURCE_SET"
 /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Memory/RawBuffer.range' >> "$SOURCE_SET"
-/bin/cat "$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/RawBuffer.range" >> "$SOURCE_SET"
+/bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range" >> "$SOURCE_SET"
 /usr/bin/printf '\n%s\n' 'compilerSourceFile\trole=project\tpath=Project/IntegerUnsigned8.range' >> "$SOURCE_SET"
 /bin/cat "$REPO_ROOT/Testing/Types/Pass/IntegerUnsigned8.range" >> "$SOURCE_SET"
 /usr/bin/printf '\n' >> "$SOURCE_SET"

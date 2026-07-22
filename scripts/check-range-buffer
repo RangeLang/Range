@@ -22,9 +22,10 @@ check_case() {
     local fixture="$2"
     local expected_exit="$3"
     local expected_type="$4"
-    local append_symbol="$5"
-    local load_symbol="$6"
-    local store_symbol="$7"
+    local create_symbol="$5"
+    local append_symbol="$6"
+    local load_symbol="$7"
+    local store_symbol="$8"
     local bundle="$WORK_ROOT/$name.range"
     local llvm="$WORK_ROOT/$name.ll"
     local executable="$WORK_ROOT/$name"
@@ -33,8 +34,8 @@ check_case() {
     local compile_error="$WORK_ROOT/$name.compile.err"
 
     /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$bundle"
-    append_source "$bundle" core RangeCompiler/Range/Core/System/Memory/RawBuffer.range "$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/RawBuffer.range"
-    append_source "$bundle" core RangeCompiler/Range/Core/System/Memory/Buffer.range "$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/Buffer.range"
+    append_source "$bundle" core RangeCompiler/Sources/Core/System/Memory/RawBuffer.range "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range"
+    append_source "$bundle" core RangeCompiler/Sources/Core/System/Memory/Buffer.range "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/Buffer.range"
     append_source "$bundle" project "$fixture" "$REPO_ROOT/$fixture"
 
     local compile_status=0
@@ -73,7 +74,11 @@ check_case() {
     [[ "$run_status" -eq "$expected_exit" ]] || { echo "$name exited $run_status, expected $expected_exit" >&2; exit 1; }
     [[ ! -s "$run_output" && ! -s "$run_error" ]] || { echo "$name wrote output" >&2; exit 1; }
     /usr/bin/grep -Fq "$expected_type" "$llvm" || { echo "$name omitted $expected_type element lowering" >&2; exit 1; }
-    /usr/bin/grep -Fq 'rawBufferCreate' "$llvm" || { echo "$name omitted storage creation" >&2; exit 1; }
+    /usr/bin/grep -Fq "call ptr @$create_symbol(i32 1)" "$llvm" || { echo "$name omitted $create_symbol" >&2; exit 1; }
+    if /usr/bin/grep -Fq 'call ptr @rawBufferCreate' "$llvm"; then
+        echo "$name exposed rawBufferCreate instead of canonical Buffer creation" >&2
+        exit 1
+    fi
     /usr/bin/grep -Fq "call i32 @$append_symbol(" "$llvm" || { echo "$name omitted $append_symbol" >&2; exit 1; }
     /usr/bin/grep -Fq "@$load_symbol(" "$llvm" || { echo "$name omitted $load_symbol" >&2; exit 1; }
     /usr/bin/grep -Fq "call i32 @$store_symbol(" "$llvm" || { echo "$name omitted $store_symbol" >&2; exit 1; }
@@ -86,8 +91,8 @@ check_unsupported_layout() {
     local error="$WORK_ROOT/BufferUnsupportedFloatLayout.err"
 
     /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$bundle"
-    append_source "$bundle" core RangeCompiler/Range/Core/System/Memory/RawBuffer.range "$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/RawBuffer.range"
-    append_source "$bundle" core RangeCompiler/Range/Core/System/Memory/Buffer.range "$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/Buffer.range"
+    append_source "$bundle" core RangeCompiler/Sources/Core/System/Memory/RawBuffer.range "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range"
+    append_source "$bundle" core RangeCompiler/Sources/Core/System/Memory/Buffer.range "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/Buffer.range"
     append_source "$bundle" project Testing/Collections/Fail/BufferUnsupportedFloatLayout.range "$REPO_ROOT/Testing/Collections/Fail/BufferUnsupportedFloatLayout.range"
 
     local status=0
@@ -98,7 +103,7 @@ check_unsupported_layout() {
     fi
     [[ "$status" -eq 65 ]] || { echo "unsupported Buffer<Float> layout exited $status, expected 65" >&2; exit 1; }
     [[ ! -s "$error" ]] || { echo "unsupported Buffer<Float> layout wrote stderr" >&2; exit 1; }
-    /usr/bin/grep -Fq $'compilerError\tkind=invalidFunctionDiscovery\tfunctionRow=' "$output" \
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$output" \
         || { /bin/cat "$output" >&2; echo "unsupported Buffer<Float> layout omitted its typed diagnostic" >&2; exit 1; }
     if /usr/bin/grep -Fq 'define ' "$output"; then
         echo "unsupported Buffer<Float> layout emitted LLVM" >&2
@@ -106,8 +111,8 @@ check_unsupported_layout() {
     fi
 }
 
-check_case BufferIntLifecycle Testing/Collections/Pass/BufferIntLifecycle.range 7 'i32' rawBufferAppendInt rawBufferLoadInt rawBufferStoreInt
-check_case BufferUnsigned8Lifecycle Testing/Collections/Pass/BufferUnsigned8Lifecycle.range 1 'i8' rawBufferAppendUnsigned8 rawBufferLoadUnsigned8 rawBufferStoreUnsigned8
+check_case BufferIntLifecycle Testing/Collections/Pass/BufferIntLifecycle.range 7 'i32' bufferCreateInt rawBufferAppendInt rawBufferLoadInt rawBufferStoreInt
+check_case BufferUnsigned8Lifecycle Testing/Collections/Pass/BufferUnsigned8Lifecycle.range 1 'i8' bufferCreateUnsigned8 rawBufferAppendUnsigned8 rawBufferLoadUnsigned8 rawBufferStoreUnsigned8
 check_unsupported_layout
 
 echo "Canonical Buffer integer layouts verified."

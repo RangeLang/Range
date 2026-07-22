@@ -114,7 +114,7 @@ scripts/range compiler progression
 scripts/range check-stage2-compiler
 ```
 
-The supported implementation is the Range-authored self-hosted compiler kernel. It emits native LLVM and must reproduce byte-identical LLVM and linked compiler executables before a compiler change is accepted. Ordinary project compilation is intentionally absent until its source loading, macro materialization, lowering, and runtime behavior are Range-owned and proven. See [Documentation](Documentation/README.md) for the current architecture record and the [speed benchmark](Benchmarks/Speed/README.md) for performance comparisons.
+The supported implementation is the Range-authored self-hosted compiler kernel. It emits native LLVM and must reproduce byte-identical LLVM and linked compiler executables before a compiler change is accepted. Ordinary project compilation is intentionally absent until its source loading, macro materialization, lowering, and runtime behavior are Range-owned and proven. See the [speed benchmark](Benchmarks/Speed/README.md) for performance comparisons.
 
 ## License
 

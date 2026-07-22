@@ -1,0 +1,67 @@
+# Repository Guidance
+
+## TODO Tracking
+
+- Record repository work in the root `TODO.md` instead of creating scattered
+  TODO files or leaving TODO lists in handoffs.
+- Write actionable work as Markdown checkboxes: `- [ ]` for pending work and
+  `- [x]` for completed work.
+- Use nested checkboxes when an item has independently verifiable steps.
+- Add a short nested description, decision note, or verification condition
+  when the checkbox title alone does not provide enough context.
+- Keep historical proof and completed checkpoint details in the relevant
+  documentation; `TODO.md` should describe current or deliberately deferred
+  work.
+
+## Testing Structure
+
+- `Testing/` is the repository's single active test-fixture root.
+- Group fixtures by the language or compiler feature they protect, then by
+  expected outcome: `Testing/<Feature>/Pass/` or
+  `Testing/<Feature>/Fail/`. Do not create competing top-level `Tests`,
+  `Native`, `SelfHosting`, or global `Pass`/`Fail` trees.
+- `Pass` means the fixture must reach its expected successful result. `Fail`
+  means rejection or a runtime trap is expected; the proof script that owns
+  the fixture must check the exact failure boundary.
+- Name fixtures after the behavior they prove. Add one only for behavior
+  implemented by the Range-authored compiler and wire it into a supported
+  proof command.
+- Treat these fixtures as focused compiler proofs, not as evidence that the
+  complete language or Foundation surface works.
+- Run the supported validation ladder from the narrowest relevant gate toward
+  the broadest required gate:
+  - `scripts/range check-build-plan`
+  - `scripts/range check-root-value` (add `--controls` for its full positive
+    and rejection set)
+  - `scripts/range check-compiler-smoke`
+  - `scripts/range check-compiler-candidate`
+  - `scripts/range check-stage2-compiler`
+  - `scripts/range compiler progression`
+- A passing gate proves only that gate and its prerequisites. Do not report it
+  as proof that later gates ran or passed.
+
+## Deferred Unified Generic Parameters Review
+
+Do not change generic syntax or semantics as part of the current Buffer work.
+Use the generic system exactly as it exists unless it becomes a concrete
+blocker.
+
+A later design review should consider one unified model in which every generic
+argument is an immutable compile-time value and a type is one possible value,
+rather than maintaining fundamentally separate type-generic and value-generic
+systems. Questions for that review include:
+
+- whether a bare parameter such as `Element` should accept an unconstrained
+  compile-time value rather than implicitly mean `Type`;
+- whether an annotation such as `size: Int` should constrain the value without
+  requiring the redundant `let` spelling;
+- whether generic parameters should follow the same independent local-name and
+  external-argument-label rules as ordinary function parameters;
+- how specialization bindings should be exposed as type-level properties
+  without adding fields to every runtime instance; and
+- how parameter usage should contribute capability requirements such as
+  `Element.layout` through the graph.
+
+Revisit this only after the current generic system blocks a permanent Buffer
+layout implementation, or after that implementation is complete. Do not make
+the Buffer slice depend on resolving these questions first.

@@ -96,7 +96,9 @@ function compilerBodyRuntimeBuiltinRawBufferLoadUnsigned8(): Int { return 37 }
 function compilerBodyRuntimeBuiltinRawBufferStoreUnsigned8(): Int { return 38 }
 function compilerBodyRuntimeBuiltinRunProcess(): Int { return 39 }
 function compilerBodyRuntimeBuiltinRunProcessBatch(): Int { return 40 }
-function compilerBodyRuntimeBuiltinCount(): Int { return 40 }
+function compilerBodyRuntimeBuiltinBufferCreateInt(): Int { return 41 }
+function compilerBodyRuntimeBuiltinBufferCreateUnsigned8(): Int { return 42 }
+function compilerBodyRuntimeBuiltinCount(): Int { return 42 }
 
 function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("stringTransientRegionMark") { return compilerBodyRuntimeBuiltinStringTransientRegionMark() }
@@ -139,6 +141,8 @@ function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("rawBufferStoreUnsigned8") { return compilerBodyRuntimeBuiltinRawBufferStoreUnsigned8() }
     if name == String("runProcess") { return compilerBodyRuntimeBuiltinRunProcess() }
     if name == String("runProcessBatch") { return compilerBodyRuntimeBuiltinRunProcessBatch() }
+    if name == String("bufferCreateInt") { return compilerBodyRuntimeBuiltinBufferCreateInt() }
+    if name == String("bufferCreateUnsigned8") { return compilerBodyRuntimeBuiltinBufferCreateUnsigned8() }
     return compilerBodyRuntimeBuiltinNone()
 }
 
@@ -183,6 +187,8 @@ function compilerBodyRuntimeBuiltinName(id: Int): String {
     if id == compilerBodyRuntimeBuiltinRawBufferStoreUnsigned8() { return String("rawBufferStoreUnsigned8") }
     if id == compilerBodyRuntimeBuiltinRunProcess() { return String("runProcess") }
     if id == compilerBodyRuntimeBuiltinRunProcessBatch() { return String("runProcessBatch") }
+    if id == compilerBodyRuntimeBuiltinBufferCreateInt() { return String("bufferCreateInt") }
+    if id == compilerBodyRuntimeBuiltinBufferCreateUnsigned8() { return String("bufferCreateUnsigned8") }
     return String("")
 }
 
@@ -193,6 +199,8 @@ function compilerBodyRuntimeBuiltinReturnType(id: Int): String {
         || id == compilerBodyRuntimeBuiltinStringSliceUnchecked()
         || id == compilerBodyRuntimeBuiltinStringCharacterAt()
         || id == compilerBodyRuntimeBuiltinRawBufferCreate()
+        || id == compilerBodyRuntimeBuiltinBufferCreateInt()
+        || id == compilerBodyRuntimeBuiltinBufferCreateUnsigned8()
         || id == compilerBodyRuntimeBuiltinRawBufferMaterializeText()
         || id == compilerBodyRuntimeBuiltinStringSubstring()
         || id == compilerBodyRuntimeBuiltinCommandLineArgument()
@@ -216,6 +224,8 @@ function compilerBodyRuntimeBuiltinParameterCount(id: Int): Int {
         || id == compilerBodyRuntimeBuiltinReadFile()
         || id == compilerBodyRuntimeBuiltinCompilerMetricsSetEnabled()
         || id == compilerBodyRuntimeBuiltinPrint() { return 1 }
+    if id == compilerBodyRuntimeBuiltinBufferCreateInt()
+        || id == compilerBodyRuntimeBuiltinBufferCreateUnsigned8() { return 1 }
     if id == compilerBodyRuntimeBuiltinStringHasPrefix()
         || id == compilerBodyRuntimeBuiltinStringFindFrom()
         || id == compilerBodyRuntimeBuiltinStringFindFirstOf()
@@ -238,6 +248,8 @@ function compilerBodyRuntimeBuiltinParameterType(id: Int, ordinal: Int): String 
     let count: Int(compilerBodyRuntimeBuiltinParameterCount(id: id))
     if ordinal < 0 || ordinal >= count { return String("") }
     if id == compilerBodyRuntimeBuiltinRawBufferCreate()
+        || id == compilerBodyRuntimeBuiltinBufferCreateInt()
+        || id == compilerBodyRuntimeBuiltinBufferCreateUnsigned8()
         || id == compilerBodyRuntimeBuiltinStringTransientRegionReset()
         || id == compilerBodyRuntimeBuiltinCommandLineArgument() { return String("i32") }
     if id == compilerBodyRuntimeBuiltinCompilerMetricsSetEnabled() { return String("i1") }
@@ -710,6 +722,7 @@ function compilerNominalLLVMLayoutIsSupportedAtDepth(tables: CompilerSyntaxTable
         || compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 2) != compilerSyntaxKindConstruct() { return false }
     if compilerNominalDeclarationIsArray(tables: tables, declarationRow: declarationRow) { return true }
     let syntaxID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 0))
+    if compilerRuntimeABIConstructKind(tables: tables, constructNodeID: syntaxID) == compilerRuntimeABIOpaqueStorage() { return true }
     state memberCount: Int(0)
     state memberRow: Int(0)
     while memberRow < compilerIntTableRowCount(table: tables.members) {
@@ -731,6 +744,8 @@ function compilerNominalLLVMLayoutIsSupported(tables: CompilerSyntaxTables, decl
 
 function compilerNominalLLVMTypeName(tables: CompilerSyntaxTables, declarationRow: Int): String {
     if !compilerNominalLLVMLayoutIsSupported(tables: tables, declarationRow: declarationRow) { return String("") }
+    let syntaxID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 0))
+    if compilerRuntimeABIConstructKind(tables: tables, constructNodeID: syntaxID) == compilerRuntimeABIOpaqueStorage() { return String("") }
     let fileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
     let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
     return "%Range.\(name)"

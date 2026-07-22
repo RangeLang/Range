@@ -77,6 +77,14 @@ void *rawBufferCreate(int32_t requestedCapacity, int32_t requestedStride) {
     return buffer;
 }
 
+void *bufferCreateInt(int32_t requestedCapacity) {
+    return rawBufferCreate(requestedCapacity, (int32_t)sizeof(int32_t));
+}
+
+void *bufferCreateUnsigned8(int32_t requestedCapacity) {
+    return rawBufferCreate(requestedCapacity, (int32_t)sizeof(uint8_t));
+}
+
 int32_t rawBufferAppendInt(void *opaqueBuffer, int32_t value) {
     RangeRawBuffer *buffer = opaqueBuffer;
     if (!buffer || buffer->stride != sizeof(value) || buffer->count >= INT32_MAX) {

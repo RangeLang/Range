@@ -501,8 +501,15 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
                 return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
             }
             if ordinaryMemberFunctionCall {
-                let memberCallReceiverAddressID: Int(compilerBodyMIRBuildMemberReceiverAddress(arena: arena, receiverNodeID: memberCallReceiverNodeID, blockID: blockID))
-                if memberCallReceiverAddressID < 0 || rawBufferAppendInt(buffer: argumentValues, value: memberCallReceiverAddressID) != 0 {
+                let memberCallReceiverTypeID: Int(compilerBodyArenaExpressionTypeID(arena: arena, nodeID: memberCallReceiverNodeID))
+                state memberCallReceiverValueID: Int(0 - 1)
+                if compilerBodyArenaTypeIDIsOpaqueStorage(arena: arena, typeID: memberCallReceiverTypeID) {
+                    let memberCallReceiverValue: CompilerBodyMIRValueResult(compilerBodyMIRBuildExpression(arena: arena, nodeID: memberCallReceiverNodeID, blockID: blockID))
+                    if memberCallReceiverValue.isValid { memberCallReceiverValueID: memberCallReceiverValue.valueID }
+                } else {
+                    memberCallReceiverValueID: compilerBodyMIRBuildMemberReceiverAddress(arena: arena, receiverNodeID: memberCallReceiverNodeID, blockID: blockID)
+                }
+                if memberCallReceiverValueID < 0 || rawBufferAppendInt(buffer: argumentValues, value: memberCallReceiverValueID) != 0 {
                     rawBufferDestroy(buffer: argumentValues)
                     return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
                 }
@@ -1092,8 +1099,9 @@ function compilerBodyMIRExecuteScheduleAction(arena: CompilerBodyArena, schedule
     if action == compilerBodyCFGScheduleStatementCommit() { result: compilerBodyMIRCommitScheduledStatement(arena: arena, statementNodeID: nodeID, blockID: blockID) }
     if action == compilerBodyCFGScheduleSwitchMatch() { result: compilerBodyMIRBuildScheduledSwitchMatch(arena: arena, caseNodeID: nodeID, blockID: blockID) }
     if action == compilerBodyCFGScheduleSwitchPayloadBind() { result: compilerBodyMIRBuildScheduledSwitchPayloadBind(arena: arena, bindingNodeID: nodeID, blockID: blockID) }
-    if !result.isValid { return 0 - (action * 100000 + nodeID + 1) }
-    if compilerBodyMIRAppendExpressionValue(arena: arena, nodeID: nodeID, action: action, valueID: result.valueID, blockID: blockID) < 0 { return 0 - (800000 + nodeID + 1) }
+    let nodeKind: Int(compilerIntTableValue(table: arena.nodes, row: nodeID, column: 1))
+    if !result.isValid { return 0 - (action * 1000000 + nodeKind * 10000 + nodeID + 1) }
+    if compilerBodyMIRAppendExpressionValue(arena: arena, nodeID: nodeID, action: action, valueID: result.valueID, blockID: blockID) < 0 { return 0 - (8000000 + nodeKind * 10000 + nodeID + 1) }
     return 0
 }
 

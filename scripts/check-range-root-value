@@ -16,7 +16,7 @@ Usage:
   scripts/check-range-root-value --controls [DIR]
   scripts/check-range-root-value --help
 
-DIR defaults to RangeCompiler/Range/Programs/Compiler. The command resolves a
+DIR defaults to RangeCompiler/Sources/Compiler. The command resolves a
 content-addressed Stage 2 compiler for the current accepted seed, runtime, and
 compiler sources, then validates only RootValue boundary-forward-mixed.
 The controls mode runs the complete neighboring RootValue positive and negative
@@ -210,7 +210,7 @@ main_root_value() {
         trap '/bin/rm -rf "$WORK_ROOT"' EXIT
     fi
 
-    canonical_core_source_path="$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/RawBuffer.range"
+    canonical_core_source_path="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range"
     [[ -f "$canonical_core_source_path" ]] || fail "missing canonical Core proof input: $canonical_core_source_path"
     CORE_SOURCE_MARKER_PATH="${canonical_core_source_path#"$REPO_ROOT/"}"
     CORE_SOURCE_PATH="$WORK_ROOT/RawBuffer.range"

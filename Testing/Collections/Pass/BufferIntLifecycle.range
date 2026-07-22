@@ -1,5 +1,5 @@
 function makeNumbers(): Buffer<Int> {
-    state numbers: Buffer<Int>(storage: rawBufferCreate(capacity: 1, stride: 4))
+    state numbers: Buffer<Int>(capacity: 1)
     numbers.append(element: 1)
     numbers.append(element: 2)
     numbers.append(element: 3)

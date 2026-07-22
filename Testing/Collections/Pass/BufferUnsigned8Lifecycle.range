@@ -1,5 +1,5 @@
 function makeBytes(): Buffer<Int<8, .unsigned>> {
-    state bytes: Buffer<Int<8, .unsigned>>(storage: rawBufferCreate(capacity: 1, stride: 1))
+    state bytes: Buffer<Int<8, .unsigned>>(capacity: 1)
     let first: Int<8, .unsigned>(3)
     let second: Int<8, .unsigned>(7)
     let third: Int<8, .unsigned>(11)
