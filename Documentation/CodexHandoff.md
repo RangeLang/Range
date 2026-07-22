@@ -627,3 +627,72 @@ whose initializer is a direct `$source` reference. It does not yet prove deeper
 binding/member paths, binding forwarding, or the full shared/unique alias
 conflict matrix for Array writes. Those are the next binding-mutation boundary;
 do not generalize this source-provenance shortcut into a second storage model.
+
+## Generic Buffer Element-Layout Checkpoint
+
+`Buffer<Element>` now selects its executable raw-storage capability from the
+resolved receiver specialization rather than assuming every Element is the
+ordinary four-byte `Int`. The body compiler derives the admitted layout from
+the concrete Element TypeID. The current matrix is deliberately narrow:
+
+```text
+Int                       byteSize=4 alignment=4 LLVM=i32
+Int<8, .unsigned>         byteSize=1 alignment=1 LLVM=i8
+```
+
+The same Range-authored `Buffer<Element>` declaration now executes append,
+count, indexed read, indexed update, function return, and destruction for both
+layouts. The unsigned-eight specialization maps the declaration-driven Int
+storage leaves to the existing unsigned-eight raw-storage leaves during typed
+function discovery. Unsupported layouts such as `Buffer<Float>` reject during
+function discovery and do not emit LLVM; there is no Int fallback.
+
+Permanent fixtures live at
+`Testing/Collections/Pass/BufferUnsigned8Lifecycle.range` and
+`Testing/Collections/Fail/BufferUnsupportedFloatLayout.range`.
+`scripts/check-range-buffer` proves ordinary Int and unsigned-eight execution
+and the unsupported-layout rejection. The complete compiler candidate gate now
+runs that proof independently with Stage 2 and Stage 3.
+
+The accepted source candidate reaches a fixed point. Stage 2 and Stage 3 LLVM
+are byte-identical at SHA-256
+`df4a817e1aea0db0f40653d5496b5d036b647bb7b8329e79977b4b8e9cfd1a3a`
+and 5,572,365 bytes. Their executables are byte-identical at SHA-256
+`8ae1a4a95fded08047269902539af41d73fc5d06b5d8372f08c5a350701112b7`
+and 3,522,848 bytes. That exact LLVM artifact is now the accepted seed.
+Accepted-seed integrity passes, and the promoted seed independently reproduced
+the same LLVM hash and byte count in 139.47 seconds with 560,726,016 bytes
+maximum RSS.
+
+This checkpoint does not remove RawBuffer yet. RawBuffer remains the physical
+allocation, growth, count, and destruction substrate for Buffer and for the
+self-hosted compiler's own tables. The next removal slice must give Buffer a
+canonical Element-layout-driven create/grow/address representation, migrate
+compiler-owned integer tables to it, and only then delete the Range RawBuffer
+type and `RangeRawBuffer.c`. Do not claim that deletion from this checkpoint.
+
+## Review Later: Unified Generic Parameters
+
+Do not change generic syntax or semantics as part of the current Buffer work.
+Use the generic system exactly as it exists unless it becomes a concrete
+blocker.
+
+A later design review should consider one unified model in which every generic
+argument is an immutable compile-time value and a type is one possible value,
+rather than maintaining fundamentally separate type-generic and value-generic
+systems. Questions for that review include:
+
+- whether a bare parameter such as `Element` should accept an unconstrained
+  compile-time value rather than implicitly mean `Type`;
+- whether an annotation such as `size: Int` should constrain the value without
+  requiring the redundant `let` spelling;
+- whether generic parameters should follow the same independent local-name and
+  external-argument-label rules as ordinary function parameters;
+- how specialization bindings should be exposed as type-level properties
+  without adding fields to every runtime instance; and
+- how parameter usage should contribute capability requirements such as
+  `Element.layout` through the graph.
+
+Revisit this only after the current generic system blocks a permanent Buffer
+layout implementation, or after that implementation is complete. Do not make
+the Buffer slice depend on resolving these questions first.

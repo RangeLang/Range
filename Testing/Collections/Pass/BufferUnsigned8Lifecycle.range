@@ -1,0 +1,19 @@
+function makeBytes(): Buffer<Int<8, .unsigned>> {
+    state bytes: Buffer<Int<8, .unsigned>>(storage: rawBufferCreate(capacity: 1, stride: 1))
+    let first: Int<8, .unsigned>(3)
+    let second: Int<8, .unsigned>(7)
+    let third: Int<8, .unsigned>(11)
+    bytes.append(element: first)
+    bytes.append(element: second)
+    bytes.append(element: third)
+    return bytes
+}
+
+@main {
+    state bytes: Buffer<Int<8, .unsigned>>(makeBytes())
+    let expected: Int<8, .unsigned>(13)
+    bytes.update(element: expected, index: 1)
+    let valid: Bool(bytes.count == 3 && bytes.element(index: 1) == expected)
+    bytes.destroy()
+    return valid
+}
