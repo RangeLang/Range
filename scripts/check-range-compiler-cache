@@ -17,7 +17,7 @@ fail() {
     exit 1
 }
 
-/bin/cp "$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnInteger.range" "$INPUT"
+/bin/cp "$REPO_ROOT/Testing/Basics/Pass/ReturnInteger.range" "$INPUT"
 
 RANGE_COMPILER_CACHE_DIR="$CACHE_ROOT" RANGE_CACHE_TRACE=1 \
     "$REPO_ROOT/scripts/range" compiler emit-llvm "$INPUT" "$WORK_ROOT/cold.ll" \

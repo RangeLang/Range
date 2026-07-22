@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[3]
-BUILD = ROOT / "Development" / "Benchmarks" / "Speed" / ".build" / "nested-billion"
+ROOT = Path(__file__).resolve().parents[2]
+BUILD = ROOT / "Benchmarks" / "Speed" / ".build" / "nested-billion"
 OUTER = int(os.environ.get("OUTER", "1000"))
 INNER = int(os.environ.get("INNER", "1000000"))
 RUNS = int(os.environ.get("RUNS", "1"))

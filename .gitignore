@@ -12,6 +12,5 @@ DerivedData/
 
 .swiftpm/
 .build-local/
-RangeCLI/dist/
 .zed/
 .range/

@@ -1,0 +1,9 @@
+construct MutableArrayBox {
+    state values: [Int]
+}
+
+@main {
+    state box: MutableArrayBox(MutableArrayBox(values: [1, 2, 3]))
+    box.values[1]: 7
+    return box.values[1]
+}

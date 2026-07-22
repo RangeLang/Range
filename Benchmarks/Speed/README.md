@@ -77,7 +77,8 @@ Use `VERBOSE=1` to show full setup command output on failures.
 Every run writes the versioned category → subcategory → leaf tree to:
 
 - `results/latest.json`, the canonical benchmark artifact.
-- `Site/public/benchmarks.json`, the website input generated from the same run.
+- `Website/public/benchmarks.json`, the website input generated from the same
+  run.
 
 Each leaf includes its workload count and unit, correctness status, Range emission status,
 fastest-to-slowest language measurements, wall and CPU milliseconds, peak memory, C-relative

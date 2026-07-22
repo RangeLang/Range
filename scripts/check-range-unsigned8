@@ -18,7 +18,7 @@ trap cleanup EXIT
 
 clang -std=c11 -Wall -Wextra -Werror \
     "$REPO_ROOT/RangeCompiler/Runtime/RangeRawBuffer.c" \
-    "$REPO_ROOT/RangeCompiler/Tests/RangeCompilerTests/RangeRawBufferUnsigned8Tests.c" \
+    "$REPO_ROOT/Testing/Runtime/Pass/RangeRawBufferUnsigned8Tests.c" \
     -o "$BUILD_ROOT/RangeRawBufferUnsigned8Tests"
 "$BUILD_ROOT/RangeRawBufferUnsigned8Tests"
 
@@ -44,7 +44,7 @@ LLVM="$BUILD_ROOT/IntegerUnsigned8.ll"
 /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Memory/RawBuffer.range' >> "$SOURCE_SET"
 /bin/cat "$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/RawBuffer.range" >> "$SOURCE_SET"
 /usr/bin/printf '\n%s\n' 'compilerSourceFile\trole=project\tpath=Project/IntegerUnsigned8.range' >> "$SOURCE_SET"
-/bin/cat "$REPO_ROOT/RangeCompiler/Tests/RangeEmissionTests/IntegerUnsigned8.range" >> "$SOURCE_SET"
+/bin/cat "$REPO_ROOT/Testing/Types/Pass/IntegerUnsigned8.range" >> "$SOURCE_SET"
 /usr/bin/printf '\n' >> "$SOURCE_SET"
 
 "$CANDIDATE_COMPILER" emit-llvm "$SOURCE_SET" "$LLVM"

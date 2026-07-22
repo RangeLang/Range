@@ -1,6 +1,0 @@
-@Project
-construct Project {
-    let name: Title("Performance")
-    let version: Version(0.1.0)
-    let author: "George"
-}

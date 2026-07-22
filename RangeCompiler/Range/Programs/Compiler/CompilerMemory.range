@@ -116,28 +116,6 @@ function compilerMemoryAppendDecision(memory: CompilerMemoryGraph, decisionKind:
     return compilerMemoryAppend(memory: memory, table: memory.decisions, value: originNodeID)
 }
 
-function compilerMemoryMacroFamilyTypeName(tables: CompilerSyntaxTables, memberRow: Int): String {
-    if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: tables.members) { return String("") }
-    let fileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
-    let localStart: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 8))
-    let localEnd: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 9))
-    let start: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: localStart))
-    let end: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: localEnd))
-    if start < 0 || end <= start { return String("") }
-    let firstMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: start))
-    if firstMaybe == nil { return String("") }
-    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: start, end: start, text: String("")))
-    let first: RangeLexedToken(firstMaybe ?? fallback)
-    let macroMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: first.end))
-    if first.kind != .leftBracket || macroMaybe == nil { return String("") }
-    let macroToken: RangeLexedToken(macroMaybe ?? fallback)
-    let rightMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: macroToken.end))
-    if macroToken.kind != .macroAttribute || stringLength(value: macroToken.text) <= 1 || rightMaybe == nil { return String("") }
-    let right: RangeLexedToken(rightMaybe ?? fallback)
-    if right.kind != .rightBracket || right.end != end { return String("") }
-    return macroToken.text.substring(start: 1, end: stringLength(value: macroToken.text))
-}
-
 function compilerMemoryMacroDeclarationForFamilyName(tables: CompilerSyntaxTables, name: String): Int {
     state match: Int(0 - 1)
     state row: Int(0)
@@ -373,7 +351,7 @@ function compilerMemoryBuildMacroFamilyRepresentations(tables: CompilerSyntaxTab
         || compilerIntTableRowCount(table: memory.representationChanges) != 0 { return 0 - 1 }
     state memberRow: Int(0)
     while memberRow < compilerIntTableRowCount(table: tables.members) {
-        let name: String(compilerMemoryMacroFamilyTypeName(tables: tables, memberRow: memberRow))
+        let name: String(compilerSyntaxMemberMacroFamilyName(tables: tables, memberRow: memberRow))
         if name != String("") {
             if compilerMemoryBuildMacroFamilyForMember(tables: tables, memory: memory, memberRow: memberRow, name: name) < 0 { return 0 - 1 }
         }
@@ -1734,4 +1712,3 @@ function compilerMemorySummary(source: String): String {
     }
     return memorySummary
 }
-

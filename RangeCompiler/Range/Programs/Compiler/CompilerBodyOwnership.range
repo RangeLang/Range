@@ -921,8 +921,7 @@ function compilerBodyArenaOwnedFieldTypeID(arena: CompilerBodyArena, receiverTyp
     let memberKind: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 12))
     if receiverSyntaxID < 0 || receiverSyntaxID != memberOwnerSyntaxID
         || (memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState()) { return 0 - 1 }
-    let memberFileID: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 1))
-    return compilerBodyArenaSpecializedTypeIDForSpan(arena: arena, receiverTypeID: receiverTypeID, ownerSyntaxID: memberOwnerSyntaxID, fileID: memberFileID, start: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 8), end: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 9))
+    return compilerBodyArenaTypeIDForMemberRow(arena: arena, receiverTypeID: receiverTypeID, memberRow: memberRow)
 }
 
 function compilerBodyArenaRuntimeBuiltinRoleForApplication(arena: CompilerBodyArena, applicationNodeID: Int): Int {
@@ -1692,8 +1691,7 @@ function compilerBodyArenaTypeTrackedStorageStatus(arena: CompilerBodyArena, typ
                     if compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 2) == receiverSyntaxID {
                         let memberKind: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 12))
                         if memberKind == compilerSyntaxMemberKindLet() || memberKind == compilerSyntaxMemberKindState() || memberKind == compilerSyntaxMemberKindBinding() {
-                            let memberFileID: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 1))
-                            let fieldTypeID: Int(compilerBodyArenaSpecializedTypeIDForSpan(arena: arena, receiverTypeID: candidate, ownerSyntaxID: receiverSyntaxID, fileID: memberFileID, start: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 8), end: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 9)))
+                            let fieldTypeID: Int(compilerBodyArenaTypeIDForMemberRow(arena: arena, receiverTypeID: candidate, memberRow: memberRow))
                             if fieldTypeID < 0 {
                                 status: 0 - 1
                             } else if !compilerBodyArenaTypeListContains(values: visited, value: fieldTypeID) {
@@ -1729,8 +1727,7 @@ function compilerBodyArenaAppendOwnedPathDescendants(arena: CompilerBodyArena, r
         if compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 2) == receiverSyntaxID {
             let memberKind: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 12))
             if memberKind == compilerSyntaxMemberKindLet() || memberKind == compilerSyntaxMemberKindState() || memberKind == compilerSyntaxMemberKindBinding() {
-                let memberFileID: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 1))
-                let fieldTypeID: Int(compilerBodyArenaSpecializedTypeIDForSpan(arena: arena, receiverTypeID: typeID, ownerSyntaxID: receiverSyntaxID, fileID: memberFileID, start: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 8), end: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 9)))
+                let fieldTypeID: Int(compilerBodyArenaTypeIDForMemberRow(arena: arena, receiverTypeID: typeID, memberRow: memberRow))
                 let fieldTrackedStatus: Int(compilerBodyArenaTypeTrackedStorageStatus(arena: arena, typeID: fieldTypeID))
                 if fieldTrackedStatus < 0 { return 0 - 1 }
                 if fieldTrackedStatus == 1 {
@@ -2832,8 +2829,7 @@ function compilerBodyArenaOwnedPathApplyConstructMoveCommit(arena: CompilerBodyA
         if compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 2) == constructSyntaxID {
             let memberKind: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 12))
             if memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState() && memberKind != compilerSyntaxMemberKindBinding() { return 0 - 1 }
-            let memberFileID: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 1))
-            let memberTypeID: Int(compilerBodyArenaSpecializedTypeIDForSpan(arena: arena, receiverTypeID: resultTypeID, ownerSyntaxID: constructSyntaxID, fileID: memberFileID, start: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 8), end: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 9)))
+            let memberTypeID: Int(compilerBodyArenaTypeIDForMemberRow(arena: arena, receiverTypeID: resultTypeID, memberRow: memberRow))
             let memberTrackedStatus: Int(compilerBodyArenaTypeTrackedStorageStatus(arena: arena, typeID: memberTypeID))
             if memberTypeID < 0 || memberTrackedStatus < 0 { return 0 - 1 }
             if memberTrackedStatus == 1 {
@@ -4374,4 +4370,3 @@ function compilerReachableLLVMStateValidateEntryOwnedPaths(reachability: Compile
     }
     return status
 }
-

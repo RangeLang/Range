@@ -2,12 +2,12 @@
   "formatVersion": 1,
   "seed": {
     "path": "RangeCompiler/Bootstrap/RangeCompilerSeed.ll",
-    "bytes": 5487108,
-    "sha256": "2ed6d22bf24fa26c0891828a9f00d168cf937775b7d589beace15b07bdbd470c"
+    "bytes": 5504129,
+    "sha256": "5317f0f40aec05c3d3f2fd31cfb4981e0d57c89d6f297979be38834e461157b8"
   },
   "expectedStage3LLVM": {
-    "bytes": 5487108,
-    "sha256": "2ed6d22bf24fa26c0891828a9f00d168cf937775b7d589beace15b07bdbd470c"
+    "bytes": 5504129,
+    "sha256": "5317f0f40aec05c3d3f2fd31cfb4981e0d57c89d6f297979be38834e461157b8"
   },
   "compilerSources": [
     {
@@ -43,17 +43,17 @@
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerBodyMIR.range",
       "role": "project",
-      "sha256": "6291ff85b4cf0a1f59de3a23bf854f6a02db08fc985e1ef14806d47abd4f34f6"
+      "sha256": "4ec66d1cf769e5f0ae7c0c214e929a6b525193af6cebd0fbf17b5a0843422e72"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerBodyModel.range",
       "role": "project",
-      "sha256": "d1434c486a13af869875a3a10a7da58baa3e0163e0b04c28d3859ae651a4e156"
+      "sha256": "271809b2bae290181f6bae620bd7f47d1a4b6e29dbebc98c0c3fe18d7ff950f2"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerBodyOwnership.range",
       "role": "project",
-      "sha256": "a8fd5064b63dc519153e69e333051aaf37eabc0407c1b05cbaa5882922fbe024"
+      "sha256": "490809f6b53ab50e070f5b56f1b1f7c0e0b8e6427beed567860b131b1e96788d"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerBodyParsing.range",
@@ -63,7 +63,7 @@
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerBodyTypes.range",
       "role": "project",
-      "sha256": "e4c615a76288db364c673ff69b7370f58728f9d85538ce6dec3bd23540695c8e"
+      "sha256": "14b818270f94d576424bd72a84972640b1ec6e940de6dc09944090a2d81fc946"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerBuildPlan.range",
@@ -83,7 +83,7 @@
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerFrontend.range",
       "role": "project",
-      "sha256": "166c39b96a0fa4663b40dc336ca4de778251958b122b10251156c71169554077"
+      "sha256": "29c70baf7a62c11623a340c899a048a2e40fdad37abeff06eca8c2e0ac4e16cd"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerGraph.range",
@@ -98,7 +98,7 @@
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerMemory.range",
       "role": "project",
-      "sha256": "e0e70f6b1a135d817e09fc6e22c3a2fd808368c5c4ba930ec2abe9f8a6c9b4f3"
+      "sha256": "9a5e7489f443e6222f63a4f8964d4fef200ec58415ee0dec60acbc395dda486c"
     },
     {
       "path": "RangeCompiler/Range/Programs/Compiler/CompilerParsing.range",

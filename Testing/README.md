@@ -1,18 +1,35 @@
-# Native compiler proof fixtures
+# Compiler proof fixtures
 
 This folder contains only focused inputs consumed by the self-hosted compiler
 candidate verifier. It is not a general language conformance suite.
 
-- `SelfHosting/MacroFamilyMemory` protects candidate graph and macro-family
-  memory behavior.
-- `SelfHosting/ArrayWriteOutOfBounds.range` protects a native bounds failure.
-- `CompileFail/Collections/ImmutableArrayIndexedAssignment.range` protects the
-  one retained negative collection diagnostic used by candidate verification.
+This is the repository's one active test-fixture root. Fixtures are grouped
+first by the language or compiler feature they protect, then by their expected
+result:
 
-The retained `RangePlayground/Examples/LLVM` programs are likewise candidate
-lowering checks, not evidence that the complete Foundation or project language
-surface is operational. Run the supported validation ladder from cheapest to
-broadest:
+- `Collections/Pass` and `Collections/Fail` cover successful collection
+  behavior, semantic rejection, and required runtime traps.
+- `Basics/Pass` covers the smallest compiler smoke inputs.
+- `ControlFlow/Pass` covers branches and storage switches.
+- `Enums/Pass` covers payloads, recursive enums, and function boundaries.
+- `Macros/Pass` and `Macros/Fail` cover macro-family graph and execution
+  behavior.
+- `Members/Pass` covers derived-member syntax and execution.
+- `Types/Pass` covers scalar representation and lowering.
+- `Runtime/Pass` covers process and low-level runtime behavior.
+- `Compiler/Pass` covers compiler-specific source and graph behavior.
+
+`Pass` means the fixture must reach its expected successful result. `Fail`
+means rejection or a runtime trap is the expected result; the owning proof
+script specifies which one and checks the exact boundary.
+
+The former top-level `Tests` tree was a Swift-era suite and now exists only in
+Git history. The former `RangeCompiler/Tests`, `Native`, `SelfHosting`, and
+`CompileFail` layouts have been folded into this feature-first taxonomy.
+
+These fixtures are focused candidate checks, not evidence that the complete
+Foundation or project language surface is operational. Run the supported
+validation ladder from cheapest to broadest:
 
 ```sh
 # Focused, low-memory Range-authored build-plan reader/source loader; cached after first build.

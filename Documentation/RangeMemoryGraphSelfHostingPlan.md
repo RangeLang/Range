@@ -797,7 +797,7 @@ returned/stored-value and escape-placement fixtures pass, migrate
 ## Supporting Gate: Native Parity Matrix
 
 Before changing the default driver, run the already-built Stage 2 compiler over
-all entries in `RangePlayground/Examples/LLVM/run-manifest.tsv` and classify:
+the permanent fixtures under `Testing` and classify:
 
 - pass;
 - compiler diagnostic;

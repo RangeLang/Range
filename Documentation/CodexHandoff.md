@@ -95,9 +95,9 @@ Implications:
 
 Relevant documents:
 
-- `Development/RangeGraphDerivedConcurrencyPlan.md`
-- `Development/GraphDerivedConcurrencyPost.md`
-- `Development/RangeCompilerDesignDirection.md`
+- `Documentation/RangeGraphDerivedConcurrencyPlan.md`
+- `Documentation/GraphDerivedConcurrencyPost.md`
+- `Documentation/RangeCompilerDesignDirection.md`
 
 The short post is titled **“Range May Not Need Concurrency Syntax.”**
 
@@ -314,7 +314,7 @@ edges.
 Documentation:
 
 - `Testing/README.md`
-- `Development/RangeGraphDerivedConcurrencyPlan.md`
+- `Documentation/RangeGraphDerivedConcurrencyPlan.md`
 
 ## Why The Full Gate Is Slow And Memory-Heavy
 
@@ -569,3 +569,23 @@ scripts/range compiler progression --cached-only
   execution.
 - Keep shell and Range graphs structurally aligned during gradual cutover.
 - Never weaken ownership checks merely to make a fixture pass.
+
+## Continuation Baseline (2026-07-22)
+
+The accepted compiler has advanced beyond the older validation snapshot above.
+It is still a 24-source Range compiler, and the accepted seed is now
+5,504,129-byte LLVM with SHA-256
+`5317f0f40aec05c3d3f2fd31cfb4981e0d57c89d6f297979be38834e461157b8`.
+
+The newly accepted slice permits bounds-checked indexed mutation through one
+mutable construct field, for example `box.values[index]: value`, when both the
+local owner and the Array field are `state`. An immutable owner or field is
+rejected before LLVM. Ordinary construct fields now use the compiler's
+structural type-reference identities; macro-family fields such as
+`[@component]` remain in their existing distinct macro model.
+
+The full candidate gate passed through Stage 2 and Stage 3 with byte-identical
+LLVM and executables, `typed_only_lowering=pass`, and `swift_invocation=none`.
+Accepted-seed integrity and the independent accepted-seed fixed-point check also
+pass. The next Array mutation slice must therefore start from this seed rather
+than rebuilding the same field projection or adding a compatibility bridge.

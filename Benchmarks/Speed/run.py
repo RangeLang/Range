@@ -18,11 +18,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[3]
-BENCH = ROOT / "Development" / "Benchmarks" / "Speed"
+ROOT = Path(__file__).resolve().parents[2]
+BENCH = ROOT / "Benchmarks" / "Speed"
 BUILD = BENCH / ".build"
 RESULTS = BENCH / "results"
-SITE_RESULTS = BENCH / "Site" / "public" / "benchmarks.json"
+SITE_RESULTS = ROOT / "Website" / "public" / "benchmarks.json"
 SEED_MANIFEST = ROOT / "RangeCompiler" / "Bootstrap" / "RangeCompilerSeed.json"
 STAGE2_COMPILER = (
     ROOT / "RangeCompiler" / "Range" / "Programs" / "Compiler" / ".range" / "Build" / "stage2" / "RangeCompiler"

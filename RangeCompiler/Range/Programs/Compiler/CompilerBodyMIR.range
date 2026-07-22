@@ -734,9 +734,7 @@ function compilerBodyMIRCommitMemberAssignment(arena: CompilerBodyArena, stateme
     if receiverSymbolID < 0 || receiverSymbolID >= compilerIntTableRowCount(table: arena.symbols)
         || compilerIntTableValue(table: arena.symbols, row: receiverSymbolID, column: compilerBodySymbolKindColumn()) != compilerBodySymbolReceiver() { return 0 - 1 }
     let receiverTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTypeIDColumn()))
-    let memberFileID: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 1))
-    let memberOwnerSyntaxID: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 2))
-    let memberTypeID: Int(compilerBodyArenaSpecializedTypeIDForSpan(arena: arena, receiverTypeID: receiverTypeID, ownerSyntaxID: memberOwnerSyntaxID, fileID: memberFileID, start: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 8), end: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 9)))
+    let memberTypeID: Int(compilerBodyArenaTypeIDForMemberRow(arena: arena, receiverTypeID: receiverTypeID, memberRow: memberRow))
     let memberTypeKind: Int(compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: memberTypeID))
     if assignedValueID < 0 || assignedValueID >= compilerIntTableRowCount(table: arena.mirValues)
         || compilerIntTableValue(table: arena.mirValues, row: assignedValueID, column: compilerBodyMIRValueTypeColumn()) != memberTypeKind
@@ -1540,10 +1538,8 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                 || assignmentNodeID < 0 || assignmentNodeID >= compilerIntTableRowCount(table: arena.nodes) { return 300000 + operationRow * 100 + operationKind }
             let assignmentTargetNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: assignmentNodeID, role: compilerSyntaxRoleAssignmentTarget(), ordinal: 0))
             let assignmentResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: assignmentTargetNodeID))
-            let memberFileID: Int(compilerIntTableValue(table: arena.tables.members, row: validationTargetID, column: 1))
             let receiverTypeID: Int(compilerIntTableValue(table: arena.mirValues, row: receiverValueID, column: compilerBodyMIRValueTypeIDColumn()))
-            let memberOwnerSyntaxID: Int(compilerIntTableValue(table: arena.tables.members, row: validationTargetID, column: 2))
-            let memberTypeID: Int(compilerBodyArenaSpecializedTypeIDForSpan(arena: arena, receiverTypeID: receiverTypeID, ownerSyntaxID: memberOwnerSyntaxID, fileID: memberFileID, start: compilerIntTableValue(table: arena.tables.members, row: validationTargetID, column: 8), end: compilerIntTableValue(table: arena.tables.members, row: validationTargetID, column: 9)))
+            let memberTypeID: Int(compilerBodyArenaTypeIDForMemberRow(arena: arena, receiverTypeID: receiverTypeID, memberRow: validationTargetID))
             let memberTypeKind: Int(compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: memberTypeID))
             let receiverProvenanceID: Int(compilerIntTableValue(table: arena.mirValues, row: receiverValueID, column: compilerBodyMIRValueProvenanceIDColumn()))
             if validationTargetKind != compilerBodyMIROperationTargetNone()
@@ -1782,4 +1778,3 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
 function compilerBodyMIRIsValid(arena: CompilerBodyArena, abiPlan: CompilerModuleABIPlan): Bool {
     return compilerBodyMIRValidationCode(arena: arena, abiPlan: abiPlan) == 0
 }
-

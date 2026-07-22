@@ -2808,7 +2808,7 @@ function compilerTypedSyntaxCaptureWithPolicy(source: String, tables: CompilerSy
         }
         fileID: fileID + 1
     }
-    if compilerSyntaxLinkEnumPayloadTypeTargets(tables: tables) != 0 {
+    if compilerSyntaxLinkMemberTypeTargets(tables: tables) != 0 {
         compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseEnumPayloadLink(), reason: compilerSyntaxFailureReasonInvalidEnumPayloadType(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 0 - 1)
         return 0 - 1
     }
@@ -3879,9 +3879,9 @@ function compilerSyntaxMembersAreValid(tables: CompilerSyntaxTables): Bool {
             || (memberKind != compilerSyntaxMemberKindEnumCase() && memberKind != compilerSyntaxMemberKindEnumCasePayload() && parentKind != compilerSyntaxKindConstruct())
             || (memberKind == compilerSyntaxMemberKindEnumCasePayload() && (storagePolicy < compilerSyntaxMemberStorageDirect() || storagePolicy > compilerSyntaxMemberStorageIndirect()))
             || (memberKind != compilerSyntaxMemberKindEnumCasePayload() && storagePolicy != compilerSyntaxMemberStorageNone())
-            || (memberKind == compilerSyntaxMemberKindEnumCasePayload() && typeTargetKind != compilerSyntaxTypeTargetReference())
-            || (memberKind == compilerSyntaxMemberKindEnumCasePayload() && typeTargetID < 0)
-            || (memberKind != compilerSyntaxMemberKindEnumCasePayload() && (typeTargetKind != compilerSyntaxTypeTargetNone() || typeTargetID != 0 - 1))
+            || (compilerSyntaxMemberHasTypeReference(tables: tables, memberRow: row) && typeTargetKind != compilerSyntaxTypeTargetReference())
+            || (compilerSyntaxMemberHasTypeReference(tables: tables, memberRow: row) && typeTargetID < 0)
+            || (!compilerSyntaxMemberHasTypeReference(tables: tables, memberRow: row) && (typeTargetKind != compilerSyntaxTypeTargetNone() || typeTargetID != 0 - 1))
             || (memberKind == compilerSyntaxMemberKindEnumCasePayload() && compilerIntTableValue(table: tables.members, row: row, column: 9) <= compilerIntTableValue(table: tables.members, row: row, column: 8))
             || (memberKind == compilerSyntaxMemberKindEnumCase() && compilerIntTableValue(table: tables.members, row: row, column: 9) != compilerIntTableValue(table: tables.members, row: row, column: 8))
             || ordinal != compilerSyntaxPriorChildCount(table: tables.members, row: row, parentColumn: 2, parentSyntaxID: parentSyntaxID) {
@@ -4074,25 +4074,75 @@ function compilerSyntaxTypeReferenceBuild(tables: CompilerSyntaxTables, ownerMem
     return compilerSyntaxTypeReferenceBuildExpected(tables: tables, ownerMemberRow: ownerMemberRow, ownerSyntaxID: ownerSyntaxID, parentNodeID: parentNodeID, ordinal: ordinal, typeName: typeName, typeRange: typeRange, depth: depth, expectedGenericKind: compilerSyntaxGenericParameterTypeKind())
 }
 
-function compilerSyntaxLinkEnumPayloadTypeTargets(tables: CompilerSyntaxTables): Int {
-    state payloadRow: Int(0)
-    while payloadRow < compilerIntTableRowCount(table: tables.members) {
-        if compilerIntTableValue(table: tables.members, row: payloadRow, column: 12) == compilerSyntaxMemberKindEnumCasePayload() {
-            let fileID: Int(compilerIntTableValue(table: tables.members, row: payloadRow, column: 1))
-            let typeName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: payloadRow, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: payloadRow, column: 9)))
-            let ownerSyntaxID: Int(compilerSyntaxEnumPayloadOwnerSyntaxID(tables: tables, payloadRow: payloadRow))
-            let targetID: Int(compilerSyntaxTypeReferenceBuild(tables: tables, ownerMemberRow: payloadRow, ownerSyntaxID: ownerSyntaxID, parentNodeID: 0 - 1, ordinal: 0, typeName: typeName, typeRange: CompilerSourceRange(start: 0, end: stringLength(value: typeName), next: stringLength(value: typeName)), depth: 0))
-            if targetID < 0 {
-                let typeStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.members, row: payloadRow, column: 8)))
-                let typeEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.members, row: payloadRow, column: 9)))
-                compilerSyntaxTablesFailureAnnotateGlobal(tables: tables, phase: compilerSyntaxFailurePhaseEnumPayloadLink(), reason: compilerSyntaxFailureReasonInvalidEnumPayloadType(), fileID: fileID, start: typeStart, end: typeEnd, relatedRow: payloadRow)
-                return 0 - 1
-            }
-            let base: Int(payloadRow * compilerSyntaxMemberColumnCount())
-            if rawBufferStoreInt(buffer: tables.members.values, index: base + 14, value: compilerSyntaxTypeTargetReference()) != 0
-                || rawBufferStoreInt(buffer: tables.members.values, index: base + 15, value: targetID) != 0 { return 0 - 1 }
+function compilerSyntaxMemberKindHasTypeReference(kind: Int): Bool {
+    return kind == compilerSyntaxMemberKindLet() || kind == compilerSyntaxMemberKindState()
+        || kind == compilerSyntaxMemberKindBinding() || kind == compilerSyntaxMemberKindEnumCasePayload()
+}
+
+function compilerSyntaxMemberMacroFamilyName(tables: CompilerSyntaxTables, memberRow: Int): String {
+    if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: tables.members) { return String("") }
+    let fileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
+    let localStart: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 8))
+    let localEnd: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 9))
+    let start: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: localStart))
+    let end: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: localEnd))
+    if start < 0 || end <= start { return String("") }
+    let firstMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: start))
+    if firstMaybe == nil { return String("") }
+    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: start, end: start, text: String("")))
+    let first: RangeLexedToken(firstMaybe ?? fallback)
+    let macroMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: first.end))
+    if first.kind != .leftBracket || macroMaybe == nil { return String("") }
+    let macroToken: RangeLexedToken(macroMaybe ?? fallback)
+    let rightMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: macroToken.end))
+    if macroToken.kind != .macroAttribute || stringLength(value: macroToken.text) <= 1 || rightMaybe == nil { return String("") }
+    let right: RangeLexedToken(rightMaybe ?? fallback)
+    if right.kind != .rightBracket || right.end != end { return String("") }
+    return macroToken.text.substring(start: 1, end: stringLength(value: macroToken.text))
+}
+
+function compilerSyntaxMemberHasTypeReference(tables: CompilerSyntaxTables, memberRow: Int): Bool {
+    return memberRow >= 0 && memberRow < compilerIntTableRowCount(table: tables.members)
+        && compilerSyntaxMemberKindHasTypeReference(kind: compilerIntTableValue(table: tables.members, row: memberRow, column: 12))
+        && compilerSyntaxMemberMacroFamilyName(tables: tables, memberRow: memberRow) == String("")
+}
+
+function compilerSyntaxMemberTypeOwnerSyntaxID(tables: CompilerSyntaxTables, memberRow: Int): Int {
+    if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: tables.members) { return 0 - 1 }
+    if compilerIntTableValue(table: tables.members, row: memberRow, column: 12) == compilerSyntaxMemberKindEnumCasePayload() {
+        return compilerSyntaxEnumPayloadOwnerSyntaxID(tables: tables, payloadRow: memberRow)
+    }
+    return compilerIntTableValue(table: tables.members, row: memberRow, column: 2)
+}
+
+function compilerSyntaxLinkMemberTypeTargetAtRow(tables: CompilerSyntaxTables, memberRow: Int): Int {
+    if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: tables.members)
+        || !compilerSyntaxMemberHasTypeReference(tables: tables, memberRow: memberRow)
+        || compilerIntTableValue(table: tables.members, row: memberRow, column: 14) != compilerSyntaxTypeTargetNone()
+        || compilerIntTableValue(table: tables.members, row: memberRow, column: 15) != 0 - 1 { return 0 - 1 }
+    let fileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
+    let typeName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
+    let ownerSyntaxID: Int(compilerSyntaxMemberTypeOwnerSyntaxID(tables: tables, memberRow: memberRow))
+    let targetID: Int(compilerSyntaxTypeReferenceBuild(tables: tables, ownerMemberRow: memberRow, ownerSyntaxID: ownerSyntaxID, parentNodeID: 0 - 1, ordinal: 0, typeName: typeName, typeRange: CompilerSourceRange(start: 0, end: stringLength(value: typeName), next: stringLength(value: typeName)), depth: 0))
+    if targetID < 0 {
+        let typeStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.members, row: memberRow, column: 8)))
+        let typeEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
+        compilerSyntaxTablesFailureAnnotateGlobal(tables: tables, phase: compilerSyntaxFailurePhaseEnumPayloadLink(), reason: compilerSyntaxFailureReasonInvalidEnumPayloadType(), fileID: fileID, start: typeStart, end: typeEnd, relatedRow: memberRow)
+        return 0 - 1
+    }
+    let base: Int(memberRow * compilerSyntaxMemberColumnCount())
+    if rawBufferStoreInt(buffer: tables.members.values, index: base + 14, value: compilerSyntaxTypeTargetReference()) != 0
+        || rawBufferStoreInt(buffer: tables.members.values, index: base + 15, value: targetID) != 0 { return 0 - 1 }
+    return 0
+}
+
+function compilerSyntaxLinkMemberTypeTargets(tables: CompilerSyntaxTables): Int {
+    state memberRow: Int(0)
+    while memberRow < compilerIntTableRowCount(table: tables.members) {
+        if compilerSyntaxMemberHasTypeReference(tables: tables, memberRow: memberRow) {
+            if compilerSyntaxLinkMemberTypeTargetAtRow(tables: tables, memberRow: memberRow) != 0 { return 0 - 1 }
         }
-        payloadRow: payloadRow + 1
+        memberRow: memberRow + 1
     }
     return 0
 }
@@ -4128,7 +4178,7 @@ function compilerSyntaxEnumHasPayloads(tables: CompilerSyntaxTables, enumSyntaxI
 function compilerSyntaxEnumPayloadTypesAreValid(tables: CompilerSyntaxTables): Bool {
     state row: Int(0)
     while row < compilerIntTableRowCount(table: tables.members) {
-        if compilerIntTableValue(table: tables.members, row: row, column: 12) == compilerSyntaxMemberKindEnumCasePayload() {
+        if compilerSyntaxMemberHasTypeReference(tables: tables, memberRow: row) {
             let targetKind: Int(compilerIntTableValue(table: tables.members, row: row, column: 14))
             let targetID: Int(compilerIntTableValue(table: tables.members, row: row, column: 15))
             if targetKind != compilerSyntaxTypeTargetReference() || targetID < 0
@@ -4153,7 +4203,7 @@ function compilerSyntaxTypeReferencesAreValid(tables: CompilerSyntaxTables): Boo
         let childCount: Int(compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceChildCountColumn()))
         let depth: Int(compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceDepthColumn()))
         if ownerMemberRow < 0 || ownerMemberRow >= compilerIntTableRowCount(table: tables.members)
-            || compilerIntTableValue(table: tables.members, row: ownerMemberRow, column: 12) != compilerSyntaxMemberKindEnumCasePayload()
+            || !compilerSyntaxMemberHasTypeReference(tables: tables, memberRow: ownerMemberRow)
             || kind < compilerSyntaxTypeReferenceNamed() || kind > compilerSyntaxTypeReferenceValue()
             || depth < 0 || depth >= 32
             || (parentNodeID < 0 && (ordinal != 0 || depth != 0))
@@ -6091,7 +6141,8 @@ function compilerGraphDeltaCommitGeneratedMember(tables: CompilerSyntaxTables, r
         || ownerSyntaxID < 0
         || syntaxID < 0
         || rawBufferCount(buffer: tables.failures) != 0
-        || compilerSyntaxAppendMember(tables: tables, syntaxID: syntaxID, fileID: fileID, parentSyntaxID: ownerSyntaxID, ordinal: ordinal, memberStart: memberStartGlobal, memberEnd: memberEndGlobal, nameStart: nameStartGlobal, nameEnd: nameEndGlobal, typeStart: typeStartGlobal, typeEnd: typeEndGlobal, fingerprint: memberFingerprint, memberKind: memberKind) != 0 {
+        || compilerSyntaxAppendMember(tables: tables, syntaxID: syntaxID, fileID: fileID, parentSyntaxID: ownerSyntaxID, ordinal: ordinal, memberStart: memberStartGlobal, memberEnd: memberEndGlobal, nameStart: nameStartGlobal, nameEnd: nameEndGlobal, typeStart: typeStartGlobal, typeEnd: typeEndGlobal, fingerprint: memberFingerprint, memberKind: memberKind) != 0
+        || compilerSyntaxLinkMemberTypeTargetAtRow(tables: tables, memberRow: memberRow) != 0 {
         compilerSyntaxTablesPoison(tables: tables)
         return 0 - 1
     }

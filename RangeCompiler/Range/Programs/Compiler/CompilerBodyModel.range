@@ -596,6 +596,8 @@ function compilerEnumPayloadLLVMFieldTypeNameAtDepth(tables: CompilerSyntaxTable
     let declarationFileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
     let declarationName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: declarationFileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
     if declarationKind == compilerSyntaxKindConstruct()
+        && compilerRuntimeABIConstructKind(tables: tables, constructNodeID: targetID) == compilerRuntimeABIOpaqueStorage() { return String("ptr") }
+    if declarationKind == compilerSyntaxKindConstruct()
         && compilerNominalLLVMLayoutIsSupportedAtDepth(tables: tables, declarationRow: declarationRow, depth: depth + 1) { return "%Range.\(declarationName)" }
     if declarationKind == compilerSyntaxKindEnum() {
         if !compilerSyntaxEnumHasPayloads(tables: tables, enumSyntaxID: targetID) { return String("i32") }
@@ -654,6 +656,48 @@ function compilerNominalLLVMFieldTypeName(tables: CompilerSyntaxTables, typeName
     return compilerNominalLLVMFieldTypeNameAtDepth(tables: tables, typeName: typeName, depth: 0)
 }
 
+function compilerNominalLLVMMemberFieldTypeNameAtDepth(tables: CompilerSyntaxTables, memberRow: Int, depth: Int): String {
+    if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: tables.members) { return String("") }
+    let memberKind: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 12))
+    if memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState() && memberKind != compilerSyntaxMemberKindBinding() { return String("") }
+    let storagePolicy: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 13))
+    if storagePolicy != compilerSyntaxMemberStorageNone() || depth >= 16 { return String("") }
+    let typeReferenceID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 15))
+    if typeReferenceID < 0 || typeReferenceID >= compilerIntTableRowCount(table: tables.typeReferences) { return String("") }
+    let referenceKind: Int(compilerIntTableValue(table: tables.typeReferences, row: typeReferenceID, column: compilerSyntaxTypeReferenceKindColumn()))
+    let targetKind: Int(compilerIntTableValue(table: tables.typeReferences, row: typeReferenceID, column: compilerSyntaxTypeReferenceTargetKindColumn()))
+    let targetID: Int(compilerIntTableValue(table: tables.typeReferences, row: typeReferenceID, column: compilerSyntaxTypeReferenceTargetIDColumn()))
+    if referenceKind == compilerSyntaxTypeReferenceArray() { return String("%Range.Array") }
+    if targetKind == compilerSyntaxTypeReferenceTargetBuiltin() {
+        if targetID == compilerSyntaxBuiltinTypeInt() { return String("i32") }
+        if targetID == compilerSyntaxBuiltinTypeBool() { return String("i1") }
+        if targetID == compilerSyntaxBuiltinTypeString() { return String("ptr") }
+        if targetID == compilerSyntaxBuiltinTypeFloat() { return String("double") }
+        return String("")
+    }
+    if targetKind == compilerSyntaxTypeReferenceTargetGenericParameter() { return String("ptr") }
+    if targetKind != compilerSyntaxTypeReferenceTargetDeclaration() || targetID < 0
+        || targetID >= compilerIntTableRowCount(table: tables.syntaxIndex) { return String("") }
+    let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: targetID))
+    if declarationRow < 0 { return String("") }
+    let declarationKind: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 2))
+    let declarationFileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
+    let declarationName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: declarationFileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
+    if declarationKind == compilerSyntaxKindConstruct()
+        && compilerRuntimeABIConstructKind(tables: tables, constructNodeID: targetID) == compilerRuntimeABIOpaqueStorage() { return String("ptr") }
+    if declarationKind == compilerSyntaxKindConstruct()
+        && compilerNominalLLVMLayoutIsSupportedAtDepth(tables: tables, declarationRow: declarationRow, depth: depth + 1) { return "%Range.\(declarationName)" }
+    if declarationKind == compilerSyntaxKindEnum() {
+        if !compilerSyntaxEnumHasPayloads(tables: tables, enumSyntaxID: targetID) { return String("i32") }
+        if compilerEnumLLVMLayoutIsSupportedAtDepth(tables: tables, declarationRow: declarationRow, depth: depth + 1) { return "%Range.\(declarationName)" }
+    }
+    return String("")
+}
+
+function compilerNominalLLVMMemberFieldTypeName(tables: CompilerSyntaxTables, memberRow: Int): String {
+    return compilerNominalLLVMMemberFieldTypeNameAtDepth(tables: tables, memberRow: memberRow, depth: 0)
+}
+
 function compilerNominalLLVMLayoutIsSupportedAtDepth(tables: CompilerSyntaxTables, declarationRow: Int, depth: Int): Bool {
     if depth >= 16 { return false }
     if declarationRow < 0 || declarationRow >= compilerIntTableRowCount(table: tables.declarations)
@@ -666,9 +710,7 @@ function compilerNominalLLVMLayoutIsSupportedAtDepth(tables: CompilerSyntaxTable
         if compilerIntTableValue(table: tables.members, row: memberRow, column: 2) == syntaxID {
             let memberKind: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 12))
             if memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState() && memberKind != compilerSyntaxMemberKindBinding() { return false }
-            let fileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
-            let typeName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
-            if compilerNominalLLVMFieldTypeNameAtDepth(tables: tables, typeName: typeName, depth: depth) == String("") { return false }
+            if compilerNominalLLVMMemberFieldTypeNameAtDepth(tables: tables, memberRow: memberRow, depth: depth) == String("") { return false }
             memberCount: memberCount + 1
         }
         memberRow: memberRow + 1
@@ -718,10 +760,8 @@ function compilerNominalLLVMLayoutText(tables: CompilerSyntaxTables, index: Comp
         let memberSyntaxID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 0))
         if compilerIntTableValue(table: tables.members, row: memberRow, column: 2) == syntaxID
             && !compilerDeclarationIndexSyntaxIsOmitted(index: index, syntaxID: memberSyntaxID) {
-            let fileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
-            let sourceType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
             if fieldCount > 0 { rawBufferAppendText(buffer: fields, text: String(", ")) }
-            rawBufferAppendText(buffer: fields, text: compilerNominalLLVMFieldTypeName(tables: tables, typeName: sourceType))
+            rawBufferAppendText(buffer: fields, text: compilerNominalLLVMMemberFieldTypeName(tables: tables, memberRow: memberRow))
             fieldCount: fieldCount + 1
         }
         memberRow: memberRow + 1
@@ -1291,4 +1331,3 @@ function compilerBodyTelemetryAppending(left: CompilerBodyTelemetry, right: Comp
 function compilerTypedLLVMHelpersValue(value: CompilerTypedLLVMHelpers): CompilerLLVMHelperFunctions {
     return value.helpers
 }
-

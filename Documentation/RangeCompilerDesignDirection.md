@@ -572,7 +572,7 @@ behavior; one runtime scheduler adaptively chooses how much of that legal
 parallelism to use.
 
 The complete implementation plan is tracked in
-`Development/RangeGraphDerivedConcurrencyPlan.md`.
+`Documentation/RangeGraphDerivedConcurrencyPlan.md`.
 
 ### Work units
 
@@ -1239,7 +1239,7 @@ Gate: no memory or reactivity rule depends directly on raw parser structures.
 
 Do not begin with parallel execution or a universal macro conversion. First
 materialize stable work identities and readiness through a one-lane graph, as
-specified in `Development/RangeGraphDerivedConcurrencyPlan.md`; only then enable
+specified in `Documentation/RangeGraphDerivedConcurrencyPlan.md`; only then enable
 adaptive scheduling.
 
 The next work is three vertical milestones:
@@ -2506,7 +2506,7 @@ four-source bundle without invoking Swift, and reproduced the seed byte for
 byte.  It completed in `27.81 s` real time with `71,286,784` bytes maximum RSS
 and reported SHA-256 `9771e9668e939b06cb58f05f5b0774597e81669c6c67ddcc85e29328722ddfa9`
 at `2,971,047` bytes.  The normal native run of
-`RangePlayground/Examples/LLVM/ReturnInteger.range` exited with status `7`.
+`Testing/Basics/Pass/ReturnInteger.range` exited with status `7`.
 
 Swift is no longer needed for normal seed reproduction/daily fixed-point
 verification, but remains an explicit recovery/oracle path pending a separate
@@ -3036,9 +3036,9 @@ Do not:
 
 Current branch:
 
-- `Development/RangeAuthoredCompilerPlan.md`
-- `Development/RangeSelfHostingBootstrapSubstratePlan.md`
-- `Development/GPT56RangeSelfHostingHandoff.md` (historical operational
+- `Documentation/Archive/RangeAuthoredCompilerPlan.md`
+- `Documentation/Archive/RangeSelfHostingBootstrapSubstratePlan.md`
+- `Documentation/Archive/GPT56RangeSelfHostingHandoff.md` (historical operational
   snapshot; chunk guidance is superseded)
 - `RangeCompiler/Range/Programs/Compiler/Compiler.range`
 - `RangeCompiler/Range/Programs/Compiler/CompilerBodyCFG.range`
@@ -3177,7 +3177,7 @@ native enum layout by resolved type identity. There is no enum-name special
 case and no dynamic-record bridge.
 
 The ordinary fixture
-`RangePlayground/Examples/LLVM/ReturnAssociatedEnumFunctionBoundary.range`
+`Testing/Enums/Pass/ReturnAssociatedEnumFunctionBoundary.range`
 proves both directions of the boundary. `makeStep` returns
 `CompilerStep` through caller-owned storage with the LLVM signature
 `void (ptr, i32)`. `readStep` receives the same
@@ -3263,9 +3263,10 @@ Only the declared command-line target is compiled. Recursively treating an
 entire project directory as one program is forbidden because project trees may
 contain multiple programs and mains.
 
-`Testing/ProjectCommands/CommandFixture` is the non-Compiler regression proof:
-its metadata points to one `Main.range`, its Range-authored command line returns
-`7` for `seven` and `64` for an unknown command, and both paths are silent.
+The former `Testing/ProjectCommands/CommandFixture` proof belonged to the
+retired project-command implementation and has been removed. Current command
+line behavior is covered by the Stage 2/Stage 3 Range CLI audit in
+`scripts/check-range-compiler-candidate`.
 
 The Compiler project declares `Range/Programs/Compiler` as its command-line
 target. `range compiler compile`, `check`, and `emit-llvm` therefore forward
@@ -3513,3 +3514,35 @@ executables are both 4,299,168 bytes with SHA-256
 Both generations passed the indexed Int/enum mutation executions, typed-store
 audits, executable read/write bounds traps, and pre-emission immutable
 rejection.
+
+### Native construct-field `Array<Element>` mutation checkpoint (2026-07-22)
+
+Indexed Array mutation now crosses one ordinary construct-field projection.
+A local `state` construct may own a `state` Array field, and an assignment such
+as `box.values[index]: value` resolves the write to the construct's local owner.
+Both the owner and the field must be mutable. A `let` field or a `let` owner is
+rejected during semantic resolution before LLVM emission.
+
+This uses the existing `%Range.Array = type { ptr, i32 }` representation and
+the existing bounds-checked `ArrayStore` MIR operation. Construct field types
+are now linked into the same structural type-reference table already used by
+enum payloads. Body typing, nominal layout, generic substitution, owned-path
+discovery, MIR validation, and LLVM layout consume that shared identity rather
+than recognizing the textual spelling of `[Int]`.
+
+Permanent positive coverage constructs `MutableArrayBox`, stores `7` through
+`box.values[1]`, reads the same field and index, and exits `7`. Permanent
+negative coverage rejects an immutable Array field and an immutable containing
+construct at semantic stage 2 without emitting an LLVM definition. The slice
+does not admit nested member chains, borrowed/shared owners, bindings, slices,
+growth, escaping lexical backing storage, or owned opaque Array elements.
+
+The complete candidate gate passed in `363.21 s` with `569,458,688` bytes
+maximum RSS and `swift_invocation=none`. Stage 2 and Stage 3 LLVM are
+byte-identical at 5,504,129 bytes with SHA-256
+`5317f0f40aec05c3d3f2fd31cfb4981e0d57c89d6f297979be38834e461157b8`;
+their linked executables are byte-identical at 3,472,944 bytes with SHA-256
+`1ffac7b004f74474b9945722eda12b2a8b24d4e6bffa9586ab7724d3f9d11fd9`.
+After promotion, accepted-seed integrity passed and the seed independently
+reproduced the same LLVM hash in `134.82 s` with `567,787,520` bytes maximum
+RSS.

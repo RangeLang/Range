@@ -38,7 +38,7 @@ LLVM="$BUILD_ROOT/FloatWidths.ll"
 /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Memory/RawBuffer.range' >> "$SOURCE_SET"
 /bin/cat "$REPO_ROOT/RangeCompiler/Range/Core/System/Memory/RawBuffer.range" >> "$SOURCE_SET"
 /usr/bin/printf '\n%s\n' 'compilerSourceFile\trole=project\tpath=Project/FloatWidths.range' >> "$SOURCE_SET"
-/bin/cat "$REPO_ROOT/RangeCompiler/Tests/RangeEmissionTests/FloatWidths.range" >> "$SOURCE_SET"
+/bin/cat "$REPO_ROOT/Testing/Types/Pass/FloatWidths.range" >> "$SOURCE_SET"
 /usr/bin/printf '\n' >> "$SOURCE_SET"
 
 "$CANDIDATE_COMPILER" emit-llvm "$SOURCE_SET" "$LLVM"

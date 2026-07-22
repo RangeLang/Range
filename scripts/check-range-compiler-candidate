@@ -606,7 +606,7 @@ audit_native_arrays() {
     local stage_directory="$3"
     local kind source expected first second first_error second_error llvm linked run_output run_error
 
-    for kind in index count enum-payload argument mutation-int mutation-enum; do
+    for kind in index count enum-payload argument mutation-int mutation-enum mutation-member; do
         source="$ARRAY_INDEX_SOURCE"
         expected=2
         if [[ "$kind" == count ]]; then
@@ -623,6 +623,9 @@ audit_native_arrays() {
             expected=7
         elif [[ "$kind" == mutation-enum ]]; then
             source="$ARRAY_ENUM_MUTATION_SOURCE"
+            expected=7
+        elif [[ "$kind" == mutation-member ]]; then
+            source="$ARRAY_MEMBER_MUTATION_SOURCE"
             expected=7
         fi
         first="$WORK_ROOT/$stage_label.array.$kind.first.ll"
@@ -661,7 +664,7 @@ audit_native_arrays() {
             /usr/bin/grep -Eq 'alloca %Range\.(NumberToken|MutableNumberToken)' "$first" \
                 || fail "$stage_label native enum Array did not specialize backing storage to its element layout"
         fi
-        if [[ "$kind" == mutation-int || "$kind" == mutation-enum ]]; then
+        if [[ "$kind" == mutation-int || "$kind" == mutation-enum || "$kind" == mutation-member ]]; then
             /usr/bin/grep -Fq 'array.store.' "$first" \
                 || fail "$stage_label native Array $kind omitted the indexed store operation"
             /usr/bin/grep -Eq 'store (i32|%Range\.MutableNumberToken) .*ptr %array\.store\.' "$first" \
@@ -739,6 +742,24 @@ audit_native_arrays() {
         fail "$stage_label immutable Array mutation emitted LLVM"
     fi
 
+    local immutable_member_kind immutable_member_source immutable_member_output immutable_member_error
+    for immutable_member_kind in field owner; do
+        immutable_member_source="$ARRAY_IMMUTABLE_MEMBER_SOURCE"
+        if [[ "$immutable_member_kind" == owner ]]; then
+            immutable_member_source="$ARRAY_IMMUTABLE_MEMBER_OWNER_SOURCE"
+        fi
+        immutable_member_output="$WORK_ROOT/$stage_label.array.immutable-member-$immutable_member_kind.out"
+        immutable_member_error="$WORK_ROOT/$stage_label.array.immutable-member-$immutable_member_kind.err"
+        run_capture "$executable" "$immutable_member_source" "$immutable_member_output" "$immutable_member_error"
+        [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label immutable Array member $immutable_member_kind mutation exited $RUN_STATUS"
+        [[ ! -s "$immutable_member_error" ]] || fail "$stage_label immutable Array member $immutable_member_kind mutation wrote stderr"
+        /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$immutable_member_output" \
+            || fail "$stage_label immutable Array member $immutable_member_kind mutation missed the semantic diagnostic"
+        if /usr/bin/grep -Fq 'define ' "$immutable_member_output"; then
+            fail "$stage_label immutable Array member $immutable_member_kind mutation emitted LLVM"
+        fi
+    done
+
     local escape_output="$WORK_ROOT/$stage_label.array.return-escape.out"
     local escape_error="$WORK_ROOT/$stage_label.array.return-escape.err"
     run_capture "$executable" "$ARRAY_RETURN_ESCAPE_SOURCE" "$escape_output" "$escape_error"
@@ -749,7 +770,7 @@ audit_native_arrays() {
     if /usr/bin/grep -Fq 'define ' "$escape_output"; then
         fail "$stage_label native Array return escape emitted LLVM"
     fi
-    echo "$stage_label native Array: pass (generic pointer/count value, typed lexical storage, count/index/store, enum payload mutation, executable read/write bounds traps, immutable and return-escape rejection, deterministic)"
+    echo "$stage_label native Array: pass (generic pointer/count value, typed lexical storage, count/index/store, enum payload and mutable-member mutation, executable read/write bounds traps, immutable member/owner and return-escape rejection, deterministic)"
 }
 
 audit_storage_switches() {
@@ -2566,7 +2587,7 @@ audit_role_markers() {
 audit_driver_source_graph() {
     local stage_label="$1"
     local executable="$2"
-    local source="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnInteger.range"
+    local source="$REPO_ROOT/Testing/Basics/Pass/ReturnInteger.range"
     local graph="$WORK_ROOT/$stage_label.source-graph.range"
     local repeated="$WORK_ROOT/$stage_label.source-graph.repeat.range"
     local inventory="$WORK_ROOT/$stage_label.source-graph.inventory.range"
@@ -4838,7 +4859,7 @@ audit_macro_family_memory() {
     local stage_label="$1"
     local executable="$2"
     local stage_directory="$3"
-    local fixture_root="$REPO_ROOT/Testing/SelfHosting/MacroFamilyMemory"
+    local fixture_root="$REPO_ROOT/Testing/Macros"
     local positive="$WORK_ROOT/$stage_label.macro-family.positive.out"
     local positive_repeat="$WORK_ROOT/$stage_label.macro-family.positive.repeat.out"
     local reordered="$WORK_ROOT/$stage_label.macro-family.reordered.out"
@@ -4856,22 +4877,22 @@ audit_macro_family_memory() {
     local positive_projection="$WORK_ROOT/$stage_label.macro-family.positive.runtime"
     local reordered_projection="$WORK_ROOT/$stage_label.macro-family.reordered.runtime"
 
-    run_capture "$executable" "$fixture_root/Positive.range" "$positive" "$error"
+    run_capture "$executable" "$fixture_root/Pass/Positive.range" "$positive" "$error"
     require_successful_output "$stage_label macro-family MemoryGraph" "$positive" "$error"
-    run_capture "$executable" "$fixture_root/Positive.range" "$positive_repeat" "$error"
+    run_capture "$executable" "$fixture_root/Pass/Positive.range" "$positive_repeat" "$error"
     require_successful_output "$stage_label repeated macro-family MemoryGraph" "$positive_repeat" "$error"
     /usr/bin/cmp -s "$positive" "$positive_repeat" || fail "$stage_label macro-family MemoryGraph was not deterministic"
     /usr/bin/grep -Fq $'macroFamilyMemory\tvalid=true\tfamilyCount=1\tmemberCount=2\trepresentationCount=1\tpartitionCount=1\tvalueCount=2\tchangeCount=3' "$positive" \
         || fail "$stage_label macro array omitted its ID-reference representation"
 
-    run_capture "$executable" "$fixture_root/Reordered.range" "$reordered" "$error"
+    run_capture "$executable" "$fixture_root/Pass/Reordered.range" "$reordered" "$error"
     require_successful_output "$stage_label reordered macro-family MemoryGraph" "$reordered" "$error"
     macro_family_runtime_projection "$positive" "$positive_projection"
     macro_family_runtime_projection "$reordered" "$reordered_projection"
     /usr/bin/cmp -s "$positive_projection" "$reordered_projection" \
         || fail "$stage_label macro-family runtime representation changed with source order"
 
-    run_capture "$executable" "$fixture_root/UnknownFamily.range" "$unknown" "$error"
+    run_capture "$executable" "$fixture_root/Fail/UnknownFamily.range" "$unknown" "$error"
     [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label unknown macro family exited $RUN_STATUS"
     [[ ! -s "$error" ]] || fail "$stage_label unknown macro family wrote stderr"
     /usr/bin/grep -Fq $'compilerError\tkind=invalidMacroFamilyMemoryGraph' "$unknown" \
@@ -4882,23 +4903,23 @@ audit_macro_family_memory() {
         fail "$stage_label unknown macro family emitted LLVM before rejection"
     fi
 
-    run_capture "$executable" "$fixture_root/TypedSyntax.range" "$typed" "$error"
+    run_capture "$executable" "$fixture_root/Pass/TypedSyntax.range" "$typed" "$error"
     require_successful_output "$stage_label macro-family typed syntax" "$typed" "$error"
     /usr/bin/grep -Fq $'name=components\tnameStart=134\tnameEnd=144\ttype=[@component]' "$typed" \
         || fail "$stage_label typed syntax did not preserve the macro-family element type"
     /usr/bin/grep -Fq $'type=[@component]\ttypeStart=146\ttypeEnd=158\tkind=state' "$typed" \
         || fail "$stage_label typed syntax did not preserve mutable family storage"
 
-    run_capture "$executable" "$fixture_root/GeneralTargets.range" "$general" "$error"
+    run_capture "$executable" "$fixture_root/Pass/GeneralTargets.range" "$general" "$error"
     require_successful_output "$stage_label general macro-array targets" "$general" "$error"
     /usr/bin/grep -Fq $'macroFamilyMemory\tvalid=true\tfamilyCount=2\tmemberCount=2\trepresentationCount=2\tpartitionCount=2\tvalueCount=2\tchangeCount=4' "$general" \
         || fail "$stage_label macro arrays did not include construct and member targets"
     [[ "$(/usr/bin/grep -Ec '^memoryRepresentationChange[[:space:]]' "$general")" -eq 4 ]] \
         || fail "$stage_label macro arrays emitted the wrong change count"
 
-    run_capture "$executable" "$fixture_root/Ordinary.range" "$ordinary" "$ordinary_error"
+    run_capture "$executable" "$fixture_root/Pass/Ordinary.range" "$ordinary" "$ordinary_error"
     require_successful_output "$stage_label ordinary macro-family compilation" "$ordinary" "$ordinary_error"
-    run_capture "$executable" "$fixture_root/Ordinary.range" "$ordinary_repeat" "$ordinary_error"
+    run_capture "$executable" "$fixture_root/Pass/Ordinary.range" "$ordinary_repeat" "$ordinary_error"
     require_successful_output "$stage_label repeated ordinary macro-family compilation" "$ordinary_repeat" "$ordinary_error"
     /usr/bin/cmp -s "$ordinary" "$ordinary_repeat" || fail "$stage_label ordinary macro-family LLVM was not deterministic"
     /bin/mkdir -p "$stage_directory"
@@ -5198,20 +5219,23 @@ main() {
         '    return first.first + second.second' \
         '}' > "$SMOKE_SOURCE"
 
-    SWITCH_INTEGER_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnIntegerSwitch.range"
-    SWITCH_STRING_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnStringSwitch.range"
-    SWITCH_BOOL_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnBoolSwitch.range"
-    SWITCH_STATE_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnStateIntegerSwitch.range"
-    SWITCH_MEMBER_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnMemberIntegerSwitch.range"
-    SWITCH_ENUM_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnEnumSwitch.range"
-    SWITCH_ENUM_FUNCTION_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnEnumFunctionSwitch.range"
-    ARRAY_INDEX_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnArrayIndex.range"
-    ARRAY_COUNT_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnArrayCount.range"
-    ARRAY_ENUM_PAYLOAD_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnEnumArrayPayload.range"
-    ARRAY_MUTATION_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnArrayStateIndexedAssignment.range"
-    ARRAY_ENUM_MUTATION_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnEnumArrayStateIndexedAssignment.range"
-    ARRAY_IMMUTABLE_MUTATION_SOURCE="$REPO_ROOT/Testing/CompileFail/Collections/ImmutableArrayIndexedAssignment.range"
-    ARRAY_WRITE_OUT_OF_BOUNDS_SOURCE="$REPO_ROOT/Testing/SelfHosting/ArrayWriteOutOfBounds.range"
+    SWITCH_INTEGER_SOURCE="$REPO_ROOT/Testing/ControlFlow/Pass/ReturnIntegerSwitch.range"
+    SWITCH_STRING_SOURCE="$REPO_ROOT/Testing/ControlFlow/Pass/ReturnStringSwitch.range"
+    SWITCH_BOOL_SOURCE="$REPO_ROOT/Testing/ControlFlow/Pass/ReturnBoolSwitch.range"
+    SWITCH_STATE_SOURCE="$REPO_ROOT/Testing/ControlFlow/Pass/ReturnStateIntegerSwitch.range"
+    SWITCH_MEMBER_SOURCE="$REPO_ROOT/Testing/ControlFlow/Pass/ReturnMemberIntegerSwitch.range"
+    SWITCH_ENUM_SOURCE="$REPO_ROOT/Testing/Enums/Pass/ReturnEnumSwitch.range"
+    SWITCH_ENUM_FUNCTION_SOURCE="$REPO_ROOT/Testing/Enums/Pass/ReturnEnumFunctionSwitch.range"
+    ARRAY_INDEX_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ReturnArrayIndex.range"
+    ARRAY_COUNT_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ReturnArrayCount.range"
+    ARRAY_ENUM_PAYLOAD_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ReturnEnumArrayPayload.range"
+    ARRAY_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ReturnArrayStateIndexedAssignment.range"
+    ARRAY_ENUM_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ReturnEnumArrayStateIndexedAssignment.range"
+    ARRAY_MEMBER_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ConstructMemberArrayIndexedAssignment.range"
+    ARRAY_IMMUTABLE_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableArrayIndexedAssignment.range"
+    ARRAY_IMMUTABLE_MEMBER_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableConstructArrayMemberIndexedAssignment.range"
+    ARRAY_IMMUTABLE_MEMBER_OWNER_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableConstructContainingArrayIndexedAssignment.range"
+    ARRAY_WRITE_OUT_OF_BOUNDS_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ArrayWriteOutOfBounds.range"
     ARRAY_ARGUMENT_SOURCE="$WORK_ROOT/ArrayArgument.range"
     /usr/bin/printf '%s\n' \
         '@builtin' \
@@ -5420,8 +5444,8 @@ main() {
         '@main {' \
         '    return 0' \
         '}' > "$RECURSIVE_ENUM_DUPLICATE_PAYLOAD_SOURCE"
-    RECURSIVE_ENUM_BODY_USE_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnRecursiveBindingEnumSwitch.range"
-    NATIVE_PAYLOAD_ENUM_ABI_SOURCE="$REPO_ROOT/RangePlayground/Examples/LLVM/ReturnAssociatedEnumFunctionBoundary.range"
+    RECURSIVE_ENUM_BODY_USE_SOURCE="$REPO_ROOT/Testing/Enums/Pass/ReturnRecursiveBindingEnumSwitch.range"
+    NATIVE_PAYLOAD_ENUM_ABI_SOURCE="$REPO_ROOT/Testing/Enums/Pass/ReturnAssociatedEnumFunctionBoundary.range"
 
     PLACEMENT_GUARD_SOURCE="$WORK_ROOT/PlacementSymbolGuard.range"
     /usr/bin/printf '%s\n' \

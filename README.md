@@ -6,7 +6,7 @@ Native LLVM · `-O3` · July 2026
 
 </div>
 
-![Range String performance improved from 491.2 ms and 5.3 GB to 4.1 ms and 1.9 MB](Development/Benchmarks/Speed/range-strings-improvement.svg)
+![Range String performance improved from 491.2 ms and 5.3 GB to 4.1 ms and 1.9 MB](Benchmarks/Speed/range-strings-improvement.svg)
 
 Range's owned String storage now carries its length, capacity, and data forward, allowing uniquely owned strings to grow in the same allocation.
 
@@ -114,7 +114,7 @@ scripts/range compiler progression
 scripts/range check-stage2-compiler
 ```
 
-The supported implementation is the Range-authored self-hosted compiler kernel. It emits native LLVM and must reproduce byte-identical LLVM and linked compiler executables before a compiler change is accepted. Ordinary project compilation is intentionally absent until its source loading, macro materialization, lowering, and runtime behavior are Range-owned and proven. See [Development](Development/README.md) and the [speed benchmark](Development/Benchmarks/Speed/README.md) for historical design work and performance comparisons.
+The supported implementation is the Range-authored self-hosted compiler kernel. It emits native LLVM and must reproduce byte-identical LLVM and linked compiler executables before a compiler change is accepted. Ordinary project compilation is intentionally absent until its source loading, macro materialization, lowering, and runtime behavior are Range-owned and proven. See [Documentation](Documentation/README.md) for the current architecture record and the [speed benchmark](Benchmarks/Speed/README.md) for performance comparisons.
 
 ## License
 
