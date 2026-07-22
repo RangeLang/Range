@@ -1,27 +1,17 @@
-import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profile=pinch-dissolve-v4";
+import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profile=width-pinch-v1";
 
 const defaults = {
   endpointGap: 8,
   endpointGapEnd: 16,
   divisionBase: 3,
   divisionLevels: 3,
+  markLength: 5,
+  markThickness: 0.25,
   pinch: 0.27,
-  pinchCore: 10,
   pinchFalloff: 0.16,
-  pinchInnerEdge: 0.68,
   pinchStrength: 0.9,
-  measureMinimum: 0.7,
-  invisibleCollapsePower: 1.35,
-  invisibleMeasureMinimum: 0.1,
-  invisibleStrokeMinimum: 0.06,
-  markerCaptureDivisionWeight: 0.48,
-  markerCaptureFalloff: 0.14,
-  markerCaptureStrength: 0.9,
-  strokeMinimum: 0.65,
   snapHysteresis: 0.08,
   snapToMarks: true,
-  toneFalloff: 0.12,
-  toneIntensity: 0.16,
 };
 
 function finiteAttribute(element, name, fallback) {
@@ -35,23 +25,13 @@ class RangeScale extends HTMLElement {
     "endpoint-gap-end",
     "division-base",
     "division-levels",
+    "mark-length",
+    "mark-thickness",
     "pinch",
-    "pinch-core",
     "pinch-falloff",
-    "pinch-inner-edge",
     "pinch-strength",
-    "measure-minimum",
-    "invisible-collapse-power",
-    "invisible-measure-minimum",
-    "invisible-stroke-minimum",
-    "marker-capture-division-weight",
-    "marker-capture-falloff",
-    "marker-capture-strength",
-    "stroke-minimum",
     "snap-hysteresis",
     "snap-to-marks",
-    "tone-falloff",
-    "tone-intensity",
   ];
 
   #activePinch;
@@ -137,23 +117,13 @@ class RangeScale extends HTMLElement {
       endpointGapEnd: Math.max(0, finiteAttribute(this, "endpoint-gap-end", defaults.endpointGapEnd)),
       divisionBase: Math.max(2, Math.round(finiteAttribute(this, "division-base", defaults.divisionBase))),
       divisionLevels: Math.min(6, Math.max(1, Math.round(finiteAttribute(this, "division-levels", defaults.divisionLevels)))),
+      markLength: Math.max(1, finiteAttribute(this, "mark-length", defaults.markLength)),
+      markThickness: Math.max(0.1, finiteAttribute(this, "mark-thickness", defaults.markThickness)),
       pinch: Math.min(1, Math.max(0, finiteAttribute(this, "pinch", defaults.pinch))),
-      pinchCore: Math.max(0, finiteAttribute(this, "pinch-core", defaults.pinchCore)),
       pinchFalloff: Math.max(0.000001, finiteAttribute(this, "pinch-falloff", defaults.pinchFalloff)),
-      pinchInnerEdge: Math.min(1, Math.max(0, finiteAttribute(this, "pinch-inner-edge", defaults.pinchInnerEdge))),
       pinchStrength: Math.min(0.999999, Math.max(0, finiteAttribute(this, "pinch-strength", defaults.pinchStrength))),
-      measureMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "measure-minimum", defaults.measureMinimum))),
-      invisibleCollapsePower: Math.max(0.000001, finiteAttribute(this, "invisible-collapse-power", defaults.invisibleCollapsePower)),
-      invisibleMeasureMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "invisible-measure-minimum", defaults.invisibleMeasureMinimum))),
-      invisibleStrokeMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "invisible-stroke-minimum", defaults.invisibleStrokeMinimum))),
-      markerCaptureDivisionWeight: Math.min(1, Math.max(0, finiteAttribute(this, "marker-capture-division-weight", defaults.markerCaptureDivisionWeight))),
-      markerCaptureFalloff: Math.max(0.000001, finiteAttribute(this, "marker-capture-falloff", defaults.markerCaptureFalloff)),
-      markerCaptureStrength: Math.min(1, Math.max(0, finiteAttribute(this, "marker-capture-strength", defaults.markerCaptureStrength))),
-      strokeMinimum: Math.min(1, Math.max(0.000001, finiteAttribute(this, "stroke-minimum", defaults.strokeMinimum))),
       snapHysteresis: Math.min(0.499999, Math.max(0, finiteAttribute(this, "snap-hysteresis", defaults.snapHysteresis))),
       snapToMarks: this.getAttribute("snap-to-marks") !== "false",
-      toneFalloff: Math.max(0.000001, finiteAttribute(this, "tone-falloff", defaults.toneFalloff)),
-      toneIntensity: Math.min(1, Math.max(0, finiteAttribute(this, "tone-intensity", defaults.toneIntensity))),
     };
   }
 
@@ -172,11 +142,7 @@ class RangeScale extends HTMLElement {
 
   #render() {
     const config = this.#config();
-    const marks = createRangeMarks({
-      ...config,
-      pinch: this.#activePinch ?? config.pinch,
-      pinchCoreRadius: config.pinchCore / (2 * Math.max(1, this.getBoundingClientRect().height)),
-    });
+    const marks = createRangeMarks({ ...config, pinch: this.#activePinch ?? config.pinch });
     if (!this.#canvas) {
       this.shadowRoot.innerHTML = `<style>:host{display:block;position:absolute;width:48px;pointer-events:auto;transform:translateX(-50%)}canvas{display:block;width:100%;height:100%}.colorProbe{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}</style><canvas role="presentation"></canvas><span class="colorProbe" aria-hidden="true"></span>`;
       this.#canvas = this.shadowRoot.querySelector("canvas");
@@ -204,16 +170,14 @@ class RangeScale extends HTMLElement {
         ? getComputedStyle(this.#colorProbe).backgroundColor
         : ink;
       this.#context.fillStyle = this.#context.strokeStyle;
-      this.#context.globalAlpha = mark.opacity;
       const deviceWidth = this.#canvas.width;
       const deviceHeight = this.#canvas.height;
-      const markWidth = Math.max(1, Math.round(mark.measure * pixelRatio));
-      const markHeight = Math.max(1, Math.round(Math.min(1, mark.stroke) * pixelRatio));
+      const markWidth = Math.max(1, Math.round(config.markLength * mark.width * pixelRatio));
+      const markHeight = config.markThickness * pixelRatio;
       const x = Math.round(deviceWidth / 2 - markWidth / 2);
-      const y = mark.position * deviceHeight - markHeight / 2;
+      const y = mark.position * (deviceHeight - markHeight);
       this.#context.fillRect(x, y, markWidth, markHeight);
     }
-    this.#context.globalAlpha = 1;
   }
 
   #startMotion() {

@@ -64,7 +64,7 @@ export function createScaleMarks({ divisionBase = 3, divisionLevels = 3 } = {}) 
     const isDivision = !isMajor && index % divisionStride === 0;
     return {
       isRadix: isMajor || isDivision,
-      measure: isMajor ? 5 : isDivision ? 3 : 1,
+      measure: 1,
       position: index / intervalCount,
       source: "scale",
       tier: isMajor ? "major" : isDivision ? "division" : "single",
@@ -90,6 +90,23 @@ export function pinchScaleValue(value, {
 
   const offset = value - center;
   return value - strength * offset * pinchInfluence(value, center, falloff);
+}
+
+export function pinchMarkerWidth(value, {
+  center = 0.27,
+  falloff = 0.16,
+  strength = 0.9,
+} = {}) {
+  assertFiniteNumber(value, "value");
+  assertFiniteNumber(center, "center");
+  assertFiniteNumber(falloff, "falloff");
+  assertFiniteNumber(strength, "strength");
+  if (value < 0 || value > 1) throw new RangeError("value must be within [0, 1]");
+  if (center <= 0 || center >= 1) throw new RangeError("center must be inside (0, 1)");
+  if (falloff <= 0) throw new RangeError("falloff must be positive");
+  if (strength < 0 || strength > 1) throw new RangeError("strength must be within [0, 1]");
+
+  return 1 - strength * pinchInfluence(value, center, falloff);
 }
 
 export function captureMarkerPosition(position, {
@@ -240,58 +257,14 @@ export function createRangeMarks(config = {}) {
     divisionLevels: config.divisionLevels,
   });
 
-  return logicalMarks.map((mark) => {
-    const baseline = mark.measure ?? (mark.isRadix ? 1.8 : 1);
-    if (mark.position === 0 || mark.position === 1) {
-      return {
-        ...mark,
-        anchored: true,
-        blur: 0,
-        measure: baseline,
-        opacity: 1,
-        position: mark.position,
-        stroke: 1,
-        tone: 0,
-      };
-    }
-    const markerCaptureWeight = baseline >= 5
-      ? 1
-      : baseline >= 3
-        ? (config.markerCaptureDivisionWeight ?? 0.48)
-        : 0;
-    const shape = sphericalPinchInfluence(mark.position, {
+  return logicalMarks.map((mark) => ({
+    ...mark,
+    anchored: mark.position === 0 || mark.position === 1,
+    position: mark.position,
+    width: pinchMarkerWidth(mark.position, {
       center: config.pinch,
-      coreRadius: config.pinchCoreRadius,
       falloff: config.pinchFalloff,
-      innerEdge: config.pinchInnerEdge,
-    });
-    const tone = sphericalPinchInfluence(mark.position, {
-      center: config.pinch,
-      coreRadius: config.pinchCoreRadius,
-      falloff: config.toneFalloff,
-      innerEdge: config.pinchInnerEdge,
-    });
-    const opacity = (1 - tone) ** 1.25;
-    const blur = 1.6 * tone ** 1.5;
-    const stroke = 1 - (1 - config.strokeMinimum) * shape;
-    return {
-      ...mark,
-      blur,
-      measure: baseline * (1 - (1 - config.measureMinimum) * shape),
-      stroke,
-      opacity,
-      tone,
-      position: captureMarkerPosition(pinchScaleValue(mark.position, {
-        center: config.pinch,
-        falloff: config.pinchFalloff,
-        strength: config.pinchStrength,
-      }), {
-        anchor: mark.position,
-        center: config.pinch,
-        falloff: config.markerCaptureFalloff ?? 0.14,
-        strength: config.markerCaptureStrength ?? 1,
-        weight: markerCaptureWeight,
-      }),
-    };
-  });
+      strength: config.pinchStrength,
+    }),
+  }));
 }

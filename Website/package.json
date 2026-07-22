@@ -3,21 +3,29 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=22.13.0"
+    "bun": ">=1.3.14"
   },
   "scripts": {
-    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite",
-    "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite build",
-    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite preview",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs"
+    "dev": "vite dev",
+    "build": "vite build",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "start": "bun build/index.js",
+    "test": "bun run build && bun test tests"
   },
-  "dependencies": {},
+  "dependencies": {
+    "drizzle-orm": "0.45.2"
+  },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.1",
-    "@types/node": "22.19.19",
+    "@sveltejs/adapter-node": "5.5.7",
+    "@sveltejs/kit": "2.70.1",
+    "@sveltejs/vite-plugin-svelte": "6.2.1",
+    "@types/bun": "1.3.14",
+    "@types/node": "24.10.1",
+    "drizzle-kit": "0.31.7",
+    "svelte": "5.56.7",
+    "svelte-check": "4.3.3",
     "typescript": "5.9.3",
-    "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "vite": "7.3.6"
   },
   "type": "module"
 }
