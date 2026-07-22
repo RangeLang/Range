@@ -57,7 +57,7 @@ function compilerBodyArenaBindControlDecisionOperation(arena: CompilerBodyArena,
     let decisionID: Int(compilerBodyArenaControlDecisionForSource(arena: arena, sourceNodeID: sourceNodeID, blockID: blockID))
     if decisionID < 0 || operationID < 0 || operationID >= compilerIntTableRowCount(table: arena.mirOperations)
         || compilerIntTableValue(table: arena.controlDecisions, row: decisionID, column: compilerBodyControlDecisionOperationColumn()) >= 0 { return 0 - 1 }
-    return rawBufferStoreInt(buffer: arena.controlDecisions.values, index: decisionID * compilerBodyControlDecisionColumnCount() + compilerBodyControlDecisionOperationColumn(), value: operationID)
+    return arena.controlDecisions.values.update(element: operationID, index: decisionID * compilerBodyControlDecisionColumnCount() + compilerBodyControlDecisionOperationColumn())
 }
 
 function compilerBodyArenaAppendControlRegion(arena: CompilerBodyArena, sourceNodeID: Int, blockID: Int, trueBlockID: Int, falseBlockID: Int): Int {
@@ -107,15 +107,15 @@ function compilerBodyArenaResolveControlRegion(arena: CompilerBodyArena, regionI
     if regionID < 0 || regionID >= compilerIntTableRowCount(table: arena.controlRegions)
         || mergeBlockID < 0 || mergeBlockID >= compilerIntTableRowCount(table: arena.cfgBlocks)
         || compilerIntTableValue(table: arena.controlRegions, row: regionID, column: compilerBodyControlRegionMergeTargetColumn()) >= 0 { return 0 - 1 }
-    if rawBufferStoreInt(buffer: arena.controlRegions.values, index: regionID * compilerBodyControlRegionColumnCount() + compilerBodyControlRegionMergeTargetColumn(), value: mergeBlockID) != 0 { return 0 - 1 }
-    return rawBufferStoreInt(buffer: arena.controlRegions.values, index: regionID * compilerBodyControlRegionColumnCount() + compilerBodyControlRegionResolutionColumn(), value: compilerBodyControlResolutionMerge())
+    if arena.controlRegions.values.update(element: mergeBlockID, index: regionID * compilerBodyControlRegionColumnCount() + compilerBodyControlRegionMergeTargetColumn()) != 0 { return 0 - 1 }
+    return arena.controlRegions.values.update(element: compilerBodyControlResolutionMerge(), index: regionID * compilerBodyControlRegionColumnCount() + compilerBodyControlRegionResolutionColumn())
 }
 
 function compilerBodyArenaTerminateControlRegion(arena: CompilerBodyArena, regionID: Int): Int {
     if regionID < 0 || regionID >= compilerIntTableRowCount(table: arena.controlRegions)
         || compilerIntTableValue(table: arena.controlRegions, row: regionID, column: compilerBodyControlRegionMergeTargetColumn()) >= 0
         || compilerIntTableValue(table: arena.controlRegions, row: regionID, column: compilerBodyControlRegionResolutionColumn()) != compilerBodyControlResolutionPending() { return 0 - 1 }
-    return rawBufferStoreInt(buffer: arena.controlRegions.values, index: regionID * compilerBodyControlRegionColumnCount() + compilerBodyControlRegionResolutionColumn(), value: compilerBodyControlResolutionTerminated())
+    return arena.controlRegions.values.update(element: compilerBodyControlResolutionTerminated(), index: regionID * compilerBodyControlRegionColumnCount() + compilerBodyControlRegionResolutionColumn())
 }
 
 function compilerBodyArenaCFGScheduleAppend(arena: CompilerBodyArena, blockID: Int, nodeID: Int, action: Int): Int {
@@ -258,9 +258,9 @@ function compilerBodyArenaBuildCFGExpression(arena: CompilerBodyArena, nodeID: I
 }
 
 function compilerBodyArenaCFGSetBlock(arena: CompilerBodyArena, blockID: Int, statementCount: Int, terminatorKind: Int, terminatorSourceNodeID: Int): Int {
-    if rawBufferStoreInt(buffer: arena.cfgBlocks.values, index: blockID * compilerBodyCFGBlockColumnCount() + compilerBodyCFGBlockStatementCountColumn(), value: statementCount) != 0
-        || rawBufferStoreInt(buffer: arena.cfgBlocks.values, index: blockID * compilerBodyCFGBlockColumnCount() + compilerBodyCFGBlockTerminatorKindColumn(), value: terminatorKind) != 0
-        || rawBufferStoreInt(buffer: arena.cfgBlocks.values, index: blockID * compilerBodyCFGBlockColumnCount() + compilerBodyCFGBlockTerminatorSourceColumn(), value: terminatorSourceNodeID) != 0 { return 0 - 1 }
+    if arena.cfgBlocks.values.update(element: statementCount, index: blockID * compilerBodyCFGBlockColumnCount() + compilerBodyCFGBlockStatementCountColumn()) != 0
+        || arena.cfgBlocks.values.update(element: terminatorKind, index: blockID * compilerBodyCFGBlockColumnCount() + compilerBodyCFGBlockTerminatorKindColumn()) != 0
+        || arena.cfgBlocks.values.update(element: terminatorSourceNodeID, index: blockID * compilerBodyCFGBlockColumnCount() + compilerBodyCFGBlockTerminatorSourceColumn()) != 0 { return 0 - 1 }
     return 0
 }
 

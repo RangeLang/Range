@@ -1209,7 +1209,7 @@ function compilerBodyArenaAppendResolution(arena: CompilerBodyArena, sourceNodeI
 
 function compilerBodyArenaSetResolutionInstanceID(arena: CompilerBodyArena, resolutionRow: Int, instanceID: Int): Int {
     if resolutionRow < 0 || resolutionRow >= compilerIntTableRowCount(table: arena.resolutions) { return 0 - 1 }
-    return rawBufferStoreInt(buffer: arena.resolutions.values, index: resolutionRow * compilerBodyResolutionColumnCount() + compilerBodyResolutionInstanceIDColumn(), value: instanceID)
+    return arena.resolutions.values.update(element: instanceID, index: resolutionRow * compilerBodyResolutionColumnCount() + compilerBodyResolutionInstanceIDColumn())
 }
 
 function compilerBodyArenaNodeText(arena: CompilerBodyArena, nodeID: Int): String {
@@ -1934,9 +1934,9 @@ function compilerBodyArenaRewriteDerivedReadAsApplication(arena: CompilerBodyAre
         edgeRow: edgeRow + 1
     }
     if receiverEdgeRow < 0
-        || rawBufferStoreInt(buffer: arena.edges.values, index: receiverEdgeRow * compilerBodyArenaEdgeColumnCount(), value: calleeNodeID) != 0
+        || arena.edges.values.update(element: calleeNodeID, index: receiverEdgeRow * compilerBodyArenaEdgeColumnCount()) != 0
         || rawBufferStoreInt(buffer: arena.parentNodes, index: receiverNodeID, value: calleeNodeID) != 0
-        || rawBufferStoreInt(buffer: arena.nodes.values, index: nodeID * compilerBodyArenaNodeColumnCount() + 1, value: compilerSyntaxKindApplication()) != 0
+        || arena.nodes.values.update(element: compilerSyntaxKindApplication(), index: nodeID * compilerBodyArenaNodeColumnCount() + 1) != 0
         || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: nodeID, childNodeID: calleeNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0) != 0 { return 0 - 1 }
     return calleeNodeID
 }
@@ -1962,7 +1962,7 @@ function compilerBodyArenaRewriteImplicitMemberRead(arena: CompilerBodyArena, in
     let start: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.nodes, row: nodeID, column: 4)))
     let receiverNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindIdentifier(), ordinal: 0, start: start, end: start, firstStart: start, firstEnd: start, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
     if receiverNodeID < 0
-        || rawBufferStoreInt(buffer: arena.nodes.values, index: nodeID * compilerBodyArenaNodeColumnCount() + 1, value: compilerSyntaxKindMemberRead()) != 0
+        || arena.nodes.values.update(element: compilerSyntaxKindMemberRead(), index: nodeID * compilerBodyArenaNodeColumnCount() + 1) != 0
         || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: nodeID, childNodeID: receiverNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0) != 0
         || compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: receiverNodeID, targetKind: compilerBodyResolutionLocalSymbol(), targetID: receiverSymbolID, typeKind: compilerBodyTypeConstruct(), typeID: receiverTypeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
     return receiverNodeID

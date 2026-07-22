@@ -2997,7 +2997,7 @@ function compilerTypedSyntaxCaptureMacroWithPolicy(source: String, tables: Compi
         compilerMacroDiagnosticAppend(tables: tables, code: compilerMacroDiagnosticMalformedDeclaration(), fileID: fileID, start: parts.bodyRange.start, end: parts.bodyRange.end, relatedKind: 1, relatedRow: macroRow, identity: identity)
     }
     let parameterCapture: CompilerMacroParameterCapture(compilerTypedSyntaxCaptureMacroParameters(source: source, tables: tables, macroDeclarationRow: macroRow, start: parts.parameterRange.start, end: parts.parameterRange.end, baseFingerprint: identity))
-    if rawBufferStoreInt(buffer: tables.macroDeclarations.values, index: macroRow * tables.macroDeclarations.columnCount + 24, value: parameterCapture.count) != 0 {
+    if tables.macroDeclarations.values.update(element: parameterCapture.count, index: macroRow * tables.macroDeclarations.columnCount + 24) != 0 {
         compilerSyntaxTablesPoison(tables: tables)
     }
     let genericParameterCapture: CompilerMacroParameterCapture(compilerTypedSyntaxCaptureMacroGenericParameters(source: source, tables: tables, macroDeclarationRow: macroRow, start: parts.genericRange.start, end: parts.genericRange.end, ordinalStart: parameterCapture.count, baseFingerprint: parameterCapture.fingerprint))
@@ -3353,8 +3353,8 @@ function compilerTypedSyntaxCaptureEnumCasePayloads(source: String, tables: Comp
     }
     fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: payloadOrdinal)
     if payloadOrdinal <= 0
-        || rawBufferStoreInt(buffer: tables.members.values, index: caseRow * compilerSyntaxMemberColumnCount() + 10, value: fingerprint.first) != 0
-        || rawBufferStoreInt(buffer: tables.members.values, index: caseRow * compilerSyntaxMemberColumnCount() + 11, value: fingerprint.second) != 0 { return 0 - 1 }
+        || tables.members.values.update(element: fingerprint.first, index: caseRow * compilerSyntaxMemberColumnCount() + 10) != 0
+        || tables.members.values.update(element: fingerprint.second, index: caseRow * compilerSyntaxMemberColumnCount() + 11) != 0 { return 0 - 1 }
     return payloadOrdinal
 }
 
@@ -3466,8 +3466,8 @@ function compilerTypedSyntaxCaptureEnum(source: String, tables: CompilerSyntaxTa
     let caseCapture: CompilerTypedMemberCapture(compilerTypedSyntaxCaptureEnumCases(source: source, tables: tables, fileID: fileID, parentSyntaxID: syntaxID, start: parts.bodyRange.start, end: parts.bodyRange.end, baseFingerprint: fingerprint))
     fingerprint: compilerFingerprintAppendInt(fingerprint: caseCapture.fingerprint, value: caseCapture.count)
     if builtinPolicy != compilerBuiltinPolicyNone() { fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: builtinPolicy) }
-    if rawBufferStoreInt(buffer: tables.declarations.values, index: declarationRow * compilerSyntaxDeclarationColumnCount() + 11, value: fingerprint.first) != 0
-        || rawBufferStoreInt(buffer: tables.declarations.values, index: declarationRow * compilerSyntaxDeclarationColumnCount() + 12, value: fingerprint.second) != 0 { compilerSyntaxTablesPoison(tables: tables) }
+    if tables.declarations.values.update(element: fingerprint.first, index: declarationRow * compilerSyntaxDeclarationColumnCount() + 11) != 0
+        || tables.declarations.values.update(element: fingerprint.second, index: declarationRow * compilerSyntaxDeclarationColumnCount() + 12) != 0 { compilerSyntaxTablesPoison(tables: tables) }
     return CompilerTypedDeclarationCaptureStep(captured: true, nextIndex: parts.bodyRange.next)
 }
 
@@ -3500,8 +3500,8 @@ function compilerTypedSyntaxCaptureConstructWithPolicy(source: String, tables: C
     let memberCapture: CompilerTypedMemberCapture(compilerTypedSyntaxCaptureMembers(source: source, tables: tables, fileID: fileID, parentSyntaxID: syntaxID, start: parts.bodyRange.start, end: parts.bodyRange.end, baseFingerprint: fingerprint, captureBodies: captureBodies))
     fingerprint: compilerFingerprintAppendInt(fingerprint: memberCapture.fingerprint, value: memberCapture.count)
     if builtinPolicy != compilerBuiltinPolicyNone() { fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: builtinPolicy) }
-    if rawBufferStoreInt(buffer: tables.declarations.values, index: declarationRow * compilerSyntaxDeclarationColumnCount() + 11, value: fingerprint.first) != 0
-        || rawBufferStoreInt(buffer: tables.declarations.values, index: declarationRow * compilerSyntaxDeclarationColumnCount() + 12, value: fingerprint.second) != 0 { compilerSyntaxTablesPoison(tables: tables) }
+    if tables.declarations.values.update(element: fingerprint.first, index: declarationRow * compilerSyntaxDeclarationColumnCount() + 11) != 0
+        || tables.declarations.values.update(element: fingerprint.second, index: declarationRow * compilerSyntaxDeclarationColumnCount() + 12) != 0 { compilerSyntaxTablesPoison(tables: tables) }
     return CompilerTypedDeclarationCaptureStep(captured: true, nextIndex: parts.bodyRange.next)
 }
 
@@ -4114,8 +4114,8 @@ function compilerSyntaxTypeReferenceBuildExpected(tables: CompilerSyntaxTables, 
         childOrdinal: childOrdinal + 1
     }
     let base: Int(nodeID * compilerSyntaxTypeReferenceColumnCount())
-    if rawBufferStoreInt(buffer: tables.typeReferences.values, index: base + compilerSyntaxTypeReferenceFingerprintFirstColumn(), value: fingerprint.first) != 0
-        || rawBufferStoreInt(buffer: tables.typeReferences.values, index: base + compilerSyntaxTypeReferenceFingerprintSecondColumn(), value: fingerprint.second) != 0 { return 0 - 1 }
+    if tables.typeReferences.values.update(element: fingerprint.first, index: base + compilerSyntaxTypeReferenceFingerprintFirstColumn()) != 0
+        || tables.typeReferences.values.update(element: fingerprint.second, index: base + compilerSyntaxTypeReferenceFingerprintSecondColumn()) != 0 { return 0 - 1 }
     return nodeID
 }
 
@@ -4180,8 +4180,8 @@ function compilerSyntaxLinkMemberTypeTargetAtRow(tables: CompilerSyntaxTables, m
         return 0 - 1
     }
     let base: Int(memberRow * compilerSyntaxMemberColumnCount())
-    if rawBufferStoreInt(buffer: tables.members.values, index: base + 14, value: compilerSyntaxTypeTargetReference()) != 0
-        || rawBufferStoreInt(buffer: tables.members.values, index: base + 15, value: targetID) != 0 { return 0 - 1 }
+    if tables.members.values.update(element: compilerSyntaxTypeTargetReference(), index: base + 14) != 0
+        || tables.members.values.update(element: targetID, index: base + 15) != 0 { return 0 - 1 }
     return 0
 }
 
@@ -5241,12 +5241,12 @@ function compilerMacroFinalizeApplications(tables: CompilerSyntaxTables): Int {
         }
         state targetKind: Int(compilerMacroTargetKindMissing())
         if targetSyntaxID < 0 {
-            if rawBufferStoreInt(buffer: tables.macroApplications.values, index: applicationRow * tables.macroApplications.columnCount + 13, value: targetKind) != 0 { return 0 - 1 }
+            if tables.macroApplications.values.update(element: targetKind, index: applicationRow * tables.macroApplications.columnCount + 13) != 0 { return 0 - 1 }
         } else {
             targetKind: compilerIntTableValue(table: tables.syntaxIndex, row: targetSyntaxID, column: 0)
-            if rawBufferStoreInt(buffer: tables.macroApplications.values, index: applicationRow * tables.macroApplications.columnCount + 12, value: targetSyntaxID) != 0
-                || rawBufferStoreInt(buffer: tables.macroApplications.values, index: applicationRow * tables.macroApplications.columnCount + 13, value: targetKind) != 0
-                || rawBufferStoreInt(buffer: tables.macroApplications.values, index: applicationRow * tables.macroApplications.columnCount + 16, value: compilerDeclarationNameHash(name: compilerMacroTargetKindName(kindTag: targetKind))) != 0 { return 0 - 1 }
+            if tables.macroApplications.values.update(element: targetSyntaxID, index: applicationRow * tables.macroApplications.columnCount + 12) != 0
+                || tables.macroApplications.values.update(element: targetKind, index: applicationRow * tables.macroApplications.columnCount + 13) != 0
+                || tables.macroApplications.values.update(element: compilerDeclarationNameHash(name: compilerMacroTargetKindName(kindTag: targetKind)), index: applicationRow * tables.macroApplications.columnCount + 16) != 0 { return 0 - 1 }
         }
         state ordinal: Int(0)
         state prior: Int(0)
@@ -5254,9 +5254,9 @@ function compilerMacroFinalizeApplications(tables: CompilerSyntaxTables): Int {
             if compilerIntTableValue(table: tables.macroApplications, row: prior, column: 1) == fileID { ordinal: ordinal + 1 }
             prior: prior + 1
         }
-        if rawBufferStoreInt(buffer: tables.macroApplications.values, index: applicationRow * tables.macroApplications.columnCount + 14, value: ordinal) != 0 { return 0 - 1 }
+        if tables.macroApplications.values.update(element: ordinal, index: applicationRow * tables.macroApplications.columnCount + 14) != 0 { return 0 - 1 }
         let identity: CompilerFingerprint(compilerMacroIdentityForApplication(tables: tables, fileID: fileID, nameStartLocal: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 4), nameEndLocal: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 5), authoredStartLocal: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 2), authoredEndLocal: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 3), targetKind: targetKind, ordinal: ordinal))
-        if rawBufferStoreInt(buffer: tables.macroApplications.values, index: applicationRow * tables.macroApplications.columnCount + 17, value: identity.first) != 0 || rawBufferStoreInt(buffer: tables.macroApplications.values, index: applicationRow * tables.macroApplications.columnCount + 18, value: identity.second) != 0 { return 0 - 1 }
+        if tables.macroApplications.values.update(element: identity.first, index: applicationRow * tables.macroApplications.columnCount + 17) != 0 || tables.macroApplications.values.update(element: identity.second, index: applicationRow * tables.macroApplications.columnCount + 18) != 0 { return 0 - 1 }
         applicationRow: applicationRow + 1
     }
     return 0
@@ -5407,17 +5407,17 @@ function compilerMacroExecutionAppendHandle(tables: CompilerSyntaxTables, invoca
 
 function compilerMacroExecutionSetInvocation(tables: CompilerSyntaxTables, row: Int, status: Int, diagnosticCode: Int, diagnosticFileID: Int, diagnosticStart: Int, diagnosticEnd: Int, resultIdentity: CompilerFingerprint, mirOperationCount: Int, stepCount: Int, pipelineStatus: Int, pipelineFailureCode: Int): Int {
     let base: Int(row * compilerSyntaxMacroInvocationColumnCount())
-    if rawBufferStoreInt(buffer: tables.macroInvocations.values, index: base + 9, value: status) != 0
-        || rawBufferStoreInt(buffer: tables.macroInvocations.values, index: base + 10, value: diagnosticCode) != 0
-        || rawBufferStoreInt(buffer: tables.macroInvocations.values, index: base + 11, value: diagnosticFileID) != 0
-        || rawBufferStoreInt(buffer: tables.macroInvocations.values, index: base + 12, value: diagnosticStart) != 0
-        || rawBufferStoreInt(buffer: tables.macroInvocations.values, index: base + 13, value: diagnosticEnd) != 0
-        || rawBufferStoreInt(buffer: tables.macroInvocations.values, index: base + 25, value: resultIdentity.first) != 0
-        || rawBufferStoreInt(buffer: tables.macroInvocations.values, index: base + 26, value: resultIdentity.second) != 0
-        || rawBufferStoreInt(buffer: tables.macroInvocations.values, index: base + 27, value: mirOperationCount) != 0
-        || rawBufferStoreInt(buffer: tables.macroInvocations.values, index: base + 28, value: stepCount) != 0
-        || rawBufferStoreInt(buffer: tables.macroInvocations.values, index: base + 33, value: pipelineStatus) != 0
-        || rawBufferStoreInt(buffer: tables.macroInvocations.values, index: base + 34, value: pipelineFailureCode) != 0 { return 0 - 1 }
+    if tables.macroInvocations.values.update(element: status, index: base + 9) != 0
+        || tables.macroInvocations.values.update(element: diagnosticCode, index: base + 10) != 0
+        || tables.macroInvocations.values.update(element: diagnosticFileID, index: base + 11) != 0
+        || tables.macroInvocations.values.update(element: diagnosticStart, index: base + 12) != 0
+        || tables.macroInvocations.values.update(element: diagnosticEnd, index: base + 13) != 0
+        || tables.macroInvocations.values.update(element: resultIdentity.first, index: base + 25) != 0
+        || tables.macroInvocations.values.update(element: resultIdentity.second, index: base + 26) != 0
+        || tables.macroInvocations.values.update(element: mirOperationCount, index: base + 27) != 0
+        || tables.macroInvocations.values.update(element: stepCount, index: base + 28) != 0
+        || tables.macroInvocations.values.update(element: pipelineStatus, index: base + 33) != 0
+        || tables.macroInvocations.values.update(element: pipelineFailureCode, index: base + 34) != 0 { return 0 - 1 }
     return 0
 }
 

@@ -101,7 +101,7 @@ for ((index = 0; index < compiler_source_count; index += 1)); do
     source_relative="$(manifest_value "compilerSources.$index.path")"
     source_role="$(manifest_value "compilerSources.$index.role")"
     source_path="$REPO_ROOT/$source_relative"
-    source_marker_path="$(basename "$source_path")"
+    source_marker_path="${source_relative#RangeCompiler/Sources/Compiler/}"
     if [[ "$source_role" == "core" ]]; then source_marker_path="$source_relative"; fi
     /usr/bin/printf 'compilerSourceFile\\trole=%s\\tpath=%s\n' "$source_role" "$source_marker_path" >> "$bundle"
     /bin/cat "$source_path" >> "$bundle"

@@ -592,20 +592,20 @@ function compilerBodyLLVMEmitterInitializeLabelsDepthFirst(emitter: CompilerBody
             let continuationBlockID: Int(compilerBodyLLVMConditionMergeTarget(arena: emitter.arena, blockID: blockID))
             if continuationBlockID >= 0
                 && compilerIntTableValue(table: emitter.blockLabels, row: continuationBlockID, column: compilerBodyLLVMBlockLabelKindColumn()) == 0 {
-                if rawBufferStoreInt(buffer: emitter.blockLabels.values, index: continuationBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelKindColumn(), value: compilerBodyLLVMBlockLabelAfter()) != 0
-                    || rawBufferStoreInt(buffer: emitter.blockLabels.values, index: continuationBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelNumberColumn(), value: branchNumber) != 0 { return 0 - 1 }
+                if emitter.blockLabels.values.update(element: compilerBodyLLVMBlockLabelAfter(), index: continuationBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelKindColumn()) != 0
+                    || emitter.blockLabels.values.update(element: branchNumber, index: continuationBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelNumberColumn()) != 0 { return 0 - 1 }
             }
         }
         if isWhileHeader {
             trueLabelKind: compilerBodyLLVMBlockLabelWhileBody()
             falseLabelKind: compilerBodyLLVMBlockLabelAfterWhile()
-            if rawBufferStoreInt(buffer: emitter.blockLabels.values, index: blockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelKindColumn(), value: compilerBodyLLVMBlockLabelWhile()) != 0
-                || rawBufferStoreInt(buffer: emitter.blockLabels.values, index: blockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelNumberColumn(), value: branchNumber) != 0 { return 0 - 1 }
+            if emitter.blockLabels.values.update(element: compilerBodyLLVMBlockLabelWhile(), index: blockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelKindColumn()) != 0
+                || emitter.blockLabels.values.update(element: branchNumber, index: blockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelNumberColumn()) != 0 { return 0 - 1 }
         }
-        if rawBufferStoreInt(buffer: emitter.blockLabels.values, index: trueBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelKindColumn(), value: trueLabelKind) != 0
-            || rawBufferStoreInt(buffer: emitter.blockLabels.values, index: trueBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelNumberColumn(), value: branchNumber) != 0
-            || rawBufferStoreInt(buffer: emitter.blockLabels.values, index: falseBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelKindColumn(), value: falseLabelKind) != 0
-            || rawBufferStoreInt(buffer: emitter.blockLabels.values, index: falseBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelNumberColumn(), value: branchNumber) != 0
+        if emitter.blockLabels.values.update(element: trueLabelKind, index: trueBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelKindColumn()) != 0
+            || emitter.blockLabels.values.update(element: branchNumber, index: trueBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelNumberColumn()) != 0
+            || emitter.blockLabels.values.update(element: falseLabelKind, index: falseBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelKindColumn()) != 0
+            || emitter.blockLabels.values.update(element: branchNumber, index: falseBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelNumberColumn()) != 0
             || rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextBranch(), value: branchNumber + 1) != 0 { return 0 - 1 }
         if compilerBodyLLVMEmitterInitializeLabelsDepthFirst(emitter: emitter, blockID: trueBlockID, visited: visited) != 0 { return 0 - 1 }
         return compilerBodyLLVMEmitterInitializeLabelsDepthFirst(emitter: emitter, blockID: falseBlockID, visited: visited)
@@ -626,7 +626,7 @@ function compilerBodyLLVMEmitterInitializeLabels(emitter: CompilerBodyLLVMEmitte
             || compilerIntTableAppend(table: emitter.blockLabels, value: blockRow) != 0 { return 0 - 1 }
         blockRow: blockRow + 1
     }
-    if rawBufferStoreInt(buffer: emitter.blockLabels.values, index: compilerBodyLLVMBlockLabelKindColumn(), value: compilerBodyLLVMBlockLabelEntry()) != 0 { return 0 - 1 }
+    if emitter.blockLabels.values.update(element: compilerBodyLLVMBlockLabelEntry(), index: compilerBodyLLVMBlockLabelKindColumn()) != 0 { return 0 - 1 }
     return 0
 }
 

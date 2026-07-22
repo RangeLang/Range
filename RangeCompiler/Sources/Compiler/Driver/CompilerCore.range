@@ -160,7 +160,7 @@ construct CompilerSourceMarker {
 }
 
 construct CompilerIntTable {
-    let values: RawBuffer
+    let values: Buffer<Int>
     let columnCount: Int
 }
 
@@ -719,25 +719,25 @@ function compilerIntTableCreate(columnCount: Int, estimatedRowCount: Int): Compi
     if columnCount > 0 && estimatedRowCount > 0 {
         capacity: columnCount * estimatedRowCount
     }
-    return CompilerIntTable(values: rawBufferCreate(capacity: capacity, stride: 4), columnCount: columnCount)
+    return CompilerIntTable(values: bufferCreateInt(capacity: capacity), columnCount: columnCount)
 }
 
 function compilerIntTableAppend(table: CompilerIntTable, value: Int): Int {
-    return rawBufferAppendInt(buffer: table.values, value: value)
+    return table.values.append(element: value)
 }
 
 function compilerIntTableRowCount(table: CompilerIntTable): Int {
     if table.columnCount <= 0 {
         return 0
     }
-    return rawBufferCount(buffer: table.values) / table.columnCount
+    return table.values.count / table.columnCount
 }
 
 function compilerIntTableIsComplete(table: CompilerIntTable): Bool {
     if table.columnCount <= 0 {
         return false
     }
-    return rawBufferCount(buffer: table.values) % table.columnCount == 0
+    return table.values.count % table.columnCount == 0
 }
 
 function compilerIntTableValue(table: CompilerIntTable, row: Int, column: Int): Int {
@@ -745,9 +745,9 @@ function compilerIntTableValue(table: CompilerIntTable, row: Int, column: Int): 
     if row < 0 || row >= rowCount || column < 0 || column >= table.columnCount {
         return 0 - 1
     }
-    return rawBufferLoadInt(buffer: table.values, index: row * table.columnCount + column)
+    return table.values.element(index: row * table.columnCount + column)
 }
 
 function compilerIntTableDestroy(table: CompilerIntTable): Int {
-    return rawBufferDestroy(buffer: table.values)
+    return table.values.destroy()
 }

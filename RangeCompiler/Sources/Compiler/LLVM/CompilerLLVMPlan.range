@@ -746,22 +746,22 @@ function compilerReachableLLVMStateReturnSummaryStatus(reachability: CompilerRea
 function compilerReachableLLVMStateSetReturnSummary(reachability: CompilerReachableLLVMState, instanceID: Int, status: Int, typeKeyID: Int, typeKind: Int, firstLeaf: Int, leafCount: Int): Int {
     if instanceID < 0 || instanceID >= compilerIntTableRowCount(table: reachability.functionInstanceReturnSummaries) { return 0 - 1 }
     let baseIndex: Int(instanceID * compilerReachableFunctionInstanceReturnSummaryColumnCount())
-    if rawBufferStoreInt(buffer: reachability.functionInstanceReturnSummaries.values, index: baseIndex + compilerReachableFunctionInstanceReturnSummaryInstanceColumn(), value: instanceID) != 0 { return 0 - 1 }
-    if rawBufferStoreInt(buffer: reachability.functionInstanceReturnSummaries.values, index: baseIndex + compilerReachableFunctionInstanceReturnSummaryStatusColumn(), value: status) != 0 { return 0 - 1 }
-    if rawBufferStoreInt(buffer: reachability.functionInstanceReturnSummaries.values, index: baseIndex + compilerReachableFunctionInstanceReturnSummaryTypeKeyColumn(), value: typeKeyID) != 0 { return 0 - 1 }
-    if rawBufferStoreInt(buffer: reachability.functionInstanceReturnSummaries.values, index: baseIndex + compilerReachableFunctionInstanceReturnSummaryTypeKindColumn(), value: typeKind) != 0 { return 0 - 1 }
-    if rawBufferStoreInt(buffer: reachability.functionInstanceReturnSummaries.values, index: baseIndex + compilerReachableFunctionInstanceReturnSummaryFirstLeafColumn(), value: firstLeaf) != 0 { return 0 - 1 }
-    return rawBufferStoreInt(buffer: reachability.functionInstanceReturnSummaries.values, index: baseIndex + compilerReachableFunctionInstanceReturnSummaryLeafCountColumn(), value: leafCount)
+    if reachability.functionInstanceReturnSummaries.values.update(element: instanceID, index: baseIndex + compilerReachableFunctionInstanceReturnSummaryInstanceColumn()) != 0 { return 0 - 1 }
+    if reachability.functionInstanceReturnSummaries.values.update(element: status, index: baseIndex + compilerReachableFunctionInstanceReturnSummaryStatusColumn()) != 0 { return 0 - 1 }
+    if reachability.functionInstanceReturnSummaries.values.update(element: typeKeyID, index: baseIndex + compilerReachableFunctionInstanceReturnSummaryTypeKeyColumn()) != 0 { return 0 - 1 }
+    if reachability.functionInstanceReturnSummaries.values.update(element: typeKind, index: baseIndex + compilerReachableFunctionInstanceReturnSummaryTypeKindColumn()) != 0 { return 0 - 1 }
+    if reachability.functionInstanceReturnSummaries.values.update(element: firstLeaf, index: baseIndex + compilerReachableFunctionInstanceReturnSummaryFirstLeafColumn()) != 0 { return 0 - 1 }
+    return reachability.functionInstanceReturnSummaries.values.update(element: leafCount, index: baseIndex + compilerReachableFunctionInstanceReturnSummaryLeafCountColumn())
 }
 
-function compilerReachableLLVMStateAppendReturnLeafToBuffer(output: RawBuffer, instanceID: Int, returnPathID: Int, sourceKind: Int, baseKind: Int, ordinal: Int, sourcePathID: Int, storageKeyID: Int): Int {
-    if rawBufferAppendInt(buffer: output, value: instanceID) != 0 { return 0 - 1 }
-    if rawBufferAppendInt(buffer: output, value: returnPathID) != 0 { return 0 - 1 }
-    if rawBufferAppendInt(buffer: output, value: sourceKind) != 0 { return 0 - 1 }
-    if rawBufferAppendInt(buffer: output, value: baseKind) != 0 { return 0 - 1 }
-    if rawBufferAppendInt(buffer: output, value: ordinal) != 0 { return 0 - 1 }
-    if rawBufferAppendInt(buffer: output, value: sourcePathID) != 0 { return 0 - 1 }
-    return rawBufferAppendInt(buffer: output, value: storageKeyID)
+function compilerReachableLLVMStateAppendReturnLeaf(output: CompilerIntTable, instanceID: Int, returnPathID: Int, sourceKind: Int, baseKind: Int, ordinal: Int, sourcePathID: Int, storageKeyID: Int): Int {
+    if compilerIntTableAppend(table: output, value: instanceID) != 0 { return 0 - 1 }
+    if compilerIntTableAppend(table: output, value: returnPathID) != 0 { return 0 - 1 }
+    if compilerIntTableAppend(table: output, value: sourceKind) != 0 { return 0 - 1 }
+    if compilerIntTableAppend(table: output, value: baseKind) != 0 { return 0 - 1 }
+    if compilerIntTableAppend(table: output, value: ordinal) != 0 { return 0 - 1 }
+    if compilerIntTableAppend(table: output, value: sourcePathID) != 0 { return 0 - 1 }
+    return compilerIntTableAppend(table: output, value: storageKeyID)
 }
 
 function compilerBodyFunctionSignatureABICategoryNone(): Int { return 0 }
@@ -851,8 +851,8 @@ function compilerReachableLLVMStateFreezeFunctionInstanceSignature(reachability:
     if signature.first == 0 && signature.second == 0 { return 0 - 1 }
     let firstIndex: Int(instanceID * compilerReachableFunctionInstanceColumnCount() + compilerReachableFunctionInstanceSignatureFirstColumn())
     let secondIndex: Int(instanceID * compilerReachableFunctionInstanceColumnCount() + compilerReachableFunctionInstanceSignatureSecondColumn())
-    let existingFirst: Int(rawBufferLoadInt(buffer: reachability.functionInstances.values, index: firstIndex))
-    let existingSecond: Int(rawBufferLoadInt(buffer: reachability.functionInstances.values, index: secondIndex))
+    let existingFirst: Int(reachability.functionInstances.values.element(index: firstIndex))
+    let existingSecond: Int(reachability.functionInstances.values.element(index: secondIndex))
     if existingFirst >= 0 || existingSecond >= 0 {
         if existingFirst != signature.first || existingSecond != signature.second { return 0 - 1 }
     }
@@ -918,8 +918,8 @@ function compilerReachableLLVMStateFreezeFunctionInstanceSignature(reachability:
         }
         parameterOrdinal: parameterOrdinal + 1
     }
-    if rawBufferStoreInt(buffer: reachability.functionInstances.values, index: firstIndex, value: signature.first) != 0 { return 0 - 1 }
-    if rawBufferStoreInt(buffer: reachability.functionInstances.values, index: secondIndex, value: signature.second) != 0 { return 0 - 1 }
+    if reachability.functionInstances.values.update(element: signature.first, index: firstIndex) != 0 { return 0 - 1 }
+    if reachability.functionInstances.values.update(element: signature.second, index: secondIndex) != 0 { return 0 - 1 }
     return 0
 }
 

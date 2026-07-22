@@ -332,13 +332,13 @@ function compilerMemoryBuildMacroFamilyForMember(tables: CompilerSyntaxTables, m
     let familyBase: Int(familyID * compilerMemoryMacroFamilyColumnCount())
     let representationBase: Int(representationID * compilerMemoryRuntimeRepresentationColumnCount())
     let partitionBase: Int(partitionID * compilerMemoryRuntimePartitionColumnCount())
-    if rawBufferStoreInt(buffer: memory.macroFamilies.values, index: familyBase + 9, value: ordinal) != 0
-        || rawBufferStoreInt(buffer: memory.runtimeRepresentations.values, index: representationBase + 4, value: 1) != 0
-        || rawBufferStoreInt(buffer: memory.runtimeRepresentations.values, index: representationBase + 5, value: representationFingerprint.first) != 0
-        || rawBufferStoreInt(buffer: memory.runtimeRepresentations.values, index: representationBase + 6, value: representationFingerprint.second) != 0
-        || rawBufferStoreInt(buffer: memory.runtimeRepresentations.values, index: representationBase + 7, value: ordinal + 1) != 0
-        || rawBufferStoreInt(buffer: memory.runtimeRepresentations.values, index: representationBase + 8, value: ordinal) != 0
-        || rawBufferStoreInt(buffer: memory.runtimePartitions.values, index: partitionBase + 8, value: ordinal) != 0 { return 0 - 1 }
+    if memory.macroFamilies.values.update(element: ordinal, index: familyBase + 9) != 0
+        || memory.runtimeRepresentations.values.update(element: 1, index: representationBase + 4) != 0
+        || memory.runtimeRepresentations.values.update(element: representationFingerprint.first, index: representationBase + 5) != 0
+        || memory.runtimeRepresentations.values.update(element: representationFingerprint.second, index: representationBase + 6) != 0
+        || memory.runtimeRepresentations.values.update(element: ordinal + 1, index: representationBase + 7) != 0
+        || memory.runtimeRepresentations.values.update(element: ordinal, index: representationBase + 8) != 0
+        || memory.runtimePartitions.values.update(element: ordinal, index: partitionBase + 8) != 0 { return 0 - 1 }
     return familyID
 }
 

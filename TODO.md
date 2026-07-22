@@ -37,10 +37,12 @@
 ## Compiler Storage
 
 - [ ] Replace the compiler's direct RawBuffer dependency incrementally.
-  - [ ] Add `Buffer.range` to the compiler's manifested Core source set.
-  - [ ] Migrate `CompilerIntTable.values` from `RawBuffer` to `Buffer<Int>` as
+  - [x] Add `Buffer.range` to the compiler's manifested Core source set.
+  - [x] Migrate `CompilerIntTable.values` from `RawBuffer` to `Buffer<Int>` as
     the first compiler-owned table.
-  - [ ] Prove the migrated table through the full fixed-point gate before
-    widening the migration to other integer or text buffers.
+  - [x] Prove the migrated table through the full fixed-point gate and promote
+    the independently verified accepted seed.
+  - [ ] Widen the migration to the compiler's remaining integer and text
+    buffers in separately proven slices.
   - [ ] Delete raw runtime entry points only after no accepted compiler or Core
     path consumes them.

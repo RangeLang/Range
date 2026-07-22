@@ -300,7 +300,7 @@ function compilerBodyArenaParseArrayLiteral(arena: CompilerBodyArena, left: Rang
         if maybeToken == nil { return compilerBodyParseFailure(index: cursor) }
         let token: RangeLexedToken(maybeToken ?? fallback)
         if token.kind == .rightBracket {
-            if rawBufferStoreInt(buffer: arena.nodes.values, index: arrayNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: token.end)) != 0 { return compilerBodyParseFailure(index: token.start) }
+            if arena.nodes.values.update(element: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: token.end), index: arrayNodeID * compilerBodyArenaNodeColumnCount() + 5) != 0 { return compilerBodyParseFailure(index: token.start) }
             return compilerBodyParseSuccess(nodeID: arrayNodeID, nextIndex: token.end)
         }
         let element: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: token.start, limit: limit, minimumPrecedence: 0))
@@ -310,7 +310,7 @@ function compilerBodyArenaParseArrayLiteral(arena: CompilerBodyArena, left: Rang
         if maybeSeparator == nil { return compilerBodyParseFailure(index: element.nextIndex) }
         let separator: RangeLexedToken(maybeSeparator ?? fallback)
         if separator.kind == .rightBracket {
-            if rawBufferStoreInt(buffer: arena.nodes.values, index: arrayNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: separator.end)) != 0 { return compilerBodyParseFailure(index: separator.start) }
+            if arena.nodes.values.update(element: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: separator.end), index: arrayNodeID * compilerBodyArenaNodeColumnCount() + 5) != 0 { return compilerBodyParseFailure(index: separator.start) }
             return compilerBodyParseSuccess(nodeID: arrayNodeID, nextIndex: separator.end)
         }
         if separator.kind != .comma { return compilerBodyParseFailure(index: separator.start) }
@@ -474,7 +474,7 @@ function compilerBodyArenaParseSwitchPattern(arena: CompilerBodyArena, start: In
         || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: callNodeID, childNodeID: primary.nodeID, role: compilerSyntaxRoleCallee(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: start) }
     let arguments: CompilerBodyParseResult(compilerBodyArenaParseSwitchPatternArguments(arena: arena, callNodeID: callNodeID, start: left.end, limit: limit))
     if !arguments.isValid { return arguments }
-    if rawBufferStoreInt(buffer: arena.nodes.values, index: callNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: arguments.nextIndex)) != 0 { return compilerBodyParseFailure(index: start) }
+    if arena.nodes.values.update(element: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: arguments.nextIndex), index: callNodeID * compilerBodyArenaNodeColumnCount() + 5) != 0 { return compilerBodyParseFailure(index: start) }
     return compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: arguments.nextIndex)
 }
 
@@ -504,7 +504,7 @@ function compilerBodyArenaParsePostfix(arena: CompilerBodyArena, start: Int, lim
             if callNodeID < 0 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: callNodeID, childNodeID: calleeNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: result.nextIndex) }
             let arguments: CompilerBodyParseResult(compilerBodyArenaParseCallArguments(arena: arena, callNodeID: callNodeID, start: suffix.end, limit: limit))
             if !arguments.isValid { return arguments }
-            if rawBufferStoreInt(buffer: arena.nodes.values, index: callNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: arguments.nextIndex)) != 0 { return compilerBodyParseFailure(index: result.nextIndex) }
+            if arena.nodes.values.update(element: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: arguments.nextIndex), index: callNodeID * compilerBodyArenaNodeColumnCount() + 5) != 0 { return compilerBodyParseFailure(index: result.nextIndex) }
             result: compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: arguments.nextIndex)
         } else if suffix.kind == .leftBracket {
             let indexValue: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: suffix.end, limit: limit, minimumPrecedence: 0))
@@ -576,7 +576,7 @@ function compilerBodyArenaParseReturnStatement(arena: CompilerBodyArena, keyword
     if statementNodeID < 0 { return compilerBodyParseFailure(index: keyword.start) }
     let value: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: keyword.end, limit: limit, minimumPrecedence: 0))
     if !value.isValid { return value }
-    if rawBufferStoreInt(buffer: arena.nodes.values, index: statementNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: value.nextIndex)) != 0 { return compilerBodyParseFailure(index: keyword.end) }
+    if arena.nodes.values.update(element: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: value.nextIndex), index: statementNodeID * compilerBodyArenaNodeColumnCount() + 5) != 0 { return compilerBodyParseFailure(index: keyword.end) }
     if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: statementNodeID, childNodeID: value.nodeID, role: compilerSyntaxRoleReturnValue(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: value.nextIndex) }
     return compilerBodyParseSuccess(nodeID: statementNodeID, nextIndex: value.nextIndex)
 }
@@ -677,7 +677,7 @@ function compilerBodyArenaParseLetStatement(arena: CompilerBodyArena, keyword: R
             || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: callNodeID, childNodeID: calleeNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: leftParen.start) }
         let arguments: CompilerBodyParseResult(compilerBodyArenaParseCallArguments(arena: arena, callNodeID: callNodeID, start: leftParen.end, limit: limit))
         if !arguments.isValid { return arguments }
-        if rawBufferStoreInt(buffer: arena.nodes.values, index: callNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: arguments.nextIndex)) != 0 { return compilerBodyParseFailure(index: leftParen.start) }
+        if arena.nodes.values.update(element: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: arguments.nextIndex), index: callNodeID * compilerBodyArenaNodeColumnCount() + 5) != 0 { return compilerBodyParseFailure(index: leftParen.start) }
         initializer: arguments
         localEnd: arguments.nextIndex
     } else {
@@ -764,7 +764,7 @@ function compilerBodyArenaParseIfStatement(arena: CompilerBodyArena, keyword: Ra
         if !parsedElse.isValid { return parsedElse }
     }
     if compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: ifNodeID, childNodeID: elseRegionNodeID, role: compilerSyntaxRoleElseRegion(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: elseToken.start) }
-    if rawBufferStoreInt(buffer: arena.nodes.values, index: ifNodeID * compilerBodyArenaNodeColumnCount() + 5, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: elseNext)) != 0 { return compilerBodyParseFailure(index: elseToken.start) }
+    if arena.nodes.values.update(element: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: elseNext), index: ifNodeID * compilerBodyArenaNodeColumnCount() + 5) != 0 { return compilerBodyParseFailure(index: elseToken.start) }
     return compilerBodyParseSuccess(nodeID: ifNodeID, nextIndex: elseNext)
 }
 

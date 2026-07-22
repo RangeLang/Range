@@ -877,7 +877,7 @@ function compilerBodyMIRMarkStringAppendChainOwned(arena: CompilerBodyArena, val
     while !markedRoot {
         let producerOperationID: Int(compilerBodyMIRValueProducerOperationAny(arena: arena, valueID: cursorValueID))
         let leftValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: producerOperationID, ordinal: 0))
-        if rawBufferStoreInt(buffer: arena.mirOperations.values, index: producerOperationID * compilerBodyMIROperationColumnCount() + compilerBodyMIROperationKindColumn(), value: compilerBodyMIROperationStringAppendOwned()) != 0 { return false }
+        if arena.mirOperations.values.update(element: compilerBodyMIROperationStringAppendOwned(), index: producerOperationID * compilerBodyMIROperationColumnCount() + compilerBodyMIROperationKindColumn()) != 0 { return false }
         if compilerIntTableValue(table: arena.mirValues, row: leftValueID, column: compilerBodyMIRValueProvenanceKindColumn()) == compilerBodyMemorySubjectSymbol()
             && compilerIntTableValue(table: arena.mirValues, row: leftValueID, column: compilerBodyMIRValueProvenanceIDColumn()) == symbolID {
             markedRoot: true
@@ -1121,8 +1121,8 @@ function compilerBodyMIRInitializeBlocks(arena: CompilerBodyArena): Int {
 
 function compilerBodyMIRAppendBlock(arena: CompilerBodyArena, cfgBlockID: Int, firstOperation: Int, operationCount: Int): Int {
     if cfgBlockID < 0 || cfgBlockID >= compilerIntTableRowCount(table: arena.mirBlocks)
-        || rawBufferStoreInt(buffer: arena.mirBlocks.values, index: cfgBlockID * compilerBodyMIRBlockColumnCount() + compilerBodyMIRBlockFirstOperationColumn(), value: firstOperation) != 0
-        || rawBufferStoreInt(buffer: arena.mirBlocks.values, index: cfgBlockID * compilerBodyMIRBlockColumnCount() + compilerBodyMIRBlockOperationCountColumn(), value: operationCount) != 0 { return 0 - 1 }
+        || arena.mirBlocks.values.update(element: firstOperation, index: cfgBlockID * compilerBodyMIRBlockColumnCount() + compilerBodyMIRBlockFirstOperationColumn()) != 0
+        || arena.mirBlocks.values.update(element: operationCount, index: cfgBlockID * compilerBodyMIRBlockColumnCount() + compilerBodyMIRBlockOperationCountColumn()) != 0 { return 0 - 1 }
     return cfgBlockID
 }
 
