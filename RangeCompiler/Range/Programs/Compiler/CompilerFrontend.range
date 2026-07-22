@@ -986,7 +986,7 @@ function compilerFunctionReachabilityScanRange(source: String, start: Int, end: 
     while cursor < end {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: cursor))
         if maybeToken == nil { return 0 }
-        let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: cursor, end: cursor, text: String("")))
+        let fallback: RangeLexedToken(kind: .eof, start: cursor, end: cursor, text: String(""))
         let token: RangeLexedToken(maybeToken ?? fallback)
         if token.start >= end { return 0 }
         if token.end <= cursor { return 0 - 1 }
@@ -1261,7 +1261,7 @@ function compilerBodySyntaxExpressionRecordRangeIsValid(source: String, record: 
 }
 
 function compilerBodySyntaxFindTokenRange(source: String, start: Int, end: Int, kind: RangeTokenKind, text: String): CompilerSourceRange {
-    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    state cursor: CompilerTokenCursor(source: source, index: start)
     state foundStart: Int(0 - 1)
     state foundEnd: Int(0 - 1)
     while cursor.index < end && foundStart < 0 {
@@ -1286,8 +1286,8 @@ function compilerBodySyntaxFindTokenRange(source: String, start: Int, end: Int, 
 }
 
 function compilerBodySyntaxFindDelimitedSuffix(source: String, start: Int, end: Int, leftKind: RangeTokenKind, rightKind: RangeTokenKind): CompilerSourceRange {
-    let missingRange: CompilerSourceRange(CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1))
-    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    let missingRange: CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1)
+    let cursor: CompilerTokenCursor(source: source, index: start)
     let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeToken == nil { return missingRange }
     let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursor))
@@ -1295,7 +1295,7 @@ function compilerBodySyntaxFindDelimitedSuffix(source: String, start: Int, end: 
     if token.kind != leftKind || token.start >= end { return missingRange }
     let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: cursor, leftKind: leftKind, rightKind: rightKind))
     if maybeRange == nil { return missingRange }
-    let rangeFallback: CompilerSourceRange(CompilerSourceRange(start: token.end, end: token.end, next: token.end))
+    let rangeFallback: CompilerSourceRange(start: token.end, end: token.end, next: token.end)
     let range: CompilerSourceRange(maybeRange ?? rangeFallback)
     if range.next != end { return missingRange }
     return range
@@ -1305,7 +1305,7 @@ function compilerBodySyntaxCaptureExpressionLeaf(source: String, tables: Compile
     let start: Int(compilerCoreExpressionRecordStart(record: record))
     let end: Int(compilerCoreExpressionRecordEnd(record: record))
     let value: String(compilerCoreExpressionRecordValue(record: record))
-    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    let cursor: CompilerTokenCursor(source: source, index: start)
     let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeToken == nil { return 0 - 1 }
     let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursor))
@@ -1324,10 +1324,10 @@ function compilerBodySyntaxCaptureTypeIdentifierRecord(source: String, tables: C
     if compilerCoreExpressionRecordKind(record: record) != String("identifier") { return 0 - 1 }
     let start: Int(compilerCoreExpressionRecordStart(record: record))
     let end: Int(compilerCoreExpressionRecordEnd(record: record))
-    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    let cursor: CompilerTokenCursor(source: source, index: start)
     let maybeType: Optional<CompilerTypeReference>(compilerCoreParseTypeReference(cursor: cursor))
     if maybeType == nil { return 0 - 1 }
-    let typeFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: start, end: start))
+    let typeFallback: CompilerTypeReference(text: String(""), start: start, end: start)
     let typeReference: CompilerTypeReference(maybeType ?? typeFallback)
     if typeReference.start != start || typeReference.end != end || typeReference.text != compilerCoreExpressionRecordValue(record: record) {
         return 0 - 1
@@ -1357,7 +1357,7 @@ function compilerBodySyntaxCaptureMemberRecord(source: String, tables: CompilerS
     let leftEnd: Int(compilerCoreExpressionRecordEnd(record: leftRecord))
     let end: Int(compilerCoreExpressionRecordEnd(record: record))
     let value: String(compilerCoreExpressionRecordValue(record: record))
-    let dotCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: leftEnd))
+    let dotCursor: CompilerTokenCursor(source: source, index: leftEnd)
     let maybeDot: Optional<RangeLexedToken>(compilerCursorPeek(cursor: dotCursor))
     if maybeDot == nil { return 0 - 1 }
     let dotFallback: RangeLexedToken(compilerFallbackToken(cursor: dotCursor))
@@ -1442,7 +1442,7 @@ function compilerBodySyntaxCaptureIndexRecord(source: String, tables: CompilerSy
     let indexExpression: CompilerExpression(maybeIndex ?? indexFallback)
     let maybeRightBracket: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: indexExpression.end))
     if maybeRightBracket == nil { return 0 - 1 }
-    let bracketCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: indexExpression.end))
+    let bracketCursor: CompilerTokenCursor(source: source, index: indexExpression.end)
     let rightBracketFallback: RangeLexedToken(compilerFallbackToken(cursor: bracketCursor))
     let rightBracket: RangeLexedToken(maybeRightBracket ?? rightBracketFallback)
     if indexExpression.record != indexRecord || rightBracket.kind != .rightBracket
@@ -1497,7 +1497,7 @@ function compilerBodySyntaxCaptureExpressionRecord(source: String, tables: Compi
 
 function compilerBodySyntaxCaptureCallArgumentRecords(source: String, tables: CompilerSyntaxTables, records: String, start: Int, end: Int, context: CompilerBodySyntaxCaptureContext, callSyntaxID: Int): Int {
     if callSyntaxID < 0 || start < 0 || end < start || end > stringLength(value: source) { return 0 - 1 }
-    state sourceCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    state sourceCursor: CompilerTokenCursor(source: source, index: start)
     state recordIndex: Int(0)
     state argumentIndex: Int(0)
     let recordsLength: Int(stringLength(value: records))
@@ -1584,10 +1584,10 @@ function compilerBodySyntaxCaptureLocalBindingStatement(source: String, tables: 
     if nameRange.start < 0 { return 0 - 1 }
     let colonRange: CompilerSourceRange(compilerBodySyntaxFindTokenRange(source: source, start: nameRange.end, end: statement.end, kind: .colon, text: String("")))
     if colonRange.start < 0 { return 0 - 1 }
-    let typeCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: colonRange.end))
+    let typeCursor: CompilerTokenCursor(source: source, index: colonRange.end)
     let maybeType: Optional<CompilerTypeReference>(compilerCoreParseTypeReference(cursor: typeCursor))
     if maybeType == nil { return 0 - 1 }
-    let typeFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: typeCursor.index, end: typeCursor.index))
+    let typeFallback: CompilerTypeReference(text: String(""), start: typeCursor.index, end: typeCursor.index)
     let typeReference: CompilerTypeReference(maybeType ?? typeFallback)
     if typeReference.text != statement.typeName || typeReference.end > statement.end { return 0 - 1 }
     state expressionSyntaxID: Int(0 - 1)
@@ -1651,7 +1651,7 @@ function compilerBodySyntaxCaptureIfStatement(source: String, tables: CompilerSy
     let conditionFallback: CompilerExpression(compilerCoreMissingExpression(start: keywordRange.end))
     let condition: CompilerExpression(maybeCondition ?? conditionFallback)
     if condition.record != statement.expressionRecord { return 0 - 1 }
-    let braceCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: condition.end))
+    let braceCursor: CompilerTokenCursor(source: source, index: condition.end)
     let maybeLeftBrace: Optional<RangeLexedToken>(compilerCursorPeek(cursor: braceCursor))
     if maybeLeftBrace == nil { return 0 - 1 }
     let leftBraceFallback: RangeLexedToken(compilerFallbackToken(cursor: braceCursor))
@@ -1665,7 +1665,7 @@ function compilerBodySyntaxCaptureIfStatement(source: String, tables: CompilerSy
     if conditionSyntaxID < 0 { return 0 - 1 }
     let ifSyntaxID: Int(compilerBodySyntaxAppendNode(tables: tables, context: context, kindTag: compilerSyntaxKindIf(), ordinal: context.statementOrdinal, start: statement.start, end: statement.end, firstStart: keywordRange.start, firstEnd: keywordRange.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
     if ifSyntaxID < 0 { return 0 - 1 }
-    let regionContext: CompilerBodySyntaxCaptureContext(CompilerBodySyntaxCaptureContext(fileID: context.fileID, ownerSyntaxID: ifSyntaxID, statementOrdinal: 0))
+    let regionContext: CompilerBodySyntaxCaptureContext(fileID: context.fileID, ownerSyntaxID: ifSyntaxID, statementOrdinal: 0)
     let regionSyntaxID: Int(compilerBodySyntaxAppendNode(tables: tables, context: regionContext, kindTag: compilerSyntaxKindLexicalRegion(), ordinal: 0, start: statement.bodyStart, end: statement.bodyEnd, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
     if regionSyntaxID < 0
         || compilerBodySyntaxAppendEdge(tables: tables, ownerSyntaxID: ifSyntaxID, childSyntaxID: conditionSyntaxID, roleTag: compilerSyntaxRoleCondition(), ordinal: 0) != 0
@@ -2232,7 +2232,7 @@ function compilerSyntaxAppendMacroDeclaration(tables: CompilerSyntaxTables, file
     if compilerSyntaxTableAppend(tables: tables, table: tables.macroDeclarations, value: compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: bodyEnd)) != 0 { return 0 - 1 }
     if compilerSyntaxTableAppend(tables: tables, table: tables.macroDeclarations, value: acceptedTargetKind) != 0 { return 0 - 1 }
     let name: String(stringSliceUnchecked(source: tables.sourceStore.source, start: nameStart, end: nameEnd))
-    state target: String(String(""))
+    state target: String("")
     if targetStart >= 0 && targetEnd >= targetStart { target: stringSliceUnchecked(source: tables.sourceStore.source, start: targetStart, end: targetEnd) }
     if compilerSyntaxTableAppend(tables: tables, table: tables.macroDeclarations, value: compilerDeclarationNameHash(name: name)) != 0 { return 0 - 1 }
     if compilerSyntaxTableAppend(tables: tables, table: tables.macroDeclarations, value: compilerDeclarationNameHash(name: target)) != 0 { return 0 - 1 }
@@ -2385,13 +2385,13 @@ function compilerSyntaxAppendMacroExpansionTemplate(tables: CompilerSyntaxTables
 }
 
 function compilerSyntaxAppendOpaqueMacroExpansionTemplate(tables: CompilerSyntaxTables, macroDeclarationRow: Int, fileID: Int, expansionStart: Int, expansionEnd: Int, declarationStart: Int, declarationEnd: Int, nameStart: Int, nameEnd: Int, bodyStart: Int, bodyEnd: Int, ordinal: Int, placement: Int, lexicalParent: Int, lexicalParentOrdinal: Int, targetSpliceStart: Int, targetSpliceEnd: Int, targetSpliceFingerprint: CompilerFingerprint): Int {
-    let invalidRange: CompilerSourceRange(CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1))
+    let invalidRange: CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1)
     let fingerprint: CompilerFingerprint(compilerFingerprintAppendRange(fingerprint: compilerFingerprintInitial(), tag: 87, source: tables.sourceStore.source, start: declarationStart, end: declarationEnd))
     return compilerSyntaxAppendMacroExpansionTemplate(tables: tables, macroDeclarationRow: macroDeclarationRow, fileID: fileID, expansionStart: expansionStart, expansionEnd: expansionEnd, declarationStart: declarationStart, declarationEnd: declarationEnd, nameStart: nameStart, nameEnd: nameEnd, parameterStart: invalidRange.start, parameterEnd: invalidRange.end, returnTypeStart: invalidRange.start, returnTypeEnd: invalidRange.end, bodyStart: bodyStart, bodyEnd: bodyEnd, ordinal: ordinal, fingerprint: fingerprint, kindTag: compilerMacroExpansionTemplateKindOpaqueSyntax(), placement: placement, lexicalParent: lexicalParent, lexicalParentOrdinal: lexicalParentOrdinal, targetSpliceStart: targetSpliceStart, targetSpliceEnd: targetSpliceEnd, targetSpliceFingerprint: targetSpliceFingerprint, memberKind: 0)
 }
 
 function compilerMacroExpansionTargetSplice(source: String, start: Int): Optional<CompilerSourceRange> {
-    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    state cursor: CompilerTokenCursor(source: source, index: start)
     let maybeHash: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeHash == nil { return nil }
     let hashFallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
@@ -2450,7 +2450,7 @@ function compilerMacroExpansionSyntaxSplice(source: String, start: Int): Optiona
     if hash.kind != .hash { return nil }
     let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: source, index: hash.end), leftKind: .leftParen, rightKind: .rightParen))
     if maybeRange == nil { return nil }
-    let rangeFallback: CompilerSourceRange(CompilerSourceRange(start: hash.end, end: hash.end, next: hash.end))
+    let rangeFallback: CompilerSourceRange(start: hash.end, end: hash.end, next: hash.end)
     let range: CompilerSourceRange(maybeRange ?? rangeFallback)
     return CompilerSourceRange(start: hash.start, end: range.next, next: range.next)
 }
@@ -2466,7 +2466,7 @@ function compilerMacroExpansionDeclarationBody(source: String, start: Int, limit
         if token.kind == .leftBrace {
             let maybeBody: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: source, index: token.start), leftKind: .leftBrace, rightKind: .rightBrace))
             if maybeBody == nil { return nil }
-            let bodyFallback: CompilerSourceRange(CompilerSourceRange(start: token.end, end: token.end, next: token.end))
+            let bodyFallback: CompilerSourceRange(start: token.end, end: token.end, next: token.end)
             let body: CompilerSourceRange(maybeBody ?? bodyFallback)
             if body.next > limit { return nil }
             return body
@@ -2477,7 +2477,7 @@ function compilerMacroExpansionDeclarationBody(source: String, start: Int, limit
 }
 
 function compilerMacroTargetDeclarationExpansion(source: String, start: Int): Optional<CompilerSourceRange> {
-    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    state cursor: CompilerTokenCursor(source: source, index: start)
     let fallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
     let maybeTarget: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeTarget == nil { return nil }
@@ -2516,7 +2516,7 @@ function compilerTypedSyntaxCaptureMacroExpansionMember(source: String, tables: 
     if !memberStep.keepScanning || !memberStep.found || memberStep.nextIndex > expansionEnd {
         return CompilerMacroExpansionMemberCaptureStep(nextIndex: memberToken.end, isValid: false)
     }
-    let invalidRange: CompilerSourceRange(CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1))
+    let invalidRange: CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1)
     let memberFingerprintBase: CompilerFingerprint(compilerSyntaxDeclarationBaseFingerprint(tables: tables, fileID: fileID, kindTag: compilerSyntaxKindMember(), name: memberStep.nameToken.text))
     let memberTypeFingerprint: CompilerFingerprint(compilerTypedFingerprintAppendNamedType(fingerprint: memberFingerprintBase, tag: 90, ordinal: templateOrdinal, name: memberStep.nameToken.text, typeName: memberStep.typeReference.text))
     let memberStructuralFingerprint: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: memberTypeFingerprint, value: memberStep.kindTag))
@@ -2541,15 +2541,15 @@ function compilerTypedSyntaxCaptureMacroExpansionExtension(source: String, table
         } else if memberToken.text == String("function") {
             let maybeMemberParts: Optional<CompilerFunctionDeclarationParts>(compilerCoreParseFunctionDeclarationParts(source: source, keyword: memberToken))
             if maybeMemberParts == nil { return CompilerMacroExpansionExtensionCaptureStep(nextTemplateOrdinal: nextTemplateOrdinal, captured: captured, isValid: false) }
-            let memberPartsFallback: CompilerFunctionDeclarationParts(CompilerFunctionDeclarationParts(nameToken: memberToken, genericRange: CompilerSourceRange(start: memberToken.end, end: memberToken.end, next: memberToken.end), parameterRange: CompilerSourceRange(start: memberToken.end, end: memberToken.end, next: memberToken.end), returnType: CompilerTypeReference(text: String(""), start: memberToken.end, end: memberToken.end), bodyRange: CompilerSourceRange(start: memberToken.end, end: memberToken.end, next: memberToken.end)))
+            let memberPartsFallback: CompilerFunctionDeclarationParts(nameToken: memberToken, genericRange: CompilerSourceRange(start: memberToken.end, end: memberToken.end, next: memberToken.end), parameterRange: CompilerSourceRange(start: memberToken.end, end: memberToken.end, next: memberToken.end), returnType: CompilerTypeReference(text: String(""), start: memberToken.end, end: memberToken.end), bodyRange: CompilerSourceRange(start: memberToken.end, end: memberToken.end, next: memberToken.end))
             let memberParts: CompilerFunctionDeclarationParts(maybeMemberParts ?? memberPartsFallback)
             if memberParts.bodyRange.next > extensionBody.end { return CompilerMacroExpansionExtensionCaptureStep(nextTemplateOrdinal: nextTemplateOrdinal, captured: captured, isValid: false) }
             let memberFingerprintBase: CompilerFingerprint(compilerSyntaxDeclarationBaseFingerprint(tables: tables, fileID: fileID, kindTag: compilerSyntaxKindFunction(), name: memberParts.nameToken.text))
             let memberParameterFingerprint: CompilerFingerprint(compilerFingerprintAppendRange(fingerprint: memberFingerprintBase, tag: 81, source: source, start: memberParts.parameterRange.start, end: memberParts.parameterRange.end))
             let memberReturnFingerprint: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: memberParameterFingerprint, tag: 82, text: memberParts.returnType.text))
             let memberStructuralFingerprint: CompilerFingerprint(compilerFingerprintAppendRange(fingerprint: memberReturnFingerprint, tag: 83, source: source, start: memberParts.bodyRange.start, end: memberParts.bodyRange.end))
-            let invalidRange: CompilerSourceRange(CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1))
-            let invalidFingerprint: CompilerFingerprint(CompilerFingerprint(first: 0, second: 0))
+            let invalidRange: CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1)
+            let invalidFingerprint: CompilerFingerprint(first: 0, second: 0)
             if compilerSyntaxAppendMacroExpansionTemplate(tables: tables, macroDeclarationRow: macroDeclarationRow, fileID: fileID, expansionStart: expansionStart, expansionEnd: expansionEnd, declarationStart: memberToken.start, declarationEnd: memberParts.bodyRange.next, nameStart: memberParts.nameToken.start, nameEnd: memberParts.nameToken.end, parameterStart: memberParts.parameterRange.start, parameterEnd: memberParts.parameterRange.end, returnTypeStart: memberParts.returnType.start, returnTypeEnd: memberParts.returnType.end, bodyStart: memberParts.bodyRange.start, bodyEnd: memberParts.bodyRange.end, ordinal: nextTemplateOrdinal, fingerprint: memberStructuralFingerprint, kindTag: compilerGraphGeneratedKindFunction(), placement: compilerMacroExpansionTemplatePlacementMember(), lexicalParent: extensionRow, lexicalParentOrdinal: extensionOrdinal, targetSpliceStart: targetSplice.start, targetSpliceEnd: targetSplice.end, targetSpliceFingerprint: targetSpliceFingerprint, memberKind: 0 - 1) < 0 {
                 return CompilerMacroExpansionExtensionCaptureStep(nextTemplateOrdinal: nextTemplateOrdinal, captured: captured, isValid: false)
             }
@@ -2565,7 +2565,7 @@ function compilerTypedSyntaxCaptureMacroExpansionExtension(source: String, table
         } else if memberToken.kind == .hash {
             let maybeSplice: Optional<CompilerSourceRange>(compilerMacroExpansionSyntaxSplice(source: source, start: memberToken.start))
             if maybeSplice == nil { return CompilerMacroExpansionExtensionCaptureStep(nextTemplateOrdinal: nextTemplateOrdinal, captured: captured, isValid: false) }
-            let spliceFallback: CompilerSourceRange(CompilerSourceRange(start: memberToken.start, end: memberToken.end, next: memberToken.end))
+            let spliceFallback: CompilerSourceRange(start: memberToken.start, end: memberToken.end, next: memberToken.end)
             let splice: CompilerSourceRange(maybeSplice ?? spliceFallback)
             if splice.next > extensionBody.end
                 || compilerSyntaxAppendOpaqueMacroExpansionTemplate(tables: tables, macroDeclarationRow: macroDeclarationRow, fileID: fileID, expansionStart: expansionStart, expansionEnd: expansionEnd, declarationStart: splice.start, declarationEnd: splice.end, nameStart: memberToken.start, nameEnd: memberToken.end, bodyStart: 0 - 1, bodyEnd: 0 - 1, ordinal: nextTemplateOrdinal, placement: compilerMacroExpansionTemplatePlacementMember(), lexicalParent: extensionRow, lexicalParentOrdinal: extensionOrdinal, targetSpliceStart: targetSplice.start, targetSpliceEnd: targetSplice.end, targetSpliceFingerprint: targetSpliceFingerprint) < 0 {
@@ -2593,11 +2593,11 @@ function compilerTypedSyntaxCaptureMacroExpansionTemplates(source: String, table
     while cursor < end {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: cursor))
         if maybeToken == nil { return 0 - 1 }
-        let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: cursor, end: cursor, text: String("")))
+        let fallback: RangeLexedToken(kind: .eof, start: cursor, end: cursor, text: String(""))
         let token: RangeLexedToken(maybeToken ?? fallback)
         if token.start >= end { return captured }
         state hasExpansion: Bool(false)
-        state expansion: CompilerSourceRange(CompilerSourceRange(start: token.end, end: token.end, next: token.end))
+        state expansion: CompilerSourceRange(start: token.end, end: token.end, next: token.end)
         if token.kind == .macroAttribute && token.text == String("@expand") {
             let maybeBrace: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: token.end))
             if maybeBrace == nil { return 0 - 1 }
@@ -2627,15 +2627,15 @@ function compilerTypedSyntaxCaptureMacroExpansionTemplates(source: String, table
                 } else if functionToken.text == String("function") {
                     let maybeParts: Optional<CompilerFunctionDeclarationParts>(compilerCoreParseFunctionDeclarationParts(source: source, keyword: functionToken))
                     if maybeParts == nil { return 0 - 1 }
-                    let partsFallback: CompilerFunctionDeclarationParts(CompilerFunctionDeclarationParts(nameToken: functionToken, genericRange: CompilerSourceRange(start: functionToken.end, end: functionToken.end, next: functionToken.end), parameterRange: CompilerSourceRange(start: functionToken.end, end: functionToken.end, next: functionToken.end), returnType: CompilerTypeReference(text: String(""), start: functionToken.end, end: functionToken.end), bodyRange: CompilerSourceRange(start: functionToken.end, end: functionToken.end, next: functionToken.end)))
+                    let partsFallback: CompilerFunctionDeclarationParts(nameToken: functionToken, genericRange: CompilerSourceRange(start: functionToken.end, end: functionToken.end, next: functionToken.end), parameterRange: CompilerSourceRange(start: functionToken.end, end: functionToken.end, next: functionToken.end), returnType: CompilerTypeReference(text: String(""), start: functionToken.end, end: functionToken.end), bodyRange: CompilerSourceRange(start: functionToken.end, end: functionToken.end, next: functionToken.end))
                     let parts: CompilerFunctionDeclarationParts(maybeParts ?? partsFallback)
                     if parts.bodyRange.next > expansion.end { return 0 - 1 }
                     let templateFingerprintBase: CompilerFingerprint(compilerSyntaxDeclarationBaseFingerprint(tables: tables, fileID: fileID, kindTag: compilerSyntaxKindFunction(), name: parts.nameToken.text))
                     let parameterFingerprint: CompilerFingerprint(compilerFingerprintAppendRange(fingerprint: templateFingerprintBase, tag: 81, source: source, start: parts.parameterRange.start, end: parts.parameterRange.end))
                     let returnFingerprint: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: parameterFingerprint, tag: 82, text: parts.returnType.text))
                     let structuralFingerprint: CompilerFingerprint(compilerFingerprintAppendRange(fingerprint: returnFingerprint, tag: 83, source: source, start: parts.bodyRange.start, end: parts.bodyRange.end))
-                    let invalidRange: CompilerSourceRange(CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1))
-                    let invalidFingerprint: CompilerFingerprint(CompilerFingerprint(first: 0, second: 0))
+                    let invalidRange: CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1)
+                    let invalidFingerprint: CompilerFingerprint(first: 0, second: 0)
                     if compilerSyntaxAppendMacroExpansionTemplate(tables: tables, macroDeclarationRow: macroDeclarationRow, fileID: fileID, expansionStart: token.start, expansionEnd: expansion.next, declarationStart: functionToken.start, declarationEnd: parts.bodyRange.next, nameStart: parts.nameToken.start, nameEnd: parts.nameToken.end, parameterStart: parts.parameterRange.start, parameterEnd: parts.parameterRange.end, returnTypeStart: parts.returnType.start, returnTypeEnd: parts.returnType.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end, ordinal: templateOrdinal, fingerprint: structuralFingerprint, kindTag: compilerGraphGeneratedKindFunction(), placement: compilerMacroExpansionTemplatePlacementRoot(), lexicalParent: 0 - 1, lexicalParentOrdinal: 0 - 1, targetSpliceStart: invalidRange.start, targetSpliceEnd: invalidRange.end, targetSpliceFingerprint: invalidFingerprint, memberKind: 0 - 1) < 0 { return 0 - 1 }
                     templateOrdinal: templateOrdinal + 1
                     captured: captured + 1
@@ -2643,11 +2643,11 @@ function compilerTypedSyntaxCaptureMacroExpansionTemplates(source: String, table
                 } else if functionToken.text == String("extension") {
                     let maybeTargetSplice: Optional<CompilerSourceRange>(compilerMacroExpansionTargetSplice(source: source, start: functionToken.end))
                     if maybeTargetSplice == nil { return 0 - 1 }
-                    let targetSpliceFallback: CompilerSourceRange(CompilerSourceRange(start: functionToken.end, end: functionToken.end, next: functionToken.end))
+                    let targetSpliceFallback: CompilerSourceRange(start: functionToken.end, end: functionToken.end, next: functionToken.end)
                     let targetSplice: CompilerSourceRange(maybeTargetSplice ?? targetSpliceFallback)
                     let maybeExtensionBody: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: source, index: targetSplice.next), leftKind: .leftBrace, rightKind: .rightBrace))
                     if maybeExtensionBody == nil { return 0 - 1 }
-                    let extensionBodyFallback: CompilerSourceRange(CompilerSourceRange(start: targetSplice.next, end: targetSplice.next, next: targetSplice.next))
+                    let extensionBodyFallback: CompilerSourceRange(start: targetSplice.next, end: targetSplice.next, next: targetSplice.next)
                     let extensionBody: CompilerSourceRange(maybeExtensionBody ?? extensionBodyFallback)
                     let targetSpliceFingerprint: CompilerFingerprint(compilerFingerprintAppendRange(fingerprint: compilerFingerprintInitial(), tag: 84, source: source, start: targetSplice.start, end: targetSplice.end))
                     let extensionRow: Int(compilerSyntaxAppendMacroExpansionTemplate(tables: tables, macroDeclarationRow: macroDeclarationRow, fileID: fileID, expansionStart: token.start, expansionEnd: expansion.next, declarationStart: functionToken.start, declarationEnd: extensionBody.next, nameStart: functionToken.start, nameEnd: functionToken.end, parameterStart: targetSplice.start, parameterEnd: targetSplice.end, returnTypeStart: extensionBody.start, returnTypeEnd: extensionBody.start, bodyStart: extensionBody.start, bodyEnd: extensionBody.end, ordinal: templateOrdinal, fingerprint: targetSpliceFingerprint, kindTag: compilerMacroExpansionTemplateKindExtension(), placement: compilerMacroExpansionTemplatePlacementMember(), lexicalParent: 0 - 1, lexicalParentOrdinal: 0 - 1, targetSpliceStart: targetSplice.start, targetSpliceEnd: targetSplice.end, targetSpliceFingerprint: targetSpliceFingerprint, memberKind: 0 - 1))
@@ -2668,9 +2668,9 @@ function compilerTypedSyntaxCaptureMacroExpansionTemplates(source: String, table
                     if macroKeyword.text != String("macro") { return 0 - 1 }
                     let maybeBody: Optional<CompilerSourceRange>(compilerMacroExpansionDeclarationBody(source: source, start: macroKeyword.end, limit: expansion.end))
                     if maybeBody == nil { return 0 - 1 }
-                    let bodyFallback: CompilerSourceRange(CompilerSourceRange(start: macroKeyword.end, end: macroKeyword.end, next: macroKeyword.end))
+                    let bodyFallback: CompilerSourceRange(start: macroKeyword.end, end: macroKeyword.end, next: macroKeyword.end)
                     let body: CompilerSourceRange(maybeBody ?? bodyFallback)
-                    let invalidFingerprint: CompilerFingerprint(CompilerFingerprint(first: 0, second: 0))
+                    let invalidFingerprint: CompilerFingerprint(first: 0, second: 0)
                     if compilerSyntaxAppendOpaqueMacroExpansionTemplate(tables: tables, macroDeclarationRow: macroDeclarationRow, fileID: fileID, expansionStart: token.start, expansionEnd: expansion.next, declarationStart: functionToken.start, declarationEnd: body.next, nameStart: macroKeyword.start, nameEnd: macroKeyword.end, bodyStart: body.start, bodyEnd: body.end, ordinal: templateOrdinal, placement: compilerMacroExpansionTemplatePlacementRoot(), lexicalParent: 0 - 1, lexicalParentOrdinal: 0 - 1, targetSpliceStart: 0 - 1, targetSpliceEnd: 0 - 1, targetSpliceFingerprint: invalidFingerprint) < 0 { return 0 - 1 }
                     templateOrdinal: templateOrdinal + 1
                     captured: captured + 1
@@ -2740,7 +2740,7 @@ function compilerTypedSyntaxCaptureWithPolicy(source: String, tables: CompilerSy
             if maybeToken == nil {
                 sourceIndex: fileEnd
             } else {
-                let fallbackToken: RangeLexedToken(RangeLexedToken(kind: .eof, start: sourceIndex, end: sourceIndex, text: String("")))
+                let fallbackToken: RangeLexedToken(kind: .eof, start: sourceIndex, end: sourceIndex, text: String(""))
                 let token: RangeLexedToken(maybeToken ?? fallbackToken)
                 if token.start >= fileEnd {
                     sourceIndex: fileEnd
@@ -2753,7 +2753,7 @@ function compilerTypedSyntaxCaptureWithPolicy(source: String, tables: CompilerSy
                     sourceIndex: token.end
                     let maybeLeftParen: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: token.end))
                     if maybeLeftParen != nil {
-                        let attributeFallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: token.end, end: token.end, text: String("")))
+                        let attributeFallback: RangeLexedToken(kind: .eof, start: token.end, end: token.end, text: String(""))
                         let leftParen: RangeLexedToken(maybeLeftParen ?? attributeFallback)
                         if leftParen.start < fileEnd && leftParen.kind == .leftParen {
                             let maybeDot: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: leftParen.end))
@@ -2818,7 +2818,7 @@ function compilerTypedSyntaxCaptureWithPolicy(source: String, tables: CompilerSy
 
 function compilerTypedSyntaxSwitchNextIndex(source: String, start: Int, end: Int): Int {
     state cursor: Int(start)
-    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: start, end: start, text: String("")))
+    let fallback: RangeLexedToken(kind: .eof, start: start, end: start, text: String(""))
     while cursor < end {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: cursor))
         if maybeToken == nil { return 0 - 1 }
@@ -2827,7 +2827,7 @@ function compilerTypedSyntaxSwitchNextIndex(source: String, start: Int, end: Int
         if token.kind == .leftBrace {
             let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: source, index: token.start), leftKind: .leftBrace, rightKind: .rightBrace))
             if maybeRange == nil { return 0 - 1 }
-            let rangeFallback: CompilerSourceRange(CompilerSourceRange(start: token.end, end: token.end, next: token.end))
+            let rangeFallback: CompilerSourceRange(start: token.end, end: token.end, next: token.end)
             let range: CompilerSourceRange(maybeRange ?? rangeFallback)
             if range.next > end { return 0 - 1 }
             return range.next
@@ -2838,13 +2838,13 @@ function compilerTypedSyntaxSwitchNextIndex(source: String, start: Int, end: Int
 }
 
 function compilerTypedSyntaxCaptureBody(source: String, tables: CompilerSyntaxTables, fileID: Int, ownerSyntaxID: Int, start: Int, end: Int): Int {
-    let emptyDeclarations: CompilerParsedDeclarations(CompilerParsedDeclarations(records: String(""), declarationSummary: String(""), functionSummary: String(""), count: 0))
+    let emptyDeclarations: CompilerParsedDeclarations(records: String(""), declarationSummary: String(""), functionSummary: String(""), count: 0)
     let program: CompilerProgram(compilerCoreProgramWithoutMain(source: source, parsedDeclarations: emptyDeclarations))
     state sourceIndex: Int(start)
     state statementOrdinal: Int(0)
     while sourceIndex < end {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: sourceIndex))
-        let fallbackToken: RangeLexedToken(RangeLexedToken(kind: .eof, start: sourceIndex, end: sourceIndex, text: String("")))
+        let fallbackToken: RangeLexedToken(kind: .eof, start: sourceIndex, end: sourceIndex, text: String(""))
         let token: RangeLexedToken(maybeToken ?? fallbackToken)
         if maybeToken != nil && token.kind == .keyword && token.text == String("switch") {
             let nextIndex: Int(compilerTypedSyntaxSwitchNextIndex(source: source, start: token.end, end: end))
@@ -2855,7 +2855,7 @@ function compilerTypedSyntaxCaptureBody(source: String, tables: CompilerSyntaxTa
             sourceIndex: nextIndex
             statementOrdinal: statementOrdinal + 1
         } else {
-            let context: CompilerBodySyntaxCaptureContext(CompilerBodySyntaxCaptureContext(fileID: fileID, ownerSyntaxID: ownerSyntaxID, statementOrdinal: statementOrdinal))
+            let context: CompilerBodySyntaxCaptureContext(fileID: fileID, ownerSyntaxID: ownerSyntaxID, statementOrdinal: statementOrdinal)
             let maybeStatement: Optional<CompilerStatement>(parseCompilerStatement(program: program, start: sourceIndex, bodyEnd: end))
             if maybeStatement == nil {
                 let remainingStart: Int(compilerCoreFirstNonWhitespaceIndex(source: source, start: sourceIndex, end: end))
@@ -2883,10 +2883,10 @@ function compilerTypedSyntaxCaptureBody(source: String, tables: CompilerSyntaxTa
 function compilerTypedSyntaxCaptureMain(source: String, tables: CompilerSyntaxTables): Int {
     let maybeMain: Optional<CompilerMainBlock>(compilerCoreParseMainBlock(source: source))
     if maybeMain == nil { return 0 }
-    let fallbackMain: CompilerMainBlock(CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
+    let fallbackMain: CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0)
     let mainBlock: CompilerMainBlock(maybeMain ?? fallbackMain)
     let fileID: Int(compilerSourceStoreFileIDAtGlobalOffset(store: tables.sourceStore, globalOffset: mainBlock.attributeStart))
-    let mainRootContext: CompilerBodySyntaxCaptureContext(CompilerBodySyntaxCaptureContext(fileID: fileID, ownerSyntaxID: 0 - 1, statementOrdinal: 0))
+    let mainRootContext: CompilerBodySyntaxCaptureContext(fileID: fileID, ownerSyntaxID: 0 - 1, statementOrdinal: 0)
     let mainAnnotationSyntaxID: Int(compilerBodySyntaxAppendNode(tables: tables, context: mainRootContext, kindTag: compilerSyntaxKindMainAnnotation(), ordinal: 0, start: mainBlock.attributeStart, end: mainBlock.bodyStart, firstStart: mainBlock.attributeStart, firstEnd: mainBlock.bodyStart, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
     let entrySyntaxID: Int(compilerBodySyntaxAppendNode(tables: tables, context: mainRootContext, kindTag: compilerSyntaxKindEntry(), ordinal: 0, start: mainBlock.bodyStart, end: mainBlock.bodyEnd, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
     if mainAnnotationSyntaxID < 0 || entrySyntaxID < 0
@@ -2930,8 +2930,8 @@ function compilerTypedSyntaxCaptureMacroApplication(source: String, tables: Comp
         compilerMacroDiagnosticAppend(tables: tables, code: compilerMacroDiagnosticMalformedApplication(), fileID: fileID, start: compilerCoreRangeTokenStart(token: macroToken), end: compilerCoreRangeTokenEnd(token: macroToken), relatedKind: 2, relatedRow: 0 - 1, identity: malformedIdentity)
         return compilerCoreRangeTokenEnd(token: macroToken)
     }
-    let fallbackRange: CompilerSourceRange(CompilerSourceRange(start: compilerCoreRangeTokenEnd(token: macroToken), end: compilerCoreRangeTokenEnd(token: macroToken), next: compilerCoreRangeTokenEnd(token: macroToken)))
-    let partsFallback: CompilerMacroApplicationParts(CompilerMacroApplicationParts(macroToken: macroToken, genericRange: fallbackRange, argumentRange: fallbackRange, bodyRange: fallbackRange, nextIndex: compilerCoreRangeTokenEnd(token: macroToken)))
+    let fallbackRange: CompilerSourceRange(start: compilerCoreRangeTokenEnd(token: macroToken), end: compilerCoreRangeTokenEnd(token: macroToken), next: compilerCoreRangeTokenEnd(token: macroToken))
+    let partsFallback: CompilerMacroApplicationParts(macroToken: macroToken, genericRange: fallbackRange, argumentRange: fallbackRange, bodyRange: fallbackRange, nextIndex: compilerCoreRangeTokenEnd(token: macroToken))
     let parts: CompilerMacroApplicationParts(maybeParts ?? partsFallback)
     let nameStartLocal: Int(compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: nameStart))
     let nameEndLocal: Int(compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: nameEnd))
@@ -2954,10 +2954,10 @@ function compilerTypedSyntaxCaptureMacroWithPolicy(source: String, tables: Compi
         compilerMacroDiagnosticAppend(tables: tables, code: compilerMacroDiagnosticMalformedDeclaration(), fileID: fileID, start: declarationStart, end: keyword.end, relatedKind: 1, relatedRow: 0 - 1, identity: malformedIdentity)
         return CompilerTypedDeclarationCaptureStep(captured: false, nextIndex: keyword.end)
     }
-    let fallbackToken: RangeLexedToken(RangeLexedToken(kind: .eof, start: keyword.end, end: keyword.end, text: String("")))
-    let fallbackRange: CompilerSourceRange(CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end))
-    let fallbackType: CompilerTypeReference(CompilerTypeReference(text: String(""), start: keyword.end, end: keyword.end))
-    let partsFallback: CompilerMacroDeclarationParts(CompilerMacroDeclarationParts(nameToken: fallbackToken, genericRange: fallbackRange, parameterRange: fallbackRange, targetType: fallbackType, expansionType: fallbackType, hasExpansionType: false, bodyRange: fallbackRange, capabilityStatus: compilerMacroCapabilityHeaderMalformed(), capabilityHeaderRange: fallbackRange, executableBodyRange: fallbackRange, targetCapabilityRange: fallbackRange, diagnosticsCapabilityRange: fallbackRange, graphCapabilityRange: fallbackRange, declarationStart: declarationStart, visibility: visibility))
+    let fallbackToken: RangeLexedToken(kind: .eof, start: keyword.end, end: keyword.end, text: String(""))
+    let fallbackRange: CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end)
+    let fallbackType: CompilerTypeReference(text: String(""), start: keyword.end, end: keyword.end)
+    let partsFallback: CompilerMacroDeclarationParts(nameToken: fallbackToken, genericRange: fallbackRange, parameterRange: fallbackRange, targetType: fallbackType, expansionType: fallbackType, hasExpansionType: false, bodyRange: fallbackRange, capabilityStatus: compilerMacroCapabilityHeaderMalformed(), capabilityHeaderRange: fallbackRange, executableBodyRange: fallbackRange, targetCapabilityRange: fallbackRange, diagnosticsCapabilityRange: fallbackRange, graphCapabilityRange: fallbackRange, declarationStart: declarationStart, visibility: visibility)
     let parts: CompilerMacroDeclarationParts(maybeParts ?? partsFallback)
     let targetKind: Int(compilerMacroTargetKindForText(text: parts.targetType.text))
     let macroRow: Int(compilerIntTableRowCount(table: tables.macroDeclarations))
@@ -3065,7 +3065,7 @@ function compilerTypedSyntaxMacroParameterEnd(source: String, typeEnd: Int, para
 }
 
 function compilerTypedSyntaxCaptureMacroParameters(source: String, tables: CompilerSyntaxTables, macroDeclarationRow: Int, start: Int, end: Int, baseFingerprint: CompilerFingerprint): CompilerMacroParameterCapture {
-    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    state cursor: CompilerTokenCursor(source: source, index: start)
     state ordinal: Int(0)
     state fingerprint: CompilerFingerprint(baseFingerprint)
     state valid: Bool(true)
@@ -3080,10 +3080,10 @@ function compilerTypedSyntaxCaptureMacroParameters(source: String, tables: Compi
         if token.start >= end { return CompilerMacroParameterCapture(count: ordinal, fingerprint: fingerprint, isValid: valid) }
         state parameterToken: RangeLexedToken(token)
         if token.kind == .macroAttribute {
-            state parameterCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: token.end))
+            state parameterCursor: CompilerTokenCursor(source: source, index: token.end)
             let maybeCaptureGeneric: Optional<CompilerSourceRange>(compilerCoreParseAngleRangeAfterName(source: source, nameToken: token))
             if maybeCaptureGeneric != nil {
-                let captureGenericFallback: CompilerSourceRange(CompilerSourceRange(start: token.end, end: token.end, next: token.end))
+                let captureGenericFallback: CompilerSourceRange(start: token.end, end: token.end, next: token.end)
                 let captureGeneric: CompilerSourceRange(maybeCaptureGeneric ?? captureGenericFallback)
                 parameterCursor: CompilerTokenCursor(source: source, index: captureGeneric.next)
             }
@@ -3204,7 +3204,7 @@ function compilerTypedSyntaxCaptureMacroGenericParameters(source: String, tables
 
 function compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(source: String, tables: CompilerSyntaxTables, declarationOrdinal: Int, token: RangeLexedToken, captureBodies: Bool, builtinPolicy: Int, fileEnd: Int): CompilerTypedDeclarationCaptureStep {
     if token.kind == .keyword && (token.text == String("open") || token.text == String("closed")) {
-        let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: token.end))
+        let cursor: CompilerTokenCursor(source: source, index: token.end)
         let maybeMacro: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
         if maybeMacro != nil {
             let fallbackMacro: RangeLexedToken(compilerFallbackToken(cursor: cursor))
@@ -3245,9 +3245,9 @@ function compilerTypedSyntaxCaptureExtension(source: String, tables: CompilerSyn
         compilerSyntaxTablesPoison(tables: tables)
         return CompilerTypedDeclarationCaptureStep(captured: false, nextIndex: keyword.end)
     }
-    let fallbackToken: RangeLexedToken(RangeLexedToken(kind: .eof, start: keyword.end, end: keyword.end, text: String("")))
-    let fallbackRange: CompilerSourceRange(CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end))
-    let partsFallback: CompilerConstructDeclarationParts(CompilerConstructDeclarationParts(nameToken: fallbackToken, genericRange: fallbackRange, bodyRange: fallbackRange))
+    let fallbackToken: RangeLexedToken(kind: .eof, start: keyword.end, end: keyword.end, text: String(""))
+    let fallbackRange: CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end)
+    let partsFallback: CompilerConstructDeclarationParts(nameToken: fallbackToken, genericRange: fallbackRange, bodyRange: fallbackRange)
     let parts: CompilerConstructDeclarationParts(maybeParts ?? partsFallback)
     let ownerSyntaxID: Int(compilerSyntaxDeclarationSyntaxIDForTypeName(tables: tables, typeName: parts.nameToken.text))
     if builtinPolicy != compilerBuiltinPolicyNone()
@@ -3262,10 +3262,10 @@ function compilerTypedSyntaxCaptureExtension(source: String, tables: CompilerSyn
         compilerSyntaxTablesPoison(tables: tables)
         return CompilerTypedDeclarationCaptureStep(captured: false, nextIndex: parts.bodyRange.next)
     }
-    let baseFingerprint: CompilerFingerprint(CompilerFingerprint(
+    let baseFingerprint: CompilerFingerprint(
         first: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 11),
         second: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 12)
-    ))
+    )
     compilerTypedSyntaxCaptureMembers(source: source, tables: tables, fileID: compilerSourceStoreFileIDAtGlobalOffset(store: tables.sourceStore, globalOffset: keyword.start), parentSyntaxID: ownerSyntaxID, start: parts.bodyRange.start, end: parts.bodyRange.end, baseFingerprint: baseFingerprint, captureBodies: captureBodies)
     return CompilerTypedDeclarationCaptureStep(captured: false, nextIndex: parts.bodyRange.next)
 }
@@ -3295,11 +3295,11 @@ function compilerTypedSyntaxEnumPayloadNameExists(tables: CompilerSyntaxTables, 
 function compilerTypedSyntaxCaptureEnumCasePayloads(source: String, tables: CompilerSyntaxTables, fileID: Int, caseRow: Int, start: Int, end: Int): Int {
     if caseRow < 0 || caseRow >= compilerIntTableRowCount(table: tables.members) || start >= end { return 0 - 1 }
     let caseSyntaxID: Int(compilerIntTableValue(table: tables.members, row: caseRow, column: 0))
-    state fingerprint: CompilerFingerprint(CompilerFingerprint(
+    state fingerprint: CompilerFingerprint(
         first: compilerIntTableValue(table: tables.members, row: caseRow, column: 10),
         second: compilerIntTableValue(table: tables.members, row: caseRow, column: 11)
-    ))
-    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    )
+    state cursor: CompilerTokenCursor(source: source, index: start)
     state payloadOrdinal: Int(0)
     while cursor.index < end {
         let maybeFirst: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
@@ -3331,7 +3331,7 @@ function compilerTypedSyntaxCaptureEnumCasePayloads(source: String, tables: Comp
         if payloadSyntaxID < 0
             || compilerSyntaxAppendMemberWithStorage(tables: tables, syntaxID: payloadSyntaxID, fileID: fileID, parentSyntaxID: caseSyntaxID, ordinal: payloadOrdinal, memberStart: firstToken.start, memberEnd: step.typeReference.end, nameStart: step.nameToken.start, nameEnd: step.nameToken.end, typeStart: step.typeReference.start, typeEnd: step.typeReference.end, fingerprint: payloadFingerprint, memberKind: compilerSyntaxMemberKindEnumCasePayload(), storagePolicy: storagePolicy) != 0 { return 0 - 1 }
         payloadOrdinal: payloadOrdinal + 1
-        let separatorCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: step.nextIndex))
+        let separatorCursor: CompilerTokenCursor(source: source, index: step.nextIndex)
         let maybeSeparator: Optional<RangeLexedToken>(compilerCursorPeek(cursor: separatorCursor))
         if maybeSeparator == nil { return 0 - 1 }
         let separator: RangeLexedToken(maybeSeparator ?? fallback)
@@ -3354,7 +3354,7 @@ function compilerTypedSyntaxCaptureEnumCasePayloads(source: String, tables: Comp
 }
 
 function compilerTypedSyntaxCaptureEnumCases(source: String, tables: CompilerSyntaxTables, fileID: Int, parentSyntaxID: Int, start: Int, end: Int, baseFingerprint: CompilerFingerprint): CompilerTypedMemberCapture {
-    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    state cursor: CompilerTokenCursor(source: source, index: start)
     state caseOrdinal: Int(0)
     state declarationFingerprint: CompilerFingerprint(baseFingerprint)
     while cursor.index < end {
@@ -3383,8 +3383,8 @@ function compilerTypedSyntaxCaptureEnumCases(source: String, tables: CompilerSyn
             return CompilerTypedMemberCapture(count: caseOrdinal, fingerprint: declarationFingerprint)
         }
         state caseEnd: Int(nameToken.end)
-        state payloadRange: CompilerSourceRange(CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: nameToken.end))
-        let payloadCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: nameToken.end))
+        state payloadRange: CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: nameToken.end)
+        let payloadCursor: CompilerTokenCursor(source: source, index: nameToken.end)
         let maybePayloadStart: Optional<RangeLexedToken>(compilerCursorPeek(cursor: payloadCursor))
         if maybePayloadStart != nil {
             let payloadStart: RangeLexedToken(maybePayloadStart ?? fallback)
@@ -3436,9 +3436,9 @@ function compilerTypedSyntaxCaptureEnum(source: String, tables: CompilerSyntaxTa
         compilerSyntaxTablesPoison(tables: tables)
         return CompilerTypedDeclarationCaptureStep(captured: false, nextIndex: keyword.end)
     }
-    let fallbackToken: RangeLexedToken(RangeLexedToken(kind: .eof, start: keyword.end, end: keyword.end, text: String("")))
-    let fallbackRange: CompilerSourceRange(CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end))
-    let partsFallback: CompilerConstructDeclarationParts(CompilerConstructDeclarationParts(nameToken: fallbackToken, genericRange: fallbackRange, bodyRange: fallbackRange))
+    let fallbackToken: RangeLexedToken(kind: .eof, start: keyword.end, end: keyword.end, text: String(""))
+    let fallbackRange: CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end)
+    let partsFallback: CompilerConstructDeclarationParts(nameToken: fallbackToken, genericRange: fallbackRange, bodyRange: fallbackRange)
     let parts: CompilerConstructDeclarationParts(maybeParts ?? partsFallback)
     let fileID: Int(compilerSourceStoreFileIDAtGlobalOffset(store: tables.sourceStore, globalOffset: keyword.start))
     if (builtinPolicy != compilerBuiltinPolicyNone() && builtinPolicy != compilerBuiltinPolicyRuntime())
@@ -3473,9 +3473,9 @@ function compilerTypedSyntaxCaptureConstructWithPolicy(source: String, tables: C
         return CompilerTypedDeclarationCaptureStep(captured: false, nextIndex: keyword.end)
     }
 
-    let fallbackToken: RangeLexedToken(RangeLexedToken(kind: .eof, start: keyword.end, end: keyword.end, text: String("")))
-    let fallbackRange: CompilerSourceRange(CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end))
-    let partsFallback: CompilerConstructDeclarationParts(CompilerConstructDeclarationParts(nameToken: fallbackToken, genericRange: fallbackRange, bodyRange: fallbackRange))
+    let fallbackToken: RangeLexedToken(kind: .eof, start: keyword.end, end: keyword.end, text: String(""))
+    let fallbackRange: CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end)
+    let partsFallback: CompilerConstructDeclarationParts(nameToken: fallbackToken, genericRange: fallbackRange, bodyRange: fallbackRange)
     let parts: CompilerConstructDeclarationParts(maybeParts ?? partsFallback)
     let fileID: Int(compilerSourceStoreFileIDAtGlobalOffset(store: tables.sourceStore, globalOffset: keyword.start))
     if !compilerSyntaxDeclarationRangesAreValid(tables: tables, fileID: fileID, declarationStart: keyword.start, declarationEnd: parts.bodyRange.next, nameStart: parts.nameToken.start, nameEnd: parts.nameToken.end, bodyStart: parts.bodyRange.start, bodyEnd: parts.bodyRange.end)
@@ -3501,7 +3501,7 @@ function compilerTypedSyntaxCaptureConstructWithPolicy(source: String, tables: C
 }
 
 function compilerTypedSyntaxCaptureMembers(source: String, tables: CompilerSyntaxTables, fileID: Int, parentSyntaxID: Int, start: Int, end: Int, baseFingerprint: CompilerFingerprint, captureBodies: Bool): CompilerTypedMemberCapture {
-    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    state cursor: CompilerTokenCursor(source: source, index: start)
     state memberOrdinal: Int(0)
     state functionOrdinal: Int(0)
     state declarationFingerprint: CompilerFingerprint(baseFingerprint)
@@ -3576,25 +3576,25 @@ function compilerTypedSyntaxCaptureFunction(source: String, tables: CompilerSynt
 function compilerCoreParseBuiltinFunctionDeclarationParts(source: String, keyword: RangeLexedToken, fileEnd: Int): Optional<CompilerFunctionDeclarationParts> {
     let maybeName: Optional<RangeLexedToken>(compilerCoreParseFunctionNameAfterKeyword(source: source, keyword: keyword))
     if maybeName == nil { return nil }
-    let fallbackCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: keyword.end))
+    let fallbackCursor: CompilerTokenCursor(source: source, index: keyword.end)
     let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: fallbackCursor))
     let nameToken: RangeLexedToken(maybeName ?? fallbackToken)
-    state genericRange: CompilerSourceRange(CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: nameToken.end))
+    state genericRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: nameToken.end)
     let maybeGeneric: Optional<CompilerSourceRange>(compilerCoreParseAngleRangeAfterName(source: source, nameToken: nameToken))
     if maybeGeneric != nil {
-        let genericFallback: CompilerSourceRange(CompilerSourceRange(start: nameToken.end, end: nameToken.end, next: nameToken.end))
+        let genericFallback: CompilerSourceRange(start: nameToken.end, end: nameToken.end, next: nameToken.end)
         genericRange: maybeGeneric ?? genericFallback
     }
-    let parameterCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: genericRange.next))
+    let parameterCursor: CompilerTokenCursor(source: source, index: genericRange.next)
     let maybeParameters: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: parameterCursor, leftKind: .leftParen, rightKind: .rightParen))
     if maybeParameters == nil { return nil }
-    let parameterFallback: CompilerSourceRange(CompilerSourceRange(start: genericRange.next, end: genericRange.next, next: genericRange.next))
+    let parameterFallback: CompilerSourceRange(start: genericRange.next, end: genericRange.next, next: genericRange.next)
     let parameterRange: CompilerSourceRange(maybeParameters ?? parameterFallback)
     let maybeReturnType: Optional<CompilerTypeReference>(compilerCoreParseReturnTypeAfterParametersWithEnd(source: source, parameterRange: parameterRange, fileEnd: fileEnd))
     if maybeReturnType == nil { return nil }
-    let returnTypeFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: parameterRange.next, end: parameterRange.next))
+    let returnTypeFallback: CompilerTypeReference(text: String(""), start: parameterRange.next, end: parameterRange.next)
     let returnType: CompilerTypeReference(maybeReturnType ?? returnTypeFallback)
-    let emptyBody: CompilerSourceRange(CompilerSourceRange(start: returnType.end, end: returnType.end, next: returnType.end))
+    let emptyBody: CompilerSourceRange(start: returnType.end, end: returnType.end, next: returnType.end)
     return CompilerFunctionDeclarationParts(nameToken: nameToken, genericRange: genericRange, parameterRange: parameterRange, returnType: returnType, bodyRange: emptyBody)
 }
 
@@ -3606,10 +3606,10 @@ function compilerTypedSyntaxCaptureFunctionWithPolicy(source: String, tables: Co
         return CompilerTypedDeclarationCaptureStep(captured: false, nextIndex: keyword.end)
     }
 
-    let fallbackToken: RangeLexedToken(RangeLexedToken(kind: .eof, start: keyword.end, end: keyword.end, text: String("")))
-    let fallbackRange: CompilerSourceRange(CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end))
-    let fallbackType: CompilerTypeReference(CompilerTypeReference(text: String(""), start: keyword.end, end: keyword.end))
-    let partsFallback: CompilerFunctionDeclarationParts(CompilerFunctionDeclarationParts(nameToken: fallbackToken, genericRange: fallbackRange, parameterRange: fallbackRange, returnType: fallbackType, bodyRange: fallbackRange))
+    let fallbackToken: RangeLexedToken(kind: .eof, start: keyword.end, end: keyword.end, text: String(""))
+    let fallbackRange: CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end)
+    let fallbackType: CompilerTypeReference(text: String(""), start: keyword.end, end: keyword.end)
+    let partsFallback: CompilerFunctionDeclarationParts(nameToken: fallbackToken, genericRange: fallbackRange, parameterRange: fallbackRange, returnType: fallbackType, bodyRange: fallbackRange)
     let parts: CompilerFunctionDeclarationParts(maybeParts ?? partsFallback)
     let fileID: Int(compilerSourceStoreFileIDAtGlobalOffset(store: tables.sourceStore, globalOffset: keyword.start))
     let fileRole: Int(compilerSourceStoreFileRole(store: tables.sourceStore, fileID: fileID))
@@ -3649,7 +3649,7 @@ function compilerTypedSyntaxCaptureFunctionWithPolicy(source: String, tables: Co
 }
 
 function compilerTypedSyntaxCaptureParameters(source: String, tables: CompilerSyntaxTables, fileID: Int, functionID: Int, start: Int, end: Int, baseFingerprint: CompilerFingerprint): CompilerTypedParameterCapture {
-    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    state cursor: CompilerTokenCursor(source: source, index: start)
     state parameterOrdinal: Int(0)
     state signature: CompilerFingerprint(baseFingerprint)
     while cursor.index < end {
@@ -4047,7 +4047,7 @@ function compilerSyntaxTypeReferenceBuildExpected(tables: CompilerSyntaxTables, 
     if nodeID < 0 { return 0 - 1 }
     state childOrdinal: Int(0)
     while childOrdinal < childCount {
-        state nestedRange: CompilerSourceRange(CompilerSourceRange(start: childRangeStart, end: childRangeEnd, next: childRangeEnd))
+        state nestedRange: CompilerSourceRange(start: childRangeStart, end: childRangeEnd, next: childRangeEnd)
         if kind == compilerSyntaxTypeReferenceApplication() {
             nestedRange: compilerSemanticGenericArgumentRangeInText(text: typeName, typeRange: normalized, ordinal: childOrdinal)
         }
@@ -4089,7 +4089,7 @@ function compilerSyntaxMemberMacroFamilyName(tables: CompilerSyntaxTables, membe
     if start < 0 || end <= start { return String("") }
     let firstMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: start))
     if firstMaybe == nil { return String("") }
-    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: start, end: start, text: String("")))
+    let fallback: RangeLexedToken(kind: .eof, start: start, end: start, text: String(""))
     let first: RangeLexedToken(firstMaybe ?? fallback)
     let macroMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: first.end))
     if first.kind != .leftBracket || macroMaybe == nil { return String("") }
@@ -5005,7 +5005,7 @@ function compilerMacroExpansionTemplatesAreStructurallyValid(tables: CompilerSyn
             let targetSpliceGlobalStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: targetSpliceStart))
             let maybeTargetSplice: Optional<CompilerSourceRange>(compilerMacroExpansionTargetSplice(source: tables.sourceStore.source, start: targetSpliceGlobalStart))
             if maybeTargetSplice == nil { return compilerMacroExpansionTemplateStructuralFailure(tables: tables, row: row, reason: compilerSyntaxFailureReasonInvalidMacroTemplateTarget()) }
-            let targetSpliceFallback: CompilerSourceRange(CompilerSourceRange(start: targetSpliceGlobalStart, end: targetSpliceGlobalStart, next: targetSpliceGlobalStart))
+            let targetSpliceFallback: CompilerSourceRange(start: targetSpliceGlobalStart, end: targetSpliceGlobalStart, next: targetSpliceGlobalStart)
             let targetSplice: CompilerSourceRange(maybeTargetSplice ?? targetSpliceFallback)
             if compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: targetSplice.start) != targetSpliceStart
                 || compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: targetSplice.end) != targetSpliceEnd { return compilerMacroExpansionTemplateStructuralFailure(tables: tables, row: row, reason: compilerSyntaxFailureReasonInvalidMacroTemplateTarget()) }
@@ -5214,7 +5214,7 @@ function compilerMacroLink(tables: CompilerSyntaxTables): Int {
         let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12))
         let targetKind: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 13))
         let ordinal: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 14))
-        let identity: CompilerFingerprint(CompilerFingerprint(first: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 17), second: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 18)))
+        let identity: CompilerFingerprint(first: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 17), second: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 18))
         let authoredStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 2)))
         let authoredEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 3)))
         if targetSyntaxID < 0 {
@@ -5647,7 +5647,7 @@ function compilerMacroGraphDeltaAppendGeneratedFunction(tables: CompilerSyntaxTa
     let lexicalParentOrdinal: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 25))
     if kindTag != compilerGraphGeneratedKindFunction() { return 0 - 1 }
     state ownerSyntaxID: Int(0 - 1)
-    state parentFingerprint: CompilerFingerprint(CompilerFingerprint(first: 0, second: 0))
+    state parentFingerprint: CompilerFingerprint(first: 0, second: 0)
     if placement == compilerMacroExpansionTemplatePlacementMember() {
         if lexicalParent < 0 || lexicalParent >= templateRow
             || compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 18) != compilerMacroExpansionTemplateKindExtension()
@@ -5722,7 +5722,7 @@ function compilerMacroGraphDeltaAppendGeneratedMember(tables: CompilerSyntaxTabl
     let memberKind: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 26))
     if kindTag != compilerMacroExpansionTemplateKindMember() || (memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState()) { return 0 - 1 }
     state ownerSyntaxID: Int(0 - 1)
-    state parentFingerprint: CompilerFingerprint(CompilerFingerprint(first: 0, second: 0))
+    state parentFingerprint: CompilerFingerprint(first: 0, second: 0)
     if placement == compilerMacroExpansionTemplatePlacementMember() {
         if lexicalParent < 0 || lexicalParent >= templateRow
             || compilerIntTableValue(table: tables.macroExpansionTemplates, row: lexicalParent, column: 18) != compilerMacroExpansionTemplateKindExtension()
@@ -5856,7 +5856,7 @@ function compilerMacroGraphDeltaGeneratedFunctionTemplateIsSupported(tables: Com
     if keyword.text != String("function") { return false }
     let maybeParts: Optional<CompilerFunctionDeclarationParts>(compilerCoreParseFunctionDeclarationParts(source: tables.sourceStore.source, keyword: keyword))
     if maybeParts == nil { return false }
-    let partsFallback: CompilerFunctionDeclarationParts(CompilerFunctionDeclarationParts(nameToken: keyword, genericRange: CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end), parameterRange: CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end), returnType: CompilerTypeReference(text: String(""), start: keyword.end, end: keyword.end), bodyRange: CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end)))
+    let partsFallback: CompilerFunctionDeclarationParts(nameToken: keyword, genericRange: CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end), parameterRange: CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end), returnType: CompilerTypeReference(text: String(""), start: keyword.end, end: keyword.end), bodyRange: CompilerSourceRange(start: keyword.end, end: keyword.end, next: keyword.end))
     let parts: CompilerFunctionDeclarationParts(maybeParts ?? partsFallback)
     let expectedDeclarationEnd: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 6))
     let expectedNameStart: Int(compilerIntTableValue(table: tables.macroExpansionTemplates, row: templateRow, column: 7))
@@ -6100,7 +6100,7 @@ function compilerGraphDeltaCommitGeneratedFunction(tables: CompilerSyntaxTables,
     let declarationRow: Int(compilerIntTableRowCount(table: tables.declarations))
     let parameterRow: Int(compilerIntTableRowCount(table: tables.parameters))
     let syntaxID: Int(compilerSyntaxAllocate(tables: tables, kindTag: generatedSyntaxKind, facetRow: functionRow))
-    let signature: CompilerFingerprint(CompilerFingerprint(first: compilerIntTableValue(table: tables.pendingGeneratedFunctions, row: row, column: 19), second: compilerIntTableValue(table: tables.pendingGeneratedFunctions, row: row, column: 20)))
+    let signature: CompilerFingerprint(first: compilerIntTableValue(table: tables.pendingGeneratedFunctions, row: row, column: 19), second: compilerIntTableValue(table: tables.pendingGeneratedFunctions, row: row, column: 20))
     let source: String(tables.sourceStore.source)
     let parameterCapture: CompilerTypedParameterCapture(compilerTypedSyntaxCaptureParameters(source: source, tables: tables, fileID: fileID, functionID: functionRow, start: parameterGlobalStart, end: parameterGlobalEnd, baseFingerprint: signature))
     if generatedGraphKind != compilerGraphGeneratedKindFunction()
@@ -6130,7 +6130,7 @@ function compilerGraphDeltaCommitGeneratedMember(tables: CompilerSyntaxTables, r
     let memberRow: Int(compilerIntTableRowCount(table: tables.members))
     let syntaxID: Int(compilerSyntaxAllocate(tables: tables, kindTag: compilerSyntaxKindMember(), facetRow: memberRow))
     let ordinal: Int(compilerSyntaxPriorChildCount(table: tables.members, row: memberRow, parentColumn: 2, parentSyntaxID: ownerSyntaxID))
-    let memberFingerprint: CompilerFingerprint(CompilerFingerprint(first: compilerIntTableValue(table: tables.pendingGeneratedMembers, row: row, column: 17), second: compilerIntTableValue(table: tables.pendingGeneratedMembers, row: row, column: 18)))
+    let memberFingerprint: CompilerFingerprint(first: compilerIntTableValue(table: tables.pendingGeneratedMembers, row: row, column: 17), second: compilerIntTableValue(table: tables.pendingGeneratedMembers, row: row, column: 18))
     let memberStartGlobal: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: memberStart))
     let memberEndGlobal: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: memberEnd))
     let nameStartGlobal: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: nameStart))
@@ -6204,7 +6204,7 @@ function compilerMacroRecordGeneratedFunctionCommitDiagnostic(tables: CompilerSy
     state fileID: Int(0 - 1)
     state start: Int(0 - 1)
     state end: Int(0 - 1)
-    state identity: CompilerFingerprint(CompilerFingerprint(first: 0, second: 0))
+    state identity: CompilerFingerprint(first: 0, second: 0)
     state code: Int(compilerMacroDiagnosticGraphDeltaInvalid())
     let memberCollision: Bool(compilerMacroGraphDeltaHasGeneratedMemberCollision(tables: tables, delta: delta))
     if compilerIntTableRowCount(table: delta.generatedFunctions) > 0 && !memberCollision {
@@ -6233,7 +6233,7 @@ function compilerMacroExecutionRecordFinalFailure(tables: CompilerSyntaxTables, 
     state row: Int(0)
     while row < compilerIntTableRowCount(table: tables.macroInvocations) {
         if compilerIntTableValue(table: tables.macroInvocations, row: row, column: 9) == compilerMacroInvocationSuccess() {
-            let identity: CompilerFingerprint(CompilerFingerprint(first: compilerIntTableValue(table: tables.macroInvocations, row: row, column: 23), second: compilerIntTableValue(table: tables.macroInvocations, row: row, column: 24)))
+            let identity: CompilerFingerprint(first: compilerIntTableValue(table: tables.macroInvocations, row: row, column: 23), second: compilerIntTableValue(table: tables.macroInvocations, row: row, column: 24))
             return compilerMacroExecutionSetInvocation(tables: tables, row: row, status: compilerMacroInvocationFailed(), diagnosticCode: code, diagnosticFileID: compilerIntTableValue(table: tables.macroInvocations, row: row, column: 14), diagnosticStart: compilerIntTableValue(table: tables.macroInvocations, row: row, column: 15), diagnosticEnd: compilerIntTableValue(table: tables.macroInvocations, row: row, column: 16), resultIdentity: identity, mirOperationCount: compilerIntTableValue(table: tables.macroInvocations, row: row, column: 27), stepCount: compilerIntTableValue(table: tables.macroInvocations, row: row, column: 28), pipelineStatus: compilerIntTableValue(table: tables.macroInvocations, row: row, column: 33), pipelineFailureCode: compilerIntTableValue(table: tables.macroInvocations, row: row, column: 34))
         }
         row: row + 1
@@ -6631,7 +6631,7 @@ function compilerMacroExecutionRunInvocation(tables: CompilerSyntaxTables, index
     let emptyEffectPaths: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyFunctionInstanceEffectPathColumnCount(), estimatedRowCount: 0))
     let emptyReturnSummaries: CompilerIntTable(compilerIntTableCreate(columnCount: compilerReachableFunctionInstanceReturnSummaryColumnCount(), estimatedRowCount: 0))
     let emptyReturnLeaves: CompilerIntTable(compilerIntTableCreate(columnCount: compilerReachableFunctionInstanceReturnLeafColumnCount(), estimatedRowCount: 0))
-    let abiPlan: CompilerModuleABIPlan(CompilerModuleABIPlan(returnModes: $emptyReturnModes, participants: $emptyParticipants, isFrozen: false))
+    let abiPlan: CompilerModuleABIPlan(returnModes: $emptyReturnModes, participants: $emptyParticipants, isFrozen: false)
     state status: Int(0)
     state diagnosticCode: Int(0)
     state eventCount: Int(0)

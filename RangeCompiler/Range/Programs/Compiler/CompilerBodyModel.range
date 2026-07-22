@@ -527,7 +527,7 @@ function compilerBodyArenaOwnerAuxID(arena: CompilerBodyArena): Int {
 }
 
 function compilerReachableLLVMStateABIPlan(reachability: CompilerReachableLLVMState): CompilerModuleABIPlan {
-    let plan: CompilerModuleABIPlan(CompilerModuleABIPlan(returnModes: $reachability.abiReturnModes, participants: $reachability.abiParticipants, isFrozen: rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLVMPlanFrozen()) == 1))
+    let plan: CompilerModuleABIPlan(returnModes: $reachability.abiReturnModes, participants: $reachability.abiParticipants, isFrozen: rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLVMPlanFrozen()) == 1)
     return plan
 }
 

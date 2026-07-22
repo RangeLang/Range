@@ -1042,7 +1042,7 @@ function compilerBodyMIRExecuteScheduleAction(arena: CompilerBodyArena, schedule
     let blockID: Int(compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleBlockColumn()))
     let nodeID: Int(compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleNodeColumn()))
     let action: Int(compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleActionColumn()))
-    state result: CompilerBodyMIRValueResult(CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false))
+    state result: CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
     if action == compilerBodyCFGScheduleEvaluateNode() { result: compilerBodyMIRBuildExpression(arena: arena, nodeID: nodeID, blockID: blockID) }
     if action == compilerBodyCFGScheduleOptionalTag() { result: compilerBodyMIRBuildScheduledOptionalTag(arena: arena, nodeID: nodeID, blockID: blockID) }
     if action == compilerBodyCFGScheduleOptionalPayload() { result: compilerBodyMIRBuildScheduledOptionalPayload(arena: arena, nodeID: nodeID, blockID: blockID) }

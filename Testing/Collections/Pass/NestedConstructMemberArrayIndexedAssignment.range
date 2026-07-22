@@ -7,7 +7,7 @@ construct MutableArrayRoot {
 }
 
 @main {
-    state root: MutableArrayRoot(MutableArrayRoot(leaf: MutableArrayLeaf(values: [1, 2, 3])))
+    state root: MutableArrayRoot(leaf: MutableArrayLeaf(values: [1, 2, 3]))
     root.leaf.values[1]: 7
     return root.leaf.values[1]
 }

@@ -4,7 +4,7 @@ function compilerCoreLLVM(source: String): String {
 }
 
 function compilerCoreLLVMSelectedHelperAuditTyped(tables: CompilerSyntaxTables, selection: CompilerFunctionSelection): CompilerLLVMHelperAudit {
-    state audit: CompilerLLVMHelperAudit(CompilerLLVMHelperAudit(selectedCount: 0, lowerableCount: 0, excludedCount: 0, maxBodyLength: 0, maxBodyName: String(""), details: String("")))
+    state audit: CompilerLLVMHelperAudit(selectedCount: 0, lowerableCount: 0, excludedCount: 0, maxBodyLength: 0, maxBodyName: String(""), details: String(""))
     state declarationRow: Int(0)
     let declarationCount: Int(compilerIntTableRowCount(table: tables.declarations))
     while declarationRow < declarationCount {
@@ -134,7 +134,7 @@ function compilerCoreLLVMPlaceholderFailure(placeholderCount: Int, renderedText:
 }
 
 function compilerCoreRenderLLVMEntryFunction(block: CompilerLLVMLoweredBlock): String {
-    let llvmFunction: CompilerLLVMFunction(CompilerLLVMFunction(name: String("main"), returnType: String("i32"), parameterText: String(""), renderedBlocks: block.renderedBlocks, block: compilerCoreMainLLVMBasicBlock(block: block)))
+    let llvmFunction: CompilerLLVMFunction(name: String("main"), returnType: String("i32"), parameterText: String(""), renderedBlocks: block.renderedBlocks, block: compilerCoreMainLLVMBasicBlock(block: block))
     return compilerCoreRenderLLVMFunction(llvmFunction: llvmFunction)
 }
 
@@ -183,7 +183,7 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
         return String("compilerError\tkind=invalidExpansionOverlay")
     }
     let program: CompilerProgram(compilerNativeSourceSetProgramForLLVM(source: source))
-    let context: CompilerLLVMLoweringContext(CompilerLLVMLoweringContext(program: program, tables: $tables, declarationIndex: $declarationIndex))
+    let context: CompilerLLVMLoweringContext(program: program, tables: $tables, declarationIndex: $declarationIndex)
     let reachability: CompilerReachableLLVMState(compilerReachableLLVMStateCreate(context: context))
     let output: String(compilerCoreLLVMNativeEntryTextForReachability(reachability: reachability))
     compilerReachableLLVMStateDestroy(reachability: reachability)
@@ -239,7 +239,7 @@ function compilerCoreLLVMNativeEntryTextForProgram(program: CompilerProgram, dec
         compilerDeclarationIndexDestroy(index: declarationIndex)
         return String("compilerError\tkind=invalidDeclarationIndex")
     }
-    let context: CompilerLLVMLoweringContext(CompilerLLVMLoweringContext(program: program, tables: $declarationTables, declarationIndex: $declarationIndex))
+    let context: CompilerLLVMLoweringContext(program: program, tables: $declarationTables, declarationIndex: $declarationIndex)
     let reachability: CompilerReachableLLVMState(compilerReachableLLVMStateCreate(context: context))
     let output: String(compilerCoreLLVMNativeEntryTextForReachability(reachability: reachability))
     compilerReachableLLVMStateDestroy(reachability: reachability)
@@ -516,7 +516,7 @@ function compilerCoreLLVMNativeEntryTextFromParts(usage: String, globals: String
 }
 
 function compilerCoreMainLLVM(block: CompilerLLVMLoweredBlock): String {
-    let fallbackProgram: CompilerProgram(CompilerProgram(source: String(""), hasMainBlock: false, mainAttributeStart: 0, mainBlock: block.block, mainStatementRecords: String(""), mainStatementSummary: String(""), declarationRecords: block.declarationRecords, declarationSummary: String("")))
+    let fallbackProgram: CompilerProgram(source: String(""), hasMainBlock: false, mainAttributeStart: 0, mainBlock: block.block, mainStatementRecords: String(""), mainStatementSummary: String(""), declarationRecords: block.declarationRecords, declarationSummary: String(""))
     let module: CompilerLLVMModule(compilerCoreLLVMModule(program: fallbackProgram, block: block))
     return compilerCoreRenderLLVMModule(module: module)
 }
@@ -821,7 +821,7 @@ function compilerReachableLLVMStateInternFunctionInstance(reachability: Compiler
     let syntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: functionRow, column: 0))
     let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: syntaxID))
     if declarationRow < 0 { return 0 - 1 }
-    state fingerprint: CompilerFingerprint(CompilerFingerprint(first: compilerIntTableValue(table: reachability.context.tables.declarations, row: declarationRow, column: 11), second: compilerIntTableValue(table: reachability.context.tables.declarations, row: declarationRow, column: 12)))
+    state fingerprint: CompilerFingerprint(first: compilerIntTableValue(table: reachability.context.tables.declarations, row: declarationRow, column: 11), second: compilerIntTableValue(table: reachability.context.tables.declarations, row: declarationRow, column: 12))
     if canonicalReceiverTypeKeyID >= 0 {
         let receiverFingerprint: CompilerFingerprint(compilerReachableTypeKeyFingerprint(typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments, tables: reachability.context.tables, typeKeyID: canonicalReceiverTypeKeyID))
         fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: receiverFingerprint.first)
@@ -967,7 +967,7 @@ function compilerReachableLLVMStateCreate(context: CompilerLLVMLoweringContext):
     let functionInstanceReturnLeaves: CompilerIntTable(compilerIntTableCreate(columnCount: compilerReachableFunctionInstanceReturnLeafColumnCount(), estimatedRowCount: functionCount * 4 + 32))
     let functionsBuffer: RawBuffer(rawBufferCreate(capacity: 1048576, stride: 1))
     let globalsBuffer: RawBuffer(rawBufferCreate(capacity: 65536, stride: 1))
-    let created: CompilerReachableLLVMState(CompilerReachableLLVMState(
+    let created: CompilerReachableLLVMState(
         context: $context,
         selection: selection,
         worklist: worklist,
@@ -994,7 +994,7 @@ function compilerReachableLLVMStateCreate(context: CompilerLLVMLoweringContext):
         functionsBuffer: functionsBuffer,
         globalsBuffer: globalsBuffer,
         counters: counters
-    ))
+    )
     return created
 }
 
@@ -1282,7 +1282,7 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
     let probeEdgeOwners: RawBuffer(rawBufferCreate(capacity: 16, stride: 4))
     let probeEdgeTargets: RawBuffer(rawBufferCreate(capacity: 16, stride: 4))
     let sensitiveCountBefore: Int(compilerReachableLLVMStateSensitiveCount(reachability: reachability))
-    let candidatePlan: CompilerModuleABIPlan(CompilerModuleABIPlan(returnModes: $reachability.abiReturnModes, participants: $reachability.abiParticipants, isFrozen: true))
+    let candidatePlan: CompilerModuleABIPlan(returnModes: $reachability.abiReturnModes, participants: $reachability.abiParticipants, isFrozen: true)
     let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreateForFunctionInstance(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow, functionInstanceID: instanceID, receiverTypeKeyID: compilerReachableLLVMStateFunctionInstanceReceiverKey(reachability: reachability, instanceID: instanceID), typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments)))
     state capable: Bool(compilerBodyArenaIsValid(arena: arena))
     state failureStage: Int(1)
@@ -1730,7 +1730,7 @@ function compilerReachableLLVMStateSeedEntryRoots(reachability: CompilerReachabl
         if maybeMain == nil {
             status: 101
         } else {
-            let fallbackMain: CompilerMainBlock(CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
+            let fallbackMain: CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0)
             let mainBlock: CompilerMainBlock(maybeMain ?? fallbackMain)
             if arena.ownerFunctionRow != 0 - 1 { status: 102 }
             if status == 0 && arena.ownerDeclarationSyntaxID != mainBlock.attributeStart { status: 103 }
@@ -1993,7 +1993,7 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
 }
 
 function compilerReachableLLVMStateHelpers(reachability: CompilerReachableLLVMState): CompilerTypedLLVMHelpers {
-    let telemetry: CompilerBodyTelemetry(CompilerBodyTelemetry(
+    let telemetry: CompilerBodyTelemetry(
         supportedCount: rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLMSupported()),
         typedParseAttempts: rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLMTypedAttempts()),
         typedParseSuccesses: rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLMTypedSuccesses()),
@@ -2002,7 +2002,7 @@ function compilerReachableLLVMStateHelpers(reachability: CompilerReachableLLVMSt
         arenaDestroys: rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLMArenaDestroys()),
         recordBytes: rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLMRecordBytes()),
         committedFailures: rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLMCommittedFailures())
-    ))
+    )
     return CompilerTypedLLVMHelpers(
         helpers: CompilerLLVMHelperFunctions(renderedFunctions: rawBufferMaterializeText(buffer: reachability.functionsBuffer), instructionRecords: String(""), nextTemporary: rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLVMNextTemporary())),
         renderedGlobals: rawBufferMaterializeText(buffer: reachability.globalsBuffer),

@@ -660,7 +660,7 @@ function compilerNativeSourceSetLLVMText(source: String): String {
 }
 
 function compilerNativeSourceSetProgramForLLVM(source: String): CompilerProgram {
-    let emptyBlock: CompilerBlock(CompilerBlock(start: 0, end: 0))
+    let emptyBlock: CompilerBlock(start: 0, end: 0)
     return CompilerProgram(source: source, hasMainBlock: false, mainAttributeStart: 0, mainBlock: emptyBlock, mainStatementRecords: String(""), mainStatementSummary: String(""), declarationRecords: String(""), declarationSummary: String(""))
 }
 
@@ -684,7 +684,7 @@ function parseCompilerProgramForLLVMNamedBodies(source: String, bodyFunctionName
 }
 
 function compilerCoreProgramWithoutMain(source: String, parsedDeclarations: CompilerParsedDeclarations): CompilerProgram {
-    let blockFallback: CompilerBlock(CompilerBlock(start: 0, end: 0))
+    let blockFallback: CompilerBlock(start: 0, end: 0)
     return CompilerProgram(
         source: source,
         hasMainBlock: false,
@@ -841,11 +841,11 @@ function compilerCoreParseTypeReference(cursor: CompilerTokenCursor): Optional<C
 function compilerCoreParseMacroSurfaceTypeReference(cursor: CompilerTokenCursor): Optional<CompilerTypeReference> {
     let maybeFirst: Optional<CompilerTypeReference>(compilerCoreParseTypeReference(cursor: cursor))
     if maybeFirst == nil { return nil }
-    let firstFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: cursor.index, end: cursor.index))
+    let firstFallback: CompilerTypeReference(text: String(""), start: cursor.index, end: cursor.index)
     let first: CompilerTypeReference(maybeFirst ?? firstFallback)
     state surfaceEnd: Int(first.end)
     while true {
-        let separatorCursor: CompilerTokenCursor(CompilerTokenCursor(source: cursor.source, index: surfaceEnd))
+        let separatorCursor: CompilerTokenCursor(source: cursor.source, index: surfaceEnd)
         let maybeSeparator: Optional<RangeLexedToken>(compilerCursorPeek(cursor: separatorCursor))
         if maybeSeparator == nil {
             return CompilerTypeReference(text: stringSubstring(source: cursor.source, start: first.start, end: surfaceEnd), start: first.start, end: surfaceEnd)
@@ -858,7 +858,7 @@ function compilerCoreParseMacroSurfaceTypeReference(cursor: CompilerTokenCursor)
         let nextCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: separatorCursor, token: separator))
         let maybeNext: Optional<CompilerTypeReference>(compilerCoreParseTypeReference(cursor: nextCursor))
         if maybeNext == nil { return nil }
-        let nextFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: nextCursor.index, end: nextCursor.index))
+        let nextFallback: CompilerTypeReference(text: String(""), start: nextCursor.index, end: nextCursor.index)
         let next: CompilerTypeReference(maybeNext ?? nextFallback)
         surfaceEnd: next.end
     }
@@ -879,18 +879,18 @@ function compilerCoreParseTypeReferenceWithEnd(cursor: CompilerTokenCursor, end:
     if firstToken.kind == .leftParen {
         let maybeInputs: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: cursor, leftKind: .leftParen, rightKind: .rightParen))
         if maybeInputs == nil { return nil }
-        let inputsFallback: CompilerSourceRange(CompilerSourceRange(start: firstToken.end, end: firstToken.end, next: firstToken.end))
+        let inputsFallback: CompilerSourceRange(start: firstToken.end, end: firstToken.end, next: firstToken.end)
         let inputs: CompilerSourceRange(maybeInputs ?? inputsFallback)
-        let arrowCursor: CompilerTokenCursor(CompilerTokenCursor(source: cursor.source, index: inputs.next))
+        let arrowCursor: CompilerTokenCursor(source: cursor.source, index: inputs.next)
         let maybeArrow: Optional<RangeLexedToken>(compilerCursorPeek(cursor: arrowCursor))
         if maybeArrow == nil { return nil }
         let arrowFallback: RangeLexedToken(compilerFallbackToken(cursor: arrowCursor))
         let arrow: RangeLexedToken(maybeArrow ?? arrowFallback)
         if arrow.kind != .arrow || arrow.end >= end { return nil }
-        let resultCursor: CompilerTokenCursor(CompilerTokenCursor(source: cursor.source, index: arrow.end))
+        let resultCursor: CompilerTokenCursor(source: cursor.source, index: arrow.end)
         let maybeResult: Optional<CompilerTypeReference>(compilerCoreParseTypeReferenceWithEnd(cursor: resultCursor, end: end))
         if maybeResult == nil { return nil }
-        let resultFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: arrow.end, end: arrow.end))
+        let resultFallback: CompilerTypeReference(text: String(""), start: arrow.end, end: arrow.end)
         let result: CompilerTypeReference(maybeResult ?? resultFallback)
         return CompilerTypeReference(text: stringSubstring(source: cursor.source, start: firstToken.start, end: result.end), start: firstToken.start, end: result.end)
     }
@@ -904,7 +904,7 @@ function compilerCoreParseTypeReferenceWithEnd(cursor: CompilerTokenCursor, end:
 }
 
 function compilerCoreTypeReferenceInitialState(cursor: CompilerTokenCursor, firstToken: RangeLexedToken): CompilerTypeReferenceParseState {
-    let cursorState: CompilerTokenCursor(CompilerTokenCursor(source: cursor.source, index: cursor.index))
+    let cursorState: CompilerTokenCursor(source: cursor.source, index: cursor.index)
     return CompilerTypeReferenceParseState(output: String(""), typeEnd: firstToken.start, cursor: cursorState, genericDepth: 0, arrayDepth: 0, consumedToken: false, keepScanning: true)
 }
 
@@ -913,7 +913,7 @@ function compilerCoreParseTypeReferenceScanning(parseState: CompilerTypeReferenc
 }
 
 function compilerCoreParseTypeReferenceScanningUntil(parseState: CompilerTypeReferenceParseState, end: Int): CompilerTypeReferenceParseState {
-    state scanState: CompilerTypeReferenceParseState(CompilerTypeReferenceParseState(output: parseState.output, typeEnd: parseState.typeEnd, cursor: parseState.cursor, genericDepth: parseState.genericDepth, arrayDepth: parseState.arrayDepth, consumedToken: parseState.consumedToken, keepScanning: parseState.keepScanning))
+    state scanState: CompilerTypeReferenceParseState(output: parseState.output, typeEnd: parseState.typeEnd, cursor: parseState.cursor, genericDepth: parseState.genericDepth, arrayDepth: parseState.arrayDepth, consumedToken: parseState.consumedToken, keepScanning: parseState.keepScanning)
     while scanState.keepScanning {
         let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: scanState.cursor))
         if maybeToken == nil {
@@ -1028,7 +1028,7 @@ function compilerCoreTypeReferenceStop(parseState: CompilerTypeReferenceParseSta
 function parseCompilerCallArgumentsCore(source: String, start: Int, end: Int): CompilerCallArguments {
     state output: String("")
     state records: String("")
-    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: start))
+    state cursor: CompilerTokenCursor(source: source, index: start)
     state argumentIndex: Int(0)
 
     while cursor.index < end {
@@ -1087,8 +1087,8 @@ function parseCompilerCallArgumentsCore(source: String, start: Int, end: Int): C
 }
 
 function compilerCoreMissingFunctionParameterTokenStep(source: String, index: Int, nextIndex: Int, keepScanning: Bool): CompilerFunctionParameterTokenStep {
-    let missingToken: RangeLexedToken(RangeLexedToken(kind: .eof, start: index, end: index, text: String("")))
-    let missingType: CompilerTypeReference(CompilerTypeReference(text: String(""), start: index, end: index))
+    let missingToken: RangeLexedToken(kind: .eof, start: index, end: index, text: String(""))
+    let missingType: CompilerTypeReference(text: String(""), start: index, end: index)
     return CompilerFunctionParameterTokenStep(found: false, keepScanning: keepScanning, nameToken: missingToken, typeReference: missingType, nextIndex: nextIndex)
 }
 
@@ -1104,7 +1104,7 @@ function compilerCoreParseFunctionParameterToken(source: String, end: Int, token
     }
 
     state nameToken: RangeLexedToken(token)
-    let firstCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: token.start))
+    let firstCursor: CompilerTokenCursor(source: source, index: token.start)
     state colonCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: firstCursor, token: token))
     state maybeColon: Optional<RangeLexedToken>(compilerCursorPeek(cursor: colonCursor))
     if maybeColon == nil {
@@ -1132,14 +1132,14 @@ function compilerCoreParseFunctionParameterToken(source: String, end: Int, token
         return compilerCoreMissingFunctionParameterTokenStep(source: source, index: token.start, nextIndex: token.end, keepScanning: false)
     }
 
-    let typeFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: typeCursor.index, end: typeCursor.index))
+    let typeFallback: CompilerTypeReference(text: String(""), start: typeCursor.index, end: typeCursor.index)
     let typeReference: CompilerTypeReference(maybeType ?? typeFallback)
     return CompilerFunctionParameterTokenStep(found: true, keepScanning: true, nameToken: nameToken, typeReference: typeReference, nextIndex: typeReference.end)
 }
 
 function compilerCoreMissingStoredMemberParseStep(source: String, index: Int, nextIndex: Int, keepScanning: Bool): CompilerStoredMemberParseStep {
-    let missingToken: RangeLexedToken(RangeLexedToken(kind: .eof, start: index, end: index, text: String("")))
-    let missingType: CompilerTypeReference(CompilerTypeReference(text: String(""), start: index, end: index))
+    let missingToken: RangeLexedToken(kind: .eof, start: index, end: index, text: String(""))
+    let missingType: CompilerTypeReference(text: String(""), start: index, end: index)
     return CompilerStoredMemberParseStep(found: false, keepScanning: keepScanning, kindTag: 0 - 1, nameToken: missingToken, typeReference: missingType, nextIndex: nextIndex)
 }
 
@@ -1158,7 +1158,7 @@ function compilerCoreParseStoredMemberToken(source: String, end: Int, token: Ran
         return compilerCoreMissingStoredMemberParseStep(source: source, index: token.start, nextIndex: token.end, keepScanning: true)
     }
 
-    let tokenCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: token.start))
+    let tokenCursor: CompilerTokenCursor(source: source, index: token.start)
     let nameCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: tokenCursor, token: token))
     let maybeName: Optional<RangeLexedToken>(compilerCursorPeek(cursor: nameCursor))
     if maybeName == nil {
@@ -1189,10 +1189,10 @@ function compilerCoreParseStoredMemberToken(source: String, end: Int, token: Ran
         return compilerCoreMissingStoredMemberParseStep(source: source, index: token.start, nextIndex: token.end, keepScanning: false)
     }
 
-    let typeFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: typeCursor.index, end: typeCursor.index))
+    let typeFallback: CompilerTypeReference(text: String(""), start: typeCursor.index, end: typeCursor.index)
     let typeReference: CompilerTypeReference(maybeType ?? typeFallback)
     state nextIndex: Int(typeReference.end)
-    let initializerCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: typeReference.end))
+    let initializerCursor: CompilerTokenCursor(source: source, index: typeReference.end)
     let maybeInitializer: Optional<RangeLexedToken>(compilerCursorPeek(cursor: initializerCursor))
     if maybeInitializer != nil {
         let initializerFallback: RangeLexedToken(compilerFallbackToken(cursor: initializerCursor))
@@ -1204,7 +1204,7 @@ function compilerCoreParseStoredMemberToken(source: String, end: Int, token: Ran
             if maybeInitializerRange == nil {
                 return compilerCoreMissingStoredMemberParseStep(source: source, index: token.start, nextIndex: initializer.end, keepScanning: false)
             }
-            let initializerRangeFallback: CompilerSourceRange(CompilerSourceRange(start: initializer.end, end: initializer.end, next: initializer.end))
+            let initializerRangeFallback: CompilerSourceRange(start: initializer.end, end: initializer.end, next: initializer.end)
             let initializerRange: CompilerSourceRange(maybeInitializerRange ?? initializerRangeFallback)
             if initializerRange.next > end {
                 return compilerCoreMissingStoredMemberParseStep(source: source, index: token.start, nextIndex: initializerRange.next, keepScanning: false)
@@ -1220,7 +1220,7 @@ function compilerCoreParseStoredMemberToken(source: String, end: Int, token: Ran
 }
 
 function compilerCoreParseDeclarationNameAfterKeyword(source: String, keyword: RangeLexedToken): Optional<RangeLexedToken> {
-    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: keyword.start))
+    state cursor: CompilerTokenCursor(source: source, index: keyword.start)
     cursor: CompilerTokenCursor(source: source, index: keyword.end)
     let maybeName: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeName == nil {
@@ -1237,7 +1237,7 @@ function compilerCoreParseDeclarationNameAfterKeyword(source: String, keyword: R
 }
 
 function compilerCoreParseMacroNameAfterKeyword(source: String, keyword: RangeLexedToken): Optional<RangeLexedToken> {
-    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: keyword.end))
+    let cursor: CompilerTokenCursor(source: source, index: keyword.end)
     let maybeName: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeName == nil { return nil }
     let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursor))
@@ -1268,7 +1268,7 @@ function compilerCoreTokenCanNameFunction(token: RangeLexedToken): Bool {
 }
 
 function compilerCoreParseFunctionNameAfterKeyword(source: String, keyword: RangeLexedToken): Optional<RangeLexedToken> {
-    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: keyword.end))
+    let cursor: CompilerTokenCursor(source: source, index: keyword.end)
     let maybeName: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeName == nil { return nil }
     let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursor))
@@ -1278,7 +1278,7 @@ function compilerCoreParseFunctionNameAfterKeyword(source: String, keyword: Rang
 }
 
 function compilerCoreParseAngleRangeAfterName(source: String, nameToken: RangeLexedToken): Optional<CompilerSourceRange> {
-    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: nameToken.end))
+    let cursor: CompilerTokenCursor(source: source, index: nameToken.end)
     let maybeLeft: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeLeft == nil { return nil }
     let fallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
@@ -1305,26 +1305,26 @@ function compilerCoreParseAngleRangeAfterName(source: String, nameToken: RangeLe
 }
 
 function compilerCoreParseMacroApplicationParts(source: String, macroToken: RangeLexedToken): Optional<CompilerMacroApplicationParts> {
-    let invalidRange: CompilerSourceRange(CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: macroToken)))
-    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: compilerCoreRangeTokenEnd(token: macroToken)))
-    state genericRange: CompilerSourceRange(CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: macroToken)))
-    state argumentRange: CompilerSourceRange(CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: macroToken)))
-    state bodyRange: CompilerSourceRange(CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: macroToken)))
+    let invalidRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: macroToken))
+    let cursor: CompilerTokenCursor(source: source, index: compilerCoreRangeTokenEnd(token: macroToken))
+    state genericRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: macroToken))
+    state argumentRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: macroToken))
+    state bodyRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: macroToken))
     state nextIndex: Int(compilerCoreRangeTokenEnd(token: macroToken))
     let maybeNext: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeNext != nil {
         let genericTokenFallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
         let token: RangeLexedToken(maybeNext ?? genericTokenFallback)
         if token.kind == .less {
-            let syntheticName: RangeLexedToken(RangeLexedToken(kind: .identifier, start: compilerCoreRangeTokenStart(token: macroToken) + 1, end: compilerCoreRangeTokenEnd(token: macroToken), text: stringSliceUnchecked(source: source, start: compilerCoreRangeTokenStart(token: macroToken) + 1, end: compilerCoreRangeTokenEnd(token: macroToken))))
+            let syntheticName: RangeLexedToken(kind: .identifier, start: compilerCoreRangeTokenStart(token: macroToken) + 1, end: compilerCoreRangeTokenEnd(token: macroToken), text: stringSliceUnchecked(source: source, start: compilerCoreRangeTokenStart(token: macroToken) + 1, end: compilerCoreRangeTokenEnd(token: macroToken)))
             let maybeGeneric: Optional<CompilerSourceRange>(compilerCoreParseAngleRangeAfterName(source: source, nameToken: syntheticName))
             if maybeGeneric == nil { return nil }
-            let genericFallback: CompilerSourceRange(CompilerSourceRange(start: token.start, end: token.end, next: token.end))
+            let genericFallback: CompilerSourceRange(start: token.start, end: token.end, next: token.end)
             genericRange: maybeGeneric ?? genericFallback
             nextIndex: genericRange.next
         }
     }
-    let argumentCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: nextIndex))
+    let argumentCursor: CompilerTokenCursor(source: source, index: nextIndex)
     let maybeArgumentToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: argumentCursor))
     if maybeArgumentToken != nil {
         let argumentTokenFallback: RangeLexedToken(compilerFallbackToken(cursor: argumentCursor))
@@ -1332,12 +1332,12 @@ function compilerCoreParseMacroApplicationParts(source: String, macroToken: Rang
         if argumentToken.kind == .leftParen {
             let maybeArgument: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: argumentCursor, leftKind: .leftParen, rightKind: .rightParen))
             if maybeArgument == nil { return nil }
-            let argumentFallback: CompilerSourceRange(CompilerSourceRange(start: argumentToken.end, end: argumentToken.end, next: argumentToken.end))
+            let argumentFallback: CompilerSourceRange(start: argumentToken.end, end: argumentToken.end, next: argumentToken.end)
             argumentRange: maybeArgument ?? argumentFallback
             nextIndex: argumentRange.next
         }
     }
-    let bodyCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: nextIndex))
+    let bodyCursor: CompilerTokenCursor(source: source, index: nextIndex)
     let maybeBodyToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: bodyCursor))
     if maybeBodyToken != nil {
         let bodyTokenFallback: RangeLexedToken(compilerFallbackToken(cursor: bodyCursor))
@@ -1345,7 +1345,7 @@ function compilerCoreParseMacroApplicationParts(source: String, macroToken: Rang
         if bodyToken.kind == .leftBrace {
             let maybeBody: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: bodyCursor, leftKind: .leftBrace, rightKind: .rightBrace))
             if maybeBody == nil { return nil }
-            let bodyFallback: CompilerSourceRange(CompilerSourceRange(start: bodyToken.end, end: bodyToken.end, next: bodyToken.end))
+            let bodyFallback: CompilerSourceRange(start: bodyToken.end, end: bodyToken.end, next: bodyToken.end)
             bodyRange: maybeBody ?? bodyFallback
             nextIndex: bodyRange.next
         }
@@ -1354,11 +1354,11 @@ function compilerCoreParseMacroApplicationParts(source: String, macroToken: Rang
 }
 
 function compilerCoreParseMacroCapabilityHeader(source: String, bodyRange: CompilerSourceRange): CompilerMacroCapabilityHeader {
-    let invalidRange: CompilerSourceRange(CompilerSourceRange(start: bodyRange.start, end: bodyRange.start, next: bodyRange.start))
+    let invalidRange: CompilerSourceRange(start: bodyRange.start, end: bodyRange.start, next: bodyRange.start)
     if bodyRange.end <= bodyRange.start {
         return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderValid(), headerRange: invalidRange, executableBodyRange: invalidRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
     }
-    let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: bodyRange.start, end: bodyRange.start, text: String("")))
+    let fallback: RangeLexedToken(kind: .eof, start: bodyRange.start, end: bodyRange.start, text: String(""))
     let firstMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: bodyRange.start))
     if firstMaybe == nil {
         return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderDeclarative(), headerRange: invalidRange, executableBodyRange: bodyRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
@@ -1418,34 +1418,34 @@ function compilerCoreParseMacroDeclarationParts(source: String, keyword: RangeLe
     if maybeName == nil { return nil }
     let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: source, index: compilerCoreRangeTokenEnd(token: keyword))))
     let nameToken: RangeLexedToken(maybeName ?? fallbackToken)
-    let invalidRange: CompilerSourceRange(CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: nameToken)))
-    state genericRange: CompilerSourceRange(CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: nameToken)))
+    let invalidRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: nameToken))
+    state genericRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: nameToken))
     let maybeGeneric: Optional<CompilerSourceRange>(compilerCoreParseAngleRangeAfterName(source: source, nameToken: nameToken))
     if maybeGeneric != nil {
-        let genericFallback: CompilerSourceRange(CompilerSourceRange(start: compilerCoreRangeTokenEnd(token: nameToken), end: compilerCoreRangeTokenEnd(token: nameToken), next: compilerCoreRangeTokenEnd(token: nameToken)))
+        let genericFallback: CompilerSourceRange(start: compilerCoreRangeTokenEnd(token: nameToken), end: compilerCoreRangeTokenEnd(token: nameToken), next: compilerCoreRangeTokenEnd(token: nameToken))
         genericRange: maybeGeneric ?? genericFallback
     }
     state parameterStart: Int(compilerCoreRangeTokenEnd(token: nameToken))
     if maybeGeneric != nil { parameterStart: genericRange.next }
-    let parameterCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: parameterStart))
+    let parameterCursor: CompilerTokenCursor(source: source, index: parameterStart)
     let maybeParameter: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: parameterCursor, leftKind: .leftParen, rightKind: .rightParen))
     if maybeParameter == nil { return nil }
-    let parameterFallback: CompilerSourceRange(CompilerSourceRange(start: compilerCoreRangeTokenEnd(token: nameToken), end: compilerCoreRangeTokenEnd(token: nameToken), next: compilerCoreRangeTokenEnd(token: nameToken)))
+    let parameterFallback: CompilerSourceRange(start: compilerCoreRangeTokenEnd(token: nameToken), end: compilerCoreRangeTokenEnd(token: nameToken), next: compilerCoreRangeTokenEnd(token: nameToken))
     let parameterRange: CompilerSourceRange(maybeParameter ?? parameterFallback)
-    let separatorCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: parameterRange.next))
+    let separatorCursor: CompilerTokenCursor(source: source, index: parameterRange.next)
     let maybeSeparator: Optional<RangeLexedToken>(compilerCursorPeek(cursor: separatorCursor))
     if maybeSeparator == nil { return nil }
     let separatorFallback: RangeLexedToken(compilerFallbackToken(cursor: separatorCursor))
     let separator: RangeLexedToken(maybeSeparator ?? separatorFallback)
-    state targetType: CompilerTypeReference(CompilerTypeReference(text: String(""), start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset()))
-    state expansionType: CompilerTypeReference(CompilerTypeReference(text: String(""), start: 0 - 1, end: 0 - 1))
+    state targetType: CompilerTypeReference(text: String(""), start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset())
+    state expansionType: CompilerTypeReference(text: String(""), start: 0 - 1, end: 0 - 1)
     state hasExpansion: Bool(false)
     state bodyCursor: CompilerTokenCursor(separatorCursor)
     if separator.kind == .colon {
         let targetCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: separatorCursor, token: separator))
         let maybeTarget: Optional<CompilerTypeReference>(compilerCoreParseMacroSurfaceTypeReference(cursor: targetCursor))
         if maybeTarget == nil { return nil }
-        let targetFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: targetCursor.index, end: targetCursor.index))
+        let targetFallback: CompilerTypeReference(text: String(""), start: targetCursor.index, end: targetCursor.index)
         targetType: maybeTarget ?? targetFallback
         bodyCursor: CompilerTokenCursor(source: source, index: targetType.end)
         let maybeArrow: Optional<RangeLexedToken>(compilerCursorPeek(cursor: bodyCursor))
@@ -1456,7 +1456,7 @@ function compilerCoreParseMacroDeclarationParts(source: String, keyword: RangeLe
                 let expansionCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: bodyCursor, token: arrow))
                 let maybeExpansion: Optional<CompilerTypeReference>(compilerCoreParseMacroSurfaceTypeReference(cursor: expansionCursor))
                 if maybeExpansion == nil { return nil }
-                let expansionFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: expansionCursor.index, end: expansionCursor.index))
+                let expansionFallback: CompilerTypeReference(text: String(""), start: expansionCursor.index, end: expansionCursor.index)
                 expansionType: maybeExpansion ?? expansionFallback
                 hasExpansion: true
                 bodyCursor: CompilerTokenCursor(source: source, index: expansionType.end)
@@ -1466,7 +1466,7 @@ function compilerCoreParseMacroDeclarationParts(source: String, keyword: RangeLe
         let expansionCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: separatorCursor, token: separator))
         let maybeExpansion: Optional<CompilerTypeReference>(compilerCoreParseMacroSurfaceTypeReference(cursor: expansionCursor))
         if maybeExpansion == nil { return nil }
-        let expansionFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: expansionCursor.index, end: expansionCursor.index))
+        let expansionFallback: CompilerTypeReference(text: String(""), start: expansionCursor.index, end: expansionCursor.index)
         expansionType: maybeExpansion ?? expansionFallback
         hasExpansion: true
         bodyCursor: CompilerTokenCursor(source: source, index: expansionType.end)
@@ -1475,19 +1475,19 @@ function compilerCoreParseMacroDeclarationParts(source: String, keyword: RangeLe
     }
     let maybeBody: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: bodyCursor, leftKind: .leftBrace, rightKind: .rightBrace))
     if maybeBody == nil { return nil }
-    let bodyFallback: CompilerSourceRange(CompilerSourceRange(start: bodyCursor.index, end: bodyCursor.index, next: bodyCursor.index))
+    let bodyFallback: CompilerSourceRange(start: bodyCursor.index, end: bodyCursor.index, next: bodyCursor.index)
     let bodyRange: CompilerSourceRange(maybeBody ?? bodyFallback)
     let capabilityHeader: CompilerMacroCapabilityHeader(compilerCoreParseMacroCapabilityHeader(source: source, bodyRange: bodyRange))
     return CompilerMacroDeclarationParts(nameToken: nameToken, genericRange: genericRange, parameterRange: parameterRange, targetType: targetType, expansionType: expansionType, hasExpansionType: hasExpansion, bodyRange: bodyRange, capabilityStatus: capabilityHeader.status, capabilityHeaderRange: capabilityHeader.headerRange, executableBodyRange: capabilityHeader.executableBodyRange, targetCapabilityRange: capabilityHeader.targetRange, diagnosticsCapabilityRange: capabilityHeader.diagnosticsRange, graphCapabilityRange: capabilityHeader.graphRange, declarationStart: declarationStart, visibility: visibility)
 }
 
 function compilerCoreParseBodyRangeAfterName(source: String, nameToken: RangeLexedToken): Optional<CompilerSourceRange> {
-    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: nameToken.end))
+    let cursor: CompilerTokenCursor(source: source, index: nameToken.end)
     return compilerCoreParseBalancedRange(cursor: cursor, leftKind: .leftBrace, rightKind: .rightBrace)
 }
 
 function compilerCoreParseParameterRangeAfterName(source: String, nameToken: RangeLexedToken): Optional<CompilerSourceRange> {
-    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: nameToken.end))
+    let cursor: CompilerTokenCursor(source: source, index: nameToken.end)
     return compilerCoreParseBalancedRange(cursor: cursor, leftKind: .leftParen, rightKind: .rightParen)
 }
 
@@ -1496,7 +1496,7 @@ function compilerCoreParseReturnTypeAfterParameters(source: String, parameterRan
 }
 
 function compilerCoreParseReturnTypeAfterParametersWithEnd(source: String, parameterRange: CompilerSourceRange, fileEnd: Int): Optional<CompilerTypeReference> {
-    state cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: parameterRange.start))
+    state cursor: CompilerTokenCursor(source: source, index: parameterRange.start)
     cursor: CompilerTokenCursor(source: source, index: parameterRange.next)
     let maybeColon: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeColon == nil {
@@ -1514,7 +1514,7 @@ function compilerCoreParseReturnTypeAfterParametersWithEnd(source: String, param
 }
 
 function compilerCoreParseFunctionBodyAfterReturnType(source: String, returnType: CompilerTypeReference): Optional<CompilerSourceRange> {
-    let cursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: returnType.end))
+    let cursor: CompilerTokenCursor(source: source, index: returnType.end)
     return compilerCoreParseBalancedRange(cursor: cursor, leftKind: .leftBrace, rightKind: .rightBrace)
 }
 
@@ -1524,22 +1524,22 @@ function compilerCoreParseConstructDeclarationParts(source: String, keyword: Ran
         return nil
     }
 
-    let fallbackCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: keyword.end))
+    let fallbackCursor: CompilerTokenCursor(source: source, index: keyword.end)
     let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: fallbackCursor))
     let nameToken: RangeLexedToken(maybeName ?? fallbackToken)
-    state genericRange: CompilerSourceRange(CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: nameToken.end))
+    state genericRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: nameToken.end)
     let maybeGeneric: Optional<CompilerSourceRange>(compilerCoreParseAngleRangeAfterName(source: source, nameToken: nameToken))
     if maybeGeneric != nil {
-        let genericFallback: CompilerSourceRange(CompilerSourceRange(start: nameToken.end, end: nameToken.end, next: nameToken.end))
+        let genericFallback: CompilerSourceRange(start: nameToken.end, end: nameToken.end, next: nameToken.end)
         genericRange: maybeGeneric ?? genericFallback
     }
-    let bodyCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: genericRange.next))
+    let bodyCursor: CompilerTokenCursor(source: source, index: genericRange.next)
     let maybeBody: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: bodyCursor, leftKind: .leftBrace, rightKind: .rightBrace))
     if maybeBody == nil {
         return nil
     }
 
-    let bodyFallback: CompilerSourceRange(CompilerSourceRange(start: genericRange.next, end: genericRange.next, next: genericRange.next))
+    let bodyFallback: CompilerSourceRange(start: genericRange.next, end: genericRange.next, next: genericRange.next)
     let bodyRange: CompilerSourceRange(maybeBody ?? bodyFallback)
     return CompilerConstructDeclarationParts(nameToken: nameToken, genericRange: genericRange, bodyRange: bodyRange)
 }
@@ -1554,32 +1554,32 @@ function compilerCoreParseFunctionDeclarationPartsWithEnd(source: String, keywor
         return nil
     }
 
-    let fallbackCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: keyword.end))
+    let fallbackCursor: CompilerTokenCursor(source: source, index: keyword.end)
     let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: fallbackCursor))
     let nameToken: RangeLexedToken(maybeName ?? fallbackToken)
-    state genericRange: CompilerSourceRange(CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: nameToken.end))
+    state genericRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: nameToken.end)
     let maybeGeneric: Optional<CompilerSourceRange>(compilerCoreParseAngleRangeAfterName(source: source, nameToken: nameToken))
     if maybeGeneric != nil {
-        let genericFallback: CompilerSourceRange(CompilerSourceRange(start: nameToken.end, end: nameToken.end, next: nameToken.end))
+        let genericFallback: CompilerSourceRange(start: nameToken.end, end: nameToken.end, next: nameToken.end)
         genericRange: maybeGeneric ?? genericFallback
     }
-    let parameterCursor: CompilerTokenCursor(CompilerTokenCursor(source: source, index: genericRange.next))
+    let parameterCursor: CompilerTokenCursor(source: source, index: genericRange.next)
     let maybeParameters: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: parameterCursor, leftKind: .leftParen, rightKind: .rightParen))
     if maybeParameters == nil {
         return nil
     }
 
-    let parameterFallback: CompilerSourceRange(CompilerSourceRange(start: genericRange.next, end: genericRange.next, next: genericRange.next))
+    let parameterFallback: CompilerSourceRange(start: genericRange.next, end: genericRange.next, next: genericRange.next)
     let parameterRange: CompilerSourceRange(maybeParameters ?? parameterFallback)
     let maybeReturnType: Optional<CompilerTypeReference>(compilerCoreParseReturnTypeAfterParametersWithEnd(source: source, parameterRange: parameterRange, fileEnd: fileEnd))
     if maybeReturnType == nil {
         return nil
     }
 
-    let returnTypeFallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: parameterRange.next, end: parameterRange.next))
+    let returnTypeFallback: CompilerTypeReference(text: String(""), start: parameterRange.next, end: parameterRange.next)
     let returnType: CompilerTypeReference(maybeReturnType ?? returnTypeFallback)
     let maybeBody: Optional<CompilerSourceRange>(compilerCoreParseFunctionBodyAfterReturnType(source: source, returnType: returnType))
-    let bodyFallback: CompilerSourceRange(CompilerSourceRange(start: returnType.end, end: returnType.end, next: returnType.end))
+    let bodyFallback: CompilerSourceRange(start: returnType.end, end: returnType.end, next: returnType.end)
     let bodyRange: CompilerSourceRange(maybeBody ?? bodyFallback)
     return CompilerFunctionDeclarationParts(nameToken: nameToken, genericRange: genericRange, parameterRange: parameterRange, returnType: returnType, bodyRange: bodyRange)
 }

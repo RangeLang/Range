@@ -3575,3 +3575,30 @@ their executables are byte-identical at 3,472,944 bytes with SHA-256
 After promotion, accepted-seed integrity passed and the promoted seed
 independently reproduced the same LLVM hash in `137.86 s` with `569,425,920`
 bytes maximum RSS.
+
+### Canonical construct initialization checkpoint (2026-07-22)
+
+A typed local now has one canonical spelling when its value is constructed from
+labeled fields. `let view: NumberView(values: $numbers)` names `NumberView`
+once: the declared type is also the construct value being initialized. The
+previous `NumberView(NumberView(...))` spelling represented no recursion or
+second runtime value and is now rejected before LLVM.
+
+The body parser already had a typed path that synthesizes the construct
+application from labeled fields. This checkpoint made that path canonical,
+migrated 305 redundant initializations across the self-hosted compiler,
+permanent fixtures, and generated proof fixtures, and added both a static
+candidate audit and a permanent rejection fixture. Initializing a typed local
+from an arbitrary expression remains valid; only an initializer application
+that repeats its declared type is rejected. Construct-member requirement and
+default semantics are unchanged.
+
+The complete candidate gate passed in `374.97 s` with `569,245,696` bytes
+maximum RSS. Stage 2 and Stage 3 LLVM are byte-identical at 5,507,013 bytes with
+SHA-256
+`2b12f5ad37d7e2b1b4903243b537e6252c06d382e7eab7fce21a35fd3740042d`;
+their executables are byte-identical at 3,473,008 bytes with SHA-256
+`e07a6235e7098361e015c440f9c7917e8e80dd74d71f987ee4228d65c91f275c`.
+After promotion, accepted-seed integrity passed and the promoted seed
+independently reproduced the same LLVM hash in `150.40 s` with `569,606,144`
+bytes maximum RSS. Binding-based Array mutation remains the next proof boundary.

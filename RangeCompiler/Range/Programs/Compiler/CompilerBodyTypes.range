@@ -1769,7 +1769,7 @@ function compilerBodyArenaExplicitArrayElementTypeID(arena: CompilerBodyArena, a
                 || stringByteAt(source: arena.tables.sourceStore.source, index: typeGlobalEnd - 1) != 93 { return 0 - 1 }
             let maybeElementType: Optional<CompilerTypeReference>(compilerCoreParseTypeReference(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: typeGlobalStart + 1)))
             if maybeElementType == nil { return 0 - 1 }
-            let fallback: CompilerTypeReference(CompilerTypeReference(text: String(""), start: typeGlobalStart + 1, end: typeGlobalStart + 1))
+            let fallback: CompilerTypeReference(text: String(""), start: typeGlobalStart + 1, end: typeGlobalStart + 1)
             let elementType: CompilerTypeReference(maybeElementType ?? fallback)
             if elementType.end != typeGlobalEnd - 1 { return 0 - 1 }
             let elementLocalStart: Int(compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: elementType.start))

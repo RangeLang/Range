@@ -3,7 +3,7 @@ construct ImmutableArrayBox {
 }
 
 @main {
-    state box: ImmutableArrayBox(ImmutableArrayBox(values: [1, 2, 3]))
+    state box: ImmutableArrayBox(values: [1, 2, 3])
     box.values[1]: 7
     return box.values[1]
 }

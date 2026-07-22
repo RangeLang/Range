@@ -350,7 +350,7 @@ function compilerBodyArenaBuildCFGSwitch(arena: CompilerBodyArena, regionNodeID:
         if caseNodeID != defaultCaseNodeID {
             let patternNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: caseNodeID, role: compilerSyntaxRoleSwitchPattern(), ordinal: 0))
             let caseRegionNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: caseNodeID, role: compilerSyntaxRoleSwitchBody(), ordinal: 0))
-            state patternResult: CompilerBodyCFGResult(CompilerBodyCFGResult(blockID: testBlockID, isTerminated: false, isValid: true))
+            state patternResult: CompilerBodyCFGResult(blockID: testBlockID, isTerminated: false, isValid: true)
             if !compilerBodyArenaPatternUsesNativeEnumTag(arena: arena, patternNodeID: patternNodeID) {
                 patternResult: compilerBodyArenaBuildCFGExpression(arena: arena, nodeID: patternNodeID, entryBlockID: testBlockID)
             }
@@ -373,7 +373,7 @@ function compilerBodyArenaBuildCFGSwitch(arena: CompilerBodyArena, regionNodeID:
                     || compilerBodyArenaCFGAppendEdge(arena: arena, fromBlockID: testBlockID, toBlockID: falseBlockID, role: compilerBodyCFGEdgeFalse(), ordinal: 1) != 0 {
                     valid: false
                 } else {
-                    state bodyResult: CompilerBodyCFGResult(CompilerBodyCFGResult(blockID: bodyBlockID, isTerminated: false, isValid: false))
+                    state bodyResult: CompilerBodyCFGResult(blockID: bodyBlockID, isTerminated: false, isValid: false)
                     if compilerBodyArenaScheduleSwitchPayloadBindings(arena: arena, patternNodeID: patternNodeID, bodyBlockID: bodyBlockID) == 0 {
                         bodyResult: compilerBodyArenaBuildCFGRegion(arena: arena, regionNodeID: caseRegionNodeID, initialBlockID: bodyBlockID)
                     }

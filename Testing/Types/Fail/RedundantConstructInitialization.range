@@ -1,0 +1,8 @@
+construct NumberView {
+    let value: Int
+}
+
+@main {
+    let view: NumberView(NumberView(value: 7))
+    return view.value
+}

@@ -1397,7 +1397,7 @@ function bindingReadCount(buffer: RawBuffer): Int {
 @main {
     let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
     rawBufferAppendInt(buffer: source, value: 7)
-    let view: LocalBufferView(LocalBufferView(storage: $source))
+    let view: LocalBufferView(storage: $source)
     let count: Int(bindingReadCount(buffer: view.storage))
     let value: Int(rawBufferLoadInt(buffer: source, index: 0))
     rawBufferDestroy(buffer: source)
@@ -1422,8 +1422,8 @@ function bindingReadFirst(buffer: RawBuffer): Int {
 @main {
     let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
     rawBufferAppendInt(buffer: source, value: 7)
-    let holder: BufferHolder(BufferHolder(storage: source))
-    let view: MemberBufferView(MemberBufferView(storage: $holder.storage))
+    let holder: BufferHolder(storage: source)
+    let view: MemberBufferView(storage: $holder.storage)
     let value: Int(bindingReadFirst(buffer: view.storage))
     rawBufferDestroy(buffer: holder.storage)
     return value
@@ -1438,7 +1438,7 @@ construct MissingDollarView {
 
 @main {
     let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
-    let view: MissingDollarView(MissingDollarView(storage: source))
+    let view: MissingDollarView(storage: source)
     return 0
 }
 RANGE
@@ -1451,7 +1451,7 @@ construct DestroyAliasView {
 
 @main {
     let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
-    let view: DestroyAliasView(DestroyAliasView(storage: $source))
+    let view: DestroyAliasView(storage: $source)
     rawBufferDestroy(buffer: view.storage)
     return 0
 }
@@ -1491,8 +1491,8 @@ construct BufferViewWrapper {
 
 @main {
     let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
-    let view: NestedBufferView(NestedBufferView(storage: $source))
-    let wrapper: BufferViewWrapper(BufferViewWrapper(view: view))
+    let view: NestedBufferView(storage: $source)
+    let wrapper: BufferViewWrapper(view: view)
     return 0
 }
 RANGE
@@ -1504,7 +1504,7 @@ construct ReturnedBufferView {
 }
 
 function returnBufferView(buffer: RawBuffer): ReturnedBufferView {
-    let view: ReturnedBufferView(ReturnedBufferView(storage: $buffer))
+    let view: ReturnedBufferView(storage: $buffer)
     return view
 }
 
@@ -1531,7 +1531,7 @@ construct BoundaryBufferView {
 }
 
 function returnBoundaryBufferView(owners: BoundaryBufferOwners): BoundaryBufferView {
-    let view: BoundaryBufferView(BoundaryBufferView(first: $owners.first, second: $owners.second))
+    let view: BoundaryBufferView(first: $owners.first, second: $owners.second)
     return view
 }
 
@@ -1540,7 +1540,7 @@ function returnBoundaryBufferView(owners: BoundaryBufferOwners): BoundaryBufferV
     rawBufferAppendInt(buffer: first, value: 3)
     let second: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
     rawBufferAppendInt(buffer: second, value: 4)
-    let owners: BoundaryBufferOwners(BoundaryBufferOwners(first: first, second: second))
+    let owners: BoundaryBufferOwners(first: first, second: second)
     let view: BoundaryBufferView(returnBoundaryBufferView(owners: owners))
     let firstValue: Int(rawBufferLoadInt(buffer: view.first, index: 0))
     let secondValue: Int(rawBufferLoadInt(buffer: view.second, index: 0))
@@ -1558,7 +1558,7 @@ construct EscapedLocalBufferView {
 
 function escapeLocalBufferView(): EscapedLocalBufferView {
     let local: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
-    let view: EscapedLocalBufferView(EscapedLocalBufferView(storage: $local))
+    let view: EscapedLocalBufferView(storage: $local)
     return view
 }
 
@@ -1575,8 +1575,8 @@ construct SameBranchBufferView {
 }
 
 function chooseSameBufferView(buffer: RawBuffer, flag: Bool): SameBranchBufferView {
-    let first: SameBranchBufferView(SameBranchBufferView(storage: $buffer))
-    let second: SameBranchBufferView(SameBranchBufferView(storage: $buffer))
+    let first: SameBranchBufferView(storage: $buffer)
+    let second: SameBranchBufferView(storage: $buffer)
     if flag {
         return first
     } else {
@@ -1601,8 +1601,8 @@ construct DifferentBranchBufferView {
 }
 
 function chooseDifferentBufferView(left: RawBuffer, right: RawBuffer, flag: Bool): DifferentBranchBufferView {
-    let first: DifferentBranchBufferView(DifferentBranchBufferView(storage: $left))
-    let second: DifferentBranchBufferView(DifferentBranchBufferView(storage: $right))
+    let first: DifferentBranchBufferView(storage: $left)
+    let second: DifferentBranchBufferView(storage: $right)
     if flag {
         return first
     } else {
@@ -1625,7 +1625,7 @@ construct ForwardedBufferView {
 }
 
 function baseBufferView(buffer: RawBuffer): ForwardedBufferView {
-    let view: ForwardedBufferView(ForwardedBufferView(storage: $buffer))
+    let view: ForwardedBufferView(storage: $buffer)
     return view
 }
 
@@ -1654,7 +1654,7 @@ construct MixedBufferView {
 function makeMixedBufferView(buffer: RawBuffer): MixedBufferView {
     let owned: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
     rawBufferAppendInt(buffer: owned, value: 3)
-    let view: MixedBufferView(MixedBufferView(owned: owned, borrowed: $buffer))
+    let view: MixedBufferView(owned: owned, borrowed: $buffer)
     return view
 }
 
@@ -1689,7 +1689,7 @@ function makeArenaEmitterResult(owners: ArenaEmitterAliasOwners): ArenaEmitterRe
     rawBufferAppendInt(buffer: firstOwned, value: 1)
     let secondOwned: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
     rawBufferAppendInt(buffer: secondOwned, value: 2)
-    let result: ArenaEmitterResult(ArenaEmitterResult(firstOwned: firstOwned, secondOwned: secondOwned, firstAlias: $owners.first, secondAlias: $owners.second))
+    let result: ArenaEmitterResult(firstOwned: firstOwned, secondOwned: secondOwned, firstAlias: $owners.first, secondAlias: $owners.second)
     return result
 }
 
@@ -1698,7 +1698,7 @@ function makeArenaEmitterResult(owners: ArenaEmitterAliasOwners): ArenaEmitterRe
     rawBufferAppendInt(buffer: firstAlias, value: 1)
     let secondAlias: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
     rawBufferAppendInt(buffer: secondAlias, value: 3)
-    let owners: ArenaEmitterAliasOwners(ArenaEmitterAliasOwners(first: firstAlias, second: secondAlias))
+    let owners: ArenaEmitterAliasOwners(first: firstAlias, second: secondAlias)
     let result: ArenaEmitterResult(makeArenaEmitterResult(owners: owners))
     let firstOwnedValue: Int(rawBufferLoadInt(buffer: result.firstOwned, index: 0))
     let secondOwnedValue: Int(rawBufferLoadInt(buffer: result.secondOwned, index: 0))
@@ -1719,7 +1719,7 @@ construct ConsumedOwnerBufferView {
 }
 
 function returnConsumedOwnerView(buffer: RawBuffer): ConsumedOwnerBufferView {
-    let view: ConsumedOwnerBufferView(ConsumedOwnerBufferView(storage: $buffer))
+    let view: ConsumedOwnerBufferView(storage: $buffer)
     rawBufferDestroy(buffer: buffer)
     return view
 }
@@ -1738,7 +1738,7 @@ construct UsedAfterOwnerBufferView {
 }
 
 function returnUsedAfterOwnerView(buffer: RawBuffer): UsedAfterOwnerBufferView {
-    let view: UsedAfterOwnerBufferView(UsedAfterOwnerBufferView(storage: $buffer))
+    let view: UsedAfterOwnerBufferView(storage: $buffer)
     return view
 }
 
@@ -1779,14 +1779,14 @@ construct NestedDirectBufferView {
 }
 
 function returnNestedBufferView(leaf: NestedLeafBufferView): NestedDirectBufferView {
-    let nested: NestedDirectBufferView(NestedDirectBufferView(leaf: $leaf))
+    let nested: NestedDirectBufferView(leaf: $leaf)
     return nested
 }
 
 @main {
     let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
     rawBufferAppendInt(buffer: source, value: 7)
-    let leaf: NestedLeafBufferView(NestedLeafBufferView(storage: $source))
+    let leaf: NestedLeafBufferView(storage: $source)
     let nested: NestedDirectBufferView(returnNestedBufferView(leaf: leaf))
     let value: Int(rawBufferLoadInt(buffer: nested.leaf.storage, index: 0))
     rawBufferDestroy(buffer: source)
@@ -1806,8 +1806,8 @@ construct OwnedBuffer {
 
 @main {
     let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
-    let view: MoveAliasView(MoveAliasView(storage: $source))
-    let moved: OwnedBuffer(OwnedBuffer(storage: view.storage))
+    let view: MoveAliasView(storage: $source)
+    let moved: OwnedBuffer(storage: view.storage)
     return 0
 }
 RANGE
@@ -1918,7 +1918,7 @@ construct RootBoundaryForwardMixedResult {
 function makeRootBoundaryForwardMixedResult(forwardedSource: RawBuffer, borrowedSource: RawBuffer): RootBoundaryForwardMixedResult {
     let created: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
     rawBufferAppendInt(buffer: created, value: 3)
-    let result: RootBoundaryForwardMixedResult(RootBoundaryForwardMixedResult(forwarded: forwardedSource, borrowed: $borrowedSource, created: created))
+    let result: RootBoundaryForwardMixedResult(forwarded: forwardedSource, borrowed: $borrowedSource, created: created)
     return result
 }
 
@@ -1987,7 +1987,7 @@ construct RootLocalHolder {
 }
 
 function makeRootLocalHolder(): RootLocalHolder {
-    let holder: RootLocalHolder(RootLocalHolder(storage: rawBufferCreate(capacity: 1, stride: 4)))
+    let holder: RootLocalHolder(storage: rawBufferCreate(capacity: 1, stride: 4))
     return holder
 }
 
@@ -2033,7 +2033,7 @@ construct RootPartialOwner {
 @main {
     let first: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
     let second: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
-    let owner: RootPartialOwner(RootPartialOwner(first: first, second: second))
+    let owner: RootPartialOwner(first: first, second: second)
     rawBufferDestroy(buffer: owner.first)
     rawBufferAppendInt(buffer: owner.second, value: 7)
     let value: Int(rawBufferLoadInt(buffer: owner.second, index: 0))
@@ -2088,7 +2088,7 @@ function absentBranchScope(buffer: RawBuffer, flag: Bool): Int {
         result: rawBufferLoadInt(buffer: branchOwner, index: 0)
         rawBufferDestroy(buffer: branchOwner)
     } else {
-        let branchAlias: AbsentBranchAliasView(AbsentBranchAliasView(storage: $buffer))
+        let branchAlias: AbsentBranchAliasView(storage: $buffer)
         result: rawBufferLoadInt(buffer: branchAlias.storage, index: 0)
     }
     return result
@@ -2132,10 +2132,10 @@ construct AbsentReturnedAliasView {
 
 function absentChooseAlias(buffer: RawBuffer, flag: Bool): AbsentReturnedAliasView {
     if flag {
-        let first: AbsentReturnedAliasView(AbsentReturnedAliasView(storage: $buffer))
+        let first: AbsentReturnedAliasView(storage: $buffer)
         return first
     } else {
-        let second: AbsentReturnedAliasView(AbsentReturnedAliasView(storage: $buffer))
+        let second: AbsentReturnedAliasView(storage: $buffer)
         return second
     }
 }
@@ -2348,7 +2348,7 @@ construct RootDuplicateHolder {
 
 @main {
     let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
-    let holder: RootDuplicateHolder(RootDuplicateHolder(first: source, second: source))
+    let holder: RootDuplicateHolder(first: source, second: source)
     return 0
 }
 RANGE
@@ -2369,7 +2369,7 @@ construct RootMovedHolder {
 
 @main {
     let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
-    let holder: RootMovedHolder(RootMovedHolder(storage: source))
+    let holder: RootMovedHolder(storage: source)
     rawBufferAppendInt(buffer: source, value: 7)
     rawBufferDestroy(buffer: holder.storage)
     return 0
@@ -2384,7 +2384,7 @@ construct RootOwnedHolder {
 
 @main {
     let source: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
-    let holder: RootOwnedHolder(RootOwnedHolder(storage: $source))
+    let holder: RootOwnedHolder(storage: $source)
     rawBufferDestroy(buffer: source)
     return 0
 }
@@ -2400,7 +2400,7 @@ construct RootPartialMoveOwner {
 @main {
     let first: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
     let second: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
-    let owner: RootPartialMoveOwner(RootPartialMoveOwner(first: first, second: second))
+    let owner: RootPartialMoveOwner(first: first, second: second)
     rawBufferDestroy(buffer: owner.first)
     let moved: RootPartialMoveOwner(owner)
     rawBufferDestroy(buffer: moved.second)
@@ -2418,7 +2418,7 @@ construct RootPartialDoubleDestroyOwner {
 @main {
     let first: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
     let second: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
-    let owner: RootPartialDoubleDestroyOwner(RootPartialDoubleDestroyOwner(first: first, second: second))
+    let owner: RootPartialDoubleDestroyOwner(first: first, second: second)
     rawBufferDestroy(buffer: owner.first)
     rawBufferDestroy(buffer: owner.first)
     rawBufferDestroy(buffer: owner.second)
@@ -2436,7 +2436,7 @@ construct RootPartialUseAfterDestroyOwner {
 @main {
     let first: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
     let second: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
-    let owner: RootPartialUseAfterDestroyOwner(RootPartialUseAfterDestroyOwner(first: first, second: second))
+    let owner: RootPartialUseAfterDestroyOwner(first: first, second: second)
     rawBufferDestroy(buffer: owner.first)
     rawBufferCount(buffer: owner.first)
     rawBufferDestroy(buffer: owner.second)
@@ -3995,7 +3995,7 @@ write_macro_generated_function_bundle() {
     fi
     /usr/bin/printf '%b\n' \
         '@main {' \
-        '    let user: User(User(seed: 0))' >> "$output"
+        '    let user: User(seed: 0)' >> "$output"
     if [[ "$kind" == positive ]]; then
         /usr/bin/printf '%b\n' \
             '    return globalFunction(input: 4) + user.memberFunction(delta: 0)' >> "$output"
@@ -4066,7 +4066,7 @@ write_macro_registrable_bundle() {
         '}' \
         '' \
         '@main {' \
-        '    let user: User(User(name: 1, registrationSeed: 3, registrationCount: 2))' >> "$output"
+        '    let user: User(name: 1, registrationSeed: 3, registrationCount: 2)' >> "$output"
     if [[ "$kind" == positive ]]; then
         /usr/bin/printf '%b\n' \
             '    user.register(delta: 1)' \
@@ -4986,6 +4986,23 @@ audit_range_cli() {
     echo "$stage_label Range CLI: pass (Range-authored dispatch, compile/check/emit-llvm, exact output, deterministic failures)"
 }
 
+audit_construct_initialization_syntax() {
+    local stage_label="$1"
+    local executable="$2"
+    local output="$WORK_ROOT/$stage_label.redundant-construct-initialization.out"
+    local error="$WORK_ROOT/$stage_label.redundant-construct-initialization.err"
+
+    run_capture "$executable" "$REDUNDANT_CONSTRUCT_INITIALIZATION_SOURCE" "$output" "$error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label redundant construct initialization exited $RUN_STATUS"
+    [[ ! -s "$error" ]] || fail "$stage_label redundant construct initialization wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=' "$output" \
+        || fail "$stage_label redundant construct initialization missed the deterministic diagnostic"
+    if /usr/bin/grep -Fq 'define ' "$output"; then
+        fail "$stage_label redundant construct initialization emitted LLVM"
+    fi
+    echo "$stage_label construct initialization syntax: pass (single type/value spelling canonical, redundant wrapper rejected)"
+}
+
 audit_stage() {
     local stage_label="$1"
     local executable="$2"
@@ -5009,6 +5026,7 @@ audit_stage() {
     audit_smoke "$stage_label" "$executable" "$stage_directory"
     audit_native_arrays "$stage_label" "$executable" "$stage_directory"
     audit_range_cli "$stage_label" "$executable"
+    audit_construct_initialization_syntax "$stage_label" "$executable"
     audit_storage_switches "$stage_label" "$executable" "$stage_directory"
     audit_recursive_enum_declarations "$stage_label" "$executable" "$stage_directory"
     audit_native_payload_enum_abi "$stage_label" "$executable" "$stage_directory"
@@ -5077,6 +5095,17 @@ audit_typed_only_lowering_invariant() {
     done
     if rg -n 'legacyParses: [1-9]|recordBytes: [1-9]' "$directory" -g '*.range' -g '!**/.range/**' -g '!**/.build/**' >/dev/null; then
         fail "$label contains a literal legacy-record lowering producer"
+    fi
+}
+
+audit_canonical_construct_initialization() {
+    local directory="$1"
+    local label="$2"
+    local pattern=':\s*(?<type>[A-Z][A-Za-z0-9_]*)\s*\(\s*\k<type>\s*\('
+
+    [[ -d "$directory" ]] || fail "missing $label source directory"
+    if rg -U --pcre2 -n "$pattern" "$directory" -g '*.range' -g 'check-range-compiler-candidate' -g '!**/.range/**' -g '!**/.build/**' -g '!**/Types/Fail/RedundantConstructInitialization.range' >/dev/null; then
+        fail "$label contains redundant same-type construct initialization"
     fi
 }
 
@@ -5156,6 +5185,9 @@ main() {
         audit_no_temporary_debug_probes "$compiler_directory/CompilerCore.range" "final compiler"
         audit_no_body_syntax_sink "$compiler_directory/CompilerCore.range" "final compiler"
         audit_typed_only_lowering_invariant "$compiler_directory" "final compiler"
+        audit_canonical_construct_initialization "$compiler_directory" "final compiler"
+        audit_canonical_construct_initialization "$REPO_ROOT/Testing" "permanent fixture"
+        audit_canonical_construct_initialization "$REPO_ROOT/scripts" "generated proof fixture"
         audit_no_legacy_record_lowering "$compiler_directory"
         if [[ -n "$bootstrap_bridge_source_directory" ]]; then
             audit_no_temporary_debug_probes "$bootstrap_bridge_source_directory/CompilerCore.range" "bootstrap bridge"
@@ -5243,6 +5275,7 @@ main() {
     ARRAY_IMMUTABLE_MEMBER_OWNER_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableConstructContainingArrayIndexedAssignment.range"
     ARRAY_IMMUTABLE_MEMBER_INTERMEDIATE_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableIntermediateConstructArrayIndexedAssignment.range"
     ARRAY_WRITE_OUT_OF_BOUNDS_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ArrayWriteOutOfBounds.range"
+    REDUNDANT_CONSTRUCT_INITIALIZATION_SOURCE="$REPO_ROOT/Testing/Types/Fail/RedundantConstructInitialization.range"
     ARRAY_ARGUMENT_SOURCE="$WORK_ROOT/ArrayArgument.range"
     /usr/bin/printf '%s\n' \
         '@builtin' \
@@ -5466,7 +5499,7 @@ main() {
         '}' \
         '' \
         'function placementGuardAggregate(value: Int): PlacementGuardPair {' \
-        '    let result: PlacementGuardPair(PlacementGuardPair(first: value, second: 7))' \
+        '    let result: PlacementGuardPair(first: value, second: 7)' \
         '    return result' \
         '}' \
         '' \

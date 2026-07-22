@@ -7,7 +7,7 @@ construct ImmutableArrayRoot {
 }
 
 @main {
-    state root: ImmutableArrayRoot(ImmutableArrayRoot(leaf: MutableArrayLeaf(values: [1, 2, 3])))
+    state root: ImmutableArrayRoot(leaf: MutableArrayLeaf(values: [1, 2, 3]))
     root.leaf.values[1]: 7
     return root.leaf.values[1]
 }

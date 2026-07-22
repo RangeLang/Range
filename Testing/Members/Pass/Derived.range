@@ -7,6 +7,6 @@ construct Counter {
 }
 
 @main {
-    let counter: Counter(Counter(value: 3))
+    let counter: Counter(value: 3)
     return counter.doubled
 }

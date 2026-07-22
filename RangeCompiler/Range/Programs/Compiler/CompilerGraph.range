@@ -779,7 +779,7 @@ function compilerSemanticTrimStringRange(text: String, start: Int, end: Int): Co
 }
 
 function compilerSemanticGenericOuterNameRangeInText(text: String, typeRange: CompilerSourceRange): CompilerSourceRange {
-    let invalidRange: CompilerSourceRange(CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1))
+    let invalidRange: CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1)
     let normalizedRange: CompilerSourceRange(compilerSemanticTrimStringRange(text: text, start: typeRange.start, end: typeRange.end))
     if normalizedRange.start < 0 || normalizedRange.end <= normalizedRange.start { return invalidRange }
     state genericStart: Int(0 - 1)
@@ -795,7 +795,7 @@ function compilerSemanticGenericOuterNameRangeInText(text: String, typeRange: Co
 }
 
 function compilerSemanticGenericArgumentRangeInText(text: String, typeRange: CompilerSourceRange, ordinal: Int): CompilerSourceRange {
-    let invalidRange: CompilerSourceRange(CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1))
+    let invalidRange: CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1)
     if ordinal < 0 || typeRange.start < 0 || typeRange.end < typeRange.start { return invalidRange }
     let normalizedRange: CompilerSourceRange(compilerSemanticTrimStringRange(text: text, start: typeRange.start, end: typeRange.end))
     if normalizedRange.start < 0 || normalizedRange.end <= normalizedRange.start { return invalidRange }
@@ -1442,10 +1442,10 @@ function compilerSemanticGraphIsValid(tables: CompilerSyntaxTables, delta: Compi
         let specializationNodeID: Int(compilerIntTableValue(table: semantics.specializations, row: semanticSpecializationValidationRow, column: 0))
         let specializationDeclarationNodeID: Int(compilerIntTableValue(table: semantics.specializations, row: semanticSpecializationValidationRow, column: 1))
         let specializationArity: Int(compilerIntTableValue(table: semantics.specializations, row: semanticSpecializationValidationRow, column: 2))
-        let specializationFingerprint: CompilerFingerprint(CompilerFingerprint(
+        let specializationFingerprint: CompilerFingerprint(
             first: compilerIntTableValue(table: semantics.specializations, row: semanticSpecializationValidationRow, column: 3),
             second: compilerIntTableValue(table: semantics.specializations, row: semanticSpecializationValidationRow, column: 4)
-        ))
+        )
         let expectedSpecializationFingerprint: CompilerFingerprint(compilerSemanticSpecializationFingerprintForNode(tables: tables, nodeID: specializationNodeID))
         let expectedSpecializationDeclarationNodeID: Int(compilerSemanticSpecializationDeclarationForTypeName(tables: tables, typeName: compilerSemanticDeclaredTypeName(tables: tables, nodeID: specializationNodeID)))
         if specializationNodeID <= previousSpecializationNodeID

@@ -108,7 +108,7 @@ function lexRangeSource(source: String): String {
             return output
         }
 
-        let fallback: RangeLexedToken(RangeLexedToken(kind: .eof, start: sourceIndex, end: sourceIndex, text: String("")))
+        let fallback: RangeLexedToken(kind: .eof, start: sourceIndex, end: sourceIndex, text: String(""))
         let token: RangeLexedToken(maybeToken ?? fallback)
         output: "\(output)\(tokenIndex)\t\(rangeTokenKindName(kind: token.kind))\t\(token.text)\n"
         sourceIndex: token.end

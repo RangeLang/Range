@@ -9,7 +9,7 @@ function compilerBodyLLVMEmitterCreate(arena: CompilerBodyArena, initialTemporar
     let blockLabels: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyLLVMBlockLabelColumnCount(), estimatedRowCount: 32))
     let globalDescriptors: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyLLVMGlobalDescriptorColumnCount(), estimatedRowCount: 16))
     let renderedBlocks: RawBuffer(rawBufferCreate(capacity: 4096, stride: 1))
-    let created: CompilerBodyLLVMEmitter(CompilerBodyLLVMEmitter(arena: $arena, abiPlan: $abiPlan, typeKeys: $typeKeys, typeKeyArguments: $typeKeyArguments, functionInstances: $functionInstances, functionInstanceSignatures: $functionInstanceSignatures, functionInstanceSignatureParameters: $functionInstanceSignatureParameters, valueAssignments: valueAssignments, blockLabels: blockLabels, runtimeState: emitterState, globalDescriptors: globalDescriptors, renderedBlocks: renderedBlocks))
+    let created: CompilerBodyLLVMEmitter(arena: $arena, abiPlan: $abiPlan, typeKeys: $typeKeys, typeKeyArguments: $typeKeyArguments, functionInstances: $functionInstances, functionInstanceSignatures: $functionInstanceSignatures, functionInstanceSignatureParameters: $functionInstanceSignatureParameters, valueAssignments: valueAssignments, blockLabels: blockLabels, runtimeState: emitterState, globalDescriptors: globalDescriptors, renderedBlocks: renderedBlocks)
     return created
 }
 
@@ -1150,7 +1150,7 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
             if rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  call void @\(callTargetName)(\(renderedArguments))\n") != 0 { return 0 - 1 }
             return rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(callTemporary) = load \(callResultTypeName), ptr \(callDestination)\n")
         }
-        let callInstruction: CompilerLLVMInstruction(CompilerLLVMInstruction(result: "%r\(callTemporary)", operation: String("call"), typeName: compilerBodyLLVMValueTypeName(arena: emitter.arena, valueID: resultValueID), left: callTargetName, right: renderedArguments))
+        let callInstruction: CompilerLLVMInstruction(result: "%r\(callTemporary)", operation: String("call"), typeName: compilerBodyLLVMValueTypeName(arena: emitter.arena, valueID: resultValueID), left: callTargetName, right: renderedArguments)
         if callTargetName == String("") || compilerBodyLLVMEmitterAppendInstruction(emitter: emitter, instruction: callInstruction) != 0 { return 0 - 1 }
         return 0
     }
@@ -1210,7 +1210,7 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         }
         if phiAssignmentRow < 0 || phiInitialValue.text == String("") || phiBackedgeValue.text == String("") || phiInitialBlockID < 0 || phiSecondBlockID < 0 { return 0 - 1 }
         let phiTemporary: Int(compilerIntTableValue(table: emitter.valueAssignments, row: phiAssignmentRow, column: compilerBodyLLVMValueAssignmentNumberColumn()))
-        let phiInstruction: CompilerLLVMInstruction(CompilerLLVMInstruction(result: "%r\(phiTemporary)", operation: String("phi"), typeName: phiInitialValue.typeName, left: "[\(phiInitialValue.text), %\(compilerBodyLLVMEffectivePredecessorLabel(emitter: emitter, blockID: phiInitialBlockID))]", right: "[\(phiBackedgeValue.text), %\(compilerBodyLLVMEffectivePredecessorLabel(emitter: emitter, blockID: phiSecondBlockID))]"))
+        let phiInstruction: CompilerLLVMInstruction(result: "%r\(phiTemporary)", operation: String("phi"), typeName: phiInitialValue.typeName, left: "[\(phiInitialValue.text), %\(compilerBodyLLVMEffectivePredecessorLabel(emitter: emitter, blockID: phiInitialBlockID))]", right: "[\(phiBackedgeValue.text), %\(compilerBodyLLVMEffectivePredecessorLabel(emitter: emitter, blockID: phiSecondBlockID))]")
         return compilerBodyLLVMEmitterAppendInstruction(emitter: emitter, instruction: phiInstruction)
     }
     if operationKind == compilerBodyMIROperationMemberRead() {
@@ -1247,7 +1247,7 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         if memberTypeName == String("i32") { memberGetterName: String("rangeConstructGetInt") }
         if memberTypeName == String("i1") { memberGetterName: String("rangeConstructGetBool") }
         let memberArguments: String("ptr \(memberReceiverValue.text), ptr getelementptr inbounds ([\(emittedMemberByteCount) x i8], ptr @.str.\(memberGlobalTemporary), i32 0, i32 0)")
-        let memberInstruction: CompilerLLVMInstruction(CompilerLLVMInstruction(result: "%r\(memberCallTemporary)", operation: String("call"), typeName: memberTypeName, left: memberGetterName, right: memberArguments))
+        let memberInstruction: CompilerLLVMInstruction(result: "%r\(memberCallTemporary)", operation: String("call"), typeName: memberTypeName, left: memberGetterName, right: memberArguments)
         return compilerBodyLLVMEmitterAppendInstruction(emitter: emitter, instruction: memberInstruction)
     }
     if operationKind == compilerBodyMIROperationPrefixNot() || operationKind == compilerBodyMIROperationPrefixNegate() {
@@ -1265,7 +1265,7 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
             prefixLeft: String("0")
             prefixRight: prefixOperandValue.text
         }
-        let prefixInstruction: CompilerLLVMInstruction(CompilerLLVMInstruction(result: "%r\(prefixTemporary)", operation: prefixInstructionName, typeName: prefixOperandValue.typeName, left: prefixLeft, right: prefixRight))
+        let prefixInstruction: CompilerLLVMInstruction(result: "%r\(prefixTemporary)", operation: prefixInstructionName, typeName: prefixOperandValue.typeName, left: prefixLeft, right: prefixRight)
         return compilerBodyLLVMEmitterAppendInstruction(emitter: emitter, instruction: prefixInstruction)
     }
     if (operationKind >= compilerBodyMIROperationEqual() && operationKind <= compilerBodyMIROperationOr())
@@ -1294,15 +1294,15 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
             if rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(optionalTagTemporary) = extractvalue \(comparedOptionalType) \(comparedOptionalValue.text), 0\n") != 0 { return 0 - 1 }
             state optionalComparisonName: String("icmp eq")
             if operationKind == compilerBodyMIROperationNotEqual() { optionalComparisonName: String("icmp ne") }
-            let optionalComparisonInstruction: CompilerLLVMInstruction(CompilerLLVMInstruction(result: "%r\(binaryTemporary)", operation: optionalComparisonName, typeName: String("i1"), left: "%r\(optionalTagTemporary)", right: String("false")))
+            let optionalComparisonInstruction: CompilerLLVMInstruction(result: "%r\(binaryTemporary)", operation: optionalComparisonName, typeName: String("i1"), left: "%r\(optionalTagTemporary)", right: String("false"))
             return compilerBodyLLVMEmitterAppendInstruction(emitter: emitter, instruction: optionalComparisonInstruction)
         }
         if (operationKind == compilerBodyMIROperationEqual() || operationKind == compilerBodyMIROperationNotEqual()) && leftValue.typeName == String("ptr") && rightValue.typeName == String("ptr") {
             let stringEqualTemporary: Int(binaryTemporary - 1)
-            let equalInstruction: CompilerLLVMInstruction(CompilerLLVMInstruction(result: "%r\(stringEqualTemporary)", operation: String("call"), typeName: String("i32"), left: String("stringEqual"), right: "ptr \(leftValue.text), ptr \(rightValue.text)"))
+            let equalInstruction: CompilerLLVMInstruction(result: "%r\(stringEqualTemporary)", operation: String("call"), typeName: String("i32"), left: String("stringEqual"), right: "ptr \(leftValue.text), ptr \(rightValue.text)")
             state comparisonOperation: String("icmp ne")
             if operationKind == compilerBodyMIROperationNotEqual() { comparisonOperation: String("icmp eq") }
-            let comparisonInstruction: CompilerLLVMInstruction(CompilerLLVMInstruction(result: "%r\(binaryTemporary)", operation: comparisonOperation, typeName: String("i32"), left: "%r\(stringEqualTemporary)", right: String("0")))
+            let comparisonInstruction: CompilerLLVMInstruction(result: "%r\(binaryTemporary)", operation: comparisonOperation, typeName: String("i32"), left: "%r\(stringEqualTemporary)", right: String("0"))
             if compilerBodyLLVMEmitterAppendInstruction(emitter: emitter, instruction: equalInstruction) != 0
                 || compilerBodyLLVMEmitterAppendInstruction(emitter: emitter, instruction: comparisonInstruction) != 0 { return 0 - 1 }
             return 0
@@ -1310,12 +1310,12 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         if operationKind >= compilerBodyMIROperationLessThan() && operationKind <= compilerBodyMIROperationGreaterEqual()
             && leftValue.typeName == String("ptr") && rightValue.typeName == String("ptr") {
             let stringCompareTemporary: Int(binaryTemporary - 1)
-            let compareInstruction: CompilerLLVMInstruction(CompilerLLVMInstruction(result: "%r\(stringCompareTemporary)", operation: String("call"), typeName: String("i32"), left: String("stringCompare"), right: "ptr \(leftValue.text), ptr \(rightValue.text)"))
+            let compareInstruction: CompilerLLVMInstruction(result: "%r\(stringCompareTemporary)", operation: String("call"), typeName: String("i32"), left: String("stringCompare"), right: "ptr \(leftValue.text), ptr \(rightValue.text)")
             state orderedComparisonOperation: String("icmp slt")
             if operationKind == compilerBodyMIROperationLessEqual() { orderedComparisonOperation: String("icmp sle") }
             if operationKind == compilerBodyMIROperationGreaterThan() { orderedComparisonOperation: String("icmp sgt") }
             if operationKind == compilerBodyMIROperationGreaterEqual() { orderedComparisonOperation: String("icmp sge") }
-            let orderedComparisonInstruction: CompilerLLVMInstruction(CompilerLLVMInstruction(result: "%r\(binaryTemporary)", operation: orderedComparisonOperation, typeName: String("i32"), left: "%r\(stringCompareTemporary)", right: String("0")))
+            let orderedComparisonInstruction: CompilerLLVMInstruction(result: "%r\(binaryTemporary)", operation: orderedComparisonOperation, typeName: String("i32"), left: "%r\(stringCompareTemporary)", right: String("0"))
             if compilerBodyLLVMEmitterAppendInstruction(emitter: emitter, instruction: compareInstruction) != 0
                 || compilerBodyLLVMEmitterAppendInstruction(emitter: emitter, instruction: orderedComparisonInstruction) != 0 { return 0 - 1 }
             return 0
@@ -1363,7 +1363,7 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         }
         if isFloatBinary && operationKind == compilerBodyMIROperationEqual() { instructionName: "fcmp oeq" }
         if isFloatBinary && operationKind == compilerBodyMIROperationNotEqual() { instructionName: "fcmp one" }
-        let binaryInstruction: CompilerLLVMInstruction(CompilerLLVMInstruction(result: "%r\(binaryTemporary)", operation: instructionName, typeName: leftValue.typeName, left: leftValue.text, right: rightValue.text))
+        let binaryInstruction: CompilerLLVMInstruction(result: "%r\(binaryTemporary)", operation: instructionName, typeName: leftValue.typeName, left: leftValue.text, right: rightValue.text)
         if compilerBodyLLVMEmitterAppendInstruction(emitter: emitter, instruction: binaryInstruction) != 0 { return 0 - 1 }
         return 0
     }
@@ -1376,7 +1376,7 @@ function compilerBodyLLVMEmitterRenderBlock(emitter: CompilerBodyLLVMEmitter, mi
     let operationCount: Int(compilerIntTableValue(table: emitter.arena.mirBlocks, row: mirBlockID, column: compilerBodyMIRBlockOperationCountColumn()))
     let terminatorOperationID: Int(firstOperation + operationCount - 1)
     let terminatorKind: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: terminatorOperationID, column: compilerBodyMIROperationKindColumn()))
-    let initialTerminal: CompilerLLVMTerminator(CompilerLLVMTerminator(kind: String("jump"), typeName: String(""), value: String(""), trueLabel: String(""), falseLabel: String("")))
+    let initialTerminal: CompilerLLVMTerminator(kind: String("jump"), typeName: String(""), value: String(""), trueLabel: String(""), falseLabel: String(""))
     state terminal: CompilerLLVMTerminator(initialTerminal)
     if terminatorKind == compilerBodyMIROperationCondBranch() {
         let conditionValueID: Int(compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: terminatorOperationID, ordinal: 0))
@@ -1483,7 +1483,7 @@ function compilerBodyLLVMEmit(arena: CompilerBodyArena, initialTemporary: Int, i
     bodyStart: arena.bodyStart
     state bodyEnd: Int(0)
     bodyEnd: arena.bodyEnd
-    let emptyBlock: CompilerLLVMLoweredBlock(CompilerLLVMLoweredBlock(block: CompilerBlock(start: bodyStart, end: bodyEnd), declarationRecords: String(""), renderedBlocks: String(""), instructionRecords: String(""), localValues: String(""), nextTemporary: initialTemporary, nextBranchIndex: initialBranch, exitLabel: String("entry"), hasEntryBranch: false, entryBranchCondition: String(""), entryBranchThenLabel: String(""), entryBranchElseLabel: String(""), hasReturn: false, returnLLVMType: String(""), returnLLVMValue: String("")))
+    let emptyBlock: CompilerLLVMLoweredBlock(block: CompilerBlock(start: bodyStart, end: bodyEnd), declarationRecords: String(""), renderedBlocks: String(""), instructionRecords: String(""), localValues: String(""), nextTemporary: initialTemporary, nextBranchIndex: initialBranch, exitLabel: String("entry"), hasEntryBranch: false, entryBranchCondition: String(""), entryBranchThenLabel: String(""), entryBranchElseLabel: String(""), hasReturn: false, returnLLVMType: String(""), returnLLVMValue: String(""))
     if !compilerBodyMIRIsValid(arena: arena, abiPlan: abiPlan) || !compilerBodyMemoryIsFrozenAndValid(arena: arena) { return CompilerBodyLLVMEmissionResult(block: emptyBlock, renderedGlobals: String(""), runtimeRequirements: 0, isValid: false) }
     let emitter: CompilerBodyLLVMEmitter(compilerBodyLLVMEmitterCreate(arena: arena, initialTemporary: initialTemporary, initialBranch: initialBranch, abiPlan: abiPlan, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, functionInstances: functionInstances, functionInstanceSignatures: functionInstanceSignatures, functionInstanceSignatureParameters: functionInstanceSignatureParameters))
     state valid: Bool(true)
@@ -1541,7 +1541,7 @@ function compilerBodyLLVMEmit(arena: CompilerBodyArena, initialTemporary: Int, i
     let nextTemporary: Int(rawBufferLoadInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary()))
     let nextBranch: Int(rawBufferLoadInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextBranch()))
     if compilerBodyLLVMEmitterDestroy(emitter: emitter) != 0 { valid: false }
-    let loweredBlock: CompilerLLVMLoweredBlock(CompilerLLVMLoweredBlock(block: CompilerBlock(start: bodyStart, end: bodyEnd), declarationRecords: String(""), renderedBlocks: renderedBlocks, instructionRecords: String(""), localValues: String(""), nextTemporary: nextTemporary, nextBranchIndex: nextBranch, exitLabel: exitLabel, hasEntryBranch: hasEntryBranch, entryBranchCondition: entryBranchCondition, entryBranchThenLabel: entryBranchThenLabel, entryBranchElseLabel: entryBranchElseLabel, hasReturn: hasReturn, returnLLVMType: returnLLVMType, returnLLVMValue: returnLLVMValue))
+    let loweredBlock: CompilerLLVMLoweredBlock(block: CompilerBlock(start: bodyStart, end: bodyEnd), declarationRecords: String(""), renderedBlocks: renderedBlocks, instructionRecords: String(""), localValues: String(""), nextTemporary: nextTemporary, nextBranchIndex: nextBranch, exitLabel: exitLabel, hasEntryBranch: hasEntryBranch, entryBranchCondition: entryBranchCondition, entryBranchThenLabel: entryBranchThenLabel, entryBranchElseLabel: entryBranchElseLabel, hasReturn: hasReturn, returnLLVMType: returnLLVMType, returnLLVMValue: returnLLVMValue)
     return CompilerBodyLLVMEmissionResult(block: loweredBlock, renderedGlobals: renderedGlobals, runtimeRequirements: runtimeRequirements, isValid: valid)
 }
 
@@ -1554,7 +1554,7 @@ function compilerBodyArenaValidationCode(arena: CompilerBodyArena): Int {
         if arena.ownerFunctionRow != 0 - 1 { return 3 }
         let maybeMain: Optional<CompilerMainBlock>(compilerCoreParseMainBlock(source: arena.tables.sourceStore.source))
         if maybeMain == nil { return 4 }
-        let fallbackMain: CompilerMainBlock(CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
+        let fallbackMain: CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0)
         let mainBlock: CompilerMainBlock(maybeMain ?? fallbackMain)
         if arena.ownerDeclarationSyntaxID != mainBlock.attributeStart
             || arena.fileID != compilerSourceStoreFileIDAtGlobalOffset(store: arena.tables.sourceStore, globalOffset: mainBlock.attributeStart)
@@ -1628,7 +1628,7 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
         if arena.ownerFunctionRow != 0 - 1 { return false }
         let maybeMain: Optional<CompilerMainBlock>(compilerCoreParseMainBlock(source: arena.tables.sourceStore.source))
         if maybeMain == nil { return false }
-        let fallbackMain: CompilerMainBlock(CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
+        let fallbackMain: CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0)
         let mainBlock: CompilerMainBlock(maybeMain ?? fallbackMain)
         if arena.ownerDeclarationSyntaxID != mainBlock.attributeStart
             || arena.fileID != compilerSourceStoreFileIDAtGlobalOffset(store: arena.tables.sourceStore, globalOffset: mainBlock.attributeStart)
@@ -1774,7 +1774,7 @@ function compilerCoreLLVMLowerBodyArena(context: CompilerLLVMLoweringContext, ar
     let statementNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: arena.rootNodeID, role: compilerSyntaxRoleStatement(), ordinal: 0))
     let expressionNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleReturnValue(), ordinal: 0))
     let expression: CompilerLLVMLoweredExpression(compilerCoreLLVMLowerBodyArenaExpression(arena: arena, nodeID: expressionNodeID, initialTemporaryIndex: initialTemporaryIndex))
-    let terminal: CompilerLLVMTerminator(CompilerLLVMTerminator(kind: String("return"), typeName: String("i32"), value: expression.operand, trueLabel: String(""), falseLabel: String("")))
+    let terminal: CompilerLLVMTerminator(kind: String("return"), typeName: String("i32"), value: expression.operand, trueLabel: String(""), falseLabel: String(""))
     let renderedBlocks: String(compilerCoreRenderLLVMNamedBlock(label: String("entry"), instructionRecords: String(""), terminal: terminal))
     return CompilerLLVMLoweredBlock(block: CompilerBlock(start: bodyStart, end: bodyEnd), declarationRecords: String(""), renderedBlocks: renderedBlocks, instructionRecords: expression.instructionRecords, localValues: compilerCoreLLVMFunctionParameterLocalValuesTyped(tables: context.tables, functionRow: functionRow), nextTemporary: expression.nextTemporary, nextBranchIndex: 0, exitLabel: String("entry"), hasEntryBranch: false, entryBranchCondition: String(""), entryBranchThenLabel: String(""), entryBranchElseLabel: String(""), hasReturn: true, returnLLVMType: String("i32"), returnLLVMValue: expression.operand)
 }
@@ -1857,7 +1857,7 @@ function compilerCoreLLVMLowerEntryTyped(context: CompilerLLVMLoweringContext, r
             valid: false
         }
     }
-    state emission: CompilerBodyLLVMEmissionResult(CompilerBodyLLVMEmissionResult(block: failureBlock, renderedGlobals: String(""), runtimeRequirements: 0, isValid: false))
+    state emission: CompilerBodyLLVMEmissionResult(block: failureBlock, renderedGlobals: String(""), runtimeRequirements: 0, isValid: false)
     if valid { emission: compilerBodyLLVMEmit(arena: arena, initialTemporary: initialTemporaryIndex, initialBranch: 0, abiPlan: abiPlan, typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments, functionInstances: reachability.functionInstances, functionInstanceSignatures: reachability.functionInstanceSignatures, functionInstanceSignatureParameters: reachability.functionInstanceSignatureParameters) }
     if valid && !emission.isValid {
         failureStage: 11
@@ -1981,7 +1981,7 @@ function compilerCoreLLVMLowerHelperFunctionTypedObserved(context: CompilerLLVML
                 typedValid: false
             }
         }
-        state emission: CompilerBodyLLVMEmissionResult(CompilerBodyLLVMEmissionResult(block: loweredArena, renderedGlobals: String(""), runtimeRequirements: 0, isValid: false))
+        state emission: CompilerBodyLLVMEmissionResult(block: loweredArena, renderedGlobals: String(""), runtimeRequirements: 0, isValid: false)
         if typedValid { emission: compilerBodyLLVMEmit(arena: arena, initialTemporary: initialTemporaryIndex, initialBranch: 0, abiPlan: abiPlan, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, functionInstances: functionInstances, functionInstanceSignatures: functionInstanceSignatures, functionInstanceSignatureParameters: functionInstanceSignatureParameters) }
         if typedValid && !emission.isValid {
             typedFailureStage: 9
@@ -2039,7 +2039,7 @@ function compilerCoreRenderLLVMHelperFunctionTyped(tables: CompilerSyntaxTables,
         llvmReturnType: String("void")
         if renderedParameterText == String("") { renderedParameterText: String("ptr %returnDestination") } else { renderedParameterText: "ptr %returnDestination, \(renderedParameterText)" }
     }
-    let llvmFunction: CompilerLLVMFunction(CompilerLLVMFunction(name: renderedName, returnType: llvmReturnType, parameterText: renderedParameterText, renderedBlocks: block.renderedBlocks, block: functionBlock))
+    let llvmFunction: CompilerLLVMFunction(name: renderedName, returnType: llvmReturnType, parameterText: renderedParameterText, renderedBlocks: block.renderedBlocks, block: functionBlock)
     return compilerCoreRenderLLVMFunction(llvmFunction: llvmFunction)
 }
 
@@ -2058,7 +2058,7 @@ function compilerCoreLLVMDefaultReturnValue(typeName: String): String {
 function compilerCoreMainLLVMBasicBlock(block: CompilerLLVMLoweredBlock): CompilerLLVMBasicBlock {
     state instructionRecords: String("")
     instructionRecords: block.instructionRecords
-    state terminal: CompilerLLVMTerminator(CompilerLLVMTerminator(kind: String("return"), typeName: block.returnLLVMType, value: block.returnLLVMValue, trueLabel: String(""), falseLabel: String("")))
+    state terminal: CompilerLLVMTerminator(kind: String("return"), typeName: block.returnLLVMType, value: block.returnLLVMValue, trueLabel: String(""), falseLabel: String(""))
     if block.returnLLVMType == String("i1") && block.returnLLVMValue != String("") {
         instructionRecords: "\(instructionRecords)  %entry_result = zext i1 \(block.returnLLVMValue) to i32\n"
         terminal: CompilerLLVMTerminator(kind: String("return"), typeName: String("i32"), value: String("%entry_result"), trueLabel: String(""), falseLabel: String(""))

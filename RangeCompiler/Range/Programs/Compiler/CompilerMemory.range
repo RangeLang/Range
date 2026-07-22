@@ -162,8 +162,8 @@ function compilerMemoryMacroArrayTargetIdentity(tables: CompilerSyntaxTables, ta
 
 function compilerMemoryMacroFamilyNextApplication(tables: CompilerSyntaxTables, memory: CompilerMemoryGraph, familyID: Int, macroDeclarationRow: Int): Int {
     state selected: Int(0 - 1)
-    state selectedTargetIdentity: CompilerFingerprint(CompilerFingerprint(first: 0, second: 0))
-    state selectedApplicationIdentity: CompilerFingerprint(CompilerFingerprint(first: 0, second: 0))
+    state selectedTargetIdentity: CompilerFingerprint(first: 0, second: 0)
+    state selectedApplicationIdentity: CompilerFingerprint(first: 0, second: 0)
     state row: Int(0)
     while row < compilerIntTableRowCount(table: tables.macroApplications) {
         let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: row, column: 12))
@@ -285,7 +285,7 @@ function compilerMemoryBuildMacroFamilyForMember(tables: CompilerSyntaxTables, m
     }
     state storagePolicy: Int(compilerMemoryStorageImmutable())
     if memberKind == compilerSyntaxMemberKindState() { storagePolicy: compilerMemoryStorageMutable() }
-    let macroIdentity: CompilerFingerprint(CompilerFingerprint(first: compilerIntTableValue(table: tables.macroDeclarations, row: macroDeclarationRow, column: 20), second: compilerIntTableValue(table: tables.macroDeclarations, row: macroDeclarationRow, column: 21)))
+    let macroIdentity: CompilerFingerprint(first: compilerIntTableValue(table: tables.macroDeclarations, row: macroDeclarationRow, column: 20), second: compilerIntTableValue(table: tables.macroDeclarations, row: macroDeclarationRow, column: 21))
     state familyIdentity: CompilerFingerprint(compilerFingerprintInitial())
     familyIdentity: compilerFingerprintAppendInt(fingerprint: familyIdentity, value: 730)
     familyIdentity: compilerFingerprintAppendInt(fingerprint: familyIdentity, value: compilerIntTableValue(table: tables.members, row: memberRow, column: 10))

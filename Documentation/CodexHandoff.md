@@ -574,26 +574,32 @@ scripts/range compiler progression --cached-only
 
 The accepted compiler has advanced beyond the older validation snapshot above.
 It is still a 24-source Range compiler, and the accepted seed is now
-5,504,129-byte LLVM with SHA-256
-`5317f0f40aec05c3d3f2fd31cfb4981e0d57c89d6f297979be38834e461157b8`.
+5,507,013-byte LLVM with SHA-256
+`2b12f5ad37d7e2b1b4903243b537e6252c06d382e7eab7fce21a35fd3740042d`.
 
-The newly accepted slice permits bounds-checked indexed mutation through one
-mutable construct field, for example `box.values[index]: value`, when both the
-local owner and the Array field are `state`. An immutable owner or field is
-rejected before LLVM. Ordinary construct fields now use the compiler's
-structural type-reference identities; macro-family fields such as
-`[@component]` remain in their existing distinct macro model.
+Construct initialization now has one canonical spelling. A typed local creates
+its construct value directly from labeled fields:
+
+```range
+let view: NumberView(values: $numbers)
+```
+
+The redundant same-type wrapper `NumberView(NumberView(...))` is rejected
+before LLVM. The compiler sources, permanent fixtures, and generated gate
+fixtures were migrated across 305 occurrences. The candidate gate statically
+audits canonical sources and executes a permanent negative fixture so the old
+spelling cannot silently return. This does not change construct-member
+requirements or defaults: a member without a default remains an input required
+when its containing construct is initialized.
 
 The full candidate gate passed through Stage 2 and Stage 3 with byte-identical
-LLVM and executables and `typed_only_lowering=pass`.
+LLVM and executables and `typed_only_lowering=pass`. Their LLVM is the accepted
+5,507,013-byte artifact above; both executables are 3,473,008 bytes with SHA-256
+`e07a6235e7098361e015c440f9c7917e8e80dd74d71f987ee4228d65c91f275c`.
 Accepted-seed integrity and the independent accepted-seed fixed-point check also
 pass.
 
-The next accepted slice extends that same operation through arbitrary-depth
-mutable construct fields. `root.leaf.values[index]: value` succeeds only when
-the root and every field are `state`; an immutable intermediate field rejects
-before LLVM. Stage 2 and Stage 3 reproduce byte-identical 5,503,762-byte LLVM
-with SHA-256
-`68db0983014046fee2e13a6d6aad4993c7051a9c4d9b50befcd432aab9756252`, and
-`typed_only_lowering=pass`. Binding-based mutation
-remains the next separate proof boundary.
+Bounds-checked indexed mutation already follows arbitrary-depth mutable
+construct fields such as `root.leaf.values[index]: value`. Binding-based Array
+mutation remains the next separate proof boundary and should use the canonical
+single-name initialization form.

@@ -1,5 +1,5 @@
 @main {
-    let token: String(String("name"))
+    let token: String("name")
     switch token {
     case String("int"):
         return 1

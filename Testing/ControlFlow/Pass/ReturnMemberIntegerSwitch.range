@@ -3,7 +3,7 @@ construct SwitchStorage {
 }
 
 @main {
-    let storage: SwitchStorage(SwitchStorage(value: 2))
+    let storage: SwitchStorage(value: 2)
     switch storage.value {
     case 1:
         return 1
