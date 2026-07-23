@@ -308,9 +308,9 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
     }
     if !compilerReachableLLVMStateABIPlanIsValid(reachability: reachability) {
         state invalidPlanEdge: Int(0)
-        while invalidPlanEdge < rawBufferCount(buffer: reachability.edgeTargets) {
-            let invalidPlanOwner: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: invalidPlanEdge))
-            let invalidPlanTarget: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: invalidPlanEdge))
+        while invalidPlanEdge < reachability.edgeTargets.count {
+            let invalidPlanOwner: Int(reachability.edgeOwners.element(index: invalidPlanEdge))
+            let invalidPlanTarget: Int(reachability.edgeTargets.element(index: invalidPlanEdge))
             let invalidPlanOwnerParticipant: Int(rawBufferLoadInt(buffer: reachability.abiParticipants, index: invalidPlanOwner))
             let invalidPlanTargetParticipant: Int(rawBufferLoadInt(buffer: reachability.abiParticipants, index: invalidPlanTarget))
             let invalidPlanTargetReturnMode: Int(rawBufferLoadInt(buffer: reachability.abiReturnModes, index: invalidPlanTarget))
@@ -327,9 +327,9 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
     if rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLMIndirectCapabilities()) < 1 { return String("compilerError\tkind=emptyIndirectABICapability") }
     if rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLMIndirectActivations()) < 1 {
         state blockerEdge: Int(0)
-        while blockerEdge < rawBufferCount(buffer: reachability.edgeTargets) {
-            let blockerOwner: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: blockerEdge))
-            let blockerTarget: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: blockerEdge))
+        while blockerEdge < reachability.edgeTargets.count {
+            let blockerOwner: Int(reachability.edgeOwners.element(index: blockerEdge))
+            let blockerTarget: Int(reachability.edgeTargets.element(index: blockerEdge))
             if rawBufferLoadInt(buffer: reachability.abiCapabilities, index: blockerTarget) == 1
                 && compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: blockerTarget) == compilerFunctionReturnABIIndirect()
                 && rawBufferLoadInt(buffer: reachability.abiCapabilities, index: blockerOwner) != 1 {
@@ -344,9 +344,9 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
             blockerEdge: blockerEdge + 1
         }
         state incapableEdge: Int(0)
-        while incapableEdge < rawBufferCount(buffer: reachability.edgeTargets) {
-            let incapableOwner: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: incapableEdge))
-            let incapableTarget: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: incapableEdge))
+        while incapableEdge < reachability.edgeTargets.count {
+            let incapableOwner: Int(reachability.edgeOwners.element(index: incapableEdge))
+            let incapableTarget: Int(reachability.edgeTargets.element(index: incapableEdge))
             if compilerFunctionReturnABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: incapableTarget) == compilerFunctionReturnABIIndirect()
                 && rawBufferLoadInt(buffer: reachability.abiCapabilities, index: incapableTarget) != 1
                 && rawBufferLoadInt(buffer: reachability.abiCapabilities, index: incapableOwner) == 1 {
@@ -361,9 +361,9 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
             incapableEdge: incapableEdge + 1
         }
         state parameterBlockerEdge: Int(0)
-        while parameterBlockerEdge < rawBufferCount(buffer: reachability.edgeTargets) {
-            let parameterBlockerOwner: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: parameterBlockerEdge))
-            let parameterBlockerTarget: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: parameterBlockerEdge))
+        while parameterBlockerEdge < reachability.edgeTargets.count {
+            let parameterBlockerOwner: Int(reachability.edgeOwners.element(index: parameterBlockerEdge))
+            let parameterBlockerTarget: Int(reachability.edgeTargets.element(index: parameterBlockerEdge))
             if compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterBlockerTarget)
                 && rawBufferLoadInt(buffer: reachability.abiCapabilities, index: parameterBlockerTarget) != 1
                 && rawBufferLoadInt(buffer: reachability.abiCapabilities, index: parameterBlockerOwner) == 1 {
@@ -378,9 +378,9 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
             parameterBlockerEdge: parameterBlockerEdge + 1
         }
         state aggregateCallerBlockerEdge: Int(0)
-        while aggregateCallerBlockerEdge < rawBufferCount(buffer: reachability.edgeTargets) {
-            let aggregateCallerBlockerOwner: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: aggregateCallerBlockerEdge))
-            let aggregateCallerBlockerTarget: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: aggregateCallerBlockerEdge))
+        while aggregateCallerBlockerEdge < reachability.edgeTargets.count {
+            let aggregateCallerBlockerOwner: Int(reachability.edgeOwners.element(index: aggregateCallerBlockerEdge))
+            let aggregateCallerBlockerTarget: Int(reachability.edgeTargets.element(index: aggregateCallerBlockerEdge))
             if compilerFunctionHasAggregateParameterABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: aggregateCallerBlockerTarget)
                 && rawBufferLoadInt(buffer: reachability.abiCapabilities, index: aggregateCallerBlockerTarget) == 1
                 && rawBufferLoadInt(buffer: reachability.abiCapabilities, index: aggregateCallerBlockerOwner) != 1 {
@@ -952,8 +952,8 @@ function compilerReachableLLVMStateCreate(context: CompilerLLVMLoweringContext):
     let selection: CompilerFunctionSelection(compilerFunctionSelectionCreateEmpty(functionCount: functionCount, valid: context.declarationIndex.isValid))
     let worklist: RawBuffer(rawBufferCreate(capacity: functionCount, stride: 4))
     let worklistInstanceIDs: RawBuffer(rawBufferCreate(capacity: functionCount * 2 + 16, stride: 4))
-    let edgeOwners: RawBuffer(rawBufferCreate(capacity: functionCount * 4, stride: 4))
-    let edgeTargets: RawBuffer(rawBufferCreate(capacity: functionCount * 4, stride: 4))
+    let edgeOwners: Buffer<Int>(bufferCreateInt(capacity: functionCount * 4))
+    let edgeTargets: Buffer<Int>(bufferCreateInt(capacity: functionCount * 4))
     let instanceEdgeOwners: RawBuffer(rawBufferCreate(capacity: functionCount * 4, stride: 4))
     let instanceEdgeTargets: RawBuffer(rawBufferCreate(capacity: functionCount * 4, stride: 4))
     let typeKeys: CompilerIntTable(compilerIntTableCreate(columnCount: compilerReachableTypeKeyColumnCount(), estimatedRowCount: 32))
@@ -1180,8 +1180,8 @@ function compilerReachableLLVMStateAddCounter(reachability: CompilerReachableLLV
 
 function compilerReachableLLVMStateEnqueueEdges(reachability: CompilerReachableLLVMState, edgeStart: Int): Int {
     state edgeIndex: Int(edgeStart)
-    while edgeIndex < rawBufferCount(buffer: reachability.edgeTargets) {
-        let targetFunctionRow: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: edgeIndex))
+    while edgeIndex < reachability.edgeTargets.count {
+        let targetFunctionRow: Int(reachability.edgeTargets.element(index: edgeIndex))
         if targetFunctionRow < 0 || targetFunctionRow >= compilerIntTableRowCount(table: reachability.context.tables.functions) { return 0 - 1 }
         edgeIndex: edgeIndex + 1
     }
@@ -1247,9 +1247,9 @@ function compilerReachableLLVMStatePrepareCandidateABIPlan(reachability: Compile
         functionRow: functionRow + 1
     }
     state edgeIndex: Int(0)
-    while edgeIndex < rawBufferCount(buffer: reachability.edgeTargets) {
-        let ownerFunctionRow: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: edgeIndex))
-        let targetFunctionRow: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: edgeIndex))
+    while edgeIndex < reachability.edgeTargets.count {
+        let ownerFunctionRow: Int(reachability.edgeOwners.element(index: edgeIndex))
+        let targetFunctionRow: Int(reachability.edgeTargets.element(index: edgeIndex))
         if ownerFunctionRow < 0 || ownerFunctionRow >= functionCount || targetFunctionRow < 0 || targetFunctionRow >= functionCount { return 0 - 1 }
         let edgeTransientMark: Int(stringTransientRegionMark())
         if compilerReachableLLVMStateFunctionIsRepresentationSensitive(reachability: reachability, functionRow: targetFunctionRow) {
@@ -1280,8 +1280,8 @@ function compilerReachableLLVMStateSensitiveCount(reachability: CompilerReachabl
 
 function compilerReachableLLVMStateProbeCandidateFunction(reachability: CompilerReachableLLVMState, functionRow: Int, instanceID: Int): Int {
     state transientMark: Int(stringTransientRegionMark())
-    let probeEdgeOwners: RawBuffer(rawBufferCreate(capacity: 16, stride: 4))
-    let probeEdgeTargets: RawBuffer(rawBufferCreate(capacity: 16, stride: 4))
+    let probeEdgeOwners: Buffer<Int>(bufferCreateInt(capacity: 16))
+    let probeEdgeTargets: Buffer<Int>(bufferCreateInt(capacity: 16))
     let sensitiveCountBefore: Int(compilerReachableLLVMStateSensitiveCount(reachability: reachability))
     let candidatePlan: CompilerModuleABIPlan(returnModes: $reachability.abiReturnModes, participants: $reachability.abiParticipants, isFrozen: true)
     let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreateForFunctionInstance(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow, functionInstanceID: instanceID, receiverTypeKeyID: compilerReachableLLVMStateFunctionInstanceReceiverKey(reachability: reachability, instanceID: instanceID), typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments)))
@@ -1359,8 +1359,8 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
     if capable && compilerReachableLLVMStateSensitiveCount(reachability: reachability) != sensitiveCountBefore { discoveredSensitiveTarget: true }
     if capable {
         state probeEdgeIndex: Int(0)
-        while capable && probeEdgeIndex < rawBufferCount(buffer: probeEdgeTargets) {
-            if !compilerFunctionEdgesContain(edgeOwners: reachability.edgeOwners, edgeTargets: reachability.edgeTargets, ownerFunctionRow: rawBufferLoadInt(buffer: probeEdgeOwners, index: probeEdgeIndex), targetFunctionRow: rawBufferLoadInt(buffer: probeEdgeTargets, index: probeEdgeIndex)) {
+        while capable && probeEdgeIndex < probeEdgeTargets.count {
+            if !compilerFunctionEdgesContain(edgeOwners: reachability.edgeOwners, edgeTargets: reachability.edgeTargets, ownerFunctionRow: probeEdgeOwners.element(index: probeEdgeIndex), targetFunctionRow: probeEdgeTargets.element(index: probeEdgeIndex)) {
                 failureStage: 10002
                 capable: false
             }
@@ -1390,8 +1390,8 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
     if discoveredSensitiveTarget { capabilityValue: 0 }
     state status: Int(rawBufferStoreInt(buffer: reachability.abiCapabilities, index: functionRow, value: capabilityValue))
     if compilerBodyArenaDestroy(arena: arena) != 0 { status: 0 - 1 }
-    let probeEdgeOwnersDestroyStatus: Int(rawBufferDestroy(buffer: probeEdgeOwners))
-    let probeEdgeTargetsDestroyStatus: Int(rawBufferDestroy(buffer: probeEdgeTargets))
+    let probeEdgeOwnersDestroyStatus: Int(probeEdgeOwners.destroy())
+    let probeEdgeTargetsDestroyStatus: Int(probeEdgeTargets.destroy())
     if probeEdgeOwnersDestroyStatus != 0 || probeEdgeTargetsDestroyStatus != 0 { status: 0 - 1 }
     stringTransientRegionReset(mark: transientMark)
     return status
@@ -1428,10 +1428,10 @@ function compilerReachableLLVMStateProbeReachableInstancesForFunction(reachabili
 
 function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReachableLLVMState, functionRow: Int, instanceID: Int): Int {
     let transientMark: Int(stringTransientRegionMark())
-    let edgeStart: Int(rawBufferCount(buffer: reachability.edgeTargets))
+    let edgeStart: Int(reachability.edgeTargets.count)
     let instanceEdgeStart: Int(rawBufferCount(buffer: reachability.instanceEdgeTargets))
-    let typedEdgeOwners: RawBuffer(rawBufferCreate(capacity: 16, stride: 4))
-    let typedEdgeTargets: RawBuffer(rawBufferCreate(capacity: 16, stride: 4))
+    let typedEdgeOwners: Buffer<Int>(bufferCreateInt(capacity: 16))
+    let typedEdgeTargets: Buffer<Int>(bufferCreateInt(capacity: 16))
     let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreateForFunctionInstance(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow, functionInstanceID: instanceID, receiverTypeKeyID: compilerReachableLLVMStateFunctionInstanceReceiverKey(reachability: reachability, instanceID: instanceID), typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments)))
     state typedReady: Bool(compilerBodyArenaIsValid(arena: arena))
     state typedFailureStage: Int(0)
@@ -1484,16 +1484,16 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
     }
     if status == 0 {
         state acceptedEdgeIndex: Int(0)
-        while acceptedEdgeIndex < rawBufferCount(buffer: typedEdgeTargets) {
-            if rawBufferAppendInt(buffer: reachability.edgeOwners, value: rawBufferLoadInt(buffer: typedEdgeOwners, index: acceptedEdgeIndex)) != 0 { status: 0 - 1 }
+        while acceptedEdgeIndex < typedEdgeTargets.count {
+            if reachability.edgeOwners.append(element: typedEdgeOwners.element(index: acceptedEdgeIndex)) != 0 { status: 0 - 1 }
             if status == 0 {
-                if rawBufferAppendInt(buffer: reachability.edgeTargets, value: rawBufferLoadInt(buffer: typedEdgeTargets, index: acceptedEdgeIndex)) != 0 { status: 0 - 1 }
+                if reachability.edgeTargets.append(element: typedEdgeTargets.element(index: acceptedEdgeIndex)) != 0 { status: 0 - 1 }
             }
             acceptedEdgeIndex: acceptedEdgeIndex + 1
         }
     }
-    let typedEdgeOwnersDestroyStatus: Int(rawBufferDestroy(buffer: typedEdgeOwners))
-    let typedEdgeTargetsDestroyStatus: Int(rawBufferDestroy(buffer: typedEdgeTargets))
+    let typedEdgeOwnersDestroyStatus: Int(typedEdgeOwners.destroy())
+    let typedEdgeTargetsDestroyStatus: Int(typedEdgeTargets.destroy())
     let typedArenaDestroyStatus: Int(compilerBodyArenaDestroy(arena: arena))
     if typedEdgeOwnersDestroyStatus != 0 || typedEdgeTargetsDestroyStatus != 0 || typedArenaDestroyStatus != 0 {
         status: 0 - 1
@@ -1508,7 +1508,7 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
     return status
 }
 
-function compilerReachableLLVMStateEmitFunction(reachability: CompilerReachableLLVMState, functionRow: Int, instanceID: Int, emissionEdgeOwners: RawBuffer, emissionEdgeTargets: RawBuffer): Int {
+function compilerReachableLLVMStateEmitFunction(reachability: CompilerReachableLLVMState, functionRow: Int, instanceID: Int, emissionEdgeOwners: Buffer<Int>, emissionEdgeTargets: Buffer<Int>): Int {
     if rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLVMPlanFrozen()) != 1 { return 0 - 1 }
     let syntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: functionRow, column: 0))
     let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: syntaxID))
@@ -1546,9 +1546,9 @@ function compilerReachableLLVMStateFreezeABIPlan(reachability: CompilerReachable
         functionRow: functionRow + 1
     }
     state edgeIndex: Int(0)
-    while edgeIndex < rawBufferCount(buffer: reachability.edgeTargets) {
-        let ownerFunctionRow: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: edgeIndex))
-        let targetFunctionRow: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: edgeIndex))
+    while edgeIndex < reachability.edgeTargets.count {
+        let ownerFunctionRow: Int(reachability.edgeOwners.element(index: edgeIndex))
+        let targetFunctionRow: Int(reachability.edgeTargets.element(index: edgeIndex))
         if rawBufferLoadInt(buffer: reachability.abiReturnModes, index: targetFunctionRow) == compilerFunctionReturnABIIndirect() {
             if rawBufferStoreInt(buffer: reachability.abiParticipants, index: ownerFunctionRow, value: 1) != 0 { return 0 - 1 }
         }
@@ -1576,9 +1576,9 @@ function compilerReachableLLVMStateABIPlanIsValid(reachability: CompilerReachabl
         functionRow: functionRow + 1
     }
     state edgeIndex: Int(0)
-    while edgeIndex < rawBufferCount(buffer: reachability.edgeTargets) {
-        let ownerFunctionRow: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: edgeIndex))
-        let targetFunctionRow: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: edgeIndex))
+    while edgeIndex < reachability.edgeTargets.count {
+        let ownerFunctionRow: Int(reachability.edgeOwners.element(index: edgeIndex))
+        let targetFunctionRow: Int(reachability.edgeTargets.element(index: edgeIndex))
         if rawBufferLoadInt(buffer: reachability.abiReturnModes, index: targetFunctionRow) == compilerFunctionReturnABIIndirect()
             && rawBufferLoadInt(buffer: reachability.abiParticipants, index: ownerFunctionRow) != 1 { return false }
         if rawBufferLoadInt(buffer: reachability.abiParticipants, index: ownerFunctionRow) == 1
@@ -1636,9 +1636,9 @@ function compilerReachableLLVMStateBuildABIComponents(reachability: CompilerReac
             while componentCursor < rawBufferCount(buffer: componentQueue) && status == 0 {
                 let componentMember: Int(rawBufferLoadInt(buffer: componentQueue, index: componentCursor))
                 state componentEdge: Int(0)
-                while componentEdge < rawBufferCount(buffer: reachability.edgeTargets) && status == 0 {
-                    let componentOwner: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: componentEdge))
-                    let componentTarget: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: componentEdge))
+                while componentEdge < reachability.edgeTargets.count && status == 0 {
+                    let componentOwner: Int(reachability.edgeOwners.element(index: componentEdge))
+                    let componentTarget: Int(reachability.edgeTargets.element(index: componentEdge))
                     if componentOwner < 0 || componentOwner >= functionCount || componentTarget < 0 || componentTarget >= functionCount {
                         status: 0 - 1
                     }
@@ -1842,9 +1842,9 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
             closureFunctionRow: closureFunctionRow + 1
         }
         state closureEdge: Int(0)
-        while closureEdge < rawBufferCount(buffer: reachability.edgeTargets) {
-            let closureOwner: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: closureEdge))
-            let closureTarget: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: closureEdge))
+        while closureEdge < reachability.edgeTargets.count {
+            let closureOwner: Int(reachability.edgeOwners.element(index: closureEdge))
+            let closureTarget: Int(reachability.edgeTargets.element(index: closureEdge))
             if rawBufferLoadInt(buffer: reachability.abiActivation, index: closureTarget) == 1 {
                 if rawBufferStoreInt(buffer: reachability.abiParticipants, index: closureOwner, value: 1) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
                 if rawBufferStoreInt(buffer: reachability.abiParticipants, index: closureTarget, value: 1) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
@@ -1855,9 +1855,9 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
         while parameterParticipationChanged {
             parameterParticipationChanged: false
             state parameterParticipationEdge: Int(0)
-            while parameterParticipationEdge < rawBufferCount(buffer: reachability.edgeTargets) {
-                let parameterParticipationOwner: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: parameterParticipationEdge))
-                let parameterParticipationTarget: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: parameterParticipationEdge))
+            while parameterParticipationEdge < reachability.edgeTargets.count {
+                let parameterParticipationOwner: Int(reachability.edgeOwners.element(index: parameterParticipationEdge))
+                let parameterParticipationTarget: Int(reachability.edgeTargets.element(index: parameterParticipationEdge))
                 if rawBufferLoadInt(buffer: reachability.abiParticipants, index: parameterParticipationOwner) == 1
                     && compilerFunctionHasRepresentationSensitiveABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: parameterParticipationTarget)
                     && rawBufferLoadInt(buffer: reachability.abiCapabilities, index: parameterParticipationTarget) == 1
@@ -1898,9 +1898,9 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
         while blockingParticipationChanged {
             blockingParticipationChanged: false
             closureEdge: 0
-            while closureEdge < rawBufferCount(buffer: reachability.edgeTargets) {
-                let closureCheckedOwner: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: closureEdge))
-                let closureCheckedTarget: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: closureEdge))
+            while closureEdge < reachability.edgeTargets.count {
+                let closureCheckedOwner: Int(reachability.edgeOwners.element(index: closureEdge))
+                let closureCheckedTarget: Int(reachability.edgeTargets.element(index: closureEdge))
                 if compilerFunctionHasRepresentationSensitiveABI(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: closureCheckedTarget)
                     && rawBufferLoadInt(buffer: reachability.abiParticipants, index: closureCheckedOwner) == 2
                     && rawBufferLoadInt(buffer: reachability.abiParticipants, index: closureCheckedTarget) == 1 {
@@ -1938,9 +1938,9 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
             closureFunctionRow: closureFunctionRow + 1
         }
         closureEdge: 0
-        while closureEdge < rawBufferCount(buffer: reachability.edgeTargets) {
-            let closurePrunedOwner: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: closureEdge))
-            let closurePrunedTarget: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: closureEdge))
+        while closureEdge < reachability.edgeTargets.count {
+            let closurePrunedOwner: Int(reachability.edgeOwners.element(index: closureEdge))
+            let closurePrunedTarget: Int(reachability.edgeTargets.element(index: closureEdge))
             if rawBufferLoadInt(buffer: reachability.abiParticipants, index: closurePrunedOwner) == 2
                 && rawBufferLoadInt(buffer: reachability.abiActivation, index: closurePrunedTarget) == 1 {
                 if rawBufferStoreInt(buffer: reachability.abiActivation, index: closurePrunedTarget, value: 0) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
@@ -1955,8 +1955,8 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
     if compilerReachableLLVMStateFreezeABIPlan(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("abiPlan.end"))
     if rawBufferStoreInt(buffer: reachability.counters, index: compilerReachableLLVMNextTemporary(), value: 0) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
-    let emissionEdgeOwners: RawBuffer(rawBufferCreate(capacity: rawBufferCount(buffer: reachability.edgeOwners), stride: 4))
-    let emissionEdgeTargets: RawBuffer(rawBufferCreate(capacity: rawBufferCount(buffer: reachability.edgeTargets), stride: 4))
+    let emissionEdgeOwners: Buffer<Int>(bufferCreateInt(capacity: reachability.edgeOwners.count))
+    let emissionEdgeTargets: Buffer<Int>(bufferCreateInt(capacity: reachability.edgeTargets.count))
     state emissionStatus: Int(0)
     while emissionStatus == 0 && rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLVMEmissionIndex()) < rawBufferCount(buffer: reachability.worklist) {
         let emissionIndex: Int(rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLVMEmissionIndex()))
@@ -1967,17 +1967,17 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
             if rawBufferStoreInt(buffer: reachability.counters, index: compilerReachableLLVMEmissionIndex(), value: emissionIndex + 1) != 0 { emissionStatus: 21 }
         }
     }
-    if rawBufferCount(buffer: emissionEdgeOwners) != rawBufferCount(buffer: emissionEdgeTargets)
-        || rawBufferCount(buffer: reachability.edgeOwners) != rawBufferCount(buffer: reachability.edgeTargets) { emissionStatus: 30 }
+    if emissionEdgeOwners.count != emissionEdgeTargets.count
+        || reachability.edgeOwners.count != reachability.edgeTargets.count { emissionStatus: 30 }
     state emissionEdgeIndex: Int(0)
-    while emissionStatus == 0 && emissionEdgeIndex < rawBufferCount(buffer: emissionEdgeTargets) {
-        if !compilerFunctionEdgesContain(edgeOwners: reachability.edgeOwners, edgeTargets: reachability.edgeTargets, ownerFunctionRow: rawBufferLoadInt(buffer: emissionEdgeOwners, index: emissionEdgeIndex), targetFunctionRow: rawBufferLoadInt(buffer: emissionEdgeTargets, index: emissionEdgeIndex)) { emissionStatus: 31 }
+    while emissionStatus == 0 && emissionEdgeIndex < emissionEdgeTargets.count {
+        if !compilerFunctionEdgesContain(edgeOwners: reachability.edgeOwners, edgeTargets: reachability.edgeTargets, ownerFunctionRow: emissionEdgeOwners.element(index: emissionEdgeIndex), targetFunctionRow: emissionEdgeTargets.element(index: emissionEdgeIndex)) { emissionStatus: 31 }
         emissionEdgeIndex: emissionEdgeIndex + 1
     }
     state plannedEdgeIndex: Int(0)
-    while emissionStatus == 0 && plannedEdgeIndex < rawBufferCount(buffer: reachability.edgeTargets) {
-        let plannedOwner: Int(rawBufferLoadInt(buffer: reachability.edgeOwners, index: plannedEdgeIndex))
-        let plannedTarget: Int(rawBufferLoadInt(buffer: reachability.edgeTargets, index: plannedEdgeIndex))
+    while emissionStatus == 0 && plannedEdgeIndex < reachability.edgeTargets.count {
+        let plannedOwner: Int(reachability.edgeOwners.element(index: plannedEdgeIndex))
+        let plannedTarget: Int(reachability.edgeTargets.element(index: plannedEdgeIndex))
         let plannedEdgeTransientMark: Int(stringTransientRegionMark())
         if compilerReachableLLVMStateFunctionIsRepresentationSensitive(reachability: reachability, functionRow: plannedTarget) {
             if !compilerFunctionEdgesContain(edgeOwners: emissionEdgeOwners, edgeTargets: emissionEdgeTargets, ownerFunctionRow: plannedOwner, targetFunctionRow: plannedTarget) { emissionStatus: 32 }
@@ -1985,8 +1985,8 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
         stringTransientRegionReset(mark: plannedEdgeTransientMark)
         plannedEdgeIndex: plannedEdgeIndex + 1
     }
-    let emissionEdgeOwnersDestroyStatus: Int(rawBufferDestroy(buffer: emissionEdgeOwners))
-    let emissionEdgeTargetsDestroyStatus: Int(rawBufferDestroy(buffer: emissionEdgeTargets))
+    let emissionEdgeOwnersDestroyStatus: Int(emissionEdgeOwners.destroy())
+    let emissionEdgeTargetsDestroyStatus: Int(emissionEdgeTargets.destroy())
     if emissionEdgeOwnersDestroyStatus != 0 || emissionEdgeTargetsDestroyStatus != 0 { emissionStatus: 33 }
     if emissionStatus != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: emissionStatus) }
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("functionEmission.end"))
@@ -2016,8 +2016,8 @@ function compilerReachableLLVMStateDestroy(reachability: CompilerReachableLLVMSt
     state status: Int(compilerFunctionSelectionDestroy(selection: reachability.selection))
     if rawBufferDestroy(buffer: reachability.worklist) != 0 { status: 0 - 1 }
     if rawBufferDestroy(buffer: reachability.worklistInstanceIDs) != 0 { status: 0 - 1 }
-    if rawBufferDestroy(buffer: reachability.edgeOwners) != 0 { status: 0 - 1 }
-    if rawBufferDestroy(buffer: reachability.edgeTargets) != 0 { status: 0 - 1 }
+    if reachability.edgeOwners.destroy() != 0 { status: 0 - 1 }
+    if reachability.edgeTargets.destroy() != 0 { status: 0 - 1 }
     if rawBufferDestroy(buffer: reachability.instanceEdgeOwners) != 0 { status: 0 - 1 }
     if rawBufferDestroy(buffer: reachability.instanceEdgeTargets) != 0 { status: 0 - 1 }
     if compilerIntTableDestroy(table: reachability.typeKeys) != 0 { status: 0 - 1 }
@@ -2041,7 +2041,7 @@ function compilerReachableLLVMStateDestroy(reachability: CompilerReachableLLVMSt
     return status
 }
 
-function compilerCoreLLVMSelectedHelperFunctionTyped(context: CompilerLLVMLoweringContext, declarationRow: Int, functionRow: Int, instanceID: Int, receiverTypeKeyID: Int, typeKeys: CompilerIntTable, typeKeyArguments: CompilerIntTable, functionInstances: CompilerIntTable, functionInstanceSignatures: CompilerIntTable, functionInstanceSignatureParameters: CompilerIntTable, functionInstanceEffects: CompilerIntTable, functionInstanceEffectPaths: CompilerIntTable, functionInstanceReturnSummaries: CompilerIntTable, functionInstanceReturnLeaves: CompilerIntTable, expectedSignatureFirst: Int, expectedSignatureSecond: Int, initialTemporaryIndex: Int, edgeOwners: RawBuffer, edgeTargets: RawBuffer, abiPlan: CompilerModuleABIPlan): CompilerTypedLLVMHelpers {
+function compilerCoreLLVMSelectedHelperFunctionTyped(context: CompilerLLVMLoweringContext, declarationRow: Int, functionRow: Int, instanceID: Int, receiverTypeKeyID: Int, typeKeys: CompilerIntTable, typeKeyArguments: CompilerIntTable, functionInstances: CompilerIntTable, functionInstanceSignatures: CompilerIntTable, functionInstanceSignatureParameters: CompilerIntTable, functionInstanceEffects: CompilerIntTable, functionInstanceEffectPaths: CompilerIntTable, functionInstanceReturnSummaries: CompilerIntTable, functionInstanceReturnLeaves: CompilerIntTable, expectedSignatureFirst: Int, expectedSignatureSecond: Int, initialTemporaryIndex: Int, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, abiPlan: CompilerModuleABIPlan): CompilerTypedLLVMHelpers {
     let lowering: CompilerTypedBodyLowering(compilerCoreLLVMLowerHelperFunctionTypedObserved(context: context, functionRow: functionRow, instanceID: instanceID, receiverTypeKeyID: receiverTypeKeyID, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, functionInstances: functionInstances, functionInstanceSignatures: functionInstanceSignatures, functionInstanceSignatureParameters: functionInstanceSignatureParameters, functionInstanceEffects: functionInstanceEffects, functionInstanceEffectPaths: functionInstanceEffectPaths, functionInstanceReturnSummaries: functionInstanceReturnSummaries, functionInstanceReturnLeaves: functionInstanceReturnLeaves, expectedSignatureFirst: expectedSignatureFirst, expectedSignatureSecond: expectedSignatureSecond, initialTemporaryIndex: initialTemporaryIndex, edgeOwners: edgeOwners, edgeTargets: edgeTargets, abiPlan: abiPlan))
     if !lowering.isValid {
         let fileID: Int(compilerIntTableValue(table: context.tables.declarations, row: declarationRow, column: 1))

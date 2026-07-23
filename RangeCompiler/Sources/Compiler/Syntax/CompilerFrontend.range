@@ -851,33 +851,33 @@ function compilerFunctionSelectionFirstDifference(left: CompilerFunctionSelectio
     return 0 - 1
 }
 
-function compilerFunctionEdgesAppend(edgeOwners: RawBuffer, edgeTargets: RawBuffer, ownerFunctionRow: Int, targetFunctionRow: Int): Int {
+function compilerFunctionEdgesAppend(edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, ownerFunctionRow: Int, targetFunctionRow: Int): Int {
     if targetFunctionRow < 0 { return 0 }
-    if rawBufferAppendInt(buffer: edgeOwners, value: ownerFunctionRow) != 0 || rawBufferAppendInt(buffer: edgeTargets, value: targetFunctionRow) != 0 { return 0 - 1 }
+    if edgeOwners.append(element: ownerFunctionRow) != 0 || edgeTargets.append(element: targetFunctionRow) != 0 { return 0 - 1 }
     return 0
 }
 
-function compilerFunctionEdgesAppendMissing(edgeOwners: RawBuffer, edgeTargets: RawBuffer, ownerFunctionRow: Int, targetFunctionRow: Int): Int {
+function compilerFunctionEdgesAppendMissing(edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, ownerFunctionRow: Int, targetFunctionRow: Int): Int {
     state edgeIndex: Int(0)
-    while edgeIndex < rawBufferCount(buffer: edgeTargets) {
-        if rawBufferLoadInt(buffer: edgeOwners, index: edgeIndex) == ownerFunctionRow
-            && rawBufferLoadInt(buffer: edgeTargets, index: edgeIndex) == targetFunctionRow { return 0 }
+    while edgeIndex < edgeTargets.count {
+        if edgeOwners.element(index: edgeIndex) == ownerFunctionRow
+            && edgeTargets.element(index: edgeIndex) == targetFunctionRow { return 0 }
         edgeIndex: edgeIndex + 1
     }
     return compilerFunctionEdgesAppend(edgeOwners: edgeOwners, edgeTargets: edgeTargets, ownerFunctionRow: ownerFunctionRow, targetFunctionRow: targetFunctionRow)
 }
 
-function compilerFunctionEdgesContain(edgeOwners: RawBuffer, edgeTargets: RawBuffer, ownerFunctionRow: Int, targetFunctionRow: Int): Bool {
+function compilerFunctionEdgesContain(edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, ownerFunctionRow: Int, targetFunctionRow: Int): Bool {
     state edgeIndex: Int(0)
-    while edgeIndex < rawBufferCount(buffer: edgeTargets) {
-        if rawBufferLoadInt(buffer: edgeOwners, index: edgeIndex) == ownerFunctionRow
-            && rawBufferLoadInt(buffer: edgeTargets, index: edgeIndex) == targetFunctionRow { return true }
+    while edgeIndex < edgeTargets.count {
+        if edgeOwners.element(index: edgeIndex) == ownerFunctionRow
+            && edgeTargets.element(index: edgeIndex) == targetFunctionRow { return true }
         edgeIndex: edgeIndex + 1
     }
     return false
 }
 
-function compilerBodyArenaAppendFunctionEdges(arena: CompilerBodyArena, edgeOwners: RawBuffer, edgeTargets: RawBuffer): Int {
+function compilerBodyArenaAppendFunctionEdges(arena: CompilerBodyArena, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>): Int {
     if arena.ownerKind != compilerBodyArenaOwnerFunction() { return 0 - 1 }
     state row: Int(0)
     while row < compilerIntTableRowCount(table: arena.resolutions) {
@@ -914,7 +914,7 @@ function compilerBodyArenaMarkRepresentationSensitiveTargets(arena: CompilerBody
     return 0
 }
 
-function compilerBodyMIRAppendFunctionEdges(arena: CompilerBodyArena, edgeOwners: RawBuffer, edgeTargets: RawBuffer): Int {
+function compilerBodyMIRAppendFunctionEdges(arena: CompilerBodyArena, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>): Int {
     if arena.ownerKind != compilerBodyArenaOwnerFunction() { return 0 - 1 }
     state operationRow: Int(0)
     while operationRow < compilerIntTableRowCount(table: arena.mirOperations) {
@@ -965,7 +965,7 @@ function compilerBodyArenaHasUnplannedRepresentationSensitiveCall(arena: Compile
     return false
 }
 
-function compilerFunctionReachabilityRecordTarget(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: RawBuffer, edgeOwners: RawBuffer, edgeTargets: RawBuffer, ownerFunctionRow: Int, targetName: String): Int {
+function compilerFunctionReachabilityRecordTarget(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: RawBuffer, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, ownerFunctionRow: Int, targetName: String): Int {
     if targetName == String("String") || compilerBodyRuntimeBuiltinID(name: targetName) != compilerBodyRuntimeBuiltinNone() { return 0 }
     let declarationRow: Int(compilerDeclarationIndexLookup(tables: tables, index: index, name: targetName, kindTag: compilerSyntaxKindFunction()))
     state targetFunctionRow: Int(0 - 1)
@@ -977,13 +977,13 @@ function compilerFunctionReachabilityRecordTarget(tables: CompilerSyntaxTables, 
         targetFunctionRow: compilerDeclarationIndexAnyMemberFunctionLookup(tables: tables, index: index, name: targetName)
     }
     if targetFunctionRow < 0 { return 0 }
-    if rawBufferAppendInt(buffer: edgeOwners, value: ownerFunctionRow) != 0 || rawBufferAppendInt(buffer: edgeTargets, value: targetFunctionRow) != 0 { return 0 - 1 }
+    if edgeOwners.append(element: ownerFunctionRow) != 0 || edgeTargets.append(element: targetFunctionRow) != 0 { return 0 - 1 }
     if compilerFunctionSelectionContains(selection: selection, functionRow: targetFunctionRow) { return 0 }
     if compilerFunctionSelectionMark(selection: selection, functionRow: targetFunctionRow) != 0 { return 0 - 1 }
     return rawBufferAppendInt(buffer: worklist, value: targetFunctionRow)
 }
 
-function compilerFunctionReachabilityScanRange(source: String, start: Int, end: Int, tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: RawBuffer, edgeOwners: RawBuffer, edgeTargets: RawBuffer, ownerFunctionRow: Int, scanInterpolations: Bool): Int {
+function compilerFunctionReachabilityScanRange(source: String, start: Int, end: Int, tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: RawBuffer, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, ownerFunctionRow: Int, scanInterpolations: Bool): Int {
     state cursor: Int(start)
     while cursor < end {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: cursor))
@@ -1008,7 +1008,7 @@ function compilerFunctionReachabilityScanRange(source: String, start: Int, end: 
     return 0
 }
 
-function compilerFunctionReachabilityScanInterpolations(content: String, tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: RawBuffer, edgeOwners: RawBuffer, edgeTargets: RawBuffer, ownerFunctionRow: Int): Int {
+function compilerFunctionReachabilityScanInterpolations(content: String, tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: RawBuffer, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, ownerFunctionRow: Int): Int {
     let contentLength: Int(stringLength(value: content))
     let backslash: String(compilerCoreSingleBackslash())
     state contentIndex: Int(0)
@@ -1039,7 +1039,7 @@ function compilerFunctionReachabilitySeedRoots(tables: CompilerSyntaxTables, ind
     return 0
 }
 
-function compilerFunctionReachabilityExpand(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: RawBuffer, edgeOwners: RawBuffer, edgeTargets: RawBuffer): Int {
+function compilerFunctionReachabilityExpand(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: RawBuffer, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>): Int {
     state workIndex: Int(0)
     while workIndex < rawBufferCount(buffer: worklist) {
         let ownerFunctionRow: Int(rawBufferLoadInt(buffer: worklist, index: workIndex))
@@ -1056,8 +1056,8 @@ function compilerFunctionReachabilityExpand(tables: CompilerSyntaxTables, index:
 function compilerFunctionReachabilityCreate(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, rootNames: String): CompilerFunctionReachability {
     let functionCount: Int(compilerIntTableRowCount(table: tables.functions))
     let selection: CompilerFunctionSelection(compilerFunctionSelectionCreateEmpty(functionCount: functionCount, valid: index.isValid))
-    let edgeOwners: RawBuffer(rawBufferCreate(capacity: functionCount, stride: 4))
-    let edgeTargets: RawBuffer(rawBufferCreate(capacity: functionCount, stride: 4))
+    let edgeOwners: Buffer<Int>(bufferCreateInt(capacity: functionCount))
+    let edgeTargets: Buffer<Int>(bufferCreateInt(capacity: functionCount))
     let worklist: RawBuffer(rawBufferCreate(capacity: functionCount, stride: 4))
     state valid: Bool(false)
     valid: selection.isValid
@@ -1069,8 +1069,8 @@ function compilerFunctionReachabilityCreate(tables: CompilerSyntaxTables, index:
 
 function compilerFunctionReachabilityDestroy(reachability: CompilerFunctionReachability): Int {
     state status: Int(compilerFunctionSelectionDestroy(selection: reachability.selection))
-    if rawBufferDestroy(buffer: reachability.edgeOwners) != 0 { status: 0 - 1 }
-    if rawBufferDestroy(buffer: reachability.edgeTargets) != 0 { status: 0 - 1 }
+    if reachability.edgeOwners.destroy() != 0 { status: 0 - 1 }
+    if reachability.edgeTargets.destroy() != 0 { status: 0 - 1 }
     return status
 }
 

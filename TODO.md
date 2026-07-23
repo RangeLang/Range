@@ -46,5 +46,8 @@
     buffers in separately proven slices.
     - [x] Migrate the function-selection bitmap to `Buffer<Int>` and promote
       its independently verified fixed-point seed.
+    - [x] Migrate function-call edge owner/target storage, including probe,
+      typed, and emission edge pairs, to `Buffer<Int>` and promote its
+      independently verified fixed-point seed.
   - [ ] Delete raw runtime entry points only after no accepted compiler or Core
     path consumes them.

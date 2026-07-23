@@ -231,8 +231,8 @@ construct CompilerFunctionSelection {
 
 construct CompilerFunctionReachability {
     let selection: CompilerFunctionSelection
-    let edgeOwners: RawBuffer
-    let edgeTargets: RawBuffer
+    let edgeOwners: Buffer<Int>
+    let edgeTargets: Buffer<Int>
     let isValid: Bool
 }
 
@@ -634,8 +634,8 @@ construct CompilerReachableLLVMState {
     let selection: CompilerFunctionSelection
     let worklist: RawBuffer
     let worklistInstanceIDs: RawBuffer
-    let edgeOwners: RawBuffer
-    let edgeTargets: RawBuffer
+    let edgeOwners: Buffer<Int>
+    let edgeTargets: Buffer<Int>
     let instanceEdgeOwners: RawBuffer
     let instanceEdgeTargets: RawBuffer
     let typeKeys: CompilerIntTable
