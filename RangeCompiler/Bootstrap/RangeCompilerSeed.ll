@@ -1091,131 +1091,131 @@
 @.str.20517 = private unnamed_addr constant [2 x i8] c"t\00"
 @.str.20727 = private unnamed_addr constant [9 x i8] c"function\00"
 @.str.20748 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.22181 = private unnamed_addr constant [4 x i8] c"Int\00"
-@.str.22184 = private unnamed_addr constant [5 x i8] c"Bool\00"
-@.str.22188 = private unnamed_addr constant [7 x i8] c"String\00"
-@.str.22192 = private unnamed_addr constant [6 x i8] c"Float\00"
-@.str.22206 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.22210 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.22218 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.22225 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.22385 = private unnamed_addr constant [27 x i8] c"RANGE_LOWERING_PLACEHOLDER\00"
-@.str.22395 = private unnamed_addr constant [66 x i8] c"compilerError\09kind=unsupportedReachableLowering\09placeholderCount=\00"
-@.str.22403 = private unnamed_addr constant [11 x i8] c"dependency\00"
-@.str.22406 = private unnamed_addr constant [6 x i8] c"proof\00"
-@.str.22409 = private unnamed_addr constant [11 x i8] c"unresolved\00"
-@.str.22412 = private unnamed_addr constant [10 x i8] c"passLimit\00"
-@.str.22413 = private unnamed_addr constant [8 x i8] c"invalid\00"
-@.str.22518 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.22521 = private unnamed_addr constant [4 x i8] c"Int\00"
-@.str.22524 = private unnamed_addr constant [5 x i8] c"Bool\00"
-@.str.22528 = private unnamed_addr constant [7 x i8] c"String\00"
-@.str.22532 = private unnamed_addr constant [6 x i8] c"Float\00"
-@.str.22552 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.22558 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.22563 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.22570 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.22578 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22182 = private unnamed_addr constant [4 x i8] c"Int\00"
+@.str.22185 = private unnamed_addr constant [5 x i8] c"Bool\00"
+@.str.22189 = private unnamed_addr constant [7 x i8] c"String\00"
+@.str.22193 = private unnamed_addr constant [6 x i8] c"Float\00"
+@.str.22207 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22211 = private unnamed_addr constant [2 x i8] c"<\00"
+@.str.22219 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22226 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22386 = private unnamed_addr constant [27 x i8] c"RANGE_LOWERING_PLACEHOLDER\00"
+@.str.22396 = private unnamed_addr constant [66 x i8] c"compilerError\09kind=unsupportedReachableLowering\09placeholderCount=\00"
+@.str.22404 = private unnamed_addr constant [11 x i8] c"dependency\00"
+@.str.22407 = private unnamed_addr constant [6 x i8] c"proof\00"
+@.str.22410 = private unnamed_addr constant [11 x i8] c"unresolved\00"
+@.str.22413 = private unnamed_addr constant [10 x i8] c"passLimit\00"
+@.str.22414 = private unnamed_addr constant [8 x i8] c"invalid\00"
+@.str.22519 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22522 = private unnamed_addr constant [4 x i8] c"Int\00"
+@.str.22525 = private unnamed_addr constant [5 x i8] c"Bool\00"
+@.str.22529 = private unnamed_addr constant [7 x i8] c"String\00"
+@.str.22533 = private unnamed_addr constant [6 x i8] c"Float\00"
+@.str.22553 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22559 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22564 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22571 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.22579 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.22580 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.22581 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.22582 = private unnamed_addr constant [6 x i8] c"entry\00"
-@.str.22583 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22582 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22583 = private unnamed_addr constant [6 x i8] c"entry\00"
 @.str.22584 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.22585 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.22586 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.22587 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.22959 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22588 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.22960 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.22961 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.22962 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.22963 = private unnamed_addr constant [6 x i8] c"entry\00"
-@.str.22964 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22963 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22964 = private unnamed_addr constant [6 x i8] c"entry\00"
 @.str.22965 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.22966 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.22967 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.22968 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.22989 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23014 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23016 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23018 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23020 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23022 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23024 = private unnamed_addr constant [6 x i8] c"entry\00"
-@.str.23134 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22969 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.22990 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23015 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23017 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23019 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23021 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23023 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23025 = private unnamed_addr constant [6 x i8] c"entry\00"
 @.str.23135 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.23136 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23156 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23160 = private unnamed_addr constant [7 x i8] c"return\00"
-@.str.23163 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23137 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23157 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23161 = private unnamed_addr constant [7 x i8] c"return\00"
 @.str.23164 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23171 = private unnamed_addr constant [3 x i8] c"i1\00"
-@.str.23175 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23179 = private unnamed_addr constant [27 x i8] c"  %entry_result = zext i1 \00"
-@.str.23181 = private unnamed_addr constant [9 x i8] c" to i32\0A\00"
-@.str.23185 = private unnamed_addr constant [7 x i8] c"return\00"
-@.str.23186 = private unnamed_addr constant [4 x i8] c"i32\00"
-@.str.23187 = private unnamed_addr constant [14 x i8] c"%entry_result\00"
-@.str.23188 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23165 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23172 = private unnamed_addr constant [3 x i8] c"i1\00"
+@.str.23176 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23180 = private unnamed_addr constant [27 x i8] c"  %entry_result = zext i1 \00"
+@.str.23182 = private unnamed_addr constant [9 x i8] c" to i32\0A\00"
+@.str.23186 = private unnamed_addr constant [7 x i8] c"return\00"
+@.str.23187 = private unnamed_addr constant [4 x i8] c"i32\00"
+@.str.23188 = private unnamed_addr constant [14 x i8] c"%entry_result\00"
 @.str.23189 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23198 = private unnamed_addr constant [7 x i8] c"branch\00"
-@.str.23199 = private unnamed_addr constant [3 x i8] c"i1\00"
-@.str.23209 = private unnamed_addr constant [7 x i8] c"return\00"
-@.str.23212 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23190 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23199 = private unnamed_addr constant [7 x i8] c"branch\00"
+@.str.23200 = private unnamed_addr constant [3 x i8] c"i1\00"
+@.str.23210 = private unnamed_addr constant [7 x i8] c"return\00"
 @.str.23213 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23226 = private unnamed_addr constant [7 x i8] c"return\00"
-@.str.23229 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23214 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23227 = private unnamed_addr constant [7 x i8] c"return\00"
 @.str.23230 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23237 = private unnamed_addr constant [6 x i8] c"entry\00"
-@.str.23242 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23245 = private unnamed_addr constant [8 x i8] c"define \00"
-@.str.23247 = private unnamed_addr constant [3 x i8] c" @\00"
-@.str.23249 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.23251 = private unnamed_addr constant [5 x i8] c") {\0A\00"
-@.str.23253 = private unnamed_addr constant [3 x i8] c"}\0A\00"
-@.str.23264 = private unnamed_addr constant [8 x i8] c"define \00"
-@.str.23266 = private unnamed_addr constant [3 x i8] c" @\00"
-@.str.23268 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.23270 = private unnamed_addr constant [5 x i8] c") {\0A\00"
-@.str.23271 = private unnamed_addr constant [3 x i8] c"}\0A\00"
-@.str.23280 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23231 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23238 = private unnamed_addr constant [6 x i8] c"entry\00"
+@.str.23243 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23246 = private unnamed_addr constant [8 x i8] c"define \00"
+@.str.23248 = private unnamed_addr constant [3 x i8] c" @\00"
+@.str.23250 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.23252 = private unnamed_addr constant [5 x i8] c") {\0A\00"
+@.str.23254 = private unnamed_addr constant [3 x i8] c"}\0A\00"
+@.str.23265 = private unnamed_addr constant [8 x i8] c"define \00"
+@.str.23267 = private unnamed_addr constant [3 x i8] c" @\00"
+@.str.23269 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.23271 = private unnamed_addr constant [5 x i8] c") {\0A\00"
+@.str.23272 = private unnamed_addr constant [3 x i8] c"}\0A\00"
 @.str.23281 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23306 = private unnamed_addr constant [62 x i8] c"compilerError\09kind=unsupportedReachableHelpers\09selectedCount=\00"
-@.str.23308 = private unnamed_addr constant [17 x i8] c"\09lowerableCount=\00"
-@.str.23310 = private unnamed_addr constant [16 x i8] c"\09excludedCount=\00"
-@.str.23312 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@.str.23358 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23376 = private unnamed_addr constant [34 x i8] c"%Range.Array = type { ptr, i32 }\0A\00"
-@.str.23397 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23411 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23438 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23445 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23462 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23465 = private unnamed_addr constant [15 x i8] c" = type { i1, \00"
-@.str.23466 = private unnamed_addr constant [4 x i8] c" }\0A\00"
-@.str.23481 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@.str.23485 = private unnamed_addr constant [13 x i8] c"%Range.Array\00"
-@.str.23488 = private unnamed_addr constant [6 x i8] c"Array\00"
-@.str.23498 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.23503 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@.str.23525 = private unnamed_addr constant [2 x i8] c"n\00"
-@.str.23531 = private unnamed_addr constant [2 x i8] c"t\00"
-@.str.23583 = private unnamed_addr constant [5 x i8] c"__ri\00"
-@.str.23586 = private unnamed_addr constant [2 x i8] c"_\00"
-@.str.23647 = private unnamed_addr constant [4 x i8] c"i32\00"
-@.str.23652 = private unnamed_addr constant [3 x i8] c"i1\00"
-@.str.23657 = private unnamed_addr constant [7 x i8] c"double\00"
-@.str.23662 = private unnamed_addr constant [4 x i8] c"ptr\00"
-@.str.23667 = private unnamed_addr constant [3 x i8] c"i8\00"
-@.str.23672 = private unnamed_addr constant [6 x i8] c"float\00"
-@.str.23688 = private unnamed_addr constant [5 x i8] c"void\00"
-@.str.23691 = private unnamed_addr constant [2 x i8] c"@\00"
-@.str.23692 = private unnamed_addr constant [2 x i8] c"(\00"
-@.str.23695 = private unnamed_addr constant [8 x i8] c"define \00"
-@.str.23696 = private unnamed_addr constant [2 x i8] c" \00"
-@.str.23699 = private unnamed_addr constant [6 x i8] c"call \00"
-@.str.23700 = private unnamed_addr constant [2 x i8] c" \00"
-@.str.23733 = private unnamed_addr constant [5 x i8] c"ptr \00"
+@.str.23282 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23307 = private unnamed_addr constant [62 x i8] c"compilerError\09kind=unsupportedReachableHelpers\09selectedCount=\00"
+@.str.23309 = private unnamed_addr constant [17 x i8] c"\09lowerableCount=\00"
+@.str.23311 = private unnamed_addr constant [16 x i8] c"\09excludedCount=\00"
+@.str.23313 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@.str.23359 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23377 = private unnamed_addr constant [34 x i8] c"%Range.Array = type { ptr, i32 }\0A\00"
+@.str.23398 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23412 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23439 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23446 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23463 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23466 = private unnamed_addr constant [15 x i8] c" = type { i1, \00"
+@.str.23467 = private unnamed_addr constant [4 x i8] c" }\0A\00"
+@.str.23482 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@.str.23486 = private unnamed_addr constant [13 x i8] c"%Range.Array\00"
+@.str.23489 = private unnamed_addr constant [6 x i8] c"Array\00"
+@.str.23499 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.23504 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@.str.23526 = private unnamed_addr constant [2 x i8] c"n\00"
+@.str.23532 = private unnamed_addr constant [2 x i8] c"t\00"
+@.str.23584 = private unnamed_addr constant [5 x i8] c"__ri\00"
+@.str.23587 = private unnamed_addr constant [2 x i8] c"_\00"
+@.str.23648 = private unnamed_addr constant [4 x i8] c"i32\00"
+@.str.23653 = private unnamed_addr constant [3 x i8] c"i1\00"
+@.str.23658 = private unnamed_addr constant [7 x i8] c"double\00"
+@.str.23663 = private unnamed_addr constant [4 x i8] c"ptr\00"
+@.str.23668 = private unnamed_addr constant [3 x i8] c"i8\00"
+@.str.23673 = private unnamed_addr constant [6 x i8] c"float\00"
+@.str.23689 = private unnamed_addr constant [5 x i8] c"void\00"
+@.str.23692 = private unnamed_addr constant [2 x i8] c"@\00"
+@.str.23693 = private unnamed_addr constant [2 x i8] c"(\00"
+@.str.23696 = private unnamed_addr constant [8 x i8] c"define \00"
+@.str.23697 = private unnamed_addr constant [2 x i8] c" \00"
+@.str.23700 = private unnamed_addr constant [6 x i8] c"call \00"
+@.str.23701 = private unnamed_addr constant [2 x i8] c" \00"
+@.str.23734 = private unnamed_addr constant [5 x i8] c"ptr \00"
 @.str.23925 = private unnamed_addr constant [6 x i8] c"macro\00"
 @.str.24073 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.24084 = private unnamed_addr constant [1 x i8] c"\00"
@@ -20973,7 +20973,7 @@ entry:
 }
 define void @compilerFunctionSelectionCreateEmpty(ptr %returnDestination, i32 %functionCount, i1 %valid) {
 entry:
-  %r11415 = call ptr @rawBufferCreate(i32 %functionCount, i32 4)
+  %r11415 = call ptr @bufferCreateInt(i32 %functionCount)
   br label %bb1
 bb1:
   %r11416 = phi i1 [%valid, %entry], [%r11421, %bb5]
@@ -20981,7 +20981,7 @@ bb1:
   %r11418 = icmp slt i32 %r11417, %functionCount
   br i1 %r11418, label %bb2, label %bb3
 bb2:
-  %r11419 = call i32 @rawBufferAppendInt(ptr %r11415, i32 0)
+  %r11419 = call i32 @append__ri14222135_4744918(ptr %r11415, i32 0)
   %r11420 = icmp ne i32 %r11419, 0
   br i1 %r11420, label %bb4, label %bb5
 bb4:
@@ -21233,7 +21233,7 @@ bb40:
   %r11531 = icmp slt i32 %r11530, 0
   %r11532 = extractvalue %Range.CompilerReachableLLVMState %reachability, 1
   %r11533 = extractvalue %Range.CompilerFunctionSelection %r11532, 0
-  %r11534 = call i32 @rawBufferCount(ptr %r11533)
+  %r11534 = call i32 @count__ri12754630_7389670(ptr %r11533)
   %r11535 = icmp sge i32 %r11530, %r11534
   %r11536 = or i1 %r11531, %r11535
   br i1 %r11536, label %bb42, label %bb43
@@ -22878,11 +22878,11 @@ entry:
   %r12749 = icmp sge i32 %functionRow, 0
   %r12750 = and i1 %r12748, %r12749
   %r12751 = extractvalue %Range.CompilerFunctionSelection %selection, 0
-  %r12752 = call i32 @rawBufferCount(ptr %r12751)
+  %r12752 = call i32 @count__ri12754630_7389670(ptr %r12751)
   %r12753 = icmp slt i32 %functionRow, %r12752
   %r12754 = and i1 %r12750, %r12753
   %r12755 = extractvalue %Range.CompilerFunctionSelection %selection, 0
-  %r12756 = call i32 @rawBufferLoadInt(ptr %r12755, i32 %functionRow)
+  %r12756 = call i32 @element__ri1950873_9116773(ptr %r12755, i32 %functionRow)
   %r12757 = icmp eq i32 %r12756, 1
   %r12758 = and i1 %r12754, %r12757
   ret i1 %r12758
@@ -23400,7 +23400,7 @@ bb12:
 define i32 @compilerFunctionSelectionDestroy(%Range.CompilerFunctionSelection %selection) {
 entry:
   %r13099 = extractvalue %Range.CompilerFunctionSelection %selection, 0
-  %r13100 = call i32 @rawBufferDestroy(ptr %r13099)
+  %r13100 = call i32 @destroy__ri1613724_519400(ptr %r13099)
   ret i32 %r13100
 }
 define i32 @compilerSourceRoleCore() {
@@ -35386,65 +35386,70 @@ bb1:
 bb2:
   ret i32 0
 }
+define i32 @append__ri14222135_4744918(ptr %self, i32 %element) {
+entry:
+  %r20981 = call i32 @rawBufferAppendInt(ptr %self, i32 %element)
+  ret i32 %r20981
+}
 define void @compilerBodyArenaCreateEntry(ptr %returnDestination, %Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index) {
 entry:
   %storage1 = alloca %Range.Optional.CompilerMainBlock
   %storage2 = alloca %Range.CompilerMainBlock
   %storage3 = alloca %Range.CompilerBodyArena
-  %r20981 = extractvalue %Range.CompilerSyntaxTables %tables, 0
-  %r20982 = extractvalue %Range.CompilerSourceStore %r20981, 0
-  call void @compilerCoreParseMainBlock(ptr %storage1, ptr %r20982)
-  %r20983 = load %Range.Optional.CompilerMainBlock, ptr %storage1
-  %r20984 = sub i32 0, 1
+  %r20982 = extractvalue %Range.CompilerSyntaxTables %tables, 0
+  %r20983 = extractvalue %Range.CompilerSourceStore %r20982, 0
+  call void @compilerCoreParseMainBlock(ptr %storage1, ptr %r20983)
+  %r20984 = load %Range.Optional.CompilerMainBlock, ptr %storage1
   %r20985 = sub i32 0, 1
   %r20986 = sub i32 0, 1
-  %r20987 = insertvalue %Range.Optional.CompilerMainBlock poison, i1 false, 0
-  %r20988 = extractvalue %Range.Optional.CompilerMainBlock %r20983, 0
-  %r20989 = icmp ne i1 %r20988, false
-  br i1 %r20989, label %bb1, label %bb2
+  %r20987 = sub i32 0, 1
+  %r20988 = insertvalue %Range.Optional.CompilerMainBlock poison, i1 false, 0
+  %r20989 = extractvalue %Range.Optional.CompilerMainBlock %r20984, 0
+  %r20990 = icmp ne i1 %r20989, false
+  br i1 %r20990, label %bb1, label %bb2
 bb1:
-  %r20990 = insertvalue %Range.CompilerMainBlock poison, i32 0, 0
-  %r20991 = insertvalue %Range.CompilerMainBlock %r20990, i32 0, 1
-  %r20992 = insertvalue %Range.CompilerMainBlock %r20991, i32 0, 2
-  store %Range.CompilerMainBlock %r20992, ptr %storage2
-  %r20993 = extractvalue %Range.Optional.CompilerMainBlock %r20983, 0
-  br i1 %r20993, label %bb3, label %bb4
+  %r20991 = insertvalue %Range.CompilerMainBlock poison, i32 0, 0
+  %r20992 = insertvalue %Range.CompilerMainBlock %r20991, i32 0, 1
+  %r20993 = insertvalue %Range.CompilerMainBlock %r20992, i32 0, 2
+  store %Range.CompilerMainBlock %r20993, ptr %storage2
+  %r20994 = extractvalue %Range.Optional.CompilerMainBlock %r20984, 0
+  br i1 %r20994, label %bb3, label %bb4
 bb3:
-  %r20994 = extractvalue %Range.Optional.CompilerMainBlock %r20983, 1
+  %r20995 = extractvalue %Range.Optional.CompilerMainBlock %r20984, 1
   br label %bb5
 bb4:
   br label %bb5
 bb5:
-  %r20995 = phi %Range.CompilerMainBlock [%r20994, %bb3], [%r20992, %bb4]
-  %r20996 = extractvalue %Range.CompilerMainBlock %r20995, 0
-  %r20997 = extractvalue %Range.CompilerSyntaxTables %tables, 0
-  %r20998 = extractvalue %Range.CompilerMainBlock %r20995, 0
-  %r20999 = call i32 @compilerSourceStoreFileIDAtGlobalOffset(%Range.CompilerSourceStore %r20997, i32 %r20998)
-  %r21000 = extractvalue %Range.CompilerMainBlock %r20995, 1
-  %r21001 = extractvalue %Range.CompilerMainBlock %r20995, 2
+  %r20996 = phi %Range.CompilerMainBlock [%r20995, %bb3], [%r20993, %bb4]
+  %r20997 = extractvalue %Range.CompilerMainBlock %r20996, 0
+  %r20998 = extractvalue %Range.CompilerSyntaxTables %tables, 0
+  %r20999 = extractvalue %Range.CompilerMainBlock %r20996, 0
+  %r21000 = call i32 @compilerSourceStoreFileIDAtGlobalOffset(%Range.CompilerSourceStore %r20998, i32 %r20999)
+  %r21001 = extractvalue %Range.CompilerMainBlock %r20996, 1
+  %r21002 = extractvalue %Range.CompilerMainBlock %r20996, 2
   br label %bb2
 bb2:
-  %r21002 = phi i1 [false, %entry], [true, %bb5]
-  %r21003 = phi i32 [%r20984, %entry], [%r20996, %bb5]
-  %r21004 = phi i32 [0, %entry], [%r20999, %bb5]
-  %r21005 = phi i32 [%r20985, %entry], [%r21000, %bb5]
+  %r21003 = phi i1 [false, %entry], [true, %bb5]
+  %r21004 = phi i32 [%r20985, %entry], [%r20997, %bb5]
+  %r21005 = phi i32 [0, %entry], [%r21000, %bb5]
   %r21006 = phi i32 [%r20986, %entry], [%r21001, %bb5]
-  %r21007 = call i32 @compilerBodyArenaOwnerEntry()
-  %r21008 = sub i32 0, 1
+  %r21007 = phi i32 [%r20987, %entry], [%r21002, %bb5]
+  %r21008 = call i32 @compilerBodyArenaOwnerEntry()
   %r21009 = sub i32 0, 1
   %r21010 = sub i32 0, 1
   %r21011 = sub i32 0, 1
-  call void @compilerBodyArenaCreateForBody(ptr %storage3, %Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %r21007, i32 %r21003, i32 %r21008, i32 %r21009, i32 %r21010, i32 %r21011, i32 %r21004, i32 %r21005, i32 %r21006)
-  %r21012 = load %Range.CompilerBodyArena, ptr %storage3
-  %r21013 = xor i1 %r21002, true
-  br i1 %r21013, label %bb6, label %bb7
+  %r21012 = sub i32 0, 1
+  call void @compilerBodyArenaCreateForBody(ptr %storage3, %Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %r21008, i32 %r21004, i32 %r21009, i32 %r21010, i32 %r21011, i32 %r21012, i32 %r21005, i32 %r21006, i32 %r21007)
+  %r21013 = load %Range.CompilerBodyArena, ptr %storage3
+  %r21014 = xor i1 %r21003, true
+  br i1 %r21014, label %bb6, label %bb7
 bb6:
-  %r21014 = extractvalue %Range.CompilerBodyArena %r21012, 43
-  %r21015 = sub i32 0, 1
-  %r21016 = call i32 @rawBufferAppendInt(ptr %r21014, i32 %r21015)
+  %r21015 = extractvalue %Range.CompilerBodyArena %r21013, 43
+  %r21016 = sub i32 0, 1
+  %r21017 = call i32 @rawBufferAppendInt(ptr %r21015, i32 %r21016)
   br label %bb7
 bb7:
-  store %Range.CompilerBodyArena %r21012, ptr %returnDestination
+  store %Range.CompilerBodyArena %r21013, ptr %returnDestination
   ret void
 }
 define void @compilerCoreParseMainBlock(ptr %returnDestination, ptr %source) {
@@ -35453,653 +35458,653 @@ entry:
   %storage2 = alloca %Range.CompilerTokenCursor
   %storage3 = alloca %Range.RangeLexedToken
   call void @compilerCoreFindMainAttributeToken(ptr %storage1, ptr %source)
-  %r21017 = load %Range.Optional.RangeLexedToken, ptr %storage1
-  %r21018 = insertvalue %Range.Optional.RangeLexedToken poison, i1 false, 0
-  %r21019 = extractvalue %Range.Optional.RangeLexedToken %r21017, 0
-  %r21020 = icmp eq i1 %r21019, false
-  br i1 %r21020, label %bb1, label %bb2
+  %r21018 = load %Range.Optional.RangeLexedToken, ptr %storage1
+  %r21019 = insertvalue %Range.Optional.RangeLexedToken poison, i1 false, 0
+  %r21020 = extractvalue %Range.Optional.RangeLexedToken %r21018, 0
+  %r21021 = icmp eq i1 %r21020, false
+  br i1 %r21021, label %bb1, label %bb2
 bb1:
-  %r21021 = insertvalue %Range.Optional.CompilerMainBlock poison, i1 false, 0
-  store %Range.Optional.CompilerMainBlock %r21021, ptr %returnDestination
+  %r21022 = insertvalue %Range.Optional.CompilerMainBlock poison, i1 false, 0
+  store %Range.Optional.CompilerMainBlock %r21022, ptr %returnDestination
   ret void
 bb2:
-  %r21022 = insertvalue %Range.CompilerTokenCursor poison, ptr %source, 0
-  %r21023 = insertvalue %Range.CompilerTokenCursor %r21022, i32 0, 1
-  store %Range.CompilerTokenCursor %r21023, ptr %storage2
-  call void @compilerFallbackToken(ptr %storage3, %Range.CompilerTokenCursor %r21023)
-  %r21024 = load %Range.RangeLexedToken, ptr %storage3
-  %r21025 = extractvalue %Range.Optional.RangeLexedToken %r21017, 0
-  br i1 %r21025, label %bb3, label %bb4
+  %r21023 = insertvalue %Range.CompilerTokenCursor poison, ptr %source, 0
+  %r21024 = insertvalue %Range.CompilerTokenCursor %r21023, i32 0, 1
+  store %Range.CompilerTokenCursor %r21024, ptr %storage2
+  call void @compilerFallbackToken(ptr %storage3, %Range.CompilerTokenCursor %r21024)
+  %r21025 = load %Range.RangeLexedToken, ptr %storage3
+  %r21026 = extractvalue %Range.Optional.RangeLexedToken %r21018, 0
+  br i1 %r21026, label %bb3, label %bb4
 bb3:
-  %r21026 = extractvalue %Range.Optional.RangeLexedToken %r21017, 1
+  %r21027 = extractvalue %Range.Optional.RangeLexedToken %r21018, 1
   br label %bb5
 bb4:
   br label %bb5
 bb5:
-  %r21027 = phi %Range.RangeLexedToken [%r21026, %bb3], [%r21024, %bb4]
-  call void @compilerCoreParseMainBlockBody(ptr %returnDestination, ptr %source, %Range.RangeLexedToken %r21027)
-  %r21028 = load %Range.Optional.CompilerMainBlock, ptr %returnDestination
-  store %Range.Optional.CompilerMainBlock %r21028, ptr %returnDestination
+  %r21028 = phi %Range.RangeLexedToken [%r21027, %bb3], [%r21025, %bb4]
+  call void @compilerCoreParseMainBlockBody(ptr %returnDestination, ptr %source, %Range.RangeLexedToken %r21028)
+  %r21029 = load %Range.Optional.CompilerMainBlock, ptr %returnDestination
+  store %Range.Optional.CompilerMainBlock %r21029, ptr %returnDestination
   ret void
 }
 define i1 @compilerBodyArenaSymbolsAndResolutionsAreValid(%Range.CompilerBodyArena %arena) {
 entry:
-  %r21029 = extractvalue %Range.CompilerBodyArena %arena, 16
-  %r21030 = call i1 @compilerIntTableIsComplete(%Range.CompilerIntTable %r21029)
-  %r21031 = xor i1 %r21030, true
-  %r21032 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r21033 = call i1 @compilerIntTableIsComplete(%Range.CompilerIntTable %r21032)
-  %r21034 = xor i1 %r21033, true
-  %r21035 = or i1 %r21031, %r21034
-  %r21036 = extractvalue %Range.CompilerBodyArena %arena, 18
-  %r21037 = call i1 @compilerIntTableIsComplete(%Range.CompilerIntTable %r21036)
-  %r21038 = xor i1 %r21037, true
-  %r21039 = or i1 %r21035, %r21038
-  %r21040 = call i1 @compilerBodyArenaTypeArgumentsAreValid(%Range.CompilerBodyArena %arena)
-  %r21041 = xor i1 %r21040, true
-  %r21042 = or i1 %r21039, %r21041
-  br i1 %r21042, label %bb1, label %bb2
+  %r21030 = extractvalue %Range.CompilerBodyArena %arena, 16
+  %r21031 = call i1 @compilerIntTableIsComplete(%Range.CompilerIntTable %r21030)
+  %r21032 = xor i1 %r21031, true
+  %r21033 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r21034 = call i1 @compilerIntTableIsComplete(%Range.CompilerIntTable %r21033)
+  %r21035 = xor i1 %r21034, true
+  %r21036 = or i1 %r21032, %r21035
+  %r21037 = extractvalue %Range.CompilerBodyArena %arena, 18
+  %r21038 = call i1 @compilerIntTableIsComplete(%Range.CompilerIntTable %r21037)
+  %r21039 = xor i1 %r21038, true
+  %r21040 = or i1 %r21036, %r21039
+  %r21041 = call i1 @compilerBodyArenaTypeArgumentsAreValid(%Range.CompilerBodyArena %arena)
+  %r21042 = xor i1 %r21041, true
+  %r21043 = or i1 %r21040, %r21042
+  br i1 %r21043, label %bb1, label %bb2
 bb1:
   ret i1 false
 bb2:
   br label %bb3
 bb3:
-  %r21043 = phi i32 [0, %bb2], [%r21078, %bb7]
-  %r21044 = extractvalue %Range.CompilerBodyArena %arena, 18
-  %r21045 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21044)
-  %r21046 = icmp slt i32 %r21043, %r21045
-  br i1 %r21046, label %bb4, label %bb5
+  %r21044 = phi i32 [0, %bb2], [%r21079, %bb7]
+  %r21045 = extractvalue %Range.CompilerBodyArena %arena, 18
+  %r21046 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21045)
+  %r21047 = icmp slt i32 %r21044, %r21046
+  br i1 %r21047, label %bb4, label %bb5
 bb4:
-  %r21047 = extractvalue %Range.CompilerBodyArena %arena, 18
-  %r21048 = call i32 @compilerBodyTypeInstanceKindColumn()
-  %r21049 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21047, i32 %r21043, i32 %r21048)
-  %r21050 = extractvalue %Range.CompilerBodyArena %arena, 18
-  %r21051 = call i32 @compilerBodyTypeInstanceIDColumn()
-  %r21052 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21050, i32 %r21043, i32 %r21051)
-  %r21053 = icmp ne i32 %r21052, %r21043
-  %r21054 = call i32 @compilerBodyTypeInt()
-  %r21055 = icmp slt i32 %r21049, %r21054
-  %r21056 = or i1 %r21053, %r21055
-  %r21057 = call i32 @compilerBodyTypeLast()
-  %r21058 = icmp sgt i32 %r21049, %r21057
-  %r21059 = or i1 %r21056, %r21058
-  %r21060 = extractvalue %Range.CompilerBodyArena %arena, 18
-  %r21061 = call i32 @compilerBodyTypeInstanceFileColumn()
-  %r21062 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21060, i32 %r21043, i32 %r21061)
-  %r21063 = icmp slt i32 %r21062, 0
-  %r21064 = or i1 %r21059, %r21063
-  %r21065 = extractvalue %Range.CompilerBodyArena %arena, 18
-  %r21066 = call i32 @compilerBodyTypeInstanceStartColumn()
-  %r21067 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21065, i32 %r21043, i32 %r21066)
-  %r21068 = icmp slt i32 %r21067, 0
-  %r21069 = or i1 %r21064, %r21068
-  %r21070 = extractvalue %Range.CompilerBodyArena %arena, 18
-  %r21071 = call i32 @compilerBodyTypeInstanceEndColumn()
-  %r21072 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21070, i32 %r21043, i32 %r21071)
-  %r21073 = extractvalue %Range.CompilerBodyArena %arena, 18
-  %r21074 = call i32 @compilerBodyTypeInstanceStartColumn()
-  %r21075 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21073, i32 %r21043, i32 %r21074)
-  %r21076 = icmp sle i32 %r21072, %r21075
-  %r21077 = or i1 %r21069, %r21076
-  br i1 %r21077, label %bb6, label %bb7
+  %r21048 = extractvalue %Range.CompilerBodyArena %arena, 18
+  %r21049 = call i32 @compilerBodyTypeInstanceKindColumn()
+  %r21050 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21048, i32 %r21044, i32 %r21049)
+  %r21051 = extractvalue %Range.CompilerBodyArena %arena, 18
+  %r21052 = call i32 @compilerBodyTypeInstanceIDColumn()
+  %r21053 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21051, i32 %r21044, i32 %r21052)
+  %r21054 = icmp ne i32 %r21053, %r21044
+  %r21055 = call i32 @compilerBodyTypeInt()
+  %r21056 = icmp slt i32 %r21050, %r21055
+  %r21057 = or i1 %r21054, %r21056
+  %r21058 = call i32 @compilerBodyTypeLast()
+  %r21059 = icmp sgt i32 %r21050, %r21058
+  %r21060 = or i1 %r21057, %r21059
+  %r21061 = extractvalue %Range.CompilerBodyArena %arena, 18
+  %r21062 = call i32 @compilerBodyTypeInstanceFileColumn()
+  %r21063 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21061, i32 %r21044, i32 %r21062)
+  %r21064 = icmp slt i32 %r21063, 0
+  %r21065 = or i1 %r21060, %r21064
+  %r21066 = extractvalue %Range.CompilerBodyArena %arena, 18
+  %r21067 = call i32 @compilerBodyTypeInstanceStartColumn()
+  %r21068 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21066, i32 %r21044, i32 %r21067)
+  %r21069 = icmp slt i32 %r21068, 0
+  %r21070 = or i1 %r21065, %r21069
+  %r21071 = extractvalue %Range.CompilerBodyArena %arena, 18
+  %r21072 = call i32 @compilerBodyTypeInstanceEndColumn()
+  %r21073 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21071, i32 %r21044, i32 %r21072)
+  %r21074 = extractvalue %Range.CompilerBodyArena %arena, 18
+  %r21075 = call i32 @compilerBodyTypeInstanceStartColumn()
+  %r21076 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21074, i32 %r21044, i32 %r21075)
+  %r21077 = icmp sle i32 %r21073, %r21076
+  %r21078 = or i1 %r21070, %r21077
+  br i1 %r21078, label %bb6, label %bb7
 bb6:
   ret i1 false
 bb7:
-  %r21078 = add i32 %r21043, 1
+  %r21079 = add i32 %r21044, 1
   br label %bb3
 bb5:
   br label %bb8
 bb8:
-  %r21079 = phi i32 [0, %bb5], [%r21156, %bb15]
-  %r21080 = extractvalue %Range.CompilerBodyArena %arena, 16
-  %r21081 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21080)
-  %r21082 = icmp slt i32 %r21079, %r21081
-  br i1 %r21082, label %bb9, label %bb10
+  %r21080 = phi i32 [0, %bb5], [%r21157, %bb15]
+  %r21081 = extractvalue %Range.CompilerBodyArena %arena, 16
+  %r21082 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21081)
+  %r21083 = icmp slt i32 %r21080, %r21082
+  br i1 %r21083, label %bb9, label %bb10
 bb9:
-  %r21083 = extractvalue %Range.CompilerBodyArena %arena, 16
-  %r21084 = call i32 @compilerBodySymbolKindColumn()
-  %r21085 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21083, i32 %r21079, i32 %r21084)
-  %r21086 = extractvalue %Range.CompilerBodyArena %arena, 16
-  %r21087 = call i32 @compilerBodySymbolRegionColumn()
-  %r21088 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21086, i32 %r21079, i32 %r21087)
-  %r21089 = extractvalue %Range.CompilerBodyArena %arena, 16
-  %r21090 = call i32 @compilerBodySymbolIDColumn()
-  %r21091 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21089, i32 %r21079, i32 %r21090)
-  %r21092 = icmp ne i32 %r21091, %r21079
-  %r21093 = call i32 @compilerBodySymbolParameter()
-  %r21094 = icmp ne i32 %r21085, %r21093
-  %r21095 = call i32 @compilerBodySymbolLet()
-  %r21096 = icmp ne i32 %r21085, %r21095
-  %r21097 = and i1 %r21094, %r21096
-  %r21098 = call i32 @compilerBodySymbolState()
-  %r21099 = icmp ne i32 %r21085, %r21098
-  %r21100 = and i1 %r21097, %r21099
-  %r21101 = call i32 @compilerBodySymbolReceiver()
-  %r21102 = icmp ne i32 %r21085, %r21101
-  %r21103 = and i1 %r21100, %r21102
-  %r21104 = call i32 @compilerBodySymbolEnumPayloadBinding()
-  %r21105 = icmp ne i32 %r21085, %r21104
-  %r21106 = and i1 %r21103, %r21105
-  %r21107 = or i1 %r21092, %r21106
-  %r21108 = icmp slt i32 %r21088, 0
-  %r21109 = or i1 %r21107, %r21108
-  %r21110 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21111 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21110)
-  %r21112 = icmp sge i32 %r21088, %r21111
-  %r21113 = or i1 %r21109, %r21112
-  %r21114 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21115 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21114, i32 %r21088, i32 1)
-  %r21116 = call i32 @compilerSyntaxKindLexicalRegion()
-  %r21117 = icmp ne i32 %r21115, %r21116
-  %r21118 = or i1 %r21113, %r21117
-  %r21119 = extractvalue %Range.CompilerBodyArena %arena, 16
-  %r21120 = call i32 @compilerBodySymbolNameStartColumn()
-  %r21121 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21119, i32 %r21079, i32 %r21120)
-  %r21122 = icmp slt i32 %r21121, 0
-  %r21123 = or i1 %r21118, %r21122
-  %r21124 = extractvalue %Range.CompilerBodyArena %arena, 16
-  %r21125 = call i32 @compilerBodySymbolNameEndColumn()
-  %r21126 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21124, i32 %r21079, i32 %r21125)
-  %r21127 = extractvalue %Range.CompilerBodyArena %arena, 16
-  %r21128 = call i32 @compilerBodySymbolNameStartColumn()
-  %r21129 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21127, i32 %r21079, i32 %r21128)
-  %r21130 = icmp sle i32 %r21126, %r21129
-  %r21131 = or i1 %r21123, %r21130
-  %r21132 = extractvalue %Range.CompilerBodyArena %arena, 16
-  %r21133 = call i32 @compilerBodySymbolTypeStartColumn()
-  %r21134 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21132, i32 %r21079, i32 %r21133)
-  %r21135 = icmp slt i32 %r21134, 0
-  %r21136 = or i1 %r21131, %r21135
-  %r21137 = extractvalue %Range.CompilerBodyArena %arena, 16
-  %r21138 = call i32 @compilerBodySymbolTypeEndColumn()
-  %r21139 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21137, i32 %r21079, i32 %r21138)
-  %r21140 = extractvalue %Range.CompilerBodyArena %arena, 16
-  %r21141 = call i32 @compilerBodySymbolTypeStartColumn()
-  %r21142 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21140, i32 %r21079, i32 %r21141)
-  %r21143 = icmp sle i32 %r21139, %r21142
-  %r21144 = or i1 %r21136, %r21143
-  br i1 %r21144, label %bb11, label %bb12
+  %r21084 = extractvalue %Range.CompilerBodyArena %arena, 16
+  %r21085 = call i32 @compilerBodySymbolKindColumn()
+  %r21086 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21084, i32 %r21080, i32 %r21085)
+  %r21087 = extractvalue %Range.CompilerBodyArena %arena, 16
+  %r21088 = call i32 @compilerBodySymbolRegionColumn()
+  %r21089 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21087, i32 %r21080, i32 %r21088)
+  %r21090 = extractvalue %Range.CompilerBodyArena %arena, 16
+  %r21091 = call i32 @compilerBodySymbolIDColumn()
+  %r21092 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21090, i32 %r21080, i32 %r21091)
+  %r21093 = icmp ne i32 %r21092, %r21080
+  %r21094 = call i32 @compilerBodySymbolParameter()
+  %r21095 = icmp ne i32 %r21086, %r21094
+  %r21096 = call i32 @compilerBodySymbolLet()
+  %r21097 = icmp ne i32 %r21086, %r21096
+  %r21098 = and i1 %r21095, %r21097
+  %r21099 = call i32 @compilerBodySymbolState()
+  %r21100 = icmp ne i32 %r21086, %r21099
+  %r21101 = and i1 %r21098, %r21100
+  %r21102 = call i32 @compilerBodySymbolReceiver()
+  %r21103 = icmp ne i32 %r21086, %r21102
+  %r21104 = and i1 %r21101, %r21103
+  %r21105 = call i32 @compilerBodySymbolEnumPayloadBinding()
+  %r21106 = icmp ne i32 %r21086, %r21105
+  %r21107 = and i1 %r21104, %r21106
+  %r21108 = or i1 %r21093, %r21107
+  %r21109 = icmp slt i32 %r21089, 0
+  %r21110 = or i1 %r21108, %r21109
+  %r21111 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21112 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21111)
+  %r21113 = icmp sge i32 %r21089, %r21112
+  %r21114 = or i1 %r21110, %r21113
+  %r21115 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21116 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21115, i32 %r21089, i32 1)
+  %r21117 = call i32 @compilerSyntaxKindLexicalRegion()
+  %r21118 = icmp ne i32 %r21116, %r21117
+  %r21119 = or i1 %r21114, %r21118
+  %r21120 = extractvalue %Range.CompilerBodyArena %arena, 16
+  %r21121 = call i32 @compilerBodySymbolNameStartColumn()
+  %r21122 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21120, i32 %r21080, i32 %r21121)
+  %r21123 = icmp slt i32 %r21122, 0
+  %r21124 = or i1 %r21119, %r21123
+  %r21125 = extractvalue %Range.CompilerBodyArena %arena, 16
+  %r21126 = call i32 @compilerBodySymbolNameEndColumn()
+  %r21127 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21125, i32 %r21080, i32 %r21126)
+  %r21128 = extractvalue %Range.CompilerBodyArena %arena, 16
+  %r21129 = call i32 @compilerBodySymbolNameStartColumn()
+  %r21130 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21128, i32 %r21080, i32 %r21129)
+  %r21131 = icmp sle i32 %r21127, %r21130
+  %r21132 = or i1 %r21124, %r21131
+  %r21133 = extractvalue %Range.CompilerBodyArena %arena, 16
+  %r21134 = call i32 @compilerBodySymbolTypeStartColumn()
+  %r21135 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21133, i32 %r21080, i32 %r21134)
+  %r21136 = icmp slt i32 %r21135, 0
+  %r21137 = or i1 %r21132, %r21136
+  %r21138 = extractvalue %Range.CompilerBodyArena %arena, 16
+  %r21139 = call i32 @compilerBodySymbolTypeEndColumn()
+  %r21140 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21138, i32 %r21080, i32 %r21139)
+  %r21141 = extractvalue %Range.CompilerBodyArena %arena, 16
+  %r21142 = call i32 @compilerBodySymbolTypeStartColumn()
+  %r21143 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21141, i32 %r21080, i32 %r21142)
+  %r21144 = icmp sle i32 %r21140, %r21143
+  %r21145 = or i1 %r21137, %r21144
+  br i1 %r21145, label %bb11, label %bb12
 bb11:
   ret i1 false
 bb12:
-  %r21145 = call ptr @compilerBodyArenaSymbolName(%Range.CompilerBodyArena %arena, i32 %r21079)
+  %r21146 = call ptr @compilerBodyArenaSymbolName(%Range.CompilerBodyArena %arena, i32 %r21080)
   br label %bb13
 bb13:
-  %r21146 = phi i32 [0, %bb12], [%r21155, %bb17]
-  %r21147 = icmp slt i32 %r21146, %r21079
-  br i1 %r21147, label %bb14, label %bb15
+  %r21147 = phi i32 [0, %bb12], [%r21156, %bb17]
+  %r21148 = icmp slt i32 %r21147, %r21080
+  br i1 %r21148, label %bb14, label %bb15
 bb14:
-  %r21148 = extractvalue %Range.CompilerBodyArena %arena, 16
-  %r21149 = call i32 @compilerBodySymbolRegionColumn()
-  %r21150 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21148, i32 %r21146, i32 %r21149)
-  %r21151 = icmp eq i32 %r21150, %r21088
-  br i1 %r21151, label %bb16, label %bb17
+  %r21149 = extractvalue %Range.CompilerBodyArena %arena, 16
+  %r21150 = call i32 @compilerBodySymbolRegionColumn()
+  %r21151 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21149, i32 %r21147, i32 %r21150)
+  %r21152 = icmp eq i32 %r21151, %r21089
+  br i1 %r21152, label %bb16, label %bb17
 bb16:
-  %r21152 = call ptr @compilerBodyArenaSymbolName(%Range.CompilerBodyArena %arena, i32 %r21146)
-  %r21153 = call i32 @stringEqual(ptr %r21152, ptr %r21145)
-  %r21154 = icmp ne i32 %r21153, 0
-  br i1 %r21154, label %bb18, label %bb19
+  %r21153 = call ptr @compilerBodyArenaSymbolName(%Range.CompilerBodyArena %arena, i32 %r21147)
+  %r21154 = call i32 @stringEqual(ptr %r21153, ptr %r21146)
+  %r21155 = icmp ne i32 %r21154, 0
+  br i1 %r21155, label %bb18, label %bb19
 bb18:
   ret i1 false
 bb19:
   br label %bb17
 bb17:
-  %r21155 = add i32 %r21146, 1
+  %r21156 = add i32 %r21147, 1
   br label %bb13
 bb15:
-  %r21156 = add i32 %r21079, 1
+  %r21157 = add i32 %r21080, 1
   br label %bb8
 bb10:
   br label %bb20
 bb20:
-  %r21157 = phi i32 [0, %bb10], [%r21512, %bb65]
-  %r21158 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r21159 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21158)
-  %r21160 = icmp slt i32 %r21157, %r21159
-  br i1 %r21160, label %bb21, label %bb22
+  %r21158 = phi i32 [0, %bb10], [%r21513, %bb65]
+  %r21159 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r21160 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21159)
+  %r21161 = icmp slt i32 %r21158, %r21160
+  br i1 %r21161, label %bb21, label %bb22
 bb21:
-  %r21161 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r21162 = call i32 @compilerBodyResolutionSourceColumn()
-  %r21163 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21161, i32 %r21157, i32 %r21162)
-  %r21164 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r21165 = call i32 @compilerBodyResolutionTargetKindColumn()
-  %r21166 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21164, i32 %r21157, i32 %r21165)
-  %r21167 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r21168 = call i32 @compilerBodyResolutionTargetIDColumn()
-  %r21169 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21167, i32 %r21157, i32 %r21168)
-  %r21170 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r21171 = call i32 @compilerBodyResolutionTypeIDColumn()
-  %r21172 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21170, i32 %r21157, i32 %r21171)
-  %r21173 = icmp slt i32 %r21163, 0
-  %r21174 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21175 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21174)
-  %r21176 = icmp sge i32 %r21163, %r21175
-  %r21177 = or i1 %r21173, %r21176
-  %r21178 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21179 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21178, i32 %r21163, i32 1)
-  %r21180 = call i32 @compilerSyntaxKindIdentifier()
-  %r21181 = icmp ne i32 %r21179, %r21180
-  %r21182 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21183 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21182, i32 %r21163, i32 1)
-  %r21184 = call i32 @compilerSyntaxKindBindingReference()
-  %r21185 = icmp ne i32 %r21183, %r21184
-  %r21186 = and i1 %r21181, %r21185
-  %r21187 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21188 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21187, i32 %r21163, i32 1)
-  %r21189 = call i32 @compilerSyntaxKindMemberRead()
-  %r21190 = icmp ne i32 %r21188, %r21189
-  %r21191 = and i1 %r21186, %r21190
-  %r21192 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21193 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21192, i32 %r21163, i32 1)
-  %r21194 = call i32 @compilerSyntaxKindEquality()
-  %r21195 = icmp ne i32 %r21193, %r21194
-  %r21196 = and i1 %r21191, %r21195
-  %r21197 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21198 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21197, i32 %r21163, i32 1)
-  %r21199 = call i32 @compilerSyntaxKindBooleanAnd()
-  %r21200 = icmp ne i32 %r21198, %r21199
-  %r21201 = and i1 %r21196, %r21200
-  %r21202 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21203 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21202, i32 %r21163, i32 1)
-  %r21204 = call i32 @compilerSyntaxKindBooleanOr()
-  %r21205 = icmp ne i32 %r21203, %r21204
-  %r21206 = and i1 %r21201, %r21205
-  %r21207 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21208 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21207, i32 %r21163, i32 1)
-  %r21209 = call i32 @compilerSyntaxKindAddition()
-  %r21210 = icmp ne i32 %r21208, %r21209
-  %r21211 = and i1 %r21206, %r21210
-  %r21212 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21213 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21212, i32 %r21163, i32 1)
-  %r21214 = call i32 @compilerSyntaxKindSubtraction()
-  %r21215 = icmp ne i32 %r21213, %r21214
-  %r21216 = and i1 %r21211, %r21215
-  %r21217 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21218 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21217, i32 %r21163, i32 1)
-  %r21219 = call i32 @compilerSyntaxKindMultiplication()
-  %r21220 = icmp ne i32 %r21218, %r21219
-  %r21221 = and i1 %r21216, %r21220
-  %r21222 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21223 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21222, i32 %r21163, i32 1)
-  %r21224 = call i32 @compilerSyntaxKindDivision()
-  %r21225 = icmp ne i32 %r21223, %r21224
-  %r21226 = and i1 %r21221, %r21225
-  %r21227 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21228 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21227, i32 %r21163, i32 1)
-  %r21229 = call i32 @compilerSyntaxKindRemainder()
-  %r21230 = icmp ne i32 %r21228, %r21229
-  %r21231 = and i1 %r21226, %r21230
-  %r21232 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21233 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21232, i32 %r21163, i32 1)
-  %r21234 = call i32 @compilerSyntaxKindLessThan()
-  %r21235 = icmp ne i32 %r21233, %r21234
-  %r21236 = and i1 %r21231, %r21235
-  %r21237 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21238 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21237, i32 %r21163, i32 1)
-  %r21239 = call i32 @compilerSyntaxKindLessEqual()
-  %r21240 = icmp ne i32 %r21238, %r21239
-  %r21241 = and i1 %r21236, %r21240
-  %r21242 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21243 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21242, i32 %r21163, i32 1)
-  %r21244 = call i32 @compilerSyntaxKindGreaterThan()
-  %r21245 = icmp ne i32 %r21243, %r21244
-  %r21246 = and i1 %r21241, %r21245
-  %r21247 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21248 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21247, i32 %r21163, i32 1)
-  %r21249 = call i32 @compilerSyntaxKindGreaterEqual()
-  %r21250 = icmp ne i32 %r21248, %r21249
-  %r21251 = and i1 %r21246, %r21250
-  %r21252 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21253 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21252, i32 %r21163, i32 1)
-  %r21254 = call i32 @compilerSyntaxKindPrefixNot()
-  %r21255 = icmp ne i32 %r21253, %r21254
-  %r21256 = and i1 %r21251, %r21255
-  %r21257 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21258 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21257, i32 %r21163, i32 1)
-  %r21259 = call i32 @compilerSyntaxKindPrefixNegate()
-  %r21260 = icmp ne i32 %r21258, %r21259
-  %r21261 = and i1 %r21256, %r21260
-  %r21262 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21263 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21262, i32 %r21163, i32 1)
-  %r21264 = call i32 @compilerSyntaxKindOptionalCoalescing()
-  %r21265 = icmp ne i32 %r21263, %r21264
-  %r21266 = and i1 %r21261, %r21265
-  %r21267 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21268 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21267, i32 %r21163, i32 1)
-  %r21269 = call i32 @compilerSyntaxKindInterpolatedString()
-  %r21270 = icmp ne i32 %r21268, %r21269
-  %r21271 = and i1 %r21266, %r21270
-  %r21272 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21273 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21272, i32 %r21163, i32 1)
-  %r21274 = call i32 @compilerSyntaxKindEnumCaseValue()
-  %r21275 = icmp ne i32 %r21273, %r21274
-  %r21276 = and i1 %r21271, %r21275
-  %r21277 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21278 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21277, i32 %r21163, i32 1)
-  %r21279 = call i32 @compilerSyntaxKindArrayLiteral()
-  %r21280 = icmp ne i32 %r21278, %r21279
-  %r21281 = and i1 %r21276, %r21280
-  %r21282 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21283 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21282, i32 %r21163, i32 1)
-  %r21284 = call i32 @compilerSyntaxKindIndex()
-  %r21285 = icmp ne i32 %r21283, %r21284
-  %r21286 = and i1 %r21281, %r21285
-  %r21287 = or i1 %r21177, %r21286
-  %r21288 = call i32 @compilerBodyResolutionLocalSymbol()
-  %r21289 = icmp slt i32 %r21166, %r21288
-  %r21290 = or i1 %r21287, %r21289
-  %r21291 = call i32 @compilerBodyResolutionArrayCount()
-  %r21292 = icmp sgt i32 %r21166, %r21291
-  %r21293 = or i1 %r21290, %r21292
-  br i1 %r21293, label %bb23, label %bb24
+  %r21162 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r21163 = call i32 @compilerBodyResolutionSourceColumn()
+  %r21164 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21162, i32 %r21158, i32 %r21163)
+  %r21165 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r21166 = call i32 @compilerBodyResolutionTargetKindColumn()
+  %r21167 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21165, i32 %r21158, i32 %r21166)
+  %r21168 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r21169 = call i32 @compilerBodyResolutionTargetIDColumn()
+  %r21170 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21168, i32 %r21158, i32 %r21169)
+  %r21171 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r21172 = call i32 @compilerBodyResolutionTypeIDColumn()
+  %r21173 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21171, i32 %r21158, i32 %r21172)
+  %r21174 = icmp slt i32 %r21164, 0
+  %r21175 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21176 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21175)
+  %r21177 = icmp sge i32 %r21164, %r21176
+  %r21178 = or i1 %r21174, %r21177
+  %r21179 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21180 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21179, i32 %r21164, i32 1)
+  %r21181 = call i32 @compilerSyntaxKindIdentifier()
+  %r21182 = icmp ne i32 %r21180, %r21181
+  %r21183 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21184 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21183, i32 %r21164, i32 1)
+  %r21185 = call i32 @compilerSyntaxKindBindingReference()
+  %r21186 = icmp ne i32 %r21184, %r21185
+  %r21187 = and i1 %r21182, %r21186
+  %r21188 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21189 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21188, i32 %r21164, i32 1)
+  %r21190 = call i32 @compilerSyntaxKindMemberRead()
+  %r21191 = icmp ne i32 %r21189, %r21190
+  %r21192 = and i1 %r21187, %r21191
+  %r21193 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21194 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21193, i32 %r21164, i32 1)
+  %r21195 = call i32 @compilerSyntaxKindEquality()
+  %r21196 = icmp ne i32 %r21194, %r21195
+  %r21197 = and i1 %r21192, %r21196
+  %r21198 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21199 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21198, i32 %r21164, i32 1)
+  %r21200 = call i32 @compilerSyntaxKindBooleanAnd()
+  %r21201 = icmp ne i32 %r21199, %r21200
+  %r21202 = and i1 %r21197, %r21201
+  %r21203 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21204 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21203, i32 %r21164, i32 1)
+  %r21205 = call i32 @compilerSyntaxKindBooleanOr()
+  %r21206 = icmp ne i32 %r21204, %r21205
+  %r21207 = and i1 %r21202, %r21206
+  %r21208 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21209 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21208, i32 %r21164, i32 1)
+  %r21210 = call i32 @compilerSyntaxKindAddition()
+  %r21211 = icmp ne i32 %r21209, %r21210
+  %r21212 = and i1 %r21207, %r21211
+  %r21213 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21214 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21213, i32 %r21164, i32 1)
+  %r21215 = call i32 @compilerSyntaxKindSubtraction()
+  %r21216 = icmp ne i32 %r21214, %r21215
+  %r21217 = and i1 %r21212, %r21216
+  %r21218 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21219 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21218, i32 %r21164, i32 1)
+  %r21220 = call i32 @compilerSyntaxKindMultiplication()
+  %r21221 = icmp ne i32 %r21219, %r21220
+  %r21222 = and i1 %r21217, %r21221
+  %r21223 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21224 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21223, i32 %r21164, i32 1)
+  %r21225 = call i32 @compilerSyntaxKindDivision()
+  %r21226 = icmp ne i32 %r21224, %r21225
+  %r21227 = and i1 %r21222, %r21226
+  %r21228 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21229 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21228, i32 %r21164, i32 1)
+  %r21230 = call i32 @compilerSyntaxKindRemainder()
+  %r21231 = icmp ne i32 %r21229, %r21230
+  %r21232 = and i1 %r21227, %r21231
+  %r21233 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21234 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21233, i32 %r21164, i32 1)
+  %r21235 = call i32 @compilerSyntaxKindLessThan()
+  %r21236 = icmp ne i32 %r21234, %r21235
+  %r21237 = and i1 %r21232, %r21236
+  %r21238 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21239 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21238, i32 %r21164, i32 1)
+  %r21240 = call i32 @compilerSyntaxKindLessEqual()
+  %r21241 = icmp ne i32 %r21239, %r21240
+  %r21242 = and i1 %r21237, %r21241
+  %r21243 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21244 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21243, i32 %r21164, i32 1)
+  %r21245 = call i32 @compilerSyntaxKindGreaterThan()
+  %r21246 = icmp ne i32 %r21244, %r21245
+  %r21247 = and i1 %r21242, %r21246
+  %r21248 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21249 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21248, i32 %r21164, i32 1)
+  %r21250 = call i32 @compilerSyntaxKindGreaterEqual()
+  %r21251 = icmp ne i32 %r21249, %r21250
+  %r21252 = and i1 %r21247, %r21251
+  %r21253 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21254 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21253, i32 %r21164, i32 1)
+  %r21255 = call i32 @compilerSyntaxKindPrefixNot()
+  %r21256 = icmp ne i32 %r21254, %r21255
+  %r21257 = and i1 %r21252, %r21256
+  %r21258 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21259 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21258, i32 %r21164, i32 1)
+  %r21260 = call i32 @compilerSyntaxKindPrefixNegate()
+  %r21261 = icmp ne i32 %r21259, %r21260
+  %r21262 = and i1 %r21257, %r21261
+  %r21263 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21264 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21263, i32 %r21164, i32 1)
+  %r21265 = call i32 @compilerSyntaxKindOptionalCoalescing()
+  %r21266 = icmp ne i32 %r21264, %r21265
+  %r21267 = and i1 %r21262, %r21266
+  %r21268 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21269 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21268, i32 %r21164, i32 1)
+  %r21270 = call i32 @compilerSyntaxKindInterpolatedString()
+  %r21271 = icmp ne i32 %r21269, %r21270
+  %r21272 = and i1 %r21267, %r21271
+  %r21273 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21274 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21273, i32 %r21164, i32 1)
+  %r21275 = call i32 @compilerSyntaxKindEnumCaseValue()
+  %r21276 = icmp ne i32 %r21274, %r21275
+  %r21277 = and i1 %r21272, %r21276
+  %r21278 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21279 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21278, i32 %r21164, i32 1)
+  %r21280 = call i32 @compilerSyntaxKindArrayLiteral()
+  %r21281 = icmp ne i32 %r21279, %r21280
+  %r21282 = and i1 %r21277, %r21281
+  %r21283 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21284 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21283, i32 %r21164, i32 1)
+  %r21285 = call i32 @compilerSyntaxKindIndex()
+  %r21286 = icmp ne i32 %r21284, %r21285
+  %r21287 = and i1 %r21282, %r21286
+  %r21288 = or i1 %r21178, %r21287
+  %r21289 = call i32 @compilerBodyResolutionLocalSymbol()
+  %r21290 = icmp slt i32 %r21167, %r21289
+  %r21291 = or i1 %r21288, %r21290
+  %r21292 = call i32 @compilerBodyResolutionArrayCount()
+  %r21293 = icmp sgt i32 %r21167, %r21292
+  %r21294 = or i1 %r21291, %r21293
+  br i1 %r21294, label %bb23, label %bb24
 bb23:
   ret i1 false
 bb24:
-  %r21294 = call i32 @compilerBodyResolutionLocalSymbol()
-  %r21295 = icmp eq i32 %r21166, %r21294
-  %r21296 = icmp slt i32 %r21169, 0
-  %r21297 = extractvalue %Range.CompilerBodyArena %arena, 16
-  %r21298 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21297)
-  %r21299 = icmp sge i32 %r21169, %r21298
-  %r21300 = or i1 %r21296, %r21299
-  %r21301 = and i1 %r21295, %r21300
-  br i1 %r21301, label %bb25, label %bb26
+  %r21295 = call i32 @compilerBodyResolutionLocalSymbol()
+  %r21296 = icmp eq i32 %r21167, %r21295
+  %r21297 = icmp slt i32 %r21170, 0
+  %r21298 = extractvalue %Range.CompilerBodyArena %arena, 16
+  %r21299 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21298)
+  %r21300 = icmp sge i32 %r21170, %r21299
+  %r21301 = or i1 %r21297, %r21300
+  %r21302 = and i1 %r21296, %r21301
+  br i1 %r21302, label %bb25, label %bb26
 bb25:
   ret i1 false
 bb26:
-  %r21302 = call i32 @compilerBodyResolutionFunction()
-  %r21303 = icmp eq i32 %r21166, %r21302
-  %r21304 = icmp slt i32 %r21169, 0
-  %r21305 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r21306 = extractvalue %Range.CompilerSyntaxTables %r21305, 4
-  %r21307 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21306)
-  %r21308 = icmp sge i32 %r21169, %r21307
-  %r21309 = or i1 %r21304, %r21308
-  %r21310 = and i1 %r21303, %r21309
-  br i1 %r21310, label %bb27, label %bb28
+  %r21303 = call i32 @compilerBodyResolutionFunction()
+  %r21304 = icmp eq i32 %r21167, %r21303
+  %r21305 = icmp slt i32 %r21170, 0
+  %r21306 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r21307 = extractvalue %Range.CompilerSyntaxTables %r21306, 4
+  %r21308 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21307)
+  %r21309 = icmp sge i32 %r21170, %r21308
+  %r21310 = or i1 %r21305, %r21309
+  %r21311 = and i1 %r21304, %r21310
+  br i1 %r21311, label %bb27, label %bb28
 bb27:
   ret i1 false
 bb28:
-  %r21311 = call i32 @compilerBodyResolutionBuiltin()
-  %r21312 = icmp eq i32 %r21166, %r21311
-  %r21313 = call i32 @compilerBodyBuiltinString()
-  %r21314 = icmp ne i32 %r21169, %r21313
-  %r21315 = and i1 %r21312, %r21314
-  %r21316 = call i32 @compilerBodyBuiltinFloat()
-  %r21317 = icmp ne i32 %r21169, %r21316
-  %r21318 = and i1 %r21315, %r21317
-  %r21319 = call i32 @compilerBodyBuiltinRuntimeCall()
-  %r21320 = icmp ne i32 %r21169, %r21319
-  %r21321 = and i1 %r21318, %r21320
-  %r21322 = call i32 @compilerBodyBuiltinNil()
-  %r21323 = icmp ne i32 %r21169, %r21322
-  %r21324 = and i1 %r21321, %r21323
-  br i1 %r21324, label %bb29, label %bb30
+  %r21312 = call i32 @compilerBodyResolutionBuiltin()
+  %r21313 = icmp eq i32 %r21167, %r21312
+  %r21314 = call i32 @compilerBodyBuiltinString()
+  %r21315 = icmp ne i32 %r21170, %r21314
+  %r21316 = and i1 %r21313, %r21315
+  %r21317 = call i32 @compilerBodyBuiltinFloat()
+  %r21318 = icmp ne i32 %r21170, %r21317
+  %r21319 = and i1 %r21316, %r21318
+  %r21320 = call i32 @compilerBodyBuiltinRuntimeCall()
+  %r21321 = icmp ne i32 %r21170, %r21320
+  %r21322 = and i1 %r21319, %r21321
+  %r21323 = call i32 @compilerBodyBuiltinNil()
+  %r21324 = icmp ne i32 %r21170, %r21323
+  %r21325 = and i1 %r21322, %r21324
+  br i1 %r21325, label %bb29, label %bb30
 bb29:
   ret i1 false
 bb30:
-  %r21325 = call i32 @compilerBodyResolutionMember()
-  %r21326 = icmp eq i32 %r21166, %r21325
-  %r21327 = icmp slt i32 %r21169, 0
-  %r21328 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r21329 = extractvalue %Range.CompilerSyntaxTables %r21328, 3
-  %r21330 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21329)
-  %r21331 = icmp sge i32 %r21169, %r21330
-  %r21332 = or i1 %r21327, %r21331
-  %r21333 = and i1 %r21326, %r21332
-  br i1 %r21333, label %bb31, label %bb32
+  %r21326 = call i32 @compilerBodyResolutionMember()
+  %r21327 = icmp eq i32 %r21167, %r21326
+  %r21328 = icmp slt i32 %r21170, 0
+  %r21329 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r21330 = extractvalue %Range.CompilerSyntaxTables %r21329, 3
+  %r21331 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21330)
+  %r21332 = icmp sge i32 %r21170, %r21331
+  %r21333 = or i1 %r21328, %r21332
+  %r21334 = and i1 %r21327, %r21333
+  br i1 %r21334, label %bb31, label %bb32
 bb31:
   ret i1 false
 bb32:
-  %r21334 = call i32 @compilerBodyResolutionOperator()
-  %r21335 = icmp eq i32 %r21166, %r21334
-  %r21336 = call i32 @compilerSyntaxKindAddition()
-  %r21337 = icmp slt i32 %r21169, %r21336
-  %r21338 = call i32 @compilerSyntaxKindPrefixNegate()
-  %r21339 = icmp sgt i32 %r21169, %r21338
-  %r21340 = or i1 %r21337, %r21339
-  %r21341 = call i32 @compilerSyntaxKindOptionalCoalescing()
-  %r21342 = icmp ne i32 %r21169, %r21341
-  %r21343 = and i1 %r21340, %r21342
-  %r21344 = call i32 @compilerSyntaxKindInterpolatedString()
-  %r21345 = icmp ne i32 %r21169, %r21344
-  %r21346 = and i1 %r21343, %r21345
-  %r21347 = call i32 @compilerSyntaxKindDivision()
-  %r21348 = icmp ne i32 %r21169, %r21347
-  %r21349 = and i1 %r21346, %r21348
-  %r21350 = call i32 @compilerSyntaxKindRemainder()
-  %r21351 = icmp ne i32 %r21169, %r21350
-  %r21352 = and i1 %r21349, %r21351
-  %r21353 = call i32 @compilerSyntaxKindIndex()
-  %r21354 = icmp ne i32 %r21169, %r21353
-  %r21355 = and i1 %r21352, %r21354
-  %r21356 = and i1 %r21335, %r21355
-  br i1 %r21356, label %bb33, label %bb34
+  %r21335 = call i32 @compilerBodyResolutionOperator()
+  %r21336 = icmp eq i32 %r21167, %r21335
+  %r21337 = call i32 @compilerSyntaxKindAddition()
+  %r21338 = icmp slt i32 %r21170, %r21337
+  %r21339 = call i32 @compilerSyntaxKindPrefixNegate()
+  %r21340 = icmp sgt i32 %r21170, %r21339
+  %r21341 = or i1 %r21338, %r21340
+  %r21342 = call i32 @compilerSyntaxKindOptionalCoalescing()
+  %r21343 = icmp ne i32 %r21170, %r21342
+  %r21344 = and i1 %r21341, %r21343
+  %r21345 = call i32 @compilerSyntaxKindInterpolatedString()
+  %r21346 = icmp ne i32 %r21170, %r21345
+  %r21347 = and i1 %r21344, %r21346
+  %r21348 = call i32 @compilerSyntaxKindDivision()
+  %r21349 = icmp ne i32 %r21170, %r21348
+  %r21350 = and i1 %r21347, %r21349
+  %r21351 = call i32 @compilerSyntaxKindRemainder()
+  %r21352 = icmp ne i32 %r21170, %r21351
+  %r21353 = and i1 %r21350, %r21352
+  %r21354 = call i32 @compilerSyntaxKindIndex()
+  %r21355 = icmp ne i32 %r21170, %r21354
+  %r21356 = and i1 %r21353, %r21355
+  %r21357 = and i1 %r21336, %r21356
+  br i1 %r21357, label %bb33, label %bb34
 bb33:
   ret i1 false
 bb34:
-  %r21357 = call i32 @compilerBodyResolutionRuntimeBuiltin()
-  %r21358 = icmp eq i32 %r21166, %r21357
-  %r21359 = call i32 @compilerBodyRuntimeBuiltinNone()
-  %r21360 = icmp sle i32 %r21169, %r21359
-  %r21361 = call i32 @compilerBodyRuntimeBuiltinCount()
-  %r21362 = icmp sgt i32 %r21169, %r21361
-  %r21363 = or i1 %r21360, %r21362
-  %r21364 = and i1 %r21358, %r21363
-  br i1 %r21364, label %bb35, label %bb36
+  %r21358 = call i32 @compilerBodyResolutionRuntimeBuiltin()
+  %r21359 = icmp eq i32 %r21167, %r21358
+  %r21360 = call i32 @compilerBodyRuntimeBuiltinNone()
+  %r21361 = icmp sle i32 %r21170, %r21360
+  %r21362 = call i32 @compilerBodyRuntimeBuiltinCount()
+  %r21363 = icmp sgt i32 %r21170, %r21362
+  %r21364 = or i1 %r21361, %r21363
+  %r21365 = and i1 %r21359, %r21364
+  br i1 %r21365, label %bb35, label %bb36
 bb35:
   ret i1 false
 bb36:
-  %r21365 = call i32 @compilerBodyResolutionMemberRuntimeBuiltin()
-  %r21366 = icmp eq i32 %r21166, %r21365
-  %r21367 = call i32 @compilerBodyRuntimeBuiltinNone()
-  %r21368 = icmp sle i32 %r21169, %r21367
-  %r21369 = call i32 @compilerBodyRuntimeBuiltinCount()
-  %r21370 = icmp sgt i32 %r21169, %r21369
-  %r21371 = or i1 %r21368, %r21370
-  %r21372 = and i1 %r21366, %r21371
-  br i1 %r21372, label %bb37, label %bb38
+  %r21366 = call i32 @compilerBodyResolutionMemberRuntimeBuiltin()
+  %r21367 = icmp eq i32 %r21167, %r21366
+  %r21368 = call i32 @compilerBodyRuntimeBuiltinNone()
+  %r21369 = icmp sle i32 %r21170, %r21368
+  %r21370 = call i32 @compilerBodyRuntimeBuiltinCount()
+  %r21371 = icmp sgt i32 %r21170, %r21370
+  %r21372 = or i1 %r21369, %r21371
+  %r21373 = and i1 %r21367, %r21372
+  br i1 %r21373, label %bb37, label %bb38
 bb37:
   ret i1 false
 bb38:
-  %r21373 = call i32 @compilerBodyResolutionMacroCapability()
-  %r21374 = icmp eq i32 %r21166, %r21373
-  %r21375 = call i32 @compilerMacroOperationInformation()
-  %r21376 = icmp slt i32 %r21169, %r21375
-  %r21377 = call i32 @compilerMacroOperationError()
-  %r21378 = icmp sgt i32 %r21169, %r21377
-  %r21379 = or i1 %r21376, %r21378
-  %r21380 = and i1 %r21374, %r21379
-  br i1 %r21380, label %bb39, label %bb40
+  %r21374 = call i32 @compilerBodyResolutionMacroCapability()
+  %r21375 = icmp eq i32 %r21167, %r21374
+  %r21376 = call i32 @compilerMacroOperationInformation()
+  %r21377 = icmp slt i32 %r21170, %r21376
+  %r21378 = call i32 @compilerMacroOperationError()
+  %r21379 = icmp sgt i32 %r21170, %r21378
+  %r21380 = or i1 %r21377, %r21379
+  %r21381 = and i1 %r21375, %r21380
+  br i1 %r21381, label %bb39, label %bb40
 bb39:
   ret i1 false
 bb40:
-  %r21381 = call i32 @compilerBodyResolutionMacroCapabilityDenied()
-  %r21382 = icmp eq i32 %r21166, %r21381
-  %r21383 = icmp ne i32 %r21169, 0
-  %r21384 = and i1 %r21382, %r21383
-  br i1 %r21384, label %bb41, label %bb42
+  %r21382 = call i32 @compilerBodyResolutionMacroCapabilityDenied()
+  %r21383 = icmp eq i32 %r21167, %r21382
+  %r21384 = icmp ne i32 %r21170, 0
+  %r21385 = and i1 %r21383, %r21384
+  br i1 %r21385, label %bb41, label %bb42
 bb41:
   ret i1 false
 bb42:
-  %r21385 = call i32 @compilerBodyResolutionMacroGraphQuery()
-  %r21386 = icmp eq i32 %r21166, %r21385
-  %r21387 = call i32 @compilerMacroGraphOperationDeclarationCount()
-  %r21388 = icmp ne i32 %r21169, %r21387
-  %r21389 = and i1 %r21386, %r21388
-  br i1 %r21389, label %bb43, label %bb44
+  %r21386 = call i32 @compilerBodyResolutionMacroGraphQuery()
+  %r21387 = icmp eq i32 %r21167, %r21386
+  %r21388 = call i32 @compilerMacroGraphOperationDeclarationCount()
+  %r21389 = icmp ne i32 %r21170, %r21388
+  %r21390 = and i1 %r21387, %r21389
+  br i1 %r21390, label %bb43, label %bb44
 bb43:
   ret i1 false
 bb44:
-  %r21390 = call i32 @compilerBodyResolutionMacroTargetOperation()
-  %r21391 = icmp eq i32 %r21166, %r21390
-  %r21392 = call i32 @compilerMacroTargetOperationOmit()
-  %r21393 = icmp ne i32 %r21169, %r21392
-  %r21394 = and i1 %r21391, %r21393
-  %r21395 = call i32 @compilerMacroTargetOperationMemberCount()
-  %r21396 = icmp ne i32 %r21169, %r21395
-  %r21397 = and i1 %r21394, %r21396
-  %r21398 = call i32 @compilerMacroTargetOperationExpand()
-  %r21399 = icmp ne i32 %r21169, %r21398
-  %r21400 = and i1 %r21397, %r21399
-  br i1 %r21400, label %bb45, label %bb46
+  %r21391 = call i32 @compilerBodyResolutionMacroTargetOperation()
+  %r21392 = icmp eq i32 %r21167, %r21391
+  %r21393 = call i32 @compilerMacroTargetOperationOmit()
+  %r21394 = icmp ne i32 %r21170, %r21393
+  %r21395 = and i1 %r21392, %r21394
+  %r21396 = call i32 @compilerMacroTargetOperationMemberCount()
+  %r21397 = icmp ne i32 %r21170, %r21396
+  %r21398 = and i1 %r21395, %r21397
+  %r21399 = call i32 @compilerMacroTargetOperationExpand()
+  %r21400 = icmp ne i32 %r21170, %r21399
+  %r21401 = and i1 %r21398, %r21400
+  br i1 %r21401, label %bb45, label %bb46
 bb45:
   ret i1 false
 bb46:
-  %r21401 = call i32 @compilerBodyResolutionMacroTargetQueryInvalid()
-  %r21402 = icmp eq i32 %r21166, %r21401
-  %r21403 = call i32 @compilerMacroTargetOperationMemberCount()
-  %r21404 = icmp ne i32 %r21169, %r21403
-  %r21405 = and i1 %r21402, %r21404
-  br i1 %r21405, label %bb47, label %bb48
+  %r21402 = call i32 @compilerBodyResolutionMacroTargetQueryInvalid()
+  %r21403 = icmp eq i32 %r21167, %r21402
+  %r21404 = call i32 @compilerMacroTargetOperationMemberCount()
+  %r21405 = icmp ne i32 %r21170, %r21404
+  %r21406 = and i1 %r21403, %r21405
+  br i1 %r21406, label %bb47, label %bb48
 bb47:
   ret i1 false
 bb48:
-  %r21406 = call i32 @compilerBodyResolutionConstruct()
-  %r21407 = icmp eq i32 %r21166, %r21406
-  %r21408 = icmp slt i32 %r21169, 0
-  %r21409 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r21410 = extractvalue %Range.CompilerSyntaxTables %r21409, 1
-  %r21411 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21410)
-  %r21412 = icmp sge i32 %r21169, %r21411
-  %r21413 = or i1 %r21408, %r21412
-  %r21414 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r21415 = extractvalue %Range.CompilerSyntaxTables %r21414, 1
-  %r21416 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21415, i32 %r21169, i32 0)
-  %r21417 = call i32 @compilerSyntaxKindConstruct()
-  %r21418 = icmp ne i32 %r21416, %r21417
-  %r21419 = or i1 %r21413, %r21418
-  %r21420 = and i1 %r21407, %r21419
-  br i1 %r21420, label %bb49, label %bb50
+  %r21407 = call i32 @compilerBodyResolutionConstruct()
+  %r21408 = icmp eq i32 %r21167, %r21407
+  %r21409 = icmp slt i32 %r21170, 0
+  %r21410 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r21411 = extractvalue %Range.CompilerSyntaxTables %r21410, 1
+  %r21412 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21411)
+  %r21413 = icmp sge i32 %r21170, %r21412
+  %r21414 = or i1 %r21409, %r21413
+  %r21415 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r21416 = extractvalue %Range.CompilerSyntaxTables %r21415, 1
+  %r21417 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21416, i32 %r21170, i32 0)
+  %r21418 = call i32 @compilerSyntaxKindConstruct()
+  %r21419 = icmp ne i32 %r21417, %r21418
+  %r21420 = or i1 %r21414, %r21419
+  %r21421 = and i1 %r21408, %r21420
+  br i1 %r21421, label %bb49, label %bb50
 bb49:
   ret i1 false
 bb50:
-  %r21421 = call i32 @compilerBodyResolutionEnumCase()
-  %r21422 = icmp eq i32 %r21166, %r21421
-  %r21423 = icmp slt i32 %r21169, 0
-  %r21424 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r21425 = extractvalue %Range.CompilerSyntaxTables %r21424, 3
-  %r21426 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21425)
-  %r21427 = icmp sge i32 %r21169, %r21426
-  %r21428 = or i1 %r21423, %r21427
-  %r21429 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r21430 = extractvalue %Range.CompilerSyntaxTables %r21429, 3
-  %r21431 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21430, i32 %r21169, i32 12)
-  %r21432 = call i32 @compilerSyntaxMemberKindEnumCase()
-  %r21433 = icmp ne i32 %r21431, %r21432
-  %r21434 = or i1 %r21428, %r21433
-  %r21435 = and i1 %r21422, %r21434
-  br i1 %r21435, label %bb51, label %bb52
+  %r21422 = call i32 @compilerBodyResolutionEnumCase()
+  %r21423 = icmp eq i32 %r21167, %r21422
+  %r21424 = icmp slt i32 %r21170, 0
+  %r21425 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r21426 = extractvalue %Range.CompilerSyntaxTables %r21425, 3
+  %r21427 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21426)
+  %r21428 = icmp sge i32 %r21170, %r21427
+  %r21429 = or i1 %r21424, %r21428
+  %r21430 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r21431 = extractvalue %Range.CompilerSyntaxTables %r21430, 3
+  %r21432 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21431, i32 %r21170, i32 12)
+  %r21433 = call i32 @compilerSyntaxMemberKindEnumCase()
+  %r21434 = icmp ne i32 %r21432, %r21433
+  %r21435 = or i1 %r21429, %r21434
+  %r21436 = and i1 %r21423, %r21435
+  br i1 %r21436, label %bb51, label %bb52
 bb51:
   ret i1 false
 bb52:
-  %r21436 = call i32 @compilerBodyResolutionEnum()
-  %r21437 = icmp eq i32 %r21166, %r21436
-  %r21438 = icmp slt i32 %r21169, 0
-  %r21439 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r21440 = extractvalue %Range.CompilerSyntaxTables %r21439, 1
-  %r21441 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21440)
-  %r21442 = icmp sge i32 %r21169, %r21441
-  %r21443 = or i1 %r21438, %r21442
-  %r21444 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r21445 = extractvalue %Range.CompilerSyntaxTables %r21444, 1
-  %r21446 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21445, i32 %r21169, i32 0)
-  %r21447 = call i32 @compilerSyntaxKindEnum()
-  %r21448 = icmp ne i32 %r21446, %r21447
-  %r21449 = or i1 %r21443, %r21448
-  %r21450 = and i1 %r21437, %r21449
-  br i1 %r21450, label %bb53, label %bb54
+  %r21437 = call i32 @compilerBodyResolutionEnum()
+  %r21438 = icmp eq i32 %r21167, %r21437
+  %r21439 = icmp slt i32 %r21170, 0
+  %r21440 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r21441 = extractvalue %Range.CompilerSyntaxTables %r21440, 1
+  %r21442 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21441)
+  %r21443 = icmp sge i32 %r21170, %r21442
+  %r21444 = or i1 %r21439, %r21443
+  %r21445 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r21446 = extractvalue %Range.CompilerSyntaxTables %r21445, 1
+  %r21447 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21446, i32 %r21170, i32 0)
+  %r21448 = call i32 @compilerSyntaxKindEnum()
+  %r21449 = icmp ne i32 %r21447, %r21448
+  %r21450 = or i1 %r21444, %r21449
+  %r21451 = and i1 %r21438, %r21450
+  br i1 %r21451, label %bb53, label %bb54
 bb53:
   ret i1 false
 bb54:
-  %r21451 = call i32 @compilerBodyResolutionArrayLiteral()
-  %r21452 = icmp eq i32 %r21166, %r21451
-  %r21453 = call i32 @compilerBodyArenaArrayDeclarationSyntaxID(%Range.CompilerBodyArena %arena)
-  %r21454 = icmp ne i32 %r21169, %r21453
-  %r21455 = call i1 @compilerBodyArenaTypeIDIsArray(%Range.CompilerBodyArena %arena, i32 %r21172)
-  %r21456 = xor i1 %r21455, true
-  %r21457 = or i1 %r21454, %r21456
-  %r21458 = and i1 %r21452, %r21457
-  br i1 %r21458, label %bb55, label %bb56
+  %r21452 = call i32 @compilerBodyResolutionArrayLiteral()
+  %r21453 = icmp eq i32 %r21167, %r21452
+  %r21454 = call i32 @compilerBodyArenaArrayDeclarationSyntaxID(%Range.CompilerBodyArena %arena)
+  %r21455 = icmp ne i32 %r21170, %r21454
+  %r21456 = call i1 @compilerBodyArenaTypeIDIsArray(%Range.CompilerBodyArena %arena, i32 %r21173)
+  %r21457 = xor i1 %r21456, true
+  %r21458 = or i1 %r21455, %r21457
+  %r21459 = and i1 %r21453, %r21458
+  br i1 %r21459, label %bb55, label %bb56
 bb55:
   ret i1 false
 bb56:
-  %r21459 = call i32 @compilerBodyResolutionArrayCount()
-  %r21460 = icmp eq i32 %r21166, %r21459
-  %r21461 = icmp ne i32 %r21169, 0
-  %r21462 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r21463 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21462, i32 %r21163, i32 1)
-  %r21464 = call i32 @compilerSyntaxKindMemberRead()
-  %r21465 = icmp ne i32 %r21463, %r21464
-  %r21466 = or i1 %r21461, %r21465
-  %r21467 = and i1 %r21460, %r21466
-  br i1 %r21467, label %bb57, label %bb58
+  %r21460 = call i32 @compilerBodyResolutionArrayCount()
+  %r21461 = icmp eq i32 %r21167, %r21460
+  %r21462 = icmp ne i32 %r21170, 0
+  %r21463 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r21464 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21463, i32 %r21164, i32 1)
+  %r21465 = call i32 @compilerSyntaxKindMemberRead()
+  %r21466 = icmp ne i32 %r21464, %r21465
+  %r21467 = or i1 %r21462, %r21466
+  %r21468 = and i1 %r21461, %r21467
+  br i1 %r21468, label %bb57, label %bb58
 bb57:
   ret i1 false
 bb58:
-  %r21468 = call i32 @compilerBodyResolutionLocalSymbol()
-  %r21469 = icmp eq i32 %r21166, %r21468
-  %r21470 = call i32 @compilerBodyResolutionFunction()
-  %r21471 = icmp eq i32 %r21166, %r21470
-  %r21472 = or i1 %r21469, %r21471
-  %r21473 = call i32 @compilerBodyResolutionMember()
-  %r21474 = icmp eq i32 %r21166, %r21473
-  %r21475 = or i1 %r21472, %r21474
-  %r21476 = call i32 @compilerBodyResolutionConstruct()
-  %r21477 = icmp eq i32 %r21166, %r21476
-  %r21478 = or i1 %r21475, %r21477
-  %r21479 = call i32 @compilerBodyResolutionEnumCase()
-  %r21480 = icmp eq i32 %r21166, %r21479
-  %r21481 = or i1 %r21478, %r21480
-  %r21482 = call i32 @compilerBodyResolutionEnum()
-  %r21483 = icmp eq i32 %r21166, %r21482
-  %r21484 = or i1 %r21481, %r21483
-  %r21485 = call i32 @compilerBodyResolutionArrayLiteral()
-  %r21486 = icmp eq i32 %r21166, %r21485
-  %r21487 = or i1 %r21484, %r21486
-  %r21488 = icmp slt i32 %r21172, 0
-  %r21489 = extractvalue %Range.CompilerBodyArena %arena, 18
-  %r21490 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21489)
-  %r21491 = icmp sge i32 %r21172, %r21490
-  %r21492 = or i1 %r21488, %r21491
-  %r21493 = and i1 %r21487, %r21492
-  br i1 %r21493, label %bb59, label %bb60
+  %r21469 = call i32 @compilerBodyResolutionLocalSymbol()
+  %r21470 = icmp eq i32 %r21167, %r21469
+  %r21471 = call i32 @compilerBodyResolutionFunction()
+  %r21472 = icmp eq i32 %r21167, %r21471
+  %r21473 = or i1 %r21470, %r21472
+  %r21474 = call i32 @compilerBodyResolutionMember()
+  %r21475 = icmp eq i32 %r21167, %r21474
+  %r21476 = or i1 %r21473, %r21475
+  %r21477 = call i32 @compilerBodyResolutionConstruct()
+  %r21478 = icmp eq i32 %r21167, %r21477
+  %r21479 = or i1 %r21476, %r21478
+  %r21480 = call i32 @compilerBodyResolutionEnumCase()
+  %r21481 = icmp eq i32 %r21167, %r21480
+  %r21482 = or i1 %r21479, %r21481
+  %r21483 = call i32 @compilerBodyResolutionEnum()
+  %r21484 = icmp eq i32 %r21167, %r21483
+  %r21485 = or i1 %r21482, %r21484
+  %r21486 = call i32 @compilerBodyResolutionArrayLiteral()
+  %r21487 = icmp eq i32 %r21167, %r21486
+  %r21488 = or i1 %r21485, %r21487
+  %r21489 = icmp slt i32 %r21173, 0
+  %r21490 = extractvalue %Range.CompilerBodyArena %arena, 18
+  %r21491 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21490)
+  %r21492 = icmp sge i32 %r21173, %r21491
+  %r21493 = or i1 %r21489, %r21492
+  %r21494 = and i1 %r21488, %r21493
+  br i1 %r21494, label %bb59, label %bb60
 bb59:
   ret i1 false
 bb60:
-  %r21494 = call i32 @compilerBodyResolutionOperator()
-  %r21495 = icmp eq i32 %r21166, %r21494
-  %r21496 = call i32 @compilerSyntaxKindOptionalCoalescing()
-  %r21497 = icmp eq i32 %r21169, %r21496
-  %r21498 = and i1 %r21495, %r21497
-  %r21499 = icmp slt i32 %r21172, 0
-  %r21500 = extractvalue %Range.CompilerBodyArena %arena, 18
-  %r21501 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21500)
-  %r21502 = icmp sge i32 %r21172, %r21501
-  %r21503 = or i1 %r21499, %r21502
-  %r21504 = and i1 %r21498, %r21503
-  br i1 %r21504, label %bb61, label %bb62
+  %r21495 = call i32 @compilerBodyResolutionOperator()
+  %r21496 = icmp eq i32 %r21167, %r21495
+  %r21497 = call i32 @compilerSyntaxKindOptionalCoalescing()
+  %r21498 = icmp eq i32 %r21170, %r21497
+  %r21499 = and i1 %r21496, %r21498
+  %r21500 = icmp slt i32 %r21173, 0
+  %r21501 = extractvalue %Range.CompilerBodyArena %arena, 18
+  %r21502 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21501)
+  %r21503 = icmp sge i32 %r21173, %r21502
+  %r21504 = or i1 %r21500, %r21503
+  %r21505 = and i1 %r21499, %r21504
+  br i1 %r21505, label %bb61, label %bb62
 bb61:
   ret i1 false
 bb62:
   br label %bb63
 bb63:
-  %r21505 = phi i32 [0, %bb62], [%r21511, %bb67]
-  %r21506 = icmp slt i32 %r21505, %r21157
-  br i1 %r21506, label %bb64, label %bb65
+  %r21506 = phi i32 [0, %bb62], [%r21512, %bb67]
+  %r21507 = icmp slt i32 %r21506, %r21158
+  br i1 %r21507, label %bb64, label %bb65
 bb64:
-  %r21507 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r21508 = call i32 @compilerBodyResolutionSourceColumn()
-  %r21509 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21507, i32 %r21505, i32 %r21508)
-  %r21510 = icmp eq i32 %r21509, %r21163
-  br i1 %r21510, label %bb66, label %bb67
+  %r21508 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r21509 = call i32 @compilerBodyResolutionSourceColumn()
+  %r21510 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21508, i32 %r21506, i32 %r21509)
+  %r21511 = icmp eq i32 %r21510, %r21164
+  br i1 %r21511, label %bb66, label %bb67
 bb66:
   ret i1 false
 bb67:
-  %r21511 = add i32 %r21505, 1
+  %r21512 = add i32 %r21506, 1
   br label %bb63
 bb65:
-  %r21512 = add i32 %r21157, 1
+  %r21513 = add i32 %r21158, 1
   br label %bb20
 bb22:
   ret i1 true
@@ -36108,140 +36113,140 @@ define i32 @compilerReachableLLVMStateAssignFunctionInstancesForArena(%Range.Com
 entry:
   br label %bb1
 bb1:
-  %r21513 = phi i32 [0, %entry], [%r21555, %bb5]
-  %r21514 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r21515 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21514)
-  %r21516 = icmp slt i32 %r21513, %r21515
-  br i1 %r21516, label %bb2, label %bb3
+  %r21514 = phi i32 [0, %entry], [%r21556, %bb5]
+  %r21515 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r21516 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21515)
+  %r21517 = icmp slt i32 %r21514, %r21516
+  br i1 %r21517, label %bb2, label %bb3
 bb2:
-  %r21517 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r21518 = call i32 @compilerBodyResolutionTargetKindColumn()
-  %r21519 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21517, i32 %r21513, i32 %r21518)
-  %r21520 = call i32 @compilerBodyResolutionFunction()
-  %r21521 = icmp eq i32 %r21519, %r21520
-  br i1 %r21521, label %bb4, label %bb5
+  %r21518 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r21519 = call i32 @compilerBodyResolutionTargetKindColumn()
+  %r21520 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21518, i32 %r21514, i32 %r21519)
+  %r21521 = call i32 @compilerBodyResolutionFunction()
+  %r21522 = icmp eq i32 %r21520, %r21521
+  br i1 %r21522, label %bb4, label %bb5
 bb4:
-  %r21522 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r21523 = call i32 @compilerBodyResolutionTargetIDColumn()
-  %r21524 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21522, i32 %r21513, i32 %r21523)
-  %r21525 = icmp slt i32 %r21524, 0
-  %r21526 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r21527 = extractvalue %Range.CompilerLLVMLoweringContext %r21526, 1
-  %r21528 = extractvalue %Range.CompilerSyntaxTables %r21527, 4
-  %r21529 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21528)
-  %r21530 = icmp sge i32 %r21524, %r21529
-  %r21531 = or i1 %r21525, %r21530
-  br i1 %r21531, label %bb6, label %bb7
+  %r21523 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r21524 = call i32 @compilerBodyResolutionTargetIDColumn()
+  %r21525 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21523, i32 %r21514, i32 %r21524)
+  %r21526 = icmp slt i32 %r21525, 0
+  %r21527 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r21528 = extractvalue %Range.CompilerLLVMLoweringContext %r21527, 1
+  %r21529 = extractvalue %Range.CompilerSyntaxTables %r21528, 4
+  %r21530 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21529)
+  %r21531 = icmp sge i32 %r21525, %r21530
+  %r21532 = or i1 %r21526, %r21531
+  br i1 %r21532, label %bb6, label %bb7
 bb6:
-  %r21532 = sub i32 0, 1
-  ret i32 %r21532
-bb7:
   %r21533 = sub i32 0, 1
-  %r21534 = call i32 @compilerReachableLLVMStateReceiverTypeIDForResolution(%Range.CompilerBodyArena %arena, i32 %r21513)
-  %r21535 = icmp sge i32 %r21534, 0
-  br i1 %r21535, label %bb8, label %bb9
+  ret i32 %r21533
+bb7:
+  %r21534 = sub i32 0, 1
+  %r21535 = call i32 @compilerReachableLLVMStateReceiverTypeIDForResolution(%Range.CompilerBodyArena %arena, i32 %r21514)
+  %r21536 = icmp sge i32 %r21535, 0
+  br i1 %r21536, label %bb8, label %bb9
 bb8:
-  %r21536 = call i32 @compilerBodyArenaTypeKindForTypeID(%Range.CompilerBodyArena %arena, i32 %r21534)
-  %r21537 = call i32 @compilerBodyTypeConstruct()
-  %r21538 = icmp ne i32 %r21536, %r21537
-  br i1 %r21538, label %bb10, label %bb11
+  %r21537 = call i32 @compilerBodyArenaTypeKindForTypeID(%Range.CompilerBodyArena %arena, i32 %r21535)
+  %r21538 = call i32 @compilerBodyTypeConstruct()
+  %r21539 = icmp ne i32 %r21537, %r21538
+  br i1 %r21539, label %bb10, label %bb11
 bb10:
-  %r21539 = sub i32 0, 1
-  ret i32 %r21539
+  %r21540 = sub i32 0, 1
+  ret i32 %r21540
 bb11:
-  %r21540 = extractvalue %Range.CompilerReachableLLVMState %reachability, 8
-  %r21541 = extractvalue %Range.CompilerReachableLLVMState %reachability, 9
-  %r21542 = call i32 @compilerReachableTypeKeyInternFromArena(%Range.CompilerIntTable %r21540, %Range.CompilerIntTable %r21541, %Range.CompilerBodyArena %arena, i32 %r21534)
-  %r21543 = icmp slt i32 %r21542, 0
-  br i1 %r21543, label %bb12, label %bb13
+  %r21541 = extractvalue %Range.CompilerReachableLLVMState %reachability, 8
+  %r21542 = extractvalue %Range.CompilerReachableLLVMState %reachability, 9
+  %r21543 = call i32 @compilerReachableTypeKeyInternFromArena(%Range.CompilerIntTable %r21541, %Range.CompilerIntTable %r21542, %Range.CompilerBodyArena %arena, i32 %r21535)
+  %r21544 = icmp slt i32 %r21543, 0
+  br i1 %r21544, label %bb12, label %bb13
 bb12:
-  %r21544 = sub i32 0, 1
-  ret i32 %r21544
+  %r21545 = sub i32 0, 1
+  ret i32 %r21545
 bb13:
   br label %bb9
 bb9:
-  %r21545 = phi i32 [%r21533, %bb7], [%r21542, %bb13]
-  %r21546 = call i32 @compilerReachableLLVMStateInternFunctionInstance(%Range.CompilerReachableLLVMState %reachability, i32 %r21524, i32 %r21545)
-  %r21547 = icmp slt i32 %r21546, 0
-  br i1 %r21547, label %bb14, label %bb15
+  %r21546 = phi i32 [%r21534, %bb7], [%r21543, %bb13]
+  %r21547 = call i32 @compilerReachableLLVMStateInternFunctionInstance(%Range.CompilerReachableLLVMState %reachability, i32 %r21525, i32 %r21546)
+  %r21548 = icmp slt i32 %r21547, 0
+  br i1 %r21548, label %bb14, label %bb15
 bb14:
-  %r21548 = sub i32 0, 1
-  ret i32 %r21548
+  %r21549 = sub i32 0, 1
+  ret i32 %r21549
 bb15:
-  %r21549 = call i32 @compilerBodyArenaSetResolutionInstanceID(%Range.CompilerBodyArena %arena, i32 %r21513, i32 %r21546)
-  %r21550 = icmp ne i32 %r21549, 0
-  br i1 %r21550, label %bb16, label %bb17
+  %r21550 = call i32 @compilerBodyArenaSetResolutionInstanceID(%Range.CompilerBodyArena %arena, i32 %r21514, i32 %r21547)
+  %r21551 = icmp ne i32 %r21550, 0
+  br i1 %r21551, label %bb16, label %bb17
 bb16:
-  %r21551 = sub i32 0, 1
-  ret i32 %r21551
+  %r21552 = sub i32 0, 1
+  ret i32 %r21552
 bb17:
-  %r21552 = call i32 @compilerReachableLLVMStateAppendInstanceEdgeMissing(%Range.CompilerReachableLLVMState %reachability, i32 %ownerInstanceID, i32 %r21546)
-  %r21553 = icmp ne i32 %r21552, 0
-  br i1 %r21553, label %bb18, label %bb19
+  %r21553 = call i32 @compilerReachableLLVMStateAppendInstanceEdgeMissing(%Range.CompilerReachableLLVMState %reachability, i32 %ownerInstanceID, i32 %r21547)
+  %r21554 = icmp ne i32 %r21553, 0
+  br i1 %r21554, label %bb18, label %bb19
 bb18:
-  %r21554 = sub i32 0, 1
-  ret i32 %r21554
+  %r21555 = sub i32 0, 1
+  ret i32 %r21555
 bb19:
   br label %bb5
 bb5:
-  %r21555 = add i32 %r21513, 1
+  %r21556 = add i32 %r21514, 1
   br label %bb1
 bb3:
   br label %bb20
 bb20:
-  %r21556 = phi i32 [0, %bb3], [%r21586, %bb24]
-  %r21557 = extractvalue %Range.CompilerBodyArena %arena, 35
-  %r21558 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21557)
-  %r21559 = icmp slt i32 %r21556, %r21558
-  br i1 %r21559, label %bb21, label %bb22
+  %r21557 = phi i32 [0, %bb3], [%r21587, %bb24]
+  %r21558 = extractvalue %Range.CompilerBodyArena %arena, 35
+  %r21559 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21558)
+  %r21560 = icmp slt i32 %r21557, %r21559
+  br i1 %r21560, label %bb21, label %bb22
 bb21:
-  %r21560 = extractvalue %Range.CompilerBodyArena %arena, 35
-  %r21561 = call i32 @compilerBodyMIROperationTargetKindColumn()
-  %r21562 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21560, i32 %r21556, i32 %r21561)
-  %r21563 = call i32 @compilerBodyMIROperationTargetFunction()
-  %r21564 = icmp eq i32 %r21562, %r21563
-  br i1 %r21564, label %bb23, label %bb24
+  %r21561 = extractvalue %Range.CompilerBodyArena %arena, 35
+  %r21562 = call i32 @compilerBodyMIROperationTargetKindColumn()
+  %r21563 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21561, i32 %r21557, i32 %r21562)
+  %r21564 = call i32 @compilerBodyMIROperationTargetFunction()
+  %r21565 = icmp eq i32 %r21563, %r21564
+  br i1 %r21565, label %bb23, label %bb24
 bb23:
-  %r21565 = extractvalue %Range.CompilerBodyArena %arena, 35
-  %r21566 = call i32 @compilerBodyMIROperationSourceColumn()
-  %r21567 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21565, i32 %r21556, i32 %r21566)
-  %r21568 = call i32 @compilerSyntaxRoleCallee()
-  %r21569 = call i32 @compilerBodyArenaChild(%Range.CompilerBodyArena %arena, i32 %r21567, i32 %r21568, i32 0)
-  %r21570 = call i32 @compilerBodyArenaResolutionForSource(%Range.CompilerBodyArena %arena, i32 %r21569)
-  %r21571 = icmp slt i32 %r21570, 0
-  br i1 %r21571, label %bb25, label %bb26
+  %r21566 = extractvalue %Range.CompilerBodyArena %arena, 35
+  %r21567 = call i32 @compilerBodyMIROperationSourceColumn()
+  %r21568 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21566, i32 %r21557, i32 %r21567)
+  %r21569 = call i32 @compilerSyntaxRoleCallee()
+  %r21570 = call i32 @compilerBodyArenaChild(%Range.CompilerBodyArena %arena, i32 %r21568, i32 %r21569, i32 0)
+  %r21571 = call i32 @compilerBodyArenaResolutionForSource(%Range.CompilerBodyArena %arena, i32 %r21570)
+  %r21572 = icmp slt i32 %r21571, 0
+  br i1 %r21572, label %bb25, label %bb26
 bb25:
-  %r21572 = sub i32 0, 1
-  ret i32 %r21572
+  %r21573 = sub i32 0, 1
+  ret i32 %r21573
 bb26:
-  %r21573 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r21574 = call i32 @compilerBodyResolutionInstanceIDColumn()
-  %r21575 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21573, i32 %r21570, i32 %r21574)
-  %r21576 = icmp slt i32 %r21575, 0
-  br i1 %r21576, label %bb27, label %bb28
+  %r21574 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r21575 = call i32 @compilerBodyResolutionInstanceIDColumn()
+  %r21576 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21574, i32 %r21571, i32 %r21575)
+  %r21577 = icmp slt i32 %r21576, 0
+  br i1 %r21577, label %bb27, label %bb28
 bb27:
-  %r21577 = sub i32 0, 1
-  ret i32 %r21577
+  %r21578 = sub i32 0, 1
+  ret i32 %r21578
 bb28:
-  %r21578 = extractvalue %Range.CompilerBodyArena %arena, 35
-  %r21579 = call i32 @compilerBodyMIROperationInstanceIDColumn()
-  %r21580 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21578, i32 %r21556, i32 %r21579)
-  %r21581 = icmp ne i32 %r21580, %r21575
-  br i1 %r21581, label %bb29, label %bb30
+  %r21579 = extractvalue %Range.CompilerBodyArena %arena, 35
+  %r21580 = call i32 @compilerBodyMIROperationInstanceIDColumn()
+  %r21581 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r21579, i32 %r21557, i32 %r21580)
+  %r21582 = icmp ne i32 %r21581, %r21576
+  br i1 %r21582, label %bb29, label %bb30
 bb29:
-  %r21582 = sub i32 0, 1
-  ret i32 %r21582
+  %r21583 = sub i32 0, 1
+  ret i32 %r21583
 bb30:
-  %r21583 = call i32 @compilerReachableLLVMStateAppendInstanceEdgeMissing(%Range.CompilerReachableLLVMState %reachability, i32 %ownerInstanceID, i32 %r21575)
-  %r21584 = icmp ne i32 %r21583, 0
-  br i1 %r21584, label %bb31, label %bb32
+  %r21584 = call i32 @compilerReachableLLVMStateAppendInstanceEdgeMissing(%Range.CompilerReachableLLVMState %reachability, i32 %ownerInstanceID, i32 %r21576)
+  %r21585 = icmp ne i32 %r21584, 0
+  br i1 %r21585, label %bb31, label %bb32
 bb31:
-  %r21585 = sub i32 0, 1
-  ret i32 %r21585
+  %r21586 = sub i32 0, 1
+  ret i32 %r21586
 bb32:
   br label %bb24
 bb24:
-  %r21586 = add i32 %r21556, 1
+  %r21587 = add i32 %r21557, 1
   br label %bb20
 bb22:
   ret i32 0
@@ -36260,25 +36265,25 @@ entry:
 }
 define i1 @compilerBodyArenaResultTypeIsRepresentationSensitive(%Range.CompilerBodyArena %arena, i32 %typeKind, i32 %typeID) {
 entry:
-  %r21587 = call i32 @compilerBodyTypeConstruct()
-  %r21588 = icmp ne i32 %typeKind, %r21587
-  %r21589 = call i32 @compilerBodyTypeEnum()
-  %r21590 = icmp ne i32 %typeKind, %r21589
-  %r21591 = and i1 %r21588, %r21590
-  %r21592 = icmp slt i32 %typeID, 0
-  %r21593 = or i1 %r21591, %r21592
-  %r21594 = extractvalue %Range.CompilerBodyArena %arena, 18
-  %r21595 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21594)
-  %r21596 = icmp sge i32 %typeID, %r21595
-  %r21597 = or i1 %r21593, %r21596
-  br i1 %r21597, label %bb1, label %bb2
+  %r21588 = call i32 @compilerBodyTypeConstruct()
+  %r21589 = icmp ne i32 %typeKind, %r21588
+  %r21590 = call i32 @compilerBodyTypeEnum()
+  %r21591 = icmp ne i32 %typeKind, %r21590
+  %r21592 = and i1 %r21589, %r21591
+  %r21593 = icmp slt i32 %typeID, 0
+  %r21594 = or i1 %r21592, %r21593
+  %r21595 = extractvalue %Range.CompilerBodyArena %arena, 18
+  %r21596 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21595)
+  %r21597 = icmp sge i32 %typeID, %r21596
+  %r21598 = or i1 %r21594, %r21597
+  br i1 %r21598, label %bb1, label %bb2
 bb1:
   ret i1 false
 bb2:
-  %r21598 = call i32 @compilerBodyArenaFunctionSignatureABICategory(%Range.CompilerBodyArena %arena, i32 %typeID, i32 %typeKind)
-  %r21599 = call i32 @compilerBodyFunctionSignatureABICategoryNone()
-  %r21600 = icmp eq i32 %r21598, %r21599
-  ret i1 %r21600
+  %r21599 = call i32 @compilerBodyArenaFunctionSignatureABICategory(%Range.CompilerBodyArena %arena, i32 %typeID, i32 %typeKind)
+  %r21600 = call i32 @compilerBodyFunctionSignatureABICategoryNone()
+  %r21601 = icmp eq i32 %r21599, %r21600
+  ret i1 %r21601
 }
 define i32 @compilerBodyResolutionTypeKindColumn() {
 entry:
@@ -36290,35 +36295,35 @@ entry:
 }
 define i32 @compilerReachableLLVMStateEnqueueInstance(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID) {
 entry:
-  %r21601 = call i32 @compilerReachableLLVMStateFunctionInstanceRow(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID)
-  %r21602 = icmp slt i32 %r21601, 0
-  br i1 %r21602, label %bb1, label %bb2
+  %r21602 = call i32 @compilerReachableLLVMStateFunctionInstanceRow(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID)
+  %r21603 = icmp slt i32 %r21602, 0
+  br i1 %r21603, label %bb1, label %bb2
 bb1:
-  %r21603 = sub i32 0, 1
-  ret i32 %r21603
+  %r21604 = sub i32 0, 1
+  ret i32 %r21604
 bb2:
-  %r21604 = extractvalue %Range.CompilerReachableLLVMState %reachability, 1
-  %r21605 = call i1 @compilerFunctionSelectionContains(%Range.CompilerFunctionSelection %r21604, i32 %r21601)
-  %r21606 = xor i1 %r21605, true
-  br i1 %r21606, label %bb3, label %bb4
+  %r21605 = extractvalue %Range.CompilerReachableLLVMState %reachability, 1
+  %r21606 = call i1 @compilerFunctionSelectionContains(%Range.CompilerFunctionSelection %r21605, i32 %r21602)
+  %r21607 = xor i1 %r21606, true
+  br i1 %r21607, label %bb3, label %bb4
 bb3:
-  %r21607 = extractvalue %Range.CompilerReachableLLVMState %reachability, 1
-  %r21608 = call i32 @compilerFunctionSelectionMark(%Range.CompilerFunctionSelection %r21607, i32 %r21601)
-  %r21609 = icmp ne i32 %r21608, 0
-  br i1 %r21609, label %bb5, label %bb6
+  %r21608 = extractvalue %Range.CompilerReachableLLVMState %reachability, 1
+  %r21609 = call i32 @compilerFunctionSelectionMark(%Range.CompilerFunctionSelection %r21608, i32 %r21602)
+  %r21610 = icmp ne i32 %r21609, 0
+  br i1 %r21610, label %bb5, label %bb6
 bb5:
-  %r21610 = sub i32 0, 1
-  ret i32 %r21610
+  %r21611 = sub i32 0, 1
+  ret i32 %r21611
 bb6:
   br label %bb4
 bb4:
-  %r21611 = call i1 @compilerReachableLLVMStateWorklistContainsInstance(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID)
-  br i1 %r21611, label %bb7, label %bb8
+  %r21612 = call i1 @compilerReachableLLVMStateWorklistContainsInstance(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID)
+  br i1 %r21612, label %bb7, label %bb8
 bb7:
   ret i32 0
 bb8:
-  %r21612 = call i32 @compilerReachableLLVMStateAppendWorklistInstance(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID)
-  ret i32 %r21612
+  %r21613 = call i32 @compilerReachableLLVMStateAppendWorklistInstance(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID)
+  ret i32 %r21613
 }
 define i32 @compilerReachableLLVMFailureStage() {
 entry:
@@ -36326,17 +36331,17 @@ entry:
 }
 define i32 @compilerReachableLLVMStateSetInvalid(%Range.CompilerReachableLLVMState %reachability) {
 entry:
-  %r21613 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r21614 = call i32 @compilerReachableLLMValid()
-  %r21615 = call i32 @rawBufferStoreInt(ptr %r21613, i32 %r21614, i32 0)
-  %r21616 = icmp ne i32 %r21615, 0
-  br i1 %r21616, label %bb1, label %bb2
+  %r21614 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r21615 = call i32 @compilerReachableLLMValid()
+  %r21616 = call i32 @rawBufferStoreInt(ptr %r21614, i32 %r21615, i32 0)
+  %r21617 = icmp ne i32 %r21616, 0
+  br i1 %r21617, label %bb1, label %bb2
 bb1:
-  %r21617 = sub i32 0, 1
-  ret i32 %r21617
-bb2:
   %r21618 = sub i32 0, 1
   ret i32 %r21618
+bb2:
+  %r21619 = sub i32 0, 1
+  ret i32 %r21619
 }
 define i32 @compilerReachableLLMWorkIndex() {
 entry:
@@ -36344,1134 +36349,1134 @@ entry:
 }
 define i32 @compilerReachableLLVMStateWorklistInstanceID(%Range.CompilerReachableLLVMState %reachability, i32 %workIndex) {
 entry:
-  %r21619 = icmp slt i32 %workIndex, 0
-  %r21620 = extractvalue %Range.CompilerReachableLLVMState %reachability, 3
-  %r21621 = call i32 @rawBufferCount(ptr %r21620)
-  %r21622 = icmp sge i32 %workIndex, %r21621
-  %r21623 = or i1 %r21619, %r21622
-  br i1 %r21623, label %bb1, label %bb2
+  %r21620 = icmp slt i32 %workIndex, 0
+  %r21621 = extractvalue %Range.CompilerReachableLLVMState %reachability, 3
+  %r21622 = call i32 @rawBufferCount(ptr %r21621)
+  %r21623 = icmp sge i32 %workIndex, %r21622
+  %r21624 = or i1 %r21620, %r21623
+  br i1 %r21624, label %bb1, label %bb2
 bb1:
-  %r21624 = sub i32 0, 1
-  ret i32 %r21624
+  %r21625 = sub i32 0, 1
+  ret i32 %r21625
 bb2:
-  %r21625 = extractvalue %Range.CompilerReachableLLVMState %reachability, 3
-  %r21626 = call i32 @rawBufferLoadInt(ptr %r21625, i32 %workIndex)
-  ret i32 %r21626
+  %r21626 = extractvalue %Range.CompilerReachableLLVMState %reachability, 3
+  %r21627 = call i32 @rawBufferLoadInt(ptr %r21626, i32 %workIndex)
+  ret i32 %r21627
 }
 define i32 @compilerReachableLLVMStateDiscoverFunction(%Range.CompilerReachableLLVMState %reachability, i32 %functionRow, i32 %instanceID) {
 entry:
   %storage0 = alloca %Range.CompilerBodyArena
   %storage1 = alloca %Range.CompilerBodyArena
-  %r21627 = call i32 @stringTransientRegionMark()
-  %r21628 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
-  %r21629 = call i32 @rawBufferCount(ptr %r21628)
-  %r21630 = extractvalue %Range.CompilerReachableLLVMState %reachability, 7
-  %r21631 = call i32 @rawBufferCount(ptr %r21630)
-  %r21632 = call ptr @rawBufferCreate(i32 16, i32 4)
+  %r21628 = call i32 @stringTransientRegionMark()
+  %r21629 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
+  %r21630 = call i32 @rawBufferCount(ptr %r21629)
+  %r21631 = extractvalue %Range.CompilerReachableLLVMState %reachability, 7
+  %r21632 = call i32 @rawBufferCount(ptr %r21631)
   %r21633 = call ptr @rawBufferCreate(i32 16, i32 4)
-  %r21634 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r21635 = extractvalue %Range.CompilerLLVMLoweringContext %r21634, 1
-  %r21636 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r21637 = extractvalue %Range.CompilerLLVMLoweringContext %r21636, 2
-  %r21638 = call i32 @compilerReachableLLVMStateFunctionInstanceReceiverKey(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID)
-  %r21639 = extractvalue %Range.CompilerReachableLLVMState %reachability, 8
-  %r21640 = extractvalue %Range.CompilerReachableLLVMState %reachability, 9
-  call void @compilerBodyArenaCreateForFunctionInstance(ptr %storage1, %Range.CompilerSyntaxTables %r21635, %Range.CompilerDeclarationIndex %r21637, i32 %functionRow, i32 %instanceID, i32 %r21638, %Range.CompilerIntTable %r21639, %Range.CompilerIntTable %r21640)
-  %r21641 = load %Range.CompilerBodyArena, ptr %storage1
-  call void @compilerBodyArenaParseFunction(ptr %storage0, %Range.CompilerBodyArena %r21641)
-  %r21642 = load %Range.CompilerBodyArena, ptr %storage0
-  %r21643 = call i1 @compilerBodyArenaIsValid(%Range.CompilerBodyArena %r21642)
-  %r21644 = xor i1 %r21643, true
-  br i1 %r21644, label %bb1, label %bb2
+  %r21634 = call ptr @rawBufferCreate(i32 16, i32 4)
+  %r21635 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r21636 = extractvalue %Range.CompilerLLVMLoweringContext %r21635, 1
+  %r21637 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r21638 = extractvalue %Range.CompilerLLVMLoweringContext %r21637, 2
+  %r21639 = call i32 @compilerReachableLLVMStateFunctionInstanceReceiverKey(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID)
+  %r21640 = extractvalue %Range.CompilerReachableLLVMState %reachability, 8
+  %r21641 = extractvalue %Range.CompilerReachableLLVMState %reachability, 9
+  call void @compilerBodyArenaCreateForFunctionInstance(ptr %storage1, %Range.CompilerSyntaxTables %r21636, %Range.CompilerDeclarationIndex %r21638, i32 %functionRow, i32 %instanceID, i32 %r21639, %Range.CompilerIntTable %r21640, %Range.CompilerIntTable %r21641)
+  %r21642 = load %Range.CompilerBodyArena, ptr %storage1
+  call void @compilerBodyArenaParseFunction(ptr %storage0, %Range.CompilerBodyArena %r21642)
+  %r21643 = load %Range.CompilerBodyArena, ptr %storage0
+  %r21644 = call i1 @compilerBodyArenaIsValid(%Range.CompilerBodyArena %r21643)
+  %r21645 = xor i1 %r21644, true
+  br i1 %r21645, label %bb1, label %bb2
 bb1:
   br label %bb2
 bb2:
-  %r21645 = phi i32 [0, %entry], [1, %bb1]
-  br i1 %r21643, label %bb3, label %bb4
+  %r21646 = phi i32 [0, %entry], [1, %bb1]
+  br i1 %r21644, label %bb3, label %bb4
 bb3:
-  %r21646 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r21647 = extractvalue %Range.CompilerLLVMLoweringContext %r21646, 2
-  %r21648 = call i32 @compilerBodyArenaBuildSymbolsAndResolutions(%Range.CompilerBodyArena %r21642, %Range.CompilerDeclarationIndex %r21647)
-  %r21649 = icmp ne i32 %r21648, 0
-  br i1 %r21649, label %bb5, label %bb6
+  %r21647 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r21648 = extractvalue %Range.CompilerLLVMLoweringContext %r21647, 2
+  %r21649 = call i32 @compilerBodyArenaBuildSymbolsAndResolutions(%Range.CompilerBodyArena %r21643, %Range.CompilerDeclarationIndex %r21648)
+  %r21650 = icmp ne i32 %r21649, 0
+  br i1 %r21650, label %bb5, label %bb6
 bb5:
   br label %bb6
 bb6:
-  %r21650 = phi i1 [%r21643, %bb3], [false, %bb5]
-  %r21651 = phi i32 [%r21645, %bb3], [2, %bb5]
+  %r21651 = phi i1 [%r21644, %bb3], [false, %bb5]
+  %r21652 = phi i32 [%r21646, %bb3], [2, %bb5]
   br label %bb4
 bb4:
-  %r21652 = phi i1 [%r21643, %bb2], [%r21650, %bb6]
-  %r21653 = phi i32 [%r21645, %bb2], [%r21651, %bb6]
-  br i1 %r21652, label %bb7, label %bb8
+  %r21653 = phi i1 [%r21644, %bb2], [%r21651, %bb6]
+  %r21654 = phi i32 [%r21646, %bb2], [%r21652, %bb6]
+  br i1 %r21653, label %bb7, label %bb8
 bb7:
-  %r21654 = call i1 @compilerBodyArenaSymbolsAndResolutionsAreValid(%Range.CompilerBodyArena %r21642)
-  %r21655 = xor i1 %r21654, true
-  br i1 %r21655, label %bb9, label %bb10
+  %r21655 = call i1 @compilerBodyArenaSymbolsAndResolutionsAreValid(%Range.CompilerBodyArena %r21643)
+  %r21656 = xor i1 %r21655, true
+  br i1 %r21656, label %bb9, label %bb10
 bb9:
   br label %bb10
 bb10:
-  %r21656 = phi i1 [%r21652, %bb7], [false, %bb9]
-  %r21657 = phi i32 [%r21653, %bb7], [3, %bb9]
+  %r21657 = phi i1 [%r21653, %bb7], [false, %bb9]
+  %r21658 = phi i32 [%r21654, %bb7], [3, %bb9]
   br label %bb8
 bb8:
-  %r21658 = phi i1 [%r21652, %bb4], [%r21656, %bb10]
-  %r21659 = phi i32 [%r21653, %bb4], [%r21657, %bb10]
-  br i1 %r21658, label %bb11, label %bb12
+  %r21659 = phi i1 [%r21653, %bb4], [%r21657, %bb10]
+  %r21660 = phi i32 [%r21654, %bb4], [%r21658, %bb10]
+  br i1 %r21659, label %bb11, label %bb12
 bb11:
-  %r21660 = call i32 @compilerReachableLLVMStateFreezeFunctionInstanceSignature(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID, %Range.CompilerBodyArena %r21642)
-  %r21661 = icmp ne i32 %r21660, 0
-  br i1 %r21661, label %bb13, label %bb14
+  %r21661 = call i32 @compilerReachableLLVMStateFreezeFunctionInstanceSignature(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID, %Range.CompilerBodyArena %r21643)
+  %r21662 = icmp ne i32 %r21661, 0
+  br i1 %r21662, label %bb13, label %bb14
 bb13:
   br label %bb14
 bb14:
-  %r21662 = phi i1 [%r21658, %bb11], [false, %bb13]
-  %r21663 = phi i32 [%r21659, %bb11], [12, %bb13]
+  %r21663 = phi i1 [%r21659, %bb11], [false, %bb13]
+  %r21664 = phi i32 [%r21660, %bb11], [12, %bb13]
   br label %bb12
 bb12:
-  %r21664 = phi i1 [%r21658, %bb8], [%r21662, %bb14]
-  %r21665 = phi i32 [%r21659, %bb8], [%r21663, %bb14]
-  br i1 %r21664, label %bb15, label %bb16
+  %r21665 = phi i1 [%r21659, %bb8], [%r21663, %bb14]
+  %r21666 = phi i32 [%r21660, %bb8], [%r21664, %bb14]
+  br i1 %r21665, label %bb15, label %bb16
 bb15:
-  %r21666 = call i32 @compilerBodyArenaAppendFunctionEdges(%Range.CompilerBodyArena %r21642, ptr %r21632, ptr %r21633)
-  %r21667 = icmp ne i32 %r21666, 0
-  br i1 %r21667, label %bb17, label %bb18
+  %r21667 = call i32 @compilerBodyArenaAppendFunctionEdges(%Range.CompilerBodyArena %r21643, ptr %r21633, ptr %r21634)
+  %r21668 = icmp ne i32 %r21667, 0
+  br i1 %r21668, label %bb17, label %bb18
 bb17:
   br label %bb18
 bb18:
-  %r21668 = phi i1 [%r21664, %bb15], [false, %bb17]
-  %r21669 = phi i32 [%r21665, %bb15], [10, %bb17]
+  %r21669 = phi i1 [%r21665, %bb15], [false, %bb17]
+  %r21670 = phi i32 [%r21666, %bb15], [10, %bb17]
   br label %bb16
 bb16:
-  %r21670 = phi i1 [%r21664, %bb12], [%r21668, %bb18]
-  %r21671 = phi i32 [%r21665, %bb12], [%r21669, %bb18]
-  br i1 %r21670, label %bb19, label %bb20
+  %r21671 = phi i1 [%r21665, %bb12], [%r21669, %bb18]
+  %r21672 = phi i32 [%r21666, %bb12], [%r21670, %bb18]
+  br i1 %r21671, label %bb19, label %bb20
 bb19:
-  %r21672 = call i32 @compilerReachableLLVMStateAssignFunctionInstancesForArena(%Range.CompilerReachableLLVMState %reachability, %Range.CompilerBodyArena %r21642, i32 %instanceID)
-  %r21673 = icmp ne i32 %r21672, 0
-  br i1 %r21673, label %bb21, label %bb22
+  %r21673 = call i32 @compilerReachableLLVMStateAssignFunctionInstancesForArena(%Range.CompilerReachableLLVMState %reachability, %Range.CompilerBodyArena %r21643, i32 %instanceID)
+  %r21674 = icmp ne i32 %r21673, 0
+  br i1 %r21674, label %bb21, label %bb22
 bb21:
   br label %bb22
 bb22:
-  %r21674 = phi i1 [%r21670, %bb19], [false, %bb21]
-  %r21675 = phi i32 [%r21671, %bb19], [11, %bb21]
+  %r21675 = phi i1 [%r21671, %bb19], [false, %bb21]
+  %r21676 = phi i32 [%r21672, %bb19], [11, %bb21]
   br label %bb20
 bb20:
-  %r21676 = phi i1 [%r21670, %bb16], [%r21674, %bb22]
-  %r21677 = phi i32 [%r21671, %bb16], [%r21675, %bb22]
-  br i1 %r21676, label %bb23, label %bb24
+  %r21677 = phi i1 [%r21671, %bb16], [%r21675, %bb22]
+  %r21678 = phi i32 [%r21672, %bb16], [%r21676, %bb22]
+  br i1 %r21677, label %bb23, label %bb24
 bb23:
-  %r21678 = extractvalue %Range.CompilerReachableLLVMState %reachability, 22
-  %r21679 = call i32 @compilerBodyArenaMarkRepresentationSensitiveTargets(%Range.CompilerBodyArena %r21642, ptr %r21678)
-  %r21680 = icmp ne i32 %r21679, 0
-  br i1 %r21680, label %bb25, label %bb26
+  %r21679 = extractvalue %Range.CompilerReachableLLVMState %reachability, 22
+  %r21680 = call i32 @compilerBodyArenaMarkRepresentationSensitiveTargets(%Range.CompilerBodyArena %r21643, ptr %r21679)
+  %r21681 = icmp ne i32 %r21680, 0
+  br i1 %r21681, label %bb25, label %bb26
 bb25:
   br label %bb26
 bb26:
-  %r21681 = phi i1 [%r21676, %bb23], [false, %bb25]
-  %r21682 = phi i32 [%r21677, %bb23], [10, %bb25]
+  %r21682 = phi i1 [%r21677, %bb23], [false, %bb25]
+  %r21683 = phi i32 [%r21678, %bb23], [10, %bb25]
   br label %bb24
 bb24:
-  %r21683 = phi i1 [%r21676, %bb20], [%r21681, %bb26]
-  %r21684 = phi i32 [%r21677, %bb20], [%r21682, %bb26]
-  %r21685 = xor i1 %r21683, true
-  br i1 %r21685, label %bb27, label %bb28
+  %r21684 = phi i1 [%r21677, %bb20], [%r21682, %bb26]
+  %r21685 = phi i32 [%r21678, %bb20], [%r21683, %bb26]
+  %r21686 = xor i1 %r21684, true
+  br i1 %r21686, label %bb27, label %bb28
 bb27:
-  %r21686 = extractvalue %Range.CompilerBodyArena %r21642, 43
-  %r21687 = call i32 @rawBufferCount(ptr %r21686)
-  %r21688 = icmp sgt i32 %r21687, 0
-  br i1 %r21688, label %bb29, label %bb30
+  %r21687 = extractvalue %Range.CompilerBodyArena %r21643, 43
+  %r21688 = call i32 @rawBufferCount(ptr %r21687)
+  %r21689 = icmp sgt i32 %r21688, 0
+  br i1 %r21689, label %bb29, label %bb30
 bb29:
-  %r21689 = extractvalue %Range.CompilerBodyArena %r21642, 43
-  %r21690 = call i32 @rawBufferLoadInt(ptr %r21689, i32 0)
+  %r21690 = extractvalue %Range.CompilerBodyArena %r21643, 43
+  %r21691 = call i32 @rawBufferLoadInt(ptr %r21690, i32 0)
   br label %bb30
 bb30:
-  %r21691 = phi i32 [%r21684, %bb27], [%r21690, %bb29]
-  %r21692 = icmp sle i32 %r21691, 0
-  br i1 %r21692, label %bb31, label %bb32
+  %r21692 = phi i32 [%r21685, %bb27], [%r21691, %bb29]
+  %r21693 = icmp sle i32 %r21692, 0
+  br i1 %r21693, label %bb31, label %bb32
 bb31:
   br label %bb32
 bb32:
-  %r21693 = phi i32 [%r21691, %bb30], [1, %bb31]
-  %r21694 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
-  %r21695 = sub i32 0, %r21693
-  %r21696 = call i32 @rawBufferStoreInt(ptr %r21694, i32 %functionRow, i32 %r21695)
-  %r21697 = icmp ne i32 %r21696, 0
-  br i1 %r21697, label %bb33, label %bb34
+  %r21694 = phi i32 [%r21692, %bb30], [1, %bb31]
+  %r21695 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
+  %r21696 = sub i32 0, %r21694
+  %r21697 = call i32 @rawBufferStoreInt(ptr %r21695, i32 %functionRow, i32 %r21696)
+  %r21698 = icmp ne i32 %r21697, 0
+  br i1 %r21698, label %bb33, label %bb34
 bb33:
-  %r21698 = sub i32 0, 1
+  %r21699 = sub i32 0, 1
   br label %bb34
 bb34:
-  %r21699 = phi i32 [0, %bb32], [%r21698, %bb33]
-  %r21700 = icmp eq i32 %r21699, 0
-  br i1 %r21700, label %bb35, label %bb36
+  %r21700 = phi i32 [0, %bb32], [%r21699, %bb33]
+  %r21701 = icmp eq i32 %r21700, 0
+  br i1 %r21701, label %bb35, label %bb36
 bb35:
-  %r21701 = sub i32 0, 1
+  %r21702 = sub i32 0, 1
   br label %bb36
 bb36:
-  %r21702 = phi i32 [%r21699, %bb34], [%r21701, %bb35]
+  %r21703 = phi i32 [%r21700, %bb34], [%r21702, %bb35]
   br label %bb28
 bb28:
-  %r21703 = phi i32 [0, %bb24], [%r21702, %bb36]
-  %r21704 = icmp eq i32 %r21703, 0
-  br i1 %r21704, label %bb37, label %bb38
+  %r21704 = phi i32 [0, %bb24], [%r21703, %bb36]
+  %r21705 = icmp eq i32 %r21704, 0
+  br i1 %r21705, label %bb37, label %bb38
 bb37:
   br label %bb39
 bb39:
-  %r21705 = phi i32 [%r21703, %bb37], [%r21722, %bb45]
-  %r21706 = phi i32 [0, %bb37], [%r21723, %bb45]
-  %r21707 = call i32 @rawBufferCount(ptr %r21633)
-  %r21708 = icmp slt i32 %r21706, %r21707
-  br i1 %r21708, label %bb40, label %bb41
+  %r21706 = phi i32 [%r21704, %bb37], [%r21723, %bb45]
+  %r21707 = phi i32 [0, %bb37], [%r21724, %bb45]
+  %r21708 = call i32 @rawBufferCount(ptr %r21634)
+  %r21709 = icmp slt i32 %r21707, %r21708
+  br i1 %r21709, label %bb40, label %bb41
 bb40:
-  %r21709 = extractvalue %Range.CompilerReachableLLVMState %reachability, 4
-  %r21710 = call i32 @rawBufferLoadInt(ptr %r21632, i32 %r21706)
-  %r21711 = call i32 @rawBufferAppendInt(ptr %r21709, i32 %r21710)
-  %r21712 = icmp ne i32 %r21711, 0
-  br i1 %r21712, label %bb42, label %bb43
+  %r21710 = extractvalue %Range.CompilerReachableLLVMState %reachability, 4
+  %r21711 = call i32 @rawBufferLoadInt(ptr %r21633, i32 %r21707)
+  %r21712 = call i32 @rawBufferAppendInt(ptr %r21710, i32 %r21711)
+  %r21713 = icmp ne i32 %r21712, 0
+  br i1 %r21713, label %bb42, label %bb43
 bb42:
-  %r21713 = sub i32 0, 1
+  %r21714 = sub i32 0, 1
   br label %bb43
 bb43:
-  %r21714 = phi i32 [%r21705, %bb40], [%r21713, %bb42]
-  %r21715 = icmp eq i32 %r21714, 0
-  br i1 %r21715, label %bb44, label %bb45
+  %r21715 = phi i32 [%r21706, %bb40], [%r21714, %bb42]
+  %r21716 = icmp eq i32 %r21715, 0
+  br i1 %r21716, label %bb44, label %bb45
 bb44:
-  %r21716 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
-  %r21717 = call i32 @rawBufferLoadInt(ptr %r21633, i32 %r21706)
-  %r21718 = call i32 @rawBufferAppendInt(ptr %r21716, i32 %r21717)
-  %r21719 = icmp ne i32 %r21718, 0
-  br i1 %r21719, label %bb46, label %bb47
+  %r21717 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
+  %r21718 = call i32 @rawBufferLoadInt(ptr %r21634, i32 %r21707)
+  %r21719 = call i32 @rawBufferAppendInt(ptr %r21717, i32 %r21718)
+  %r21720 = icmp ne i32 %r21719, 0
+  br i1 %r21720, label %bb46, label %bb47
 bb46:
-  %r21720 = sub i32 0, 1
+  %r21721 = sub i32 0, 1
   br label %bb47
 bb47:
-  %r21721 = phi i32 [%r21714, %bb44], [%r21720, %bb46]
+  %r21722 = phi i32 [%r21715, %bb44], [%r21721, %bb46]
   br label %bb45
 bb45:
-  %r21722 = phi i32 [%r21714, %bb43], [%r21721, %bb47]
-  %r21723 = add i32 %r21706, 1
+  %r21723 = phi i32 [%r21715, %bb43], [%r21722, %bb47]
+  %r21724 = add i32 %r21707, 1
   br label %bb39
 bb41:
   br label %bb38
 bb38:
-  %r21724 = phi i32 [%r21703, %bb28], [%r21705, %bb41]
-  %r21725 = call i32 @rawBufferDestroy(ptr %r21632)
+  %r21725 = phi i32 [%r21704, %bb28], [%r21706, %bb41]
   %r21726 = call i32 @rawBufferDestroy(ptr %r21633)
-  %r21727 = call i32 @compilerBodyArenaDestroy(%Range.CompilerBodyArena %r21642)
-  %r21728 = icmp ne i32 %r21725, 0
+  %r21727 = call i32 @rawBufferDestroy(ptr %r21634)
+  %r21728 = call i32 @compilerBodyArenaDestroy(%Range.CompilerBodyArena %r21643)
   %r21729 = icmp ne i32 %r21726, 0
-  %r21730 = or i1 %r21728, %r21729
-  %r21731 = icmp ne i32 %r21727, 0
-  %r21732 = or i1 %r21730, %r21731
-  br i1 %r21732, label %bb48, label %bb49
+  %r21730 = icmp ne i32 %r21727, 0
+  %r21731 = or i1 %r21729, %r21730
+  %r21732 = icmp ne i32 %r21728, 0
+  %r21733 = or i1 %r21731, %r21732
+  br i1 %r21733, label %bb48, label %bb49
 bb48:
-  %r21733 = sub i32 0, 1
+  %r21734 = sub i32 0, 1
   br label %bb49
 bb49:
-  %r21734 = phi i32 [%r21724, %bb38], [%r21733, %bb48]
-  %r21735 = icmp eq i32 %r21734, 0
-  br i1 %r21735, label %bb50, label %bb51
+  %r21735 = phi i32 [%r21725, %bb38], [%r21734, %bb48]
+  %r21736 = icmp eq i32 %r21735, 0
+  br i1 %r21736, label %bb50, label %bb51
 bb50:
-  %r21736 = call i32 @compilerReachableLLVMStateEnqueueEdges(%Range.CompilerReachableLLVMState %reachability, i32 %r21629)
-  %r21737 = icmp ne i32 %r21736, 0
-  br i1 %r21737, label %bb52, label %bb53
+  %r21737 = call i32 @compilerReachableLLVMStateEnqueueEdges(%Range.CompilerReachableLLVMState %reachability, i32 %r21630)
+  %r21738 = icmp ne i32 %r21737, 0
+  br i1 %r21738, label %bb52, label %bb53
 bb52:
-  %r21738 = sub i32 0, 1
+  %r21739 = sub i32 0, 1
   br label %bb53
 bb53:
-  %r21739 = phi i32 [%r21734, %bb50], [%r21738, %bb52]
+  %r21740 = phi i32 [%r21735, %bb50], [%r21739, %bb52]
   br label %bb51
 bb51:
-  %r21740 = phi i32 [%r21734, %bb49], [%r21739, %bb53]
-  %r21741 = icmp eq i32 %r21740, 0
-  br i1 %r21741, label %bb54, label %bb55
+  %r21741 = phi i32 [%r21735, %bb49], [%r21740, %bb53]
+  %r21742 = icmp eq i32 %r21741, 0
+  br i1 %r21742, label %bb54, label %bb55
 bb54:
-  %r21742 = call i32 @compilerReachableLLVMStateEnqueueInstanceEdges(%Range.CompilerReachableLLVMState %reachability, i32 %r21631)
-  %r21743 = icmp ne i32 %r21742, 0
-  br i1 %r21743, label %bb56, label %bb57
+  %r21743 = call i32 @compilerReachableLLVMStateEnqueueInstanceEdges(%Range.CompilerReachableLLVMState %reachability, i32 %r21632)
+  %r21744 = icmp ne i32 %r21743, 0
+  br i1 %r21744, label %bb56, label %bb57
 bb56:
-  %r21744 = sub i32 0, 1
+  %r21745 = sub i32 0, 1
   br label %bb57
 bb57:
-  %r21745 = phi i32 [%r21740, %bb54], [%r21744, %bb56]
+  %r21746 = phi i32 [%r21741, %bb54], [%r21745, %bb56]
   br label %bb55
 bb55:
-  %r21746 = phi i32 [%r21740, %bb51], [%r21745, %bb57]
-  %r21747 = call i32 @stringTransientRegionReset(i32 %r21627)
-  ret i32 %r21746
+  %r21747 = phi i32 [%r21741, %bb51], [%r21746, %bb57]
+  %r21748 = call i32 @stringTransientRegionReset(i32 %r21628)
+  ret i32 %r21747
 }
 define i32 @compilerReachableLLVMStateBuildFunctionInstanceEffects(%Range.CompilerReachableLLVMState %reachability) {
 entry:
-  %r21748 = extractvalue %Range.CompilerReachableLLVMState %reachability, 13
-  %r21749 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21748)
-  %r21750 = icmp ne i32 %r21749, 0
-  %r21751 = extractvalue %Range.CompilerReachableLLVMState %reachability, 14
-  %r21752 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21751)
-  %r21753 = icmp ne i32 %r21752, 0
-  %r21754 = or i1 %r21750, %r21753
-  %r21755 = extractvalue %Range.CompilerReachableLLVMState %reachability, 15
-  %r21756 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21755)
-  %r21757 = icmp ne i32 %r21756, 0
-  %r21758 = or i1 %r21754, %r21757
-  %r21759 = extractvalue %Range.CompilerReachableLLVMState %reachability, 17
-  %r21760 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21759)
-  %r21761 = icmp ne i32 %r21760, 0
-  %r21762 = or i1 %r21758, %r21761
-  br i1 %r21762, label %bb1, label %bb2
+  %r21749 = extractvalue %Range.CompilerReachableLLVMState %reachability, 13
+  %r21750 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21749)
+  %r21751 = icmp ne i32 %r21750, 0
+  %r21752 = extractvalue %Range.CompilerReachableLLVMState %reachability, 14
+  %r21753 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21752)
+  %r21754 = icmp ne i32 %r21753, 0
+  %r21755 = or i1 %r21751, %r21754
+  %r21756 = extractvalue %Range.CompilerReachableLLVMState %reachability, 15
+  %r21757 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21756)
+  %r21758 = icmp ne i32 %r21757, 0
+  %r21759 = or i1 %r21755, %r21758
+  %r21760 = extractvalue %Range.CompilerReachableLLVMState %reachability, 17
+  %r21761 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21760)
+  %r21762 = icmp ne i32 %r21761, 0
+  %r21763 = or i1 %r21759, %r21762
+  br i1 %r21763, label %bb1, label %bb2
 bb1:
-  %r21763 = sub i32 0, 1
-  ret i32 %r21763
+  %r21764 = sub i32 0, 1
+  ret i32 %r21764
 bb2:
   br label %bb3
 bb3:
-  %r21764 = phi i32 [0, %bb2], [%r21771, %bb7]
-  %r21765 = extractvalue %Range.CompilerReachableLLVMState %reachability, 2
-  %r21766 = call i32 @rawBufferCount(ptr %r21765)
-  %r21767 = icmp slt i32 %r21764, %r21766
-  br i1 %r21767, label %bb4, label %bb5
+  %r21765 = phi i32 [0, %bb2], [%r21772, %bb7]
+  %r21766 = extractvalue %Range.CompilerReachableLLVMState %reachability, 2
+  %r21767 = call i32 @rawBufferCount(ptr %r21766)
+  %r21768 = icmp slt i32 %r21765, %r21767
+  br i1 %r21768, label %bb4, label %bb5
 bb4:
-  %r21768 = call i32 @compilerReachableLLVMStateClassifyReturnAndCollectDirectEffectsForWorkItem(%Range.CompilerReachableLLVMState %reachability, i32 %r21764)
-  %r21769 = icmp ne i32 %r21768, 0
-  br i1 %r21769, label %bb6, label %bb7
+  %r21769 = call i32 @compilerReachableLLVMStateClassifyReturnAndCollectDirectEffectsForWorkItem(%Range.CompilerReachableLLVMState %reachability, i32 %r21765)
+  %r21770 = icmp ne i32 %r21769, 0
+  br i1 %r21770, label %bb6, label %bb7
 bb6:
-  %r21770 = sub i32 0, 2
-  ret i32 %r21770
+  %r21771 = sub i32 0, 2
+  ret i32 %r21771
 bb7:
-  %r21771 = add i32 %r21764, 1
+  %r21772 = add i32 %r21765, 1
   br label %bb3
 bb5:
-  %r21772 = extractvalue %Range.CompilerReachableLLVMState %reachability, 13
-  %r21773 = call i32 @compilerReachableLLVMStateCloseFunctionInstanceEffects(%Range.CompilerReachableLLVMState %reachability, %Range.CompilerIntTable %r21772)
-  %r21774 = icmp ne i32 %r21773, 0
-  br i1 %r21774, label %bb8, label %bb9
+  %r21773 = extractvalue %Range.CompilerReachableLLVMState %reachability, 13
+  %r21774 = call i32 @compilerReachableLLVMStateCloseFunctionInstanceEffects(%Range.CompilerReachableLLVMState %reachability, %Range.CompilerIntTable %r21773)
+  %r21775 = icmp ne i32 %r21774, 0
+  br i1 %r21775, label %bb8, label %bb9
 bb8:
-  %r21775 = sub i32 0, 3
-  ret i32 %r21775
+  %r21776 = sub i32 0, 3
+  ret i32 %r21776
 bb9:
-  %r21776 = call i32 @compilerReachableLLVMStateBuildOwnedReturnSummaries(%Range.CompilerReachableLLVMState %reachability)
-  %r21777 = icmp ne i32 %r21776, 0
-  br i1 %r21777, label %bb10, label %bb11
+  %r21777 = call i32 @compilerReachableLLVMStateBuildOwnedReturnSummaries(%Range.CompilerReachableLLVMState %reachability)
+  %r21778 = icmp ne i32 %r21777, 0
+  br i1 %r21778, label %bb10, label %bb11
 bb10:
-  %r21778 = sub i32 0, 4
-  ret i32 %r21778
+  %r21779 = sub i32 0, 4
+  ret i32 %r21779
 bb11:
-  %r21779 = call i1 @compilerReachableLLVMStateReturnSummariesAreValid(%Range.CompilerReachableLLVMState %reachability)
-  %r21780 = xor i1 %r21779, true
-  br i1 %r21780, label %bb12, label %bb13
+  %r21780 = call i1 @compilerReachableLLVMStateReturnSummariesAreValid(%Range.CompilerReachableLLVMState %reachability)
+  %r21781 = xor i1 %r21780, true
+  br i1 %r21781, label %bb12, label %bb13
 bb12:
-  %r21781 = sub i32 0, 5
-  ret i32 %r21781
-bb13:
-  %r21782 = call i32 @compilerReachableLLVMStateValidateFunctionInstanceEffects(%Range.CompilerReachableLLVMState %reachability)
+  %r21782 = sub i32 0, 5
   ret i32 %r21782
+bb13:
+  %r21783 = call i32 @compilerReachableLLVMStateValidateFunctionInstanceEffects(%Range.CompilerReachableLLVMState %reachability)
+  ret i32 %r21783
 }
 define i32 @compilerReachableLLVMStateSensitiveCount(%Range.CompilerReachableLLVMState %reachability) {
 entry:
   br label %bb1
 bb1:
-  %r21783 = phi i32 [0, %entry], [%r21792, %bb5]
   %r21784 = phi i32 [0, %entry], [%r21793, %bb5]
-  %r21785 = extractvalue %Range.CompilerReachableLLVMState %reachability, 22
-  %r21786 = call i32 @rawBufferCount(ptr %r21785)
-  %r21787 = icmp slt i32 %r21784, %r21786
-  br i1 %r21787, label %bb2, label %bb3
+  %r21785 = phi i32 [0, %entry], [%r21794, %bb5]
+  %r21786 = extractvalue %Range.CompilerReachableLLVMState %reachability, 22
+  %r21787 = call i32 @rawBufferCount(ptr %r21786)
+  %r21788 = icmp slt i32 %r21785, %r21787
+  br i1 %r21788, label %bb2, label %bb3
 bb2:
-  %r21788 = extractvalue %Range.CompilerReachableLLVMState %reachability, 22
-  %r21789 = call i32 @rawBufferLoadInt(ptr %r21788, i32 %r21784)
-  %r21790 = icmp eq i32 %r21789, 1
-  br i1 %r21790, label %bb4, label %bb5
+  %r21789 = extractvalue %Range.CompilerReachableLLVMState %reachability, 22
+  %r21790 = call i32 @rawBufferLoadInt(ptr %r21789, i32 %r21785)
+  %r21791 = icmp eq i32 %r21790, 1
+  br i1 %r21791, label %bb4, label %bb5
 bb4:
-  %r21791 = add i32 %r21783, 1
+  %r21792 = add i32 %r21784, 1
   br label %bb5
 bb5:
-  %r21792 = phi i32 [%r21783, %bb2], [%r21791, %bb4]
-  %r21793 = add i32 %r21784, 1
+  %r21793 = phi i32 [%r21784, %bb2], [%r21792, %bb4]
+  %r21794 = add i32 %r21785, 1
   br label %bb1
 bb3:
-  ret i32 %r21783
+  ret i32 %r21784
 }
 define i32 @compilerReachableLLVMStatePrepareCandidateABIPlan(%Range.CompilerReachableLLVMState %reachability) {
 entry:
-  %r21794 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r21795 = extractvalue %Range.CompilerLLVMLoweringContext %r21794, 1
-  %r21796 = extractvalue %Range.CompilerSyntaxTables %r21795, 4
-  %r21797 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21796)
+  %r21795 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r21796 = extractvalue %Range.CompilerLLVMLoweringContext %r21795, 1
+  %r21797 = extractvalue %Range.CompilerSyntaxTables %r21796, 4
+  %r21798 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21797)
   br label %bb1
 bb1:
-  %r21798 = phi i32 [0, %entry], [%r21818, %bb11]
-  %r21799 = icmp slt i32 %r21798, %r21797
-  br i1 %r21799, label %bb2, label %bb3
+  %r21799 = phi i32 [0, %entry], [%r21819, %bb11]
+  %r21800 = icmp slt i32 %r21799, %r21798
+  br i1 %r21800, label %bb2, label %bb3
 bb2:
-  %r21800 = call i32 @stringTransientRegionMark()
-  %r21801 = call i32 @compilerReachableLLVMStatePlannedReturnMode(%Range.CompilerReachableLLVMState %reachability, i32 %r21798)
-  %r21802 = extractvalue %Range.CompilerReachableLLVMState %reachability, 1
-  %r21803 = call i1 @compilerFunctionSelectionContains(%Range.CompilerFunctionSelection %r21802, i32 %r21798)
-  br i1 %r21803, label %bb4, label %bb5
+  %r21801 = call i32 @stringTransientRegionMark()
+  %r21802 = call i32 @compilerReachableLLVMStatePlannedReturnMode(%Range.CompilerReachableLLVMState %reachability, i32 %r21799)
+  %r21803 = extractvalue %Range.CompilerReachableLLVMState %reachability, 1
+  %r21804 = call i1 @compilerFunctionSelectionContains(%Range.CompilerFunctionSelection %r21803, i32 %r21799)
+  br i1 %r21804, label %bb4, label %bb5
 bb4:
-  %r21804 = call i1 @compilerReachableLLVMStateFunctionIsRepresentationSensitive(%Range.CompilerReachableLLVMState %reachability, i32 %r21798)
-  br i1 %r21804, label %bb6, label %bb7
+  %r21805 = call i1 @compilerReachableLLVMStateFunctionIsRepresentationSensitive(%Range.CompilerReachableLLVMState %reachability, i32 %r21799)
+  br i1 %r21805, label %bb6, label %bb7
 bb6:
   br label %bb7
 bb7:
-  %r21805 = phi i32 [0, %bb4], [1, %bb6]
+  %r21806 = phi i32 [0, %bb4], [1, %bb6]
   br label %bb5
 bb5:
-  %r21806 = phi i32 [0, %bb2], [%r21805, %bb7]
-  %r21807 = extractvalue %Range.CompilerReachableLLVMState %reachability, 20
-  %r21808 = call i32 @rawBufferStoreInt(ptr %r21807, i32 %r21798, i32 %r21801)
-  %r21809 = icmp ne i32 %r21808, 0
-  br i1 %r21809, label %bb8, label %bb9
+  %r21807 = phi i32 [0, %bb2], [%r21806, %bb7]
+  %r21808 = extractvalue %Range.CompilerReachableLLVMState %reachability, 20
+  %r21809 = call i32 @rawBufferStoreInt(ptr %r21808, i32 %r21799, i32 %r21802)
+  %r21810 = icmp ne i32 %r21809, 0
+  br i1 %r21810, label %bb8, label %bb9
 bb8:
-  %r21810 = call i32 @stringTransientRegionReset(i32 %r21800)
-  %r21811 = sub i32 0, 1
-  ret i32 %r21811
+  %r21811 = call i32 @stringTransientRegionReset(i32 %r21801)
+  %r21812 = sub i32 0, 1
+  ret i32 %r21812
 bb9:
-  %r21812 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r21813 = call i32 @rawBufferStoreInt(ptr %r21812, i32 %r21798, i32 %r21806)
-  %r21814 = icmp ne i32 %r21813, 0
-  br i1 %r21814, label %bb10, label %bb11
+  %r21813 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r21814 = call i32 @rawBufferStoreInt(ptr %r21813, i32 %r21799, i32 %r21807)
+  %r21815 = icmp ne i32 %r21814, 0
+  br i1 %r21815, label %bb10, label %bb11
 bb10:
-  %r21815 = call i32 @stringTransientRegionReset(i32 %r21800)
-  %r21816 = sub i32 0, 1
-  ret i32 %r21816
+  %r21816 = call i32 @stringTransientRegionReset(i32 %r21801)
+  %r21817 = sub i32 0, 1
+  ret i32 %r21817
 bb11:
-  %r21817 = call i32 @stringTransientRegionReset(i32 %r21800)
-  %r21818 = add i32 %r21798, 1
+  %r21818 = call i32 @stringTransientRegionReset(i32 %r21801)
+  %r21819 = add i32 %r21799, 1
   br label %bb1
 bb3:
   br label %bb12
 bb12:
-  %r21819 = phi i32 [0, %bb3], [%r21848, %bb18]
-  %r21820 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
-  %r21821 = call i32 @rawBufferCount(ptr %r21820)
-  %r21822 = icmp slt i32 %r21819, %r21821
-  br i1 %r21822, label %bb13, label %bb14
+  %r21820 = phi i32 [0, %bb3], [%r21849, %bb18]
+  %r21821 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
+  %r21822 = call i32 @rawBufferCount(ptr %r21821)
+  %r21823 = icmp slt i32 %r21820, %r21822
+  br i1 %r21823, label %bb13, label %bb14
 bb13:
-  %r21823 = extractvalue %Range.CompilerReachableLLVMState %reachability, 4
-  %r21824 = call i32 @rawBufferLoadInt(ptr %r21823, i32 %r21819)
-  %r21825 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
-  %r21826 = call i32 @rawBufferLoadInt(ptr %r21825, i32 %r21819)
-  %r21827 = icmp slt i32 %r21824, 0
-  %r21828 = icmp sge i32 %r21824, %r21797
-  %r21829 = or i1 %r21827, %r21828
-  %r21830 = icmp slt i32 %r21826, 0
-  %r21831 = or i1 %r21829, %r21830
-  %r21832 = icmp sge i32 %r21826, %r21797
-  %r21833 = or i1 %r21831, %r21832
-  br i1 %r21833, label %bb15, label %bb16
+  %r21824 = extractvalue %Range.CompilerReachableLLVMState %reachability, 4
+  %r21825 = call i32 @rawBufferLoadInt(ptr %r21824, i32 %r21820)
+  %r21826 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
+  %r21827 = call i32 @rawBufferLoadInt(ptr %r21826, i32 %r21820)
+  %r21828 = icmp slt i32 %r21825, 0
+  %r21829 = icmp sge i32 %r21825, %r21798
+  %r21830 = or i1 %r21828, %r21829
+  %r21831 = icmp slt i32 %r21827, 0
+  %r21832 = or i1 %r21830, %r21831
+  %r21833 = icmp sge i32 %r21827, %r21798
+  %r21834 = or i1 %r21832, %r21833
+  br i1 %r21834, label %bb15, label %bb16
 bb15:
-  %r21834 = sub i32 0, 1
-  ret i32 %r21834
+  %r21835 = sub i32 0, 1
+  ret i32 %r21835
 bb16:
-  %r21835 = call i32 @stringTransientRegionMark()
-  %r21836 = call i1 @compilerReachableLLVMStateFunctionIsRepresentationSensitive(%Range.CompilerReachableLLVMState %reachability, i32 %r21826)
-  br i1 %r21836, label %bb17, label %bb18
+  %r21836 = call i32 @stringTransientRegionMark()
+  %r21837 = call i1 @compilerReachableLLVMStateFunctionIsRepresentationSensitive(%Range.CompilerReachableLLVMState %reachability, i32 %r21827)
+  br i1 %r21837, label %bb17, label %bb18
 bb17:
-  %r21837 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r21838 = call i32 @rawBufferStoreInt(ptr %r21837, i32 %r21824, i32 1)
-  %r21839 = icmp ne i32 %r21838, 0
-  br i1 %r21839, label %bb19, label %bb20
+  %r21838 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r21839 = call i32 @rawBufferStoreInt(ptr %r21838, i32 %r21825, i32 1)
+  %r21840 = icmp ne i32 %r21839, 0
+  br i1 %r21840, label %bb19, label %bb20
 bb19:
-  %r21840 = call i32 @stringTransientRegionReset(i32 %r21835)
-  %r21841 = sub i32 0, 1
-  ret i32 %r21841
+  %r21841 = call i32 @stringTransientRegionReset(i32 %r21836)
+  %r21842 = sub i32 0, 1
+  ret i32 %r21842
 bb20:
-  %r21842 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r21843 = call i32 @rawBufferStoreInt(ptr %r21842, i32 %r21826, i32 1)
-  %r21844 = icmp ne i32 %r21843, 0
-  br i1 %r21844, label %bb21, label %bb22
+  %r21843 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r21844 = call i32 @rawBufferStoreInt(ptr %r21843, i32 %r21827, i32 1)
+  %r21845 = icmp ne i32 %r21844, 0
+  br i1 %r21845, label %bb21, label %bb22
 bb21:
-  %r21845 = call i32 @stringTransientRegionReset(i32 %r21835)
-  %r21846 = sub i32 0, 1
-  ret i32 %r21846
+  %r21846 = call i32 @stringTransientRegionReset(i32 %r21836)
+  %r21847 = sub i32 0, 1
+  ret i32 %r21847
 bb22:
   br label %bb18
 bb18:
-  %r21847 = call i32 @stringTransientRegionReset(i32 %r21835)
-  %r21848 = add i32 %r21819, 1
+  %r21848 = call i32 @stringTransientRegionReset(i32 %r21836)
+  %r21849 = add i32 %r21820, 1
   br label %bb12
 bb14:
   ret i32 0
 }
 define i32 @compilerReachableLLVMStateBuildABIComponents(%Range.CompilerReachableLLVMState %reachability) {
 entry:
-  %r21849 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r21850 = extractvalue %Range.CompilerLLVMLoweringContext %r21849, 1
-  %r21851 = extractvalue %Range.CompilerSyntaxTables %r21850, 4
-  %r21852 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21851)
-  %r21853 = call ptr @rawBufferCreate(i32 %r21852, i32 4)
-  %r21854 = call ptr @rawBufferCreate(i32 %r21852, i32 4)
-  %r21855 = sub i32 0, 1
-  %r21856 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r21857 = call i32 @compilerReachableLLMIndirectActivations()
-  %r21858 = call i32 @rawBufferStoreInt(ptr %r21856, i32 %r21857, i32 0)
-  %r21859 = icmp ne i32 %r21858, 0
-  br i1 %r21859, label %bb1, label %bb2
+  %r21850 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r21851 = extractvalue %Range.CompilerLLVMLoweringContext %r21850, 1
+  %r21852 = extractvalue %Range.CompilerSyntaxTables %r21851, 4
+  %r21853 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r21852)
+  %r21854 = call ptr @rawBufferCreate(i32 %r21853, i32 4)
+  %r21855 = call ptr @rawBufferCreate(i32 %r21853, i32 4)
+  %r21856 = sub i32 0, 1
+  %r21857 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r21858 = call i32 @compilerReachableLLMIndirectActivations()
+  %r21859 = call i32 @rawBufferStoreInt(ptr %r21857, i32 %r21858, i32 0)
+  %r21860 = icmp ne i32 %r21859, 0
+  br i1 %r21860, label %bb1, label %bb2
 bb1:
-  %r21860 = sub i32 0, 1
+  %r21861 = sub i32 0, 1
   br label %bb2
 bb2:
-  %r21861 = phi i32 [0, %entry], [%r21860, %bb1]
+  %r21862 = phi i32 [0, %entry], [%r21861, %bb1]
   br label %bb3
 bb3:
-  %r21862 = phi i32 [%r21861, %bb2], [%r21887, %bb15]
-  %r21863 = phi i32 [0, %bb2], [%r21889, %bb15]
-  %r21864 = icmp slt i32 %r21863, %r21852
-  %r21865 = icmp eq i32 %r21862, 0
-  %r21866 = and i1 %r21864, %r21865
-  br i1 %r21866, label %bb4, label %bb5
+  %r21863 = phi i32 [%r21862, %bb2], [%r21888, %bb15]
+  %r21864 = phi i32 [0, %bb2], [%r21890, %bb15]
+  %r21865 = icmp slt i32 %r21864, %r21853
+  %r21866 = icmp eq i32 %r21863, 0
+  %r21867 = and i1 %r21865, %r21866
+  br i1 %r21867, label %bb4, label %bb5
 bb4:
-  %r21867 = call i32 @stringTransientRegionMark()
-  %r21868 = call i1 @compilerReachableLLVMStateFunctionIsRepresentationSensitive(%Range.CompilerReachableLLVMState %reachability, i32 %r21863)
-  br i1 %r21868, label %bb6, label %bb7
+  %r21868 = call i32 @stringTransientRegionMark()
+  %r21869 = call i1 @compilerReachableLLVMStateFunctionIsRepresentationSensitive(%Range.CompilerReachableLLVMState %reachability, i32 %r21864)
+  br i1 %r21869, label %bb6, label %bb7
 bb6:
   br label %bb7
 bb7:
-  %r21869 = phi i32 [0, %bb4], [1, %bb6]
-  %r21870 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r21871 = call i32 @rawBufferStoreInt(ptr %r21870, i32 %r21863, i32 0)
-  %r21872 = icmp ne i32 %r21871, 0
-  br i1 %r21872, label %bb8, label %bb9
+  %r21870 = phi i32 [0, %bb4], [1, %bb6]
+  %r21871 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r21872 = call i32 @rawBufferStoreInt(ptr %r21871, i32 %r21864, i32 0)
+  %r21873 = icmp ne i32 %r21872, 0
+  br i1 %r21873, label %bb8, label %bb9
 bb8:
-  %r21873 = sub i32 0, 1
+  %r21874 = sub i32 0, 1
   br label %bb9
 bb9:
-  %r21874 = phi i32 [%r21862, %bb7], [%r21873, %bb8]
-  %r21875 = icmp eq i32 %r21874, 0
-  br i1 %r21875, label %bb10, label %bb11
+  %r21875 = phi i32 [%r21863, %bb7], [%r21874, %bb8]
+  %r21876 = icmp eq i32 %r21875, 0
+  br i1 %r21876, label %bb10, label %bb11
 bb10:
-  %r21876 = extractvalue %Range.CompilerReachableLLVMState %reachability, 19
-  %r21877 = call i32 @rawBufferStoreInt(ptr %r21876, i32 %r21863, i32 0)
-  %r21878 = icmp ne i32 %r21877, 0
-  br i1 %r21878, label %bb12, label %bb13
+  %r21877 = extractvalue %Range.CompilerReachableLLVMState %reachability, 19
+  %r21878 = call i32 @rawBufferStoreInt(ptr %r21877, i32 %r21864, i32 0)
+  %r21879 = icmp ne i32 %r21878, 0
+  br i1 %r21879, label %bb12, label %bb13
 bb12:
-  %r21879 = sub i32 0, 1
+  %r21880 = sub i32 0, 1
   br label %bb13
 bb13:
-  %r21880 = phi i32 [%r21874, %bb10], [%r21879, %bb12]
+  %r21881 = phi i32 [%r21875, %bb10], [%r21880, %bb12]
   br label %bb11
 bb11:
-  %r21881 = phi i32 [%r21874, %bb9], [%r21880, %bb13]
-  %r21882 = icmp eq i32 %r21881, 0
-  br i1 %r21882, label %bb14, label %bb15
+  %r21882 = phi i32 [%r21875, %bb9], [%r21881, %bb13]
+  %r21883 = icmp eq i32 %r21882, 0
+  br i1 %r21883, label %bb14, label %bb15
 bb14:
-  %r21883 = call i32 @rawBufferAppendInt(ptr %r21854, i32 %r21869)
-  %r21884 = icmp ne i32 %r21883, 0
-  br i1 %r21884, label %bb16, label %bb17
+  %r21884 = call i32 @rawBufferAppendInt(ptr %r21855, i32 %r21870)
+  %r21885 = icmp ne i32 %r21884, 0
+  br i1 %r21885, label %bb16, label %bb17
 bb16:
-  %r21885 = sub i32 0, 1
+  %r21886 = sub i32 0, 1
   br label %bb17
 bb17:
-  %r21886 = phi i32 [%r21881, %bb14], [%r21885, %bb16]
+  %r21887 = phi i32 [%r21882, %bb14], [%r21886, %bb16]
   br label %bb15
 bb15:
-  %r21887 = phi i32 [%r21881, %bb11], [%r21886, %bb17]
-  %r21888 = call i32 @stringTransientRegionReset(i32 %r21867)
-  %r21889 = add i32 %r21863, 1
+  %r21888 = phi i32 [%r21882, %bb11], [%r21887, %bb17]
+  %r21889 = call i32 @stringTransientRegionReset(i32 %r21868)
+  %r21890 = add i32 %r21864, 1
   br label %bb3
 bb5:
   br label %bb18
 bb18:
-  %r21890 = phi i32 [%r21855, %bb5], [%r22078, %bb22]
-  %r21891 = phi i1 [false, %bb5], [%r22079, %bb22]
-  %r21892 = phi i32 [%r21862, %bb5], [%r22080, %bb22]
-  %r21893 = phi i32 [0, %bb5], [%r22081, %bb22]
-  %r21894 = icmp slt i32 %r21893, %r21852
-  %r21895 = xor i1 %r21891, true
-  %r21896 = and i1 %r21894, %r21895
-  %r21897 = icmp eq i32 %r21892, 0
-  %r21898 = and i1 %r21896, %r21897
-  br i1 %r21898, label %bb19, label %bb20
+  %r21891 = phi i32 [%r21856, %bb5], [%r22079, %bb22]
+  %r21892 = phi i1 [false, %bb5], [%r22080, %bb22]
+  %r21893 = phi i32 [%r21863, %bb5], [%r22081, %bb22]
+  %r21894 = phi i32 [0, %bb5], [%r22082, %bb22]
+  %r21895 = icmp slt i32 %r21894, %r21853
+  %r21896 = xor i1 %r21892, true
+  %r21897 = and i1 %r21895, %r21896
+  %r21898 = icmp eq i32 %r21893, 0
+  %r21899 = and i1 %r21897, %r21898
+  br i1 %r21899, label %bb19, label %bb20
 bb19:
-  %r21899 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r21900 = call i32 @rawBufferLoadInt(ptr %r21899, i32 %r21893)
-  %r21901 = icmp eq i32 %r21900, 0
-  %r21902 = extractvalue %Range.CompilerReachableLLVMState %reachability, 1
-  %r21903 = call i1 @compilerFunctionSelectionContains(%Range.CompilerFunctionSelection %r21902, i32 %r21893)
-  %r21904 = and i1 %r21901, %r21903
-  %r21905 = call i32 @rawBufferLoadInt(ptr %r21854, i32 %r21893)
-  %r21906 = icmp eq i32 %r21905, 1
-  %r21907 = and i1 %r21904, %r21906
-  br i1 %r21907, label %bb21, label %bb22
+  %r21900 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r21901 = call i32 @rawBufferLoadInt(ptr %r21900, i32 %r21894)
+  %r21902 = icmp eq i32 %r21901, 0
+  %r21903 = extractvalue %Range.CompilerReachableLLVMState %reachability, 1
+  %r21904 = call i1 @compilerFunctionSelectionContains(%Range.CompilerFunctionSelection %r21903, i32 %r21894)
+  %r21905 = and i1 %r21902, %r21904
+  %r21906 = call i32 @rawBufferLoadInt(ptr %r21855, i32 %r21894)
+  %r21907 = icmp eq i32 %r21906, 1
+  %r21908 = and i1 %r21905, %r21907
+  br i1 %r21908, label %bb21, label %bb22
 bb21:
-  %r21908 = call i32 @rawBufferCount(ptr %r21853)
-  %r21909 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r21910 = call i32 @rawBufferStoreInt(ptr %r21909, i32 %r21893, i32 3)
-  %r21911 = icmp ne i32 %r21910, 0
-  br i1 %r21911, label %bb23, label %bb24
+  %r21909 = call i32 @rawBufferCount(ptr %r21854)
+  %r21910 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r21911 = call i32 @rawBufferStoreInt(ptr %r21910, i32 %r21894, i32 3)
+  %r21912 = icmp ne i32 %r21911, 0
+  br i1 %r21912, label %bb23, label %bb24
 bb23:
-  %r21912 = sub i32 0, 1
+  %r21913 = sub i32 0, 1
   br label %bb24
 bb24:
-  %r21913 = phi i32 [%r21892, %bb21], [%r21912, %bb23]
-  %r21914 = icmp eq i32 %r21913, 0
-  br i1 %r21914, label %bb25, label %bb26
+  %r21914 = phi i32 [%r21893, %bb21], [%r21913, %bb23]
+  %r21915 = icmp eq i32 %r21914, 0
+  br i1 %r21915, label %bb25, label %bb26
 bb25:
-  %r21915 = call i32 @rawBufferAppendInt(ptr %r21853, i32 %r21893)
-  %r21916 = icmp ne i32 %r21915, 0
-  br i1 %r21916, label %bb27, label %bb28
+  %r21916 = call i32 @rawBufferAppendInt(ptr %r21854, i32 %r21894)
+  %r21917 = icmp ne i32 %r21916, 0
+  br i1 %r21917, label %bb27, label %bb28
 bb27:
-  %r21917 = sub i32 0, 1
+  %r21918 = sub i32 0, 1
   br label %bb28
 bb28:
-  %r21918 = phi i32 [%r21913, %bb25], [%r21917, %bb27]
+  %r21919 = phi i32 [%r21914, %bb25], [%r21918, %bb27]
   br label %bb26
 bb26:
-  %r21919 = phi i32 [%r21913, %bb24], [%r21918, %bb28]
+  %r21920 = phi i32 [%r21914, %bb24], [%r21919, %bb28]
   br label %bb29
 bb29:
-  %r21920 = phi i32 [%r21919, %bb26], [%r21927, %bb34]
-  %r21921 = phi i32 [%r21908, %bb26], [%r21975, %bb34]
-  %r21922 = call i32 @rawBufferCount(ptr %r21853)
-  %r21923 = icmp slt i32 %r21921, %r21922
-  %r21924 = icmp eq i32 %r21920, 0
-  %r21925 = and i1 %r21923, %r21924
-  br i1 %r21925, label %bb30, label %bb31
+  %r21921 = phi i32 [%r21920, %bb26], [%r21928, %bb34]
+  %r21922 = phi i32 [%r21909, %bb26], [%r21976, %bb34]
+  %r21923 = call i32 @rawBufferCount(ptr %r21854)
+  %r21924 = icmp slt i32 %r21922, %r21923
+  %r21925 = icmp eq i32 %r21921, 0
+  %r21926 = and i1 %r21924, %r21925
+  br i1 %r21926, label %bb30, label %bb31
 bb30:
-  %r21926 = call i32 @rawBufferLoadInt(ptr %r21853, i32 %r21921)
+  %r21927 = call i32 @rawBufferLoadInt(ptr %r21854, i32 %r21922)
   br label %bb32
 bb32:
-  %r21927 = phi i32 [%r21920, %bb30], [%r21973, %bb38]
-  %r21928 = phi i32 [0, %bb30], [%r21974, %bb38]
-  %r21929 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
-  %r21930 = call i32 @rawBufferCount(ptr %r21929)
-  %r21931 = icmp slt i32 %r21928, %r21930
-  %r21932 = icmp eq i32 %r21927, 0
-  %r21933 = and i1 %r21931, %r21932
-  br i1 %r21933, label %bb33, label %bb34
+  %r21928 = phi i32 [%r21921, %bb30], [%r21974, %bb38]
+  %r21929 = phi i32 [0, %bb30], [%r21975, %bb38]
+  %r21930 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
+  %r21931 = call i32 @rawBufferCount(ptr %r21930)
+  %r21932 = icmp slt i32 %r21929, %r21931
+  %r21933 = icmp eq i32 %r21928, 0
+  %r21934 = and i1 %r21932, %r21933
+  br i1 %r21934, label %bb33, label %bb34
 bb33:
-  %r21934 = extractvalue %Range.CompilerReachableLLVMState %reachability, 4
-  %r21935 = call i32 @rawBufferLoadInt(ptr %r21934, i32 %r21928)
-  %r21936 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
-  %r21937 = call i32 @rawBufferLoadInt(ptr %r21936, i32 %r21928)
-  %r21938 = icmp slt i32 %r21935, 0
-  %r21939 = icmp sge i32 %r21935, %r21852
-  %r21940 = or i1 %r21938, %r21939
-  %r21941 = icmp slt i32 %r21937, 0
-  %r21942 = or i1 %r21940, %r21941
-  %r21943 = icmp sge i32 %r21937, %r21852
-  %r21944 = or i1 %r21942, %r21943
-  br i1 %r21944, label %bb35, label %bb36
+  %r21935 = extractvalue %Range.CompilerReachableLLVMState %reachability, 4
+  %r21936 = call i32 @rawBufferLoadInt(ptr %r21935, i32 %r21929)
+  %r21937 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
+  %r21938 = call i32 @rawBufferLoadInt(ptr %r21937, i32 %r21929)
+  %r21939 = icmp slt i32 %r21936, 0
+  %r21940 = icmp sge i32 %r21936, %r21853
+  %r21941 = or i1 %r21939, %r21940
+  %r21942 = icmp slt i32 %r21938, 0
+  %r21943 = or i1 %r21941, %r21942
+  %r21944 = icmp sge i32 %r21938, %r21853
+  %r21945 = or i1 %r21943, %r21944
+  br i1 %r21945, label %bb35, label %bb36
 bb35:
-  %r21945 = sub i32 0, 1
+  %r21946 = sub i32 0, 1
   br label %bb36
 bb36:
-  %r21946 = phi i32 [%r21927, %bb33], [%r21945, %bb35]
-  %r21947 = icmp eq i32 %r21946, 0
-  %r21948 = call i32 @rawBufferLoadInt(ptr %r21854, i32 %r21937)
-  %r21949 = icmp eq i32 %r21948, 1
-  %r21950 = and i1 %r21947, %r21949
-  br i1 %r21950, label %bb37, label %bb38
+  %r21947 = phi i32 [%r21928, %bb33], [%r21946, %bb35]
+  %r21948 = icmp eq i32 %r21947, 0
+  %r21949 = call i32 @rawBufferLoadInt(ptr %r21855, i32 %r21938)
+  %r21950 = icmp eq i32 %r21949, 1
+  %r21951 = and i1 %r21948, %r21950
+  br i1 %r21951, label %bb37, label %bb38
 bb37:
-  %r21951 = sub i32 0, 1
-  %r21952 = icmp eq i32 %r21935, %r21926
-  br i1 %r21952, label %bb39, label %bb40
+  %r21952 = sub i32 0, 1
+  %r21953 = icmp eq i32 %r21936, %r21927
+  br i1 %r21953, label %bb39, label %bb40
 bb39:
   br label %bb40
 bb40:
-  %r21953 = phi i32 [%r21951, %bb37], [%r21937, %bb39]
-  %r21954 = icmp eq i32 %r21937, %r21926
-  br i1 %r21954, label %bb41, label %bb42
+  %r21954 = phi i32 [%r21952, %bb37], [%r21938, %bb39]
+  %r21955 = icmp eq i32 %r21938, %r21927
+  br i1 %r21955, label %bb41, label %bb42
 bb41:
   br label %bb42
 bb42:
-  %r21955 = phi i32 [%r21953, %bb40], [%r21935, %bb41]
-  %r21956 = icmp sge i32 %r21955, 0
-  br i1 %r21956, label %bb43, label %bb44
+  %r21956 = phi i32 [%r21954, %bb40], [%r21936, %bb41]
+  %r21957 = icmp sge i32 %r21956, 0
+  br i1 %r21957, label %bb43, label %bb44
 bb43:
-  %r21957 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r21958 = call i32 @rawBufferLoadInt(ptr %r21957, i32 %r21955)
-  %r21959 = icmp eq i32 %r21958, 0
-  br i1 %r21959, label %bb45, label %bb46
+  %r21958 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r21959 = call i32 @rawBufferLoadInt(ptr %r21958, i32 %r21956)
+  %r21960 = icmp eq i32 %r21959, 0
+  br i1 %r21960, label %bb45, label %bb46
 bb45:
-  %r21960 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r21961 = call i32 @rawBufferStoreInt(ptr %r21960, i32 %r21955, i32 3)
-  %r21962 = icmp ne i32 %r21961, 0
-  br i1 %r21962, label %bb47, label %bb48
+  %r21961 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r21962 = call i32 @rawBufferStoreInt(ptr %r21961, i32 %r21956, i32 3)
+  %r21963 = icmp ne i32 %r21962, 0
+  br i1 %r21963, label %bb47, label %bb48
 bb47:
-  %r21963 = sub i32 0, 1
+  %r21964 = sub i32 0, 1
   br label %bb48
 bb48:
-  %r21964 = phi i32 [%r21946, %bb45], [%r21963, %bb47]
-  %r21965 = icmp eq i32 %r21964, 0
-  br i1 %r21965, label %bb49, label %bb50
+  %r21965 = phi i32 [%r21947, %bb45], [%r21964, %bb47]
+  %r21966 = icmp eq i32 %r21965, 0
+  br i1 %r21966, label %bb49, label %bb50
 bb49:
-  %r21966 = call i32 @rawBufferAppendInt(ptr %r21853, i32 %r21955)
-  %r21967 = icmp ne i32 %r21966, 0
-  br i1 %r21967, label %bb51, label %bb52
+  %r21967 = call i32 @rawBufferAppendInt(ptr %r21854, i32 %r21956)
+  %r21968 = icmp ne i32 %r21967, 0
+  br i1 %r21968, label %bb51, label %bb52
 bb51:
-  %r21968 = sub i32 0, 1
+  %r21969 = sub i32 0, 1
   br label %bb52
 bb52:
-  %r21969 = phi i32 [%r21964, %bb49], [%r21968, %bb51]
+  %r21970 = phi i32 [%r21965, %bb49], [%r21969, %bb51]
   br label %bb50
 bb50:
-  %r21970 = phi i32 [%r21964, %bb48], [%r21969, %bb52]
+  %r21971 = phi i32 [%r21965, %bb48], [%r21970, %bb52]
   br label %bb46
 bb46:
-  %r21971 = phi i32 [%r21946, %bb43], [%r21970, %bb50]
+  %r21972 = phi i32 [%r21947, %bb43], [%r21971, %bb50]
   br label %bb44
 bb44:
-  %r21972 = phi i32 [%r21946, %bb42], [%r21971, %bb46]
+  %r21973 = phi i32 [%r21947, %bb42], [%r21972, %bb46]
   br label %bb38
 bb38:
-  %r21973 = phi i32 [%r21946, %bb36], [%r21972, %bb44]
-  %r21974 = add i32 %r21928, 1
+  %r21974 = phi i32 [%r21947, %bb36], [%r21973, %bb44]
+  %r21975 = add i32 %r21929, 1
   br label %bb32
 bb34:
-  %r21975 = add i32 %r21921, 1
+  %r21976 = add i32 %r21922, 1
   br label %bb29
 bb31:
-  %r21976 = call i32 @rawBufferCount(ptr %r21853)
+  %r21977 = call i32 @rawBufferCount(ptr %r21854)
   br label %bb53
 bb53:
-  %r21977 = phi i32 [%r21890, %bb31], [%r21989, %bb57]
-  %r21978 = phi i1 [false, %bb31], [%r21990, %bb57]
-  %r21979 = phi i32 [%r21908, %bb31], [%r21991, %bb57]
-  %r21980 = icmp slt i32 %r21979, %r21976
-  %r21981 = icmp eq i32 %r21920, 0
-  %r21982 = and i1 %r21980, %r21981
-  br i1 %r21982, label %bb54, label %bb55
+  %r21978 = phi i32 [%r21891, %bb31], [%r21990, %bb57]
+  %r21979 = phi i1 [false, %bb31], [%r21991, %bb57]
+  %r21980 = phi i32 [%r21909, %bb31], [%r21992, %bb57]
+  %r21981 = icmp slt i32 %r21980, %r21977
+  %r21982 = icmp eq i32 %r21921, 0
+  %r21983 = and i1 %r21981, %r21982
+  br i1 %r21983, label %bb54, label %bb55
 bb54:
-  %r21983 = call i32 @rawBufferLoadInt(ptr %r21853, i32 %r21979)
-  %r21984 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
-  %r21985 = call i32 @rawBufferLoadInt(ptr %r21984, i32 %r21983)
-  %r21986 = icmp slt i32 %r21985, 0
-  br i1 %r21986, label %bb56, label %bb57
+  %r21984 = call i32 @rawBufferLoadInt(ptr %r21854, i32 %r21980)
+  %r21985 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
+  %r21986 = call i32 @rawBufferLoadInt(ptr %r21985, i32 %r21984)
+  %r21987 = icmp slt i32 %r21986, 0
+  br i1 %r21987, label %bb56, label %bb57
 bb56:
-  %r21987 = icmp slt i32 %r21977, 0
-  br i1 %r21987, label %bb58, label %bb59
+  %r21988 = icmp slt i32 %r21978, 0
+  br i1 %r21988, label %bb58, label %bb59
 bb58:
   br label %bb59
 bb59:
-  %r21988 = phi i32 [%r21977, %bb56], [%r21983, %bb58]
+  %r21989 = phi i32 [%r21978, %bb56], [%r21984, %bb58]
   br label %bb57
 bb57:
-  %r21989 = phi i32 [%r21977, %bb54], [%r21988, %bb59]
-  %r21990 = phi i1 [%r21978, %bb54], [true, %bb59]
-  %r21991 = add i32 %r21979, 1
+  %r21990 = phi i32 [%r21978, %bb54], [%r21989, %bb59]
+  %r21991 = phi i1 [%r21979, %bb54], [true, %bb59]
+  %r21992 = add i32 %r21980, 1
   br label %bb53
 bb55:
   br label %bb60
 bb60:
-  %r21992 = phi i32 [%r21920, %bb55], [%r22002, %bb64]
-  %r21993 = phi i32 [%r21908, %bb55], [%r22003, %bb64]
-  %r21994 = icmp slt i32 %r21993, %r21976
-  %r21995 = icmp eq i32 %r21992, 0
-  %r21996 = and i1 %r21994, %r21995
-  br i1 %r21996, label %bb61, label %bb62
+  %r21993 = phi i32 [%r21921, %bb55], [%r22003, %bb64]
+  %r21994 = phi i32 [%r21909, %bb55], [%r22004, %bb64]
+  %r21995 = icmp slt i32 %r21994, %r21977
+  %r21996 = icmp eq i32 %r21993, 0
+  %r21997 = and i1 %r21995, %r21996
+  br i1 %r21997, label %bb61, label %bb62
 bb61:
-  %r21997 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r21998 = call i32 @rawBufferLoadInt(ptr %r21853, i32 %r21993)
-  %r21999 = call i32 @rawBufferStoreInt(ptr %r21997, i32 %r21998, i32 1)
-  %r22000 = icmp ne i32 %r21999, 0
-  br i1 %r22000, label %bb63, label %bb64
+  %r21998 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r21999 = call i32 @rawBufferLoadInt(ptr %r21854, i32 %r21994)
+  %r22000 = call i32 @rawBufferStoreInt(ptr %r21998, i32 %r21999, i32 1)
+  %r22001 = icmp ne i32 %r22000, 0
+  br i1 %r22001, label %bb63, label %bb64
 bb63:
-  %r22001 = sub i32 0, 1
+  %r22002 = sub i32 0, 1
   br label %bb64
 bb64:
-  %r22002 = phi i32 [%r21992, %bb61], [%r22001, %bb63]
-  %r22003 = add i32 %r21993, 1
+  %r22003 = phi i32 [%r21993, %bb61], [%r22002, %bb63]
+  %r22004 = add i32 %r21994, 1
   br label %bb60
 bb62:
-  %r22004 = sub i32 %r21976, 1
+  %r22005 = sub i32 %r21977, 1
   br label %bb65
 bb65:
-  %r22005 = phi i32 [%r21977, %bb62], [%r22040, %bb75]
-  %r22006 = phi i1 [%r21891, %bb62], [%r22029, %bb75]
-  %r22007 = phi i32 [%r21992, %bb62], [%r22030, %bb75]
-  %r22008 = phi i1 [%r21978, %bb62], [%r22041, %bb75]
-  %r22009 = phi i32 [%r22004, %bb62], [%r22042, %bb75]
-  %r22010 = xor i1 %r22008, true
-  %r22011 = xor i1 %r22006, true
-  %r22012 = and i1 %r22010, %r22011
-  %r22013 = icmp sge i32 %r22009, %r21908
-  %r22014 = and i1 %r22012, %r22013
-  %r22015 = icmp eq i32 %r22007, 0
-  %r22016 = and i1 %r22014, %r22015
-  br i1 %r22016, label %bb66, label %bb67
+  %r22006 = phi i32 [%r21978, %bb62], [%r22041, %bb75]
+  %r22007 = phi i1 [%r21892, %bb62], [%r22030, %bb75]
+  %r22008 = phi i32 [%r21993, %bb62], [%r22031, %bb75]
+  %r22009 = phi i1 [%r21979, %bb62], [%r22042, %bb75]
+  %r22010 = phi i32 [%r22005, %bb62], [%r22043, %bb75]
+  %r22011 = xor i1 %r22009, true
+  %r22012 = xor i1 %r22007, true
+  %r22013 = and i1 %r22011, %r22012
+  %r22014 = icmp sge i32 %r22010, %r21909
+  %r22015 = and i1 %r22013, %r22014
+  %r22016 = icmp eq i32 %r22008, 0
+  %r22017 = and i1 %r22015, %r22016
+  br i1 %r22017, label %bb66, label %bb67
 bb66:
-  %r22017 = call i32 @rawBufferLoadInt(ptr %r21853, i32 %r22009)
-  %r22018 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
-  %r22019 = call i32 @rawBufferLoadInt(ptr %r22018, i32 %r22017)
-  %r22020 = icmp eq i32 %r22019, 0
-  br i1 %r22020, label %bb68, label %bb69
+  %r22018 = call i32 @rawBufferLoadInt(ptr %r21854, i32 %r22010)
+  %r22019 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
+  %r22020 = call i32 @rawBufferLoadInt(ptr %r22019, i32 %r22018)
+  %r22021 = icmp eq i32 %r22020, 0
+  br i1 %r22021, label %bb68, label %bb69
 bb68:
-  %r22021 = call i32 @compilerReachableLLVMStateSensitiveCount(%Range.CompilerReachableLLVMState %reachability)
-  %r22022 = call i32 @compilerReachableLLVMStateProbeReachableInstancesForFunction(%Range.CompilerReachableLLVMState %reachability, i32 %r22017)
-  %r22023 = icmp ne i32 %r22022, 0
-  br i1 %r22023, label %bb70, label %bb71
+  %r22022 = call i32 @compilerReachableLLVMStateSensitiveCount(%Range.CompilerReachableLLVMState %reachability)
+  %r22023 = call i32 @compilerReachableLLVMStateProbeReachableInstancesForFunction(%Range.CompilerReachableLLVMState %reachability, i32 %r22018)
+  %r22024 = icmp ne i32 %r22023, 0
+  br i1 %r22024, label %bb70, label %bb71
 bb70:
-  %r22024 = sub i32 0, 1
+  %r22025 = sub i32 0, 1
   br label %bb71
 bb71:
-  %r22025 = phi i32 [%r22007, %bb68], [%r22024, %bb70]
-  %r22026 = call i32 @compilerReachableLLVMStateSensitiveCount(%Range.CompilerReachableLLVMState %reachability)
-  %r22027 = icmp ne i32 %r22026, %r22021
-  br i1 %r22027, label %bb72, label %bb73
+  %r22026 = phi i32 [%r22008, %bb68], [%r22025, %bb70]
+  %r22027 = call i32 @compilerReachableLLVMStateSensitiveCount(%Range.CompilerReachableLLVMState %reachability)
+  %r22028 = icmp ne i32 %r22027, %r22022
+  br i1 %r22028, label %bb72, label %bb73
 bb72:
   br label %bb73
 bb73:
-  %r22028 = phi i1 [%r22006, %bb71], [true, %bb72]
+  %r22029 = phi i1 [%r22007, %bb71], [true, %bb72]
   br label %bb69
 bb69:
-  %r22029 = phi i1 [%r22006, %bb66], [%r22028, %bb73]
-  %r22030 = phi i32 [%r22007, %bb66], [%r22025, %bb73]
-  %r22031 = icmp eq i32 %r22030, 0
-  %r22032 = xor i1 %r22029, true
-  %r22033 = and i1 %r22031, %r22032
-  %r22034 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
-  %r22035 = call i32 @rawBufferLoadInt(ptr %r22034, i32 %r22017)
-  %r22036 = icmp ne i32 %r22035, 1
-  %r22037 = and i1 %r22033, %r22036
-  br i1 %r22037, label %bb74, label %bb75
+  %r22030 = phi i1 [%r22007, %bb66], [%r22029, %bb73]
+  %r22031 = phi i32 [%r22008, %bb66], [%r22026, %bb73]
+  %r22032 = icmp eq i32 %r22031, 0
+  %r22033 = xor i1 %r22030, true
+  %r22034 = and i1 %r22032, %r22033
+  %r22035 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
+  %r22036 = call i32 @rawBufferLoadInt(ptr %r22035, i32 %r22018)
+  %r22037 = icmp ne i32 %r22036, 1
+  %r22038 = and i1 %r22034, %r22037
+  br i1 %r22038, label %bb74, label %bb75
 bb74:
-  %r22038 = icmp slt i32 %r22005, 0
-  br i1 %r22038, label %bb76, label %bb77
+  %r22039 = icmp slt i32 %r22006, 0
+  br i1 %r22039, label %bb76, label %bb77
 bb76:
   br label %bb77
 bb77:
-  %r22039 = phi i32 [%r22005, %bb74], [%r22017, %bb76]
+  %r22040 = phi i32 [%r22006, %bb74], [%r22018, %bb76]
   br label %bb75
 bb75:
-  %r22040 = phi i32 [%r22005, %bb69], [%r22039, %bb77]
-  %r22041 = phi i1 [%r22008, %bb69], [true, %bb77]
-  %r22042 = sub i32 %r22009, 1
+  %r22041 = phi i32 [%r22006, %bb69], [%r22040, %bb77]
+  %r22042 = phi i1 [%r22009, %bb69], [true, %bb77]
+  %r22043 = sub i32 %r22010, 1
   br label %bb65
 bb67:
   br label %bb78
 bb78:
-  %r22043 = phi i32 [%r22007, %bb67], [%r22076, %bb86]
-  %r22044 = phi i32 [%r21908, %bb67], [%r22077, %bb86]
-  %r22045 = xor i1 %r22006, true
-  %r22046 = icmp slt i32 %r22044, %r21976
-  %r22047 = and i1 %r22045, %r22046
-  %r22048 = icmp eq i32 %r22043, 0
-  %r22049 = and i1 %r22047, %r22048
-  br i1 %r22049, label %bb79, label %bb80
+  %r22044 = phi i32 [%r22008, %bb67], [%r22077, %bb86]
+  %r22045 = phi i32 [%r21909, %bb67], [%r22078, %bb86]
+  %r22046 = xor i1 %r22007, true
+  %r22047 = icmp slt i32 %r22045, %r21977
+  %r22048 = and i1 %r22046, %r22047
+  %r22049 = icmp eq i32 %r22044, 0
+  %r22050 = and i1 %r22048, %r22049
+  br i1 %r22050, label %bb79, label %bb80
 bb79:
-  %r22050 = call i32 @rawBufferLoadInt(ptr %r21853, i32 %r22044)
-  br i1 %r22008, label %bb81, label %bb82
+  %r22051 = call i32 @rawBufferLoadInt(ptr %r21854, i32 %r22045)
+  br i1 %r22009, label %bb81, label %bb82
 bb81:
   br label %bb82
 bb82:
-  %r22051 = phi i32 [1, %bb79], [2, %bb81]
-  %r22052 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r22053 = call i32 @rawBufferStoreInt(ptr %r22052, i32 %r22050, i32 %r22051)
-  %r22054 = icmp ne i32 %r22053, 0
-  br i1 %r22054, label %bb83, label %bb84
+  %r22052 = phi i32 [1, %bb79], [2, %bb81]
+  %r22053 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r22054 = call i32 @rawBufferStoreInt(ptr %r22053, i32 %r22051, i32 %r22052)
+  %r22055 = icmp ne i32 %r22054, 0
+  br i1 %r22055, label %bb83, label %bb84
 bb83:
-  %r22055 = sub i32 0, 1
+  %r22056 = sub i32 0, 1
   br label %bb84
 bb84:
-  %r22056 = phi i32 [%r22043, %bb82], [%r22055, %bb83]
-  %r22057 = icmp eq i32 %r22056, 0
-  %r22058 = xor i1 %r22008, true
-  %r22059 = and i1 %r22057, %r22058
-  %r22060 = call i32 @compilerReachableLLVMStatePlannedReturnMode(%Range.CompilerReachableLLVMState %reachability, i32 %r22050)
-  %r22061 = call i32 @compilerFunctionReturnABIIndirect()
-  %r22062 = icmp eq i32 %r22060, %r22061
-  %r22063 = and i1 %r22059, %r22062
-  br i1 %r22063, label %bb85, label %bb86
+  %r22057 = phi i32 [%r22044, %bb82], [%r22056, %bb83]
+  %r22058 = icmp eq i32 %r22057, 0
+  %r22059 = xor i1 %r22009, true
+  %r22060 = and i1 %r22058, %r22059
+  %r22061 = call i32 @compilerReachableLLVMStatePlannedReturnMode(%Range.CompilerReachableLLVMState %reachability, i32 %r22051)
+  %r22062 = call i32 @compilerFunctionReturnABIIndirect()
+  %r22063 = icmp eq i32 %r22061, %r22062
+  %r22064 = and i1 %r22060, %r22063
+  br i1 %r22064, label %bb85, label %bb86
 bb85:
-  %r22064 = extractvalue %Range.CompilerReachableLLVMState %reachability, 19
-  %r22065 = call i32 @rawBufferStoreInt(ptr %r22064, i32 %r22050, i32 1)
-  %r22066 = icmp ne i32 %r22065, 0
-  br i1 %r22066, label %bb87, label %bb88
+  %r22065 = extractvalue %Range.CompilerReachableLLVMState %reachability, 19
+  %r22066 = call i32 @rawBufferStoreInt(ptr %r22065, i32 %r22051, i32 1)
+  %r22067 = icmp ne i32 %r22066, 0
+  br i1 %r22067, label %bb87, label %bb88
 bb87:
-  %r22067 = sub i32 0, 1
+  %r22068 = sub i32 0, 1
   br label %bb88
 bb88:
-  %r22068 = phi i32 [%r22056, %bb85], [%r22067, %bb87]
-  %r22069 = icmp eq i32 %r22068, 0
-  br i1 %r22069, label %bb89, label %bb90
+  %r22069 = phi i32 [%r22057, %bb85], [%r22068, %bb87]
+  %r22070 = icmp eq i32 %r22069, 0
+  br i1 %r22070, label %bb89, label %bb90
 bb89:
-  %r22070 = call i32 @compilerReachableLLMIndirectActivations()
-  %r22071 = call i32 @compilerReachableLLVMStateAddCounter(%Range.CompilerReachableLLVMState %reachability, i32 %r22070, i32 1)
-  %r22072 = icmp ne i32 %r22071, 0
-  br i1 %r22072, label %bb91, label %bb92
+  %r22071 = call i32 @compilerReachableLLMIndirectActivations()
+  %r22072 = call i32 @compilerReachableLLVMStateAddCounter(%Range.CompilerReachableLLVMState %reachability, i32 %r22071, i32 1)
+  %r22073 = icmp ne i32 %r22072, 0
+  br i1 %r22073, label %bb91, label %bb92
 bb91:
-  %r22073 = sub i32 0, 1
+  %r22074 = sub i32 0, 1
   br label %bb92
 bb92:
-  %r22074 = phi i32 [%r22068, %bb89], [%r22073, %bb91]
+  %r22075 = phi i32 [%r22069, %bb89], [%r22074, %bb91]
   br label %bb90
 bb90:
-  %r22075 = phi i32 [%r22068, %bb88], [%r22074, %bb92]
+  %r22076 = phi i32 [%r22069, %bb88], [%r22075, %bb92]
   br label %bb86
 bb86:
-  %r22076 = phi i32 [%r22056, %bb84], [%r22075, %bb90]
-  %r22077 = add i32 %r22044, 1
+  %r22077 = phi i32 [%r22057, %bb84], [%r22076, %bb90]
+  %r22078 = add i32 %r22045, 1
   br label %bb78
 bb80:
   br label %bb22
 bb22:
-  %r22078 = phi i32 [%r21890, %bb19], [%r22005, %bb80]
-  %r22079 = phi i1 [%r21891, %bb19], [%r22006, %bb80]
-  %r22080 = phi i32 [%r21892, %bb19], [%r22043, %bb80]
-  %r22081 = add i32 %r21893, 1
+  %r22079 = phi i32 [%r21891, %bb19], [%r22006, %bb80]
+  %r22080 = phi i1 [%r21892, %bb19], [%r22007, %bb80]
+  %r22081 = phi i32 [%r21893, %bb19], [%r22044, %bb80]
+  %r22082 = add i32 %r21894, 1
   br label %bb18
 bb20:
-  %r22082 = call i32 @rawBufferDestroy(ptr %r21854)
-  %r22083 = call i32 @rawBufferDestroy(ptr %r21853)
-  %r22084 = icmp ne i32 %r22082, 0
+  %r22083 = call i32 @rawBufferDestroy(ptr %r21855)
+  %r22084 = call i32 @rawBufferDestroy(ptr %r21854)
   %r22085 = icmp ne i32 %r22083, 0
-  %r22086 = or i1 %r22084, %r22085
-  br i1 %r22086, label %bb93, label %bb94
+  %r22086 = icmp ne i32 %r22084, 0
+  %r22087 = or i1 %r22085, %r22086
+  br i1 %r22087, label %bb93, label %bb94
 bb93:
-  %r22087 = sub i32 0, 1
+  %r22088 = sub i32 0, 1
   br label %bb94
 bb94:
-  %r22088 = phi i32 [%r21892, %bb20], [%r22087, %bb93]
-  %r22089 = icmp eq i32 %r22088, 0
-  %r22090 = and i1 %r22089, %r21891
-  br i1 %r22090, label %bb95, label %bb96
+  %r22089 = phi i32 [%r21893, %bb20], [%r22088, %bb93]
+  %r22090 = icmp eq i32 %r22089, 0
+  %r22091 = and i1 %r22090, %r21892
+  br i1 %r22091, label %bb95, label %bb96
 bb95:
-  %r22091 = add i32 %r21852, 1
-  ret i32 %r22091
+  %r22092 = add i32 %r21853, 1
+  ret i32 %r22092
 bb96:
-  %r22092 = icmp eq i32 %r22088, 0
-  %r22093 = icmp sge i32 %r21890, 0
-  %r22094 = and i1 %r22092, %r22093
-  br i1 %r22094, label %bb97, label %bb98
+  %r22093 = icmp eq i32 %r22089, 0
+  %r22094 = icmp sge i32 %r21891, 0
+  %r22095 = and i1 %r22093, %r22094
+  br i1 %r22095, label %bb97, label %bb98
 bb97:
-  %r22095 = add i32 %r21890, 1
-  ret i32 %r22095
+  %r22096 = add i32 %r21891, 1
+  ret i32 %r22096
 bb98:
-  ret i32 %r22088
+  ret i32 %r22089
 }
 define i32 @compilerReachableLLVMStateRefreshCapabilityCounter(%Range.CompilerReachableLLVMState %reachability) {
 entry:
   br label %bb1
 bb1:
-  %r22096 = phi i32 [0, %entry], [%r22108, %bb5]
   %r22097 = phi i32 [0, %entry], [%r22109, %bb5]
-  %r22098 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
-  %r22099 = call i32 @rawBufferCount(ptr %r22098)
-  %r22100 = icmp slt i32 %r22097, %r22099
-  br i1 %r22100, label %bb2, label %bb3
+  %r22098 = phi i32 [0, %entry], [%r22110, %bb5]
+  %r22099 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
+  %r22100 = call i32 @rawBufferCount(ptr %r22099)
+  %r22101 = icmp slt i32 %r22098, %r22100
+  br i1 %r22101, label %bb2, label %bb3
 bb2:
-  %r22101 = extractvalue %Range.CompilerReachableLLVMState %reachability, 1
-  %r22102 = call i1 @compilerFunctionSelectionContains(%Range.CompilerFunctionSelection %r22101, i32 %r22097)
-  %r22103 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
-  %r22104 = call i32 @rawBufferLoadInt(ptr %r22103, i32 %r22097)
-  %r22105 = icmp eq i32 %r22104, 1
-  %r22106 = and i1 %r22102, %r22105
-  br i1 %r22106, label %bb4, label %bb5
+  %r22102 = extractvalue %Range.CompilerReachableLLVMState %reachability, 1
+  %r22103 = call i1 @compilerFunctionSelectionContains(%Range.CompilerFunctionSelection %r22102, i32 %r22098)
+  %r22104 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
+  %r22105 = call i32 @rawBufferLoadInt(ptr %r22104, i32 %r22098)
+  %r22106 = icmp eq i32 %r22105, 1
+  %r22107 = and i1 %r22103, %r22106
+  br i1 %r22107, label %bb4, label %bb5
 bb4:
-  %r22107 = add i32 %r22096, 1
+  %r22108 = add i32 %r22097, 1
   br label %bb5
 bb5:
-  %r22108 = phi i32 [%r22096, %bb2], [%r22107, %bb4]
-  %r22109 = add i32 %r22097, 1
+  %r22109 = phi i32 [%r22097, %bb2], [%r22108, %bb4]
+  %r22110 = add i32 %r22098, 1
   br label %bb1
 bb3:
-  %r22110 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r22111 = call i32 @compilerReachableLLMIndirectCapabilities()
-  %r22112 = call i32 @rawBufferStoreInt(ptr %r22110, i32 %r22111, i32 %r22096)
-  ret i32 %r22112
+  %r22111 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r22112 = call i32 @compilerReachableLLMIndirectCapabilities()
+  %r22113 = call i32 @rawBufferStoreInt(ptr %r22111, i32 %r22112, i32 %r22097)
+  ret i32 %r22113
 }
 define i32 @compilerReachableLLVMStateValidateEntryOwnedPaths(%Range.CompilerReachableLLVMState %reachability) {
 entry:
   %storage0 = alloca %Range.CompilerBodyArena
   %storage1 = alloca %Range.CompilerBodyArena
-  %r22113 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22114 = extractvalue %Range.CompilerLLVMLoweringContext %r22113, 1
-  %r22115 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22116 = extractvalue %Range.CompilerLLVMLoweringContext %r22115, 2
-  call void @compilerBodyArenaCreateEntry(ptr %storage1, %Range.CompilerSyntaxTables %r22114, %Range.CompilerDeclarationIndex %r22116)
-  %r22117 = load %Range.CompilerBodyArena, ptr %storage1
-  call void @compilerBodyArenaParseFunction(ptr %storage0, %Range.CompilerBodyArena %r22117)
-  %r22118 = load %Range.CompilerBodyArena, ptr %storage0
-  %r22119 = call i1 @compilerBodyArenaIsValid(%Range.CompilerBodyArena %r22118)
-  %r22120 = xor i1 %r22119, true
-  br i1 %r22120, label %bb1, label %bb2
+  %r22114 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22115 = extractvalue %Range.CompilerLLVMLoweringContext %r22114, 1
+  %r22116 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22117 = extractvalue %Range.CompilerLLVMLoweringContext %r22116, 2
+  call void @compilerBodyArenaCreateEntry(ptr %storage1, %Range.CompilerSyntaxTables %r22115, %Range.CompilerDeclarationIndex %r22117)
+  %r22118 = load %Range.CompilerBodyArena, ptr %storage1
+  call void @compilerBodyArenaParseFunction(ptr %storage0, %Range.CompilerBodyArena %r22118)
+  %r22119 = load %Range.CompilerBodyArena, ptr %storage0
+  %r22120 = call i1 @compilerBodyArenaIsValid(%Range.CompilerBodyArena %r22119)
+  %r22121 = xor i1 %r22120, true
+  br i1 %r22121, label %bb1, label %bb2
 bb1:
   br label %bb2
 bb2:
-  %r22121 = phi i32 [0, %entry], [1, %bb1]
-  %r22122 = icmp eq i32 %r22121, 0
-  br i1 %r22122, label %bb3, label %bb4
+  %r22122 = phi i32 [0, %entry], [1, %bb1]
+  %r22123 = icmp eq i32 %r22122, 0
+  br i1 %r22123, label %bb3, label %bb4
 bb3:
-  %r22123 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22124 = extractvalue %Range.CompilerLLVMLoweringContext %r22123, 2
-  %r22125 = call i32 @compilerBodyArenaBuildSymbolsAndResolutions(%Range.CompilerBodyArena %r22118, %Range.CompilerDeclarationIndex %r22124)
-  %r22126 = icmp ne i32 %r22125, 0
-  br i1 %r22126, label %bb5, label %bb6
+  %r22124 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22125 = extractvalue %Range.CompilerLLVMLoweringContext %r22124, 2
+  %r22126 = call i32 @compilerBodyArenaBuildSymbolsAndResolutions(%Range.CompilerBodyArena %r22119, %Range.CompilerDeclarationIndex %r22125)
+  %r22127 = icmp ne i32 %r22126, 0
+  br i1 %r22127, label %bb5, label %bb6
 bb5:
   br label %bb6
 bb6:
-  %r22127 = phi i32 [%r22121, %bb3], [2, %bb5]
+  %r22128 = phi i32 [%r22122, %bb3], [2, %bb5]
   br label %bb4
 bb4:
-  %r22128 = phi i32 [%r22121, %bb2], [%r22127, %bb6]
-  %r22129 = icmp eq i32 %r22128, 0
-  br i1 %r22129, label %bb7, label %bb8
+  %r22129 = phi i32 [%r22122, %bb2], [%r22128, %bb6]
+  %r22130 = icmp eq i32 %r22129, 0
+  br i1 %r22130, label %bb7, label %bb8
 bb7:
-  %r22130 = extractvalue %Range.CompilerReachableLLVMState %reachability, 8
-  %r22131 = extractvalue %Range.CompilerReachableLLVMState %reachability, 9
-  %r22132 = extractvalue %Range.CompilerReachableLLVMState %reachability, 10
-  %r22133 = extractvalue %Range.CompilerReachableLLVMState %reachability, 11
-  %r22134 = call i32 @compilerReachableLLVMStateBindPlannedFunctionInstancesForArena(%Range.CompilerIntTable %r22130, %Range.CompilerIntTable %r22131, %Range.CompilerIntTable %r22132, %Range.CompilerIntTable %r22133, %Range.CompilerBodyArena %r22118)
-  %r22135 = icmp ne i32 %r22134, 0
-  br i1 %r22135, label %bb9, label %bb10
+  %r22131 = extractvalue %Range.CompilerReachableLLVMState %reachability, 8
+  %r22132 = extractvalue %Range.CompilerReachableLLVMState %reachability, 9
+  %r22133 = extractvalue %Range.CompilerReachableLLVMState %reachability, 10
+  %r22134 = extractvalue %Range.CompilerReachableLLVMState %reachability, 11
+  %r22135 = call i32 @compilerReachableLLVMStateBindPlannedFunctionInstancesForArena(%Range.CompilerIntTable %r22131, %Range.CompilerIntTable %r22132, %Range.CompilerIntTable %r22133, %Range.CompilerIntTable %r22134, %Range.CompilerBodyArena %r22119)
+  %r22136 = icmp ne i32 %r22135, 0
+  br i1 %r22136, label %bb9, label %bb10
 bb9:
-  %r22136 = sub i32 0, %r22134
-  %r22137 = add i32 3000, %r22136
+  %r22137 = sub i32 0, %r22135
+  %r22138 = add i32 3000, %r22137
   br label %bb10
 bb10:
-  %r22138 = phi i32 [%r22128, %bb7], [%r22137, %bb9]
+  %r22139 = phi i32 [%r22129, %bb7], [%r22138, %bb9]
   br label %bb8
 bb8:
-  %r22139 = phi i32 [%r22128, %bb4], [%r22138, %bb10]
-  %r22140 = icmp eq i32 %r22139, 0
-  br i1 %r22140, label %bb11, label %bb12
+  %r22140 = phi i32 [%r22129, %bb4], [%r22139, %bb10]
+  %r22141 = icmp eq i32 %r22140, 0
+  br i1 %r22141, label %bb11, label %bb12
 bb11:
-  %r22141 = call i32 @compilerBodyArenaBuildCFG(%Range.CompilerBodyArena %r22118)
-  %r22142 = icmp ne i32 %r22141, 0
-  br i1 %r22142, label %bb13, label %bb14
+  %r22142 = call i32 @compilerBodyArenaBuildCFG(%Range.CompilerBodyArena %r22119)
+  %r22143 = icmp ne i32 %r22142, 0
+  br i1 %r22143, label %bb13, label %bb14
 bb13:
   br label %bb14
 bb14:
-  %r22143 = phi i32 [%r22139, %bb11], [4, %bb13]
+  %r22144 = phi i32 [%r22140, %bb11], [4, %bb13]
   br label %bb12
 bb12:
-  %r22144 = phi i32 [%r22139, %bb8], [%r22143, %bb14]
-  %r22145 = icmp eq i32 %r22144, 0
-  br i1 %r22145, label %bb15, label %bb16
+  %r22145 = phi i32 [%r22140, %bb8], [%r22144, %bb14]
+  %r22146 = icmp eq i32 %r22145, 0
+  br i1 %r22146, label %bb15, label %bb16
 bb15:
-  %r22146 = call i32 @compilerBodyArenaBuildOwnedPathTables(%Range.CompilerBodyArena %r22118)
-  %r22147 = icmp ne i32 %r22146, 0
-  br i1 %r22147, label %bb17, label %bb18
+  %r22147 = call i32 @compilerBodyArenaBuildOwnedPathTables(%Range.CompilerBodyArena %r22119)
+  %r22148 = icmp ne i32 %r22147, 0
+  br i1 %r22148, label %bb17, label %bb18
 bb17:
   br label %bb18
 bb18:
-  %r22148 = phi i32 [%r22144, %bb15], [5, %bb17]
+  %r22149 = phi i32 [%r22145, %bb15], [5, %bb17]
   br label %bb16
 bb16:
-  %r22149 = phi i32 [%r22144, %bb12], [%r22148, %bb18]
-  %r22150 = icmp eq i32 %r22149, 0
-  br i1 %r22150, label %bb19, label %bb20
+  %r22150 = phi i32 [%r22145, %bb12], [%r22149, %bb18]
+  %r22151 = icmp eq i32 %r22150, 0
+  br i1 %r22151, label %bb19, label %bb20
 bb19:
-  %r22151 = extractvalue %Range.CompilerReachableLLVMState %reachability, 8
-  %r22152 = extractvalue %Range.CompilerReachableLLVMState %reachability, 9
-  %r22153 = extractvalue %Range.CompilerReachableLLVMState %reachability, 13
-  %r22154 = extractvalue %Range.CompilerReachableLLVMState %reachability, 14
-  %r22155 = extractvalue %Range.CompilerReachableLLVMState %reachability, 16
-  %r22156 = extractvalue %Range.CompilerReachableLLVMState %reachability, 17
-  %r22157 = call i32 @compilerBodyArenaValidateOwnedPaths(%Range.CompilerBodyArena %r22118, %Range.CompilerIntTable %r22151, %Range.CompilerIntTable %r22152, %Range.CompilerIntTable %r22153, %Range.CompilerIntTable %r22154, %Range.CompilerIntTable %r22155, %Range.CompilerIntTable %r22156, i1 true, i1 false)
-  %r22158 = icmp ne i32 %r22157, 0
-  br i1 %r22158, label %bb21, label %bb22
+  %r22152 = extractvalue %Range.CompilerReachableLLVMState %reachability, 8
+  %r22153 = extractvalue %Range.CompilerReachableLLVMState %reachability, 9
+  %r22154 = extractvalue %Range.CompilerReachableLLVMState %reachability, 13
+  %r22155 = extractvalue %Range.CompilerReachableLLVMState %reachability, 14
+  %r22156 = extractvalue %Range.CompilerReachableLLVMState %reachability, 16
+  %r22157 = extractvalue %Range.CompilerReachableLLVMState %reachability, 17
+  %r22158 = call i32 @compilerBodyArenaValidateOwnedPaths(%Range.CompilerBodyArena %r22119, %Range.CompilerIntTable %r22152, %Range.CompilerIntTable %r22153, %Range.CompilerIntTable %r22154, %Range.CompilerIntTable %r22155, %Range.CompilerIntTable %r22156, %Range.CompilerIntTable %r22157, i1 true, i1 false)
+  %r22159 = icmp ne i32 %r22158, 0
+  br i1 %r22159, label %bb21, label %bb22
 bb21:
-  %r22159 = sub i32 0, %r22157
-  %r22160 = add i32 6000, %r22159
+  %r22160 = sub i32 0, %r22158
+  %r22161 = add i32 6000, %r22160
   br label %bb22
 bb22:
-  %r22161 = phi i32 [%r22149, %bb19], [%r22160, %bb21]
+  %r22162 = phi i32 [%r22150, %bb19], [%r22161, %bb21]
   br label %bb20
 bb20:
-  %r22162 = phi i32 [%r22149, %bb16], [%r22161, %bb22]
-  %r22163 = call i32 @compilerBodyArenaDestroy(%Range.CompilerBodyArena %r22118)
-  %r22164 = icmp eq i32 %r22162, 0
-  br i1 %r22164, label %bb23, label %bb24
+  %r22163 = phi i32 [%r22150, %bb16], [%r22162, %bb22]
+  %r22164 = call i32 @compilerBodyArenaDestroy(%Range.CompilerBodyArena %r22119)
+  %r22165 = icmp eq i32 %r22163, 0
+  br i1 %r22165, label %bb23, label %bb24
 bb23:
-  %r22165 = icmp ne i32 %r22163, 0
-  br i1 %r22165, label %bb25, label %bb26
+  %r22166 = icmp ne i32 %r22164, 0
+  br i1 %r22166, label %bb25, label %bb26
 bb25:
   br label %bb26
 bb26:
-  %r22166 = phi i32 [%r22162, %bb23], [7, %bb25]
+  %r22167 = phi i32 [%r22163, %bb23], [7, %bb25]
   br label %bb24
 bb24:
-  %r22167 = phi i32 [%r22162, %bb20], [%r22166, %bb26]
-  ret i32 %r22167
+  %r22168 = phi i32 [%r22163, %bb20], [%r22167, %bb26]
+  ret i32 %r22168
 }
 define i32 @compilerFunctionReturnABI(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %functionRow) {
 entry:
-  %r22168 = icmp slt i32 %functionRow, 0
-  %r22169 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r22170 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22169)
-  %r22171 = icmp sge i32 %functionRow, %r22170
-  %r22172 = or i1 %r22168, %r22171
-  br i1 %r22172, label %bb1, label %bb2
+  %r22169 = icmp slt i32 %functionRow, 0
+  %r22170 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r22171 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22170)
+  %r22172 = icmp sge i32 %functionRow, %r22171
+  %r22173 = or i1 %r22169, %r22172
+  br i1 %r22173, label %bb1, label %bb2
 bb1:
-  %r22173 = call i32 @compilerFunctionReturnABINone()
-  ret i32 %r22173
+  %r22174 = call i32 @compilerFunctionReturnABINone()
+  ret i32 %r22174
 bb2:
-  %r22174 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r22175 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22174, i32 %functionRow, i32 1)
-  %r22176 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r22177 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22176, i32 %functionRow, i32 6)
-  %r22178 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r22179 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22178, i32 %functionRow, i32 7)
-  %r22180 = call ptr @compilerTypedSyntaxLocalText(%Range.CompilerSyntaxTables %tables, i32 %r22175, i32 %r22177, i32 %r22179)
-  %r22182 = call i32 @stringEqual(ptr %r22180, ptr getelementptr inbounds ([4 x i8], ptr @.str.22181, i32 0, i32 0))
-  %r22183 = icmp ne i32 %r22182, 0
-  %r22185 = call i32 @stringEqual(ptr %r22180, ptr getelementptr inbounds ([5 x i8], ptr @.str.22184, i32 0, i32 0))
-  %r22186 = icmp ne i32 %r22185, 0
-  %r22187 = or i1 %r22183, %r22186
-  %r22189 = call i32 @stringEqual(ptr %r22180, ptr getelementptr inbounds ([7 x i8], ptr @.str.22188, i32 0, i32 0))
-  %r22190 = icmp ne i32 %r22189, 0
-  %r22191 = or i1 %r22187, %r22190
-  %r22193 = call i32 @stringEqual(ptr %r22180, ptr getelementptr inbounds ([6 x i8], ptr @.str.22192, i32 0, i32 0))
-  %r22194 = icmp ne i32 %r22193, 0
-  %r22195 = or i1 %r22191, %r22194
-  %r22196 = call i1 @compilerIntegerTypeIsUnsigned8(ptr %r22180)
-  %r22197 = or i1 %r22195, %r22196
-  %r22198 = call i1 @compilerFloatTypeIs32(ptr %r22180)
-  %r22199 = or i1 %r22197, %r22198
-  %r22200 = call i1 @compilerFloatTypeIs64(ptr %r22180)
-  %r22201 = or i1 %r22199, %r22200
-  br i1 %r22201, label %bb3, label %bb4
+  %r22175 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r22176 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22175, i32 %functionRow, i32 1)
+  %r22177 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r22178 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22177, i32 %functionRow, i32 6)
+  %r22179 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r22180 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22179, i32 %functionRow, i32 7)
+  %r22181 = call ptr @compilerTypedSyntaxLocalText(%Range.CompilerSyntaxTables %tables, i32 %r22176, i32 %r22178, i32 %r22180)
+  %r22183 = call i32 @stringEqual(ptr %r22181, ptr getelementptr inbounds ([4 x i8], ptr @.str.22182, i32 0, i32 0))
+  %r22184 = icmp ne i32 %r22183, 0
+  %r22186 = call i32 @stringEqual(ptr %r22181, ptr getelementptr inbounds ([5 x i8], ptr @.str.22185, i32 0, i32 0))
+  %r22187 = icmp ne i32 %r22186, 0
+  %r22188 = or i1 %r22184, %r22187
+  %r22190 = call i32 @stringEqual(ptr %r22181, ptr getelementptr inbounds ([7 x i8], ptr @.str.22189, i32 0, i32 0))
+  %r22191 = icmp ne i32 %r22190, 0
+  %r22192 = or i1 %r22188, %r22191
+  %r22194 = call i32 @stringEqual(ptr %r22181, ptr getelementptr inbounds ([6 x i8], ptr @.str.22193, i32 0, i32 0))
+  %r22195 = icmp ne i32 %r22194, 0
+  %r22196 = or i1 %r22192, %r22195
+  %r22197 = call i1 @compilerIntegerTypeIsUnsigned8(ptr %r22181)
+  %r22198 = or i1 %r22196, %r22197
+  %r22199 = call i1 @compilerFloatTypeIs32(ptr %r22181)
+  %r22200 = or i1 %r22198, %r22199
+  %r22201 = call i1 @compilerFloatTypeIs64(ptr %r22181)
+  %r22202 = or i1 %r22200, %r22201
+  br i1 %r22202, label %bb3, label %bb4
 bb3:
-  %r22202 = call i32 @compilerFunctionReturnABIDirect()
-  ret i32 %r22202
+  %r22203 = call i32 @compilerFunctionReturnABIDirect()
+  ret i32 %r22203
 bb4:
-  %r22203 = call i1 @compilerBodyRuntimeABITypeIsOpaque(%Range.CompilerSyntaxTables %tables, ptr %r22180)
-  br i1 %r22203, label %bb5, label %bb6
+  %r22204 = call i1 @compilerBodyRuntimeABITypeIsOpaque(%Range.CompilerSyntaxTables %tables, ptr %r22181)
+  br i1 %r22204, label %bb5, label %bb6
 bb5:
-  %r22204 = call i32 @compilerFunctionReturnABIDirect()
-  ret i32 %r22204
+  %r22205 = call i32 @compilerFunctionReturnABIDirect()
+  ret i32 %r22205
 bb6:
-  %r22205 = call ptr @compilerSpecializedOptionalLLVMTypeName(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22180)
-  %r22207 = call i32 @stringEqual(ptr %r22205, ptr getelementptr inbounds ([1 x i8], ptr @.str.22206, i32 0, i32 0))
-  %r22208 = icmp eq i32 %r22207, 0
-  br i1 %r22208, label %bb7, label %bb8
+  %r22206 = call ptr @compilerSpecializedOptionalLLVMTypeName(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22181)
+  %r22208 = call i32 @stringEqual(ptr %r22206, ptr getelementptr inbounds ([1 x i8], ptr @.str.22207, i32 0, i32 0))
+  %r22209 = icmp eq i32 %r22208, 0
+  br i1 %r22209, label %bb7, label %bb8
 bb7:
-  %r22209 = call i32 @compilerFunctionReturnABIIndirect()
-  ret i32 %r22209
+  %r22210 = call i32 @compilerFunctionReturnABIIndirect()
+  ret i32 %r22210
 bb8:
-  %r22211 = call i32 @stringIndexOf(ptr %r22180, ptr getelementptr inbounds ([2 x i8], ptr @.str.22210, i32 0, i32 0), i32 0)
-  %r22212 = icmp sge i32 %r22211, 0
-  br i1 %r22212, label %bb9, label %bb10
+  %r22212 = call i32 @stringIndexOf(ptr %r22181, ptr getelementptr inbounds ([2 x i8], ptr @.str.22211, i32 0, i32 0), i32 0)
+  %r22213 = icmp sge i32 %r22212, 0
+  br i1 %r22213, label %bb9, label %bb10
 bb9:
-  %r22213 = call i32 @compilerFunctionReturnABINone()
-  ret i32 %r22213
+  %r22214 = call i32 @compilerFunctionReturnABINone()
+  ret i32 %r22214
 bb10:
-  %r22214 = call ptr @compilerBodyArenaTypeOuterName(ptr %r22180)
-  %r22215 = call i32 @compilerSyntaxKindConstruct()
-  %r22216 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22214, i32 %r22215)
-  %r22217 = call ptr @compilerNominalLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r22216)
-  %r22219 = call i32 @stringEqual(ptr %r22217, ptr getelementptr inbounds ([1 x i8], ptr @.str.22218, i32 0, i32 0))
-  %r22220 = icmp eq i32 %r22219, 0
-  br i1 %r22220, label %bb11, label %bb12
+  %r22215 = call ptr @compilerBodyArenaTypeOuterName(ptr %r22181)
+  %r22216 = call i32 @compilerSyntaxKindConstruct()
+  %r22217 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22215, i32 %r22216)
+  %r22218 = call ptr @compilerNominalLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r22217)
+  %r22220 = call i32 @stringEqual(ptr %r22218, ptr getelementptr inbounds ([1 x i8], ptr @.str.22219, i32 0, i32 0))
+  %r22221 = icmp eq i32 %r22220, 0
+  br i1 %r22221, label %bb11, label %bb12
 bb11:
-  %r22221 = call i32 @compilerFunctionReturnABIIndirect()
-  ret i32 %r22221
+  %r22222 = call i32 @compilerFunctionReturnABIIndirect()
+  ret i32 %r22222
 bb12:
-  %r22222 = call i32 @compilerSyntaxKindEnum()
-  %r22223 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22214, i32 %r22222)
-  %r22224 = call ptr @compilerEnumLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r22223)
-  %r22226 = call i32 @stringEqual(ptr %r22224, ptr getelementptr inbounds ([1 x i8], ptr @.str.22225, i32 0, i32 0))
-  %r22227 = icmp eq i32 %r22226, 0
-  br i1 %r22227, label %bb13, label %bb14
+  %r22223 = call i32 @compilerSyntaxKindEnum()
+  %r22224 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22215, i32 %r22223)
+  %r22225 = call ptr @compilerEnumLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r22224)
+  %r22227 = call i32 @stringEqual(ptr %r22225, ptr getelementptr inbounds ([1 x i8], ptr @.str.22226, i32 0, i32 0))
+  %r22228 = icmp eq i32 %r22227, 0
+  br i1 %r22228, label %bb13, label %bb14
 bb13:
-  %r22228 = call i32 @compilerFunctionReturnABIIndirect()
-  ret i32 %r22228
-bb14:
-  %r22229 = call i32 @compilerFunctionReturnABINone()
+  %r22229 = call i32 @compilerFunctionReturnABIIndirect()
   ret i32 %r22229
+bb14:
+  %r22230 = call i32 @compilerFunctionReturnABINone()
+  ret i32 %r22230
 }
 define i32 @compilerFunctionReturnABIIndirect() {
 entry:
@@ -37479,12 +37484,12 @@ entry:
 }
 define i32 @compilerReachableLLVMStateAddCounter(%Range.CompilerReachableLLVMState %reachability, i32 %index, i32 %value) {
 entry:
-  %r22230 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
   %r22231 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r22232 = call i32 @rawBufferLoadInt(ptr %r22231, i32 %index)
-  %r22233 = add i32 %r22232, %value
-  %r22234 = call i32 @rawBufferStoreInt(ptr %r22230, i32 %index, i32 %r22233)
-  ret i32 %r22234
+  %r22232 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r22233 = call i32 @rawBufferLoadInt(ptr %r22232, i32 %index)
+  %r22234 = add i32 %r22233, %value
+  %r22235 = call i32 @rawBufferStoreInt(ptr %r22231, i32 %index, i32 %r22234)
+  ret i32 %r22235
 }
 define i32 @compilerReachableLLMIndirectActivations() {
 entry:
@@ -37492,104 +37497,104 @@ entry:
 }
 define i1 @compilerFunctionHasRepresentationSensitiveABI(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %functionRow) {
 entry:
-  %r22235 = call i32 @compilerFunctionReturnABI(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %functionRow)
-  %r22236 = call i32 @compilerFunctionReturnABIIndirect()
-  %r22237 = icmp eq i32 %r22235, %r22236
-  %r22238 = call i1 @compilerFunctionHasAggregateParameterABI(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %functionRow)
-  %r22239 = or i1 %r22237, %r22238
-  ret i1 %r22239
+  %r22236 = call i32 @compilerFunctionReturnABI(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %functionRow)
+  %r22237 = call i32 @compilerFunctionReturnABIIndirect()
+  %r22238 = icmp eq i32 %r22236, %r22237
+  %r22239 = call i1 @compilerFunctionHasAggregateParameterABI(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %functionRow)
+  %r22240 = or i1 %r22238, %r22239
+  ret i1 %r22240
 }
 define i32 @compilerReachableLLVMStateFreezeABIPlan(%Range.CompilerReachableLLVMState %reachability) {
 entry:
-  %r22240 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22241 = extractvalue %Range.CompilerLLVMLoweringContext %r22240, 1
-  %r22242 = extractvalue %Range.CompilerSyntaxTables %r22241, 4
-  %r22243 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22242)
+  %r22241 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22242 = extractvalue %Range.CompilerLLVMLoweringContext %r22241, 1
+  %r22243 = extractvalue %Range.CompilerSyntaxTables %r22242, 4
+  %r22244 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22243)
   br label %bb1
 bb1:
-  %r22244 = phi i32 [0, %entry], [%r22267, %bb11]
-  %r22245 = icmp slt i32 %r22244, %r22243
-  br i1 %r22245, label %bb2, label %bb3
+  %r22245 = phi i32 [0, %entry], [%r22268, %bb11]
+  %r22246 = icmp slt i32 %r22245, %r22244
+  br i1 %r22246, label %bb2, label %bb3
 bb2:
-  %r22246 = call i32 @compilerFunctionReturnABINone()
-  %r22247 = call i32 @compilerReachableLLVMStatePlannedReturnMode(%Range.CompilerReachableLLVMState %reachability, i32 %r22244)
-  %r22248 = call i32 @compilerFunctionReturnABIDirect()
-  %r22249 = icmp eq i32 %r22247, %r22248
-  br i1 %r22249, label %bb4, label %bb5
+  %r22247 = call i32 @compilerFunctionReturnABINone()
+  %r22248 = call i32 @compilerReachableLLVMStatePlannedReturnMode(%Range.CompilerReachableLLVMState %reachability, i32 %r22245)
+  %r22249 = call i32 @compilerFunctionReturnABIDirect()
+  %r22250 = icmp eq i32 %r22248, %r22249
+  br i1 %r22250, label %bb4, label %bb5
 bb4:
-  %r22250 = call i32 @compilerFunctionReturnABIDirect()
+  %r22251 = call i32 @compilerFunctionReturnABIDirect()
   br label %bb5
 bb5:
-  %r22251 = phi i32 [%r22246, %bb2], [%r22250, %bb4]
-  %r22252 = extractvalue %Range.CompilerReachableLLVMState %reachability, 19
-  %r22253 = call i32 @rawBufferLoadInt(ptr %r22252, i32 %r22244)
-  %r22254 = icmp eq i32 %r22253, 1
-  br i1 %r22254, label %bb6, label %bb7
+  %r22252 = phi i32 [%r22247, %bb2], [%r22251, %bb4]
+  %r22253 = extractvalue %Range.CompilerReachableLLVMState %reachability, 19
+  %r22254 = call i32 @rawBufferLoadInt(ptr %r22253, i32 %r22245)
+  %r22255 = icmp eq i32 %r22254, 1
+  br i1 %r22255, label %bb6, label %bb7
 bb6:
-  %r22255 = call i32 @compilerFunctionReturnABIIndirect()
+  %r22256 = call i32 @compilerFunctionReturnABIIndirect()
   br label %bb7
 bb7:
-  %r22256 = phi i32 [%r22251, %bb5], [%r22255, %bb6]
-  %r22257 = extractvalue %Range.CompilerReachableLLVMState %reachability, 20
-  %r22258 = call i32 @rawBufferStoreInt(ptr %r22257, i32 %r22244, i32 %r22256)
-  %r22259 = icmp ne i32 %r22258, 0
-  br i1 %r22259, label %bb8, label %bb9
+  %r22257 = phi i32 [%r22252, %bb5], [%r22256, %bb6]
+  %r22258 = extractvalue %Range.CompilerReachableLLVMState %reachability, 20
+  %r22259 = call i32 @rawBufferStoreInt(ptr %r22258, i32 %r22245, i32 %r22257)
+  %r22260 = icmp ne i32 %r22259, 0
+  br i1 %r22260, label %bb8, label %bb9
 bb8:
-  %r22260 = sub i32 0, 1
-  ret i32 %r22260
+  %r22261 = sub i32 0, 1
+  ret i32 %r22261
 bb9:
-  %r22261 = call i32 @compilerFunctionReturnABIIndirect()
-  %r22262 = icmp eq i32 %r22256, %r22261
-  br i1 %r22262, label %bb10, label %bb11
+  %r22262 = call i32 @compilerFunctionReturnABIIndirect()
+  %r22263 = icmp eq i32 %r22257, %r22262
+  br i1 %r22263, label %bb10, label %bb11
 bb10:
-  %r22263 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r22264 = call i32 @rawBufferStoreInt(ptr %r22263, i32 %r22244, i32 1)
-  %r22265 = icmp ne i32 %r22264, 0
-  br i1 %r22265, label %bb12, label %bb13
+  %r22264 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r22265 = call i32 @rawBufferStoreInt(ptr %r22264, i32 %r22245, i32 1)
+  %r22266 = icmp ne i32 %r22265, 0
+  br i1 %r22266, label %bb12, label %bb13
 bb12:
-  %r22266 = sub i32 0, 1
-  ret i32 %r22266
+  %r22267 = sub i32 0, 1
+  ret i32 %r22267
 bb13:
   br label %bb11
 bb11:
-  %r22267 = add i32 %r22244, 1
+  %r22268 = add i32 %r22245, 1
   br label %bb1
 bb3:
   br label %bb14
 bb14:
-  %r22268 = phi i32 [0, %bb3], [%r22284, %bb18]
-  %r22269 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
-  %r22270 = call i32 @rawBufferCount(ptr %r22269)
-  %r22271 = icmp slt i32 %r22268, %r22270
-  br i1 %r22271, label %bb15, label %bb16
+  %r22269 = phi i32 [0, %bb3], [%r22285, %bb18]
+  %r22270 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
+  %r22271 = call i32 @rawBufferCount(ptr %r22270)
+  %r22272 = icmp slt i32 %r22269, %r22271
+  br i1 %r22272, label %bb15, label %bb16
 bb15:
-  %r22272 = extractvalue %Range.CompilerReachableLLVMState %reachability, 4
-  %r22273 = call i32 @rawBufferLoadInt(ptr %r22272, i32 %r22268)
-  %r22274 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
-  %r22275 = call i32 @rawBufferLoadInt(ptr %r22274, i32 %r22268)
-  %r22276 = extractvalue %Range.CompilerReachableLLVMState %reachability, 20
-  %r22277 = call i32 @rawBufferLoadInt(ptr %r22276, i32 %r22275)
-  %r22278 = call i32 @compilerFunctionReturnABIIndirect()
-  %r22279 = icmp eq i32 %r22277, %r22278
-  br i1 %r22279, label %bb17, label %bb18
+  %r22273 = extractvalue %Range.CompilerReachableLLVMState %reachability, 4
+  %r22274 = call i32 @rawBufferLoadInt(ptr %r22273, i32 %r22269)
+  %r22275 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
+  %r22276 = call i32 @rawBufferLoadInt(ptr %r22275, i32 %r22269)
+  %r22277 = extractvalue %Range.CompilerReachableLLVMState %reachability, 20
+  %r22278 = call i32 @rawBufferLoadInt(ptr %r22277, i32 %r22276)
+  %r22279 = call i32 @compilerFunctionReturnABIIndirect()
+  %r22280 = icmp eq i32 %r22278, %r22279
+  br i1 %r22280, label %bb17, label %bb18
 bb17:
-  %r22280 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r22281 = call i32 @rawBufferStoreInt(ptr %r22280, i32 %r22273, i32 1)
-  %r22282 = icmp ne i32 %r22281, 0
-  br i1 %r22282, label %bb19, label %bb20
+  %r22281 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r22282 = call i32 @rawBufferStoreInt(ptr %r22281, i32 %r22274, i32 1)
+  %r22283 = icmp ne i32 %r22282, 0
+  br i1 %r22283, label %bb19, label %bb20
 bb19:
-  %r22283 = sub i32 0, 1
-  ret i32 %r22283
+  %r22284 = sub i32 0, 1
+  ret i32 %r22284
 bb20:
   br label %bb18
 bb18:
-  %r22284 = add i32 %r22268, 1
+  %r22285 = add i32 %r22269, 1
   br label %bb14
 bb16:
-  %r22285 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r22286 = call i32 @compilerReachableLLVMPlanFrozen()
-  %r22287 = call i32 @rawBufferStoreInt(ptr %r22285, i32 %r22286, i32 1)
-  ret i32 %r22287
+  %r22286 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r22287 = call i32 @compilerReachableLLVMPlanFrozen()
+  %r22288 = call i32 @rawBufferStoreInt(ptr %r22286, i32 %r22287, i32 1)
+  ret i32 %r22288
 }
 define i32 @compilerReachableLLVMEmissionIndex() {
 entry:
@@ -37599,188 +37604,188 @@ define i32 @compilerReachableLLVMStateEmitFunction(%Range.CompilerReachableLLVMS
 entry:
   %storage0 = alloca %Range.CompilerTypedLLVMHelpers
   %storage1 = alloca %Range.CompilerModuleABIPlan
-  %r22288 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r22289 = call i32 @compilerReachableLLVMPlanFrozen()
-  %r22290 = call i32 @rawBufferLoadInt(ptr %r22288, i32 %r22289)
-  %r22291 = icmp ne i32 %r22290, 1
-  br i1 %r22291, label %bb1, label %bb2
+  %r22289 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r22290 = call i32 @compilerReachableLLVMPlanFrozen()
+  %r22291 = call i32 @rawBufferLoadInt(ptr %r22289, i32 %r22290)
+  %r22292 = icmp ne i32 %r22291, 1
+  br i1 %r22292, label %bb1, label %bb2
 bb1:
-  %r22292 = sub i32 0, 1
-  ret i32 %r22292
+  %r22293 = sub i32 0, 1
+  ret i32 %r22293
 bb2:
-  %r22293 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22294 = extractvalue %Range.CompilerLLVMLoweringContext %r22293, 1
-  %r22295 = extractvalue %Range.CompilerSyntaxTables %r22294, 4
-  %r22296 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22295, i32 %functionRow, i32 0)
-  %r22297 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22298 = extractvalue %Range.CompilerLLVMLoweringContext %r22297, 1
-  %r22299 = call i32 @compilerSyntaxDeclarationRowForSyntaxID(%Range.CompilerSyntaxTables %r22298, i32 %r22296)
-  %r22300 = icmp slt i32 %r22299, 0
-  br i1 %r22300, label %bb3, label %bb4
+  %r22294 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22295 = extractvalue %Range.CompilerLLVMLoweringContext %r22294, 1
+  %r22296 = extractvalue %Range.CompilerSyntaxTables %r22295, 4
+  %r22297 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22296, i32 %functionRow, i32 0)
+  %r22298 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22299 = extractvalue %Range.CompilerLLVMLoweringContext %r22298, 1
+  %r22300 = call i32 @compilerSyntaxDeclarationRowForSyntaxID(%Range.CompilerSyntaxTables %r22299, i32 %r22297)
+  %r22301 = icmp slt i32 %r22300, 0
+  br i1 %r22301, label %bb3, label %bb4
 bb3:
-  %r22301 = sub i32 0, 1
-  ret i32 %r22301
+  %r22302 = sub i32 0, 1
+  ret i32 %r22302
 bb4:
-  %r22302 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22303 = extractvalue %Range.CompilerLLVMLoweringContext %r22302, 1
-  %r22304 = extractvalue %Range.CompilerSyntaxTables %r22303, 2
-  %r22305 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22304, i32 %r22299, i32 1)
-  %r22306 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22307 = extractvalue %Range.CompilerLLVMLoweringContext %r22306, 1
-  %r22308 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22309 = extractvalue %Range.CompilerLLVMLoweringContext %r22308, 1
-  %r22310 = extractvalue %Range.CompilerSyntaxTables %r22309, 2
-  %r22311 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22310, i32 %r22299, i32 7)
-  %r22312 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22313 = extractvalue %Range.CompilerLLVMLoweringContext %r22312, 1
-  %r22314 = extractvalue %Range.CompilerSyntaxTables %r22313, 2
-  %r22315 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22314, i32 %r22299, i32 8)
-  %r22316 = call ptr @compilerTypedSyntaxLocalText(%Range.CompilerSyntaxTables %r22307, i32 %r22305, i32 %r22311, i32 %r22315)
-  %r22317 = call i32 @compilerMetricsFunctionBegin(i32 %functionRow, ptr %r22316)
-  %r22318 = call i32 @stringTransientRegionMark()
-  %r22319 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22320 = call i32 @compilerReachableLLVMStateFunctionInstanceReceiverKey(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID)
-  %r22321 = extractvalue %Range.CompilerReachableLLVMState %reachability, 8
-  %r22322 = extractvalue %Range.CompilerReachableLLVMState %reachability, 9
-  %r22323 = extractvalue %Range.CompilerReachableLLVMState %reachability, 10
-  %r22324 = extractvalue %Range.CompilerReachableLLVMState %reachability, 11
-  %r22325 = extractvalue %Range.CompilerReachableLLVMState %reachability, 12
-  %r22326 = extractvalue %Range.CompilerReachableLLVMState %reachability, 13
-  %r22327 = extractvalue %Range.CompilerReachableLLVMState %reachability, 14
-  %r22328 = extractvalue %Range.CompilerReachableLLVMState %reachability, 16
-  %r22329 = extractvalue %Range.CompilerReachableLLVMState %reachability, 17
-  %r22330 = extractvalue %Range.CompilerReachableLLVMState %reachability, 10
-  %r22331 = call i32 @compilerReachableFunctionInstanceSignatureFirstColumn()
-  %r22332 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22330, i32 %instanceID, i32 %r22331)
-  %r22333 = extractvalue %Range.CompilerReachableLLVMState %reachability, 10
-  %r22334 = call i32 @compilerReachableFunctionInstanceSignatureSecondColumn()
-  %r22335 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22333, i32 %instanceID, i32 %r22334)
-  %r22336 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r22337 = call i32 @compilerReachableLLVMNextTemporary()
-  %r22338 = call i32 @rawBufferLoadInt(ptr %r22336, i32 %r22337)
+  %r22303 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22304 = extractvalue %Range.CompilerLLVMLoweringContext %r22303, 1
+  %r22305 = extractvalue %Range.CompilerSyntaxTables %r22304, 2
+  %r22306 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22305, i32 %r22300, i32 1)
+  %r22307 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22308 = extractvalue %Range.CompilerLLVMLoweringContext %r22307, 1
+  %r22309 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22310 = extractvalue %Range.CompilerLLVMLoweringContext %r22309, 1
+  %r22311 = extractvalue %Range.CompilerSyntaxTables %r22310, 2
+  %r22312 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22311, i32 %r22300, i32 7)
+  %r22313 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22314 = extractvalue %Range.CompilerLLVMLoweringContext %r22313, 1
+  %r22315 = extractvalue %Range.CompilerSyntaxTables %r22314, 2
+  %r22316 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22315, i32 %r22300, i32 8)
+  %r22317 = call ptr @compilerTypedSyntaxLocalText(%Range.CompilerSyntaxTables %r22308, i32 %r22306, i32 %r22312, i32 %r22316)
+  %r22318 = call i32 @compilerMetricsFunctionBegin(i32 %functionRow, ptr %r22317)
+  %r22319 = call i32 @stringTransientRegionMark()
+  %r22320 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22321 = call i32 @compilerReachableLLVMStateFunctionInstanceReceiverKey(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID)
+  %r22322 = extractvalue %Range.CompilerReachableLLVMState %reachability, 8
+  %r22323 = extractvalue %Range.CompilerReachableLLVMState %reachability, 9
+  %r22324 = extractvalue %Range.CompilerReachableLLVMState %reachability, 10
+  %r22325 = extractvalue %Range.CompilerReachableLLVMState %reachability, 11
+  %r22326 = extractvalue %Range.CompilerReachableLLVMState %reachability, 12
+  %r22327 = extractvalue %Range.CompilerReachableLLVMState %reachability, 13
+  %r22328 = extractvalue %Range.CompilerReachableLLVMState %reachability, 14
+  %r22329 = extractvalue %Range.CompilerReachableLLVMState %reachability, 16
+  %r22330 = extractvalue %Range.CompilerReachableLLVMState %reachability, 17
+  %r22331 = extractvalue %Range.CompilerReachableLLVMState %reachability, 10
+  %r22332 = call i32 @compilerReachableFunctionInstanceSignatureFirstColumn()
+  %r22333 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22331, i32 %instanceID, i32 %r22332)
+  %r22334 = extractvalue %Range.CompilerReachableLLVMState %reachability, 10
+  %r22335 = call i32 @compilerReachableFunctionInstanceSignatureSecondColumn()
+  %r22336 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22334, i32 %instanceID, i32 %r22335)
+  %r22337 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r22338 = call i32 @compilerReachableLLVMNextTemporary()
+  %r22339 = call i32 @rawBufferLoadInt(ptr %r22337, i32 %r22338)
   call void @compilerReachableLLVMStateABIPlan(ptr %storage1, %Range.CompilerReachableLLVMState %reachability)
-  %r22339 = load %Range.CompilerModuleABIPlan, ptr %storage1
-  call void @compilerCoreLLVMSelectedHelperFunctionTyped(ptr %storage0, %Range.CompilerLLVMLoweringContext %r22319, i32 %r22299, i32 %functionRow, i32 %instanceID, i32 %r22320, %Range.CompilerIntTable %r22321, %Range.CompilerIntTable %r22322, %Range.CompilerIntTable %r22323, %Range.CompilerIntTable %r22324, %Range.CompilerIntTable %r22325, %Range.CompilerIntTable %r22326, %Range.CompilerIntTable %r22327, %Range.CompilerIntTable %r22328, %Range.CompilerIntTable %r22329, i32 %r22332, i32 %r22335, i32 %r22338, ptr %emissionEdgeOwners, ptr %emissionEdgeTargets, %Range.CompilerModuleABIPlan %r22339)
-  %r22340 = load %Range.CompilerTypedLLVMHelpers, ptr %storage0
-  %r22341 = extractvalue %Range.CompilerTypedLLVMHelpers %r22340, 3
-  %r22342 = extractvalue %Range.CompilerBodyTelemetry %r22341, 3
-  %r22343 = extractvalue %Range.CompilerTypedLLVMHelpers %r22340, 3
-  %r22344 = extractvalue %Range.CompilerBodyTelemetry %r22343, 6
-  %r22345 = call i32 @compilerMetricsFunctionEnd(i32 %r22342, i32 %r22344)
-  %r22346 = extractvalue %Range.CompilerReachableLLVMState %reachability, 23
-  %r22347 = extractvalue %Range.CompilerTypedLLVMHelpers %r22340, 0
-  %r22348 = extractvalue %Range.CompilerLLVMHelperFunctions %r22347, 0
-  %r22349 = call i32 @rawBufferAppendText(ptr %r22346, ptr %r22348)
-  %r22350 = icmp ne i32 %r22349, 0
-  br i1 %r22350, label %bb5, label %bb6
+  %r22340 = load %Range.CompilerModuleABIPlan, ptr %storage1
+  call void @compilerCoreLLVMSelectedHelperFunctionTyped(ptr %storage0, %Range.CompilerLLVMLoweringContext %r22320, i32 %r22300, i32 %functionRow, i32 %instanceID, i32 %r22321, %Range.CompilerIntTable %r22322, %Range.CompilerIntTable %r22323, %Range.CompilerIntTable %r22324, %Range.CompilerIntTable %r22325, %Range.CompilerIntTable %r22326, %Range.CompilerIntTable %r22327, %Range.CompilerIntTable %r22328, %Range.CompilerIntTable %r22329, %Range.CompilerIntTable %r22330, i32 %r22333, i32 %r22336, i32 %r22339, ptr %emissionEdgeOwners, ptr %emissionEdgeTargets, %Range.CompilerModuleABIPlan %r22340)
+  %r22341 = load %Range.CompilerTypedLLVMHelpers, ptr %storage0
+  %r22342 = extractvalue %Range.CompilerTypedLLVMHelpers %r22341, 3
+  %r22343 = extractvalue %Range.CompilerBodyTelemetry %r22342, 3
+  %r22344 = extractvalue %Range.CompilerTypedLLVMHelpers %r22341, 3
+  %r22345 = extractvalue %Range.CompilerBodyTelemetry %r22344, 6
+  %r22346 = call i32 @compilerMetricsFunctionEnd(i32 %r22343, i32 %r22345)
+  %r22347 = extractvalue %Range.CompilerReachableLLVMState %reachability, 23
+  %r22348 = extractvalue %Range.CompilerTypedLLVMHelpers %r22341, 0
+  %r22349 = extractvalue %Range.CompilerLLVMHelperFunctions %r22348, 0
+  %r22350 = call i32 @rawBufferAppendText(ptr %r22347, ptr %r22349)
+  %r22351 = icmp ne i32 %r22350, 0
+  br i1 %r22351, label %bb5, label %bb6
 bb5:
-  %r22351 = sub i32 0, 1
+  %r22352 = sub i32 0, 1
   br label %bb6
 bb6:
-  %r22352 = phi i32 [0, %bb4], [%r22351, %bb5]
-  %r22353 = icmp eq i32 %r22352, 0
-  br i1 %r22353, label %bb7, label %bb8
+  %r22353 = phi i32 [0, %bb4], [%r22352, %bb5]
+  %r22354 = icmp eq i32 %r22353, 0
+  br i1 %r22354, label %bb7, label %bb8
 bb7:
-  %r22354 = extractvalue %Range.CompilerReachableLLVMState %reachability, 24
-  %r22355 = extractvalue %Range.CompilerTypedLLVMHelpers %r22340, 1
-  %r22356 = call i32 @rawBufferAppendText(ptr %r22354, ptr %r22355)
-  %r22357 = icmp ne i32 %r22356, 0
-  br i1 %r22357, label %bb9, label %bb10
+  %r22355 = extractvalue %Range.CompilerReachableLLVMState %reachability, 24
+  %r22356 = extractvalue %Range.CompilerTypedLLVMHelpers %r22341, 1
+  %r22357 = call i32 @rawBufferAppendText(ptr %r22355, ptr %r22356)
+  %r22358 = icmp ne i32 %r22357, 0
+  br i1 %r22358, label %bb9, label %bb10
 bb9:
-  %r22358 = sub i32 0, 1
+  %r22359 = sub i32 0, 1
   br label %bb10
 bb10:
-  %r22359 = phi i32 [%r22352, %bb7], [%r22358, %bb9]
+  %r22360 = phi i32 [%r22353, %bb7], [%r22359, %bb9]
   br label %bb8
 bb8:
-  %r22360 = phi i32 [%r22352, %bb6], [%r22359, %bb10]
-  %r22361 = icmp eq i32 %r22360, 0
-  br i1 %r22361, label %bb11, label %bb12
+  %r22361 = phi i32 [%r22353, %bb6], [%r22360, %bb10]
+  %r22362 = icmp eq i32 %r22361, 0
+  br i1 %r22362, label %bb11, label %bb12
 bb11:
-  %r22362 = call i32 @compilerReachableLLVMStateAccumulate(%Range.CompilerReachableLLVMState %reachability, %Range.CompilerTypedLLVMHelpers %r22340)
-  %r22363 = icmp ne i32 %r22362, 0
-  br i1 %r22363, label %bb13, label %bb14
+  %r22363 = call i32 @compilerReachableLLVMStateAccumulate(%Range.CompilerReachableLLVMState %reachability, %Range.CompilerTypedLLVMHelpers %r22341)
+  %r22364 = icmp ne i32 %r22363, 0
+  br i1 %r22364, label %bb13, label %bb14
 bb13:
-  %r22364 = sub i32 0, 1
+  %r22365 = sub i32 0, 1
   br label %bb14
 bb14:
-  %r22365 = phi i32 [%r22360, %bb11], [%r22364, %bb13]
+  %r22366 = phi i32 [%r22361, %bb11], [%r22365, %bb13]
   br label %bb12
 bb12:
-  %r22366 = phi i32 [%r22360, %bb8], [%r22365, %bb14]
-  %r22367 = call i32 @stringTransientRegionReset(i32 %r22318)
-  ret i32 %r22366
+  %r22367 = phi i32 [%r22361, %bb8], [%r22366, %bb14]
+  %r22368 = call i32 @stringTransientRegionReset(i32 %r22319)
+  ret i32 %r22367
 }
 define i1 @compilerFunctionEdgesContain(ptr %edgeOwners, ptr %edgeTargets, i32 %ownerFunctionRow, i32 %targetFunctionRow) {
 entry:
   br label %bb1
 bb1:
-  %r22368 = phi i32 [0, %entry], [%r22376, %bb5]
-  %r22369 = call i32 @rawBufferCount(ptr %edgeTargets)
-  %r22370 = icmp slt i32 %r22368, %r22369
-  br i1 %r22370, label %bb2, label %bb3
+  %r22369 = phi i32 [0, %entry], [%r22377, %bb5]
+  %r22370 = call i32 @rawBufferCount(ptr %edgeTargets)
+  %r22371 = icmp slt i32 %r22369, %r22370
+  br i1 %r22371, label %bb2, label %bb3
 bb2:
-  %r22371 = call i32 @rawBufferLoadInt(ptr %edgeOwners, i32 %r22368)
-  %r22372 = icmp eq i32 %r22371, %ownerFunctionRow
-  %r22373 = call i32 @rawBufferLoadInt(ptr %edgeTargets, i32 %r22368)
-  %r22374 = icmp eq i32 %r22373, %targetFunctionRow
-  %r22375 = and i1 %r22372, %r22374
-  br i1 %r22375, label %bb4, label %bb5
+  %r22372 = call i32 @rawBufferLoadInt(ptr %edgeOwners, i32 %r22369)
+  %r22373 = icmp eq i32 %r22372, %ownerFunctionRow
+  %r22374 = call i32 @rawBufferLoadInt(ptr %edgeTargets, i32 %r22369)
+  %r22375 = icmp eq i32 %r22374, %targetFunctionRow
+  %r22376 = and i1 %r22373, %r22375
+  br i1 %r22376, label %bb4, label %bb5
 bb4:
   ret i1 true
 bb5:
-  %r22376 = add i32 %r22368, 1
+  %r22377 = add i32 %r22369, 1
   br label %bb1
 bb3:
   ret i1 false
 }
 define i1 @compilerReachableLLVMStateFunctionIsRepresentationSensitive(%Range.CompilerReachableLLVMState %reachability, i32 %functionRow) {
 entry:
-  %r22377 = extractvalue %Range.CompilerReachableLLVMState %reachability, 22
-  %r22378 = call i32 @rawBufferLoadInt(ptr %r22377, i32 %functionRow)
-  %r22379 = icmp eq i32 %r22378, 1
-  br i1 %r22379, label %bb1, label %bb2
+  %r22378 = extractvalue %Range.CompilerReachableLLVMState %reachability, 22
+  %r22379 = call i32 @rawBufferLoadInt(ptr %r22378, i32 %functionRow)
+  %r22380 = icmp eq i32 %r22379, 1
+  br i1 %r22380, label %bb1, label %bb2
 bb1:
   ret i1 true
 bb2:
-  %r22380 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22381 = extractvalue %Range.CompilerLLVMLoweringContext %r22380, 1
-  %r22382 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22383 = extractvalue %Range.CompilerLLVMLoweringContext %r22382, 2
-  %r22384 = call i1 @compilerFunctionHasRepresentationSensitiveABI(%Range.CompilerSyntaxTables %r22381, %Range.CompilerDeclarationIndex %r22383, i32 %functionRow)
-  ret i1 %r22384
+  %r22381 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22382 = extractvalue %Range.CompilerLLVMLoweringContext %r22381, 1
+  %r22383 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22384 = extractvalue %Range.CompilerLLVMLoweringContext %r22383, 2
+  %r22385 = call i1 @compilerFunctionHasRepresentationSensitiveABI(%Range.CompilerSyntaxTables %r22382, %Range.CompilerDeclarationIndex %r22384, i32 %functionRow)
+  ret i1 %r22385
 }
 define i32 @compilerCoreLLVMPlaceholderCount(ptr %text) {
 entry:
-  %r22386 = call i32 @stringLength(ptr getelementptr inbounds ([27 x i8], ptr @.str.22385, i32 0, i32 0))
+  %r22387 = call i32 @stringLength(ptr getelementptr inbounds ([27 x i8], ptr @.str.22386, i32 0, i32 0))
   br label %bb1
 bb1:
-  %r22387 = phi i32 [0, %entry], [%r22393, %bb5]
-  %r22388 = phi i32 [0, %entry], [%r22392, %bb5]
-  %r22389 = icmp sge i32 %r22387, 0
-  br i1 %r22389, label %bb2, label %bb3
+  %r22388 = phi i32 [0, %entry], [%r22394, %bb5]
+  %r22389 = phi i32 [0, %entry], [%r22393, %bb5]
+  %r22390 = icmp sge i32 %r22388, 0
+  br i1 %r22390, label %bb2, label %bb3
 bb2:
-  %r22390 = call i32 @stringFindFrom(ptr %text, i32 %r22387, ptr getelementptr inbounds ([27 x i8], ptr @.str.22385, i32 0, i32 0))
-  %r22391 = icmp slt i32 %r22390, 0
-  br i1 %r22391, label %bb4, label %bb5
+  %r22391 = call i32 @stringFindFrom(ptr %text, i32 %r22388, ptr getelementptr inbounds ([27 x i8], ptr @.str.22386, i32 0, i32 0))
+  %r22392 = icmp slt i32 %r22391, 0
+  br i1 %r22392, label %bb4, label %bb5
 bb4:
-  ret i32 %r22388
+  ret i32 %r22389
 bb5:
-  %r22392 = add i32 %r22388, 1
-  %r22393 = add i32 %r22390, %r22386
+  %r22393 = add i32 %r22389, 1
+  %r22394 = add i32 %r22391, %r22387
   br label %bb1
 bb3:
-  ret i32 %r22388
+  ret i32 %r22389
 }
 define ptr @compilerCoreLLVMPlaceholderFailure(i32 %placeholderCount, ptr %renderedText) {
 entry:
-  %r22394 = call ptr @compilerCoreLLVMPlaceholderDetails(ptr %renderedText)
-  %r22396 = call ptr @compilerCoreNewlineCharacter()
-  %r22397 = call ptr @stringFromInt(i32 %placeholderCount)
-  %r22398 = call ptr @stringConcat(ptr getelementptr inbounds ([66 x i8], ptr @.str.22395, i32 0, i32 0), ptr %r22397)
-  %r22399 = call ptr @stringConcat(ptr %r22398, ptr %r22396)
-  %r22400 = call ptr @stringConcat(ptr %r22399, ptr %r22394)
-  ret ptr %r22400
+  %r22395 = call ptr @compilerCoreLLVMPlaceholderDetails(ptr %renderedText)
+  %r22397 = call ptr @compilerCoreNewlineCharacter()
+  %r22398 = call ptr @stringFromInt(i32 %placeholderCount)
+  %r22399 = call ptr @stringConcat(ptr getelementptr inbounds ([66 x i8], ptr @.str.22396, i32 0, i32 0), ptr %r22398)
+  %r22400 = call ptr @stringConcat(ptr %r22399, ptr %r22397)
+  %r22401 = call ptr @stringConcat(ptr %r22400, ptr %r22395)
+  ret ptr %r22401
 }
 define i32 @compilerReachableLLVMReturnFailureKind() {
 entry:
@@ -37792,31 +37797,31 @@ entry:
 }
 define ptr @compilerReachableLLVMReturnFailureName(i32 %kind) {
 entry:
-  %r22401 = call i32 @compilerReachableLLVMReturnFailureDependency()
-  %r22402 = icmp eq i32 %kind, %r22401
-  br i1 %r22402, label %bb1, label %bb2
+  %r22402 = call i32 @compilerReachableLLVMReturnFailureDependency()
+  %r22403 = icmp eq i32 %kind, %r22402
+  br i1 %r22403, label %bb1, label %bb2
 bb1:
-  ret ptr getelementptr inbounds ([11 x i8], ptr @.str.22403, i32 0, i32 0)
+  ret ptr getelementptr inbounds ([11 x i8], ptr @.str.22404, i32 0, i32 0)
 bb2:
-  %r22404 = call i32 @compilerReachableLLVMReturnFailureProof()
-  %r22405 = icmp eq i32 %kind, %r22404
-  br i1 %r22405, label %bb3, label %bb4
+  %r22405 = call i32 @compilerReachableLLVMReturnFailureProof()
+  %r22406 = icmp eq i32 %kind, %r22405
+  br i1 %r22406, label %bb3, label %bb4
 bb3:
-  ret ptr getelementptr inbounds ([6 x i8], ptr @.str.22406, i32 0, i32 0)
+  ret ptr getelementptr inbounds ([6 x i8], ptr @.str.22407, i32 0, i32 0)
 bb4:
-  %r22407 = call i32 @compilerReachableLLVMReturnFailureUnresolved()
-  %r22408 = icmp eq i32 %kind, %r22407
-  br i1 %r22408, label %bb5, label %bb6
+  %r22408 = call i32 @compilerReachableLLVMReturnFailureUnresolved()
+  %r22409 = icmp eq i32 %kind, %r22408
+  br i1 %r22409, label %bb5, label %bb6
 bb5:
-  ret ptr getelementptr inbounds ([11 x i8], ptr @.str.22409, i32 0, i32 0)
+  ret ptr getelementptr inbounds ([11 x i8], ptr @.str.22410, i32 0, i32 0)
 bb6:
-  %r22410 = call i32 @compilerReachableLLVMReturnFailurePassLimit()
-  %r22411 = icmp eq i32 %kind, %r22410
-  br i1 %r22411, label %bb7, label %bb8
+  %r22411 = call i32 @compilerReachableLLVMReturnFailurePassLimit()
+  %r22412 = icmp eq i32 %kind, %r22411
+  br i1 %r22412, label %bb7, label %bb8
 bb7:
-  ret ptr getelementptr inbounds ([10 x i8], ptr @.str.22412, i32 0, i32 0)
+  ret ptr getelementptr inbounds ([10 x i8], ptr @.str.22413, i32 0, i32 0)
 bb8:
-  ret ptr getelementptr inbounds ([8 x i8], ptr @.str.22413, i32 0, i32 0)
+  ret ptr getelementptr inbounds ([8 x i8], ptr @.str.22414, i32 0, i32 0)
 }
 define i32 @compilerReachableLLVMFunctionFailureDetail() {
 entry:
@@ -37824,230 +37829,230 @@ entry:
 }
 define i1 @compilerReachableLLVMStateABIPlanIsValid(%Range.CompilerReachableLLVMState %reachability) {
 entry:
-  %r22414 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
-  %r22415 = extractvalue %Range.CompilerLLVMLoweringContext %r22414, 1
-  %r22416 = extractvalue %Range.CompilerSyntaxTables %r22415, 4
-  %r22417 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22416)
-  %r22418 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r22419 = call i32 @compilerReachableLLVMPlanFrozen()
-  %r22420 = call i32 @rawBufferLoadInt(ptr %r22418, i32 %r22419)
-  %r22421 = icmp ne i32 %r22420, 1
-  %r22422 = extractvalue %Range.CompilerReachableLLVMState %reachability, 20
-  %r22423 = call i32 @rawBufferCount(ptr %r22422)
-  %r22424 = icmp ne i32 %r22423, %r22417
-  %r22425 = or i1 %r22421, %r22424
-  %r22426 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r22427 = call i32 @rawBufferCount(ptr %r22426)
-  %r22428 = icmp ne i32 %r22427, %r22417
-  %r22429 = or i1 %r22425, %r22428
-  br i1 %r22429, label %bb1, label %bb2
+  %r22415 = extractvalue %Range.CompilerReachableLLVMState %reachability, 0
+  %r22416 = extractvalue %Range.CompilerLLVMLoweringContext %r22415, 1
+  %r22417 = extractvalue %Range.CompilerSyntaxTables %r22416, 4
+  %r22418 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22417)
+  %r22419 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r22420 = call i32 @compilerReachableLLVMPlanFrozen()
+  %r22421 = call i32 @rawBufferLoadInt(ptr %r22419, i32 %r22420)
+  %r22422 = icmp ne i32 %r22421, 1
+  %r22423 = extractvalue %Range.CompilerReachableLLVMState %reachability, 20
+  %r22424 = call i32 @rawBufferCount(ptr %r22423)
+  %r22425 = icmp ne i32 %r22424, %r22418
+  %r22426 = or i1 %r22422, %r22425
+  %r22427 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r22428 = call i32 @rawBufferCount(ptr %r22427)
+  %r22429 = icmp ne i32 %r22428, %r22418
+  %r22430 = or i1 %r22426, %r22429
+  br i1 %r22430, label %bb1, label %bb2
 bb1:
   ret i1 false
 bb2:
   br label %bb3
 bb3:
-  %r22430 = phi i32 [0, %bb2], [%r22462, %bb11]
-  %r22431 = icmp slt i32 %r22430, %r22417
-  br i1 %r22431, label %bb4, label %bb5
+  %r22431 = phi i32 [0, %bb2], [%r22463, %bb11]
+  %r22432 = icmp slt i32 %r22431, %r22418
+  br i1 %r22432, label %bb4, label %bb5
 bb4:
-  %r22432 = extractvalue %Range.CompilerReachableLLVMState %reachability, 20
-  %r22433 = call i32 @rawBufferLoadInt(ptr %r22432, i32 %r22430)
-  %r22434 = call i32 @compilerFunctionReturnABINone()
-  %r22435 = icmp slt i32 %r22433, %r22434
-  %r22436 = call i32 @compilerFunctionReturnABIIndirect()
-  %r22437 = icmp sgt i32 %r22433, %r22436
-  %r22438 = or i1 %r22435, %r22437
-  br i1 %r22438, label %bb6, label %bb7
+  %r22433 = extractvalue %Range.CompilerReachableLLVMState %reachability, 20
+  %r22434 = call i32 @rawBufferLoadInt(ptr %r22433, i32 %r22431)
+  %r22435 = call i32 @compilerFunctionReturnABINone()
+  %r22436 = icmp slt i32 %r22434, %r22435
+  %r22437 = call i32 @compilerFunctionReturnABIIndirect()
+  %r22438 = icmp sgt i32 %r22434, %r22437
+  %r22439 = or i1 %r22436, %r22438
+  br i1 %r22439, label %bb6, label %bb7
 bb6:
   ret i1 false
 bb7:
-  %r22439 = call i32 @compilerFunctionReturnABIIndirect()
-  %r22440 = icmp eq i32 %r22433, %r22439
-  %r22441 = extractvalue %Range.CompilerReachableLLVMState %reachability, 19
-  %r22442 = call i32 @rawBufferLoadInt(ptr %r22441, i32 %r22430)
-  %r22443 = icmp ne i32 %r22442, 1
-  %r22444 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r22445 = call i32 @rawBufferLoadInt(ptr %r22444, i32 %r22430)
-  %r22446 = icmp ne i32 %r22445, 1
-  %r22447 = or i1 %r22443, %r22446
-  %r22448 = call i32 @compilerReachableLLVMStatePlannedReturnMode(%Range.CompilerReachableLLVMState %reachability, i32 %r22430)
-  %r22449 = call i32 @compilerFunctionReturnABIIndirect()
-  %r22450 = icmp ne i32 %r22448, %r22449
-  %r22451 = or i1 %r22447, %r22450
-  %r22452 = and i1 %r22440, %r22451
-  br i1 %r22452, label %bb8, label %bb9
+  %r22440 = call i32 @compilerFunctionReturnABIIndirect()
+  %r22441 = icmp eq i32 %r22434, %r22440
+  %r22442 = extractvalue %Range.CompilerReachableLLVMState %reachability, 19
+  %r22443 = call i32 @rawBufferLoadInt(ptr %r22442, i32 %r22431)
+  %r22444 = icmp ne i32 %r22443, 1
+  %r22445 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r22446 = call i32 @rawBufferLoadInt(ptr %r22445, i32 %r22431)
+  %r22447 = icmp ne i32 %r22446, 1
+  %r22448 = or i1 %r22444, %r22447
+  %r22449 = call i32 @compilerReachableLLVMStatePlannedReturnMode(%Range.CompilerReachableLLVMState %reachability, i32 %r22431)
+  %r22450 = call i32 @compilerFunctionReturnABIIndirect()
+  %r22451 = icmp ne i32 %r22449, %r22450
+  %r22452 = or i1 %r22448, %r22451
+  %r22453 = and i1 %r22441, %r22452
+  br i1 %r22453, label %bb8, label %bb9
 bb8:
   ret i1 false
 bb9:
-  %r22453 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r22454 = call i32 @rawBufferLoadInt(ptr %r22453, i32 %r22430)
-  %r22455 = icmp eq i32 %r22454, 1
-  %r22456 = call i1 @compilerReachableLLVMStateFunctionIsRepresentationSensitive(%Range.CompilerReachableLLVMState %reachability, i32 %r22430)
-  %r22457 = and i1 %r22455, %r22456
-  %r22458 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
-  %r22459 = call i32 @rawBufferLoadInt(ptr %r22458, i32 %r22430)
-  %r22460 = icmp ne i32 %r22459, 1
-  %r22461 = and i1 %r22457, %r22460
-  br i1 %r22461, label %bb10, label %bb11
+  %r22454 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r22455 = call i32 @rawBufferLoadInt(ptr %r22454, i32 %r22431)
+  %r22456 = icmp eq i32 %r22455, 1
+  %r22457 = call i1 @compilerReachableLLVMStateFunctionIsRepresentationSensitive(%Range.CompilerReachableLLVMState %reachability, i32 %r22431)
+  %r22458 = and i1 %r22456, %r22457
+  %r22459 = extractvalue %Range.CompilerReachableLLVMState %reachability, 18
+  %r22460 = call i32 @rawBufferLoadInt(ptr %r22459, i32 %r22431)
+  %r22461 = icmp ne i32 %r22460, 1
+  %r22462 = and i1 %r22458, %r22461
+  br i1 %r22462, label %bb10, label %bb11
 bb10:
   ret i1 false
 bb11:
-  %r22462 = add i32 %r22430, 1
+  %r22463 = add i32 %r22431, 1
   br label %bb3
 bb5:
   br label %bb12
 bb12:
-  %r22463 = phi i32 [0, %bb5], [%r22497, %bb20]
-  %r22464 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
-  %r22465 = call i32 @rawBufferCount(ptr %r22464)
-  %r22466 = icmp slt i32 %r22463, %r22465
-  br i1 %r22466, label %bb13, label %bb14
+  %r22464 = phi i32 [0, %bb5], [%r22498, %bb20]
+  %r22465 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
+  %r22466 = call i32 @rawBufferCount(ptr %r22465)
+  %r22467 = icmp slt i32 %r22464, %r22466
+  br i1 %r22467, label %bb13, label %bb14
 bb13:
-  %r22467 = extractvalue %Range.CompilerReachableLLVMState %reachability, 4
-  %r22468 = call i32 @rawBufferLoadInt(ptr %r22467, i32 %r22463)
-  %r22469 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
-  %r22470 = call i32 @rawBufferLoadInt(ptr %r22469, i32 %r22463)
-  %r22471 = extractvalue %Range.CompilerReachableLLVMState %reachability, 20
-  %r22472 = call i32 @rawBufferLoadInt(ptr %r22471, i32 %r22470)
-  %r22473 = call i32 @compilerFunctionReturnABIIndirect()
-  %r22474 = icmp eq i32 %r22472, %r22473
-  %r22475 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r22476 = call i32 @rawBufferLoadInt(ptr %r22475, i32 %r22468)
-  %r22477 = icmp ne i32 %r22476, 1
-  %r22478 = and i1 %r22474, %r22477
-  br i1 %r22478, label %bb15, label %bb16
+  %r22468 = extractvalue %Range.CompilerReachableLLVMState %reachability, 4
+  %r22469 = call i32 @rawBufferLoadInt(ptr %r22468, i32 %r22464)
+  %r22470 = extractvalue %Range.CompilerReachableLLVMState %reachability, 5
+  %r22471 = call i32 @rawBufferLoadInt(ptr %r22470, i32 %r22464)
+  %r22472 = extractvalue %Range.CompilerReachableLLVMState %reachability, 20
+  %r22473 = call i32 @rawBufferLoadInt(ptr %r22472, i32 %r22471)
+  %r22474 = call i32 @compilerFunctionReturnABIIndirect()
+  %r22475 = icmp eq i32 %r22473, %r22474
+  %r22476 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r22477 = call i32 @rawBufferLoadInt(ptr %r22476, i32 %r22469)
+  %r22478 = icmp ne i32 %r22477, 1
+  %r22479 = and i1 %r22475, %r22478
+  br i1 %r22479, label %bb15, label %bb16
 bb15:
   ret i1 false
 bb16:
-  %r22479 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r22480 = call i32 @rawBufferLoadInt(ptr %r22479, i32 %r22468)
-  %r22481 = icmp eq i32 %r22480, 1
-  %r22482 = call i1 @compilerReachableLLVMStateFunctionIsRepresentationSensitive(%Range.CompilerReachableLLVMState %reachability, i32 %r22470)
-  %r22483 = and i1 %r22481, %r22482
-  %r22484 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r22485 = call i32 @rawBufferLoadInt(ptr %r22484, i32 %r22470)
-  %r22486 = icmp ne i32 %r22485, 1
-  %r22487 = and i1 %r22483, %r22486
-  br i1 %r22487, label %bb17, label %bb18
+  %r22480 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r22481 = call i32 @rawBufferLoadInt(ptr %r22480, i32 %r22469)
+  %r22482 = icmp eq i32 %r22481, 1
+  %r22483 = call i1 @compilerReachableLLVMStateFunctionIsRepresentationSensitive(%Range.CompilerReachableLLVMState %reachability, i32 %r22471)
+  %r22484 = and i1 %r22482, %r22483
+  %r22485 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r22486 = call i32 @rawBufferLoadInt(ptr %r22485, i32 %r22471)
+  %r22487 = icmp ne i32 %r22486, 1
+  %r22488 = and i1 %r22484, %r22487
+  br i1 %r22488, label %bb17, label %bb18
 bb17:
   ret i1 false
 bb18:
-  %r22488 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r22489 = call i32 @rawBufferLoadInt(ptr %r22488, i32 %r22470)
-  %r22490 = icmp eq i32 %r22489, 1
-  %r22491 = call i1 @compilerReachableLLVMStateFunctionIsRepresentationSensitive(%Range.CompilerReachableLLVMState %reachability, i32 %r22470)
-  %r22492 = and i1 %r22490, %r22491
-  %r22493 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
-  %r22494 = call i32 @rawBufferLoadInt(ptr %r22493, i32 %r22468)
-  %r22495 = icmp ne i32 %r22494, 1
-  %r22496 = and i1 %r22492, %r22495
-  br i1 %r22496, label %bb19, label %bb20
+  %r22489 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r22490 = call i32 @rawBufferLoadInt(ptr %r22489, i32 %r22471)
+  %r22491 = icmp eq i32 %r22490, 1
+  %r22492 = call i1 @compilerReachableLLVMStateFunctionIsRepresentationSensitive(%Range.CompilerReachableLLVMState %reachability, i32 %r22471)
+  %r22493 = and i1 %r22491, %r22492
+  %r22494 = extractvalue %Range.CompilerReachableLLVMState %reachability, 21
+  %r22495 = call i32 @rawBufferLoadInt(ptr %r22494, i32 %r22469)
+  %r22496 = icmp ne i32 %r22495, 1
+  %r22497 = and i1 %r22493, %r22496
+  br i1 %r22497, label %bb19, label %bb20
 bb19:
   ret i1 false
 bb20:
-  %r22497 = add i32 %r22463, 1
+  %r22498 = add i32 %r22464, 1
   br label %bb12
 bb14:
   ret i1 true
 }
 define i1 @compilerFunctionHasAggregateParameterABI(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %functionRow) {
 entry:
-  %r22498 = icmp slt i32 %functionRow, 0
-  %r22499 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r22500 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22499)
-  %r22501 = icmp sge i32 %functionRow, %r22500
-  %r22502 = or i1 %r22498, %r22501
-  br i1 %r22502, label %bb1, label %bb2
+  %r22499 = icmp slt i32 %functionRow, 0
+  %r22500 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r22501 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22500)
+  %r22502 = icmp sge i32 %functionRow, %r22501
+  %r22503 = or i1 %r22499, %r22502
+  br i1 %r22503, label %bb1, label %bb2
 bb1:
   ret i1 false
 bb2:
-  %r22503 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r22504 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22503, i32 %functionRow, i32 2)
-  %r22505 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r22506 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22505, i32 %functionRow, i32 3)
+  %r22504 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r22505 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22504, i32 %functionRow, i32 2)
+  %r22506 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r22507 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22506, i32 %functionRow, i32 3)
   br label %bb3
 bb3:
-  %r22507 = phi i32 [0, %bb2], [%r22561, %bb9]
-  %r22508 = icmp slt i32 %r22507, %r22506
-  br i1 %r22508, label %bb4, label %bb5
+  %r22508 = phi i32 [0, %bb2], [%r22562, %bb9]
+  %r22509 = icmp slt i32 %r22508, %r22507
+  br i1 %r22509, label %bb4, label %bb5
 bb4:
-  %r22509 = add i32 %r22504, %r22507
-  %r22510 = extractvalue %Range.CompilerSyntaxTables %tables, 6
-  %r22511 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22510, i32 %r22509, i32 1)
-  %r22512 = extractvalue %Range.CompilerSyntaxTables %tables, 6
-  %r22513 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22512, i32 %r22509, i32 8)
-  %r22514 = extractvalue %Range.CompilerSyntaxTables %tables, 6
-  %r22515 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22514, i32 %r22509, i32 9)
-  %r22516 = call ptr @compilerTypedSyntaxLocalText(%Range.CompilerSyntaxTables %tables, i32 %r22511, i32 %r22513, i32 %r22515)
-  %r22517 = call ptr @compilerSpecializedOptionalLLVMTypeName(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22516)
-  %r22519 = call i32 @stringEqual(ptr %r22517, ptr getelementptr inbounds ([1 x i8], ptr @.str.22518, i32 0, i32 0))
-  %r22520 = icmp eq i32 %r22519, 0
-  br i1 %r22520, label %bb6, label %bb7
+  %r22510 = add i32 %r22505, %r22508
+  %r22511 = extractvalue %Range.CompilerSyntaxTables %tables, 6
+  %r22512 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22511, i32 %r22510, i32 1)
+  %r22513 = extractvalue %Range.CompilerSyntaxTables %tables, 6
+  %r22514 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22513, i32 %r22510, i32 8)
+  %r22515 = extractvalue %Range.CompilerSyntaxTables %tables, 6
+  %r22516 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22515, i32 %r22510, i32 9)
+  %r22517 = call ptr @compilerTypedSyntaxLocalText(%Range.CompilerSyntaxTables %tables, i32 %r22512, i32 %r22514, i32 %r22516)
+  %r22518 = call ptr @compilerSpecializedOptionalLLVMTypeName(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22517)
+  %r22520 = call i32 @stringEqual(ptr %r22518, ptr getelementptr inbounds ([1 x i8], ptr @.str.22519, i32 0, i32 0))
+  %r22521 = icmp eq i32 %r22520, 0
+  br i1 %r22521, label %bb6, label %bb7
 bb6:
   ret i1 true
 bb7:
-  %r22522 = call i32 @stringEqual(ptr %r22516, ptr getelementptr inbounds ([4 x i8], ptr @.str.22521, i32 0, i32 0))
-  %r22523 = icmp eq i32 %r22522, 0
-  %r22525 = call i32 @stringEqual(ptr %r22516, ptr getelementptr inbounds ([5 x i8], ptr @.str.22524, i32 0, i32 0))
-  %r22526 = icmp eq i32 %r22525, 0
-  %r22527 = and i1 %r22523, %r22526
-  %r22529 = call i32 @stringEqual(ptr %r22516, ptr getelementptr inbounds ([7 x i8], ptr @.str.22528, i32 0, i32 0))
-  %r22530 = icmp eq i32 %r22529, 0
-  %r22531 = and i1 %r22527, %r22530
-  %r22533 = call i32 @stringEqual(ptr %r22516, ptr getelementptr inbounds ([6 x i8], ptr @.str.22532, i32 0, i32 0))
-  %r22534 = icmp eq i32 %r22533, 0
-  %r22535 = and i1 %r22531, %r22534
-  %r22536 = call i1 @compilerIntegerTypeIsUnsigned8(ptr %r22516)
-  %r22537 = xor i1 %r22536, true
-  %r22538 = and i1 %r22535, %r22537
-  %r22539 = call i1 @compilerFloatTypeIs32(ptr %r22516)
-  %r22540 = xor i1 %r22539, true
-  %r22541 = and i1 %r22538, %r22540
-  %r22542 = call i1 @compilerFloatTypeIs64(ptr %r22516)
-  %r22543 = xor i1 %r22542, true
-  %r22544 = and i1 %r22541, %r22543
-  %r22545 = call i1 @compilerBodyRuntimeABITypeIsOpaque(%Range.CompilerSyntaxTables %tables, ptr %r22516)
-  %r22546 = xor i1 %r22545, true
-  %r22547 = and i1 %r22544, %r22546
-  br i1 %r22547, label %bb8, label %bb9
+  %r22523 = call i32 @stringEqual(ptr %r22517, ptr getelementptr inbounds ([4 x i8], ptr @.str.22522, i32 0, i32 0))
+  %r22524 = icmp eq i32 %r22523, 0
+  %r22526 = call i32 @stringEqual(ptr %r22517, ptr getelementptr inbounds ([5 x i8], ptr @.str.22525, i32 0, i32 0))
+  %r22527 = icmp eq i32 %r22526, 0
+  %r22528 = and i1 %r22524, %r22527
+  %r22530 = call i32 @stringEqual(ptr %r22517, ptr getelementptr inbounds ([7 x i8], ptr @.str.22529, i32 0, i32 0))
+  %r22531 = icmp eq i32 %r22530, 0
+  %r22532 = and i1 %r22528, %r22531
+  %r22534 = call i32 @stringEqual(ptr %r22517, ptr getelementptr inbounds ([6 x i8], ptr @.str.22533, i32 0, i32 0))
+  %r22535 = icmp eq i32 %r22534, 0
+  %r22536 = and i1 %r22532, %r22535
+  %r22537 = call i1 @compilerIntegerTypeIsUnsigned8(ptr %r22517)
+  %r22538 = xor i1 %r22537, true
+  %r22539 = and i1 %r22536, %r22538
+  %r22540 = call i1 @compilerFloatTypeIs32(ptr %r22517)
+  %r22541 = xor i1 %r22540, true
+  %r22542 = and i1 %r22539, %r22541
+  %r22543 = call i1 @compilerFloatTypeIs64(ptr %r22517)
+  %r22544 = xor i1 %r22543, true
+  %r22545 = and i1 %r22542, %r22544
+  %r22546 = call i1 @compilerBodyRuntimeABITypeIsOpaque(%Range.CompilerSyntaxTables %tables, ptr %r22517)
+  %r22547 = xor i1 %r22546, true
+  %r22548 = and i1 %r22545, %r22547
+  br i1 %r22548, label %bb8, label %bb9
 bb8:
-  %r22548 = call ptr @compilerBodyArenaTypeOuterName(ptr %r22516)
-  %r22549 = call i32 @compilerSyntaxKindConstruct()
-  %r22550 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22548, i32 %r22549)
-  %r22551 = call ptr @compilerNominalLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r22550)
-  %r22553 = call i32 @stringEqual(ptr %r22551, ptr getelementptr inbounds ([1 x i8], ptr @.str.22552, i32 0, i32 0))
-  %r22554 = icmp eq i32 %r22553, 0
-  br i1 %r22554, label %bb10, label %bb11
+  %r22549 = call ptr @compilerBodyArenaTypeOuterName(ptr %r22517)
+  %r22550 = call i32 @compilerSyntaxKindConstruct()
+  %r22551 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22549, i32 %r22550)
+  %r22552 = call ptr @compilerNominalLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r22551)
+  %r22554 = call i32 @stringEqual(ptr %r22552, ptr getelementptr inbounds ([1 x i8], ptr @.str.22553, i32 0, i32 0))
+  %r22555 = icmp eq i32 %r22554, 0
+  br i1 %r22555, label %bb10, label %bb11
 bb10:
   ret i1 true
 bb11:
-  %r22555 = call i32 @compilerSyntaxKindEnum()
-  %r22556 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22548, i32 %r22555)
-  %r22557 = call ptr @compilerEnumLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r22556)
-  %r22559 = call i32 @stringEqual(ptr %r22557, ptr getelementptr inbounds ([1 x i8], ptr @.str.22558, i32 0, i32 0))
-  %r22560 = icmp eq i32 %r22559, 0
-  br i1 %r22560, label %bb12, label %bb13
+  %r22556 = call i32 @compilerSyntaxKindEnum()
+  %r22557 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22549, i32 %r22556)
+  %r22558 = call ptr @compilerEnumLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r22557)
+  %r22560 = call i32 @stringEqual(ptr %r22558, ptr getelementptr inbounds ([1 x i8], ptr @.str.22559, i32 0, i32 0))
+  %r22561 = icmp eq i32 %r22560, 0
+  br i1 %r22561, label %bb12, label %bb13
 bb12:
   ret i1 true
 bb13:
   br label %bb9
 bb9:
-  %r22561 = add i32 %r22507, 1
+  %r22562 = add i32 %r22508, 1
   br label %bb3
 bb5:
-  %r22562 = call ptr @compilerFunctionOwnerConstructName(%Range.CompilerSyntaxTables %tables, i32 %functionRow)
-  %r22564 = call i32 @stringEqual(ptr %r22562, ptr getelementptr inbounds ([1 x i8], ptr @.str.22563, i32 0, i32 0))
-  %r22565 = icmp eq i32 %r22564, 0
-  br i1 %r22565, label %bb14, label %bb15
+  %r22563 = call ptr @compilerFunctionOwnerConstructName(%Range.CompilerSyntaxTables %tables, i32 %functionRow)
+  %r22565 = call i32 @stringEqual(ptr %r22563, ptr getelementptr inbounds ([1 x i8], ptr @.str.22564, i32 0, i32 0))
+  %r22566 = icmp eq i32 %r22565, 0
+  br i1 %r22566, label %bb14, label %bb15
 bb14:
-  %r22566 = call i32 @compilerSyntaxKindConstruct()
-  %r22567 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22562, i32 %r22566)
-  %r22568 = icmp sge i32 %r22567, 0
-  %r22569 = call ptr @compilerNominalLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r22567)
-  %r22571 = call i32 @stringEqual(ptr %r22569, ptr getelementptr inbounds ([1 x i8], ptr @.str.22570, i32 0, i32 0))
-  %r22572 = icmp eq i32 %r22571, 0
-  %r22573 = and i1 %r22568, %r22572
-  br i1 %r22573, label %bb16, label %bb17
+  %r22567 = call i32 @compilerSyntaxKindConstruct()
+  %r22568 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r22563, i32 %r22567)
+  %r22569 = icmp sge i32 %r22568, 0
+  %r22570 = call ptr @compilerNominalLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r22568)
+  %r22572 = call i32 @stringEqual(ptr %r22570, ptr getelementptr inbounds ([1 x i8], ptr @.str.22571, i32 0, i32 0))
+  %r22573 = icmp eq i32 %r22572, 0
+  %r22574 = and i1 %r22569, %r22573
+  br i1 %r22574, label %bb16, label %bb17
 bb16:
   ret i1 true
 bb17:
@@ -38065,234 +38070,234 @@ entry:
 }
 define void @compilerCoreLLVMTypedEntryFailureBlock(ptr %returnDestination, %Range.CompilerBodyArena %arena, i32 %initialTemporaryIndex) {
 entry:
-  %r22574 = extractvalue %Range.CompilerBodyArena %arena, 9
-  %r22575 = extractvalue %Range.CompilerBodyArena %arena, 10
-  %r22576 = insertvalue %Range.CompilerBlock poison, i32 %r22574, 0
-  %r22577 = insertvalue %Range.CompilerBlock %r22576, i32 %r22575, 1
-  %r22588 = insertvalue %Range.CompilerLLVMLoweredBlock poison, %Range.CompilerBlock %r22577, 0
-  %r22589 = insertvalue %Range.CompilerLLVMLoweredBlock %r22588, ptr getelementptr inbounds ([1 x i8], ptr @.str.22578, i32 0, i32 0), 1
-  %r22590 = insertvalue %Range.CompilerLLVMLoweredBlock %r22589, ptr getelementptr inbounds ([1 x i8], ptr @.str.22579, i32 0, i32 0), 2
-  %r22591 = insertvalue %Range.CompilerLLVMLoweredBlock %r22590, ptr getelementptr inbounds ([1 x i8], ptr @.str.22580, i32 0, i32 0), 3
-  %r22592 = insertvalue %Range.CompilerLLVMLoweredBlock %r22591, ptr getelementptr inbounds ([1 x i8], ptr @.str.22581, i32 0, i32 0), 4
-  %r22593 = insertvalue %Range.CompilerLLVMLoweredBlock %r22592, i32 %initialTemporaryIndex, 5
-  %r22594 = insertvalue %Range.CompilerLLVMLoweredBlock %r22593, i32 0, 6
-  %r22595 = insertvalue %Range.CompilerLLVMLoweredBlock %r22594, ptr getelementptr inbounds ([6 x i8], ptr @.str.22582, i32 0, i32 0), 7
-  %r22596 = insertvalue %Range.CompilerLLVMLoweredBlock %r22595, i1 false, 8
-  %r22597 = insertvalue %Range.CompilerLLVMLoweredBlock %r22596, ptr getelementptr inbounds ([1 x i8], ptr @.str.22583, i32 0, i32 0), 9
-  %r22598 = insertvalue %Range.CompilerLLVMLoweredBlock %r22597, ptr getelementptr inbounds ([1 x i8], ptr @.str.22584, i32 0, i32 0), 10
-  %r22599 = insertvalue %Range.CompilerLLVMLoweredBlock %r22598, ptr getelementptr inbounds ([1 x i8], ptr @.str.22585, i32 0, i32 0), 11
-  %r22600 = insertvalue %Range.CompilerLLVMLoweredBlock %r22599, i1 false, 12
-  %r22601 = insertvalue %Range.CompilerLLVMLoweredBlock %r22600, ptr getelementptr inbounds ([1 x i8], ptr @.str.22586, i32 0, i32 0), 13
-  %r22602 = insertvalue %Range.CompilerLLVMLoweredBlock %r22601, ptr getelementptr inbounds ([1 x i8], ptr @.str.22587, i32 0, i32 0), 14
-  store %Range.CompilerLLVMLoweredBlock %r22602, ptr %returnDestination
+  %r22575 = extractvalue %Range.CompilerBodyArena %arena, 9
+  %r22576 = extractvalue %Range.CompilerBodyArena %arena, 10
+  %r22577 = insertvalue %Range.CompilerBlock poison, i32 %r22575, 0
+  %r22578 = insertvalue %Range.CompilerBlock %r22577, i32 %r22576, 1
+  %r22589 = insertvalue %Range.CompilerLLVMLoweredBlock poison, %Range.CompilerBlock %r22578, 0
+  %r22590 = insertvalue %Range.CompilerLLVMLoweredBlock %r22589, ptr getelementptr inbounds ([1 x i8], ptr @.str.22579, i32 0, i32 0), 1
+  %r22591 = insertvalue %Range.CompilerLLVMLoweredBlock %r22590, ptr getelementptr inbounds ([1 x i8], ptr @.str.22580, i32 0, i32 0), 2
+  %r22592 = insertvalue %Range.CompilerLLVMLoweredBlock %r22591, ptr getelementptr inbounds ([1 x i8], ptr @.str.22581, i32 0, i32 0), 3
+  %r22593 = insertvalue %Range.CompilerLLVMLoweredBlock %r22592, ptr getelementptr inbounds ([1 x i8], ptr @.str.22582, i32 0, i32 0), 4
+  %r22594 = insertvalue %Range.CompilerLLVMLoweredBlock %r22593, i32 %initialTemporaryIndex, 5
+  %r22595 = insertvalue %Range.CompilerLLVMLoweredBlock %r22594, i32 0, 6
+  %r22596 = insertvalue %Range.CompilerLLVMLoweredBlock %r22595, ptr getelementptr inbounds ([6 x i8], ptr @.str.22583, i32 0, i32 0), 7
+  %r22597 = insertvalue %Range.CompilerLLVMLoweredBlock %r22596, i1 false, 8
+  %r22598 = insertvalue %Range.CompilerLLVMLoweredBlock %r22597, ptr getelementptr inbounds ([1 x i8], ptr @.str.22584, i32 0, i32 0), 9
+  %r22599 = insertvalue %Range.CompilerLLVMLoweredBlock %r22598, ptr getelementptr inbounds ([1 x i8], ptr @.str.22585, i32 0, i32 0), 10
+  %r22600 = insertvalue %Range.CompilerLLVMLoweredBlock %r22599, ptr getelementptr inbounds ([1 x i8], ptr @.str.22586, i32 0, i32 0), 11
+  %r22601 = insertvalue %Range.CompilerLLVMLoweredBlock %r22600, i1 false, 12
+  %r22602 = insertvalue %Range.CompilerLLVMLoweredBlock %r22601, ptr getelementptr inbounds ([1 x i8], ptr @.str.22587, i32 0, i32 0), 13
+  %r22603 = insertvalue %Range.CompilerLLVMLoweredBlock %r22602, ptr getelementptr inbounds ([1 x i8], ptr @.str.22588, i32 0, i32 0), 14
+  store %Range.CompilerLLVMLoweredBlock %r22603, ptr %returnDestination
   ret void
 }
 define i32 @compilerReachableLLVMStateBindPlannedFunctionInstancesForArena(%Range.CompilerIntTable %typeKeys, %Range.CompilerIntTable %typeKeyArguments, %Range.CompilerIntTable %functionInstances, %Range.CompilerIntTable %functionInstanceSignatures, %Range.CompilerBodyArena %arena) {
 entry:
   br label %bb1
 bb1:
-  %r22603 = phi i32 [0, %entry], [%r22663, %bb5]
-  %r22604 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r22605 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22604)
-  %r22606 = icmp slt i32 %r22603, %r22605
-  br i1 %r22606, label %bb2, label %bb3
+  %r22604 = phi i32 [0, %entry], [%r22664, %bb5]
+  %r22605 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r22606 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22605)
+  %r22607 = icmp slt i32 %r22604, %r22606
+  br i1 %r22607, label %bb2, label %bb3
 bb2:
-  %r22607 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r22608 = call i32 @compilerBodyResolutionTargetKindColumn()
-  %r22609 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22607, i32 %r22603, i32 %r22608)
-  %r22610 = call i32 @compilerBodyResolutionFunction()
-  %r22611 = icmp eq i32 %r22609, %r22610
-  br i1 %r22611, label %bb4, label %bb5
+  %r22608 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r22609 = call i32 @compilerBodyResolutionTargetKindColumn()
+  %r22610 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22608, i32 %r22604, i32 %r22609)
+  %r22611 = call i32 @compilerBodyResolutionFunction()
+  %r22612 = icmp eq i32 %r22610, %r22611
+  br i1 %r22612, label %bb4, label %bb5
 bb4:
-  %r22612 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r22613 = call i32 @compilerBodyResolutionTargetIDColumn()
-  %r22614 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22612, i32 %r22603, i32 %r22613)
-  %r22615 = icmp slt i32 %r22614, 0
-  %r22616 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r22617 = extractvalue %Range.CompilerSyntaxTables %r22616, 4
-  %r22618 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22617)
-  %r22619 = icmp sge i32 %r22614, %r22618
-  %r22620 = or i1 %r22615, %r22619
-  br i1 %r22620, label %bb6, label %bb7
+  %r22613 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r22614 = call i32 @compilerBodyResolutionTargetIDColumn()
+  %r22615 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22613, i32 %r22604, i32 %r22614)
+  %r22616 = icmp slt i32 %r22615, 0
+  %r22617 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r22618 = extractvalue %Range.CompilerSyntaxTables %r22617, 4
+  %r22619 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22618)
+  %r22620 = icmp sge i32 %r22615, %r22619
+  %r22621 = or i1 %r22616, %r22620
+  br i1 %r22621, label %bb6, label %bb7
 bb6:
-  %r22621 = mul i32 %r22603, 10
-  %r22622 = add i32 1000, %r22621
-  %r22623 = add i32 %r22622, 1
-  %r22624 = sub i32 0, %r22623
-  ret i32 %r22624
+  %r22622 = mul i32 %r22604, 10
+  %r22623 = add i32 1000, %r22622
+  %r22624 = add i32 %r22623, 1
+  %r22625 = sub i32 0, %r22624
+  ret i32 %r22625
 bb7:
-  %r22625 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r22626 = extractvalue %Range.CompilerSyntaxTables %r22625, 5
-  %r22627 = call i32 @rawBufferLoadInt(ptr %r22626, i32 %r22614)
-  %r22628 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r22629 = call i32 @compilerSyntaxGenericParameterCountForOwner(%Range.CompilerSyntaxTables %r22628, i32 %r22627)
-  %r22630 = sub i32 0, 1
-  %r22631 = icmp sgt i32 %r22629, 0
-  br i1 %r22631, label %bb8, label %bb9
+  %r22626 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r22627 = extractvalue %Range.CompilerSyntaxTables %r22626, 5
+  %r22628 = call i32 @rawBufferLoadInt(ptr %r22627, i32 %r22615)
+  %r22629 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r22630 = call i32 @compilerSyntaxGenericParameterCountForOwner(%Range.CompilerSyntaxTables %r22629, i32 %r22628)
+  %r22631 = sub i32 0, 1
+  %r22632 = icmp sgt i32 %r22630, 0
+  br i1 %r22632, label %bb8, label %bb9
 bb8:
-  %r22632 = call i32 @compilerReachableLLVMStateReceiverTypeIDForResolution(%Range.CompilerBodyArena %arena, i32 %r22603)
-  %r22633 = icmp slt i32 %r22632, 0
-  %r22634 = call i32 @compilerBodyArenaTypeKindForTypeID(%Range.CompilerBodyArena %arena, i32 %r22632)
-  %r22635 = call i32 @compilerBodyTypeConstruct()
-  %r22636 = icmp ne i32 %r22634, %r22635
-  %r22637 = or i1 %r22633, %r22636
-  br i1 %r22637, label %bb10, label %bb11
+  %r22633 = call i32 @compilerReachableLLVMStateReceiverTypeIDForResolution(%Range.CompilerBodyArena %arena, i32 %r22604)
+  %r22634 = icmp slt i32 %r22633, 0
+  %r22635 = call i32 @compilerBodyArenaTypeKindForTypeID(%Range.CompilerBodyArena %arena, i32 %r22633)
+  %r22636 = call i32 @compilerBodyTypeConstruct()
+  %r22637 = icmp ne i32 %r22635, %r22636
+  %r22638 = or i1 %r22634, %r22637
+  br i1 %r22638, label %bb10, label %bb11
 bb10:
-  %r22638 = mul i32 %r22603, 10
-  %r22639 = add i32 1000, %r22638
-  %r22640 = add i32 %r22639, 2
-  %r22641 = sub i32 0, %r22640
-  ret i32 %r22641
+  %r22639 = mul i32 %r22604, 10
+  %r22640 = add i32 1000, %r22639
+  %r22641 = add i32 %r22640, 2
+  %r22642 = sub i32 0, %r22641
+  ret i32 %r22642
 bb11:
-  %r22642 = call i32 @compilerReachableTypeKeyFindFromArena(%Range.CompilerIntTable %typeKeys, %Range.CompilerIntTable %typeKeyArguments, %Range.CompilerBodyArena %arena, i32 %r22632)
-  %r22643 = icmp slt i32 %r22642, 0
-  br i1 %r22643, label %bb12, label %bb13
+  %r22643 = call i32 @compilerReachableTypeKeyFindFromArena(%Range.CompilerIntTable %typeKeys, %Range.CompilerIntTable %typeKeyArguments, %Range.CompilerBodyArena %arena, i32 %r22633)
+  %r22644 = icmp slt i32 %r22643, 0
+  br i1 %r22644, label %bb12, label %bb13
 bb12:
-  %r22644 = mul i32 %r22603, 10
-  %r22645 = add i32 1000, %r22644
-  %r22646 = add i32 %r22645, 3
-  %r22647 = sub i32 0, %r22646
-  ret i32 %r22647
+  %r22645 = mul i32 %r22604, 10
+  %r22646 = add i32 1000, %r22645
+  %r22647 = add i32 %r22646, 3
+  %r22648 = sub i32 0, %r22647
+  ret i32 %r22648
 bb13:
   br label %bb9
 bb9:
-  %r22648 = phi i32 [%r22630, %bb7], [%r22642, %bb13]
-  %r22649 = call i32 @compilerReachablePlannedFunctionInstance(%Range.CompilerIntTable %functionInstances, i32 %r22614, i32 %r22648)
-  %r22650 = icmp slt i32 %r22649, 0
-  br i1 %r22650, label %bb14, label %bb15
+  %r22649 = phi i32 [%r22631, %bb7], [%r22643, %bb13]
+  %r22650 = call i32 @compilerReachablePlannedFunctionInstance(%Range.CompilerIntTable %functionInstances, i32 %r22615, i32 %r22649)
+  %r22651 = icmp slt i32 %r22650, 0
+  br i1 %r22651, label %bb14, label %bb15
 bb14:
-  %r22651 = add i32 4000, %r22614
-  %r22652 = sub i32 0, %r22651
-  ret i32 %r22652
+  %r22652 = add i32 4000, %r22615
+  %r22653 = sub i32 0, %r22652
+  ret i32 %r22653
 bb15:
-  %r22653 = call i32 @compilerReachableFunctionInstanceSignatureRow(%Range.CompilerIntTable %functionInstanceSignatures, i32 %r22649)
-  %r22654 = icmp slt i32 %r22653, 0
-  br i1 %r22654, label %bb16, label %bb17
+  %r22654 = call i32 @compilerReachableFunctionInstanceSignatureRow(%Range.CompilerIntTable %functionInstanceSignatures, i32 %r22650)
+  %r22655 = icmp slt i32 %r22654, 0
+  br i1 %r22655, label %bb16, label %bb17
 bb16:
-  %r22655 = add i32 8000, %r22614
-  %r22656 = sub i32 0, %r22655
-  ret i32 %r22656
+  %r22656 = add i32 8000, %r22615
+  %r22657 = sub i32 0, %r22656
+  ret i32 %r22657
 bb17:
-  %r22657 = call i32 @compilerBodyArenaSetResolutionInstanceID(%Range.CompilerBodyArena %arena, i32 %r22603, i32 %r22649)
-  %r22658 = icmp ne i32 %r22657, 0
-  br i1 %r22658, label %bb18, label %bb19
+  %r22658 = call i32 @compilerBodyArenaSetResolutionInstanceID(%Range.CompilerBodyArena %arena, i32 %r22604, i32 %r22650)
+  %r22659 = icmp ne i32 %r22658, 0
+  br i1 %r22659, label %bb18, label %bb19
 bb18:
-  %r22659 = mul i32 %r22603, 10
-  %r22660 = add i32 1000, %r22659
-  %r22661 = add i32 %r22660, 6
-  %r22662 = sub i32 0, %r22661
-  ret i32 %r22662
+  %r22660 = mul i32 %r22604, 10
+  %r22661 = add i32 1000, %r22660
+  %r22662 = add i32 %r22661, 6
+  %r22663 = sub i32 0, %r22662
+  ret i32 %r22663
 bb19:
   br label %bb5
 bb5:
-  %r22663 = add i32 %r22603, 1
+  %r22664 = add i32 %r22604, 1
   br label %bb1
 bb3:
   br label %bb20
 bb20:
-  %r22664 = phi i32 [0, %bb3], [%r22732, %bb24]
-  %r22665 = extractvalue %Range.CompilerBodyArena %arena, 35
-  %r22666 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22665)
-  %r22667 = icmp slt i32 %r22664, %r22666
-  br i1 %r22667, label %bb21, label %bb22
+  %r22665 = phi i32 [0, %bb3], [%r22733, %bb24]
+  %r22666 = extractvalue %Range.CompilerBodyArena %arena, 35
+  %r22667 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22666)
+  %r22668 = icmp slt i32 %r22665, %r22667
+  br i1 %r22668, label %bb21, label %bb22
 bb21:
-  %r22668 = extractvalue %Range.CompilerBodyArena %arena, 35
-  %r22669 = call i32 @compilerBodyMIROperationTargetKindColumn()
-  %r22670 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22668, i32 %r22664, i32 %r22669)
-  %r22671 = call i32 @compilerBodyMIROperationTargetFunction()
-  %r22672 = icmp eq i32 %r22670, %r22671
-  br i1 %r22672, label %bb23, label %bb24
+  %r22669 = extractvalue %Range.CompilerBodyArena %arena, 35
+  %r22670 = call i32 @compilerBodyMIROperationTargetKindColumn()
+  %r22671 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22669, i32 %r22665, i32 %r22670)
+  %r22672 = call i32 @compilerBodyMIROperationTargetFunction()
+  %r22673 = icmp eq i32 %r22671, %r22672
+  br i1 %r22673, label %bb23, label %bb24
 bb23:
-  %r22673 = extractvalue %Range.CompilerBodyArena %arena, 35
-  %r22674 = call i32 @compilerBodyMIROperationTargetIDColumn()
-  %r22675 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22673, i32 %r22664, i32 %r22674)
-  %r22676 = icmp slt i32 %r22675, 0
-  %r22677 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r22678 = extractvalue %Range.CompilerSyntaxTables %r22677, 4
-  %r22679 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22678)
-  %r22680 = icmp sge i32 %r22675, %r22679
-  %r22681 = or i1 %r22676, %r22680
-  br i1 %r22681, label %bb25, label %bb26
+  %r22674 = extractvalue %Range.CompilerBodyArena %arena, 35
+  %r22675 = call i32 @compilerBodyMIROperationTargetIDColumn()
+  %r22676 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22674, i32 %r22665, i32 %r22675)
+  %r22677 = icmp slt i32 %r22676, 0
+  %r22678 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r22679 = extractvalue %Range.CompilerSyntaxTables %r22678, 4
+  %r22680 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22679)
+  %r22681 = icmp sge i32 %r22676, %r22680
+  %r22682 = or i1 %r22677, %r22681
+  br i1 %r22682, label %bb25, label %bb26
 bb25:
-  %r22682 = mul i32 %r22664, 10
-  %r22683 = add i32 2000, %r22682
-  %r22684 = add i32 %r22683, 1
-  %r22685 = sub i32 0, %r22684
-  ret i32 %r22685
+  %r22683 = mul i32 %r22665, 10
+  %r22684 = add i32 2000, %r22683
+  %r22685 = add i32 %r22684, 1
+  %r22686 = sub i32 0, %r22685
+  ret i32 %r22686
 bb26:
-  %r22686 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r22687 = extractvalue %Range.CompilerSyntaxTables %r22686, 5
-  %r22688 = call i32 @rawBufferLoadInt(ptr %r22687, i32 %r22675)
-  %r22689 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r22690 = call i32 @compilerSyntaxGenericParameterCountForOwner(%Range.CompilerSyntaxTables %r22689, i32 %r22688)
-  %r22691 = sub i32 0, 1
-  %r22692 = icmp sgt i32 %r22690, 0
-  br i1 %r22692, label %bb27, label %bb28
+  %r22687 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r22688 = extractvalue %Range.CompilerSyntaxTables %r22687, 5
+  %r22689 = call i32 @rawBufferLoadInt(ptr %r22688, i32 %r22676)
+  %r22690 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r22691 = call i32 @compilerSyntaxGenericParameterCountForOwner(%Range.CompilerSyntaxTables %r22690, i32 %r22689)
+  %r22692 = sub i32 0, 1
+  %r22693 = icmp sgt i32 %r22691, 0
+  br i1 %r22693, label %bb27, label %bb28
 bb27:
-  %r22693 = extractvalue %Range.CompilerBodyArena %arena, 35
-  %r22694 = call i32 @compilerBodyMIROperationSourceColumn()
-  %r22695 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22693, i32 %r22664, i32 %r22694)
-  %r22696 = call i32 @compilerSyntaxRoleCallee()
-  %r22697 = call i32 @compilerBodyArenaChild(%Range.CompilerBodyArena %arena, i32 %r22695, i32 %r22696, i32 0)
-  %r22698 = call i32 @compilerBodyArenaResolutionForSource(%Range.CompilerBodyArena %arena, i32 %r22697)
-  %r22699 = call i32 @compilerReachableLLVMStateReceiverTypeIDForResolution(%Range.CompilerBodyArena %arena, i32 %r22698)
-  %r22700 = icmp slt i32 %r22699, 0
-  br i1 %r22700, label %bb29, label %bb30
+  %r22694 = extractvalue %Range.CompilerBodyArena %arena, 35
+  %r22695 = call i32 @compilerBodyMIROperationSourceColumn()
+  %r22696 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22694, i32 %r22665, i32 %r22695)
+  %r22697 = call i32 @compilerSyntaxRoleCallee()
+  %r22698 = call i32 @compilerBodyArenaChild(%Range.CompilerBodyArena %arena, i32 %r22696, i32 %r22697, i32 0)
+  %r22699 = call i32 @compilerBodyArenaResolutionForSource(%Range.CompilerBodyArena %arena, i32 %r22698)
+  %r22700 = call i32 @compilerReachableLLVMStateReceiverTypeIDForResolution(%Range.CompilerBodyArena %arena, i32 %r22699)
+  %r22701 = icmp slt i32 %r22700, 0
+  br i1 %r22701, label %bb29, label %bb30
 bb29:
-  %r22701 = mul i32 %r22664, 10
-  %r22702 = add i32 2000, %r22701
-  %r22703 = add i32 %r22702, 2
-  %r22704 = sub i32 0, %r22703
-  ret i32 %r22704
+  %r22702 = mul i32 %r22665, 10
+  %r22703 = add i32 2000, %r22702
+  %r22704 = add i32 %r22703, 2
+  %r22705 = sub i32 0, %r22704
+  ret i32 %r22705
 bb30:
-  %r22705 = call i32 @compilerReachableTypeKeyFindFromArena(%Range.CompilerIntTable %typeKeys, %Range.CompilerIntTable %typeKeyArguments, %Range.CompilerBodyArena %arena, i32 %r22699)
-  %r22706 = icmp slt i32 %r22705, 0
-  br i1 %r22706, label %bb31, label %bb32
+  %r22706 = call i32 @compilerReachableTypeKeyFindFromArena(%Range.CompilerIntTable %typeKeys, %Range.CompilerIntTable %typeKeyArguments, %Range.CompilerBodyArena %arena, i32 %r22700)
+  %r22707 = icmp slt i32 %r22706, 0
+  br i1 %r22707, label %bb31, label %bb32
 bb31:
-  %r22707 = mul i32 %r22664, 10
-  %r22708 = add i32 2000, %r22707
-  %r22709 = add i32 %r22708, 3
-  %r22710 = sub i32 0, %r22709
-  ret i32 %r22710
+  %r22708 = mul i32 %r22665, 10
+  %r22709 = add i32 2000, %r22708
+  %r22710 = add i32 %r22709, 3
+  %r22711 = sub i32 0, %r22710
+  ret i32 %r22711
 bb32:
   br label %bb28
 bb28:
-  %r22711 = phi i32 [%r22691, %bb26], [%r22705, %bb32]
-  %r22712 = call i32 @compilerReachablePlannedFunctionInstance(%Range.CompilerIntTable %functionInstances, i32 %r22675, i32 %r22711)
-  %r22713 = icmp slt i32 %r22712, 0
-  br i1 %r22713, label %bb33, label %bb34
+  %r22712 = phi i32 [%r22692, %bb26], [%r22706, %bb32]
+  %r22713 = call i32 @compilerReachablePlannedFunctionInstance(%Range.CompilerIntTable %functionInstances, i32 %r22676, i32 %r22712)
+  %r22714 = icmp slt i32 %r22713, 0
+  br i1 %r22714, label %bb33, label %bb34
 bb33:
-  %r22714 = mul i32 %r22664, 10
-  %r22715 = add i32 2000, %r22714
-  %r22716 = add i32 %r22715, 4
-  %r22717 = sub i32 0, %r22716
-  ret i32 %r22717
+  %r22715 = mul i32 %r22665, 10
+  %r22716 = add i32 2000, %r22715
+  %r22717 = add i32 %r22716, 4
+  %r22718 = sub i32 0, %r22717
+  ret i32 %r22718
 bb34:
-  %r22718 = call i32 @compilerReachableFunctionInstanceSignatureRow(%Range.CompilerIntTable %functionInstanceSignatures, i32 %r22712)
-  %r22719 = icmp slt i32 %r22718, 0
-  br i1 %r22719, label %bb35, label %bb36
+  %r22719 = call i32 @compilerReachableFunctionInstanceSignatureRow(%Range.CompilerIntTable %functionInstanceSignatures, i32 %r22713)
+  %r22720 = icmp slt i32 %r22719, 0
+  br i1 %r22720, label %bb35, label %bb36
 bb35:
-  %r22720 = mul i32 %r22664, 10
-  %r22721 = add i32 2000, %r22720
-  %r22722 = add i32 %r22721, 5
-  %r22723 = sub i32 0, %r22722
-  ret i32 %r22723
+  %r22721 = mul i32 %r22665, 10
+  %r22722 = add i32 2000, %r22721
+  %r22723 = add i32 %r22722, 5
+  %r22724 = sub i32 0, %r22723
+  ret i32 %r22724
 bb36:
-  %r22724 = extractvalue %Range.CompilerBodyArena %arena, 35
-  %r22725 = call i32 @compilerBodyMIROperationInstanceIDColumn()
-  %r22726 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22724, i32 %r22664, i32 %r22725)
-  %r22727 = icmp ne i32 %r22726, %r22712
-  br i1 %r22727, label %bb37, label %bb38
+  %r22725 = extractvalue %Range.CompilerBodyArena %arena, 35
+  %r22726 = call i32 @compilerBodyMIROperationInstanceIDColumn()
+  %r22727 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22725, i32 %r22665, i32 %r22726)
+  %r22728 = icmp ne i32 %r22727, %r22713
+  br i1 %r22728, label %bb37, label %bb38
 bb37:
-  %r22728 = mul i32 %r22664, 10
-  %r22729 = add i32 2000, %r22728
-  %r22730 = add i32 %r22729, 6
-  %r22731 = sub i32 0, %r22730
-  ret i32 %r22731
+  %r22729 = mul i32 %r22665, 10
+  %r22730 = add i32 2000, %r22729
+  %r22731 = add i32 %r22730, 6
+  %r22732 = sub i32 0, %r22731
+  ret i32 %r22732
 bb38:
   br label %bb24
 bb24:
-  %r22732 = add i32 %r22664, 1
+  %r22733 = add i32 %r22665, 1
   br label %bb20
 bb22:
   ret i32 0
@@ -38301,339 +38306,339 @@ define i1 @compilerBodyArenaHasUnplannedRepresentationSensitiveCall(%Range.Compi
 entry:
   br label %bb1
 bb1:
-  %r22733 = phi i32 [0, %entry], [%r22754, %bb5]
-  %r22734 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r22735 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22734)
-  %r22736 = icmp slt i32 %r22733, %r22735
-  br i1 %r22736, label %bb2, label %bb3
+  %r22734 = phi i32 [0, %entry], [%r22755, %bb5]
+  %r22735 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r22736 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22735)
+  %r22737 = icmp slt i32 %r22734, %r22736
+  br i1 %r22737, label %bb2, label %bb3
 bb2:
-  %r22737 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r22738 = call i32 @compilerBodyResolutionTargetKindColumn()
-  %r22739 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22737, i32 %r22733, i32 %r22738)
-  %r22740 = call i32 @compilerBodyResolutionFunction()
-  %r22741 = icmp eq i32 %r22739, %r22740
-  br i1 %r22741, label %bb4, label %bb5
+  %r22738 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r22739 = call i32 @compilerBodyResolutionTargetKindColumn()
+  %r22740 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22738, i32 %r22734, i32 %r22739)
+  %r22741 = call i32 @compilerBodyResolutionFunction()
+  %r22742 = icmp eq i32 %r22740, %r22741
+  br i1 %r22742, label %bb4, label %bb5
 bb4:
-  %r22742 = extractvalue %Range.CompilerBodyArena %arena, 17
-  %r22743 = call i32 @compilerBodyResolutionTargetIDColumn()
-  %r22744 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22742, i32 %r22733, i32 %r22743)
-  %r22745 = extractvalue %Range.CompilerBodyArena %arena, 0
-  %r22746 = extractvalue %Range.CompilerBodyArena %arena, 1
-  %r22747 = call i1 @compilerFunctionHasRepresentationSensitiveABI(%Range.CompilerSyntaxTables %r22745, %Range.CompilerDeclarationIndex %r22746, i32 %r22744)
-  %r22748 = call i1 @compilerBodyArenaOwnerIsParticipant(%Range.CompilerBodyArena %arena, %Range.CompilerModuleABIPlan %abiPlan)
-  %r22749 = xor i1 %r22748, true
-  %r22750 = call i1 @compilerModuleABIPlanIsParticipant(%Range.CompilerModuleABIPlan %abiPlan, i32 %r22744)
-  %r22751 = xor i1 %r22750, true
-  %r22752 = or i1 %r22749, %r22751
-  %r22753 = and i1 %r22747, %r22752
-  br i1 %r22753, label %bb6, label %bb7
+  %r22743 = extractvalue %Range.CompilerBodyArena %arena, 17
+  %r22744 = call i32 @compilerBodyResolutionTargetIDColumn()
+  %r22745 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22743, i32 %r22734, i32 %r22744)
+  %r22746 = extractvalue %Range.CompilerBodyArena %arena, 0
+  %r22747 = extractvalue %Range.CompilerBodyArena %arena, 1
+  %r22748 = call i1 @compilerFunctionHasRepresentationSensitiveABI(%Range.CompilerSyntaxTables %r22746, %Range.CompilerDeclarationIndex %r22747, i32 %r22745)
+  %r22749 = call i1 @compilerBodyArenaOwnerIsParticipant(%Range.CompilerBodyArena %arena, %Range.CompilerModuleABIPlan %abiPlan)
+  %r22750 = xor i1 %r22749, true
+  %r22751 = call i1 @compilerModuleABIPlanIsParticipant(%Range.CompilerModuleABIPlan %abiPlan, i32 %r22745)
+  %r22752 = xor i1 %r22751, true
+  %r22753 = or i1 %r22750, %r22752
+  %r22754 = and i1 %r22748, %r22753
+  br i1 %r22754, label %bb6, label %bb7
 bb6:
   ret i1 true
 bb7:
   br label %bb5
 bb5:
-  %r22754 = add i32 %r22733, 1
+  %r22755 = add i32 %r22734, 1
   br label %bb1
 bb3:
   ret i1 false
 }
 define i1 @compilerBodyArenaCFGIsValid(%Range.CompilerBodyArena %arena) {
 entry:
-  %r22755 = extractvalue %Range.CompilerBodyArena %arena, 20
-  %r22756 = call i1 @compilerIntTableIsComplete(%Range.CompilerIntTable %r22755)
-  %r22757 = xor i1 %r22756, true
-  %r22758 = extractvalue %Range.CompilerBodyArena %arena, 21
-  %r22759 = call i1 @compilerIntTableIsComplete(%Range.CompilerIntTable %r22758)
-  %r22760 = xor i1 %r22759, true
-  %r22761 = or i1 %r22757, %r22760
-  %r22762 = extractvalue %Range.CompilerBodyArena %arena, 22
-  %r22763 = call i1 @compilerIntTableIsComplete(%Range.CompilerIntTable %r22762)
-  %r22764 = xor i1 %r22763, true
-  %r22765 = or i1 %r22761, %r22764
-  %r22766 = extractvalue %Range.CompilerBodyArena %arena, 20
-  %r22767 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22766)
-  %r22768 = icmp slt i32 %r22767, 1
-  %r22769 = or i1 %r22765, %r22768
-  br i1 %r22769, label %bb1, label %bb2
+  %r22756 = extractvalue %Range.CompilerBodyArena %arena, 20
+  %r22757 = call i1 @compilerIntTableIsComplete(%Range.CompilerIntTable %r22756)
+  %r22758 = xor i1 %r22757, true
+  %r22759 = extractvalue %Range.CompilerBodyArena %arena, 21
+  %r22760 = call i1 @compilerIntTableIsComplete(%Range.CompilerIntTable %r22759)
+  %r22761 = xor i1 %r22760, true
+  %r22762 = or i1 %r22758, %r22761
+  %r22763 = extractvalue %Range.CompilerBodyArena %arena, 22
+  %r22764 = call i1 @compilerIntTableIsComplete(%Range.CompilerIntTable %r22763)
+  %r22765 = xor i1 %r22764, true
+  %r22766 = or i1 %r22762, %r22765
+  %r22767 = extractvalue %Range.CompilerBodyArena %arena, 20
+  %r22768 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22767)
+  %r22769 = icmp slt i32 %r22768, 1
+  %r22770 = or i1 %r22766, %r22769
+  br i1 %r22770, label %bb1, label %bb2
 bb1:
   ret i1 false
 bb2:
-  %r22770 = extractvalue %Range.CompilerBodyArena %arena, 20
-  %r22771 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22770)
+  %r22771 = extractvalue %Range.CompilerBodyArena %arena, 20
+  %r22772 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22771)
   br label %bb3
 bb3:
-  %r22772 = phi i32 [0, %bb2], [%r22826, %bb12]
-  %r22773 = icmp slt i32 %r22772, %r22771
-  br i1 %r22773, label %bb4, label %bb5
+  %r22773 = phi i32 [0, %bb2], [%r22827, %bb12]
+  %r22774 = icmp slt i32 %r22773, %r22772
+  br i1 %r22774, label %bb4, label %bb5
 bb4:
-  %r22774 = extractvalue %Range.CompilerBodyArena %arena, 20
-  %r22775 = call i32 @compilerBodyCFGBlockTerminatorKindColumn()
-  %r22776 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22774, i32 %r22772, i32 %r22775)
-  %r22777 = extractvalue %Range.CompilerBodyArena %arena, 20
-  %r22778 = call i32 @compilerBodyCFGBlockRegionColumn()
-  %r22779 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22777, i32 %r22772, i32 %r22778)
+  %r22775 = extractvalue %Range.CompilerBodyArena %arena, 20
+  %r22776 = call i32 @compilerBodyCFGBlockTerminatorKindColumn()
+  %r22777 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22775, i32 %r22773, i32 %r22776)
+  %r22778 = extractvalue %Range.CompilerBodyArena %arena, 20
+  %r22779 = call i32 @compilerBodyCFGBlockRegionColumn()
+  %r22780 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22778, i32 %r22773, i32 %r22779)
   br label %bb6
 bb6:
-  %r22780 = phi i32 [0, %bb4], [%r22790, %bb10]
   %r22781 = phi i32 [0, %bb4], [%r22791, %bb10]
-  %r22782 = extractvalue %Range.CompilerBodyArena %arena, 21
-  %r22783 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22782)
-  %r22784 = icmp slt i32 %r22781, %r22783
-  br i1 %r22784, label %bb7, label %bb8
+  %r22782 = phi i32 [0, %bb4], [%r22792, %bb10]
+  %r22783 = extractvalue %Range.CompilerBodyArena %arena, 21
+  %r22784 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22783)
+  %r22785 = icmp slt i32 %r22782, %r22784
+  br i1 %r22785, label %bb7, label %bb8
 bb7:
-  %r22785 = extractvalue %Range.CompilerBodyArena %arena, 21
-  %r22786 = call i32 @compilerBodyCFGEdgeFromColumn()
-  %r22787 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22785, i32 %r22781, i32 %r22786)
-  %r22788 = icmp eq i32 %r22787, %r22772
-  br i1 %r22788, label %bb9, label %bb10
+  %r22786 = extractvalue %Range.CompilerBodyArena %arena, 21
+  %r22787 = call i32 @compilerBodyCFGEdgeFromColumn()
+  %r22788 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22786, i32 %r22782, i32 %r22787)
+  %r22789 = icmp eq i32 %r22788, %r22773
+  br i1 %r22789, label %bb9, label %bb10
 bb9:
-  %r22789 = add i32 %r22780, 1
+  %r22790 = add i32 %r22781, 1
   br label %bb10
 bb10:
-  %r22790 = phi i32 [%r22780, %bb7], [%r22789, %bb9]
-  %r22791 = add i32 %r22781, 1
+  %r22791 = phi i32 [%r22781, %bb7], [%r22790, %bb9]
+  %r22792 = add i32 %r22782, 1
   br label %bb6
 bb8:
-  %r22792 = extractvalue %Range.CompilerBodyArena %arena, 20
-  %r22793 = call i32 @compilerBodyCFGBlockIDColumn()
-  %r22794 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22792, i32 %r22772, i32 %r22793)
-  %r22795 = icmp ne i32 %r22794, %r22772
-  %r22796 = extractvalue %Range.CompilerBodyArena %arena, 11
-  %r22797 = call i1 @compilerBodyArenaLexicalRegionContainsRegion(%Range.CompilerBodyArena %arena, i32 %r22796, i32 %r22779)
-  %r22798 = xor i1 %r22797, true
-  %r22799 = or i1 %r22795, %r22798
-  %r22800 = extractvalue %Range.CompilerBodyArena %arena, 20
-  %r22801 = call i32 @compilerBodyCFGBlockStatementCountColumn()
-  %r22802 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22800, i32 %r22772, i32 %r22801)
-  %r22803 = icmp ne i32 %r22802, 0
-  %r22804 = or i1 %r22799, %r22803
-  %r22805 = call i32 @compilerBodyCFGTerminatorNone()
-  %r22806 = icmp slt i32 %r22776, %r22805
-  %r22807 = or i1 %r22804, %r22806
-  %r22808 = call i32 @compilerBodyCFGTerminatorFallthrough()
-  %r22809 = icmp sgt i32 %r22776, %r22808
-  %r22810 = or i1 %r22807, %r22809
-  %r22811 = call i32 @compilerBodyCFGTerminatorCondition()
-  %r22812 = icmp eq i32 %r22776, %r22811
-  %r22813 = icmp ne i32 %r22780, 2
-  %r22814 = and i1 %r22812, %r22813
-  %r22815 = or i1 %r22810, %r22814
-  %r22816 = call i32 @compilerBodyCFGTerminatorReturn()
-  %r22817 = icmp eq i32 %r22776, %r22816
-  %r22818 = icmp ne i32 %r22780, 0
-  %r22819 = and i1 %r22817, %r22818
-  %r22820 = or i1 %r22815, %r22819
-  %r22821 = call i32 @compilerBodyCFGTerminatorFallthrough()
-  %r22822 = icmp eq i32 %r22776, %r22821
-  %r22823 = icmp ne i32 %r22780, 1
-  %r22824 = and i1 %r22822, %r22823
-  %r22825 = or i1 %r22820, %r22824
-  br i1 %r22825, label %bb11, label %bb12
+  %r22793 = extractvalue %Range.CompilerBodyArena %arena, 20
+  %r22794 = call i32 @compilerBodyCFGBlockIDColumn()
+  %r22795 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22793, i32 %r22773, i32 %r22794)
+  %r22796 = icmp ne i32 %r22795, %r22773
+  %r22797 = extractvalue %Range.CompilerBodyArena %arena, 11
+  %r22798 = call i1 @compilerBodyArenaLexicalRegionContainsRegion(%Range.CompilerBodyArena %arena, i32 %r22797, i32 %r22780)
+  %r22799 = xor i1 %r22798, true
+  %r22800 = or i1 %r22796, %r22799
+  %r22801 = extractvalue %Range.CompilerBodyArena %arena, 20
+  %r22802 = call i32 @compilerBodyCFGBlockStatementCountColumn()
+  %r22803 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22801, i32 %r22773, i32 %r22802)
+  %r22804 = icmp ne i32 %r22803, 0
+  %r22805 = or i1 %r22800, %r22804
+  %r22806 = call i32 @compilerBodyCFGTerminatorNone()
+  %r22807 = icmp slt i32 %r22777, %r22806
+  %r22808 = or i1 %r22805, %r22807
+  %r22809 = call i32 @compilerBodyCFGTerminatorFallthrough()
+  %r22810 = icmp sgt i32 %r22777, %r22809
+  %r22811 = or i1 %r22808, %r22810
+  %r22812 = call i32 @compilerBodyCFGTerminatorCondition()
+  %r22813 = icmp eq i32 %r22777, %r22812
+  %r22814 = icmp ne i32 %r22781, 2
+  %r22815 = and i1 %r22813, %r22814
+  %r22816 = or i1 %r22811, %r22815
+  %r22817 = call i32 @compilerBodyCFGTerminatorReturn()
+  %r22818 = icmp eq i32 %r22777, %r22817
+  %r22819 = icmp ne i32 %r22781, 0
+  %r22820 = and i1 %r22818, %r22819
+  %r22821 = or i1 %r22816, %r22820
+  %r22822 = call i32 @compilerBodyCFGTerminatorFallthrough()
+  %r22823 = icmp eq i32 %r22777, %r22822
+  %r22824 = icmp ne i32 %r22781, 1
+  %r22825 = and i1 %r22823, %r22824
+  %r22826 = or i1 %r22821, %r22825
+  br i1 %r22826, label %bb11, label %bb12
 bb11:
   ret i1 false
 bb12:
-  %r22826 = add i32 %r22772, 1
+  %r22827 = add i32 %r22773, 1
   br label %bb3
 bb5:
   br label %bb13
 bb13:
-  %r22827 = phi i32 [0, %bb5], [%r22853, %bb17]
-  %r22828 = extractvalue %Range.CompilerBodyArena %arena, 21
-  %r22829 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22828)
-  %r22830 = icmp slt i32 %r22827, %r22829
-  br i1 %r22830, label %bb14, label %bb15
+  %r22828 = phi i32 [0, %bb5], [%r22854, %bb17]
+  %r22829 = extractvalue %Range.CompilerBodyArena %arena, 21
+  %r22830 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22829)
+  %r22831 = icmp slt i32 %r22828, %r22830
+  br i1 %r22831, label %bb14, label %bb15
 bb14:
-  %r22831 = extractvalue %Range.CompilerBodyArena %arena, 21
-  %r22832 = call i32 @compilerBodyCFGEdgeFromColumn()
-  %r22833 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22831, i32 %r22827, i32 %r22832)
-  %r22834 = extractvalue %Range.CompilerBodyArena %arena, 21
-  %r22835 = call i32 @compilerBodyCFGEdgeToColumn()
-  %r22836 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22834, i32 %r22827, i32 %r22835)
-  %r22837 = extractvalue %Range.CompilerBodyArena %arena, 21
-  %r22838 = call i32 @compilerBodyCFGEdgeRoleColumn()
-  %r22839 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22837, i32 %r22827, i32 %r22838)
-  %r22840 = icmp slt i32 %r22833, 0
-  %r22841 = icmp sge i32 %r22833, %r22771
-  %r22842 = or i1 %r22840, %r22841
-  %r22843 = icmp slt i32 %r22836, 0
-  %r22844 = or i1 %r22842, %r22843
-  %r22845 = icmp sge i32 %r22836, %r22771
-  %r22846 = or i1 %r22844, %r22845
-  %r22847 = call i32 @compilerBodyCFGEdgeTrue()
-  %r22848 = icmp slt i32 %r22839, %r22847
-  %r22849 = or i1 %r22846, %r22848
-  %r22850 = call i32 @compilerBodyCFGEdgeBackedge()
-  %r22851 = icmp sgt i32 %r22839, %r22850
-  %r22852 = or i1 %r22849, %r22851
-  br i1 %r22852, label %bb16, label %bb17
+  %r22832 = extractvalue %Range.CompilerBodyArena %arena, 21
+  %r22833 = call i32 @compilerBodyCFGEdgeFromColumn()
+  %r22834 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22832, i32 %r22828, i32 %r22833)
+  %r22835 = extractvalue %Range.CompilerBodyArena %arena, 21
+  %r22836 = call i32 @compilerBodyCFGEdgeToColumn()
+  %r22837 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22835, i32 %r22828, i32 %r22836)
+  %r22838 = extractvalue %Range.CompilerBodyArena %arena, 21
+  %r22839 = call i32 @compilerBodyCFGEdgeRoleColumn()
+  %r22840 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22838, i32 %r22828, i32 %r22839)
+  %r22841 = icmp slt i32 %r22834, 0
+  %r22842 = icmp sge i32 %r22834, %r22772
+  %r22843 = or i1 %r22841, %r22842
+  %r22844 = icmp slt i32 %r22837, 0
+  %r22845 = or i1 %r22843, %r22844
+  %r22846 = icmp sge i32 %r22837, %r22772
+  %r22847 = or i1 %r22845, %r22846
+  %r22848 = call i32 @compilerBodyCFGEdgeTrue()
+  %r22849 = icmp slt i32 %r22840, %r22848
+  %r22850 = or i1 %r22847, %r22849
+  %r22851 = call i32 @compilerBodyCFGEdgeBackedge()
+  %r22852 = icmp sgt i32 %r22840, %r22851
+  %r22853 = or i1 %r22850, %r22852
+  br i1 %r22853, label %bb16, label %bb17
 bb16:
   ret i1 false
 bb17:
-  %r22853 = add i32 %r22827, 1
+  %r22854 = add i32 %r22828, 1
   br label %bb13
 bb15:
-  %r22854 = call ptr @rawBufferCreate(i32 %r22771, i32 4)
+  %r22855 = call ptr @rawBufferCreate(i32 %r22772, i32 4)
   br label %bb18
 bb18:
-  %r22855 = phi i32 [0, %bb15], [%r22863, %bb22]
   %r22856 = phi i32 [0, %bb15], [%r22864, %bb22]
-  %r22857 = icmp slt i32 %r22856, %r22771
-  %r22858 = icmp eq i32 %r22855, 0
-  %r22859 = and i1 %r22857, %r22858
-  br i1 %r22859, label %bb19, label %bb20
+  %r22857 = phi i32 [0, %bb15], [%r22865, %bb22]
+  %r22858 = icmp slt i32 %r22857, %r22772
+  %r22859 = icmp eq i32 %r22856, 0
+  %r22860 = and i1 %r22858, %r22859
+  br i1 %r22860, label %bb19, label %bb20
 bb19:
-  %r22860 = call i32 @rawBufferAppendInt(ptr %r22854, i32 0)
-  %r22861 = icmp ne i32 %r22860, 0
-  br i1 %r22861, label %bb21, label %bb22
+  %r22861 = call i32 @rawBufferAppendInt(ptr %r22855, i32 0)
+  %r22862 = icmp ne i32 %r22861, 0
+  br i1 %r22862, label %bb21, label %bb22
 bb21:
-  %r22862 = sub i32 0, 1
+  %r22863 = sub i32 0, 1
   br label %bb22
 bb22:
-  %r22863 = phi i32 [%r22855, %bb19], [%r22862, %bb21]
-  %r22864 = add i32 %r22856, 1
+  %r22864 = phi i32 [%r22856, %bb19], [%r22863, %bb21]
+  %r22865 = add i32 %r22857, 1
   br label %bb18
 bb20:
   br label %bb23
 bb23:
-  %r22865 = phi i32 [%r22855, %bb20], [%r22918, %bb32]
-  %r22866 = phi i32 [0, %bb20], [%r22919, %bb32]
-  %r22867 = extractvalue %Range.CompilerBodyArena %arena, 22
-  %r22868 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22867)
-  %r22869 = icmp slt i32 %r22866, %r22868
-  %r22870 = icmp eq i32 %r22865, 0
-  %r22871 = and i1 %r22869, %r22870
-  br i1 %r22871, label %bb24, label %bb25
+  %r22866 = phi i32 [%r22856, %bb20], [%r22919, %bb32]
+  %r22867 = phi i32 [0, %bb20], [%r22920, %bb32]
+  %r22868 = extractvalue %Range.CompilerBodyArena %arena, 22
+  %r22869 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22868)
+  %r22870 = icmp slt i32 %r22867, %r22869
+  %r22871 = icmp eq i32 %r22866, 0
+  %r22872 = and i1 %r22870, %r22871
+  br i1 %r22872, label %bb24, label %bb25
 bb24:
-  %r22872 = extractvalue %Range.CompilerBodyArena %arena, 22
-  %r22873 = call i32 @compilerBodyCFGScheduleBlockColumn()
-  %r22874 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22872, i32 %r22866, i32 %r22873)
-  %r22875 = extractvalue %Range.CompilerBodyArena %arena, 22
-  %r22876 = call i32 @compilerBodyCFGScheduleNodeColumn()
-  %r22877 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22875, i32 %r22866, i32 %r22876)
-  %r22878 = extractvalue %Range.CompilerBodyArena %arena, 22
-  %r22879 = call i32 @compilerBodyCFGScheduleActionColumn()
-  %r22880 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22878, i32 %r22866, i32 %r22879)
-  %r22881 = sub i32 0, 1
-  %r22882 = icmp sge i32 %r22874, 0
-  %r22883 = icmp slt i32 %r22874, %r22771
-  %r22884 = and i1 %r22882, %r22883
-  br i1 %r22884, label %bb26, label %bb27
+  %r22873 = extractvalue %Range.CompilerBodyArena %arena, 22
+  %r22874 = call i32 @compilerBodyCFGScheduleBlockColumn()
+  %r22875 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22873, i32 %r22867, i32 %r22874)
+  %r22876 = extractvalue %Range.CompilerBodyArena %arena, 22
+  %r22877 = call i32 @compilerBodyCFGScheduleNodeColumn()
+  %r22878 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22876, i32 %r22867, i32 %r22877)
+  %r22879 = extractvalue %Range.CompilerBodyArena %arena, 22
+  %r22880 = call i32 @compilerBodyCFGScheduleActionColumn()
+  %r22881 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22879, i32 %r22867, i32 %r22880)
+  %r22882 = sub i32 0, 1
+  %r22883 = icmp sge i32 %r22875, 0
+  %r22884 = icmp slt i32 %r22875, %r22772
+  %r22885 = and i1 %r22883, %r22884
+  br i1 %r22885, label %bb26, label %bb27
 bb26:
-  %r22885 = call i32 @rawBufferLoadInt(ptr %r22854, i32 %r22874)
+  %r22886 = call i32 @rawBufferLoadInt(ptr %r22855, i32 %r22875)
   br label %bb27
 bb27:
-  %r22886 = phi i32 [%r22881, %bb24], [%r22885, %bb26]
-  %r22887 = extractvalue %Range.CompilerBodyArena %arena, 22
-  %r22888 = call i32 @compilerBodyCFGScheduleIDColumn()
-  %r22889 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22887, i32 %r22866, i32 %r22888)
-  %r22890 = icmp ne i32 %r22889, %r22866
-  %r22891 = icmp slt i32 %r22874, 0
-  %r22892 = or i1 %r22890, %r22891
-  %r22893 = icmp sge i32 %r22874, %r22771
-  %r22894 = or i1 %r22892, %r22893
-  %r22895 = icmp slt i32 %r22877, 0
-  %r22896 = or i1 %r22894, %r22895
-  %r22897 = extractvalue %Range.CompilerBodyArena %arena, 12
-  %r22898 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22897)
-  %r22899 = icmp sge i32 %r22877, %r22898
-  %r22900 = or i1 %r22896, %r22899
-  %r22901 = call i32 @compilerBodyCFGScheduleEvaluateNode()
-  %r22902 = icmp slt i32 %r22880, %r22901
-  %r22903 = or i1 %r22900, %r22902
-  %r22904 = call i32 @compilerBodyCFGScheduleSwitchPayloadBind()
-  %r22905 = icmp sgt i32 %r22880, %r22904
-  %r22906 = or i1 %r22903, %r22905
-  %r22907 = extractvalue %Range.CompilerBodyArena %arena, 22
-  %r22908 = call i32 @compilerBodyCFGScheduleOrdinalColumn()
-  %r22909 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22907, i32 %r22866, i32 %r22908)
-  %r22910 = icmp ne i32 %r22909, %r22886
-  %r22911 = or i1 %r22906, %r22910
-  br i1 %r22911, label %bb28, label %bb29
+  %r22887 = phi i32 [%r22882, %bb24], [%r22886, %bb26]
+  %r22888 = extractvalue %Range.CompilerBodyArena %arena, 22
+  %r22889 = call i32 @compilerBodyCFGScheduleIDColumn()
+  %r22890 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22888, i32 %r22867, i32 %r22889)
+  %r22891 = icmp ne i32 %r22890, %r22867
+  %r22892 = icmp slt i32 %r22875, 0
+  %r22893 = or i1 %r22891, %r22892
+  %r22894 = icmp sge i32 %r22875, %r22772
+  %r22895 = or i1 %r22893, %r22894
+  %r22896 = icmp slt i32 %r22878, 0
+  %r22897 = or i1 %r22895, %r22896
+  %r22898 = extractvalue %Range.CompilerBodyArena %arena, 12
+  %r22899 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22898)
+  %r22900 = icmp sge i32 %r22878, %r22899
+  %r22901 = or i1 %r22897, %r22900
+  %r22902 = call i32 @compilerBodyCFGScheduleEvaluateNode()
+  %r22903 = icmp slt i32 %r22881, %r22902
+  %r22904 = or i1 %r22901, %r22903
+  %r22905 = call i32 @compilerBodyCFGScheduleSwitchPayloadBind()
+  %r22906 = icmp sgt i32 %r22881, %r22905
+  %r22907 = or i1 %r22904, %r22906
+  %r22908 = extractvalue %Range.CompilerBodyArena %arena, 22
+  %r22909 = call i32 @compilerBodyCFGScheduleOrdinalColumn()
+  %r22910 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22908, i32 %r22867, i32 %r22909)
+  %r22911 = icmp ne i32 %r22910, %r22887
+  %r22912 = or i1 %r22907, %r22911
+  br i1 %r22912, label %bb28, label %bb29
 bb28:
-  %r22912 = sub i32 0, 1
+  %r22913 = sub i32 0, 1
   br label %bb32
 bb29:
-  %r22913 = add i32 %r22886, 1
-  %r22914 = call i32 @rawBufferStoreInt(ptr %r22854, i32 %r22874, i32 %r22913)
-  %r22915 = icmp ne i32 %r22914, 0
-  br i1 %r22915, label %bb30, label %bb31
+  %r22914 = add i32 %r22887, 1
+  %r22915 = call i32 @rawBufferStoreInt(ptr %r22855, i32 %r22875, i32 %r22914)
+  %r22916 = icmp ne i32 %r22915, 0
+  br i1 %r22916, label %bb30, label %bb31
 bb30:
-  %r22916 = sub i32 0, 1
+  %r22917 = sub i32 0, 1
   br label %bb31
 bb31:
-  %r22917 = phi i32 [%r22865, %bb29], [%r22916, %bb30]
+  %r22918 = phi i32 [%r22866, %bb29], [%r22917, %bb30]
   br label %bb32
 bb32:
-  %r22918 = phi i32 [%r22912, %bb28], [%r22917, %bb31]
-  %r22919 = add i32 %r22866, 1
+  %r22919 = phi i32 [%r22913, %bb28], [%r22918, %bb31]
+  %r22920 = add i32 %r22867, 1
   br label %bb23
 bb25:
-  %r22920 = call i32 @rawBufferDestroy(ptr %r22854)
-  %r22921 = icmp ne i32 %r22920, 0
-  br i1 %r22921, label %bb33, label %bb34
+  %r22921 = call i32 @rawBufferDestroy(ptr %r22855)
+  %r22922 = icmp ne i32 %r22921, 0
+  br i1 %r22922, label %bb33, label %bb34
 bb33:
-  %r22922 = sub i32 0, 1
+  %r22923 = sub i32 0, 1
   br label %bb34
 bb34:
-  %r22923 = phi i32 [%r22865, %bb25], [%r22922, %bb33]
-  %r22924 = icmp eq i32 %r22923, 0
-  ret i1 %r22924
+  %r22924 = phi i32 [%r22866, %bb25], [%r22923, %bb33]
+  %r22925 = icmp eq i32 %r22924, 0
+  ret i1 %r22925
 }
 define i1 @compilerBodyArenaEntryReturnsInt(%Range.CompilerBodyArena %arena) {
 entry:
-  %r22925 = call i1 @compilerBodyArenaIsEntry(%Range.CompilerBodyArena %arena)
-  %r22926 = xor i1 %r22925, true
-  br i1 %r22926, label %bb1, label %bb2
+  %r22926 = call i1 @compilerBodyArenaIsEntry(%Range.CompilerBodyArena %arena)
+  %r22927 = xor i1 %r22926, true
+  br i1 %r22927, label %bb1, label %bb2
 bb1:
   ret i1 false
 bb2:
   br label %bb3
 bb3:
-  %r22927 = phi i32 [0, %bb2], [%r22952, %bb7]
   %r22928 = phi i32 [0, %bb2], [%r22953, %bb7]
-  %r22929 = extractvalue %Range.CompilerBodyArena %arena, 35
-  %r22930 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22929)
-  %r22931 = icmp slt i32 %r22928, %r22930
-  br i1 %r22931, label %bb4, label %bb5
+  %r22929 = phi i32 [0, %bb2], [%r22954, %bb7]
+  %r22930 = extractvalue %Range.CompilerBodyArena %arena, 35
+  %r22931 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22930)
+  %r22932 = icmp slt i32 %r22929, %r22931
+  br i1 %r22932, label %bb4, label %bb5
 bb4:
-  %r22932 = extractvalue %Range.CompilerBodyArena %arena, 35
-  %r22933 = call i32 @compilerBodyMIROperationKindColumn()
-  %r22934 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22932, i32 %r22928, i32 %r22933)
-  %r22935 = call i32 @compilerBodyMIROperationReturn()
-  %r22936 = icmp eq i32 %r22934, %r22935
-  br i1 %r22936, label %bb6, label %bb7
+  %r22933 = extractvalue %Range.CompilerBodyArena %arena, 35
+  %r22934 = call i32 @compilerBodyMIROperationKindColumn()
+  %r22935 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22933, i32 %r22929, i32 %r22934)
+  %r22936 = call i32 @compilerBodyMIROperationReturn()
+  %r22937 = icmp eq i32 %r22935, %r22936
+  br i1 %r22937, label %bb6, label %bb7
 bb6:
-  %r22937 = call i32 @compilerBodyMIROperationOperandValue(%Range.CompilerBodyArena %arena, i32 %r22928, i32 0)
-  %r22938 = icmp slt i32 %r22937, 0
-  %r22939 = extractvalue %Range.CompilerBodyArena %arena, 33
-  %r22940 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22939)
-  %r22941 = icmp sge i32 %r22937, %r22940
-  %r22942 = or i1 %r22938, %r22941
-  br i1 %r22942, label %bb8, label %bb9
+  %r22938 = call i32 @compilerBodyMIROperationOperandValue(%Range.CompilerBodyArena %arena, i32 %r22929, i32 0)
+  %r22939 = icmp slt i32 %r22938, 0
+  %r22940 = extractvalue %Range.CompilerBodyArena %arena, 33
+  %r22941 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r22940)
+  %r22942 = icmp sge i32 %r22938, %r22941
+  %r22943 = or i1 %r22939, %r22942
+  br i1 %r22943, label %bb8, label %bb9
 bb8:
   ret i1 false
 bb9:
-  %r22943 = extractvalue %Range.CompilerBodyArena %arena, 33
-  %r22944 = call i32 @compilerBodyMIRValueTypeColumn()
-  %r22945 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22943, i32 %r22937, i32 %r22944)
-  %r22946 = call i32 @compilerBodyTypeInt()
-  %r22947 = icmp ne i32 %r22945, %r22946
-  %r22948 = call i32 @compilerBodyTypeBool()
-  %r22949 = icmp ne i32 %r22945, %r22948
-  %r22950 = and i1 %r22947, %r22949
-  br i1 %r22950, label %bb10, label %bb11
+  %r22944 = extractvalue %Range.CompilerBodyArena %arena, 33
+  %r22945 = call i32 @compilerBodyMIRValueTypeColumn()
+  %r22946 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r22944, i32 %r22938, i32 %r22945)
+  %r22947 = call i32 @compilerBodyTypeInt()
+  %r22948 = icmp ne i32 %r22946, %r22947
+  %r22949 = call i32 @compilerBodyTypeBool()
+  %r22950 = icmp ne i32 %r22946, %r22949
+  %r22951 = and i1 %r22948, %r22950
+  br i1 %r22951, label %bb10, label %bb11
 bb10:
   ret i1 false
 bb11:
-  %r22951 = add i32 %r22927, 1
+  %r22952 = add i32 %r22928, 1
   br label %bb7
 bb7:
-  %r22952 = phi i32 [%r22927, %bb4], [%r22951, %bb11]
-  %r22953 = add i32 %r22928, 1
+  %r22953 = phi i32 [%r22928, %bb4], [%r22952, %bb11]
+  %r22954 = add i32 %r22929, 1
   br label %bb3
 bb5:
-  %r22954 = icmp sgt i32 %r22927, 0
-  ret i1 %r22954
+  %r22955 = icmp sgt i32 %r22928, 0
+  ret i1 %r22955
 }
 define void @compilerBodyLLVMEmit(ptr %returnDestination, %Range.CompilerBodyArena %arena, i32 %initialTemporary, i32 %initialBranch, %Range.CompilerModuleABIPlan %abiPlan, %Range.CompilerIntTable %typeKeys, %Range.CompilerIntTable %typeKeyArguments, %Range.CompilerIntTable %functionInstances, %Range.CompilerIntTable %functionInstanceSignatures, %Range.CompilerIntTable %functionInstanceSignatureParameters) {
 entry:
@@ -38642,503 +38647,503 @@ entry:
   %storage3 = alloca %Range.CompilerLLVMValue
   %storage4 = alloca %Range.CompilerLLVMValue
   %storage5 = alloca %Range.CompilerLLVMLoweredBlock
-  %r22955 = extractvalue %Range.CompilerBodyArena %arena, 9
-  %r22956 = extractvalue %Range.CompilerBodyArena %arena, 10
-  %r22957 = insertvalue %Range.CompilerBlock poison, i32 %r22955, 0
-  %r22958 = insertvalue %Range.CompilerBlock %r22957, i32 %r22956, 1
-  %r22969 = insertvalue %Range.CompilerLLVMLoweredBlock poison, %Range.CompilerBlock %r22958, 0
-  %r22970 = insertvalue %Range.CompilerLLVMLoweredBlock %r22969, ptr getelementptr inbounds ([1 x i8], ptr @.str.22959, i32 0, i32 0), 1
-  %r22971 = insertvalue %Range.CompilerLLVMLoweredBlock %r22970, ptr getelementptr inbounds ([1 x i8], ptr @.str.22960, i32 0, i32 0), 2
-  %r22972 = insertvalue %Range.CompilerLLVMLoweredBlock %r22971, ptr getelementptr inbounds ([1 x i8], ptr @.str.22961, i32 0, i32 0), 3
-  %r22973 = insertvalue %Range.CompilerLLVMLoweredBlock %r22972, ptr getelementptr inbounds ([1 x i8], ptr @.str.22962, i32 0, i32 0), 4
-  %r22974 = insertvalue %Range.CompilerLLVMLoweredBlock %r22973, i32 %initialTemporary, 5
-  %r22975 = insertvalue %Range.CompilerLLVMLoweredBlock %r22974, i32 %initialBranch, 6
-  %r22976 = insertvalue %Range.CompilerLLVMLoweredBlock %r22975, ptr getelementptr inbounds ([6 x i8], ptr @.str.22963, i32 0, i32 0), 7
-  %r22977 = insertvalue %Range.CompilerLLVMLoweredBlock %r22976, i1 false, 8
-  %r22978 = insertvalue %Range.CompilerLLVMLoweredBlock %r22977, ptr getelementptr inbounds ([1 x i8], ptr @.str.22964, i32 0, i32 0), 9
-  %r22979 = insertvalue %Range.CompilerLLVMLoweredBlock %r22978, ptr getelementptr inbounds ([1 x i8], ptr @.str.22965, i32 0, i32 0), 10
-  %r22980 = insertvalue %Range.CompilerLLVMLoweredBlock %r22979, ptr getelementptr inbounds ([1 x i8], ptr @.str.22966, i32 0, i32 0), 11
-  %r22981 = insertvalue %Range.CompilerLLVMLoweredBlock %r22980, i1 false, 12
-  %r22982 = insertvalue %Range.CompilerLLVMLoweredBlock %r22981, ptr getelementptr inbounds ([1 x i8], ptr @.str.22967, i32 0, i32 0), 13
-  %r22983 = insertvalue %Range.CompilerLLVMLoweredBlock %r22982, ptr getelementptr inbounds ([1 x i8], ptr @.str.22968, i32 0, i32 0), 14
-  store %Range.CompilerLLVMLoweredBlock %r22983, ptr %storage1
-  %r22984 = call i1 @compilerBodyMIRIsValid(%Range.CompilerBodyArena %arena, %Range.CompilerModuleABIPlan %abiPlan)
-  %r22985 = xor i1 %r22984, true
-  %r22986 = call i1 @compilerBodyMemoryIsFrozenAndValid(%Range.CompilerBodyArena %arena)
-  %r22987 = xor i1 %r22986, true
-  %r22988 = or i1 %r22985, %r22987
-  br i1 %r22988, label %bb1, label %bb2
+  %r22956 = extractvalue %Range.CompilerBodyArena %arena, 9
+  %r22957 = extractvalue %Range.CompilerBodyArena %arena, 10
+  %r22958 = insertvalue %Range.CompilerBlock poison, i32 %r22956, 0
+  %r22959 = insertvalue %Range.CompilerBlock %r22958, i32 %r22957, 1
+  %r22970 = insertvalue %Range.CompilerLLVMLoweredBlock poison, %Range.CompilerBlock %r22959, 0
+  %r22971 = insertvalue %Range.CompilerLLVMLoweredBlock %r22970, ptr getelementptr inbounds ([1 x i8], ptr @.str.22960, i32 0, i32 0), 1
+  %r22972 = insertvalue %Range.CompilerLLVMLoweredBlock %r22971, ptr getelementptr inbounds ([1 x i8], ptr @.str.22961, i32 0, i32 0), 2
+  %r22973 = insertvalue %Range.CompilerLLVMLoweredBlock %r22972, ptr getelementptr inbounds ([1 x i8], ptr @.str.22962, i32 0, i32 0), 3
+  %r22974 = insertvalue %Range.CompilerLLVMLoweredBlock %r22973, ptr getelementptr inbounds ([1 x i8], ptr @.str.22963, i32 0, i32 0), 4
+  %r22975 = insertvalue %Range.CompilerLLVMLoweredBlock %r22974, i32 %initialTemporary, 5
+  %r22976 = insertvalue %Range.CompilerLLVMLoweredBlock %r22975, i32 %initialBranch, 6
+  %r22977 = insertvalue %Range.CompilerLLVMLoweredBlock %r22976, ptr getelementptr inbounds ([6 x i8], ptr @.str.22964, i32 0, i32 0), 7
+  %r22978 = insertvalue %Range.CompilerLLVMLoweredBlock %r22977, i1 false, 8
+  %r22979 = insertvalue %Range.CompilerLLVMLoweredBlock %r22978, ptr getelementptr inbounds ([1 x i8], ptr @.str.22965, i32 0, i32 0), 9
+  %r22980 = insertvalue %Range.CompilerLLVMLoweredBlock %r22979, ptr getelementptr inbounds ([1 x i8], ptr @.str.22966, i32 0, i32 0), 10
+  %r22981 = insertvalue %Range.CompilerLLVMLoweredBlock %r22980, ptr getelementptr inbounds ([1 x i8], ptr @.str.22967, i32 0, i32 0), 11
+  %r22982 = insertvalue %Range.CompilerLLVMLoweredBlock %r22981, i1 false, 12
+  %r22983 = insertvalue %Range.CompilerLLVMLoweredBlock %r22982, ptr getelementptr inbounds ([1 x i8], ptr @.str.22968, i32 0, i32 0), 13
+  %r22984 = insertvalue %Range.CompilerLLVMLoweredBlock %r22983, ptr getelementptr inbounds ([1 x i8], ptr @.str.22969, i32 0, i32 0), 14
+  store %Range.CompilerLLVMLoweredBlock %r22984, ptr %storage1
+  %r22985 = call i1 @compilerBodyMIRIsValid(%Range.CompilerBodyArena %arena, %Range.CompilerModuleABIPlan %abiPlan)
+  %r22986 = xor i1 %r22985, true
+  %r22987 = call i1 @compilerBodyMemoryIsFrozenAndValid(%Range.CompilerBodyArena %arena)
+  %r22988 = xor i1 %r22987, true
+  %r22989 = or i1 %r22986, %r22988
+  br i1 %r22989, label %bb1, label %bb2
 bb1:
-  %r22990 = insertvalue %Range.CompilerBodyLLVMEmissionResult poison, %Range.CompilerLLVMLoweredBlock %r22983, 0
-  %r22991 = insertvalue %Range.CompilerBodyLLVMEmissionResult %r22990, ptr getelementptr inbounds ([1 x i8], ptr @.str.22989, i32 0, i32 0), 1
-  %r22992 = insertvalue %Range.CompilerBodyLLVMEmissionResult %r22991, i32 0, 2
-  %r22993 = insertvalue %Range.CompilerBodyLLVMEmissionResult %r22992, i1 false, 3
-  store %Range.CompilerBodyLLVMEmissionResult %r22993, ptr %returnDestination
+  %r22991 = insertvalue %Range.CompilerBodyLLVMEmissionResult poison, %Range.CompilerLLVMLoweredBlock %r22984, 0
+  %r22992 = insertvalue %Range.CompilerBodyLLVMEmissionResult %r22991, ptr getelementptr inbounds ([1 x i8], ptr @.str.22990, i32 0, i32 0), 1
+  %r22993 = insertvalue %Range.CompilerBodyLLVMEmissionResult %r22992, i32 0, 2
+  %r22994 = insertvalue %Range.CompilerBodyLLVMEmissionResult %r22993, i1 false, 3
+  store %Range.CompilerBodyLLVMEmissionResult %r22994, ptr %returnDestination
   ret void
 bb2:
   call void @compilerBodyLLVMEmitterCreate(ptr %storage2, %Range.CompilerBodyArena %arena, i32 %initialTemporary, i32 %initialBranch, %Range.CompilerModuleABIPlan %abiPlan, %Range.CompilerIntTable %typeKeys, %Range.CompilerIntTable %typeKeyArguments, %Range.CompilerIntTable %functionInstances, %Range.CompilerIntTable %functionInstanceSignatures, %Range.CompilerIntTable %functionInstanceSignatureParameters)
-  %r22994 = load %Range.CompilerBodyLLVMEmitter, ptr %storage2
-  %r22995 = call i32 @compilerBodyLLVMEmitterSeedParameters(%Range.CompilerBodyLLVMEmitter %r22994)
-  %r22996 = icmp ne i32 %r22995, 0
-  %r22997 = call i32 @compilerBodyLLVMEmitterInitializeLabels(%Range.CompilerBodyLLVMEmitter %r22994)
-  %r22998 = icmp ne i32 %r22997, 0
-  %r22999 = or i1 %r22996, %r22998
-  br i1 %r22999, label %bb3, label %bb4
+  %r22995 = load %Range.CompilerBodyLLVMEmitter, ptr %storage2
+  %r22996 = call i32 @compilerBodyLLVMEmitterSeedParameters(%Range.CompilerBodyLLVMEmitter %r22995)
+  %r22997 = icmp ne i32 %r22996, 0
+  %r22998 = call i32 @compilerBodyLLVMEmitterInitializeLabels(%Range.CompilerBodyLLVMEmitter %r22995)
+  %r22999 = icmp ne i32 %r22998, 0
+  %r23000 = or i1 %r22997, %r22999
+  br i1 %r23000, label %bb3, label %bb4
 bb3:
   br label %bb4
 bb4:
-  %r23000 = phi i1 [true, %bb2], [false, %bb3]
-  %r23001 = extractvalue %Range.CompilerBodyArena %arena, 34
-  %r23002 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23001)
-  %r23003 = call ptr @rawBufferCreate(i32 %r23002, i32 4)
+  %r23001 = phi i1 [true, %bb2], [false, %bb3]
+  %r23002 = extractvalue %Range.CompilerBodyArena %arena, 34
+  %r23003 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23002)
+  %r23004 = call ptr @rawBufferCreate(i32 %r23003, i32 4)
   br label %bb5
 bb5:
-  %r23004 = call i32 @rawBufferCount(ptr %r23003)
-  %r23005 = extractvalue %Range.CompilerBodyArena %arena, 34
-  %r23006 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23005)
-  %r23007 = icmp slt i32 %r23004, %r23006
-  br i1 %r23007, label %bb6, label %bb7
+  %r23005 = call i32 @rawBufferCount(ptr %r23004)
+  %r23006 = extractvalue %Range.CompilerBodyArena %arena, 34
+  %r23007 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23006)
+  %r23008 = icmp slt i32 %r23005, %r23007
+  br i1 %r23008, label %bb6, label %bb7
 bb6:
-  %r23008 = call i32 @rawBufferAppendInt(ptr %r23003, i32 0)
+  %r23009 = call i32 @rawBufferAppendInt(ptr %r23004, i32 0)
   br label %bb5
 bb7:
-  %r23009 = call i32 @compilerBodyLLVMEmitterPlanCFGDepthFirst(%Range.CompilerBodyLLVMEmitter %r22994, i32 0, ptr %r23003)
-  %r23010 = icmp ne i32 %r23009, 0
-  %r23011 = and i1 %r23000, %r23010
-  br i1 %r23011, label %bb8, label %bb9
+  %r23010 = call i32 @compilerBodyLLVMEmitterPlanCFGDepthFirst(%Range.CompilerBodyLLVMEmitter %r22995, i32 0, ptr %r23004)
+  %r23011 = icmp ne i32 %r23010, 0
+  %r23012 = and i1 %r23001, %r23011
+  br i1 %r23012, label %bb8, label %bb9
 bb8:
   br label %bb9
 bb9:
-  %r23012 = phi i1 [%r23000, %bb7], [false, %bb8]
-  %r23013 = call i32 @rawBufferDestroy(ptr %r23003)
-  %r23015 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([1 x i8], ptr @.str.23014, i32 0, i32 0))
-  %r23017 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([1 x i8], ptr @.str.23016, i32 0, i32 0))
-  %r23019 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([1 x i8], ptr @.str.23018, i32 0, i32 0))
-  %r23021 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([1 x i8], ptr @.str.23020, i32 0, i32 0))
-  %r23023 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([1 x i8], ptr @.str.23022, i32 0, i32 0))
-  %r23025 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([6 x i8], ptr @.str.23024, i32 0, i32 0))
-  %r23026 = extractvalue %Range.CompilerBodyArena %arena, 34
-  %r23027 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23026)
-  %r23028 = call ptr @rawBufferCreate(i32 %r23027, i32 4)
+  %r23013 = phi i1 [%r23001, %bb7], [false, %bb8]
+  %r23014 = call i32 @rawBufferDestroy(ptr %r23004)
+  %r23016 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([1 x i8], ptr @.str.23015, i32 0, i32 0))
+  %r23018 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([1 x i8], ptr @.str.23017, i32 0, i32 0))
+  %r23020 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([1 x i8], ptr @.str.23019, i32 0, i32 0))
+  %r23022 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([1 x i8], ptr @.str.23021, i32 0, i32 0))
+  %r23024 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([1 x i8], ptr @.str.23023, i32 0, i32 0))
+  %r23026 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([6 x i8], ptr @.str.23025, i32 0, i32 0))
+  %r23027 = extractvalue %Range.CompilerBodyArena %arena, 34
+  %r23028 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23027)
+  %r23029 = call ptr @rawBufferCreate(i32 %r23028, i32 4)
   br label %bb10
 bb10:
-  %r23029 = call i32 @rawBufferCount(ptr %r23028)
-  %r23030 = extractvalue %Range.CompilerBodyArena %arena, 34
-  %r23031 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23030)
-  %r23032 = icmp slt i32 %r23029, %r23031
-  br i1 %r23032, label %bb11, label %bb12
+  %r23030 = call i32 @rawBufferCount(ptr %r23029)
+  %r23031 = extractvalue %Range.CompilerBodyArena %arena, 34
+  %r23032 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23031)
+  %r23033 = icmp slt i32 %r23030, %r23032
+  br i1 %r23033, label %bb11, label %bb12
 bb11:
-  %r23033 = call i32 @rawBufferAppendInt(ptr %r23028, i32 0)
+  %r23034 = call i32 @rawBufferAppendInt(ptr %r23029, i32 0)
   br label %bb10
 bb12:
-  %r23034 = call i32 @compilerBodyLLVMEmitterRenderCFGDepthFirst(%Range.CompilerBodyLLVMEmitter %r22994, i32 0, ptr %r23028)
-  %r23035 = icmp ne i32 %r23034, 0
-  %r23036 = and i1 %r23012, %r23035
-  br i1 %r23036, label %bb13, label %bb14
+  %r23035 = call i32 @compilerBodyLLVMEmitterRenderCFGDepthFirst(%Range.CompilerBodyLLVMEmitter %r22995, i32 0, ptr %r23029)
+  %r23036 = icmp ne i32 %r23035, 0
+  %r23037 = and i1 %r23013, %r23036
+  br i1 %r23037, label %bb13, label %bb14
 bb13:
   br label %bb14
 bb14:
-  %r23037 = phi i1 [%r23012, %bb12], [false, %bb13]
-  %r23038 = call i32 @rawBufferDestroy(ptr %r23028)
+  %r23038 = phi i1 [%r23013, %bb12], [false, %bb13]
+  %r23039 = call i32 @rawBufferDestroy(ptr %r23029)
   br label %bb15
 bb15:
-  %r23039 = phi i32 [0, %bb14], [%r23106, %bb19]
-  %r23040 = phi i1 [false, %bb14], [%r23099, %bb19]
-  %r23041 = phi ptr [%r23015, %bb14], [%r23100, %bb19]
-  %r23042 = phi ptr [%r23017, %bb14], [%r23101, %bb19]
-  %r23043 = phi ptr [%r23019, %bb14], [%r23102, %bb19]
-  %r23044 = phi i1 [false, %bb14], [%r23103, %bb19]
-  %r23045 = phi ptr [%r23021, %bb14], [%r23104, %bb19]
-  %r23046 = phi ptr [%r23023, %bb14], [%r23105, %bb19]
-  %r23047 = extractvalue %Range.CompilerBodyArena %arena, 34
-  %r23048 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23047)
-  %r23049 = icmp slt i32 %r23039, %r23048
-  %r23050 = and i1 %r23037, %r23049
-  br i1 %r23050, label %bb16, label %bb17
+  %r23040 = phi i32 [0, %bb14], [%r23107, %bb19]
+  %r23041 = phi i1 [false, %bb14], [%r23100, %bb19]
+  %r23042 = phi ptr [%r23016, %bb14], [%r23101, %bb19]
+  %r23043 = phi ptr [%r23018, %bb14], [%r23102, %bb19]
+  %r23044 = phi ptr [%r23020, %bb14], [%r23103, %bb19]
+  %r23045 = phi i1 [false, %bb14], [%r23104, %bb19]
+  %r23046 = phi ptr [%r23022, %bb14], [%r23105, %bb19]
+  %r23047 = phi ptr [%r23024, %bb14], [%r23106, %bb19]
+  %r23048 = extractvalue %Range.CompilerBodyArena %arena, 34
+  %r23049 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23048)
+  %r23050 = icmp slt i32 %r23040, %r23049
+  %r23051 = and i1 %r23038, %r23050
+  br i1 %r23051, label %bb16, label %bb17
 bb16:
-  %r23051 = extractvalue %Range.CompilerBodyArena %arena, 34
-  %r23052 = call i32 @compilerBodyMIRBlockFirstOperationColumn()
-  %r23053 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23051, i32 %r23039, i32 %r23052)
-  %r23054 = extractvalue %Range.CompilerBodyArena %arena, 34
-  %r23055 = call i32 @compilerBodyMIRBlockOperationCountColumn()
-  %r23056 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23054, i32 %r23039, i32 %r23055)
-  br i1 %r23037, label %bb18, label %bb19
+  %r23052 = extractvalue %Range.CompilerBodyArena %arena, 34
+  %r23053 = call i32 @compilerBodyMIRBlockFirstOperationColumn()
+  %r23054 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23052, i32 %r23040, i32 %r23053)
+  %r23055 = extractvalue %Range.CompilerBodyArena %arena, 34
+  %r23056 = call i32 @compilerBodyMIRBlockOperationCountColumn()
+  %r23057 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23055, i32 %r23040, i32 %r23056)
+  br i1 %r23038, label %bb18, label %bb19
 bb18:
-  %r23057 = add i32 %r23053, %r23056
-  %r23058 = sub i32 %r23057, 1
-  %r23059 = extractvalue %Range.CompilerBodyArena %arena, 35
-  %r23060 = call i32 @compilerBodyMIROperationKindColumn()
-  %r23061 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23059, i32 %r23058, i32 %r23060)
-  %r23062 = call i32 @compilerBodyMIROperationCondBranch()
-  %r23063 = icmp eq i32 %r23061, %r23062
-  br i1 %r23063, label %bb20, label %bb21
+  %r23058 = add i32 %r23054, %r23057
+  %r23059 = sub i32 %r23058, 1
+  %r23060 = extractvalue %Range.CompilerBodyArena %arena, 35
+  %r23061 = call i32 @compilerBodyMIROperationKindColumn()
+  %r23062 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23060, i32 %r23059, i32 %r23061)
+  %r23063 = call i32 @compilerBodyMIROperationCondBranch()
+  %r23064 = icmp eq i32 %r23062, %r23063
+  br i1 %r23064, label %bb20, label %bb21
 bb20:
-  %r23064 = call i32 @compilerBodyLLVMOperationOperandValueID(%Range.CompilerBodyArena %arena, i32 %r23058, i32 0)
-  call void @compilerBodyLLVMValue(ptr %storage3, %Range.CompilerBodyLLVMEmitter %r22994, i32 %r23064)
-  %r23065 = load %Range.CompilerLLVMValue, ptr %storage3
-  %r23066 = xor i1 %r23040, true
-  br i1 %r23066, label %bb22, label %bb23
+  %r23065 = call i32 @compilerBodyLLVMOperationOperandValueID(%Range.CompilerBodyArena %arena, i32 %r23059, i32 0)
+  call void @compilerBodyLLVMValue(ptr %storage3, %Range.CompilerBodyLLVMEmitter %r22995, i32 %r23065)
+  %r23066 = load %Range.CompilerLLVMValue, ptr %storage3
+  %r23067 = xor i1 %r23041, true
+  br i1 %r23067, label %bb22, label %bb23
 bb22:
-  %r23067 = extractvalue %Range.CompilerBodyArena %arena, 34
-  %r23068 = call i32 @compilerBodyMIRBlockCFGColumn()
-  %r23069 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23067, i32 %r23039, i32 %r23068)
-  %r23070 = extractvalue %Range.CompilerLLVMValue %r23065, 0
-  %r23071 = call ptr @stringOwnedCopy(ptr %r23070)
-  %r23072 = call i32 @compilerBodyCFGEdgeTrue()
-  %r23073 = call i32 @compilerBodyLLVMFirstCFGTarget(%Range.CompilerBodyArena %arena, i32 %r23069, i32 %r23072)
-  %r23074 = call ptr @compilerBodyLLVMBlockLabel(%Range.CompilerBodyLLVMEmitter %r22994, i32 %r23073)
-  %r23075 = call ptr @stringOwnedCopy(ptr %r23074)
-  %r23076 = call i32 @compilerBodyCFGEdgeFalse()
-  %r23077 = call i32 @compilerBodyLLVMFirstCFGTarget(%Range.CompilerBodyArena %arena, i32 %r23069, i32 %r23076)
-  %r23078 = call ptr @compilerBodyLLVMBlockLabel(%Range.CompilerBodyLLVMEmitter %r22994, i32 %r23077)
-  %r23079 = call ptr @stringOwnedCopy(ptr %r23078)
+  %r23068 = extractvalue %Range.CompilerBodyArena %arena, 34
+  %r23069 = call i32 @compilerBodyMIRBlockCFGColumn()
+  %r23070 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23068, i32 %r23040, i32 %r23069)
+  %r23071 = extractvalue %Range.CompilerLLVMValue %r23066, 0
+  %r23072 = call ptr @stringOwnedCopy(ptr %r23071)
+  %r23073 = call i32 @compilerBodyCFGEdgeTrue()
+  %r23074 = call i32 @compilerBodyLLVMFirstCFGTarget(%Range.CompilerBodyArena %arena, i32 %r23070, i32 %r23073)
+  %r23075 = call ptr @compilerBodyLLVMBlockLabel(%Range.CompilerBodyLLVMEmitter %r22995, i32 %r23074)
+  %r23076 = call ptr @stringOwnedCopy(ptr %r23075)
+  %r23077 = call i32 @compilerBodyCFGEdgeFalse()
+  %r23078 = call i32 @compilerBodyLLVMFirstCFGTarget(%Range.CompilerBodyArena %arena, i32 %r23070, i32 %r23077)
+  %r23079 = call ptr @compilerBodyLLVMBlockLabel(%Range.CompilerBodyLLVMEmitter %r22995, i32 %r23078)
+  %r23080 = call ptr @stringOwnedCopy(ptr %r23079)
   br label %bb23
 bb23:
-  %r23080 = phi i1 [%r23040, %bb20], [true, %bb22]
-  %r23081 = phi ptr [%r23041, %bb20], [%r23071, %bb22]
-  %r23082 = phi ptr [%r23042, %bb20], [%r23075, %bb22]
-  %r23083 = phi ptr [%r23043, %bb20], [%r23079, %bb22]
+  %r23081 = phi i1 [%r23041, %bb20], [true, %bb22]
+  %r23082 = phi ptr [%r23042, %bb20], [%r23072, %bb22]
+  %r23083 = phi ptr [%r23043, %bb20], [%r23076, %bb22]
+  %r23084 = phi ptr [%r23044, %bb20], [%r23080, %bb22]
   br label %bb21
 bb21:
-  %r23084 = phi i1 [%r23040, %bb18], [%r23080, %bb23]
-  %r23085 = phi ptr [%r23041, %bb18], [%r23081, %bb23]
+  %r23085 = phi i1 [%r23041, %bb18], [%r23081, %bb23]
   %r23086 = phi ptr [%r23042, %bb18], [%r23082, %bb23]
   %r23087 = phi ptr [%r23043, %bb18], [%r23083, %bb23]
-  %r23088 = call i32 @compilerBodyMIROperationReturn()
-  %r23089 = icmp eq i32 %r23061, %r23088
-  br i1 %r23089, label %bb24, label %bb25
+  %r23088 = phi ptr [%r23044, %bb18], [%r23084, %bb23]
+  %r23089 = call i32 @compilerBodyMIROperationReturn()
+  %r23090 = icmp eq i32 %r23062, %r23089
+  br i1 %r23090, label %bb24, label %bb25
 bb24:
-  %r23090 = call i32 @compilerBodyLLVMOperationOperandValueID(%Range.CompilerBodyArena %arena, i32 %r23058, i32 0)
-  call void @compilerBodyLLVMValue(ptr %storage4, %Range.CompilerBodyLLVMEmitter %r22994, i32 %r23090)
-  %r23091 = load %Range.CompilerLLVMValue, ptr %storage4
-  %r23092 = extractvalue %Range.CompilerLLVMValue %r23091, 1
-  %r23093 = call ptr @stringOwnedCopy(ptr %r23092)
-  %r23094 = extractvalue %Range.CompilerLLVMValue %r23091, 0
-  %r23095 = call ptr @stringOwnedCopy(ptr %r23094)
+  %r23091 = call i32 @compilerBodyLLVMOperationOperandValueID(%Range.CompilerBodyArena %arena, i32 %r23059, i32 0)
+  call void @compilerBodyLLVMValue(ptr %storage4, %Range.CompilerBodyLLVMEmitter %r22995, i32 %r23091)
+  %r23092 = load %Range.CompilerLLVMValue, ptr %storage4
+  %r23093 = extractvalue %Range.CompilerLLVMValue %r23092, 1
+  %r23094 = call ptr @stringOwnedCopy(ptr %r23093)
+  %r23095 = extractvalue %Range.CompilerLLVMValue %r23092, 0
+  %r23096 = call ptr @stringOwnedCopy(ptr %r23095)
   br label %bb25
 bb25:
-  %r23096 = phi i1 [%r23044, %bb21], [true, %bb24]
-  %r23097 = phi ptr [%r23045, %bb21], [%r23093, %bb24]
-  %r23098 = phi ptr [%r23046, %bb21], [%r23095, %bb24]
+  %r23097 = phi i1 [%r23045, %bb21], [true, %bb24]
+  %r23098 = phi ptr [%r23046, %bb21], [%r23094, %bb24]
+  %r23099 = phi ptr [%r23047, %bb21], [%r23096, %bb24]
   br label %bb19
 bb19:
-  %r23099 = phi i1 [%r23040, %bb16], [%r23084, %bb25]
-  %r23100 = phi ptr [%r23041, %bb16], [%r23085, %bb25]
+  %r23100 = phi i1 [%r23041, %bb16], [%r23085, %bb25]
   %r23101 = phi ptr [%r23042, %bb16], [%r23086, %bb25]
   %r23102 = phi ptr [%r23043, %bb16], [%r23087, %bb25]
-  %r23103 = phi i1 [%r23044, %bb16], [%r23096, %bb25]
-  %r23104 = phi ptr [%r23045, %bb16], [%r23097, %bb25]
+  %r23103 = phi ptr [%r23044, %bb16], [%r23088, %bb25]
+  %r23104 = phi i1 [%r23045, %bb16], [%r23097, %bb25]
   %r23105 = phi ptr [%r23046, %bb16], [%r23098, %bb25]
-  %r23106 = add i32 %r23039, 1
+  %r23106 = phi ptr [%r23047, %bb16], [%r23099, %bb25]
+  %r23107 = add i32 %r23040, 1
   br label %bb15
 bb17:
-  %r23107 = extractvalue %Range.CompilerBodyLLVMEmitter %r22994, 9
-  %r23108 = call i32 @compilerBodyLLVMEmitterLastBlock()
-  %r23109 = call i32 @rawBufferLoadInt(ptr %r23107, i32 %r23108)
-  %r23110 = call ptr @compilerBodyLLVMBlockLabel(%Range.CompilerBodyLLVMEmitter %r22994, i32 %r23109)
-  %r23111 = call ptr @stringOwnedCopy(ptr %r23110)
-  %r23112 = call i1 @compilerBodyArenaCFGHasFallthrough(%Range.CompilerBodyArena %arena)
-  %r23113 = and i1 %r23044, %r23112
-  br i1 %r23113, label %bb26, label %bb27
+  %r23108 = extractvalue %Range.CompilerBodyLLVMEmitter %r22995, 9
+  %r23109 = call i32 @compilerBodyLLVMEmitterLastBlock()
+  %r23110 = call i32 @rawBufferLoadInt(ptr %r23108, i32 %r23109)
+  %r23111 = call ptr @compilerBodyLLVMBlockLabel(%Range.CompilerBodyLLVMEmitter %r22995, i32 %r23110)
+  %r23112 = call ptr @stringOwnedCopy(ptr %r23111)
+  %r23113 = call i1 @compilerBodyArenaCFGHasFallthrough(%Range.CompilerBodyArena %arena)
+  %r23114 = and i1 %r23045, %r23113
+  br i1 %r23114, label %bb26, label %bb27
 bb26:
-  %r23114 = call ptr @compilerCoreLLVMDefaultReturnValue(ptr %r23045)
-  %r23115 = call ptr @stringOwnedCopy(ptr %r23114)
+  %r23115 = call ptr @compilerCoreLLVMDefaultReturnValue(ptr %r23046)
+  %r23116 = call ptr @stringOwnedCopy(ptr %r23115)
   br label %bb27
 bb27:
-  %r23116 = phi ptr [%r23046, %bb17], [%r23115, %bb26]
-  %r23117 = extractvalue %Range.CompilerBodyLLVMEmitter %r22994, 11
-  %r23118 = call ptr @rawBufferMaterializeText(ptr %r23117)
-  %r23119 = call ptr @compilerBodyLLVMEmitterRenderGlobals(%Range.CompilerBodyLLVMEmitter %r22994)
-  %r23120 = extractvalue %Range.CompilerBodyLLVMEmitter %r22994, 9
-  %r23121 = call i32 @compilerBodyLLVMEmitterRuntimeRequirements()
-  %r23122 = call i32 @rawBufferLoadInt(ptr %r23120, i32 %r23121)
-  %r23123 = extractvalue %Range.CompilerBodyLLVMEmitter %r22994, 9
-  %r23124 = call i32 @compilerBodyLLVMEmitterNextTemporary()
-  %r23125 = call i32 @rawBufferLoadInt(ptr %r23123, i32 %r23124)
-  %r23126 = extractvalue %Range.CompilerBodyLLVMEmitter %r22994, 9
-  %r23127 = call i32 @compilerBodyLLVMEmitterNextBranch()
-  %r23128 = call i32 @rawBufferLoadInt(ptr %r23126, i32 %r23127)
-  %r23129 = call i32 @compilerBodyLLVMEmitterDestroy(%Range.CompilerBodyLLVMEmitter %r22994)
-  %r23130 = icmp ne i32 %r23129, 0
-  br i1 %r23130, label %bb28, label %bb29
+  %r23117 = phi ptr [%r23047, %bb17], [%r23116, %bb26]
+  %r23118 = extractvalue %Range.CompilerBodyLLVMEmitter %r22995, 11
+  %r23119 = call ptr @rawBufferMaterializeText(ptr %r23118)
+  %r23120 = call ptr @compilerBodyLLVMEmitterRenderGlobals(%Range.CompilerBodyLLVMEmitter %r22995)
+  %r23121 = extractvalue %Range.CompilerBodyLLVMEmitter %r22995, 9
+  %r23122 = call i32 @compilerBodyLLVMEmitterRuntimeRequirements()
+  %r23123 = call i32 @rawBufferLoadInt(ptr %r23121, i32 %r23122)
+  %r23124 = extractvalue %Range.CompilerBodyLLVMEmitter %r22995, 9
+  %r23125 = call i32 @compilerBodyLLVMEmitterNextTemporary()
+  %r23126 = call i32 @rawBufferLoadInt(ptr %r23124, i32 %r23125)
+  %r23127 = extractvalue %Range.CompilerBodyLLVMEmitter %r22995, 9
+  %r23128 = call i32 @compilerBodyLLVMEmitterNextBranch()
+  %r23129 = call i32 @rawBufferLoadInt(ptr %r23127, i32 %r23128)
+  %r23130 = call i32 @compilerBodyLLVMEmitterDestroy(%Range.CompilerBodyLLVMEmitter %r22995)
+  %r23131 = icmp ne i32 %r23130, 0
+  br i1 %r23131, label %bb28, label %bb29
 bb28:
   br label %bb29
 bb29:
-  %r23131 = phi i1 [%r23037, %bb27], [false, %bb28]
-  %r23132 = insertvalue %Range.CompilerBlock poison, i32 %r22955, 0
-  %r23133 = insertvalue %Range.CompilerBlock %r23132, i32 %r22956, 1
-  %r23137 = insertvalue %Range.CompilerLLVMLoweredBlock poison, %Range.CompilerBlock %r23133, 0
-  %r23138 = insertvalue %Range.CompilerLLVMLoweredBlock %r23137, ptr getelementptr inbounds ([1 x i8], ptr @.str.23134, i32 0, i32 0), 1
-  %r23139 = insertvalue %Range.CompilerLLVMLoweredBlock %r23138, ptr %r23118, 2
-  %r23140 = insertvalue %Range.CompilerLLVMLoweredBlock %r23139, ptr getelementptr inbounds ([1 x i8], ptr @.str.23135, i32 0, i32 0), 3
-  %r23141 = insertvalue %Range.CompilerLLVMLoweredBlock %r23140, ptr getelementptr inbounds ([1 x i8], ptr @.str.23136, i32 0, i32 0), 4
-  %r23142 = insertvalue %Range.CompilerLLVMLoweredBlock %r23141, i32 %r23125, 5
-  %r23143 = insertvalue %Range.CompilerLLVMLoweredBlock %r23142, i32 %r23128, 6
-  %r23144 = insertvalue %Range.CompilerLLVMLoweredBlock %r23143, ptr %r23111, 7
-  %r23145 = insertvalue %Range.CompilerLLVMLoweredBlock %r23144, i1 %r23040, 8
-  %r23146 = insertvalue %Range.CompilerLLVMLoweredBlock %r23145, ptr %r23041, 9
-  %r23147 = insertvalue %Range.CompilerLLVMLoweredBlock %r23146, ptr %r23042, 10
-  %r23148 = insertvalue %Range.CompilerLLVMLoweredBlock %r23147, ptr %r23043, 11
-  %r23149 = insertvalue %Range.CompilerLLVMLoweredBlock %r23148, i1 %r23044, 12
-  %r23150 = insertvalue %Range.CompilerLLVMLoweredBlock %r23149, ptr %r23045, 13
-  %r23151 = insertvalue %Range.CompilerLLVMLoweredBlock %r23150, ptr %r23116, 14
-  store %Range.CompilerLLVMLoweredBlock %r23151, ptr %storage5
-  %r23152 = insertvalue %Range.CompilerBodyLLVMEmissionResult poison, %Range.CompilerLLVMLoweredBlock %r23151, 0
-  %r23153 = insertvalue %Range.CompilerBodyLLVMEmissionResult %r23152, ptr %r23119, 1
-  %r23154 = insertvalue %Range.CompilerBodyLLVMEmissionResult %r23153, i32 %r23122, 2
-  %r23155 = insertvalue %Range.CompilerBodyLLVMEmissionResult %r23154, i1 %r23131, 3
-  store %Range.CompilerBodyLLVMEmissionResult %r23155, ptr %returnDestination
+  %r23132 = phi i1 [%r23038, %bb27], [false, %bb28]
+  %r23133 = insertvalue %Range.CompilerBlock poison, i32 %r22956, 0
+  %r23134 = insertvalue %Range.CompilerBlock %r23133, i32 %r22957, 1
+  %r23138 = insertvalue %Range.CompilerLLVMLoweredBlock poison, %Range.CompilerBlock %r23134, 0
+  %r23139 = insertvalue %Range.CompilerLLVMLoweredBlock %r23138, ptr getelementptr inbounds ([1 x i8], ptr @.str.23135, i32 0, i32 0), 1
+  %r23140 = insertvalue %Range.CompilerLLVMLoweredBlock %r23139, ptr %r23119, 2
+  %r23141 = insertvalue %Range.CompilerLLVMLoweredBlock %r23140, ptr getelementptr inbounds ([1 x i8], ptr @.str.23136, i32 0, i32 0), 3
+  %r23142 = insertvalue %Range.CompilerLLVMLoweredBlock %r23141, ptr getelementptr inbounds ([1 x i8], ptr @.str.23137, i32 0, i32 0), 4
+  %r23143 = insertvalue %Range.CompilerLLVMLoweredBlock %r23142, i32 %r23126, 5
+  %r23144 = insertvalue %Range.CompilerLLVMLoweredBlock %r23143, i32 %r23129, 6
+  %r23145 = insertvalue %Range.CompilerLLVMLoweredBlock %r23144, ptr %r23112, 7
+  %r23146 = insertvalue %Range.CompilerLLVMLoweredBlock %r23145, i1 %r23041, 8
+  %r23147 = insertvalue %Range.CompilerLLVMLoweredBlock %r23146, ptr %r23042, 9
+  %r23148 = insertvalue %Range.CompilerLLVMLoweredBlock %r23147, ptr %r23043, 10
+  %r23149 = insertvalue %Range.CompilerLLVMLoweredBlock %r23148, ptr %r23044, 11
+  %r23150 = insertvalue %Range.CompilerLLVMLoweredBlock %r23149, i1 %r23045, 12
+  %r23151 = insertvalue %Range.CompilerLLVMLoweredBlock %r23150, ptr %r23046, 13
+  %r23152 = insertvalue %Range.CompilerLLVMLoweredBlock %r23151, ptr %r23117, 14
+  store %Range.CompilerLLVMLoweredBlock %r23152, ptr %storage5
+  %r23153 = insertvalue %Range.CompilerBodyLLVMEmissionResult poison, %Range.CompilerLLVMLoweredBlock %r23152, 0
+  %r23154 = insertvalue %Range.CompilerBodyLLVMEmissionResult %r23153, ptr %r23120, 1
+  %r23155 = insertvalue %Range.CompilerBodyLLVMEmissionResult %r23154, i32 %r23123, 2
+  %r23156 = insertvalue %Range.CompilerBodyLLVMEmissionResult %r23155, i1 %r23132, 3
+  store %Range.CompilerBodyLLVMEmissionResult %r23156, ptr %returnDestination
   ret void
 }
 define void @compilerCoreMainLLVMBasicBlock(ptr %returnDestination, %Range.CompilerLLVMLoweredBlock %block) {
 entry:
   %storage1 = alloca %Range.CompilerLLVMTerminator
-  %r23157 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([1 x i8], ptr @.str.23156, i32 0, i32 0))
-  %r23158 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 3
-  %r23159 = call ptr @stringOwnedCopy(ptr %r23158)
-  %r23161 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 13
-  %r23162 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 14
-  %r23165 = insertvalue %Range.CompilerLLVMTerminator poison, ptr getelementptr inbounds ([7 x i8], ptr @.str.23160, i32 0, i32 0), 0
-  %r23166 = insertvalue %Range.CompilerLLVMTerminator %r23165, ptr %r23161, 1
-  %r23167 = insertvalue %Range.CompilerLLVMTerminator %r23166, ptr %r23162, 2
-  %r23168 = insertvalue %Range.CompilerLLVMTerminator %r23167, ptr getelementptr inbounds ([1 x i8], ptr @.str.23163, i32 0, i32 0), 3
-  %r23169 = insertvalue %Range.CompilerLLVMTerminator %r23168, ptr getelementptr inbounds ([1 x i8], ptr @.str.23164, i32 0, i32 0), 4
-  store %Range.CompilerLLVMTerminator %r23169, ptr %storage1
-  %r23170 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 13
-  %r23172 = call i32 @stringEqual(ptr %r23170, ptr getelementptr inbounds ([3 x i8], ptr @.str.23171, i32 0, i32 0))
-  %r23173 = icmp ne i32 %r23172, 0
-  %r23174 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 14
-  %r23176 = call i32 @stringEqual(ptr %r23174, ptr getelementptr inbounds ([1 x i8], ptr @.str.23175, i32 0, i32 0))
-  %r23177 = icmp eq i32 %r23176, 0
-  %r23178 = and i1 %r23173, %r23177
-  br i1 %r23178, label %bb1, label %bb2
+  %r23158 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([1 x i8], ptr @.str.23157, i32 0, i32 0))
+  %r23159 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 3
+  %r23160 = call ptr @stringOwnedCopy(ptr %r23159)
+  %r23162 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 13
+  %r23163 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 14
+  %r23166 = insertvalue %Range.CompilerLLVMTerminator poison, ptr getelementptr inbounds ([7 x i8], ptr @.str.23161, i32 0, i32 0), 0
+  %r23167 = insertvalue %Range.CompilerLLVMTerminator %r23166, ptr %r23162, 1
+  %r23168 = insertvalue %Range.CompilerLLVMTerminator %r23167, ptr %r23163, 2
+  %r23169 = insertvalue %Range.CompilerLLVMTerminator %r23168, ptr getelementptr inbounds ([1 x i8], ptr @.str.23164, i32 0, i32 0), 3
+  %r23170 = insertvalue %Range.CompilerLLVMTerminator %r23169, ptr getelementptr inbounds ([1 x i8], ptr @.str.23165, i32 0, i32 0), 4
+  store %Range.CompilerLLVMTerminator %r23170, ptr %storage1
+  %r23171 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 13
+  %r23173 = call i32 @stringEqual(ptr %r23171, ptr getelementptr inbounds ([3 x i8], ptr @.str.23172, i32 0, i32 0))
+  %r23174 = icmp ne i32 %r23173, 0
+  %r23175 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 14
+  %r23177 = call i32 @stringEqual(ptr %r23175, ptr getelementptr inbounds ([1 x i8], ptr @.str.23176, i32 0, i32 0))
+  %r23178 = icmp eq i32 %r23177, 0
+  %r23179 = and i1 %r23174, %r23178
+  br i1 %r23179, label %bb1, label %bb2
 bb1:
-  %r23180 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 14
-  %r23182 = call ptr @stringAppendOwned(ptr %r23159, ptr getelementptr inbounds ([27 x i8], ptr @.str.23179, i32 0, i32 0))
-  %r23183 = call ptr @stringAppendOwned(ptr %r23182, ptr %r23180)
-  %r23184 = call ptr @stringAppendOwned(ptr %r23183, ptr getelementptr inbounds ([9 x i8], ptr @.str.23181, i32 0, i32 0))
-  %r23190 = insertvalue %Range.CompilerLLVMTerminator poison, ptr getelementptr inbounds ([7 x i8], ptr @.str.23185, i32 0, i32 0), 0
-  %r23191 = insertvalue %Range.CompilerLLVMTerminator %r23190, ptr getelementptr inbounds ([4 x i8], ptr @.str.23186, i32 0, i32 0), 1
-  %r23192 = insertvalue %Range.CompilerLLVMTerminator %r23191, ptr getelementptr inbounds ([14 x i8], ptr @.str.23187, i32 0, i32 0), 2
-  %r23193 = insertvalue %Range.CompilerLLVMTerminator %r23192, ptr getelementptr inbounds ([1 x i8], ptr @.str.23188, i32 0, i32 0), 3
-  %r23194 = insertvalue %Range.CompilerLLVMTerminator %r23193, ptr getelementptr inbounds ([1 x i8], ptr @.str.23189, i32 0, i32 0), 4
+  %r23181 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 14
+  %r23183 = call ptr @stringAppendOwned(ptr %r23160, ptr getelementptr inbounds ([27 x i8], ptr @.str.23180, i32 0, i32 0))
+  %r23184 = call ptr @stringAppendOwned(ptr %r23183, ptr %r23181)
+  %r23185 = call ptr @stringAppendOwned(ptr %r23184, ptr getelementptr inbounds ([9 x i8], ptr @.str.23182, i32 0, i32 0))
+  %r23191 = insertvalue %Range.CompilerLLVMTerminator poison, ptr getelementptr inbounds ([7 x i8], ptr @.str.23186, i32 0, i32 0), 0
+  %r23192 = insertvalue %Range.CompilerLLVMTerminator %r23191, ptr getelementptr inbounds ([4 x i8], ptr @.str.23187, i32 0, i32 0), 1
+  %r23193 = insertvalue %Range.CompilerLLVMTerminator %r23192, ptr getelementptr inbounds ([14 x i8], ptr @.str.23188, i32 0, i32 0), 2
+  %r23194 = insertvalue %Range.CompilerLLVMTerminator %r23193, ptr getelementptr inbounds ([1 x i8], ptr @.str.23189, i32 0, i32 0), 3
+  %r23195 = insertvalue %Range.CompilerLLVMTerminator %r23194, ptr getelementptr inbounds ([1 x i8], ptr @.str.23190, i32 0, i32 0), 4
   br label %bb2
 bb2:
-  %r23195 = phi ptr [%r23159, %entry], [%r23184, %bb1]
-  %r23196 = phi %Range.CompilerLLVMTerminator [%r23169, %entry], [%r23194, %bb1]
-  %r23197 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 8
-  br i1 %r23197, label %bb3, label %bb4
+  %r23196 = phi ptr [%r23160, %entry], [%r23185, %bb1]
+  %r23197 = phi %Range.CompilerLLVMTerminator [%r23170, %entry], [%r23195, %bb1]
+  %r23198 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 8
+  br i1 %r23198, label %bb3, label %bb4
 bb3:
-  %r23200 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 9
-  %r23201 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 10
-  %r23202 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 11
-  %r23203 = insertvalue %Range.CompilerLLVMTerminator poison, ptr getelementptr inbounds ([7 x i8], ptr @.str.23198, i32 0, i32 0), 0
-  %r23204 = insertvalue %Range.CompilerLLVMTerminator %r23203, ptr getelementptr inbounds ([3 x i8], ptr @.str.23199, i32 0, i32 0), 1
-  %r23205 = insertvalue %Range.CompilerLLVMTerminator %r23204, ptr %r23200, 2
-  %r23206 = insertvalue %Range.CompilerLLVMTerminator %r23205, ptr %r23201, 3
-  %r23207 = insertvalue %Range.CompilerLLVMTerminator %r23206, ptr %r23202, 4
+  %r23201 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 9
+  %r23202 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 10
+  %r23203 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 11
+  %r23204 = insertvalue %Range.CompilerLLVMTerminator poison, ptr getelementptr inbounds ([7 x i8], ptr @.str.23199, i32 0, i32 0), 0
+  %r23205 = insertvalue %Range.CompilerLLVMTerminator %r23204, ptr getelementptr inbounds ([3 x i8], ptr @.str.23200, i32 0, i32 0), 1
+  %r23206 = insertvalue %Range.CompilerLLVMTerminator %r23205, ptr %r23201, 2
+  %r23207 = insertvalue %Range.CompilerLLVMTerminator %r23206, ptr %r23202, 3
+  %r23208 = insertvalue %Range.CompilerLLVMTerminator %r23207, ptr %r23203, 4
   br label %bb7
 bb4:
-  %r23208 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 12
-  br i1 %r23208, label %bb5, label %bb6
+  %r23209 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 12
+  br i1 %r23209, label %bb5, label %bb6
 bb5:
-  %r23210 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 13
-  %r23211 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 14
-  %r23214 = insertvalue %Range.CompilerLLVMTerminator poison, ptr getelementptr inbounds ([7 x i8], ptr @.str.23209, i32 0, i32 0), 0
-  %r23215 = insertvalue %Range.CompilerLLVMTerminator %r23214, ptr %r23210, 1
-  %r23216 = insertvalue %Range.CompilerLLVMTerminator %r23215, ptr %r23211, 2
-  %r23217 = insertvalue %Range.CompilerLLVMTerminator %r23216, ptr getelementptr inbounds ([1 x i8], ptr @.str.23212, i32 0, i32 0), 3
-  %r23218 = insertvalue %Range.CompilerLLVMTerminator %r23217, ptr getelementptr inbounds ([1 x i8], ptr @.str.23213, i32 0, i32 0), 4
+  %r23211 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 13
+  %r23212 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 14
+  %r23215 = insertvalue %Range.CompilerLLVMTerminator poison, ptr getelementptr inbounds ([7 x i8], ptr @.str.23210, i32 0, i32 0), 0
+  %r23216 = insertvalue %Range.CompilerLLVMTerminator %r23215, ptr %r23211, 1
+  %r23217 = insertvalue %Range.CompilerLLVMTerminator %r23216, ptr %r23212, 2
+  %r23218 = insertvalue %Range.CompilerLLVMTerminator %r23217, ptr getelementptr inbounds ([1 x i8], ptr @.str.23213, i32 0, i32 0), 3
+  %r23219 = insertvalue %Range.CompilerLLVMTerminator %r23218, ptr getelementptr inbounds ([1 x i8], ptr @.str.23214, i32 0, i32 0), 4
   br label %bb6
 bb6:
-  %r23219 = phi %Range.CompilerLLVMTerminator [%r23196, %bb4], [%r23218, %bb5]
+  %r23220 = phi %Range.CompilerLLVMTerminator [%r23197, %bb4], [%r23219, %bb5]
   br label %bb7
 bb7:
-  %r23220 = phi %Range.CompilerLLVMTerminator [%r23207, %bb3], [%r23219, %bb6]
-  %r23221 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 12
-  %r23222 = xor i1 %r23221, true
-  %r23223 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 8
-  %r23224 = xor i1 %r23223, true
-  %r23225 = and i1 %r23222, %r23224
-  br i1 %r23225, label %bb8, label %bb9
+  %r23221 = phi %Range.CompilerLLVMTerminator [%r23208, %bb3], [%r23220, %bb6]
+  %r23222 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 12
+  %r23223 = xor i1 %r23222, true
+  %r23224 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 8
+  %r23225 = xor i1 %r23224, true
+  %r23226 = and i1 %r23223, %r23225
+  br i1 %r23226, label %bb8, label %bb9
 bb8:
-  %r23227 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 13
-  %r23228 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 14
-  %r23231 = insertvalue %Range.CompilerLLVMTerminator poison, ptr getelementptr inbounds ([7 x i8], ptr @.str.23226, i32 0, i32 0), 0
-  %r23232 = insertvalue %Range.CompilerLLVMTerminator %r23231, ptr %r23227, 1
-  %r23233 = insertvalue %Range.CompilerLLVMTerminator %r23232, ptr %r23228, 2
-  %r23234 = insertvalue %Range.CompilerLLVMTerminator %r23233, ptr getelementptr inbounds ([1 x i8], ptr @.str.23229, i32 0, i32 0), 3
-  %r23235 = insertvalue %Range.CompilerLLVMTerminator %r23234, ptr getelementptr inbounds ([1 x i8], ptr @.str.23230, i32 0, i32 0), 4
+  %r23228 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 13
+  %r23229 = extractvalue %Range.CompilerLLVMLoweredBlock %block, 14
+  %r23232 = insertvalue %Range.CompilerLLVMTerminator poison, ptr getelementptr inbounds ([7 x i8], ptr @.str.23227, i32 0, i32 0), 0
+  %r23233 = insertvalue %Range.CompilerLLVMTerminator %r23232, ptr %r23228, 1
+  %r23234 = insertvalue %Range.CompilerLLVMTerminator %r23233, ptr %r23229, 2
+  %r23235 = insertvalue %Range.CompilerLLVMTerminator %r23234, ptr getelementptr inbounds ([1 x i8], ptr @.str.23230, i32 0, i32 0), 3
+  %r23236 = insertvalue %Range.CompilerLLVMTerminator %r23235, ptr getelementptr inbounds ([1 x i8], ptr @.str.23231, i32 0, i32 0), 4
   br label %bb9
 bb9:
-  %r23236 = phi %Range.CompilerLLVMTerminator [%r23220, %bb7], [%r23235, %bb8]
-  %r23238 = insertvalue %Range.CompilerLLVMBasicBlock poison, ptr getelementptr inbounds ([6 x i8], ptr @.str.23237, i32 0, i32 0), 0
-  %r23239 = insertvalue %Range.CompilerLLVMBasicBlock %r23238, ptr %r23195, 1
-  %r23240 = insertvalue %Range.CompilerLLVMBasicBlock %r23239, %Range.CompilerLLVMTerminator %r23236, 2
-  store %Range.CompilerLLVMBasicBlock %r23240, ptr %returnDestination
+  %r23237 = phi %Range.CompilerLLVMTerminator [%r23221, %bb7], [%r23236, %bb8]
+  %r23239 = insertvalue %Range.CompilerLLVMBasicBlock poison, ptr getelementptr inbounds ([6 x i8], ptr @.str.23238, i32 0, i32 0), 0
+  %r23240 = insertvalue %Range.CompilerLLVMBasicBlock %r23239, ptr %r23196, 1
+  %r23241 = insertvalue %Range.CompilerLLVMBasicBlock %r23240, %Range.CompilerLLVMTerminator %r23237, 2
+  store %Range.CompilerLLVMBasicBlock %r23241, ptr %returnDestination
   ret void
 }
 define ptr @compilerCoreRenderLLVMFunction(%Range.CompilerLLVMFunction %llvmFunction) {
 entry:
-  %r23241 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 3
-  %r23243 = call i32 @stringEqual(ptr %r23241, ptr getelementptr inbounds ([1 x i8], ptr @.str.23242, i32 0, i32 0))
-  %r23244 = icmp eq i32 %r23243, 0
-  br i1 %r23244, label %bb1, label %bb2
+  %r23242 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 3
+  %r23244 = call i32 @stringEqual(ptr %r23242, ptr getelementptr inbounds ([1 x i8], ptr @.str.23243, i32 0, i32 0))
+  %r23245 = icmp eq i32 %r23244, 0
+  br i1 %r23245, label %bb1, label %bb2
 bb1:
-  %r23246 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 1
-  %r23248 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 0
-  %r23250 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 2
-  %r23252 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 3
-  %r23254 = call ptr @stringConcat(ptr getelementptr inbounds ([8 x i8], ptr @.str.23245, i32 0, i32 0), ptr %r23246)
-  %r23255 = call ptr @stringConcat(ptr %r23254, ptr getelementptr inbounds ([3 x i8], ptr @.str.23247, i32 0, i32 0))
-  %r23256 = call ptr @stringConcat(ptr %r23255, ptr %r23248)
-  %r23257 = call ptr @stringConcat(ptr %r23256, ptr getelementptr inbounds ([2 x i8], ptr @.str.23249, i32 0, i32 0))
-  %r23258 = call ptr @stringConcat(ptr %r23257, ptr %r23250)
-  %r23259 = call ptr @stringConcat(ptr %r23258, ptr getelementptr inbounds ([5 x i8], ptr @.str.23251, i32 0, i32 0))
-  %r23260 = call ptr @stringConcat(ptr %r23259, ptr %r23252)
-  %r23261 = call ptr @stringConcat(ptr %r23260, ptr getelementptr inbounds ([3 x i8], ptr @.str.23253, i32 0, i32 0))
-  ret ptr %r23261
+  %r23247 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 1
+  %r23249 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 0
+  %r23251 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 2
+  %r23253 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 3
+  %r23255 = call ptr @stringConcat(ptr getelementptr inbounds ([8 x i8], ptr @.str.23246, i32 0, i32 0), ptr %r23247)
+  %r23256 = call ptr @stringConcat(ptr %r23255, ptr getelementptr inbounds ([3 x i8], ptr @.str.23248, i32 0, i32 0))
+  %r23257 = call ptr @stringConcat(ptr %r23256, ptr %r23249)
+  %r23258 = call ptr @stringConcat(ptr %r23257, ptr getelementptr inbounds ([2 x i8], ptr @.str.23250, i32 0, i32 0))
+  %r23259 = call ptr @stringConcat(ptr %r23258, ptr %r23251)
+  %r23260 = call ptr @stringConcat(ptr %r23259, ptr getelementptr inbounds ([5 x i8], ptr @.str.23252, i32 0, i32 0))
+  %r23261 = call ptr @stringConcat(ptr %r23260, ptr %r23253)
+  %r23262 = call ptr @stringConcat(ptr %r23261, ptr getelementptr inbounds ([3 x i8], ptr @.str.23254, i32 0, i32 0))
+  ret ptr %r23262
 bb2:
-  %r23262 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 4
-  %r23263 = call ptr @compilerCoreRenderLLVMBasicBlock(%Range.CompilerLLVMBasicBlock %r23262)
-  %r23265 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 1
-  %r23267 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 0
-  %r23269 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 2
-  %r23272 = call ptr @stringConcat(ptr getelementptr inbounds ([8 x i8], ptr @.str.23264, i32 0, i32 0), ptr %r23265)
-  %r23273 = call ptr @stringConcat(ptr %r23272, ptr getelementptr inbounds ([3 x i8], ptr @.str.23266, i32 0, i32 0))
-  %r23274 = call ptr @stringConcat(ptr %r23273, ptr %r23267)
-  %r23275 = call ptr @stringConcat(ptr %r23274, ptr getelementptr inbounds ([2 x i8], ptr @.str.23268, i32 0, i32 0))
-  %r23276 = call ptr @stringConcat(ptr %r23275, ptr %r23269)
-  %r23277 = call ptr @stringConcat(ptr %r23276, ptr getelementptr inbounds ([5 x i8], ptr @.str.23270, i32 0, i32 0))
-  %r23278 = call ptr @stringConcat(ptr %r23277, ptr %r23263)
-  %r23279 = call ptr @stringConcat(ptr %r23278, ptr getelementptr inbounds ([3 x i8], ptr @.str.23271, i32 0, i32 0))
-  ret ptr %r23279
+  %r23263 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 4
+  %r23264 = call ptr @compilerCoreRenderLLVMBasicBlock(%Range.CompilerLLVMBasicBlock %r23263)
+  %r23266 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 1
+  %r23268 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 0
+  %r23270 = extractvalue %Range.CompilerLLVMFunction %llvmFunction, 2
+  %r23273 = call ptr @stringConcat(ptr getelementptr inbounds ([8 x i8], ptr @.str.23265, i32 0, i32 0), ptr %r23266)
+  %r23274 = call ptr @stringConcat(ptr %r23273, ptr getelementptr inbounds ([3 x i8], ptr @.str.23267, i32 0, i32 0))
+  %r23275 = call ptr @stringConcat(ptr %r23274, ptr %r23268)
+  %r23276 = call ptr @stringConcat(ptr %r23275, ptr getelementptr inbounds ([2 x i8], ptr @.str.23269, i32 0, i32 0))
+  %r23277 = call ptr @stringConcat(ptr %r23276, ptr %r23270)
+  %r23278 = call ptr @stringConcat(ptr %r23277, ptr getelementptr inbounds ([5 x i8], ptr @.str.23271, i32 0, i32 0))
+  %r23279 = call ptr @stringConcat(ptr %r23278, ptr %r23264)
+  %r23280 = call ptr @stringConcat(ptr %r23279, ptr getelementptr inbounds ([3 x i8], ptr @.str.23272, i32 0, i32 0))
+  ret ptr %r23280
 }
 define void @compilerCoreLLVMSelectedHelperAuditTyped(ptr %returnDestination, %Range.CompilerSyntaxTables %tables, %Range.CompilerFunctionSelection %selection) {
 entry:
   %storage1 = alloca %Range.CompilerLLVMHelperAudit
   %storage2 = alloca %Range.CompilerLLVMHelperAudit
-  %r23282 = insertvalue %Range.CompilerLLVMHelperAudit poison, i32 0, 0
-  %r23283 = insertvalue %Range.CompilerLLVMHelperAudit %r23282, i32 0, 1
-  %r23284 = insertvalue %Range.CompilerLLVMHelperAudit %r23283, i32 0, 2
-  %r23285 = insertvalue %Range.CompilerLLVMHelperAudit %r23284, i32 0, 3
-  %r23286 = insertvalue %Range.CompilerLLVMHelperAudit %r23285, ptr getelementptr inbounds ([1 x i8], ptr @.str.23280, i32 0, i32 0), 4
-  %r23287 = insertvalue %Range.CompilerLLVMHelperAudit %r23286, ptr getelementptr inbounds ([1 x i8], ptr @.str.23281, i32 0, i32 0), 5
-  store %Range.CompilerLLVMHelperAudit %r23287, ptr %storage1
-  %r23288 = extractvalue %Range.CompilerSyntaxTables %tables, 2
-  %r23289 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23288)
+  %r23283 = insertvalue %Range.CompilerLLVMHelperAudit poison, i32 0, 0
+  %r23284 = insertvalue %Range.CompilerLLVMHelperAudit %r23283, i32 0, 1
+  %r23285 = insertvalue %Range.CompilerLLVMHelperAudit %r23284, i32 0, 2
+  %r23286 = insertvalue %Range.CompilerLLVMHelperAudit %r23285, i32 0, 3
+  %r23287 = insertvalue %Range.CompilerLLVMHelperAudit %r23286, ptr getelementptr inbounds ([1 x i8], ptr @.str.23281, i32 0, i32 0), 4
+  %r23288 = insertvalue %Range.CompilerLLVMHelperAudit %r23287, ptr getelementptr inbounds ([1 x i8], ptr @.str.23282, i32 0, i32 0), 5
+  store %Range.CompilerLLVMHelperAudit %r23288, ptr %storage1
+  %r23289 = extractvalue %Range.CompilerSyntaxTables %tables, 2
+  %r23290 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23289)
   br label %bb1
 bb1:
-  %r23290 = phi %Range.CompilerLLVMHelperAudit [%r23287, %entry], [%r23304, %bb5]
-  %r23291 = phi i32 [0, %entry], [%r23305, %bb5]
-  %r23292 = icmp slt i32 %r23291, %r23289
-  br i1 %r23292, label %bb2, label %bb3
+  %r23291 = phi %Range.CompilerLLVMHelperAudit [%r23288, %entry], [%r23305, %bb5]
+  %r23292 = phi i32 [0, %entry], [%r23306, %bb5]
+  %r23293 = icmp slt i32 %r23292, %r23290
+  br i1 %r23293, label %bb2, label %bb3
 bb2:
-  %r23293 = extractvalue %Range.CompilerSyntaxTables %tables, 2
-  %r23294 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23293, i32 %r23291, i32 2)
-  %r23295 = call i32 @compilerSyntaxKindFunction()
-  %r23296 = icmp eq i32 %r23294, %r23295
-  br i1 %r23296, label %bb4, label %bb5
+  %r23294 = extractvalue %Range.CompilerSyntaxTables %tables, 2
+  %r23295 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23294, i32 %r23292, i32 2)
+  %r23296 = call i32 @compilerSyntaxKindFunction()
+  %r23297 = icmp eq i32 %r23295, %r23296
+  br i1 %r23297, label %bb4, label %bb5
 bb4:
-  %r23297 = extractvalue %Range.CompilerSyntaxTables %tables, 2
-  %r23298 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23297, i32 %r23291, i32 0)
-  %r23299 = extractvalue %Range.CompilerSyntaxTables %tables, 1
-  %r23300 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23299, i32 %r23298, i32 1)
-  %r23301 = call i1 @compilerFunctionSelectionContains(%Range.CompilerFunctionSelection %selection, i32 %r23300)
-  br i1 %r23301, label %bb6, label %bb7
+  %r23298 = extractvalue %Range.CompilerSyntaxTables %tables, 2
+  %r23299 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23298, i32 %r23292, i32 0)
+  %r23300 = extractvalue %Range.CompilerSyntaxTables %tables, 1
+  %r23301 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23300, i32 %r23299, i32 1)
+  %r23302 = call i1 @compilerFunctionSelectionContains(%Range.CompilerFunctionSelection %selection, i32 %r23301)
+  br i1 %r23302, label %bb6, label %bb7
 bb6:
-  call void @compilerCoreLLVMSelectedHelperAuditAppendingTypedFunction(ptr %storage2, %Range.CompilerSyntaxTables %tables, %Range.CompilerLLVMHelperAudit %r23290, i32 %r23291, i32 %r23300)
-  %r23302 = load %Range.CompilerLLVMHelperAudit, ptr %storage2
+  call void @compilerCoreLLVMSelectedHelperAuditAppendingTypedFunction(ptr %storage2, %Range.CompilerSyntaxTables %tables, %Range.CompilerLLVMHelperAudit %r23291, i32 %r23292, i32 %r23301)
+  %r23303 = load %Range.CompilerLLVMHelperAudit, ptr %storage2
   br label %bb7
 bb7:
-  %r23303 = phi %Range.CompilerLLVMHelperAudit [%r23290, %bb4], [%r23302, %bb6]
+  %r23304 = phi %Range.CompilerLLVMHelperAudit [%r23291, %bb4], [%r23303, %bb6]
   br label %bb5
 bb5:
-  %r23304 = phi %Range.CompilerLLVMHelperAudit [%r23290, %bb2], [%r23303, %bb7]
-  %r23305 = add i32 %r23291, 1
+  %r23305 = phi %Range.CompilerLLVMHelperAudit [%r23291, %bb2], [%r23304, %bb7]
+  %r23306 = add i32 %r23292, 1
   br label %bb1
 bb3:
-  store %Range.CompilerLLVMHelperAudit %r23290, ptr %returnDestination
+  store %Range.CompilerLLVMHelperAudit %r23291, ptr %returnDestination
   ret void
 }
 define ptr @compilerCoreLLVMHelperAuditFailure(%Range.CompilerLLVMHelperAudit %audit) {
 entry:
-  %r23307 = extractvalue %Range.CompilerLLVMHelperAudit %audit, 0
-  %r23309 = extractvalue %Range.CompilerLLVMHelperAudit %audit, 1
-  %r23311 = extractvalue %Range.CompilerLLVMHelperAudit %audit, 2
-  %r23313 = extractvalue %Range.CompilerLLVMHelperAudit %audit, 5
-  %r23314 = call ptr @stringFromInt(i32 %r23307)
-  %r23315 = call ptr @stringConcat(ptr getelementptr inbounds ([62 x i8], ptr @.str.23306, i32 0, i32 0), ptr %r23314)
-  %r23316 = call ptr @stringConcat(ptr %r23315, ptr getelementptr inbounds ([17 x i8], ptr @.str.23308, i32 0, i32 0))
-  %r23317 = call ptr @stringFromInt(i32 %r23309)
-  %r23318 = call ptr @stringConcat(ptr %r23316, ptr %r23317)
-  %r23319 = call ptr @stringConcat(ptr %r23318, ptr getelementptr inbounds ([16 x i8], ptr @.str.23310, i32 0, i32 0))
-  %r23320 = call ptr @stringFromInt(i32 %r23311)
-  %r23321 = call ptr @stringConcat(ptr %r23319, ptr %r23320)
-  %r23322 = call ptr @stringConcat(ptr %r23321, ptr getelementptr inbounds ([2 x i8], ptr @.str.23312, i32 0, i32 0))
-  %r23323 = call ptr @stringConcat(ptr %r23322, ptr %r23313)
-  ret ptr %r23323
+  %r23308 = extractvalue %Range.CompilerLLVMHelperAudit %audit, 0
+  %r23310 = extractvalue %Range.CompilerLLVMHelperAudit %audit, 1
+  %r23312 = extractvalue %Range.CompilerLLVMHelperAudit %audit, 2
+  %r23314 = extractvalue %Range.CompilerLLVMHelperAudit %audit, 5
+  %r23315 = call ptr @stringFromInt(i32 %r23308)
+  %r23316 = call ptr @stringConcat(ptr getelementptr inbounds ([62 x i8], ptr @.str.23307, i32 0, i32 0), ptr %r23315)
+  %r23317 = call ptr @stringConcat(ptr %r23316, ptr getelementptr inbounds ([17 x i8], ptr @.str.23309, i32 0, i32 0))
+  %r23318 = call ptr @stringFromInt(i32 %r23310)
+  %r23319 = call ptr @stringConcat(ptr %r23317, ptr %r23318)
+  %r23320 = call ptr @stringConcat(ptr %r23319, ptr getelementptr inbounds ([16 x i8], ptr @.str.23311, i32 0, i32 0))
+  %r23321 = call ptr @stringFromInt(i32 %r23312)
+  %r23322 = call ptr @stringConcat(ptr %r23320, ptr %r23321)
+  %r23323 = call ptr @stringConcat(ptr %r23322, ptr getelementptr inbounds ([2 x i8], ptr @.str.23313, i32 0, i32 0))
+  %r23324 = call ptr @stringConcat(ptr %r23323, ptr %r23314)
+  ret ptr %r23324
 }
 define void @compilerReachableLLVMStateHelpers(ptr %returnDestination, %Range.CompilerReachableLLVMState %reachability) {
 entry:
   %storage1 = alloca %Range.CompilerBodyTelemetry
-  %r23324 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r23325 = call i32 @compilerReachableLLMSupported()
-  %r23326 = call i32 @rawBufferLoadInt(ptr %r23324, i32 %r23325)
-  %r23327 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r23328 = call i32 @compilerReachableLLMTypedAttempts()
-  %r23329 = call i32 @rawBufferLoadInt(ptr %r23327, i32 %r23328)
-  %r23330 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r23331 = call i32 @compilerReachableLLMTypedSuccesses()
-  %r23332 = call i32 @rawBufferLoadInt(ptr %r23330, i32 %r23331)
-  %r23333 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r23334 = call i32 @compilerReachableLLMLegacyParses()
-  %r23335 = call i32 @rawBufferLoadInt(ptr %r23333, i32 %r23334)
-  %r23336 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r23337 = call i32 @compilerReachableLLMArenaCreates()
-  %r23338 = call i32 @rawBufferLoadInt(ptr %r23336, i32 %r23337)
-  %r23339 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r23340 = call i32 @compilerReachableLLMArenaDestroys()
-  %r23341 = call i32 @rawBufferLoadInt(ptr %r23339, i32 %r23340)
-  %r23342 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r23343 = call i32 @compilerReachableLLMRecordBytes()
-  %r23344 = call i32 @rawBufferLoadInt(ptr %r23342, i32 %r23343)
-  %r23345 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r23346 = call i32 @compilerReachableLLMCommittedFailures()
-  %r23347 = call i32 @rawBufferLoadInt(ptr %r23345, i32 %r23346)
-  %r23348 = insertvalue %Range.CompilerBodyTelemetry poison, i32 %r23326, 0
-  %r23349 = insertvalue %Range.CompilerBodyTelemetry %r23348, i32 %r23329, 1
-  %r23350 = insertvalue %Range.CompilerBodyTelemetry %r23349, i32 %r23332, 2
-  %r23351 = insertvalue %Range.CompilerBodyTelemetry %r23350, i32 %r23335, 3
-  %r23352 = insertvalue %Range.CompilerBodyTelemetry %r23351, i32 %r23338, 4
-  %r23353 = insertvalue %Range.CompilerBodyTelemetry %r23352, i32 %r23341, 5
-  %r23354 = insertvalue %Range.CompilerBodyTelemetry %r23353, i32 %r23344, 6
-  %r23355 = insertvalue %Range.CompilerBodyTelemetry %r23354, i32 %r23347, 7
-  store %Range.CompilerBodyTelemetry %r23355, ptr %storage1
-  %r23356 = extractvalue %Range.CompilerReachableLLVMState %reachability, 23
-  %r23357 = call ptr @rawBufferMaterializeText(ptr %r23356)
-  %r23359 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r23360 = call i32 @compilerReachableLLVMNextTemporary()
-  %r23361 = call i32 @rawBufferLoadInt(ptr %r23359, i32 %r23360)
-  %r23362 = insertvalue %Range.CompilerLLVMHelperFunctions poison, ptr %r23357, 0
-  %r23363 = insertvalue %Range.CompilerLLVMHelperFunctions %r23362, ptr getelementptr inbounds ([1 x i8], ptr @.str.23358, i32 0, i32 0), 1
-  %r23364 = insertvalue %Range.CompilerLLVMHelperFunctions %r23363, i32 %r23361, 2
-  %r23365 = extractvalue %Range.CompilerReachableLLVMState %reachability, 24
-  %r23366 = call ptr @rawBufferMaterializeText(ptr %r23365)
-  %r23367 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
-  %r23368 = call i32 @compilerReachableLLVMRuntimeRequirements()
-  %r23369 = call i32 @rawBufferLoadInt(ptr %r23367, i32 %r23368)
-  %r23370 = insertvalue %Range.CompilerTypedLLVMHelpers poison, %Range.CompilerLLVMHelperFunctions %r23364, 0
-  %r23371 = insertvalue %Range.CompilerTypedLLVMHelpers %r23370, ptr %r23366, 1
-  %r23372 = insertvalue %Range.CompilerTypedLLVMHelpers %r23371, i32 %r23369, 2
-  %r23373 = insertvalue %Range.CompilerTypedLLVMHelpers %r23372, %Range.CompilerBodyTelemetry %r23355, 3
-  store %Range.CompilerTypedLLVMHelpers %r23373, ptr %returnDestination
+  %r23325 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r23326 = call i32 @compilerReachableLLMSupported()
+  %r23327 = call i32 @rawBufferLoadInt(ptr %r23325, i32 %r23326)
+  %r23328 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r23329 = call i32 @compilerReachableLLMTypedAttempts()
+  %r23330 = call i32 @rawBufferLoadInt(ptr %r23328, i32 %r23329)
+  %r23331 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r23332 = call i32 @compilerReachableLLMTypedSuccesses()
+  %r23333 = call i32 @rawBufferLoadInt(ptr %r23331, i32 %r23332)
+  %r23334 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r23335 = call i32 @compilerReachableLLMLegacyParses()
+  %r23336 = call i32 @rawBufferLoadInt(ptr %r23334, i32 %r23335)
+  %r23337 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r23338 = call i32 @compilerReachableLLMArenaCreates()
+  %r23339 = call i32 @rawBufferLoadInt(ptr %r23337, i32 %r23338)
+  %r23340 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r23341 = call i32 @compilerReachableLLMArenaDestroys()
+  %r23342 = call i32 @rawBufferLoadInt(ptr %r23340, i32 %r23341)
+  %r23343 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r23344 = call i32 @compilerReachableLLMRecordBytes()
+  %r23345 = call i32 @rawBufferLoadInt(ptr %r23343, i32 %r23344)
+  %r23346 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r23347 = call i32 @compilerReachableLLMCommittedFailures()
+  %r23348 = call i32 @rawBufferLoadInt(ptr %r23346, i32 %r23347)
+  %r23349 = insertvalue %Range.CompilerBodyTelemetry poison, i32 %r23327, 0
+  %r23350 = insertvalue %Range.CompilerBodyTelemetry %r23349, i32 %r23330, 1
+  %r23351 = insertvalue %Range.CompilerBodyTelemetry %r23350, i32 %r23333, 2
+  %r23352 = insertvalue %Range.CompilerBodyTelemetry %r23351, i32 %r23336, 3
+  %r23353 = insertvalue %Range.CompilerBodyTelemetry %r23352, i32 %r23339, 4
+  %r23354 = insertvalue %Range.CompilerBodyTelemetry %r23353, i32 %r23342, 5
+  %r23355 = insertvalue %Range.CompilerBodyTelemetry %r23354, i32 %r23345, 6
+  %r23356 = insertvalue %Range.CompilerBodyTelemetry %r23355, i32 %r23348, 7
+  store %Range.CompilerBodyTelemetry %r23356, ptr %storage1
+  %r23357 = extractvalue %Range.CompilerReachableLLVMState %reachability, 23
+  %r23358 = call ptr @rawBufferMaterializeText(ptr %r23357)
+  %r23360 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r23361 = call i32 @compilerReachableLLVMNextTemporary()
+  %r23362 = call i32 @rawBufferLoadInt(ptr %r23360, i32 %r23361)
+  %r23363 = insertvalue %Range.CompilerLLVMHelperFunctions poison, ptr %r23358, 0
+  %r23364 = insertvalue %Range.CompilerLLVMHelperFunctions %r23363, ptr getelementptr inbounds ([1 x i8], ptr @.str.23359, i32 0, i32 0), 1
+  %r23365 = insertvalue %Range.CompilerLLVMHelperFunctions %r23364, i32 %r23362, 2
+  %r23366 = extractvalue %Range.CompilerReachableLLVMState %reachability, 24
+  %r23367 = call ptr @rawBufferMaterializeText(ptr %r23366)
+  %r23368 = extractvalue %Range.CompilerReachableLLVMState %reachability, 25
+  %r23369 = call i32 @compilerReachableLLVMRuntimeRequirements()
+  %r23370 = call i32 @rawBufferLoadInt(ptr %r23368, i32 %r23369)
+  %r23371 = insertvalue %Range.CompilerTypedLLVMHelpers poison, %Range.CompilerLLVMHelperFunctions %r23365, 0
+  %r23372 = insertvalue %Range.CompilerTypedLLVMHelpers %r23371, ptr %r23367, 1
+  %r23373 = insertvalue %Range.CompilerTypedLLVMHelpers %r23372, i32 %r23370, 2
+  %r23374 = insertvalue %Range.CompilerTypedLLVMHelpers %r23373, %Range.CompilerBodyTelemetry %r23356, 3
+  store %Range.CompilerTypedLLVMHelpers %r23374, ptr %returnDestination
   ret void
 }
 define void @compilerTypedLLVMHelpersValue(ptr %returnDestination, %Range.CompilerTypedLLVMHelpers %value) {
 entry:
-  %r23374 = extractvalue %Range.CompilerTypedLLVMHelpers %value, 0
-  store %Range.CompilerLLVMHelperFunctions %r23374, ptr %returnDestination
+  %r23375 = extractvalue %Range.CompilerTypedLLVMHelpers %value, 0
+  store %Range.CompilerLLVMHelperFunctions %r23375, ptr %returnDestination
   ret void
 }
 define i32 @compilerReachableLLMCommittedFailures() {
@@ -39147,584 +39152,584 @@ entry:
 }
 define ptr @compilerCoreRenderLLVMNominalLayouts(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i1 %includeBuiltinArray) {
 entry:
-  %r23375 = call ptr @rawBufferCreate(i32 4096, i32 1)
+  %r23376 = call ptr @rawBufferCreate(i32 4096, i32 1)
   br i1 %includeBuiltinArray, label %bb1, label %bb2
 bb1:
-  %r23377 = call i32 @rawBufferAppendText(ptr %r23375, ptr getelementptr inbounds ([34 x i8], ptr @.str.23376, i32 0, i32 0))
+  %r23378 = call i32 @rawBufferAppendText(ptr %r23376, ptr getelementptr inbounds ([34 x i8], ptr @.str.23377, i32 0, i32 0))
   br label %bb2
 bb2:
-  %r23378 = phi i32 [0, %entry], [1, %bb1]
+  %r23379 = phi i32 [0, %entry], [1, %bb1]
   br label %bb3
 bb3:
-  %r23379 = phi i32 [%r23378, %bb2], [%r23418, %bb14]
-  %r23380 = phi i32 [0, %bb2], [%r23419, %bb14]
-  %r23381 = extractvalue %Range.CompilerSyntaxTables %tables, 2
-  %r23382 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23381)
-  %r23383 = icmp slt i32 %r23380, %r23382
-  br i1 %r23383, label %bb4, label %bb5
+  %r23380 = phi i32 [%r23379, %bb2], [%r23419, %bb14]
+  %r23381 = phi i32 [0, %bb2], [%r23420, %bb14]
+  %r23382 = extractvalue %Range.CompilerSyntaxTables %tables, 2
+  %r23383 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23382)
+  %r23384 = icmp slt i32 %r23381, %r23383
+  br i1 %r23384, label %bb4, label %bb5
 bb4:
-  %r23384 = extractvalue %Range.CompilerSyntaxTables %tables, 2
-  %r23385 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23384, i32 %r23380, i32 0)
-  %r23386 = extractvalue %Range.CompilerSyntaxTables %tables, 2
-  %r23387 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23386, i32 %r23380, i32 2)
-  %r23388 = call i32 @compilerSyntaxKindConstruct()
-  %r23389 = icmp eq i32 %r23387, %r23388
-  %r23390 = call i1 @compilerNominalDeclarationIsArray(%Range.CompilerSyntaxTables %tables, i32 %r23380)
-  %r23391 = xor i1 %r23390, true
-  %r23392 = and i1 %r23389, %r23391
-  %r23393 = call i1 @compilerDeclarationIndexSyntaxIsOmitted(%Range.CompilerDeclarationIndex %index, i32 %r23385)
-  %r23394 = xor i1 %r23393, true
-  %r23395 = and i1 %r23392, %r23394
-  br i1 %r23395, label %bb6, label %bb7
+  %r23385 = extractvalue %Range.CompilerSyntaxTables %tables, 2
+  %r23386 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23385, i32 %r23381, i32 0)
+  %r23387 = extractvalue %Range.CompilerSyntaxTables %tables, 2
+  %r23388 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23387, i32 %r23381, i32 2)
+  %r23389 = call i32 @compilerSyntaxKindConstruct()
+  %r23390 = icmp eq i32 %r23388, %r23389
+  %r23391 = call i1 @compilerNominalDeclarationIsArray(%Range.CompilerSyntaxTables %tables, i32 %r23381)
+  %r23392 = xor i1 %r23391, true
+  %r23393 = and i1 %r23390, %r23392
+  %r23394 = call i1 @compilerDeclarationIndexSyntaxIsOmitted(%Range.CompilerDeclarationIndex %index, i32 %r23386)
+  %r23395 = xor i1 %r23394, true
+  %r23396 = and i1 %r23393, %r23395
+  br i1 %r23396, label %bb6, label %bb7
 bb6:
-  %r23396 = call ptr @compilerNominalLLVMLayoutText(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %r23380)
-  %r23398 = call i32 @stringEqual(ptr %r23396, ptr getelementptr inbounds ([1 x i8], ptr @.str.23397, i32 0, i32 0))
-  %r23399 = icmp eq i32 %r23398, 0
-  br i1 %r23399, label %bb8, label %bb9
+  %r23397 = call ptr @compilerNominalLLVMLayoutText(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %r23381)
+  %r23399 = call i32 @stringEqual(ptr %r23397, ptr getelementptr inbounds ([1 x i8], ptr @.str.23398, i32 0, i32 0))
+  %r23400 = icmp eq i32 %r23399, 0
+  br i1 %r23400, label %bb8, label %bb9
 bb8:
-  %r23400 = call i32 @rawBufferAppendText(ptr %r23375, ptr %r23396)
-  %r23401 = add i32 %r23379, 1
+  %r23401 = call i32 @rawBufferAppendText(ptr %r23376, ptr %r23397)
+  %r23402 = add i32 %r23380, 1
   br label %bb9
 bb9:
-  %r23402 = phi i32 [%r23379, %bb6], [%r23401, %bb8]
+  %r23403 = phi i32 [%r23380, %bb6], [%r23402, %bb8]
   br label %bb14
 bb7:
-  %r23403 = extractvalue %Range.CompilerSyntaxTables %tables, 2
-  %r23404 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23403, i32 %r23380, i32 2)
-  %r23405 = call i32 @compilerSyntaxKindEnum()
-  %r23406 = icmp eq i32 %r23404, %r23405
-  %r23407 = call i1 @compilerDeclarationIndexSyntaxIsOmitted(%Range.CompilerDeclarationIndex %index, i32 %r23385)
-  %r23408 = xor i1 %r23407, true
-  %r23409 = and i1 %r23406, %r23408
-  br i1 %r23409, label %bb10, label %bb11
+  %r23404 = extractvalue %Range.CompilerSyntaxTables %tables, 2
+  %r23405 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23404, i32 %r23381, i32 2)
+  %r23406 = call i32 @compilerSyntaxKindEnum()
+  %r23407 = icmp eq i32 %r23405, %r23406
+  %r23408 = call i1 @compilerDeclarationIndexSyntaxIsOmitted(%Range.CompilerDeclarationIndex %index, i32 %r23386)
+  %r23409 = xor i1 %r23408, true
+  %r23410 = and i1 %r23407, %r23409
+  br i1 %r23410, label %bb10, label %bb11
 bb10:
-  %r23410 = call ptr @compilerEnumLLVMLayoutText(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %r23380)
-  %r23412 = call i32 @stringEqual(ptr %r23410, ptr getelementptr inbounds ([1 x i8], ptr @.str.23411, i32 0, i32 0))
-  %r23413 = icmp eq i32 %r23412, 0
-  br i1 %r23413, label %bb12, label %bb13
+  %r23411 = call ptr @compilerEnumLLVMLayoutText(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %r23381)
+  %r23413 = call i32 @stringEqual(ptr %r23411, ptr getelementptr inbounds ([1 x i8], ptr @.str.23412, i32 0, i32 0))
+  %r23414 = icmp eq i32 %r23413, 0
+  br i1 %r23414, label %bb12, label %bb13
 bb12:
-  %r23414 = call i32 @rawBufferAppendText(ptr %r23375, ptr %r23410)
-  %r23415 = add i32 %r23379, 1
+  %r23415 = call i32 @rawBufferAppendText(ptr %r23376, ptr %r23411)
+  %r23416 = add i32 %r23380, 1
   br label %bb13
 bb13:
-  %r23416 = phi i32 [%r23379, %bb10], [%r23415, %bb12]
+  %r23417 = phi i32 [%r23380, %bb10], [%r23416, %bb12]
   br label %bb11
 bb11:
-  %r23417 = phi i32 [%r23379, %bb7], [%r23416, %bb13]
+  %r23418 = phi i32 [%r23380, %bb7], [%r23417, %bb13]
   br label %bb14
 bb14:
-  %r23418 = phi i32 [%r23402, %bb9], [%r23417, %bb11]
-  %r23419 = add i32 %r23380, 1
+  %r23419 = phi i32 [%r23403, %bb9], [%r23418, %bb11]
+  %r23420 = add i32 %r23381, 1
   br label %bb3
 bb5:
-  %r23420 = call ptr @rawBufferCreate(i32 8, i32 4)
+  %r23421 = call ptr @rawBufferCreate(i32 8, i32 4)
   br label %bb15
 bb15:
-  %r23421 = phi i32 [%r23379, %bb5], [%r23477, %bb19]
-  %r23422 = phi i32 [0, %bb5], [%r23478, %bb19]
-  %r23423 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r23424 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23423)
-  %r23425 = icmp slt i32 %r23422, %r23424
-  br i1 %r23425, label %bb16, label %bb17
+  %r23422 = phi i32 [%r23380, %bb5], [%r23478, %bb19]
+  %r23423 = phi i32 [0, %bb5], [%r23479, %bb19]
+  %r23424 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r23425 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %r23424)
+  %r23426 = icmp slt i32 %r23423, %r23425
+  br i1 %r23426, label %bb16, label %bb17
 bb16:
-  %r23426 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r23427 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23426, i32 %r23422, i32 0)
-  %r23428 = call i1 @compilerDeclarationIndexSyntaxIsOmitted(%Range.CompilerDeclarationIndex %index, i32 %r23427)
-  %r23429 = xor i1 %r23428, true
-  br i1 %r23429, label %bb18, label %bb19
+  %r23427 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r23428 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23427, i32 %r23423, i32 0)
+  %r23429 = call i1 @compilerDeclarationIndexSyntaxIsOmitted(%Range.CompilerDeclarationIndex %index, i32 %r23428)
+  %r23430 = xor i1 %r23429, true
+  br i1 %r23430, label %bb18, label %bb19
 bb18:
-  %r23430 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r23431 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23430, i32 %r23422, i32 1)
-  %r23432 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r23433 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23432, i32 %r23422, i32 6)
-  %r23434 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r23435 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23434, i32 %r23422, i32 7)
-  %r23436 = call ptr @compilerTypedSyntaxLocalText(%Range.CompilerSyntaxTables %tables, i32 %r23431, i32 %r23433, i32 %r23435)
-  %r23437 = call ptr @compilerOptionalPayloadTypeName(ptr %r23436)
-  %r23439 = call i32 @stringEqual(ptr %r23437, ptr getelementptr inbounds ([1 x i8], ptr @.str.23438, i32 0, i32 0))
-  %r23440 = icmp eq i32 %r23439, 0
-  br i1 %r23440, label %bb20, label %bb21
+  %r23431 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r23432 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23431, i32 %r23423, i32 1)
+  %r23433 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r23434 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23433, i32 %r23423, i32 6)
+  %r23435 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r23436 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23435, i32 %r23423, i32 7)
+  %r23437 = call ptr @compilerTypedSyntaxLocalText(%Range.CompilerSyntaxTables %tables, i32 %r23432, i32 %r23434, i32 %r23436)
+  %r23438 = call ptr @compilerOptionalPayloadTypeName(ptr %r23437)
+  %r23440 = call i32 @stringEqual(ptr %r23438, ptr getelementptr inbounds ([1 x i8], ptr @.str.23439, i32 0, i32 0))
+  %r23441 = icmp eq i32 %r23440, 0
+  br i1 %r23441, label %bb20, label %bb21
 bb20:
-  %r23441 = call i32 @compilerSyntaxKindConstruct()
-  %r23442 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r23437, i32 %r23441)
-  %r23443 = icmp sge i32 %r23442, 0
-  %r23444 = call ptr @compilerNominalLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r23442)
-  %r23446 = call i32 @stringEqual(ptr %r23444, ptr getelementptr inbounds ([1 x i8], ptr @.str.23445, i32 0, i32 0))
-  %r23447 = icmp eq i32 %r23446, 0
-  %r23448 = and i1 %r23443, %r23447
-  br i1 %r23448, label %bb22, label %bb23
+  %r23442 = call i32 @compilerSyntaxKindConstruct()
+  %r23443 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r23438, i32 %r23442)
+  %r23444 = icmp sge i32 %r23443, 0
+  %r23445 = call ptr @compilerNominalLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r23443)
+  %r23447 = call i32 @stringEqual(ptr %r23445, ptr getelementptr inbounds ([1 x i8], ptr @.str.23446, i32 0, i32 0))
+  %r23448 = icmp eq i32 %r23447, 0
+  %r23449 = and i1 %r23444, %r23448
+  br i1 %r23449, label %bb22, label %bb23
 bb22:
-  %r23449 = extractvalue %Range.CompilerSyntaxTables %tables, 2
-  %r23450 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23449, i32 %r23442, i32 0)
+  %r23450 = extractvalue %Range.CompilerSyntaxTables %tables, 2
+  %r23451 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23450, i32 %r23443, i32 0)
   br label %bb24
 bb24:
-  %r23451 = phi i1 [false, %bb22], [%r23457, %bb28]
-  %r23452 = phi i32 [0, %bb22], [%r23458, %bb28]
-  %r23453 = call i32 @rawBufferCount(ptr %r23420)
-  %r23454 = icmp slt i32 %r23452, %r23453
-  br i1 %r23454, label %bb25, label %bb26
+  %r23452 = phi i1 [false, %bb22], [%r23458, %bb28]
+  %r23453 = phi i32 [0, %bb22], [%r23459, %bb28]
+  %r23454 = call i32 @rawBufferCount(ptr %r23421)
+  %r23455 = icmp slt i32 %r23453, %r23454
+  br i1 %r23455, label %bb25, label %bb26
 bb25:
-  %r23455 = call i32 @rawBufferLoadInt(ptr %r23420, i32 %r23452)
-  %r23456 = icmp eq i32 %r23455, %r23450
-  br i1 %r23456, label %bb27, label %bb28
+  %r23456 = call i32 @rawBufferLoadInt(ptr %r23421, i32 %r23453)
+  %r23457 = icmp eq i32 %r23456, %r23451
+  br i1 %r23457, label %bb27, label %bb28
 bb27:
   br label %bb28
 bb28:
-  %r23457 = phi i1 [%r23451, %bb25], [true, %bb27]
-  %r23458 = add i32 %r23452, 1
+  %r23458 = phi i1 [%r23452, %bb25], [true, %bb27]
+  %r23459 = add i32 %r23453, 1
   br label %bb24
 bb26:
-  %r23459 = xor i1 %r23451, true
-  br i1 %r23459, label %bb29, label %bb30
+  %r23460 = xor i1 %r23452, true
+  br i1 %r23460, label %bb29, label %bb30
 bb29:
-  %r23460 = call ptr @compilerSpecializedOptionalLLVMTypeName(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r23436)
-  %r23461 = call ptr @compilerNominalLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r23442)
-  %r23463 = call i32 @stringEqual(ptr %r23460, ptr getelementptr inbounds ([1 x i8], ptr @.str.23462, i32 0, i32 0))
-  %r23464 = icmp eq i32 %r23463, 0
-  br i1 %r23464, label %bb31, label %bb32
+  %r23461 = call ptr @compilerSpecializedOptionalLLVMTypeName(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r23437)
+  %r23462 = call ptr @compilerNominalLLVMTypeName(%Range.CompilerSyntaxTables %tables, i32 %r23443)
+  %r23464 = call i32 @stringEqual(ptr %r23461, ptr getelementptr inbounds ([1 x i8], ptr @.str.23463, i32 0, i32 0))
+  %r23465 = icmp eq i32 %r23464, 0
+  br i1 %r23465, label %bb31, label %bb32
 bb31:
-  %r23467 = call ptr @stringConcat(ptr %r23460, ptr getelementptr inbounds ([15 x i8], ptr @.str.23465, i32 0, i32 0))
-  %r23468 = call ptr @stringConcat(ptr %r23467, ptr %r23461)
-  %r23469 = call ptr @stringConcat(ptr %r23468, ptr getelementptr inbounds ([4 x i8], ptr @.str.23466, i32 0, i32 0))
-  %r23470 = call i32 @rawBufferAppendText(ptr %r23375, ptr %r23469)
-  %r23471 = call i32 @rawBufferAppendInt(ptr %r23420, i32 %r23450)
-  %r23472 = add i32 %r23421, 1
+  %r23468 = call ptr @stringConcat(ptr %r23461, ptr getelementptr inbounds ([15 x i8], ptr @.str.23466, i32 0, i32 0))
+  %r23469 = call ptr @stringConcat(ptr %r23468, ptr %r23462)
+  %r23470 = call ptr @stringConcat(ptr %r23469, ptr getelementptr inbounds ([4 x i8], ptr @.str.23467, i32 0, i32 0))
+  %r23471 = call i32 @rawBufferAppendText(ptr %r23376, ptr %r23470)
+  %r23472 = call i32 @rawBufferAppendInt(ptr %r23421, i32 %r23451)
+  %r23473 = add i32 %r23422, 1
   br label %bb32
 bb32:
-  %r23473 = phi i32 [%r23421, %bb29], [%r23472, %bb31]
+  %r23474 = phi i32 [%r23422, %bb29], [%r23473, %bb31]
   br label %bb30
 bb30:
-  %r23474 = phi i32 [%r23421, %bb26], [%r23473, %bb32]
+  %r23475 = phi i32 [%r23422, %bb26], [%r23474, %bb32]
   br label %bb23
 bb23:
-  %r23475 = phi i32 [%r23421, %bb20], [%r23474, %bb30]
+  %r23476 = phi i32 [%r23422, %bb20], [%r23475, %bb30]
   br label %bb21
 bb21:
-  %r23476 = phi i32 [%r23421, %bb18], [%r23475, %bb23]
+  %r23477 = phi i32 [%r23422, %bb18], [%r23476, %bb23]
   br label %bb19
 bb19:
-  %r23477 = phi i32 [%r23421, %bb16], [%r23476, %bb21]
-  %r23478 = add i32 %r23422, 1
+  %r23478 = phi i32 [%r23422, %bb16], [%r23477, %bb21]
+  %r23479 = add i32 %r23423, 1
   br label %bb15
 bb17:
-  %r23479 = call i32 @rawBufferDestroy(ptr %r23420)
-  %r23480 = icmp sgt i32 %r23421, 0
-  br i1 %r23480, label %bb33, label %bb34
+  %r23480 = call i32 @rawBufferDestroy(ptr %r23421)
+  %r23481 = icmp sgt i32 %r23422, 0
+  br i1 %r23481, label %bb33, label %bb34
 bb33:
-  %r23482 = call i32 @rawBufferAppendText(ptr %r23375, ptr getelementptr inbounds ([2 x i8], ptr @.str.23481, i32 0, i32 0))
+  %r23483 = call i32 @rawBufferAppendText(ptr %r23376, ptr getelementptr inbounds ([2 x i8], ptr @.str.23482, i32 0, i32 0))
   br label %bb34
 bb34:
-  %r23483 = call ptr @rawBufferMaterializeText(ptr %r23375)
-  %r23484 = call i32 @rawBufferDestroy(ptr %r23375)
-  ret ptr %r23483
+  %r23484 = call ptr @rawBufferMaterializeText(ptr %r23376)
+  %r23485 = call i32 @rawBufferDestroy(ptr %r23376)
+  ret ptr %r23484
 }
 define i1 @compilerCoreShouldRenderBuiltinArrayLayout(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %renderedFunctions) {
 entry:
-  %r23486 = call i1 @compilerCoreRecordContains(ptr %renderedFunctions, ptr getelementptr inbounds ([13 x i8], ptr @.str.23485, i32 0, i32 0))
-  %r23487 = xor i1 %r23486, true
-  br i1 %r23487, label %bb1, label %bb2
+  %r23487 = call i1 @compilerCoreRecordContains(ptr %renderedFunctions, ptr getelementptr inbounds ([13 x i8], ptr @.str.23486, i32 0, i32 0))
+  %r23488 = xor i1 %r23487, true
+  br i1 %r23488, label %bb1, label %bb2
 bb1:
   ret i1 false
 bb2:
-  %r23489 = call i32 @compilerSyntaxKindConstruct()
-  %r23490 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr getelementptr inbounds ([6 x i8], ptr @.str.23488, i32 0, i32 0), i32 %r23489)
-  %r23491 = icmp slt i32 %r23490, 0
-  %r23492 = call i1 @compilerNominalDeclarationIsArray(%Range.CompilerSyntaxTables %tables, i32 %r23490)
-  %r23493 = or i1 %r23491, %r23492
-  ret i1 %r23493
+  %r23490 = call i32 @compilerSyntaxKindConstruct()
+  %r23491 = call i32 @compilerDeclarationIndexLookup(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr getelementptr inbounds ([6 x i8], ptr @.str.23489, i32 0, i32 0), i32 %r23490)
+  %r23492 = icmp slt i32 %r23491, 0
+  %r23493 = call i1 @compilerNominalDeclarationIsArray(%Range.CompilerSyntaxTables %tables, i32 %r23491)
+  %r23494 = or i1 %r23492, %r23493
+  ret i1 %r23494
 }
 define ptr @compilerCoreRenderLLVMRuntimeDeclarationsTyped(ptr %records, ptr %renderedFunctions, i32 %runtimeRequirements) {
 entry:
-  %r23494 = icmp slt i32 %runtimeRequirements, 0
-  %r23495 = call i32 @compilerBodyLLVMRuntimeStringCompare()
-  %r23496 = icmp sgt i32 %runtimeRequirements, %r23495
-  %r23497 = or i1 %r23494, %r23496
-  br i1 %r23497, label %bb1, label %bb2
+  %r23495 = icmp slt i32 %runtimeRequirements, 0
+  %r23496 = call i32 @compilerBodyLLVMRuntimeStringCompare()
+  %r23497 = icmp sgt i32 %runtimeRequirements, %r23496
+  %r23498 = or i1 %r23495, %r23497
+  br i1 %r23498, label %bb1, label %bb2
 bb1:
-  ret ptr getelementptr inbounds ([1 x i8], ptr @.str.23498, i32 0, i32 0)
+  ret ptr getelementptr inbounds ([1 x i8], ptr @.str.23499, i32 0, i32 0)
 bb2:
-  %r23499 = call ptr @compilerCoreRenderLLVMRuntimeDeclarations(ptr %records, ptr %renderedFunctions)
-  ret ptr %r23499
+  %r23500 = call ptr @compilerCoreRenderLLVMRuntimeDeclarations(ptr %records, ptr %renderedFunctions)
+  ret ptr %r23500
 }
 define ptr @compilerCoreRenderLLVMFunctionDeclarationsExcludingTyped(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, %Range.CompilerFunctionSelection %selection) {
 entry:
-  %r23500 = call ptr @rawBufferCreate(i32 65536, i32 1)
-  %r23501 = call i32 @compilerCoreAppendLLVMFunctionDeclarationsTyped(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, %Range.CompilerFunctionSelection %selection, ptr %r23500)
-  %r23502 = icmp sgt i32 %r23501, 0
-  br i1 %r23502, label %bb1, label %bb2
+  %r23501 = call ptr @rawBufferCreate(i32 65536, i32 1)
+  %r23502 = call i32 @compilerCoreAppendLLVMFunctionDeclarationsTyped(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, %Range.CompilerFunctionSelection %selection, ptr %r23501)
+  %r23503 = icmp sgt i32 %r23502, 0
+  br i1 %r23503, label %bb1, label %bb2
 bb1:
-  %r23504 = call i32 @rawBufferAppendText(ptr %r23500, ptr getelementptr inbounds ([2 x i8], ptr @.str.23503, i32 0, i32 0))
+  %r23505 = call i32 @rawBufferAppendText(ptr %r23501, ptr getelementptr inbounds ([2 x i8], ptr @.str.23504, i32 0, i32 0))
   br label %bb2
 bb2:
-  %r23505 = call ptr @compilerCoreRawBufferMaterializeAndDestroy(ptr %r23500)
-  ret ptr %r23505
+  %r23506 = call ptr @compilerCoreRawBufferMaterializeAndDestroy(ptr %r23501)
+  ret ptr %r23506
 }
 define ptr @compilerCoreLLVMNativeEntryTextFromParts(ptr %usage, ptr %globals, ptr %runtime, ptr %helpers, ptr %declarations, ptr %main) {
 entry:
-  %r23506 = call ptr @rawBufferCreate(i32 1048576, i32 1)
-  %r23507 = call i32 @rawBufferAppendText(ptr %r23506, ptr %usage)
-  %r23508 = call i32 @rawBufferAppendText(ptr %r23506, ptr %globals)
-  %r23509 = call i32 @rawBufferAppendText(ptr %r23506, ptr %runtime)
-  %r23510 = call i32 @rawBufferAppendText(ptr %r23506, ptr %helpers)
-  %r23511 = call i32 @rawBufferAppendText(ptr %r23506, ptr %declarations)
-  %r23512 = call i32 @rawBufferAppendText(ptr %r23506, ptr %main)
-  %r23513 = call ptr @compilerCoreRawBufferMaterializeAndDestroy(ptr %r23506)
-  ret ptr %r23513
+  %r23507 = call ptr @rawBufferCreate(i32 1048576, i32 1)
+  %r23508 = call i32 @rawBufferAppendText(ptr %r23507, ptr %usage)
+  %r23509 = call i32 @rawBufferAppendText(ptr %r23507, ptr %globals)
+  %r23510 = call i32 @rawBufferAppendText(ptr %r23507, ptr %runtime)
+  %r23511 = call i32 @rawBufferAppendText(ptr %r23507, ptr %helpers)
+  %r23512 = call i32 @rawBufferAppendText(ptr %r23507, ptr %declarations)
+  %r23513 = call i32 @rawBufferAppendText(ptr %r23507, ptr %main)
+  %r23514 = call ptr @compilerCoreRawBufferMaterializeAndDestroy(ptr %r23507)
+  ret ptr %r23514
 }
 define ptr @compilerCoreMaterializeLLVMText(ptr %text) {
 entry:
-  %r23514 = call i32 @stringLength(ptr %text)
-  %r23515 = call ptr @compilerCoreSingleBackslash()
-  %r23516 = call ptr @rawBufferCreate(i32 %r23514, i32 1)
+  %r23515 = call i32 @stringLength(ptr %text)
+  %r23516 = call ptr @compilerCoreSingleBackslash()
+  %r23517 = call ptr @rawBufferCreate(i32 %r23515, i32 1)
   br label %bb1
 bb1:
-  %r23517 = phi i32 [0, %entry], [%r23552, %bb18]
-  %r23518 = icmp slt i32 %r23517, %r23514
-  br i1 %r23518, label %bb2, label %bb3
+  %r23518 = phi i32 [0, %entry], [%r23553, %bb18]
+  %r23519 = icmp slt i32 %r23518, %r23515
+  br i1 %r23519, label %bb2, label %bb3
 bb2:
-  %r23519 = call i1 @stringHasPrefix(ptr %text, i32 %r23517, ptr %r23515)
-  %r23520 = add i32 %r23517, 1
-  %r23521 = icmp slt i32 %r23520, %r23514
-  %r23522 = and i1 %r23519, %r23521
-  br i1 %r23522, label %bb4, label %bb5
+  %r23520 = call i1 @stringHasPrefix(ptr %text, i32 %r23518, ptr %r23516)
+  %r23521 = add i32 %r23518, 1
+  %r23522 = icmp slt i32 %r23521, %r23515
+  %r23523 = and i1 %r23520, %r23522
+  br i1 %r23523, label %bb4, label %bb5
 bb4:
-  %r23523 = add i32 %r23517, 1
-  %r23524 = call ptr @stringCharacterAt(ptr %text, i32 %r23523)
-  %r23526 = call i32 @stringEqual(ptr %r23524, ptr getelementptr inbounds ([2 x i8], ptr @.str.23525, i32 0, i32 0))
-  %r23527 = icmp ne i32 %r23526, 0
-  br i1 %r23527, label %bb6, label %bb7
+  %r23524 = add i32 %r23518, 1
+  %r23525 = call ptr @stringCharacterAt(ptr %text, i32 %r23524)
+  %r23527 = call i32 @stringEqual(ptr %r23525, ptr getelementptr inbounds ([2 x i8], ptr @.str.23526, i32 0, i32 0))
+  %r23528 = icmp ne i32 %r23527, 0
+  br i1 %r23528, label %bb6, label %bb7
 bb6:
-  %r23528 = call ptr @compilerCoreNewlineCharacter()
-  %r23529 = call i32 @rawBufferAppendText(ptr %r23516, ptr %r23528)
-  %r23530 = add i32 %r23517, 2
+  %r23529 = call ptr @compilerCoreNewlineCharacter()
+  %r23530 = call i32 @rawBufferAppendText(ptr %r23517, ptr %r23529)
+  %r23531 = add i32 %r23518, 2
   br label %bb17
 bb7:
-  %r23532 = call i32 @stringEqual(ptr %r23524, ptr getelementptr inbounds ([2 x i8], ptr @.str.23531, i32 0, i32 0))
-  %r23533 = icmp ne i32 %r23532, 0
-  br i1 %r23533, label %bb8, label %bb9
+  %r23533 = call i32 @stringEqual(ptr %r23525, ptr getelementptr inbounds ([2 x i8], ptr @.str.23532, i32 0, i32 0))
+  %r23534 = icmp ne i32 %r23533, 0
+  br i1 %r23534, label %bb8, label %bb9
 bb8:
-  %r23534 = call ptr @compilerCoreTabCharacter()
-  %r23535 = call i32 @rawBufferAppendText(ptr %r23516, ptr %r23534)
-  %r23536 = add i32 %r23517, 2
+  %r23535 = call ptr @compilerCoreTabCharacter()
+  %r23536 = call i32 @rawBufferAppendText(ptr %r23517, ptr %r23535)
+  %r23537 = add i32 %r23518, 2
   br label %bb16
 bb9:
-  %r23537 = call i1 @isRangeQuote(ptr %r23524)
-  br i1 %r23537, label %bb10, label %bb11
+  %r23538 = call i1 @isRangeQuote(ptr %r23525)
+  br i1 %r23538, label %bb10, label %bb11
 bb10:
-  %r23538 = call i32 @rawBufferAppendText(ptr %r23516, ptr %r23524)
-  %r23539 = add i32 %r23517, 2
+  %r23539 = call i32 @rawBufferAppendText(ptr %r23517, ptr %r23525)
+  %r23540 = add i32 %r23518, 2
   br label %bb15
 bb11:
-  %r23540 = call i32 @stringEqual(ptr %r23524, ptr %r23515)
-  %r23541 = icmp ne i32 %r23540, 0
-  br i1 %r23541, label %bb12, label %bb13
+  %r23541 = call i32 @stringEqual(ptr %r23525, ptr %r23516)
+  %r23542 = icmp ne i32 %r23541, 0
+  br i1 %r23542, label %bb12, label %bb13
 bb12:
-  %r23542 = call i32 @rawBufferAppendText(ptr %r23516, ptr %r23515)
-  %r23543 = add i32 %r23517, 2
+  %r23543 = call i32 @rawBufferAppendText(ptr %r23517, ptr %r23516)
+  %r23544 = add i32 %r23518, 2
   br label %bb14
 bb13:
-  %r23544 = call i32 @rawBufferAppendTextCharacter(ptr %r23516, ptr %text, i32 %r23517)
-  %r23545 = add i32 %r23517, 1
+  %r23545 = call i32 @rawBufferAppendTextCharacter(ptr %r23517, ptr %text, i32 %r23518)
+  %r23546 = add i32 %r23518, 1
   br label %bb14
 bb14:
-  %r23546 = phi i32 [%r23543, %bb12], [%r23545, %bb13]
+  %r23547 = phi i32 [%r23544, %bb12], [%r23546, %bb13]
   br label %bb15
 bb15:
-  %r23547 = phi i32 [%r23539, %bb10], [%r23546, %bb14]
+  %r23548 = phi i32 [%r23540, %bb10], [%r23547, %bb14]
   br label %bb16
 bb16:
-  %r23548 = phi i32 [%r23536, %bb8], [%r23547, %bb15]
+  %r23549 = phi i32 [%r23537, %bb8], [%r23548, %bb15]
   br label %bb17
 bb17:
-  %r23549 = phi i32 [%r23530, %bb6], [%r23548, %bb16]
+  %r23550 = phi i32 [%r23531, %bb6], [%r23549, %bb16]
   br label %bb18
 bb5:
-  %r23550 = call i32 @rawBufferAppendTextCharacter(ptr %r23516, ptr %text, i32 %r23517)
-  %r23551 = add i32 %r23517, 1
+  %r23551 = call i32 @rawBufferAppendTextCharacter(ptr %r23517, ptr %text, i32 %r23518)
+  %r23552 = add i32 %r23518, 1
   br label %bb18
 bb18:
-  %r23552 = phi i32 [%r23549, %bb17], [%r23551, %bb5]
+  %r23553 = phi i32 [%r23550, %bb17], [%r23552, %bb5]
   br label %bb1
 bb3:
-  %r23553 = call ptr @compilerCoreRawBufferMaterializeAndDestroy(ptr %r23516)
-  ret ptr %r23553
+  %r23554 = call ptr @compilerCoreRawBufferMaterializeAndDestroy(ptr %r23517)
+  ret ptr %r23554
 }
 define i32 @compilerCoreLLVMDirectCallSignatureAudit(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, %Range.CompilerFunctionSelection %selection, %Range.CompilerIntTable %functionInstances, %Range.CompilerIntTable %functionInstanceSignatures, %Range.CompilerIntTable %functionInstanceSignatureParameters, %Range.CompilerModuleABIPlan %abiPlan, ptr %text) {
 entry:
   br label %bb1
 bb1:
-  %r23554 = phi i32 [0, %entry], [%r23747, %bb49]
-  %r23555 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %functionInstances)
-  %r23556 = icmp slt i32 %r23554, %r23555
-  br i1 %r23556, label %bb2, label %bb3
+  %r23555 = phi i32 [0, %entry], [%r23748, %bb49]
+  %r23556 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %functionInstances)
+  %r23557 = icmp slt i32 %r23555, %r23556
+  br i1 %r23557, label %bb2, label %bb3
 bb2:
-  %r23557 = call i32 @compilerReachableFunctionInstanceFunctionColumn()
-  %r23558 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstances, i32 %r23554, i32 %r23557)
-  %r23559 = call i1 @compilerFunctionSelectionContains(%Range.CompilerFunctionSelection %selection, i32 %r23558)
-  %r23560 = xor i1 %r23559, true
-  br i1 %r23560, label %bb4, label %bb5
+  %r23558 = call i32 @compilerReachableFunctionInstanceFunctionColumn()
+  %r23559 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstances, i32 %r23555, i32 %r23558)
+  %r23560 = call i1 @compilerFunctionSelectionContains(%Range.CompilerFunctionSelection %selection, i32 %r23559)
+  %r23561 = xor i1 %r23560, true
+  br i1 %r23561, label %bb4, label %bb5
 bb4:
-  %r23561 = mul i32 %r23554, 1000
-  %r23562 = add i32 %r23561, 1
-  ret i32 %r23562
+  %r23562 = mul i32 %r23555, 1000
+  %r23563 = add i32 %r23562, 1
+  ret i32 %r23563
 bb5:
-  %r23563 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r23564 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23563, i32 %r23558, i32 0)
-  %r23565 = call i32 @compilerSyntaxDeclarationRowForSyntaxID(%Range.CompilerSyntaxTables %tables, i32 %r23564)
-  %r23566 = call i32 @compilerReachableFunctionInstanceSignatureRow(%Range.CompilerIntTable %functionInstanceSignatures, i32 %r23554)
-  %r23567 = icmp slt i32 %r23565, 0
+  %r23564 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r23565 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23564, i32 %r23559, i32 0)
+  %r23566 = call i32 @compilerSyntaxDeclarationRowForSyntaxID(%Range.CompilerSyntaxTables %tables, i32 %r23565)
+  %r23567 = call i32 @compilerReachableFunctionInstanceSignatureRow(%Range.CompilerIntTable %functionInstanceSignatures, i32 %r23555)
   %r23568 = icmp slt i32 %r23566, 0
-  %r23569 = or i1 %r23567, %r23568
-  br i1 %r23569, label %bb6, label %bb7
+  %r23569 = icmp slt i32 %r23567, 0
+  %r23570 = or i1 %r23568, %r23569
+  br i1 %r23570, label %bb6, label %bb7
 bb6:
-  %r23570 = mul i32 %r23554, 1000
-  %r23571 = add i32 %r23570, 2
-  ret i32 %r23571
+  %r23571 = mul i32 %r23555, 1000
+  %r23572 = add i32 %r23571, 2
+  ret i32 %r23572
 bb7:
-  %r23572 = extractvalue %Range.CompilerSyntaxTables %tables, 2
-  %r23573 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23572, i32 %r23565, i32 1)
-  %r23574 = extractvalue %Range.CompilerSyntaxTables %tables, 2
-  %r23575 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23574, i32 %r23565, i32 7)
-  %r23576 = extractvalue %Range.CompilerSyntaxTables %tables, 2
-  %r23577 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23576, i32 %r23565, i32 8)
-  %r23578 = call ptr @compilerTypedSyntaxLocalText(%Range.CompilerSyntaxTables %tables, i32 %r23573, i32 %r23575, i32 %r23577)
-  %r23579 = call i32 @compilerReachableFunctionInstanceReceiverKeyColumn()
-  %r23580 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstances, i32 %r23554, i32 %r23579)
-  %r23581 = call ptr @stringOwnedCopy(ptr %r23578)
-  %r23582 = icmp sge i32 %r23580, 0
-  br i1 %r23582, label %bb8, label %bb9
+  %r23573 = extractvalue %Range.CompilerSyntaxTables %tables, 2
+  %r23574 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23573, i32 %r23566, i32 1)
+  %r23575 = extractvalue %Range.CompilerSyntaxTables %tables, 2
+  %r23576 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23575, i32 %r23566, i32 7)
+  %r23577 = extractvalue %Range.CompilerSyntaxTables %tables, 2
+  %r23578 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23577, i32 %r23566, i32 8)
+  %r23579 = call ptr @compilerTypedSyntaxLocalText(%Range.CompilerSyntaxTables %tables, i32 %r23574, i32 %r23576, i32 %r23578)
+  %r23580 = call i32 @compilerReachableFunctionInstanceReceiverKeyColumn()
+  %r23581 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstances, i32 %r23555, i32 %r23580)
+  %r23582 = call ptr @stringOwnedCopy(ptr %r23579)
+  %r23583 = icmp sge i32 %r23581, 0
+  br i1 %r23583, label %bb8, label %bb9
 bb8:
-  %r23584 = call i32 @compilerReachableFunctionInstanceFingerprintFirstColumn()
-  %r23585 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstances, i32 %r23554, i32 %r23584)
-  %r23587 = call i32 @compilerReachableFunctionInstanceFingerprintSecondColumn()
-  %r23588 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstances, i32 %r23554, i32 %r23587)
-  %r23589 = call ptr @stringConcat(ptr %r23578, ptr getelementptr inbounds ([5 x i8], ptr @.str.23583, i32 0, i32 0))
-  %r23590 = call ptr @stringFromInt(i32 %r23585)
-  %r23591 = call ptr @stringConcat(ptr %r23589, ptr %r23590)
-  %r23592 = call ptr @stringConcat(ptr %r23591, ptr getelementptr inbounds ([2 x i8], ptr @.str.23586, i32 0, i32 0))
-  %r23593 = call ptr @stringFromInt(i32 %r23588)
-  %r23594 = call ptr @stringConcat(ptr %r23592, ptr %r23593)
-  %r23595 = call ptr @stringOwnedCopy(ptr %r23594)
+  %r23585 = call i32 @compilerReachableFunctionInstanceFingerprintFirstColumn()
+  %r23586 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstances, i32 %r23555, i32 %r23585)
+  %r23588 = call i32 @compilerReachableFunctionInstanceFingerprintSecondColumn()
+  %r23589 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstances, i32 %r23555, i32 %r23588)
+  %r23590 = call ptr @stringConcat(ptr %r23579, ptr getelementptr inbounds ([5 x i8], ptr @.str.23584, i32 0, i32 0))
+  %r23591 = call ptr @stringFromInt(i32 %r23586)
+  %r23592 = call ptr @stringConcat(ptr %r23590, ptr %r23591)
+  %r23593 = call ptr @stringConcat(ptr %r23592, ptr getelementptr inbounds ([2 x i8], ptr @.str.23587, i32 0, i32 0))
+  %r23594 = call ptr @stringFromInt(i32 %r23589)
+  %r23595 = call ptr @stringConcat(ptr %r23593, ptr %r23594)
+  %r23596 = call ptr @stringOwnedCopy(ptr %r23595)
   br label %bb9
 bb9:
-  %r23596 = phi ptr [%r23581, %bb7], [%r23595, %bb8]
-  %r23597 = call i32 @compilerReachableFunctionInstanceSignatureParameterCountColumn()
-  %r23598 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstanceSignatures, i32 %r23566, i32 %r23597)
-  %r23599 = call i32 @compilerReachableFunctionInstanceSignatureParameterFirstRowColumn()
-  %r23600 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstanceSignatures, i32 %r23566, i32 %r23599)
-  %r23601 = icmp slt i32 %r23598, 0
-  %r23602 = icmp slt i32 %r23600, 0
-  %r23603 = or i1 %r23601, %r23602
-  %r23604 = add i32 %r23600, %r23598
-  %r23605 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %functionInstanceSignatureParameters)
-  %r23606 = icmp sgt i32 %r23604, %r23605
-  %r23607 = or i1 %r23603, %r23606
-  br i1 %r23607, label %bb10, label %bb11
+  %r23597 = phi ptr [%r23582, %bb7], [%r23596, %bb8]
+  %r23598 = call i32 @compilerReachableFunctionInstanceSignatureParameterCountColumn()
+  %r23599 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstanceSignatures, i32 %r23567, i32 %r23598)
+  %r23600 = call i32 @compilerReachableFunctionInstanceSignatureParameterFirstRowColumn()
+  %r23601 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstanceSignatures, i32 %r23567, i32 %r23600)
+  %r23602 = icmp slt i32 %r23599, 0
+  %r23603 = icmp slt i32 %r23601, 0
+  %r23604 = or i1 %r23602, %r23603
+  %r23605 = add i32 %r23601, %r23599
+  %r23606 = call i32 @compilerIntTableRowCount(%Range.CompilerIntTable %functionInstanceSignatureParameters)
+  %r23607 = icmp sgt i32 %r23605, %r23606
+  %r23608 = or i1 %r23604, %r23607
+  br i1 %r23608, label %bb10, label %bb11
 bb10:
-  %r23608 = mul i32 %r23554, 1000
-  %r23609 = add i32 %r23608, 3
-  ret i32 %r23609
+  %r23609 = mul i32 %r23555, 1000
+  %r23610 = add i32 %r23609, 3
+  ret i32 %r23610
 bb11:
   br label %bb12
 bb12:
-  %r23610 = phi i32 [0, %bb11], [%r23629, %bb16]
-  %r23611 = icmp slt i32 %r23610, %r23598
-  br i1 %r23611, label %bb13, label %bb14
+  %r23611 = phi i32 [0, %bb11], [%r23630, %bb16]
+  %r23612 = icmp slt i32 %r23611, %r23599
+  br i1 %r23612, label %bb13, label %bb14
 bb13:
-  %r23612 = add i32 %r23600, %r23610
-  %r23613 = call i32 @compilerReachableFunctionInstanceSignatureParameterInstanceColumn()
-  %r23614 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstanceSignatureParameters, i32 %r23612, i32 %r23613)
-  %r23615 = icmp ne i32 %r23614, %r23554
-  %r23616 = call i32 @compilerReachableFunctionInstanceSignatureParameterOrdinalColumn()
-  %r23617 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstanceSignatureParameters, i32 %r23612, i32 %r23616)
-  %r23618 = icmp ne i32 %r23617, %r23610
-  %r23619 = or i1 %r23615, %r23618
-  %r23620 = call i32 @compilerReachableFunctionInstanceSignatureParameterABICategoryColumn()
-  %r23621 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstanceSignatureParameters, i32 %r23612, i32 %r23620)
-  %r23622 = call i32 @compilerBodyFunctionSignatureABICategoryNone()
-  %r23623 = icmp eq i32 %r23621, %r23622
-  %r23624 = icmp sge i32 %r23580, 0
-  %r23625 = and i1 %r23623, %r23624
-  %r23626 = or i1 %r23619, %r23625
-  br i1 %r23626, label %bb15, label %bb16
+  %r23613 = add i32 %r23601, %r23611
+  %r23614 = call i32 @compilerReachableFunctionInstanceSignatureParameterInstanceColumn()
+  %r23615 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstanceSignatureParameters, i32 %r23613, i32 %r23614)
+  %r23616 = icmp ne i32 %r23615, %r23555
+  %r23617 = call i32 @compilerReachableFunctionInstanceSignatureParameterOrdinalColumn()
+  %r23618 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstanceSignatureParameters, i32 %r23613, i32 %r23617)
+  %r23619 = icmp ne i32 %r23618, %r23611
+  %r23620 = or i1 %r23616, %r23619
+  %r23621 = call i32 @compilerReachableFunctionInstanceSignatureParameterABICategoryColumn()
+  %r23622 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstanceSignatureParameters, i32 %r23613, i32 %r23621)
+  %r23623 = call i32 @compilerBodyFunctionSignatureABICategoryNone()
+  %r23624 = icmp eq i32 %r23622, %r23623
+  %r23625 = icmp sge i32 %r23581, 0
+  %r23626 = and i1 %r23624, %r23625
+  %r23627 = or i1 %r23620, %r23626
+  br i1 %r23627, label %bb15, label %bb16
 bb15:
-  %r23627 = mul i32 %r23554, 1000
-  %r23628 = add i32 %r23627, 4
-  ret i32 %r23628
+  %r23628 = mul i32 %r23555, 1000
+  %r23629 = add i32 %r23628, 4
+  ret i32 %r23629
 bb16:
-  %r23629 = add i32 %r23610, 1
+  %r23630 = add i32 %r23611, 1
   br label %bb12
 bb14:
-  %r23630 = call i32 @compilerReachableFunctionInstanceSignatureReturnABICategoryColumn()
-  %r23631 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstanceSignatures, i32 %r23566, i32 %r23630)
-  %r23632 = icmp sge i32 %r23580, 0
-  %r23633 = call i32 @compilerBodyFunctionSignatureABICategoryNone()
-  %r23634 = icmp eq i32 %r23631, %r23633
-  %r23635 = and i1 %r23632, %r23634
-  br i1 %r23635, label %bb17, label %bb18
+  %r23631 = call i32 @compilerReachableFunctionInstanceSignatureReturnABICategoryColumn()
+  %r23632 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %functionInstanceSignatures, i32 %r23567, i32 %r23631)
+  %r23633 = icmp sge i32 %r23581, 0
+  %r23634 = call i32 @compilerBodyFunctionSignatureABICategoryNone()
+  %r23635 = icmp eq i32 %r23632, %r23634
+  %r23636 = and i1 %r23633, %r23635
+  br i1 %r23636, label %bb17, label %bb18
 bb17:
-  %r23636 = mul i32 %r23554, 1000
-  %r23637 = add i32 %r23636, 5
-  ret i32 %r23637
+  %r23637 = mul i32 %r23555, 1000
+  %r23638 = add i32 %r23637, 5
+  ret i32 %r23638
 bb18:
-  %r23638 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r23639 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23638, i32 %r23558, i32 6)
-  %r23640 = extractvalue %Range.CompilerSyntaxTables %tables, 4
-  %r23641 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23640, i32 %r23558, i32 7)
-  %r23642 = call ptr @compilerTypedSyntaxLocalText(%Range.CompilerSyntaxTables %tables, i32 %r23573, i32 %r23639, i32 %r23641)
-  %r23643 = call ptr @compilerCoreLLVMTypeNameForRangeType(ptr %r23642)
-  %r23644 = call ptr @stringOwnedCopy(ptr %r23643)
-  %r23645 = call i32 @compilerBodyFunctionSignatureABICategoryInt()
-  %r23646 = icmp eq i32 %r23631, %r23645
-  br i1 %r23646, label %bb19, label %bb20
+  %r23639 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r23640 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23639, i32 %r23559, i32 6)
+  %r23641 = extractvalue %Range.CompilerSyntaxTables %tables, 4
+  %r23642 = call i32 @compilerIntTableValue(%Range.CompilerIntTable %r23641, i32 %r23559, i32 7)
+  %r23643 = call ptr @compilerTypedSyntaxLocalText(%Range.CompilerSyntaxTables %tables, i32 %r23574, i32 %r23640, i32 %r23642)
+  %r23644 = call ptr @compilerCoreLLVMTypeNameForRangeType(ptr %r23643)
+  %r23645 = call ptr @stringOwnedCopy(ptr %r23644)
+  %r23646 = call i32 @compilerBodyFunctionSignatureABICategoryInt()
+  %r23647 = icmp eq i32 %r23632, %r23646
+  br i1 %r23647, label %bb19, label %bb20
 bb19:
-  %r23648 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([4 x i8], ptr @.str.23647, i32 0, i32 0))
+  %r23649 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([4 x i8], ptr @.str.23648, i32 0, i32 0))
   br label %bb20
 bb20:
-  %r23649 = phi ptr [%r23644, %bb18], [%r23648, %bb19]
-  %r23650 = call i32 @compilerBodyFunctionSignatureABICategoryBool()
-  %r23651 = icmp eq i32 %r23631, %r23650
-  br i1 %r23651, label %bb21, label %bb22
+  %r23650 = phi ptr [%r23645, %bb18], [%r23649, %bb19]
+  %r23651 = call i32 @compilerBodyFunctionSignatureABICategoryBool()
+  %r23652 = icmp eq i32 %r23632, %r23651
+  br i1 %r23652, label %bb21, label %bb22
 bb21:
-  %r23653 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([3 x i8], ptr @.str.23652, i32 0, i32 0))
+  %r23654 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([3 x i8], ptr @.str.23653, i32 0, i32 0))
   br label %bb22
 bb22:
-  %r23654 = phi ptr [%r23649, %bb20], [%r23653, %bb21]
-  %r23655 = call i32 @compilerBodyFunctionSignatureABICategoryFloat()
-  %r23656 = icmp eq i32 %r23631, %r23655
-  br i1 %r23656, label %bb23, label %bb24
+  %r23655 = phi ptr [%r23650, %bb20], [%r23654, %bb21]
+  %r23656 = call i32 @compilerBodyFunctionSignatureABICategoryFloat()
+  %r23657 = icmp eq i32 %r23632, %r23656
+  br i1 %r23657, label %bb23, label %bb24
 bb23:
-  %r23658 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([7 x i8], ptr @.str.23657, i32 0, i32 0))
+  %r23659 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([7 x i8], ptr @.str.23658, i32 0, i32 0))
   br label %bb24
 bb24:
-  %r23659 = phi ptr [%r23654, %bb22], [%r23658, %bb23]
-  %r23660 = call i32 @compilerBodyFunctionSignatureABICategoryPointer()
-  %r23661 = icmp eq i32 %r23631, %r23660
-  br i1 %r23661, label %bb25, label %bb26
+  %r23660 = phi ptr [%r23655, %bb22], [%r23659, %bb23]
+  %r23661 = call i32 @compilerBodyFunctionSignatureABICategoryPointer()
+  %r23662 = icmp eq i32 %r23632, %r23661
+  br i1 %r23662, label %bb25, label %bb26
 bb25:
-  %r23663 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([4 x i8], ptr @.str.23662, i32 0, i32 0))
+  %r23664 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([4 x i8], ptr @.str.23663, i32 0, i32 0))
   br label %bb26
 bb26:
-  %r23664 = phi ptr [%r23659, %bb24], [%r23663, %bb25]
-  %r23665 = call i32 @compilerBodyFunctionSignatureABICategoryUnsigned8()
-  %r23666 = icmp eq i32 %r23631, %r23665
-  br i1 %r23666, label %bb27, label %bb28
+  %r23665 = phi ptr [%r23660, %bb24], [%r23664, %bb25]
+  %r23666 = call i32 @compilerBodyFunctionSignatureABICategoryUnsigned8()
+  %r23667 = icmp eq i32 %r23632, %r23666
+  br i1 %r23667, label %bb27, label %bb28
 bb27:
-  %r23668 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([3 x i8], ptr @.str.23667, i32 0, i32 0))
+  %r23669 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([3 x i8], ptr @.str.23668, i32 0, i32 0))
   br label %bb28
 bb28:
-  %r23669 = phi ptr [%r23664, %bb26], [%r23668, %bb27]
-  %r23670 = call i32 @compilerBodyFunctionSignatureABICategoryFloat32()
-  %r23671 = icmp eq i32 %r23631, %r23670
-  br i1 %r23671, label %bb29, label %bb30
+  %r23670 = phi ptr [%r23665, %bb26], [%r23669, %bb27]
+  %r23671 = call i32 @compilerBodyFunctionSignatureABICategoryFloat32()
+  %r23672 = icmp eq i32 %r23632, %r23671
+  br i1 %r23672, label %bb29, label %bb30
 bb29:
-  %r23673 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([6 x i8], ptr @.str.23672, i32 0, i32 0))
+  %r23674 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([6 x i8], ptr @.str.23673, i32 0, i32 0))
   br label %bb30
 bb30:
-  %r23674 = phi ptr [%r23669, %bb28], [%r23673, %bb29]
-  %r23675 = call i32 @compilerBodyFunctionSignatureABICategoryNone()
-  %r23676 = icmp eq i32 %r23631, %r23675
-  %r23677 = call i1 @compilerModuleABIPlanIsParticipant(%Range.CompilerModuleABIPlan %abiPlan, i32 %r23558)
-  %r23678 = and i1 %r23676, %r23677
-  br i1 %r23678, label %bb31, label %bb32
+  %r23675 = phi ptr [%r23670, %bb28], [%r23674, %bb29]
+  %r23676 = call i32 @compilerBodyFunctionSignatureABICategoryNone()
+  %r23677 = icmp eq i32 %r23632, %r23676
+  %r23678 = call i1 @compilerModuleABIPlanIsParticipant(%Range.CompilerModuleABIPlan %abiPlan, i32 %r23559)
+  %r23679 = and i1 %r23677, %r23678
+  br i1 %r23679, label %bb31, label %bb32
 bb31:
-  %r23679 = call ptr @compilerCoreLLVMNativeABITypeName(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r23642)
-  %r23680 = call ptr @stringOwnedCopy(ptr %r23679)
+  %r23680 = call ptr @compilerCoreLLVMNativeABITypeName(%Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, ptr %r23643)
+  %r23681 = call ptr @stringOwnedCopy(ptr %r23680)
   br label %bb32
 bb32:
-  %r23681 = phi ptr [%r23674, %bb30], [%r23680, %bb31]
-  %r23682 = call i32 @compilerModuleABIPlanReturnMode(%Range.CompilerModuleABIPlan %abiPlan, %Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %r23558)
-  %r23683 = call i32 @compilerBodyFunctionSignatureABICategoryNone()
-  %r23684 = icmp eq i32 %r23631, %r23683
-  %r23685 = call i32 @compilerFunctionReturnABIIndirect()
-  %r23686 = icmp eq i32 %r23682, %r23685
-  %r23687 = and i1 %r23684, %r23686
-  br i1 %r23687, label %bb33, label %bb34
+  %r23682 = phi ptr [%r23675, %bb30], [%r23681, %bb31]
+  %r23683 = call i32 @compilerModuleABIPlanReturnMode(%Range.CompilerModuleABIPlan %abiPlan, %Range.CompilerSyntaxTables %tables, %Range.CompilerDeclarationIndex %index, i32 %r23559)
+  %r23684 = call i32 @compilerBodyFunctionSignatureABICategoryNone()
+  %r23685 = icmp eq i32 %r23632, %r23684
+  %r23686 = call i32 @compilerFunctionReturnABIIndirect()
+  %r23687 = icmp eq i32 %r23683, %r23686
+  %r23688 = and i1 %r23685, %r23687
+  br i1 %r23688, label %bb33, label %bb34
 bb33:
-  %r23689 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([5 x i8], ptr @.str.23688, i32 0, i32 0))
+  %r23690 = call ptr @stringOwnedCopy(ptr getelementptr inbounds ([5 x i8], ptr @.str.23689, i32 0, i32 0))
   br label %bb34
 bb34:
-  %r23690 = phi ptr [%r23681, %bb32], [%r23689, %bb33]
-  %r23693 = call ptr @stringConcat(ptr getelementptr inbounds ([2 x i8], ptr @.str.23691, i32 0, i32 0), ptr %r23596)
-  %r23694 = call ptr @stringConcat(ptr %r23693, ptr getelementptr inbounds ([2 x i8], ptr @.str.23692, i32 0, i32 0))
-  %r23697 = call ptr @stringConcat(ptr getelementptr inbounds ([8 x i8], ptr @.str.23695, i32 0, i32 0), ptr %r23690)
-  %r23698 = call ptr @stringConcat(ptr %r23697, ptr getelementptr inbounds ([2 x i8], ptr @.str.23696, i32 0, i32 0))
-  %r23701 = call ptr @stringConcat(ptr getelementptr inbounds ([6 x i8], ptr @.str.23699, i32 0, i32 0), ptr %r23690)
-  %r23702 = call ptr @stringConcat(ptr %r23701, ptr getelementptr inbounds ([2 x i8], ptr @.str.23700, i32 0, i32 0))
-  %r23703 = call i32 @stringLength(ptr %r23694)
-  %r23704 = call i32 @stringLength(ptr %r23698)
-  %r23705 = call i32 @stringLength(ptr %r23702)
-  %r23706 = call i32 @stringFindFrom(ptr %text, i32 0, ptr %r23694)
+  %r23691 = phi ptr [%r23682, %bb32], [%r23690, %bb33]
+  %r23694 = call ptr @stringConcat(ptr getelementptr inbounds ([2 x i8], ptr @.str.23692, i32 0, i32 0), ptr %r23597)
+  %r23695 = call ptr @stringConcat(ptr %r23694, ptr getelementptr inbounds ([2 x i8], ptr @.str.23693, i32 0, i32 0))
+  %r23698 = call ptr @stringConcat(ptr getelementptr inbounds ([8 x i8], ptr @.str.23696, i32 0, i32 0), ptr %r23691)
+  %r23699 = call ptr @stringConcat(ptr %r23698, ptr getelementptr inbounds ([2 x i8], ptr @.str.23697, i32 0, i32 0))
+  %r23702 = call ptr @stringConcat(ptr getelementptr inbounds ([6 x i8], ptr @.str.23700, i32 0, i32 0), ptr %r23691)
+  %r23703 = call ptr @stringConcat(ptr %r23702, ptr getelementptr inbounds ([2 x i8], ptr @.str.23701, i32 0, i32 0))
+  %r23704 = call i32 @stringLength(ptr %r23695)
+  %r23705 = call i32 @stringLength(ptr %r23699)
+  %r23706 = call i32 @stringLength(ptr %r23703)
+  %r23707 = call i32 @stringFindFrom(ptr %text, i32 0, ptr %r23695)
   br label %bb35
 bb35:
-  %r23707 = phi i32 [0, %bb34], [%r23717, %bb47]
-  %r23708 = phi i32 [%r23706, %bb34], [%r23743, %bb47]
-  %r23709 = icmp sge i32 %r23708, 0
-  br i1 %r23709, label %bb36, label %bb37
+  %r23708 = phi i32 [0, %bb34], [%r23718, %bb47]
+  %r23709 = phi i32 [%r23707, %bb34], [%r23744, %bb47]
+  %r23710 = icmp sge i32 %r23709, 0
+  br i1 %r23710, label %bb36, label %bb37
 bb36:
-  %r23710 = icmp sge i32 %r23708, %r23704
-  %r23711 = sub i32 %r23708, %r23704
-  %r23712 = call ptr @stringSubstring(ptr %text, i32 %r23711, i32 %r23708)
-  %r23713 = call i32 @stringEqual(ptr %r23712, ptr %r23698)
-  %r23714 = icmp ne i32 %r23713, 0
-  %r23715 = and i1 %r23710, %r23714
-  br i1 %r23715, label %bb38, label %bb39
+  %r23711 = icmp sge i32 %r23709, %r23705
+  %r23712 = sub i32 %r23709, %r23705
+  %r23713 = call ptr @stringSubstring(ptr %text, i32 %r23712, i32 %r23709)
+  %r23714 = call i32 @stringEqual(ptr %r23713, ptr %r23699)
+  %r23715 = icmp ne i32 %r23714, 0
+  %r23716 = and i1 %r23711, %r23715
+  br i1 %r23716, label %bb38, label %bb39
 bb38:
-  %r23716 = add i32 %r23707, 1
+  %r23717 = add i32 %r23708, 1
   br label %bb39
 bb39:
-  %r23717 = phi i32 [%r23707, %bb36], [%r23716, %bb38]
-  %r23718 = phi i1 [false, %bb36], [true, %bb38]
-  %r23719 = xor i1 %r23718, true
-  %r23720 = icmp sge i32 %r23708, %r23705
-  %r23721 = and i1 %r23719, %r23720
-  %r23722 = sub i32 %r23708, %r23705
-  %r23723 = call ptr @stringSubstring(ptr %text, i32 %r23722, i32 %r23708)
-  %r23724 = call i32 @stringEqual(ptr %r23723, ptr %r23702)
-  %r23725 = icmp ne i32 %r23724, 0
-  %r23726 = and i1 %r23721, %r23725
-  br i1 %r23726, label %bb40, label %bb41
+  %r23718 = phi i32 [%r23708, %bb36], [%r23717, %bb38]
+  %r23719 = phi i1 [false, %bb36], [true, %bb38]
+  %r23720 = xor i1 %r23719, true
+  %r23721 = icmp sge i32 %r23709, %r23706
+  %r23722 = and i1 %r23720, %r23721
+  %r23723 = sub i32 %r23709, %r23706
+  %r23724 = call ptr @stringSubstring(ptr %text, i32 %r23723, i32 %r23709)
+  %r23725 = call i32 @stringEqual(ptr %r23724, ptr %r23703)
+  %r23726 = icmp ne i32 %r23725, 0
+  %r23727 = and i1 %r23722, %r23726
+  br i1 %r23727, label %bb40, label %bb41
 bb40:
-  %r23727 = call i32 @compilerBodyFunctionSignatureABICategoryNone()
-  %r23728 = icmp eq i32 %r23631, %r23727
-  %r23729 = call i32 @compilerFunctionReturnABIIndirect()
-  %r23730 = icmp eq i32 %r23682, %r23729
-  %r23731 = and i1 %r23728, %r23730
-  br i1 %r23731, label %bb42, label %bb43
+  %r23728 = call i32 @compilerBodyFunctionSignatureABICategoryNone()
+  %r23729 = icmp eq i32 %r23632, %r23728
+  %r23730 = call i32 @compilerFunctionReturnABIIndirect()
+  %r23731 = icmp eq i32 %r23683, %r23730
+  %r23732 = and i1 %r23729, %r23731
+  br i1 %r23732, label %bb42, label %bb43
 bb42:
-  %r23732 = add i32 %r23708, %r23703
-  %r23734 = call i1 @stringHasPrefix(ptr %text, i32 %r23732, ptr getelementptr inbounds ([5 x i8], ptr @.str.23733, i32 0, i32 0))
-  %r23735 = xor i1 %r23734, true
-  br i1 %r23735, label %bb44, label %bb45
+  %r23733 = add i32 %r23709, %r23704
+  %r23735 = call i1 @stringHasPrefix(ptr %text, i32 %r23733, ptr getelementptr inbounds ([5 x i8], ptr @.str.23734, i32 0, i32 0))
+  %r23736 = xor i1 %r23735, true
+  br i1 %r23736, label %bb44, label %bb45
 bb44:
-  %r23736 = mul i32 %r23554, 1000
-  %r23737 = add i32 %r23736, 6
-  ret i32 %r23737
+  %r23737 = mul i32 %r23555, 1000
+  %r23738 = add i32 %r23737, 6
+  ret i32 %r23738
 bb45:
   br label %bb43
 bb43:
   br label %bb41
 bb41:
-  %r23738 = phi i1 [%r23718, %bb39], [true, %bb43]
-  %r23739 = xor i1 %r23738, true
-  br i1 %r23739, label %bb46, label %bb47
+  %r23739 = phi i1 [%r23719, %bb39], [true, %bb43]
+  %r23740 = xor i1 %r23739, true
+  br i1 %r23740, label %bb46, label %bb47
 bb46:
-  %r23740 = mul i32 %r23554, 1000
-  %r23741 = add i32 %r23740, 7
-  ret i32 %r23741
+  %r23741 = mul i32 %r23555, 1000
+  %r23742 = add i32 %r23741, 7
+  ret i32 %r23742
 bb47:
-  %r23742 = add i32 %r23708, %r23703
-  %r23743 = call i32 @stringFindFrom(ptr %text, i32 %r23742, ptr %r23694)
+  %r23743 = add i32 %r23709, %r23704
+  %r23744 = call i32 @stringFindFrom(ptr %text, i32 %r23743, ptr %r23695)
   br label %bb35
 bb37:
-  %r23744 = icmp ne i32 %r23707, 1
-  br i1 %r23744, label %bb48, label %bb49
+  %r23745 = icmp ne i32 %r23708, 1
+  br i1 %r23745, label %bb48, label %bb49
 bb48:
-  %r23745 = mul i32 %r23554, 1000
-  %r23746 = add i32 %r23745, 8
-  ret i32 %r23746
+  %r23746 = mul i32 %r23555, 1000
+  %r23747 = add i32 %r23746, 8
+  ret i32 %r23747
 bb49:
-  %r23747 = add i32 %r23554, 1
+  %r23748 = add i32 %r23555, 1
   br label %bb1
 bb3:
   ret i32 0
@@ -39735,43 +39740,38 @@ entry:
 }
 define i32 @compilerSourceNextMarkerCandidateFromCandidate(ptr %source, ptr %marker, i32 %candidate) {
 entry:
-  %r23748 = call i32 @stringLength(ptr %source)
-  %r23749 = icmp sge i32 %candidate, %r23748
-  br i1 %r23749, label %bb1, label %bb2
+  %r23749 = call i32 @stringLength(ptr %source)
+  %r23750 = icmp sge i32 %candidate, %r23749
+  br i1 %r23750, label %bb1, label %bb2
 bb1:
-  ret i32 %r23748
+  ret i32 %r23749
 bb2:
-  %r23750 = icmp eq i32 %candidate, 0
-  %r23751 = sub i32 %candidate, 1
-  %r23752 = call ptr @stringCharacterAt(ptr %source, i32 %r23751)
-  %r23753 = call ptr @compilerCoreNewlineCharacter()
-  %r23754 = call i32 @stringEqual(ptr %r23752, ptr %r23753)
-  %r23755 = icmp ne i32 %r23754, 0
-  %r23756 = or i1 %r23750, %r23755
-  br i1 %r23756, label %bb3, label %bb4
+  %r23751 = icmp eq i32 %candidate, 0
+  %r23752 = sub i32 %candidate, 1
+  %r23753 = call ptr @stringCharacterAt(ptr %source, i32 %r23752)
+  %r23754 = call ptr @compilerCoreNewlineCharacter()
+  %r23755 = call i32 @stringEqual(ptr %r23753, ptr %r23754)
+  %r23756 = icmp ne i32 %r23755, 0
+  %r23757 = or i1 %r23751, %r23756
+  br i1 %r23757, label %bb3, label %bb4
 bb3:
   ret i32 %candidate
 bb4:
-  %r23757 = add i32 %candidate, 1
-  %r23758 = call i32 @stringIndexOf(ptr %source, ptr %marker, i32 %r23757)
-  %r23759 = call i32 @compilerSourceNextMarkerCandidateFromCandidate(ptr %source, ptr %marker, i32 %r23758)
-  ret i32 %r23759
+  %r23758 = add i32 %candidate, 1
+  %r23759 = call i32 @stringIndexOf(ptr %source, ptr %marker, i32 %r23758)
+  %r23760 = call i32 @compilerSourceNextMarkerCandidateFromCandidate(ptr %source, ptr %marker, i32 %r23759)
+  ret i32 %r23760
 }
 define i32 @compilerSourceMarkerContentEnd(ptr %source, i32 %start) {
 entry:
-  %r23760 = call i32 @stringLength(ptr %source)
-  %r23761 = call i32 @compilerSourceNextMarkerCandidate(ptr %source, i32 %start)
-  %r23762 = icmp slt i32 %r23761, %r23760
-  br i1 %r23762, label %bb1, label %bb2
+  %r23761 = call i32 @stringLength(ptr %source)
+  %r23762 = call i32 @compilerSourceNextMarkerCandidate(ptr %source, i32 %start)
+  %r23763 = icmp slt i32 %r23762, %r23761
+  br i1 %r23763, label %bb1, label %bb2
 bb1:
-  ret i32 %r23761
+  ret i32 %r23762
 bb2:
-  ret i32 %r23760
-}
-define i32 @append__ri14222135_4744918(ptr %self, i32 %element) {
-entry:
-  %r23763 = call i32 @rawBufferAppendInt(ptr %self, i32 %element)
-  ret i32 %r23763
+  ret i32 %r23761
 }
 define i32 @rangeLexerFirstNonWhitespace(ptr %source, i32 %start) {
 entry:
@@ -56162,7 +56162,7 @@ entry:
   %r33412 = icmp slt i32 %functionRow, 0
   %r33413 = or i1 %r33411, %r33412
   %r33414 = extractvalue %Range.CompilerFunctionSelection %selection, 0
-  %r33415 = call i32 @rawBufferCount(ptr %r33414)
+  %r33415 = call i32 @count__ri12754630_7389670(ptr %r33414)
   %r33416 = icmp sge i32 %functionRow, %r33415
   %r33417 = or i1 %r33413, %r33416
   br i1 %r33417, label %bb1, label %bb2
@@ -56171,14 +56171,14 @@ bb1:
   ret i32 %r33418
 bb2:
   %r33419 = extractvalue %Range.CompilerFunctionSelection %selection, 0
-  %r33420 = call i32 @rawBufferLoadInt(ptr %r33419, i32 %functionRow)
+  %r33420 = call i32 @element__ri1950873_9116773(ptr %r33419, i32 %functionRow)
   %r33421 = icmp eq i32 %r33420, 1
   br i1 %r33421, label %bb3, label %bb4
 bb3:
   ret i32 0
 bb4:
   %r33422 = extractvalue %Range.CompilerFunctionSelection %selection, 0
-  %r33423 = call i32 @rawBufferStoreInt(ptr %r33422, i32 %functionRow, i32 1)
+  %r33423 = call i32 @update__ri13862335_13033578(ptr %r33422, i32 1, i32 %functionRow)
   ret i32 %r33423
 }
 define i1 @compilerReachableLLVMStateWorklistContainsInstance(%Range.CompilerReachableLLVMState %reachability, i32 %instanceID) {

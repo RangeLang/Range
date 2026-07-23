@@ -44,5 +44,7 @@
     the independently verified accepted seed.
   - [ ] Widen the migration to the compiler's remaining integer and text
     buffers in separately proven slices.
+    - [x] Migrate the function-selection bitmap to `Buffer<Int>` and promote
+      its independently verified fixed-point seed.
   - [ ] Delete raw runtime entry points only after no accepted compiler or Core
     path consumes them.

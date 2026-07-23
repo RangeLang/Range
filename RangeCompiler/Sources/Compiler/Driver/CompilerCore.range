@@ -225,7 +225,7 @@ construct CompilerDeclarationIndex {
 }
 
 construct CompilerFunctionSelection {
-    let selectedRows: RawBuffer
+    let selectedRows: Buffer<Int>
     let isValid: Bool
 }
 

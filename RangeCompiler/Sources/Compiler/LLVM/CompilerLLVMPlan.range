@@ -1756,7 +1756,7 @@ function compilerReachableLLVMStateSeedEntryRoots(reachability: CompilerReachabl
     while status == 0 && resolutionRow < compilerIntTableRowCount(table: arena.resolutions) {
         if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) == compilerBodyResolutionFunction() {
             let targetFunctionRow: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
-            if targetFunctionRow < 0 || targetFunctionRow >= rawBufferCount(buffer: reachability.selection.selectedRows) {
+            if targetFunctionRow < 0 || targetFunctionRow >= reachability.selection.selectedRows.count {
                 status: 4
             } else {
                 if compilerBodyArenaResultTypeIsRepresentationSensitive(arena: arena, typeKind: compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()), typeID: compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeIDColumn())) {

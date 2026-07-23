@@ -815,37 +815,37 @@ function compilerDeclarationIndexAnyMemberFunctionLookup(tables: CompilerSyntaxT
 }
 
 function compilerFunctionSelectionCreateEmpty(functionCount: Int, valid: Bool): CompilerFunctionSelection {
-    let selectedRows: RawBuffer(rawBufferCreate(capacity: functionCount, stride: 4))
+    let selectedRows: Buffer<Int>(bufferCreateInt(capacity: functionCount))
     state isValid: Bool(valid)
     state functionRow: Int(0)
     while functionRow < functionCount {
-        if rawBufferAppendInt(buffer: selectedRows, value: 0) != 0 { isValid: false }
+        if selectedRows.append(element: 0) != 0 { isValid: false }
         functionRow: functionRow + 1
     }
     return CompilerFunctionSelection(selectedRows: selectedRows, isValid: isValid)
 }
 
 function compilerFunctionSelectionMark(selection: CompilerFunctionSelection, functionRow: Int): Int {
-    if !selection.isValid || functionRow < 0 || functionRow >= rawBufferCount(buffer: selection.selectedRows) { return 0 - 1 }
-    if rawBufferLoadInt(buffer: selection.selectedRows, index: functionRow) == 1 { return 0 }
-    return rawBufferStoreInt(buffer: selection.selectedRows, index: functionRow, value: 1)
+    if !selection.isValid || functionRow < 0 || functionRow >= selection.selectedRows.count { return 0 - 1 }
+    if selection.selectedRows.element(index: functionRow) == 1 { return 0 }
+    return selection.selectedRows.update(element: 1, index: functionRow)
 }
 
 function compilerFunctionSelectionCount(selection: CompilerFunctionSelection): Int {
     state count: Int(0)
     state functionRow: Int(0)
-    while functionRow < rawBufferCount(buffer: selection.selectedRows) {
-        if rawBufferLoadInt(buffer: selection.selectedRows, index: functionRow) == 1 { count: count + 1 }
+    while functionRow < selection.selectedRows.count {
+        if selection.selectedRows.element(index: functionRow) == 1 { count: count + 1 }
         functionRow: functionRow + 1
     }
     return count
 }
 
 function compilerFunctionSelectionFirstDifference(left: CompilerFunctionSelection, right: CompilerFunctionSelection): Int {
-    if !left.isValid || !right.isValid || rawBufferCount(buffer: left.selectedRows) != rawBufferCount(buffer: right.selectedRows) { return 0 }
+    if !left.isValid || !right.isValid || left.selectedRows.count != right.selectedRows.count { return 0 }
     state functionRow: Int(0)
-    while functionRow < rawBufferCount(buffer: left.selectedRows) {
-        if rawBufferLoadInt(buffer: left.selectedRows, index: functionRow) != rawBufferLoadInt(buffer: right.selectedRows, index: functionRow) { return functionRow }
+    while functionRow < left.selectedRows.count {
+        if left.selectedRows.element(index: functionRow) != right.selectedRows.element(index: functionRow) { return functionRow }
         functionRow: functionRow + 1
     }
     return 0 - 1
@@ -1075,12 +1075,12 @@ function compilerFunctionReachabilityDestroy(reachability: CompilerFunctionReach
 }
 
 function compilerFunctionSelectionDestroy(selection: CompilerFunctionSelection): Int {
-    return rawBufferDestroy(buffer: selection.selectedRows)
+    return selection.selectedRows.destroy()
 }
 
 function compilerFunctionSelectionContains(selection: CompilerFunctionSelection, functionRow: Int): Bool {
-    return selection.isValid && functionRow >= 0 && functionRow < rawBufferCount(buffer: selection.selectedRows)
-        && rawBufferLoadInt(buffer: selection.selectedRows, index: functionRow) == 1
+    return selection.isValid && functionRow >= 0 && functionRow < selection.selectedRows.count
+        && selection.selectedRows.element(index: functionRow) == 1
 }
 
 function compilerSyntaxTableAppend(tables: CompilerSyntaxTables, table: CompilerIntTable, value: Int): Int {
