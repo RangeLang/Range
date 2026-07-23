@@ -42,7 +42,6 @@ fi
 
 clang -O2 -flto=thin -Wno-override-module "$LLVM" \
     "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerHost.c" \
-    "$REPO_ROOT/RangeCompiler/Runtime/RangeString.c" \
     "$REPO_ROOT/RangeCompiler/Runtime/RangeRawBuffer.c" \
     "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerMetrics.c" \
     -o "$EXECUTABLE"
@@ -53,8 +52,11 @@ run_status=$?
 set -e
 
 [[ "$run_status" -eq 9 ]] || { echo "Array<Int> over Buffer exited $run_status, expected 9" >&2; exit 1; }
-/usr/bin/grep -Fq '%Range.Array = type { %Range.Buffer }' "$LLVM" || { echo "Array<Int> does not store Buffer<Int>" >&2; exit 1; }
-/usr/bin/grep -Fq '%Range.Buffer = type { ptr }' "$LLVM" || { echo "Buffer<Int> does not store RawBuffer" >&2; exit 1; }
+/usr/bin/grep -Fq '%Range.Array = type { ptr }' "$LLVM" || { echo "Array<Int> does not lower its Buffer<Int> storage to one pointer" >&2; exit 1; }
+if /usr/bin/grep -Fq '%Range.Buffer = type' "$LLVM"; then
+    echo "Array<Int> emitted a redundant nested Buffer wrapper" >&2
+    exit 1
+fi
 /usr/bin/grep -Fq 'rawBufferDestroy' "$LLVM" || { echo "Array<Int> omitted nested destruction" >&2; exit 1; }
 
-echo "Canonical Array<Int> over Buffer<Int> lifecycle verified."
+echo "Canonical Array<Int> over flattened Buffer<Int> lifecycle verified."

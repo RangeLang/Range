@@ -29,9 +29,9 @@ function compilerBodyArenaAppendNode(arena: CompilerBodyArena, kind: Int, ordina
         || compilerIntTableAppend(table: arena.nodes, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: secondStart)) != 0
         || compilerIntTableAppend(table: arena.nodes, value: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: secondEnd)) != 0
         || compilerIntTableAppend(table: arena.nodes, value: aux) != 0
-        || rawBufferAppendInt(buffer: arena.parentNodes, value: 0 - 1) != 0
-        || rawBufferAppendInt(buffer: arena.parentRoles, value: 0 - 1) != 0 {
-        rawBufferAppendInt(buffer: arena.failures, value: 1)
+        || arena.parentNodes.append(element: 0 - 1) != 0
+        || arena.parentRoles.append(element: 0 - 1) != 0 {
+        arena.failures.append(element: 1)
         return 0 - 1
     }
     return nodeID
@@ -42,30 +42,30 @@ function compilerBodyArenaAppendEdge(arena: CompilerBodyArena, ownerNodeID: Int,
         || compilerIntTableAppend(table: arena.edges, value: childNodeID) != 0
         || compilerIntTableAppend(table: arena.edges, value: role) != 0
         || compilerIntTableAppend(table: arena.edges, value: ordinal) != 0 {
-        rawBufferAppendInt(buffer: arena.failures, value: 1)
+        arena.failures.append(element: 1)
         return 0 - 1
     }
-    if childNodeID >= 0 && childNodeID < rawBufferCount(buffer: arena.parentNodes) {
-        if rawBufferLoadInt(buffer: arena.parentNodes, index: childNodeID) == 0 - 1 {
-            if rawBufferStoreInt(buffer: arena.parentNodes, index: childNodeID, value: ownerNodeID) != 0
-                || rawBufferStoreInt(buffer: arena.parentRoles, index: childNodeID, value: role) != 0 { return 0 - 1 }
+    if childNodeID >= 0 && childNodeID < arena.parentNodes.count {
+        if arena.parentNodes.element(index: childNodeID) == 0 - 1 {
+            if arena.parentNodes.update(element: ownerNodeID, index: childNodeID) != 0
+                || arena.parentRoles.update(element: role, index: childNodeID) != 0 { return 0 - 1 }
         } else {
-            if rawBufferStoreInt(buffer: arena.parentNodes, index: childNodeID, value: 0 - 2) != 0
-                || rawBufferStoreInt(buffer: arena.parentRoles, index: childNodeID, value: 0 - 2) != 0 { return 0 - 1 }
+            if arena.parentNodes.update(element: 0 - 2, index: childNodeID) != 0
+                || arena.parentRoles.update(element: 0 - 2, index: childNodeID) != 0 { return 0 - 1 }
         }
     }
     return 0
 }
 
 function compilerBodyArenaCreateForBodyWithTypeTables(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, typeInstances: CompilerIntTable, typeArguments: CompilerIntTable, ownerKind: Int, ownerSyntaxID: Int, ownerFunctionRow: Int, ownerFunctionInstanceID: Int, ownerReceiverTypeKeyID: Int, ownerReceiverTypeID: Int, fileID: Int, bodyStart: Int, bodyEnd: Int): CompilerBodyArena {
-    let memoryState: RawBuffer(rawBufferCreate(capacity: compilerBodyMemoryStateCount(), stride: 4))
-    rawBufferAppendInt(buffer: memoryState, value: 0)
-    rawBufferAppendInt(buffer: memoryState, value: 0)
-    rawBufferAppendInt(buffer: memoryState, value: 1)
+    let memoryState: Buffer<Int>(bufferCreateInt(capacity: compilerBodyMemoryStateCount()))
+    memoryState.append(element: 0)
+    memoryState.append(element: 0)
+    memoryState.append(element: 1)
     let nodes: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyArenaNodeColumnCount(), estimatedRowCount: 64))
     let edges: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyArenaEdgeColumnCount(), estimatedRowCount: 96))
-    let parentNodes: RawBuffer(rawBufferCreate(capacity: 64, stride: 4))
-    let parentRoles: RawBuffer(rawBufferCreate(capacity: 64, stride: 4))
+    let parentNodes: Buffer<Int>(bufferCreateInt(capacity: 64))
+    let parentRoles: Buffer<Int>(bufferCreateInt(capacity: 64))
     let symbols: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodySymbolColumnCount(), estimatedRowCount: 16))
     let resolutions: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyResolutionColumnCount(), estimatedRowCount: 32))
     let cfgBlocks: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyCFGBlockColumnCount(), estimatedRowCount: 16))
@@ -88,11 +88,11 @@ function compilerBodyArenaCreateForBodyWithTypeTables(tables: CompilerSyntaxTabl
     let mirExpressionValues: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyMIRExpressionValueColumnCount(), estimatedRowCount: 64))
     let graphZeroMIRDependencies: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyGraphZeroMIRDependencyColumnCount(), estimatedRowCount: 128))
     let graphZeroMIRFrontiers: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyGraphZeroMIRFrontierColumnCount(), estimatedRowCount: 64))
-    let graphZeroState: RawBuffer(rawBufferCreate(capacity: compilerBodyGraphZeroStateCount(), stride: 4))
-    rawBufferAppendInt(buffer: graphZeroState, value: 0)
-    rawBufferAppendInt(buffer: graphZeroState, value: 1)
-    let mirTraversal: RawBuffer(rawBufferCreate(capacity: 32, stride: 4))
-    let failures: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
+    let graphZeroState: Buffer<Int>(bufferCreateInt(capacity: compilerBodyGraphZeroStateCount()))
+    graphZeroState.append(element: 0)
+    graphZeroState.append(element: 1)
+    let mirTraversal: Buffer<Int>(bufferCreateInt(capacity: 32))
+    let failures: Buffer<Int>(bufferCreateInt(capacity: 1))
     let created: CompilerBodyArena(
         tables: $tables,
         declarationIndex: $index,
@@ -166,9 +166,9 @@ function compilerBodyArenaCreateForFunctionInstance(tables: CompilerSyntaxTables
         receiverTypeID: compilerBodyArenaImportTypeKeyIntoTables(typeInstances: typeInstances, typeArguments: typeArguments, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, typeKeyID: receiverTypeKeyID)
     }
     let arena: CompilerBodyArena(compilerBodyArenaCreateForBodyWithTypeTables(tables: tables, index: index, typeInstances: typeInstances, typeArguments: typeArguments, ownerKind: compilerBodyArenaOwnerFunction(), ownerSyntaxID: compilerIntTableValue(table: tables.functions, row: functionRow, column: 0), ownerFunctionRow: functionRow, ownerFunctionInstanceID: functionInstanceID, ownerReceiverTypeKeyID: receiverTypeKeyID, ownerReceiverTypeID: receiverTypeID, fileID: fileID, bodyStart: bodyStart, bodyEnd: bodyEnd))
-    let ownerSyntaxID: Int(rawBufferLoadInt(buffer: tables.functionOwners, index: functionRow))
-    if receiverTypeKeyID >= 0 && receiverTypeID < 0 { rawBufferAppendInt(buffer: arena.failures, value: 0 - 1) }
-    if receiverTypeKeyID < 0 && ownerSyntaxID >= 0 && compilerSyntaxGenericParameterCountForOwner(tables: tables, ownerSyntaxID: ownerSyntaxID) > 0 { rawBufferAppendInt(buffer: arena.failures, value: 0 - 1) }
+    let ownerSyntaxID: Int(tables.functionOwners.element(index: functionRow))
+    if receiverTypeKeyID >= 0 && receiverTypeID < 0 { arena.failures.append(element: 0 - 1) }
+    if receiverTypeKeyID < 0 && ownerSyntaxID >= 0 && compilerSyntaxGenericParameterCountForOwner(tables: tables, ownerSyntaxID: ownerSyntaxID) > 0 { arena.failures.append(element: 0 - 1) }
     return arena
 }
 
@@ -189,7 +189,7 @@ function compilerBodyArenaCreateEntry(tables: CompilerSyntaxTables, index: Compi
         bodyEnd: mainBlock.bodyEnd
     }
     let arena: CompilerBodyArena(compilerBodyArenaCreateForBody(tables: tables, index: index, ownerKind: compilerBodyArenaOwnerEntry(), ownerSyntaxID: ownerSyntaxID, ownerFunctionRow: 0 - 1, ownerFunctionInstanceID: 0 - 1, ownerReceiverTypeKeyID: 0 - 1, ownerReceiverTypeID: 0 - 1, fileID: fileID, bodyStart: bodyStart, bodyEnd: bodyEnd))
-    if !isValid { rawBufferAppendInt(buffer: arena.failures, value: 0 - 1) }
+    if !isValid { arena.failures.append(element: 0 - 1) }
     return arena
 }
 
@@ -1018,7 +1018,7 @@ function compilerBodyArenaParseFunction(arena: CompilerBodyArena): CompilerBodyA
     state bodyEnd: Int(0)
     bodyEnd: arena.bodyEnd
     if bodyStart < 0 || bodyEnd <= bodyStart {
-        rawBufferAppendInt(buffer: arena.failures, value: bodyStart)
+        arena.failures.append(element: bodyStart)
         return arena
     }
     let rootNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindLexicalRegion(), ordinal: 0, start: bodyStart, end: bodyEnd, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
@@ -1029,13 +1029,13 @@ function compilerBodyArenaParseFunction(arena: CompilerBodyArena): CompilerBodyA
         if rootNodeID != arena.rootNodeID || !value.isValid || compilerCoreFirstNonWhitespaceIndex(source: arena.tables.sourceStore.source, start: value.nextIndex, end: bodyEnd) < bodyEnd || returnNodeID < 0
             || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: returnNodeID, childNodeID: value.nodeID, role: compilerSyntaxRoleReturnValue(), ordinal: 0) != 0
             || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: rootNodeID, childNodeID: returnNodeID, role: compilerSyntaxRoleStatement(), ordinal: 0) != 0 {
-            rawBufferAppendInt(buffer: arena.failures, value: value.nextIndex)
+            arena.failures.append(element: value.nextIndex)
         }
         return arena
     }
     let parsedRegion: CompilerBodyParseResult(compilerBodyArenaParseRegionInto(arena: arena, regionNodeID: rootNodeID, start: bodyStart, limit: bodyEnd))
     if rootNodeID != arena.rootNodeID || !parsedRegion.isValid || parsedRegion.nextIndex < bodyEnd {
-        rawBufferAppendInt(buffer: arena.failures, value: parsedRegion.nextIndex)
+        arena.failures.append(element: parsedRegion.nextIndex)
     }
     return arena
 }

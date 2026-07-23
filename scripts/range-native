@@ -422,7 +422,7 @@ compiler_next() {
     compiler="$(ensure_seed_compiler)"
     compiler_project="$(compiler_project_file)"
     command_line_source="$(project_command_line_source "$compiler_project")"
-    compiler_directory=""
+    compiler_directory="$(cd "$command_line_source" && pwd)"
     core_sources=()
     project_sources=()
     runtimes=()
@@ -434,25 +434,19 @@ compiler_next() {
         relative="$(manifest_value "compilerSources.$index.path")"
         if [[ "$role" == "core" ]]; then
             core_sources+=("$REPO_ROOT/$relative")
-        elif [[ -z "$compiler_directory" ]]; then
-            compiler_directory="$(dirname "$REPO_ROOT/$relative")"
-        elif [[ "$(dirname "$REPO_ROOT/$relative")" != "$compiler_directory" ]]; then
-            echo "Compiler project sources span multiple directories; project command metadata must make this explicit." >&2
-            return 65
+        else
+            project_source="$REPO_ROOT/$relative"
+            if [[ ! -f "$project_source" || "$project_source" != "$compiler_directory/"* ]]; then
+                echo "Manifest compiler source is outside the @compiler commandLine root: $relative" >&2
+                return 65
+            fi
+            project_sources+=("$project_source")
         fi
     done
-    if [[ -z "$compiler_directory" || ! -d "$compiler_directory" ]]; then
+    if [[ ! -d "$compiler_directory" ]]; then
         echo "Unable to resolve the Compiler project source directory." >&2
         return 66
     fi
-    if [[ "$(cd "$command_line_source" && pwd)" != "$(cd "$compiler_directory" && pwd)" ]]; then
-        echo "The @compiler project commandLine source differs from the manifested compiler source directory." >&2
-        return 65
-    fi
-
-    while IFS= read -r project_source; do
-        project_sources+=("$project_source")
-    done < <(/usr/bin/find "$compiler_directory" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print | LC_ALL=C /usr/bin/sort)
     if [[ "${#project_sources[@]}" -eq 0 ]]; then
         echo "The Compiler project has no Range sources." >&2
         return 66

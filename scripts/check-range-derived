@@ -30,7 +30,6 @@ check_fixture() {
     fi
     clang -O2 -flto=thin -Wno-override-module "$llvm" \
         "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerHost.c" \
-        "$REPO_ROOT/RangeCompiler/Runtime/RangeString.c" \
         "$REPO_ROOT/RangeCompiler/Runtime/RangeRawBuffer.c" \
         "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerMetrics.c" \
         -o "$executable"

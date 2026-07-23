@@ -6,18 +6,18 @@ construct Array<Element> {
     }
 
     function append(element: Element): Int {
-        return rawBufferAppendInt(buffer: self.storage.storage, value: element)
+        return storage.append(element: element)
     }
 
     function element(index: Int): Element {
-        return rawBufferLoadInt(buffer: self.storage.storage, index: index)
+        return storage.element(index: index)
     }
 
     function update(element: Element, index: Int): Int {
-        return rawBufferStoreInt(buffer: self.storage.storage, index: index, value: element)
+        return storage.update(element: element, index: index)
     }
 
     function destroy(): Int {
-        return rawBufferDestroy(buffer: self.storage.storage)
+        return storage.destroy()
     }
 }

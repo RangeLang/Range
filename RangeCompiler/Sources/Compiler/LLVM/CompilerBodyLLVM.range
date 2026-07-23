@@ -1,10 +1,10 @@
 function compilerBodyLLVMEmitterCreate(arena: CompilerBodyArena, initialTemporary: Int, initialBranch: Int, abiPlan: CompilerModuleABIPlan, typeKeys: CompilerIntTable, typeKeyArguments: CompilerIntTable, functionInstances: CompilerIntTable, functionInstanceSignatures: CompilerIntTable, functionInstanceSignatureParameters: CompilerIntTable): CompilerBodyLLVMEmitter {
-    let emitterState: RawBuffer(rawBufferCreate(capacity: compilerBodyLLVMEmitterStateCount(), stride: 4))
-    rawBufferAppendInt(buffer: emitterState, value: initialTemporary)
-    rawBufferAppendInt(buffer: emitterState, value: initialBranch)
-    rawBufferAppendInt(buffer: emitterState, value: 1)
-    rawBufferAppendInt(buffer: emitterState, value: 0)
-    rawBufferAppendInt(buffer: emitterState, value: 0)
+    let emitterState: Buffer<Int>(bufferCreateInt(capacity: compilerBodyLLVMEmitterStateCount()))
+    emitterState.append(element: initialTemporary)
+    emitterState.append(element: initialBranch)
+    emitterState.append(element: 1)
+    emitterState.append(element: 0)
+    emitterState.append(element: 0)
     let valueAssignments: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyLLVMValueAssignmentColumnCount(), estimatedRowCount: 128))
     let blockLabels: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyLLVMBlockLabelColumnCount(), estimatedRowCount: 32))
     let globalDescriptors: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyLLVMGlobalDescriptorColumnCount(), estimatedRowCount: 16))
@@ -16,19 +16,19 @@ function compilerBodyLLVMEmitterCreate(arena: CompilerBodyArena, initialTemporar
 function compilerBodyLLVMEmitterDestroy(emitter: CompilerBodyLLVMEmitter): Int {
     let assignmentStatus: Int(compilerIntTableDestroy(table: emitter.valueAssignments))
     let labelStatus: Int(compilerIntTableDestroy(table: emitter.blockLabels))
-    let stateStatus: Int(rawBufferDestroy(buffer: emitter.runtimeState))
+    let stateStatus: Int(emitter.runtimeState.destroy())
     let globalStatus: Int(compilerIntTableDestroy(table: emitter.globalDescriptors))
     let blockStatus: Int(rawBufferDestroy(buffer: emitter.renderedBlocks))
     if assignmentStatus != 0 || labelStatus != 0 || stateStatus != 0 || globalStatus != 0 || blockStatus != 0 { return 0 - 1 }
     return 0
 }
 
-function compilerBodyLLVMAllForwardPredecessorsVisited(arena: CompilerBodyArena, blockID: Int, visited: RawBuffer): Bool {
+function compilerBodyLLVMAllForwardPredecessorsVisited(arena: CompilerBodyArena, blockID: Int, visited: Buffer<Int>): Bool {
     state ordinal: Int(0)
     let count: Int(compilerBodyMIRForwardPredecessorCount(arena: arena, blockID: blockID))
     while ordinal < count {
         let predecessorBlockID: Int(compilerBodyMIRForwardPredecessorAt(arena: arena, blockID: blockID, ordinal: ordinal))
-        if predecessorBlockID < 0 || rawBufferLoadInt(buffer: visited, index: predecessorBlockID) != 1 { return false }
+        if predecessorBlockID < 0 || visited.element(index: predecessorBlockID) != 1 { return false }
         ordinal: ordinal + 1
     }
     return true
@@ -206,8 +206,8 @@ function compilerBodyLLVMFunctionName(arena: CompilerBodyArena, functionID: Int)
 
 function compilerBodyLLVMFunctionNameForReceiver(arena: CompilerBodyArena, functionID: Int, receiverTypeID: Int): String {
     let baseName: String(compilerBodyLLVMFunctionName(arena: arena, functionID: functionID))
-    if functionID < 0 || functionID >= rawBufferCount(buffer: arena.tables.functionOwners) || receiverTypeID < 0 { return baseName }
-    let ownerSyntaxID: Int(rawBufferLoadInt(buffer: arena.tables.functionOwners, index: functionID))
+    if functionID < 0 || functionID >= arena.tables.functionOwners.count || receiverTypeID < 0 { return baseName }
+    let ownerSyntaxID: Int(arena.tables.functionOwners.element(index: functionID))
     if ownerSyntaxID < 0 || compilerSyntaxGenericParameterCountForOwner(tables: arena.tables, ownerSyntaxID: ownerSyntaxID) <= 0 { return baseName }
     let fingerprint: CompilerFingerprint(compilerBodyArenaTypeStructuralFingerprint(arena: arena, typeID: receiverTypeID))
     return "\(baseName)__ri\(fingerprint.first)_\(fingerprint.second)"
@@ -248,7 +248,7 @@ function compilerBodyLLVMCallResolutionTypeID(arena: CompilerBodyArena, operatio
 
 function compilerBodyLLVMCallTargetInstanceIsValid(emitter: CompilerBodyLLVMEmitter, operationID: Int, targetFunctionID: Int, resultValueID: Int): Bool {
     if operationID < 0 || operationID >= compilerIntTableRowCount(table: emitter.arena.mirOperations) || targetFunctionID < 0 || targetFunctionID >= compilerIntTableRowCount(table: emitter.arena.tables.functions) { return false }
-    let ownerSyntaxID: Int(rawBufferLoadInt(buffer: emitter.arena.tables.functionOwners, index: targetFunctionID))
+    let ownerSyntaxID: Int(emitter.arena.tables.functionOwners.element(index: targetFunctionID))
     let genericCount: Int(compilerSyntaxGenericParameterCountForOwner(tables: emitter.arena.tables, ownerSyntaxID: ownerSyntaxID))
     let receiverTypeID: Int(compilerBodyLLVMCallReceiverTypeID(arena: emitter.arena, operationID: operationID, targetFunctionID: targetFunctionID))
     let calleeNodeID: Int(compilerBodyArenaChild(arena: emitter.arena, ownerNodeID: compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationSourceColumn()), role: compilerSyntaxRoleCallee(), ordinal: 0))
@@ -566,14 +566,14 @@ function compilerBodyLLVMConditionContinuationBlock(arena: CompilerBodyArena, bl
     return 0 - 1
 }
 
-function compilerBodyLLVMEmitterInitializeLabelsDepthFirst(emitter: CompilerBodyLLVMEmitter, blockID: Int, visited: RawBuffer): Int {
+function compilerBodyLLVMEmitterInitializeLabelsDepthFirst(emitter: CompilerBodyLLVMEmitter, blockID: Int, visited: Buffer<Int>): Int {
     if blockID < 0 || blockID >= compilerIntTableRowCount(table: emitter.arena.cfgBlocks) { return 0 - 1 }
-    if rawBufferLoadInt(buffer: visited, index: blockID) == 1 { return 0 }
+    if visited.element(index: blockID) == 1 { return 0 }
     if blockID != 0 && !compilerBodyLLVMAllForwardPredecessorsVisited(arena: emitter.arena, blockID: blockID, visited: visited) { return 0 }
-    if rawBufferStoreInt(buffer: visited, index: blockID, value: 1) != 0 { return 0 - 1 }
+    if visited.update(element: 1, index: blockID) != 0 { return 0 - 1 }
     let terminatorKind: Int(compilerIntTableValue(table: emitter.arena.cfgBlocks, row: blockID, column: compilerBodyCFGBlockTerminatorKindColumn()))
     if terminatorKind == compilerBodyCFGTerminatorCondition() {
-        let branchNumber: Int(rawBufferLoadInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextBranch()))
+        let branchNumber: Int(emitter.runtimeState.element(index: compilerBodyLLVMEmitterNextBranch()))
         let trueBlockID: Int(compilerBodyLLVMConditionTarget(arena: emitter.arena, blockID: blockID, outcome: compilerBodyControlOutcomeTrue()))
         let falseBlockID: Int(compilerBodyLLVMConditionTarget(arena: emitter.arena, blockID: blockID, outcome: compilerBodyControlOutcomeFalse()))
         state isWhileHeader: Bool(false)
@@ -606,7 +606,7 @@ function compilerBodyLLVMEmitterInitializeLabelsDepthFirst(emitter: CompilerBody
             || emitter.blockLabels.values.update(element: branchNumber, index: trueBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelNumberColumn()) != 0
             || emitter.blockLabels.values.update(element: falseLabelKind, index: falseBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelKindColumn()) != 0
             || emitter.blockLabels.values.update(element: branchNumber, index: falseBlockID * compilerBodyLLVMBlockLabelColumnCount() + compilerBodyLLVMBlockLabelNumberColumn()) != 0
-            || rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextBranch(), value: branchNumber + 1) != 0 { return 0 - 1 }
+            || emitter.runtimeState.update(element: branchNumber + 1, index: compilerBodyLLVMEmitterNextBranch()) != 0 { return 0 - 1 }
         if compilerBodyLLVMEmitterInitializeLabelsDepthFirst(emitter: emitter, blockID: trueBlockID, visited: visited) != 0 { return 0 - 1 }
         return compilerBodyLLVMEmitterInitializeLabelsDepthFirst(emitter: emitter, blockID: falseBlockID, visited: visited)
     }
@@ -760,11 +760,11 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
     if operationKind == compilerBodyMIROperationArrayStore() {
         return compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueAlias(), number: 0 - 1, aux: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 2))
     }
-    let plannedTemporary: Int(rawBufferLoadInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary()))
+    let plannedTemporary: Int(emitter.runtimeState.element(index: compilerBodyLLVMEmitterNextTemporary()))
     if operationKind == compilerBodyMIROperationMemberAssign() {
         let receiverValueID: Int(compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0))
         if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueAlias(), number: plannedTemporary, aux: receiverValueID) != 0
-            || rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary(), value: plannedTemporary + 2) != 0 { return 0 - 1 }
+            || emitter.runtimeState.update(element: plannedTemporary + 2, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
         return 0
     }
     if operationKind == compilerBodyMIROperationStringGlobal() {
@@ -783,7 +783,7 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
             || compilerIntTableAppend(table: emitter.globalDescriptors, value: byteCount) != 0
             || compilerIntTableAppend(table: emitter.globalDescriptors, value: stringDescriptorKind) != 0
             || compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueGlobalString(), number: plannedTemporary, aux: byteCount) != 0
-            || rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary(), value: plannedTemporary + 1) != 0 { return 0 - 1 }
+            || emitter.runtimeState.update(element: plannedTemporary + 1, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
         return 0
     }
     if operationKind == compilerBodyMIROperationMemberRead() {
@@ -791,12 +791,12 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
         let plannedMemberReceiverValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: plannedMemberReceiverValueID))
         if plannedMemberReceiverValue.typeName != String("ptr") {
             if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary, aux: 0 - 1) != 0
-                || rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary(), value: plannedTemporary + 1) != 0 { return 0 - 1 }
+                || emitter.runtimeState.update(element: plannedTemporary + 1, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
             return 0
         }
         if compilerIntTableValue(table: emitter.arena.mirValues, row: plannedMemberReceiverValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeConstruct() {
             if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + 1, aux: 0 - 1) != 0
-                || rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary(), value: plannedTemporary + 2) != 0 { return 0 - 1 }
+                || emitter.runtimeState.update(element: plannedTemporary + 2, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
             return 0
         }
         let plannedMemberSourceNodeID: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationSourceColumn()))
@@ -808,21 +808,21 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
             || compilerIntTableAppend(table: emitter.globalDescriptors, value: memberByteCount) != 0
             || compilerIntTableAppend(table: emitter.globalDescriptors, value: compilerBodyLLVMGlobalDescriptorMemberName()) != 0
             || compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + 1, aux: 0 - 1) != 0
-            || rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary(), value: plannedTemporary + 2) != 0 { return 0 - 1 }
+            || emitter.runtimeState.update(element: plannedTemporary + 2, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
         return 0
     }
     if operationKind == compilerBodyMIROperationConstruct() {
         let fieldCount: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationOperandCountColumn()))
         if fieldCount < 1
             || compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + fieldCount - 1, aux: 0 - 1) != 0
-            || rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary(), value: plannedTemporary + fieldCount) != 0 { return 0 - 1 }
+            || emitter.runtimeState.update(element: plannedTemporary + fieldCount, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
         return 0
     }
     if operationKind == compilerBodyMIROperationEnumConstruct() {
         let payloadCount: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationOperandCountColumn()))
         if payloadCount < 0
             || compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + payloadCount, aux: 0 - 1) != 0
-            || rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary(), value: plannedTemporary + payloadCount + 1) != 0 { return 0 - 1 }
+            || emitter.runtimeState.update(element: plannedTemporary + payloadCount + 1, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
         return 0
     }
     if operationKind == compilerBodyMIROperationEnumTag() || operationKind == compilerBodyMIROperationEnumPayload() {
@@ -831,19 +831,19 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
         state temporaryCount: Int(1)
         if enumOperandValue.typeName == String("ptr") { temporaryCount: 2 }
         if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + temporaryCount - 1, aux: 0 - 1) != 0
-            || rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary(), value: plannedTemporary + temporaryCount) != 0 { return 0 - 1 }
+            || emitter.runtimeState.update(element: plannedTemporary + temporaryCount, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
         return 0
     }
     if operationKind == compilerBodyMIROperationArrayLiteral()
         || operationKind == compilerBodyMIROperationArrayIndex()
         || operationKind == compilerBodyMIROperationArrayCount() {
         if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary, aux: 0 - 1) != 0
-            || rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary(), value: plannedTemporary + 1) != 0 { return 0 - 1 }
+            || emitter.runtimeState.update(element: plannedTemporary + 1, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
         return 0
     }
     if operationKind == compilerBodyMIROperationOptionalSome() {
         if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + 1, aux: 0 - 1) != 0 { return 0 - 1 }
-        return rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary(), value: plannedTemporary + 2)
+        return emitter.runtimeState.update(element: plannedTemporary + 2, index: compilerBodyLLVMEmitterNextTemporary())
     }
     state resultTemporary: Int(plannedTemporary)
     state consumedTemporaryCount: Int(1)
@@ -859,8 +859,8 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
         } else if leftValue.typeName == String("ptr") && rightValue.typeName == String("ptr") {
             resultTemporary: plannedTemporary + 1
             consumedTemporaryCount: 2
-            if rawBufferLoadInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterRuntimeRequirements()) < compilerBodyLLVMRuntimeStringEqual()
-                && rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterRuntimeRequirements(), value: compilerBodyLLVMRuntimeStringEqual()) != 0 { return 0 - 1 }
+            if emitter.runtimeState.element(index: compilerBodyLLVMEmitterRuntimeRequirements()) < compilerBodyLLVMRuntimeStringEqual()
+                && emitter.runtimeState.update(element: compilerBodyLLVMRuntimeStringEqual(), index: compilerBodyLLVMEmitterRuntimeRequirements()) != 0 { return 0 - 1 }
         }
     }
     if operationKind >= compilerBodyMIROperationLessThan() && operationKind <= compilerBodyMIROperationGreaterEqual() {
@@ -871,20 +871,20 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
         if orderedLeftValue.typeName == String("ptr") && orderedRightValue.typeName == String("ptr") {
             resultTemporary: plannedTemporary + 1
             consumedTemporaryCount: 2
-            if rawBufferLoadInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterRuntimeRequirements()) < compilerBodyLLVMRuntimeStringCompare()
-                && rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterRuntimeRequirements(), value: compilerBodyLLVMRuntimeStringCompare()) != 0 { return 0 - 1 }
+            if emitter.runtimeState.element(index: compilerBodyLLVMEmitterRuntimeRequirements()) < compilerBodyLLVMRuntimeStringCompare()
+                && emitter.runtimeState.update(element: compilerBodyLLVMRuntimeStringCompare(), index: compilerBodyLLVMEmitterRuntimeRequirements()) != 0 { return 0 - 1 }
         }
     }
     if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: resultTemporary, aux: 0 - 1) != 0
-        || rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary(), value: plannedTemporary + consumedTemporaryCount) != 0 { return 0 - 1 }
+        || emitter.runtimeState.update(element: plannedTemporary + consumedTemporaryCount, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
     return 0
 }
 
-function compilerBodyLLVMEmitterPlanCFGDepthFirst(emitter: CompilerBodyLLVMEmitter, blockID: Int, visited: RawBuffer): Int {
+function compilerBodyLLVMEmitterPlanCFGDepthFirst(emitter: CompilerBodyLLVMEmitter, blockID: Int, visited: Buffer<Int>): Int {
     if blockID < 0 || blockID >= compilerIntTableRowCount(table: emitter.arena.mirBlocks) { return 0 - 1 }
-    if rawBufferLoadInt(buffer: visited, index: blockID) == 1 { return 0 }
+    if visited.element(index: blockID) == 1 { return 0 }
     if blockID != 0 && !compilerBodyLLVMAllForwardPredecessorsVisited(arena: emitter.arena, blockID: blockID, visited: visited) { return 0 }
-    if rawBufferStoreInt(buffer: visited, index: blockID, value: 1) != 0 { return 0 - 1 }
+    if visited.update(element: 1, index: blockID) != 0 { return 0 - 1 }
     let firstOperation: Int(compilerIntTableValue(table: emitter.arena.mirBlocks, row: blockID, column: compilerBodyMIRBlockFirstOperationColumn()))
     let operationCount: Int(compilerIntTableValue(table: emitter.arena.mirBlocks, row: blockID, column: compilerBodyMIRBlockOperationCountColumn()))
     state operationOffset: Int(0)
@@ -1154,7 +1154,7 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         state callTargetName: String("")
         if targetKind == compilerBodyMIROperationTargetFunction() {
             if !compilerBodyLLVMCallTargetInstanceIsValid(emitter: emitter, operationID: operationID, targetFunctionID: callTargetID, resultValueID: resultValueID) { return 0 - 1 }
-            let ownerSyntaxID: Int(rawBufferLoadInt(buffer: emitter.arena.tables.functionOwners, index: callTargetID))
+            let ownerSyntaxID: Int(emitter.arena.tables.functionOwners.element(index: callTargetID))
             let genericCount: Int(compilerSyntaxGenericParameterCountForOwner(tables: emitter.arena.tables, ownerSyntaxID: ownerSyntaxID))
             state targetInstanceID: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationInstanceIDColumn()))
             if genericCount <= 0 { targetInstanceID: compilerReachablePlannedFunctionInstance(functionInstances: emitter.functionInstances, functionRow: callTargetID, receiverTypeKeyID: 0 - 1) }
@@ -1426,11 +1426,11 @@ function compilerBodyLLVMEmitterRenderBlock(emitter: CompilerBodyLLVMEmitter, mi
     return rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  \(compilerCoreRenderLLVMTerminator(terminal: terminal))\n")
 }
 
-function compilerBodyLLVMEmitterRenderCFGDepthFirst(emitter: CompilerBodyLLVMEmitter, mirBlockID: Int, visited: RawBuffer): Int {
+function compilerBodyLLVMEmitterRenderCFGDepthFirst(emitter: CompilerBodyLLVMEmitter, mirBlockID: Int, visited: Buffer<Int>): Int {
     if mirBlockID < 0 || mirBlockID >= compilerIntTableRowCount(table: emitter.arena.mirBlocks) { return 0 - 1 }
-    if rawBufferLoadInt(buffer: visited, index: mirBlockID) == 1 { return 0 }
+    if visited.element(index: mirBlockID) == 1 { return 0 }
     if mirBlockID != 0 && !compilerBodyLLVMAllForwardPredecessorsVisited(arena: emitter.arena, blockID: mirBlockID, visited: visited) { return 0 }
-    if rawBufferStoreInt(buffer: visited, index: mirBlockID, value: 1) != 0 { return 0 - 1 }
+    if visited.update(element: 1, index: mirBlockID) != 0 { return 0 - 1 }
     let firstOperation: Int(compilerIntTableValue(table: emitter.arena.mirBlocks, row: mirBlockID, column: compilerBodyMIRBlockFirstOperationColumn()))
     let operationCount: Int(compilerIntTableValue(table: emitter.arena.mirBlocks, row: mirBlockID, column: compilerBodyMIRBlockOperationCountColumn()))
     state valid: Bool(operationCount > 0)
@@ -1452,7 +1452,7 @@ function compilerBodyLLVMEmitterRenderCFGDepthFirst(emitter: CompilerBodyLLVMEmi
         operationOffset: operationOffset + 1
     }
     if valid && compilerBodyLLVMEmitterRenderBlock(emitter: emitter, mirBlockID: mirBlockID) != 0 { valid: false }
-    if valid && rawBufferStoreInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterLastBlock(), value: mirBlockID) != 0 { valid: false }
+    if valid && emitter.runtimeState.update(element: mirBlockID, index: compilerBodyLLVMEmitterLastBlock()) != 0 { valid: false }
     if !valid { return 0 - 1 }
     let terminatorOperationID: Int(firstOperation + operationCount - 1)
     let terminatorKind: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: terminatorOperationID, column: compilerBodyMIROperationKindColumn()))
@@ -1507,10 +1507,10 @@ function compilerBodyLLVMEmit(arena: CompilerBodyArena, initialTemporary: Int, i
     let emitter: CompilerBodyLLVMEmitter(compilerBodyLLVMEmitterCreate(arena: arena, initialTemporary: initialTemporary, initialBranch: initialBranch, abiPlan: abiPlan, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, functionInstances: functionInstances, functionInstanceSignatures: functionInstanceSignatures, functionInstanceSignatureParameters: functionInstanceSignatureParameters))
     state valid: Bool(true)
     if compilerBodyLLVMEmitterSeedParameters(emitter: emitter) != 0 || compilerBodyLLVMEmitterInitializeLabels(emitter: emitter) != 0 { valid: false }
-    let planningVisited: RawBuffer(rawBufferCreate(capacity: compilerIntTableRowCount(table: arena.mirBlocks), stride: 4))
-    while rawBufferCount(buffer: planningVisited) < compilerIntTableRowCount(table: arena.mirBlocks) { rawBufferAppendInt(buffer: planningVisited, value: 0) }
+    let planningVisited: Buffer<Int>(bufferCreateInt(capacity: compilerIntTableRowCount(table: arena.mirBlocks)))
+    while planningVisited.count < compilerIntTableRowCount(table: arena.mirBlocks) { planningVisited.append(element: 0) }
     if valid && compilerBodyLLVMEmitterPlanCFGDepthFirst(emitter: emitter, blockID: 0, visited: planningVisited) != 0 { valid: false }
-    rawBufferDestroy(buffer: planningVisited)
+    planningVisited.destroy()
     state mirBlockID: Int(0)
     state hasEntryBranch: Bool(false)
     state entryBranchCondition: String("")
@@ -1520,10 +1520,10 @@ function compilerBodyLLVMEmit(arena: CompilerBodyArena, initialTemporary: Int, i
     state returnLLVMType: String("")
     state returnLLVMValue: String("")
     state exitLabel: String("entry")
-    let visited: RawBuffer(rawBufferCreate(capacity: compilerIntTableRowCount(table: arena.mirBlocks), stride: 4))
-    while rawBufferCount(buffer: visited) < compilerIntTableRowCount(table: arena.mirBlocks) { rawBufferAppendInt(buffer: visited, value: 0) }
+    let visited: Buffer<Int>(bufferCreateInt(capacity: compilerIntTableRowCount(table: arena.mirBlocks)))
+    while visited.count < compilerIntTableRowCount(table: arena.mirBlocks) { visited.append(element: 0) }
     if valid && compilerBodyLLVMEmitterRenderCFGDepthFirst(emitter: emitter, mirBlockID: 0, visited: visited) != 0 { valid: false }
-    rawBufferDestroy(buffer: visited)
+    visited.destroy()
     while valid && mirBlockID < compilerIntTableRowCount(table: arena.mirBlocks) {
         let firstOperation: Int(compilerIntTableValue(table: arena.mirBlocks, row: mirBlockID, column: compilerBodyMIRBlockFirstOperationColumn()))
         let operationCount: Int(compilerIntTableValue(table: arena.mirBlocks, row: mirBlockID, column: compilerBodyMIRBlockOperationCountColumn()))
@@ -1551,14 +1551,14 @@ function compilerBodyLLVMEmit(arena: CompilerBodyArena, initialTemporary: Int, i
         }
         mirBlockID: mirBlockID + 1
     }
-    let lastBlockID: Int(rawBufferLoadInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterLastBlock()))
+    let lastBlockID: Int(emitter.runtimeState.element(index: compilerBodyLLVMEmitterLastBlock()))
     exitLabel: compilerBodyLLVMBlockLabel(emitter: emitter, blockID: lastBlockID)
     if hasReturn && compilerBodyArenaCFGHasFallthrough(arena: arena) { returnLLVMValue: compilerCoreLLVMDefaultReturnValue(typeName: returnLLVMType) }
     let renderedBlocks: String(rawBufferMaterializeText(buffer: emitter.renderedBlocks))
     let renderedGlobals: String(compilerBodyLLVMEmitterRenderGlobals(emitter: emitter))
-    let runtimeRequirements: Int(rawBufferLoadInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterRuntimeRequirements()))
-    let nextTemporary: Int(rawBufferLoadInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextTemporary()))
-    let nextBranch: Int(rawBufferLoadInt(buffer: emitter.runtimeState, index: compilerBodyLLVMEmitterNextBranch()))
+    let runtimeRequirements: Int(emitter.runtimeState.element(index: compilerBodyLLVMEmitterRuntimeRequirements()))
+    let nextTemporary: Int(emitter.runtimeState.element(index: compilerBodyLLVMEmitterNextTemporary()))
+    let nextBranch: Int(emitter.runtimeState.element(index: compilerBodyLLVMEmitterNextBranch()))
     if compilerBodyLLVMEmitterDestroy(emitter: emitter) != 0 { valid: false }
     let loweredBlock: CompilerLLVMLoweredBlock(block: CompilerBlock(start: bodyStart, end: bodyEnd), declarationRecords: String(""), renderedBlocks: renderedBlocks, instructionRecords: String(""), localValues: String(""), nextTemporary: nextTemporary, nextBranchIndex: nextBranch, exitLabel: exitLabel, hasEntryBranch: hasEntryBranch, entryBranchCondition: entryBranchCondition, entryBranchThenLabel: entryBranchThenLabel, entryBranchElseLabel: entryBranchElseLabel, hasReturn: hasReturn, returnLLVMType: returnLLVMType, returnLLVMValue: returnLLVMValue)
     return CompilerBodyLLVMEmissionResult(block: loweredBlock, renderedGlobals: renderedGlobals, runtimeRequirements: runtimeRequirements, isValid: valid)
@@ -1589,7 +1589,7 @@ function compilerBodyArenaValidationCode(arena: CompilerBodyArena): Int {
     } else { return 7 }
     if arena.bodyStart < 0 || arena.bodyEnd <= arena.bodyStart { return 10 }
     if arena.rootNodeID != 0 { return 11 }
-    if rawBufferCount(buffer: arena.failures) != 0 { return 12 }
+    if arena.failures.count != 0 { return 12 }
     if !compilerIntTableIsComplete(table: arena.nodes) { return 20 }
     if !compilerIntTableIsComplete(table: arena.edges) { return 21 }
     if !compilerIntTableIsComplete(table: arena.symbols) { return 22 }
@@ -1604,7 +1604,7 @@ function compilerBodyArenaValidationCode(arena: CompilerBodyArena): Int {
     if !compilerIntTableIsComplete(table: arena.graphZeroCFGRegions) { return 31 }
     if !compilerIntTableIsComplete(table: arena.storages) { return 32 }
     if !compilerIntTableIsComplete(table: arena.memoryFacts) { return 33 }
-    if rawBufferCount(buffer: arena.memoryState) != compilerBodyMemoryStateCount() { return 34 }
+    if arena.memoryState.count != compilerBodyMemoryStateCount() { return 34 }
     if !compilerIntTableIsComplete(table: arena.mirValues) { return 35 }
     if !compilerIntTableIsComplete(table: arena.mirBlocks) { return 36 }
     if !compilerIntTableIsComplete(table: arena.mirOperations) { return 37 }
@@ -1612,7 +1612,7 @@ function compilerBodyArenaValidationCode(arena: CompilerBodyArena): Int {
     if !compilerIntTableIsComplete(table: arena.mirExpressionValues) { return 39 }
     if !compilerIntTableIsComplete(table: arena.graphZeroMIRDependencies) { return 40 }
     if !compilerIntTableIsComplete(table: arena.graphZeroMIRFrontiers) { return 41 }
-    if rawBufferCount(buffer: arena.graphZeroState) != compilerBodyGraphZeroStateCount() { return 42 }
+    if arena.graphZeroState.count != compilerBodyGraphZeroStateCount() { return 42 }
     if compilerIntTableRowCount(table: arena.nodes) < 1
         || compilerIntTableValue(table: arena.nodes, row: 0, column: 0) != 0
         || compilerIntTableValue(table: arena.nodes, row: 0, column: 1) != compilerSyntaxKindLexicalRegion() { return 50 }
@@ -1664,7 +1664,7 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
     if arena.bodyStart < 0
         || arena.bodyEnd <= arena.bodyStart
         || arena.rootNodeID != 0
-        || rawBufferCount(buffer: arena.failures) != 0
+        || arena.failures.count != 0
         || !compilerIntTableIsComplete(table: arena.nodes)
         || !compilerIntTableIsComplete(table: arena.edges)
         || !compilerIntTableIsComplete(table: arena.symbols)
@@ -1678,7 +1678,7 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
         || !compilerIntTableIsComplete(table: arena.graphZeroCFGRegions)
         || !compilerIntTableIsComplete(table: arena.storages)
         || !compilerIntTableIsComplete(table: arena.memoryFacts)
-        || rawBufferCount(buffer: arena.memoryState) != compilerBodyMemoryStateCount()
+        || arena.memoryState.count != compilerBodyMemoryStateCount()
         || !compilerIntTableIsComplete(table: arena.mirValues)
         || !compilerIntTableIsComplete(table: arena.mirBlocks)
         || !compilerIntTableIsComplete(table: arena.mirOperations)
@@ -1686,7 +1686,7 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
         || !compilerIntTableIsComplete(table: arena.mirExpressionValues)
         || !compilerIntTableIsComplete(table: arena.graphZeroMIRDependencies)
         || !compilerIntTableIsComplete(table: arena.graphZeroMIRFrontiers)
-        || rawBufferCount(buffer: arena.graphZeroState) != compilerBodyGraphZeroStateCount()
+        || arena.graphZeroState.count != compilerBodyGraphZeroStateCount()
         || compilerIntTableRowCount(table: arena.nodes) < 1
         || compilerIntTableValue(table: arena.nodes, row: 0, column: 0) != 0
         || compilerIntTableValue(table: arena.nodes, row: 0, column: 1) != compilerSyntaxKindLexicalRegion() { return false }
@@ -1726,8 +1726,8 @@ function compilerBodyArenaCanLowerFunction(arena: CompilerBodyArena): Bool {
 function compilerBodyArenaDestroy(arena: CompilerBodyArena): Int {
     let nodeStatus: Int(compilerIntTableDestroy(table: arena.nodes))
     let edgeStatus: Int(compilerIntTableDestroy(table: arena.edges))
-    let parentNodeStatus: Int(rawBufferDestroy(buffer: arena.parentNodes))
-    let parentRoleStatus: Int(rawBufferDestroy(buffer: arena.parentRoles))
+    let parentNodeStatus: Int(arena.parentNodes.destroy())
+    let parentRoleStatus: Int(arena.parentRoles.destroy())
     let symbolStatus: Int(compilerIntTableDestroy(table: arena.symbols))
     let resolutionStatus: Int(compilerIntTableDestroy(table: arena.resolutions))
     let typeInstanceStatus: Int(compilerIntTableDestroy(table: arena.typeInstances))
@@ -1744,7 +1744,7 @@ function compilerBodyArenaDestroy(arena: CompilerBodyArena): Int {
     let runtimeContractStatus: Int(compilerIntTableDestroy(table: arena.runtimeCallContracts))
     let ownedReturnTransferStatus: Int(compilerIntTableDestroy(table: arena.ownedReturnTransfers))
     let memoryStatus: Int(compilerIntTableDestroy(table: arena.memoryFacts))
-    let memoryStateStatus: Int(rawBufferDestroy(buffer: arena.memoryState))
+    let memoryStateStatus: Int(arena.memoryState.destroy())
     let mirValueStatus: Int(compilerIntTableDestroy(table: arena.mirValues))
     let mirBlockStatus: Int(compilerIntTableDestroy(table: arena.mirBlocks))
     let mirStatus: Int(compilerIntTableDestroy(table: arena.mirOperations))
@@ -1753,9 +1753,9 @@ function compilerBodyArenaDestroy(arena: CompilerBodyArena): Int {
     let mirExpressionValueStatus: Int(compilerIntTableDestroy(table: arena.mirExpressionValues))
     let graphZeroMIRDependencyStatus: Int(compilerIntTableDestroy(table: arena.graphZeroMIRDependencies))
     let graphZeroMIRFrontierStatus: Int(compilerIntTableDestroy(table: arena.graphZeroMIRFrontiers))
-    let graphZeroStateStatus: Int(rawBufferDestroy(buffer: arena.graphZeroState))
-    let mirTraversalStatus: Int(rawBufferDestroy(buffer: arena.mirTraversal))
-    let failureStatus: Int(rawBufferDestroy(buffer: arena.failures))
+    let graphZeroStateStatus: Int(arena.graphZeroState.destroy())
+    let mirTraversalStatus: Int(arena.mirTraversal.destroy())
+    let failureStatus: Int(arena.failures.destroy())
     if nodeStatus != 0 || edgeStatus != 0 || parentNodeStatus != 0 || parentRoleStatus != 0 || symbolStatus != 0 || resolutionStatus != 0 || typeInstanceStatus != 0 || typeArgumentStatus != 0
         || cfgBlockStatus != 0 || cfgEdgeStatus != 0 || cfgScheduleStatus != 0 || controlDecisionStatus != 0 || controlRegionStatus != 0 || graphZeroCFGRegionStatus != 0 || storageStatus != 0 || ownedPathStatus != 0 || bindingAliasStatus != 0 || runtimeContractStatus != 0 || ownedReturnTransferStatus != 0 || memoryStatus != 0 || memoryStateStatus != 0
         || mirValueStatus != 0 || mirBlockStatus != 0 || mirStatus != 0 || mirOperandStatus != 0 || mirVersionStatus != 0 || mirExpressionValueStatus != 0 || graphZeroMIRDependencyStatus != 0 || graphZeroMIRFrontierStatus != 0 || graphZeroStateStatus != 0 || mirTraversalStatus != 0
@@ -2312,3 +2312,4 @@ function compilerCoreRenderLLVMTerminator(terminal: CompilerLLVMTerminator): Str
 
     return String("ret i32 0")
 }
+

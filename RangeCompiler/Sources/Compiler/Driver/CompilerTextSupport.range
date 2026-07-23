@@ -1791,3 +1791,4 @@ function parseCompilerPostfixExpressionCore(source: String, start: Int, limit: I
     let finalPostfixExpression: CompilerExpression(kind: kind, value: value, summary: summary, record: record, start: token.start, end: expressionEnd)
     return finalPostfixExpression
 }
+

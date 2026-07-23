@@ -307,7 +307,7 @@ function compilerSyntaxTablesCreate(source: String): CompilerSyntaxTables {
         declarations: compilerIntTableCreate(columnCount: compilerSyntaxDeclarationColumnCount(), estimatedRowCount: 128),
         members: compilerIntTableCreate(columnCount: compilerSyntaxMemberColumnCount(), estimatedRowCount: 64),
         functions: compilerIntTableCreate(columnCount: compilerSyntaxFunctionColumnCount(), estimatedRowCount: 128),
-        functionOwners: rawBufferCreate(capacity: 128, stride: 4),
+        functionOwners: bufferCreateInt(capacity: 128),
         parameters: compilerIntTableCreate(columnCount: compilerSyntaxParameterColumnCount(), estimatedRowCount: 128),
         genericParameters: compilerIntTableCreate(columnCount: compilerSyntaxGenericParameterColumnCount(), estimatedRowCount: 64),
         typeReferences: compilerIntTableCreate(columnCount: compilerSyntaxTypeReferenceColumnCount(), estimatedRowCount: 128),
@@ -326,7 +326,7 @@ function compilerSyntaxTablesCreate(source: String): CompilerSyntaxTables {
         pendingGeneratedMembers: compilerIntTableCreate(columnCount: compilerGraphGeneratedMemberColumnCount(), estimatedRowCount: 32),
         bodyNodes: compilerIntTableCreate(columnCount: compilerSyntaxBodyNodeColumnCount(), estimatedRowCount: 256),
         bodyEdges: compilerIntTableCreate(columnCount: compilerSyntaxBodyEdgeColumnCount(), estimatedRowCount: 256),
-        failures: rawBufferCreate(capacity: compilerSyntaxFailureColumnCount(), stride: 4)
+        failures: bufferCreateInt(capacity: compilerSyntaxFailureColumnCount())
     )
 }
 
@@ -344,7 +344,7 @@ function compilerSyntaxTablesDestroy(tables: CompilerSyntaxTables): Int {
     if compilerIntTableDestroy(table: tables.functions) != 0 {
         status: 0 - 1
     }
-    if rawBufferDestroy(buffer: tables.functionOwners) != 0 {
+    if tables.functionOwners.destroy() != 0 {
         status: 0 - 1
     }
     if compilerIntTableDestroy(table: tables.parameters) != 0 {
@@ -401,7 +401,7 @@ function compilerSyntaxTablesDestroy(tables: CompilerSyntaxTables): Int {
     if compilerIntTableDestroy(table: tables.bodyEdges) != 0 {
         status: 0 - 1
     }
-    if rawBufferDestroy(buffer: tables.failures) != 0 {
+    if tables.failures.destroy() != 0 {
         status: 0 - 1
     }
     if compilerSourceStoreDestroy(store: tables.sourceStore) != 0 {
@@ -411,32 +411,32 @@ function compilerSyntaxTablesDestroy(tables: CompilerSyntaxTables): Int {
 }
 
 function compilerSyntaxTablesFailureAppend(tables: CompilerSyntaxTables, phase: Int, reason: Int, fileID: Int, start: Int, end: Int, relatedRow: Int): Int {
-    if rawBufferCount(buffer: tables.failures) != 0 { return 0 }
-    if rawBufferAppendInt(buffer: tables.failures, value: phase) != 0 { return 0 - 1 }
-    if rawBufferAppendInt(buffer: tables.failures, value: reason) != 0 { return 0 - 1 }
-    if rawBufferAppendInt(buffer: tables.failures, value: fileID) != 0 { return 0 - 1 }
-    if rawBufferAppendInt(buffer: tables.failures, value: start) != 0 { return 0 - 1 }
-    if rawBufferAppendInt(buffer: tables.failures, value: end) != 0 { return 0 - 1 }
-    return rawBufferAppendInt(buffer: tables.failures, value: relatedRow)
+    if tables.failures.count != 0 { return 0 }
+    if tables.failures.append(element: phase) != 0 { return 0 - 1 }
+    if tables.failures.append(element: reason) != 0 { return 0 - 1 }
+    if tables.failures.append(element: fileID) != 0 { return 0 - 1 }
+    if tables.failures.append(element: start) != 0 { return 0 - 1 }
+    if tables.failures.append(element: end) != 0 { return 0 - 1 }
+    return tables.failures.append(element: relatedRow)
 }
 
 function compilerSyntaxTablesFailureAnnotate(tables: CompilerSyntaxTables, phase: Int, reason: Int, fileID: Int, start: Int, end: Int, relatedRow: Int): Int {
-    if rawBufferCount(buffer: tables.failures) == 0 {
+    if tables.failures.count == 0 {
         return compilerSyntaxTablesFailureAppend(tables: tables, phase: phase, reason: reason, fileID: fileID, start: start, end: end, relatedRow: relatedRow)
     }
-    if rawBufferCount(buffer: tables.failures) != compilerSyntaxFailureColumnCount() { return 0 - 1 }
-    if rawBufferLoadInt(buffer: tables.failures, index: compilerSyntaxFailurePhaseColumn()) == compilerSyntaxFailureUnknown()
-        && rawBufferStoreInt(buffer: tables.failures, index: compilerSyntaxFailurePhaseColumn(), value: phase) != 0 { return 0 - 1 }
-    if rawBufferLoadInt(buffer: tables.failures, index: compilerSyntaxFailureReasonColumn()) == compilerSyntaxFailureUnknown()
-        && rawBufferStoreInt(buffer: tables.failures, index: compilerSyntaxFailureReasonColumn(), value: reason) != 0 { return 0 - 1 }
-    if rawBufferLoadInt(buffer: tables.failures, index: compilerSyntaxFailureFileColumn()) < 0
-        && rawBufferStoreInt(buffer: tables.failures, index: compilerSyntaxFailureFileColumn(), value: fileID) != 0 { return 0 - 1 }
-    if rawBufferLoadInt(buffer: tables.failures, index: compilerSyntaxFailureStartColumn()) < 0
-        && rawBufferStoreInt(buffer: tables.failures, index: compilerSyntaxFailureStartColumn(), value: start) != 0 { return 0 - 1 }
-    if rawBufferLoadInt(buffer: tables.failures, index: compilerSyntaxFailureEndColumn()) < 0
-        && rawBufferStoreInt(buffer: tables.failures, index: compilerSyntaxFailureEndColumn(), value: end) != 0 { return 0 - 1 }
-    if rawBufferLoadInt(buffer: tables.failures, index: compilerSyntaxFailureRelatedColumn()) < 0
-        && rawBufferStoreInt(buffer: tables.failures, index: compilerSyntaxFailureRelatedColumn(), value: relatedRow) != 0 { return 0 - 1 }
+    if tables.failures.count != compilerSyntaxFailureColumnCount() { return 0 - 1 }
+    if tables.failures.element(index: compilerSyntaxFailurePhaseColumn()) == compilerSyntaxFailureUnknown()
+        && tables.failures.update(element: phase, index: compilerSyntaxFailurePhaseColumn()) != 0 { return 0 - 1 }
+    if tables.failures.element(index: compilerSyntaxFailureReasonColumn()) == compilerSyntaxFailureUnknown()
+        && tables.failures.update(element: reason, index: compilerSyntaxFailureReasonColumn()) != 0 { return 0 - 1 }
+    if tables.failures.element(index: compilerSyntaxFailureFileColumn()) < 0
+        && tables.failures.update(element: fileID, index: compilerSyntaxFailureFileColumn()) != 0 { return 0 - 1 }
+    if tables.failures.element(index: compilerSyntaxFailureStartColumn()) < 0
+        && tables.failures.update(element: start, index: compilerSyntaxFailureStartColumn()) != 0 { return 0 - 1 }
+    if tables.failures.element(index: compilerSyntaxFailureEndColumn()) < 0
+        && tables.failures.update(element: end, index: compilerSyntaxFailureEndColumn()) != 0 { return 0 - 1 }
+    if tables.failures.element(index: compilerSyntaxFailureRelatedColumn()) < 0
+        && tables.failures.update(element: relatedRow, index: compilerSyntaxFailureRelatedColumn()) != 0 { return 0 - 1 }
     return 0
 }
 
@@ -455,7 +455,7 @@ function compilerSyntaxTablesPoison(tables: CompilerSyntaxTables): Int {
 }
 
 function compilerSyntaxTablesIsValid(tables: CompilerSyntaxTables): Bool {
-    if !tables.sourceStore.isValid || rawBufferCount(buffer: tables.failures) != 0 {
+    if !tables.sourceStore.isValid || tables.failures.count != 0 {
         return false
     }
     state tablesAreComplete: Bool(false)
@@ -463,7 +463,7 @@ function compilerSyntaxTablesIsValid(tables: CompilerSyntaxTables): Bool {
         && compilerIntTableIsComplete(table: tables.declarations)
         && compilerIntTableIsComplete(table: tables.members)
         && compilerIntTableIsComplete(table: tables.functions)
-        && rawBufferCount(buffer: tables.functionOwners) == compilerIntTableRowCount(table: tables.functions)
+        && tables.functionOwners.count == compilerIntTableRowCount(table: tables.functions)
         && compilerIntTableIsComplete(table: tables.parameters)
         && compilerIntTableIsComplete(table: tables.genericParameters)
         && compilerIntTableIsComplete(table: tables.typeReferences)
@@ -513,7 +513,7 @@ function compilerSyntaxFailureReasonName(reason: Int): String {
 }
 
 function compilerSyntaxTablesEnsureFailure(tables: CompilerSyntaxTables): Int {
-    if rawBufferCount(buffer: tables.failures) != 0 { return 0 }
+    if tables.failures.count != 0 { return 0 }
     if !tables.sourceStore.isValid {
         return compilerSyntaxTablesFailureAppend(tables: tables, phase: compilerSyntaxFailurePhaseSourceStore(), reason: compilerSyntaxFailureReasonInvalidSourceStore(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 0 - 1)
     }
@@ -521,7 +521,7 @@ function compilerSyntaxTablesEnsureFailure(tables: CompilerSyntaxTables): Int {
         && compilerIntTableIsComplete(table: tables.declarations)
         && compilerIntTableIsComplete(table: tables.members)
         && compilerIntTableIsComplete(table: tables.functions)
-        && rawBufferCount(buffer: tables.functionOwners) == compilerIntTableRowCount(table: tables.functions)
+        && tables.functionOwners.count == compilerIntTableRowCount(table: tables.functions)
         && compilerIntTableIsComplete(table: tables.parameters)
         && compilerIntTableIsComplete(table: tables.genericParameters)
         && compilerIntTableIsComplete(table: tables.typeReferences)
@@ -553,13 +553,13 @@ function compilerInvalidTypedDeclarationsDiagnostic(tables: CompilerSyntaxTables
     state start: Int(0 - 1)
     state end: Int(0 - 1)
     state relatedRow: Int(0 - 1)
-    if rawBufferCount(buffer: tables.failures) == compilerSyntaxFailureColumnCount() {
-        phase: rawBufferLoadInt(buffer: tables.failures, index: compilerSyntaxFailurePhaseColumn())
-        reason: rawBufferLoadInt(buffer: tables.failures, index: compilerSyntaxFailureReasonColumn())
-        fileID: rawBufferLoadInt(buffer: tables.failures, index: compilerSyntaxFailureFileColumn())
-        start: rawBufferLoadInt(buffer: tables.failures, index: compilerSyntaxFailureStartColumn())
-        end: rawBufferLoadInt(buffer: tables.failures, index: compilerSyntaxFailureEndColumn())
-        relatedRow: rawBufferLoadInt(buffer: tables.failures, index: compilerSyntaxFailureRelatedColumn())
+    if tables.failures.count == compilerSyntaxFailureColumnCount() {
+        phase: tables.failures.element(index: compilerSyntaxFailurePhaseColumn())
+        reason: tables.failures.element(index: compilerSyntaxFailureReasonColumn())
+        fileID: tables.failures.element(index: compilerSyntaxFailureFileColumn())
+        start: tables.failures.element(index: compilerSyntaxFailureStartColumn())
+        end: tables.failures.element(index: compilerSyntaxFailureEndColumn())
+        relatedRow: tables.failures.element(index: compilerSyntaxFailureRelatedColumn())
     }
     state roleName: String("unknown")
     state path: String("unknown")
@@ -585,10 +585,10 @@ function compilerDeclarationMemberHash(parentSyntaxID: Int, name: String): Int {
     return (compilerDeclarationNameHash(name: name) * 127 + parentSyntaxID + 1) % 16000057
 }
 
-function compilerDeclarationIndexOmissionBufferContains(omittedSyntaxIDs: RawBuffer, syntaxID: Int): Bool {
+function compilerDeclarationIndexOmissionBufferContains(omittedSyntaxIDs: Buffer<Int>, syntaxID: Int): Bool {
     state row: Int(0)
-    while row < rawBufferCount(buffer: omittedSyntaxIDs) {
-        if rawBufferLoadInt(buffer: omittedSyntaxIDs, index: row) == syntaxID { return true }
+    while row < omittedSyntaxIDs.count {
+        if omittedSyntaxIDs.element(index: row) == syntaxID { return true }
         row: row + 1
     }
     return false
@@ -602,36 +602,36 @@ function compilerSyntaxDeclarationIsTopLevel(tables: CompilerSyntaxTables, decla
         if syntaxID < 0 || syntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
             || compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 0) != compilerSyntaxKindFunction() { return false }
         let functionRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 1))
-        if functionRow < 0 || functionRow >= rawBufferCount(buffer: tables.functionOwners) { return false }
-        if rawBufferLoadInt(buffer: tables.functionOwners, index: functionRow) >= 0 { return false }
+        if functionRow < 0 || functionRow >= tables.functionOwners.count { return false }
+        if tables.functionOwners.element(index: functionRow) >= 0 { return false }
     }
     return true
 }
 
-function compilerDeclarationIndexCreateWithOmittedSyntaxIDs(tables: CompilerSyntaxTables, omittedSyntaxIDs: RawBuffer, initialIsValid: Bool): CompilerDeclarationIndex {
+function compilerDeclarationIndexCreateWithOmittedSyntaxIDs(tables: CompilerSyntaxTables, omittedSyntaxIDs: Buffer<Int>, initialIsValid: Bool): CompilerDeclarationIndex {
     let declarationCount: Int(compilerIntTableRowCount(table: tables.declarations))
     let bucketCount: Int(declarationCount * 2 + 1)
-    let bucketHeads: RawBuffer(rawBufferCreate(capacity: bucketCount, stride: 4))
-    let nextRows: RawBuffer(rawBufferCreate(capacity: declarationCount, stride: 4))
-    let nameHashes: RawBuffer(rawBufferCreate(capacity: declarationCount, stride: 4))
+    let bucketHeads: Buffer<Int>(bufferCreateInt(capacity: bucketCount))
+    let nextRows: Buffer<Int>(bufferCreateInt(capacity: declarationCount))
+    let nameHashes: Buffer<Int>(bufferCreateInt(capacity: declarationCount))
     let memberCount: Int(compilerIntTableRowCount(table: tables.members))
     let memberBucketCount: Int(memberCount * 2 + 1)
-    let memberBucketHeads: RawBuffer(rawBufferCreate(capacity: memberBucketCount, stride: 4))
-    let memberNextRows: RawBuffer(rawBufferCreate(capacity: memberCount, stride: 4))
-    let memberHashes: RawBuffer(rawBufferCreate(capacity: memberCount, stride: 4))
-    let indexOmittedSyntaxIDs: RawBuffer(rawBufferCreate(capacity: rawBufferCount(buffer: omittedSyntaxIDs), stride: 4))
+    let memberBucketHeads: Buffer<Int>(bufferCreateInt(capacity: memberBucketCount))
+    let memberNextRows: Buffer<Int>(bufferCreateInt(capacity: memberCount))
+    let memberHashes: Buffer<Int>(bufferCreateInt(capacity: memberCount))
+    let indexOmittedSyntaxIDs: Buffer<Int>(bufferCreateInt(capacity: omittedSyntaxIDs.count))
     state valid: Bool(initialIsValid)
     state omissionRow: Int(0)
-    while omissionRow < rawBufferCount(buffer: omittedSyntaxIDs) {
-        let omittedSyntaxID: Int(rawBufferLoadInt(buffer: omittedSyntaxIDs, index: omissionRow))
+    while omissionRow < omittedSyntaxIDs.count {
+        let omittedSyntaxID: Int(omittedSyntaxIDs.element(index: omissionRow))
         if omittedSyntaxID < 0 || omittedSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
             || compilerDeclarationIndexOmissionBufferContains(omittedSyntaxIDs: indexOmittedSyntaxIDs, syntaxID: omittedSyntaxID)
-            || rawBufferAppendInt(buffer: indexOmittedSyntaxIDs, value: omittedSyntaxID) != 0 { valid: false }
+            || indexOmittedSyntaxIDs.append(element: omittedSyntaxID) != 0 { valid: false }
         omissionRow: omissionRow + 1
     }
     state bucket: Int(0)
     while bucket < bucketCount {
-        if rawBufferAppendInt(buffer: bucketHeads, value: 0 - 1) != 0 { valid: false }
+        if bucketHeads.append(element: 0 - 1) != 0 { valid: false }
         bucket: bucket + 1
     }
     state row: Int(0)
@@ -639,22 +639,22 @@ function compilerDeclarationIndexCreateWithOmittedSyntaxIDs(tables: CompilerSynt
         let syntaxID: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 0))
         if compilerDeclarationIndexOmissionBufferContains(omittedSyntaxIDs: indexOmittedSyntaxIDs, syntaxID: syntaxID)
             || !compilerSyntaxDeclarationIsTopLevel(tables: tables, declarationRow: row) {
-            if rawBufferAppendInt(buffer: nextRows, value: 0 - 1) != 0 || rawBufferAppendInt(buffer: nameHashes, value: 0) != 0 { valid: false }
+            if nextRows.append(element: 0 - 1) != 0 || nameHashes.append(element: 0) != 0 { valid: false }
         } else {
             let fileID: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 1))
             let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: row, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: row, column: 8)))
             let hash: Int(compilerDeclarationNameHash(name: name))
             let nameBucket: Int(hash % bucketCount)
-            let priorHead: Int(rawBufferLoadInt(buffer: bucketHeads, index: nameBucket))
-            if rawBufferAppendInt(buffer: nextRows, value: priorHead) != 0 { valid: false }
-            if rawBufferAppendInt(buffer: nameHashes, value: hash) != 0 { valid: false }
-            if rawBufferStoreInt(buffer: bucketHeads, index: nameBucket, value: row) != 0 { valid: false }
+            let priorHead: Int(bucketHeads.element(index: nameBucket))
+            if nextRows.append(element: priorHead) != 0 { valid: false }
+            if nameHashes.append(element: hash) != 0 { valid: false }
+            if bucketHeads.update(element: row, index: nameBucket) != 0 { valid: false }
         }
         row: row + 1
     }
     bucket: 0
     while bucket < memberBucketCount {
-        if rawBufferAppendInt(buffer: memberBucketHeads, value: 0 - 1) != 0 { valid: false }
+        if memberBucketHeads.append(element: 0 - 1) != 0 { valid: false }
         bucket: bucket + 1
     }
     row: 0
@@ -663,30 +663,30 @@ function compilerDeclarationIndexCreateWithOmittedSyntaxIDs(tables: CompilerSynt
         let memberSyntaxID: Int(compilerIntTableValue(table: tables.members, row: row, column: 0))
         if compilerDeclarationIndexOmissionBufferContains(omittedSyntaxIDs: indexOmittedSyntaxIDs, syntaxID: parentSyntaxID)
             || compilerDeclarationIndexOmissionBufferContains(omittedSyntaxIDs: indexOmittedSyntaxIDs, syntaxID: memberSyntaxID) {
-            if rawBufferAppendInt(buffer: memberNextRows, value: 0 - 1) != 0 || rawBufferAppendInt(buffer: memberHashes, value: 0) != 0 { valid: false }
+            if memberNextRows.append(element: 0 - 1) != 0 || memberHashes.append(element: 0) != 0 { valid: false }
         } else {
             let memberFileID: Int(compilerIntTableValue(table: tables.members, row: row, column: 1))
             let memberName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: memberFileID, localStart: compilerIntTableValue(table: tables.members, row: row, column: 6), localEnd: compilerIntTableValue(table: tables.members, row: row, column: 7)))
             let memberHash: Int(compilerDeclarationMemberHash(parentSyntaxID: parentSyntaxID, name: memberName))
             let memberBucket: Int(memberHash % memberBucketCount)
-            let memberPriorHead: Int(rawBufferLoadInt(buffer: memberBucketHeads, index: memberBucket))
-            if rawBufferAppendInt(buffer: memberNextRows, value: memberPriorHead) != 0 { valid: false }
-            if rawBufferAppendInt(buffer: memberHashes, value: memberHash) != 0 { valid: false }
-            if rawBufferStoreInt(buffer: memberBucketHeads, index: memberBucket, value: row) != 0 { valid: false }
+            let memberPriorHead: Int(memberBucketHeads.element(index: memberBucket))
+            if memberNextRows.append(element: memberPriorHead) != 0 { valid: false }
+            if memberHashes.append(element: memberHash) != 0 { valid: false }
+            if memberBucketHeads.update(element: row, index: memberBucket) != 0 { valid: false }
         }
         row: row + 1
     }
-    if rawBufferDestroy(buffer: omittedSyntaxIDs) != 0 { valid: false }
+    if omittedSyntaxIDs.destroy() != 0 { valid: false }
     return CompilerDeclarationIndex(bucketHeads: bucketHeads, nextRows: nextRows, nameHashes: nameHashes, bucketCount: bucketCount, memberBucketHeads: memberBucketHeads, memberNextRows: memberNextRows, memberHashes: memberHashes, memberBucketCount: memberBucketCount, omittedSyntaxIDs: indexOmittedSyntaxIDs, isValid: valid)
 }
 
 function compilerDeclarationIndexCreate(tables: CompilerSyntaxTables): CompilerDeclarationIndex {
-    let omittedSyntaxIDs: RawBuffer(rawBufferCreate(capacity: 0, stride: 4))
+    let omittedSyntaxIDs: Buffer<Int>(bufferCreateInt(capacity: 0))
     return compilerDeclarationIndexCreateWithOmittedSyntaxIDs(tables: tables, omittedSyntaxIDs: omittedSyntaxIDs, initialIsValid: true)
 }
 
 function compilerDeclarationIndexCreateWithGraphDelta(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): CompilerDeclarationIndex {
-    let omittedSyntaxIDs: RawBuffer(rawBufferCreate(capacity: compilerIntTableRowCount(table: delta.facts), stride: 4))
+    let omittedSyntaxIDs: Buffer<Int>(bufferCreateInt(capacity: compilerIntTableRowCount(table: delta.facts)))
     state valid: Bool(compilerMacroGraphDeltaIsValid(tables: tables, delta: delta))
     state row: Int(0)
     while row < compilerIntTableRowCount(table: delta.facts) && valid {
@@ -695,7 +695,7 @@ function compilerDeclarationIndexCreateWithGraphDelta(tables: CompilerSyntaxTabl
         } else {
             let subjectNodeID: Int(compilerIntTableValue(table: delta.facts, row: row, column: 1))
             if subjectNodeID < 0 || subjectNodeID >= compilerIntTableRowCount(table: delta.nodes)
-                || rawBufferAppendInt(buffer: omittedSyntaxIDs, value: compilerIntTableValue(table: delta.nodes, row: subjectNodeID, column: 2)) != 0 { valid: false }
+                || omittedSyntaxIDs.append(element: compilerIntTableValue(table: delta.nodes, row: subjectNodeID, column: 2)) != 0 { valid: false }
         }
         row: row + 1
     }
@@ -704,13 +704,13 @@ function compilerDeclarationIndexCreateWithGraphDelta(tables: CompilerSyntaxTabl
 
 function compilerDeclarationIndexDestroy(index: CompilerDeclarationIndex): Int {
     state status: Int(0)
-    if rawBufferDestroy(buffer: index.bucketHeads) != 0 { status: 0 - 1 }
-    if rawBufferDestroy(buffer: index.nextRows) != 0 { status: 0 - 1 }
-    if rawBufferDestroy(buffer: index.nameHashes) != 0 { status: 0 - 1 }
-    if rawBufferDestroy(buffer: index.memberBucketHeads) != 0 { status: 0 - 1 }
-    if rawBufferDestroy(buffer: index.memberNextRows) != 0 { status: 0 - 1 }
-    if rawBufferDestroy(buffer: index.memberHashes) != 0 { status: 0 - 1 }
-    if rawBufferDestroy(buffer: index.omittedSyntaxIDs) != 0 { status: 0 - 1 }
+    if index.bucketHeads.destroy() != 0 { status: 0 - 1 }
+    if index.nextRows.destroy() != 0 { status: 0 - 1 }
+    if index.nameHashes.destroy() != 0 { status: 0 - 1 }
+    if index.memberBucketHeads.destroy() != 0 { status: 0 - 1 }
+    if index.memberNextRows.destroy() != 0 { status: 0 - 1 }
+    if index.memberHashes.destroy() != 0 { status: 0 - 1 }
+    if index.omittedSyntaxIDs.destroy() != 0 { status: 0 - 1 }
     return status
 }
 
@@ -721,16 +721,16 @@ function compilerDeclarationIndexSyntaxIsOmitted(index: CompilerDeclarationIndex
 function compilerDeclarationIndexLookup(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, name: String, kindTag: Int): Int {
     if !index.isValid || index.bucketCount <= 0 { return 0 - 1 }
     let hash: Int(compilerDeclarationNameHash(name: name))
-    state row: Int(rawBufferLoadInt(buffer: index.bucketHeads, index: hash % index.bucketCount))
+    state row: Int(index.bucketHeads.element(index: hash % index.bucketCount))
     while row >= 0 {
-        if rawBufferLoadInt(buffer: index.nameHashes, index: row) == hash
+        if index.nameHashes.element(index: row) == hash
             && (kindTag == 0 || compilerIntTableValue(table: tables.declarations, row: row, column: 2) == kindTag)
             && compilerSyntaxDeclarationIsTopLevel(tables: tables, declarationRow: row) {
             let fileID: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 1))
             let candidate: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: row, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: row, column: 8)))
             if candidate == name { return row }
         }
-        row: rawBufferLoadInt(buffer: index.nextRows, index: row)
+        row: index.nextRows.element(index: row)
     }
     return 0 - 1
 }
@@ -738,11 +738,11 @@ function compilerDeclarationIndexLookup(tables: CompilerSyntaxTables, index: Com
 function compilerDeclarationIndexUniqueLookup(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, name: String, kindTag: Int): Int {
     if !index.isValid || index.bucketCount <= 0 { return 0 - 1 }
     let hash: Int(compilerDeclarationNameHash(name: name))
-    state row: Int(rawBufferLoadInt(buffer: index.bucketHeads, index: hash % index.bucketCount))
+    state row: Int(index.bucketHeads.element(index: hash % index.bucketCount))
     state match: Int(0 - 1)
     state matchCount: Int(0)
     while row >= 0 {
-        if rawBufferLoadInt(buffer: index.nameHashes, index: row) == hash
+        if index.nameHashes.element(index: row) == hash
             && (kindTag == 0 || compilerIntTableValue(table: tables.declarations, row: row, column: 2) == kindTag)
             && compilerSyntaxDeclarationIsTopLevel(tables: tables, declarationRow: row) {
             let fileID: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 1))
@@ -752,7 +752,7 @@ function compilerDeclarationIndexUniqueLookup(tables: CompilerSyntaxTables, inde
                 matchCount: matchCount + 1
             }
         }
-        row: rawBufferLoadInt(buffer: index.nextRows, index: row)
+        row: index.nextRows.element(index: row)
     }
     if matchCount != 1 { return 0 - 1 }
     return match
@@ -769,15 +769,15 @@ function compilerDeclarationIndexLocalRangeSyntaxID(tables: CompilerSyntaxTables
 function compilerDeclarationIndexMemberLookup(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, parentSyntaxID: Int, name: String): Int {
     if !index.isValid || index.memberBucketCount <= 0 { return 0 - 1 }
     let hash: Int(compilerDeclarationMemberHash(parentSyntaxID: parentSyntaxID, name: name))
-    state row: Int(rawBufferLoadInt(buffer: index.memberBucketHeads, index: hash % index.memberBucketCount))
+    state row: Int(index.memberBucketHeads.element(index: hash % index.memberBucketCount))
     while row >= 0 {
-        if rawBufferLoadInt(buffer: index.memberHashes, index: row) == hash
+        if index.memberHashes.element(index: row) == hash
             && compilerIntTableValue(table: tables.members, row: row, column: 2) == parentSyntaxID {
             let fileID: Int(compilerIntTableValue(table: tables.members, row: row, column: 1))
             let candidate: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: row, column: 6), localEnd: compilerIntTableValue(table: tables.members, row: row, column: 7)))
             if candidate == name { return row }
         }
-        row: rawBufferLoadInt(buffer: index.memberNextRows, index: row)
+        row: index.memberNextRows.element(index: row)
     }
     return 0 - 1
 }
@@ -788,7 +788,7 @@ function compilerDeclarationIndexMemberFunctionLookup(tables: CompilerSyntaxTabl
     while functionRow < compilerIntTableRowCount(table: tables.functions) {
         let syntaxID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 0))
         let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: syntaxID))
-        if declarationRow >= 0 && functionRow < rawBufferCount(buffer: tables.functionOwners) && rawBufferLoadInt(buffer: tables.functionOwners, index: functionRow) == parentSyntaxID {
+        if declarationRow >= 0 && functionRow < tables.functionOwners.count && tables.functionOwners.element(index: functionRow) == parentSyntaxID {
             let fileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
             let candidate: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
             if candidate == name { return functionRow }
@@ -804,7 +804,7 @@ function compilerDeclarationIndexAnyMemberFunctionLookup(tables: CompilerSyntaxT
     while functionRow < compilerIntTableRowCount(table: tables.functions) {
         let syntaxID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 0))
         let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: syntaxID))
-        if declarationRow >= 0 && functionRow < rawBufferCount(buffer: tables.functionOwners) && rawBufferLoadInt(buffer: tables.functionOwners, index: functionRow) >= 0 {
+        if declarationRow >= 0 && functionRow < tables.functionOwners.count && tables.functionOwners.element(index: functionRow) >= 0 {
             let fileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
             let candidate: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
             if candidate == name { return functionRow }
@@ -895,7 +895,7 @@ function compilerBodyArenaResultTypeIsRepresentationSensitive(arena: CompilerBod
     return compilerBodyArenaFunctionSignatureABICategory(arena: arena, typeID: typeID, typeKind: typeKind) == compilerBodyFunctionSignatureABICategoryNone()
 }
 
-function compilerBodyArenaMarkRepresentationSensitiveTargets(arena: CompilerBodyArena, sensitiveFunctions: RawBuffer): Int {
+function compilerBodyArenaMarkRepresentationSensitiveTargets(arena: CompilerBodyArena, sensitiveFunctions: Buffer<Int>): Int {
     state resolutionRow: Int(0)
     while resolutionRow < compilerIntTableRowCount(table: arena.resolutions) {
         if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) == compilerBodyResolutionFunction()
@@ -904,9 +904,9 @@ function compilerBodyArenaMarkRepresentationSensitiveTargets(arena: CompilerBody
             let targetFunctionRow: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
             let resultTypeKind: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()))
             let resultTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeIDColumn()))
-            if targetFunctionRow < 0 || targetFunctionRow >= rawBufferCount(buffer: sensitiveFunctions) { return 0 - 1 }
+            if targetFunctionRow < 0 || targetFunctionRow >= sensitiveFunctions.count { return 0 - 1 }
             if compilerBodyArenaResultTypeIsRepresentationSensitive(arena: arena, typeKind: resultTypeKind, typeID: resultTypeID) {
-                if rawBufferStoreInt(buffer: sensitiveFunctions, index: targetFunctionRow, value: 1) != 0 { return 0 - 1 }
+                if sensitiveFunctions.update(element: 1, index: targetFunctionRow) != 0 { return 0 - 1 }
             }
         }
         resolutionRow: resolutionRow + 1
@@ -927,20 +927,20 @@ function compilerBodyMIRAppendFunctionEdges(arena: CompilerBodyArena, edgeOwners
     return 0
 }
 
-function compilerBodyMIRMarkRepresentationSensitiveTargets(arena: CompilerBodyArena, sensitiveFunctions: RawBuffer): Int {
+function compilerBodyMIRMarkRepresentationSensitiveTargets(arena: CompilerBodyArena, sensitiveFunctions: Buffer<Int>): Int {
     state operationRow: Int(0)
     while operationRow < compilerIntTableRowCount(table: arena.mirOperations) {
         if compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationKindColumn()) == compilerBodyMIROperationDirectCall()
             && compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationTargetKindColumn()) == compilerBodyMIROperationTargetFunction() {
             let targetFunctionRow: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationTargetIDColumn()))
             let resultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
-            if targetFunctionRow < 0 || targetFunctionRow >= rawBufferCount(buffer: sensitiveFunctions)
+            if targetFunctionRow < 0 || targetFunctionRow >= sensitiveFunctions.count
                 || resultValueID < 0 || resultValueID >= compilerIntTableRowCount(table: arena.mirValues) { return 0 - 1 }
             let resultTypeKind: Int(compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()))
             if resultTypeKind == compilerBodyTypeConstruct() || resultTypeKind == compilerBodyTypeEnum() {
                 let resultTypeID: Int(compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeIDColumn()))
                 if compilerBodyArenaResultTypeIsRepresentationSensitive(arena: arena, typeKind: resultTypeKind, typeID: resultTypeID) {
-                    if rawBufferStoreInt(buffer: sensitiveFunctions, index: targetFunctionRow, value: 1) != 0 { return 0 - 1 }
+                    if sensitiveFunctions.update(element: 1, index: targetFunctionRow) != 0 { return 0 - 1 }
                 }
             }
         }
@@ -965,7 +965,7 @@ function compilerBodyArenaHasUnplannedRepresentationSensitiveCall(arena: Compile
     return false
 }
 
-function compilerFunctionReachabilityRecordTarget(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: RawBuffer, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, ownerFunctionRow: Int, targetName: String): Int {
+function compilerFunctionReachabilityRecordTarget(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: Buffer<Int>, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, ownerFunctionRow: Int, targetName: String): Int {
     if targetName == String("String") || compilerBodyRuntimeBuiltinID(name: targetName) != compilerBodyRuntimeBuiltinNone() { return 0 }
     let declarationRow: Int(compilerDeclarationIndexLookup(tables: tables, index: index, name: targetName, kindTag: compilerSyntaxKindFunction()))
     state targetFunctionRow: Int(0 - 1)
@@ -980,10 +980,10 @@ function compilerFunctionReachabilityRecordTarget(tables: CompilerSyntaxTables, 
     if edgeOwners.append(element: ownerFunctionRow) != 0 || edgeTargets.append(element: targetFunctionRow) != 0 { return 0 - 1 }
     if compilerFunctionSelectionContains(selection: selection, functionRow: targetFunctionRow) { return 0 }
     if compilerFunctionSelectionMark(selection: selection, functionRow: targetFunctionRow) != 0 { return 0 - 1 }
-    return rawBufferAppendInt(buffer: worklist, value: targetFunctionRow)
+    return worklist.append(element: targetFunctionRow)
 }
 
-function compilerFunctionReachabilityScanRange(source: String, start: Int, end: Int, tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: RawBuffer, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, ownerFunctionRow: Int, scanInterpolations: Bool): Int {
+function compilerFunctionReachabilityScanRange(source: String, start: Int, end: Int, tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: Buffer<Int>, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, ownerFunctionRow: Int, scanInterpolations: Bool): Int {
     state cursor: Int(start)
     while cursor < end {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: cursor))
@@ -1008,7 +1008,7 @@ function compilerFunctionReachabilityScanRange(source: String, start: Int, end: 
     return 0
 }
 
-function compilerFunctionReachabilityScanInterpolations(content: String, tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: RawBuffer, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, ownerFunctionRow: Int): Int {
+function compilerFunctionReachabilityScanInterpolations(content: String, tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: Buffer<Int>, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, ownerFunctionRow: Int): Int {
     let contentLength: Int(stringLength(value: content))
     let backslash: String(compilerCoreSingleBackslash())
     state contentIndex: Int(0)
@@ -1025,7 +1025,7 @@ function compilerFunctionReachabilityScanInterpolations(content: String, tables:
     return 0
 }
 
-function compilerFunctionReachabilitySeedRoots(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: RawBuffer, rootNames: String): Int {
+function compilerFunctionReachabilitySeedRoots(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: Buffer<Int>, rootNames: String): Int {
     state rootIndex: Int(0)
     while rootIndex < stringLength(value: rootNames) {
         let rootName: String(compilerCoreNameListNameAt(names: rootNames, start: rootIndex))
@@ -1033,16 +1033,16 @@ function compilerFunctionReachabilitySeedRoots(tables: CompilerSyntaxTables, ind
         if rootDeclarationRow < 0 { return 0 - 1 }
         let rootSyntaxID: Int(compilerIntTableValue(table: tables.declarations, row: rootDeclarationRow, column: 0))
         let rootFunctionRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: rootSyntaxID, column: 1))
-        if !compilerFunctionSelectionContains(selection: selection, functionRow: rootFunctionRow) && (compilerFunctionSelectionMark(selection: selection, functionRow: rootFunctionRow) != 0 || rawBufferAppendInt(buffer: worklist, value: rootFunctionRow) != 0) { return 0 - 1 }
+        if !compilerFunctionSelectionContains(selection: selection, functionRow: rootFunctionRow) && (compilerFunctionSelectionMark(selection: selection, functionRow: rootFunctionRow) != 0 || worklist.append(element: rootFunctionRow) != 0) { return 0 - 1 }
         rootIndex: compilerCoreNameListNextIndex(names: rootNames, start: rootIndex)
     }
     return 0
 }
 
-function compilerFunctionReachabilityExpand(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: RawBuffer, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>): Int {
+function compilerFunctionReachabilityExpand(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, selection: CompilerFunctionSelection, worklist: Buffer<Int>, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>): Int {
     state workIndex: Int(0)
-    while workIndex < rawBufferCount(buffer: worklist) {
-        let ownerFunctionRow: Int(rawBufferLoadInt(buffer: worklist, index: workIndex))
+    while workIndex < worklist.count {
+        let ownerFunctionRow: Int(worklist.element(index: workIndex))
         let fileID: Int(compilerIntTableValue(table: tables.functions, row: ownerFunctionRow, column: 1))
         let bodyStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.functions, row: ownerFunctionRow, column: 8)))
         let bodyEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.functions, row: ownerFunctionRow, column: 9)))
@@ -1058,12 +1058,12 @@ function compilerFunctionReachabilityCreate(tables: CompilerSyntaxTables, index:
     let selection: CompilerFunctionSelection(compilerFunctionSelectionCreateEmpty(functionCount: functionCount, valid: index.isValid))
     let edgeOwners: Buffer<Int>(bufferCreateInt(capacity: functionCount))
     let edgeTargets: Buffer<Int>(bufferCreateInt(capacity: functionCount))
-    let worklist: RawBuffer(rawBufferCreate(capacity: functionCount, stride: 4))
+    let worklist: Buffer<Int>(bufferCreateInt(capacity: functionCount))
     state valid: Bool(false)
     valid: selection.isValid
     if valid && compilerFunctionReachabilitySeedRoots(tables: tables, index: index, selection: selection, worklist: worklist, rootNames: rootNames) != 0 { valid: false }
     if valid && compilerFunctionReachabilityExpand(tables: tables, index: index, selection: selection, worklist: worklist, edgeOwners: edgeOwners, edgeTargets: edgeTargets) != 0 { valid: false }
-    rawBufferDestroy(buffer: worklist)
+    worklist.destroy()
     return CompilerFunctionReachability(selection: selection, edgeOwners: edgeOwners, edgeTargets: edgeTargets, isValid: valid)
 }
 
@@ -1767,11 +1767,11 @@ function compilerSyntaxAppendFunction(tables: CompilerSyntaxTables, syntaxID: In
 
 function compilerSyntaxAppendFunctionOwner(tables: CompilerSyntaxTables, ownerSyntaxID: Int): Int {
     if ownerSyntaxID < 0 {
-        return rawBufferAppendInt(buffer: tables.functionOwners, value: 0 - 1)
+        return tables.functionOwners.append(element: 0 - 1)
     }
     if ownerSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
         || compilerIntTableValue(table: tables.syntaxIndex, row: ownerSyntaxID, column: 0) != compilerSyntaxKindConstruct() { return 0 - 1 }
-    return rawBufferAppendInt(buffer: tables.functionOwners, value: ownerSyntaxID)
+    return tables.functionOwners.append(element: ownerSyntaxID)
 }
 
 function compilerSyntaxAppendParameter(tables: CompilerSyntaxTables, syntaxID: Int, fileID: Int, functionID: Int, ordinal: Int, parameterStart: Int, parameterEnd: Int, nameStart: Int, nameEnd: Int, typeStart: Int, typeEnd: Int, fingerprint: CompilerFingerprint): Int {
@@ -2791,16 +2791,16 @@ function compilerTypedSyntaxCaptureWithPolicy(source: String, tables: CompilerSy
                 } else if token.kind == .macroAttribute && token.text == String("@main") {
                     sourceIndex: token.end
                 } else if token.kind == .macroAttribute {
-                    let failureCountBeforeMacro: Int(rawBufferCount(buffer: tables.failures))
+                    let failureCountBeforeMacro: Int(tables.failures.count)
                     let applicationEnd: Int(compilerTypedSyntaxCaptureMacroApplication(source: source, tables: tables, macroToken: token))
-                    if failureCountBeforeMacro == 0 && rawBufferCount(buffer: tables.failures) != 0 {
+                    if failureCountBeforeMacro == 0 && tables.failures.count != 0 {
                         compilerSyntaxTablesFailureAnnotateGlobal(tables: tables, phase: compilerSyntaxFailurePhaseMacroCapture(), reason: compilerSyntaxFailureReasonInvalidMacroApplication(), fileID: fileID, start: token.start, end: applicationEnd, relatedRow: declarationOrdinal)
                     }
                     sourceIndex: applicationEnd
                 } else {
-                    let failureCountBeforeDeclaration: Int(rawBufferCount(buffer: tables.failures))
+                    let failureCountBeforeDeclaration: Int(tables.failures.count)
                     let step: CompilerTypedDeclarationCaptureStep(compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, token: token, captureBodies: captureBodies, builtinPolicy: pendingBuiltinPolicy, fileEnd: fileEnd))
-                    if failureCountBeforeDeclaration == 0 && rawBufferCount(buffer: tables.failures) != 0 {
+                    if failureCountBeforeDeclaration == 0 && tables.failures.count != 0 {
                         compilerSyntaxTablesFailureAnnotateGlobal(tables: tables, phase: compilerSyntaxFailurePhaseTopLevelCapture(), reason: compilerSyntaxFailureReasonInvalidTopLevelDeclaration(), fileID: fileID, start: token.start, end: step.nextIndex, relatedRow: declarationOrdinal)
                     }
                     if step.captured {
@@ -4316,13 +4316,13 @@ function compilerSyntaxTypeReferencesAreValid(tables: CompilerSyntaxTables): Boo
 function compilerSyntaxEnumDirectPayloadCyclesAreAbsent(tables: CompilerSyntaxTables): Bool {
     let declarationCount: Int(compilerIntTableRowCount(table: tables.declarations))
     let syntaxCount: Int(compilerIntTableRowCount(table: tables.syntaxIndex))
-    let resolvedBySyntaxID: RawBuffer(rawBufferCreate(capacity: syntaxCount, stride: 4))
+    let resolvedBySyntaxID: Buffer<Int>(bufferCreateInt(capacity: syntaxCount))
     state valid: Bool(true)
     state syntaxID: Int(0)
     while syntaxID < syntaxCount {
         state initial: Int(1)
         if compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 0) == compilerSyntaxKindEnum() { initial: 0 }
-        if rawBufferAppendInt(buffer: resolvedBySyntaxID, value: initial) != 0 { valid: false }
+        if resolvedBySyntaxID.append(element: initial) != 0 { valid: false }
         syntaxID: syntaxID + 1
     }
     state declarationRow: Int(0)
@@ -4338,7 +4338,7 @@ function compilerSyntaxEnumDirectPayloadCyclesAreAbsent(tables: CompilerSyntaxTa
         declarationRow: 0
         while declarationRow < declarationCount {
             let declarationSyntaxID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 0))
-            if rawBufferLoadInt(buffer: resolvedBySyntaxID, index: declarationSyntaxID) == 0 {
+            if resolvedBySyntaxID.element(index: declarationSyntaxID) == 0 {
                 state blocked: Bool(false)
                 state payloadRow: Int(0)
                 while payloadRow < compilerIntTableRowCount(table: tables.members) {
@@ -4352,7 +4352,7 @@ function compilerSyntaxEnumDirectPayloadCyclesAreAbsent(tables: CompilerSyntaxTa
                             if targetSyntaxID < 0 || targetSyntaxID >= syntaxCount {
                                 valid: false
                             } else if compilerIntTableValue(table: tables.syntaxIndex, row: targetSyntaxID, column: 0) == compilerSyntaxKindEnum()
-                                && rawBufferLoadInt(buffer: resolvedBySyntaxID, index: targetSyntaxID) == 0 { blocked: true }
+                                && resolvedBySyntaxID.element(index: targetSyntaxID) == 0 { blocked: true }
                         } else if targetKind != compilerSyntaxTypeReferenceTargetBuiltin() && targetKind != compilerSyntaxTypeReferenceTargetGenericParameter() {
                             valid: false
                         }
@@ -4360,7 +4360,7 @@ function compilerSyntaxEnumDirectPayloadCyclesAreAbsent(tables: CompilerSyntaxTa
                     payloadRow: payloadRow + 1
                 }
                 if valid && !blocked {
-                    if rawBufferStoreInt(buffer: resolvedBySyntaxID, index: declarationSyntaxID, value: 1) != 0 {
+                    if resolvedBySyntaxID.update(element: 1, index: declarationSyntaxID) != 0 {
                         valid: false
                     } else {
                         changed: true
@@ -4374,10 +4374,10 @@ function compilerSyntaxEnumDirectPayloadCyclesAreAbsent(tables: CompilerSyntaxTa
     declarationRow: 0
     while valid && declarationRow < declarationCount {
         let declarationSyntaxID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 0))
-        if rawBufferLoadInt(buffer: resolvedBySyntaxID, index: declarationSyntaxID) == 0 { valid: false }
+        if resolvedBySyntaxID.element(index: declarationSyntaxID) == 0 { valid: false }
         declarationRow: declarationRow + 1
     }
-    if rawBufferDestroy(buffer: resolvedBySyntaxID) != 0 { valid: false }
+    if resolvedBySyntaxID.destroy() != 0 { valid: false }
     return valid
 }
 
@@ -4414,7 +4414,7 @@ function compilerSyntaxFunctionsAreValid(tables: CompilerSyntaxTables): Bool {
         let firstParameterRow: Int(compilerIntTableValue(table: tables.functions, row: row, column: 2))
         let childCount: Int(compilerIntTableValue(table: tables.functions, row: row, column: 3))
         let isDerived: Int(compilerIntTableValue(table: tables.functions, row: row, column: compilerSyntaxFunctionDerivedColumn()))
-        let ownerSyntaxID: Int(rawBufferLoadInt(buffer: tables.functionOwners, index: row))
+        let ownerSyntaxID: Int(tables.functionOwners.element(index: row))
         if syntaxID < 0 || syntaxID >= syntaxCount || fileID < 0 || fileID >= fileCount || firstParameterRow < 0 || childCount < 0 || firstParameterRow + childCount > parameterCount
             || (ownerSyntaxID >= 0 && (ownerSyntaxID >= syntaxCount || compilerIntTableValue(table: tables.syntaxIndex, row: ownerSyntaxID, column: 0) != compilerSyntaxKindConstruct()))
             || (isDerived != 0 && isDerived != 1)
@@ -5153,22 +5153,22 @@ function compilerMacroIndexCreate(tables: CompilerSyntaxTables): CompilerMacroIn
     let declarationCount: Int(compilerIntTableRowCount(table: tables.macroDeclarations))
     state bucketCount: Int(1)
     if declarationCount > 0 { bucketCount: declarationCount * 2 + 1 }
-    let bucketHeads: RawBuffer(rawBufferCreate(capacity: bucketCount, stride: 4))
-    let nextRows: RawBuffer(rawBufferCreate(capacity: declarationCount, stride: 4))
-    let nameHashes: RawBuffer(rawBufferCreate(capacity: declarationCount, stride: 4))
+    let bucketHeads: Buffer<Int>(bufferCreateInt(capacity: bucketCount))
+    let nextRows: Buffer<Int>(bufferCreateInt(capacity: declarationCount))
+    let nameHashes: Buffer<Int>(bufferCreateInt(capacity: declarationCount))
     state valid: Bool(true)
     state bucket: Int(0)
     while bucket < bucketCount {
-        if rawBufferAppendInt(buffer: bucketHeads, value: 0 - 1) != 0 { valid: false }
+        if bucketHeads.append(element: 0 - 1) != 0 { valid: false }
         bucket: bucket + 1
     }
     state row: Int(0)
     while row < declarationCount {
         let nameHash: Int(compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 18))
         let nameBucket: Int(nameHash % bucketCount)
-        let priorHead: Int(rawBufferLoadInt(buffer: bucketHeads, index: nameBucket))
-        if rawBufferAppendInt(buffer: nextRows, value: priorHead) != 0 || rawBufferAppendInt(buffer: nameHashes, value: nameHash) != 0 { valid: false }
-        if rawBufferStoreInt(buffer: bucketHeads, index: nameBucket, value: row) != 0 { valid: false }
+        let priorHead: Int(bucketHeads.element(index: nameBucket))
+        if nextRows.append(element: priorHead) != 0 || nameHashes.append(element: nameHash) != 0 { valid: false }
+        if bucketHeads.update(element: row, index: nameBucket) != 0 { valid: false }
         row: row + 1
     }
     return CompilerMacroIndex(bucketHeads: bucketHeads, nextRows: nextRows, nameHashes: nameHashes, bucketCount: bucketCount, isValid: valid)
@@ -5176,14 +5176,14 @@ function compilerMacroIndexCreate(tables: CompilerSyntaxTables): CompilerMacroIn
 
 function compilerMacroIndexDestroy(index: CompilerMacroIndex): Int {
     state status: Int(0)
-    if rawBufferDestroy(buffer: index.bucketHeads) != 0 { status: 0 - 1 }
-    if rawBufferDestroy(buffer: index.nextRows) != 0 { status: 0 - 1 }
-    if rawBufferDestroy(buffer: index.nameHashes) != 0 { status: 0 - 1 }
+    if index.bucketHeads.destroy() != 0 { status: 0 - 1 }
+    if index.nextRows.destroy() != 0 { status: 0 - 1 }
+    if index.nameHashes.destroy() != 0 { status: 0 - 1 }
     return status
 }
 
 function compilerMacroIndexCandidateMatches(tables: CompilerSyntaxTables, index: CompilerMacroIndex, row: Int, name: String, targetKind: Int): Bool {
-    if rawBufferLoadInt(buffer: index.nameHashes, index: row) != compilerDeclarationNameHash(name: name) { return false }
+    if index.nameHashes.element(index: row) != compilerDeclarationNameHash(name: name) { return false }
     let fileID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 1))
     let candidateName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 4), localEnd: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 5)))
     if candidateName != name { return false }
@@ -5193,15 +5193,15 @@ function compilerMacroIndexCandidateMatches(tables: CompilerSyntaxTables, index:
 function compilerMacroIndexMatchCount(tables: CompilerSyntaxTables, index: CompilerMacroIndex, name: String, targetKind: Int, compatibleOnly: Bool): Int {
     if !index.isValid || index.bucketCount <= 0 { return 0 }
     let hash: Int(compilerDeclarationNameHash(name: name))
-    state row: Int(rawBufferLoadInt(buffer: index.bucketHeads, index: hash % index.bucketCount))
+    state row: Int(index.bucketHeads.element(index: hash % index.bucketCount))
     state count: Int(0)
     while row >= 0 {
-        if rawBufferLoadInt(buffer: index.nameHashes, index: row) == hash {
+        if index.nameHashes.element(index: row) == hash {
             let fileID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 1))
             let candidateName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 4), localEnd: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 5)))
             if candidateName == name && (!compatibleOnly || compilerMacroTargetDeclarationAccepts(tables: tables, declarationRow: row, targetKind: targetKind, depth: 0)) { count: count + 1 }
         }
-        row: rawBufferLoadInt(buffer: index.nextRows, index: row)
+        row: index.nextRows.element(index: row)
     }
     return count
 }
@@ -5209,10 +5209,10 @@ function compilerMacroIndexMatchCount(tables: CompilerSyntaxTables, index: Compi
 function compilerMacroIndexFirstMatch(tables: CompilerSyntaxTables, index: CompilerMacroIndex, name: String, targetKind: Int): Int {
     if !index.isValid || index.bucketCount <= 0 { return 0 - 1 }
     let hash: Int(compilerDeclarationNameHash(name: name))
-    state row: Int(rawBufferLoadInt(buffer: index.bucketHeads, index: hash % index.bucketCount))
+    state row: Int(index.bucketHeads.element(index: hash % index.bucketCount))
     while row >= 0 {
         if compilerMacroIndexCandidateMatches(tables: tables, index: index, row: row, name: name, targetKind: targetKind) { return row }
-        row: rawBufferLoadInt(buffer: index.nextRows, index: row)
+        row: index.nextRows.element(index: row)
     }
     return 0 - 1
 }
@@ -5870,8 +5870,8 @@ function compilerMacroGraphDeltaHasAuthoredFunctionCollisionExcluding(tables: Co
     state functionRow: Int(0)
     while functionRow < compilerIntTableRowCount(table: tables.functions) {
         if functionRow != ignoredFunctionRow
-            && functionRow < rawBufferCount(buffer: tables.functionOwners)
-            && rawBufferLoadInt(buffer: tables.functionOwners, index: functionRow) == ownerTargetSyntaxID {
+            && functionRow < tables.functionOwners.count
+            && tables.functionOwners.element(index: functionRow) == ownerTargetSyntaxID {
             let syntaxID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 0))
             let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: syntaxID))
             if declarationRow >= 0 {
@@ -5892,8 +5892,8 @@ function compilerMacroGraphDeltaCommittedGeneratedFunctionRow(tables: CompilerSy
         return 0 - 1
     }
     let owner: Int(compilerIntTableValue(table: delta.generatedFunctions, row: generatedRow, column: 2))
-    if expectedFunctionRow >= rawBufferCount(buffer: tables.functionOwners)
-        || rawBufferLoadInt(buffer: tables.functionOwners, index: expectedFunctionRow) != owner { return 0 - 1 }
+    if expectedFunctionRow >= tables.functionOwners.count
+        || tables.functionOwners.element(index: expectedFunctionRow) != owner { return 0 - 1 }
     let syntaxID: Int(compilerIntTableValue(table: tables.functions, row: expectedFunctionRow, column: 0))
     let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: syntaxID))
     if declarationRow < 0 { return 0 - 1 }
@@ -6177,7 +6177,7 @@ function compilerGraphDeltaCommitGeneratedFunction(tables: CompilerSyntaxTables,
     let parameterCapture: CompilerTypedParameterCapture(compilerTypedSyntaxCaptureParameters(source: source, tables: tables, fileID: fileID, functionID: functionRow, start: parameterGlobalStart, end: parameterGlobalEnd, baseFingerprint: signature))
     if generatedGraphKind != compilerGraphGeneratedKindFunction()
         || syntaxID < 0
-        || rawBufferCount(buffer: tables.failures) != 0
+        || tables.failures.count != 0
         || compilerSyntaxAppendFunction(tables: tables, syntaxID: syntaxID, fileID: fileID, firstParameterRow: parameterRow, parameterCount: parameterCapture.count, parameterStart: parameterGlobalStart, parameterEnd: parameterGlobalEnd, returnTypeStart: returnTypeGlobalStart, returnTypeEnd: returnTypeGlobalEnd, bodyStart: bodyGlobalStart, bodyEnd: bodyGlobalEnd, signature: signature, isDerived: false) != 0
         || compilerSyntaxAppendFunctionOwner(tables: tables, ownerSyntaxID: ownerSyntaxID) != 0
         || compilerSyntaxAppendDeclaration(tables: tables, syntaxID: syntaxID, fileID: fileID, kindTag: generatedSyntaxKind, parentSyntaxID: 0 - 1, ordinal: declarationRow, declarationStart: nameGlobalStart, declarationEnd: bodyGlobalEnd, nameStart: nameGlobalStart, nameEnd: nameGlobalEnd, bodyStart: bodyGlobalStart, bodyEnd: bodyGlobalEnd, fingerprint: signature, builtinPolicy: compilerBuiltinPolicyNone()) != 0
@@ -6212,7 +6212,7 @@ function compilerGraphDeltaCommitGeneratedMember(tables: CompilerSyntaxTables, r
     if generatedGraphKind != compilerGraphGeneratedKindMember()
         || ownerSyntaxID < 0
         || syntaxID < 0
-        || rawBufferCount(buffer: tables.failures) != 0
+        || tables.failures.count != 0
         || compilerSyntaxAppendMember(tables: tables, syntaxID: syntaxID, fileID: fileID, parentSyntaxID: ownerSyntaxID, ordinal: ordinal, memberStart: memberStartGlobal, memberEnd: memberEndGlobal, nameStart: nameStartGlobal, nameEnd: nameEndGlobal, typeStart: typeStartGlobal, typeEnd: typeEndGlobal, fingerprint: memberFingerprint, memberKind: memberKind) != 0
         || compilerSyntaxLinkMemberTypeTargetAtRow(tables: tables, memberRow: memberRow) != 0 {
         compilerSyntaxTablesPoison(tables: tables)
@@ -6314,7 +6314,7 @@ function compilerMacroExecutionRecordFinalFailure(tables: CompilerSyntaxTables, 
 }
 
 function compilerMacroGraphDeltaIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Bool {
-    if rawBufferCount(buffer: delta.failures) != 0 || !compilerIntTableIsComplete(table: delta.nodes) || !compilerIntTableIsComplete(table: delta.facts)
+    if delta.failures.count != 0 || !compilerIntTableIsComplete(table: delta.nodes) || !compilerIntTableIsComplete(table: delta.facts)
         || !compilerMacroGraphDeltaGeneratedMembersAreValid(tables: tables, delta: delta)
         || !compilerMacroGraphDeltaGeneratedFunctionsAreValid(tables: tables, delta: delta) { return false }
     let nodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
@@ -6345,18 +6345,18 @@ function compilerMacroGraphDeltaIsValid(tables: CompilerSyntaxTables, delta: Com
     return true
 }
 
-function compilerMacroExecutionEvaluateExpansionOperation(tables: CompilerSyntaxTables, arena: CompilerBodyArena, graphDelta: CompilerGraphDelta, pendingOmissionTargets: RawBuffer, applicationRow: Int, declarationRow: Int, targetSyntaxID: Int, operationRow: Int): Int {
+function compilerMacroExecutionEvaluateExpansionOperation(tables: CompilerSyntaxTables, arena: CompilerBodyArena, graphDelta: CompilerGraphDelta, pendingOmissionTargets: Buffer<Int>, applicationRow: Int, declarationRow: Int, targetSyntaxID: Int, operationRow: Int): Int {
     let targetOperation: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationTargetIDColumn()))
     let expansionTargetSyntaxID: Int(targetSyntaxID)
     state duplicateTarget: Bool(false)
     state pendingRow: Int(0)
-    while pendingRow < rawBufferCount(buffer: pendingOmissionTargets) {
-        if rawBufferLoadInt(buffer: pendingOmissionTargets, index: pendingRow) == expansionTargetSyntaxID { duplicateTarget: true }
+    while pendingRow < pendingOmissionTargets.count {
+        if pendingOmissionTargets.element(index: pendingRow) == expansionTargetSyntaxID { duplicateTarget: true }
         pendingRow: pendingRow + 1
     }
     state operationStatus: Int(1)
     if targetOperation == compilerMacroTargetOperationOmit() {
-        if expansionTargetSyntaxID < 0 || duplicateTarget || rawBufferAppendInt(buffer: pendingOmissionTargets, value: expansionTargetSyntaxID) != 0 {
+        if expansionTargetSyntaxID < 0 || duplicateTarget || pendingOmissionTargets.append(element: expansionTargetSyntaxID) != 0 {
             operationStatus: 0 - compilerMacroDiagnosticGraphDeltaInvalid()
         }
     } else if targetOperation == compilerMacroTargetOperationExpand() {
@@ -6387,7 +6387,7 @@ function compilerMacroExecutionEvaluateExpansionOperation(tables: CompilerSyntax
     return operationStatus
 }
 
-function compilerMacroExecutionEvaluateReadOperation(tables: CompilerSyntaxTables, arena: CompilerBodyArena, evaluationValues: RawBuffer, applicationRow: Int, invocationRow: Int, targetSyntaxID: Int, operationRow: Int, operationKind: Int): Int {
+function compilerMacroExecutionEvaluateReadOperation(tables: CompilerSyntaxTables, arena: CompilerBodyArena, evaluationValues: Buffer<Int>, applicationRow: Int, invocationRow: Int, targetSyntaxID: Int, operationRow: Int, operationKind: Int): Int {
     state operationStatus: Int(1)
     if operationKind == compilerBodyMIROperationMacroGraphQuery() {
         let queryKindValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 1))
@@ -6405,7 +6405,7 @@ function compilerMacroExecutionEvaluateReadOperation(tables: CompilerSyntaxTable
             let graphObservation: CompilerFingerprint(compilerMacroExecutionDeclarationObservation(tables: tables, kindTag: queryKindTag, name: queryName))
             let graphQueryResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
             if compilerMacroExecutionAppendReadDependency(tables: tables, invocationRow: invocationRow, operation: compilerMacroGraphOperationDeclarationCount(), arena: arena, operationRow: operationRow, kindValueID: queryKindValueID, nameValueID: queryNameValueID, kindTag: queryKindTag, observedCount: graphObservedCount, applicationIdentity: graphApplicationIdentity, targetIdentity: graphTargetIdentity, queryIdentity: graphQueryIdentity, observation: graphObservation) < 0
-                || rawBufferStoreInt(buffer: evaluationValues, index: graphQueryResultValueID, value: graphObservedCount) != 0 {
+                || evaluationValues.update(element: graphObservedCount, index: graphQueryResultValueID) != 0 {
                 operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
             }
         }
@@ -6425,7 +6425,7 @@ function compilerMacroExecutionEvaluateReadOperation(tables: CompilerSyntaxTable
             let targetObservation: CompilerFingerprint(compilerMacroExecutionTargetMemberObservation(tables: tables, targetSyntaxID: targetSyntaxID, name: memberName))
             let targetQueryResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
             if compilerMacroExecutionAppendReadDependency(tables: tables, invocationRow: invocationRow, operation: compilerMacroTargetOperationMemberCount(), arena: arena, operationRow: operationRow, kindValueID: nameValueID, nameValueID: nameValueID, kindTag: compilerSyntaxKindConstruct(), observedCount: targetObservedCount, applicationIdentity: targetApplicationIdentity, targetIdentity: targetIdentity, queryIdentity: targetQueryIdentity, observation: targetObservation) < 0
-                || rawBufferStoreInt(buffer: evaluationValues, index: targetQueryResultValueID, value: targetObservedCount) != 0 {
+                || evaluationValues.update(element: targetObservedCount, index: targetQueryResultValueID) != 0 {
                 operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
             }
         }
@@ -6435,12 +6435,12 @@ function compilerMacroExecutionEvaluateReadOperation(tables: CompilerSyntaxTable
     return operationStatus
 }
 
-function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, evaluationValues: RawBuffer, currentBlockID: Int, previousBlockID: Int, operationRow: Int, operationKind: Int): Int {
+function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, evaluationValues: Buffer<Int>, currentBlockID: Int, previousBlockID: Int, operationRow: Int, operationKind: Int): Int {
     state operationStatus: Int(1)
     if operationKind == compilerBodyMIROperationConstant() || operationKind == compilerBodyMIROperationStringGlobal() {
         let constantResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
         let scalarValue: Int(compilerMacroExecutionScalarValue(arena: arena, valueID: constantResultValueID))
-        if rawBufferStoreInt(buffer: evaluationValues, index: constantResultValueID, value: scalarValue) != 0 {
+        if evaluationValues.update(element: scalarValue, index: constantResultValueID) != 0 {
             operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
         }
     } else if operationKind == compilerBodyMIROperationLocalValue() || operationKind == compilerBodyMIROperationAssignVersion() || operationKind == compilerBodyMIROperationPhi() {
@@ -6449,8 +6449,8 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
         state incomingOrdinal: Int(0)
         if operationKind == compilerBodyMIROperationPhi() { incomingOrdinal: compilerMacroExecutionPhiOperandOrdinal(arena: arena, blockID: currentBlockID, previousBlockID: previousBlockID, operandCount: copyOperandCount) }
         let incomingValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: incomingOrdinal))
-        if copyOperandCount <= 0 || incomingValueID < 0 || incomingValueID >= rawBufferCount(buffer: evaluationValues)
-            || rawBufferStoreInt(buffer: evaluationValues, index: copyResultValueID, value: rawBufferLoadInt(buffer: evaluationValues, index: incomingValueID)) != 0 {
+        if copyOperandCount <= 0 || incomingValueID < 0 || incomingValueID >= evaluationValues.count
+            || evaluationValues.update(element: evaluationValues.element(index: incomingValueID), index: copyResultValueID) != 0 {
             operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
         }
     } else if operationKind == compilerBodyMIROperationEqual() || operationKind == compilerBodyMIROperationNotEqual()
@@ -6466,11 +6466,11 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
         let binaryOperandCount: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()))
         state binaryScalarResult: Int(0)
         state binaryOperationValid: Bool(binaryOperandCount == 2
-            && leftValueID >= 0 && leftValueID < rawBufferCount(buffer: evaluationValues)
-            && rightValueID >= 0 && rightValueID < rawBufferCount(buffer: evaluationValues))
+            && leftValueID >= 0 && leftValueID < evaluationValues.count
+            && rightValueID >= 0 && rightValueID < evaluationValues.count)
         if binaryOperationValid {
-            let leftValue: Int(rawBufferLoadInt(buffer: evaluationValues, index: leftValueID))
-            let rightValue: Int(rawBufferLoadInt(buffer: evaluationValues, index: rightValueID))
+            let leftValue: Int(evaluationValues.element(index: leftValueID))
+            let rightValue: Int(evaluationValues.element(index: rightValueID))
             if operationKind == compilerBodyMIROperationEqual() { if leftValue == rightValue { binaryScalarResult: 1 } }
             if operationKind == compilerBodyMIROperationNotEqual() { if leftValue != rightValue { binaryScalarResult: 1 } }
             if operationKind == compilerBodyMIROperationAnd() { if leftValue != 0 && rightValue != 0 { binaryScalarResult: 1 } }
@@ -6489,7 +6489,7 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
             if operationKind == compilerBodyMIROperationGreaterThan() { if leftValue > rightValue { binaryScalarResult: 1 } }
             if operationKind == compilerBodyMIROperationGreaterEqual() { if leftValue >= rightValue { binaryScalarResult: 1 } }
         }
-        if !binaryOperationValid || rawBufferStoreInt(buffer: evaluationValues, index: binaryResultValueID, value: binaryScalarResult) != 0 {
+        if !binaryOperationValid || evaluationValues.update(element: binaryScalarResult, index: binaryResultValueID) != 0 {
             operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
         }
     } else if operationKind == compilerBodyMIROperationPrefixNot() || operationKind == compilerBodyMIROperationPrefixNegate() {
@@ -6497,14 +6497,14 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
         let prefixResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
         let prefixOperandCount: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()))
         state prefixScalarResult: Int(0)
-        if prefixOperandCount != 1 || operandValueID < 0 || operandValueID >= rawBufferCount(buffer: evaluationValues) {
+        if prefixOperandCount != 1 || operandValueID < 0 || operandValueID >= evaluationValues.count {
             operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
         } else {
-            let operandValue: Int(rawBufferLoadInt(buffer: evaluationValues, index: operandValueID))
+            let operandValue: Int(evaluationValues.element(index: operandValueID))
             if operationKind == compilerBodyMIROperationPrefixNot() {
                 if operandValue == 0 { prefixScalarResult: 1 }
             } else { prefixScalarResult: 0 - operandValue }
-            if rawBufferStoreInt(buffer: evaluationValues, index: prefixResultValueID, value: prefixScalarResult) != 0 {
+            if evaluationValues.update(element: prefixScalarResult, index: prefixResultValueID) != 0 {
                 operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
             }
         }
@@ -6514,7 +6514,7 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
     return operationStatus
 }
 
-function compilerMacroExecutionEvaluateInvocation(tables: CompilerSyntaxTables, arena: CompilerBodyArena, graphDelta: CompilerGraphDelta, pendingOmissionTargets: RawBuffer, applicationRow: Int, declarationRow: Int, invocationRow: Int, bodyStart: Int, bodyEnd: Int): CompilerMacroInvocationOutcome {
+function compilerMacroExecutionEvaluateInvocation(tables: CompilerSyntaxTables, arena: CompilerBodyArena, graphDelta: CompilerGraphDelta, pendingOmissionTargets: Buffer<Int>, applicationRow: Int, declarationRow: Int, invocationRow: Int, bodyStart: Int, bodyEnd: Int): CompilerMacroInvocationOutcome {
     state status: Int(0)
     state diagnosticCode: Int(0)
     state eventCount: Int(0)
@@ -6522,10 +6522,10 @@ function compilerMacroExecutionEvaluateInvocation(tables: CompilerSyntaxTables, 
     state mirOperationCount: Int(0)
     state stepCount: Int(0)
     let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12))
-    let evaluationValues: RawBuffer(rawBufferCreate(capacity: compilerIntTableRowCount(table: arena.mirValues), stride: 4))
+    let evaluationValues: Buffer<Int>(bufferCreateInt(capacity: compilerIntTableRowCount(table: arena.mirValues)))
     state evaluationValueRow: Int(0)
     while evaluationValueRow < compilerIntTableRowCount(table: arena.mirValues) {
-        rawBufferAppendInt(buffer: evaluationValues, value: 0)
+        evaluationValues.append(element: 0)
         evaluationValueRow: evaluationValueRow + 1
     }
     state invocationSteps: Int(0)
@@ -6630,11 +6630,11 @@ function compilerMacroExecutionEvaluateInvocation(tables: CompilerSyntaxTables, 
                         if conditionValueID >= 0 && conditionValueID < compilerIntTableRowCount(table: arena.mirValues) {
                             conditionTypeKind: compilerIntTableValue(table: arena.mirValues, row: conditionValueID, column: compilerBodyMIRValueTypeColumn())
                         }
-                        if conditionValueID < 0 || conditionValueID >= rawBufferCount(buffer: evaluationValues) || conditionTypeKind != compilerBodyTypeBool() {
+                        if conditionValueID < 0 || conditionValueID >= evaluationValues.count || conditionTypeKind != compilerBodyTypeBool() {
                             status: 0 - 1
                             diagnosticCode: compilerMacroDiagnosticBodyInvalid()
                             failureOperationRow: terminatorRow
-                        } else if rawBufferLoadInt(buffer: evaluationValues, index: conditionValueID) != 0 {
+                        } else if evaluationValues.element(index: conditionValueID) != 0 {
                             nextBlockID: compilerBodyMIRCFGTarget(arena: arena, blockID: currentBlockID, role: compilerBodyCFGEdgeTrue())
                         } else {
                             nextBlockID: compilerBodyMIRCFGTarget(arena: arena, blockID: currentBlockID, role: compilerBodyCFGEdgeFalse())
@@ -6682,11 +6682,11 @@ function compilerMacroExecutionEvaluateInvocation(tables: CompilerSyntaxTables, 
         let failureIdentity: CompilerFingerprint(compilerMacroExecutionErrorIdentity(base: compilerMacroExecutionInvocationIdentity(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow), code: diagnosticCode, row: failureOperationRow))
         compilerMacroExecutionSetInvocation(tables: tables, row: invocationRow, status: compilerMacroInvocationFailed(), diagnosticCode: diagnosticCode, diagnosticFileID: failureFileID, diagnosticStart: failureStart, diagnosticEnd: failureEnd, resultIdentity: failureIdentity, mirOperationCount: compilerIntTableRowCount(table: arena.mirOperations), stepCount: 0, pipelineStatus: 0, pipelineFailureCode: 0)
     }
-    rawBufferDestroy(buffer: evaluationValues)
+    evaluationValues.destroy()
     return CompilerMacroInvocationOutcome(status: status, diagnosticCode: diagnosticCode, eventCount: eventCount, readDependencyCount: readDependencyCount, mirOperationCount: mirOperationCount, stepCount: stepCount)
 }
 
-function compilerMacroExecutionRunInvocation(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, graphDelta: CompilerGraphDelta, pendingOmissionTargets: RawBuffer, applicationRow: Int, declarationRow: Int, invocationRow: Int, bodyStart: Int, bodyEnd: Int): CompilerMacroInvocationOutcome {
+function compilerMacroExecutionRunInvocation(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, graphDelta: CompilerGraphDelta, pendingOmissionTargets: Buffer<Int>, applicationRow: Int, declarationRow: Int, invocationRow: Int, bodyStart: Int, bodyEnd: Int): CompilerMacroInvocationOutcome {
     let declarationFileID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 1))
     let globalBodyStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: declarationFileID, localOffset: bodyStart))
     let globalBodyEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: declarationFileID, localOffset: bodyEnd))
@@ -6696,8 +6696,8 @@ function compilerMacroExecutionRunInvocation(tables: CompilerSyntaxTables, index
         return CompilerMacroInvocationOutcome(status: 0, diagnosticCode: 0, eventCount: 0, readDependencyCount: 0, mirOperationCount: 0, stepCount: 0)
     }
     let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreateMacro(tables: tables, index: index, macroDeclarationRow: declarationRow)))
-    let emptyReturnModes: RawBuffer(rawBufferCreate(capacity: 0, stride: 4))
-    let emptyParticipants: RawBuffer(rawBufferCreate(capacity: 0, stride: 4))
+    let emptyReturnModes: Buffer<Int>(bufferCreateInt(capacity: 0))
+    let emptyParticipants: Buffer<Int>(bufferCreateInt(capacity: 0))
     let emptyTypeKeys: CompilerIntTable(compilerIntTableCreate(columnCount: compilerReachableTypeKeyColumnCount(), estimatedRowCount: 0))
     let emptyTypeKeyArguments: CompilerIntTable(compilerIntTableCreate(columnCount: compilerReachableTypeKeyArgumentColumnCount(), estimatedRowCount: 0))
     let emptyEffectPaths: CompilerIntTable(compilerIntTableCreate(columnCount: compilerBodyFunctionInstanceEffectPathColumnCount(), estimatedRowCount: 0))
@@ -6712,9 +6712,9 @@ function compilerMacroExecutionRunInvocation(tables: CompilerSyntaxTables, index
     state stepCount: Int(0)
     state pipelineStatus: Int(0)
     state pipelineFailureCode: Int(0)
-    if rawBufferCount(buffer: arena.failures) != 0 {
+    if arena.failures.count != 0 {
         pipelineStatus: 1
-        let parseFailureOffset: Int(rawBufferLoadInt(buffer: arena.failures, index: 0))
+        let parseFailureOffset: Int(arena.failures.element(index: 0))
         if parseFailureOffset >= arena.bodyStart && parseFailureOffset < arena.bodyEnd {
             pipelineFailureCode: 1
         } else {
@@ -6767,8 +6767,8 @@ function compilerMacroExecutionRunInvocation(tables: CompilerSyntaxTables, index
         let bodyIdentity: CompilerFingerprint(compilerMacroExecutionErrorIdentity(base: compilerMacroExecutionInvocationIdentity(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow), code: diagnosticCode, row: pipelineStatus))
         state diagnosticStart: Int(bodyStart)
         state diagnosticEnd: Int(bodyEnd)
-        if rawBufferCount(buffer: arena.failures) > 0 {
-            let failureGlobalOffset: Int(rawBufferLoadInt(buffer: arena.failures, index: 0))
+        if arena.failures.count > 0 {
+            let failureGlobalOffset: Int(arena.failures.element(index: 0))
             if failureGlobalOffset >= arena.bodyStart && failureGlobalOffset < arena.bodyEnd {
                 diagnosticStart: compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: arena.fileID, globalOffset: failureGlobalOffset)
                 diagnosticEnd: diagnosticStart + 1
@@ -6795,14 +6795,14 @@ function compilerMacroExecutionRunInvocation(tables: CompilerSyntaxTables, index
         stepCount: evaluationOutcome.stepCount
     }
     compilerBodyArenaDestroy(arena: arena)
-    rawBufferDestroy(buffer: emptyReturnModes)
-    rawBufferDestroy(buffer: emptyParticipants)
+    emptyReturnModes.destroy()
+    emptyParticipants.destroy()
     return CompilerMacroInvocationOutcome(status: status, diagnosticCode: diagnosticCode, eventCount: eventCount, readDependencyCount: readDependencyCount, mirOperationCount: mirOperationCount, stepCount: stepCount)
 }
 
 function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex): CompilerMacroExecutionResult {
     let graphDelta: CompilerGraphDelta(compilerGraphDeltaCreate())
-    let pendingOmissionTargets: RawBuffer(rawBufferCreate(capacity: 8, stride: 4))
+    let pendingOmissionTargets: Buffer<Int>(bufferCreateInt(capacity: 8))
     state status: Int(0)
     state diagnosticCode: Int(0)
     state invocationCount: Int(0)
@@ -6854,8 +6854,8 @@ function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDec
     }
     if status == 0 {
         state omissionRow: Int(0)
-        while omissionRow < rawBufferCount(buffer: pendingOmissionTargets) && status == 0 {
-            if compilerMacroGraphDeltaAppendOmission(tables: tables, delta: graphDelta, targetSyntaxID: rawBufferLoadInt(buffer: pendingOmissionTargets, index: omissionRow)) != 0 {
+        while omissionRow < pendingOmissionTargets.count && status == 0 {
+            if compilerMacroGraphDeltaAppendOmission(tables: tables, delta: graphDelta, targetSyntaxID: pendingOmissionTargets.element(index: omissionRow)) != 0 {
                 status: 0 - 1
                 diagnosticCode: compilerMacroDiagnosticGraphDeltaInvalid()
             }
@@ -6873,7 +6873,7 @@ function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDec
             compilerMacroExecutionRecordFinalFailure(tables: tables, code: diagnosticCode)
         }
     }
-    rawBufferDestroy(buffer: pendingOmissionTargets)
+    pendingOmissionTargets.destroy()
     return CompilerMacroExecutionResult(status: status, diagnosticCode: diagnosticCode, invocationCount: invocationCount, capabilityHandleCount: handleCount, eventCount: eventCount, readDependencyCount: readDependencyCount, mirOperationCount: mirOperationCount, stepCount: stepCount, graphDelta: graphDelta)
 }
 

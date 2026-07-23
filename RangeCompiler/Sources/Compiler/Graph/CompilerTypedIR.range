@@ -22,7 +22,7 @@ function compilerTypedIRCreate(): CompilerTypedIR {
     return CompilerTypedIR(
         functions: compilerIntTableCreate(columnCount: compilerTypedIRFunctionColumnCount(), estimatedRowCount: 16),
         operations: compilerIntTableCreate(columnCount: compilerTypedIROperationColumnCount(), estimatedRowCount: 64),
-        failures: rawBufferCreate(capacity: 1, stride: 4)
+        failures: bufferCreateInt(capacity: 1)
     )
 }
 
@@ -30,12 +30,12 @@ function compilerTypedIRDestroy(ir: CompilerTypedIR): Int {
     state typedIRDestroyStatus: Int(0)
     if compilerIntTableDestroy(table: ir.functions) != 0 { typedIRDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: ir.operations) != 0 { typedIRDestroyStatus: 0 - 1 }
-    if rawBufferDestroy(buffer: ir.failures) != 0 { typedIRDestroyStatus: 0 - 1 }
+    if ir.failures.destroy() != 0 { typedIRDestroyStatus: 0 - 1 }
     return typedIRDestroyStatus
 }
 
 function compilerTypedIRPoison(ir: CompilerTypedIR): Int {
-    return rawBufferAppendInt(buffer: ir.failures, value: 1)
+    return ir.failures.append(element: 1)
 }
 
 function compilerTypedIRAppend(ir: CompilerTypedIR, table: CompilerIntTable, value: Int): Int {
@@ -413,7 +413,7 @@ function compilerTypedIRInsertFieldsAreValid(memory: CompilerMemoryGraph, ir: Co
 }
 
 function compilerTypedIRIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, semantics: CompilerSemanticGraph, memory: CompilerMemoryGraph, ir: CompilerTypedIR): Bool {
-    if rawBufferCount(buffer: ir.failures) != 0
+    if ir.failures.count != 0
         || !compilerIntTableIsComplete(table: ir.functions)
         || !compilerIntTableIsComplete(table: ir.operations) { return false }
     if compilerIntTableRowCount(table: ir.functions) < 1 { return false }
@@ -965,4 +965,5 @@ function compilerTypedIRFixedLLVMText(source: String): String {
 function compilerTypedIRFixedLLVMIfSupported(source: String): String {
     return compilerTypedIRFixedLLVMTextWithPolicy(source: source, unsupportedIsEmpty: true)
 }
+
 

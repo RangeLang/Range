@@ -181,7 +181,7 @@ construct CompilerSyntaxTables {
     let declarations: CompilerIntTable
     let members: CompilerIntTable
     let functions: CompilerIntTable
-    let functionOwners: RawBuffer
+    let functionOwners: Buffer<Int>
     let parameters: CompilerIntTable
     let genericParameters: CompilerIntTable
     let typeReferences: CompilerIntTable
@@ -200,27 +200,27 @@ construct CompilerSyntaxTables {
     let pendingGeneratedMembers: CompilerIntTable
     let bodyNodes: CompilerIntTable
     let bodyEdges: CompilerIntTable
-    let failures: RawBuffer
+    let failures: Buffer<Int>
 }
 
 construct CompilerMacroIndex {
-    let bucketHeads: RawBuffer
-    let nextRows: RawBuffer
-    let nameHashes: RawBuffer
+    let bucketHeads: Buffer<Int>
+    let nextRows: Buffer<Int>
+    let nameHashes: Buffer<Int>
     let bucketCount: Int
     let isValid: Bool
 }
 
 construct CompilerDeclarationIndex {
-    let bucketHeads: RawBuffer
-    let nextRows: RawBuffer
-    let nameHashes: RawBuffer
+    let bucketHeads: Buffer<Int>
+    let nextRows: Buffer<Int>
+    let nameHashes: Buffer<Int>
     let bucketCount: Int
-    let memberBucketHeads: RawBuffer
-    let memberNextRows: RawBuffer
-    let memberHashes: RawBuffer
+    let memberBucketHeads: Buffer<Int>
+    let memberNextRows: Buffer<Int>
+    let memberHashes: Buffer<Int>
     let memberBucketCount: Int
-    let omittedSyntaxIDs: RawBuffer
+    let omittedSyntaxIDs: Buffer<Int>
     let isValid: Bool
 }
 
@@ -257,8 +257,8 @@ construct CompilerBodyArena {
     let rootNodeID: Int
     let nodes: CompilerIntTable
     let edges: CompilerIntTable
-    let parentNodes: RawBuffer
-    let parentRoles: RawBuffer
+    let parentNodes: Buffer<Int>
+    let parentRoles: Buffer<Int>
     let symbols: CompilerIntTable
     let resolutions: CompilerIntTable
     let typeInstances: CompilerIntTable
@@ -275,7 +275,7 @@ construct CompilerBodyArena {
     let runtimeCallContracts: CompilerIntTable
     let ownedReturnTransfers: CompilerIntTable
     let memoryFacts: CompilerIntTable
-    let memoryState: RawBuffer
+    let memoryState: Buffer<Int>
     let mirValues: CompilerIntTable
     let mirBlocks: CompilerIntTable
     let mirOperations: CompilerIntTable
@@ -284,9 +284,9 @@ construct CompilerBodyArena {
     let mirExpressionValues: CompilerIntTable
     let graphZeroMIRDependencies: CompilerIntTable
     let graphZeroMIRFrontiers: CompilerIntTable
-    let graphZeroState: RawBuffer
-    let mirTraversal: RawBuffer
-    let failures: RawBuffer
+    let graphZeroState: Buffer<Int>
+    let mirTraversal: Buffer<Int>
+    let failures: Buffer<Int>
 }
 
 construct CompilerBodyParseResult {
@@ -316,7 +316,7 @@ construct CompilerBodyLLVMEmitter {
     binding functionInstanceSignatureParameters: CompilerIntTable
     let valueAssignments: CompilerIntTable
     let blockLabels: CompilerIntTable
-    let runtimeState: RawBuffer
+    let runtimeState: Buffer<Int>
     let globalDescriptors: CompilerIntTable
     let renderedBlocks: RawBuffer
 }
@@ -369,7 +369,7 @@ construct CompilerGraphDelta {
     let facts: CompilerIntTable
     let generatedFunctions: CompilerIntTable
     let generatedMembers: CompilerIntTable
-    let failures: RawBuffer
+    let failures: Buffer<Int>
 }
 
 construct CompilerMacroInvocationOutcome {
@@ -399,7 +399,7 @@ construct CompilerSemanticGraph {
     let specializations: CompilerIntTable
     let parameterEffects: CompilerIntTable
     let accessEffects: CompilerIntTable
-    let failures: RawBuffer
+    let failures: Buffer<Int>
 }
 
 construct CompilerSemanticType {
@@ -422,13 +422,13 @@ construct CompilerMemoryGraph {
     let runtimePartitions: CompilerIntTable
     let runtimeValues: CompilerIntTable
     let representationChanges: CompilerIntTable
-    let failures: RawBuffer
+    let failures: Buffer<Int>
 }
 
 construct CompilerTypedIR {
     let functions: CompilerIntTable
     let operations: CompilerIntTable
-    let failures: RawBuffer
+    let failures: Buffer<Int>
 }
 
 construct CompilerConstructDeclarationParts {
@@ -632,12 +632,12 @@ construct CompilerLLVMHelperAudit {
 construct CompilerReachableLLVMState {
     binding context: CompilerLLVMLoweringContext
     let selection: CompilerFunctionSelection
-    let worklist: RawBuffer
-    let worklistInstanceIDs: RawBuffer
+    let worklist: Buffer<Int>
+    let worklistInstanceIDs: Buffer<Int>
     let edgeOwners: Buffer<Int>
     let edgeTargets: Buffer<Int>
-    let instanceEdgeOwners: RawBuffer
-    let instanceEdgeTargets: RawBuffer
+    let instanceEdgeOwners: Buffer<Int>
+    let instanceEdgeTargets: Buffer<Int>
     let typeKeys: CompilerIntTable
     let typeKeyArguments: CompilerIntTable
     let functionInstances: CompilerIntTable
@@ -648,19 +648,19 @@ construct CompilerReachableLLVMState {
     let functionInstanceEffectCalls: CompilerIntTable
     let functionInstanceReturnSummaries: CompilerIntTable
     let functionInstanceReturnLeaves: CompilerIntTable
-    let abiCapabilities: RawBuffer
-    let abiActivation: RawBuffer
-    let abiReturnModes: RawBuffer
-    let abiParticipants: RawBuffer
-    let abiSensitiveFunctions: RawBuffer
+    let abiCapabilities: Buffer<Int>
+    let abiActivation: Buffer<Int>
+    let abiReturnModes: Buffer<Int>
+    let abiParticipants: Buffer<Int>
+    let abiSensitiveFunctions: Buffer<Int>
     let functionsBuffer: RawBuffer
     let globalsBuffer: RawBuffer
-    let counters: RawBuffer
+    let counters: Buffer<Int>
 }
 
 construct CompilerModuleABIPlan {
-    binding returnModes: RawBuffer
-    binding participants: RawBuffer
+    binding returnModes: Buffer<Int>
+    binding participants: Buffer<Int>
     let isFrozen: Bool
 }
 

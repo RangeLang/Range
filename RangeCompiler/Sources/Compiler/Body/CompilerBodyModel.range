@@ -509,14 +509,14 @@ function compilerFunctionReturnABIIndirect(): Int { return 2 }
 
 function compilerModuleABIPlanReturnMode(plan: CompilerModuleABIPlan, tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, functionRow: Int): Int {
     if !plan.isFrozen { return compilerFunctionReturnABI(tables: tables, index: index, functionRow: functionRow) }
-    if functionRow < 0 || functionRow >= rawBufferCount(buffer: plan.returnModes) { return compilerFunctionReturnABINone() }
-    return rawBufferLoadInt(buffer: plan.returnModes, index: functionRow)
+    if functionRow < 0 || functionRow >= plan.returnModes.count { return compilerFunctionReturnABINone() }
+    return plan.returnModes.element(index: functionRow)
 }
 
 function compilerModuleABIPlanIsParticipant(plan: CompilerModuleABIPlan, functionRow: Int): Bool {
     if !plan.isFrozen { return false }
-    if functionRow < 0 || functionRow >= rawBufferCount(buffer: plan.participants) { return false }
-    return rawBufferLoadInt(buffer: plan.participants, index: functionRow) == 1
+    if functionRow < 0 || functionRow >= plan.participants.count { return false }
+    return plan.participants.element(index: functionRow) == 1
 }
 
 function compilerBodyArenaOwnerIsParticipant(arena: CompilerBodyArena, plan: CompilerModuleABIPlan): Bool {
@@ -539,7 +539,7 @@ function compilerBodyArenaOwnerAuxID(arena: CompilerBodyArena): Int {
 }
 
 function compilerReachableLLVMStateABIPlan(reachability: CompilerReachableLLVMState): CompilerModuleABIPlan {
-    let plan: CompilerModuleABIPlan(returnModes: $reachability.abiReturnModes, participants: $reachability.abiParticipants, isFrozen: rawBufferLoadInt(buffer: reachability.counters, index: compilerReachableLLVMPlanFrozen()) == 1)
+    let plan: CompilerModuleABIPlan(returnModes: $reachability.abiReturnModes, participants: $reachability.abiParticipants, isFrozen: reachability.counters.element(index: compilerReachableLLVMPlanFrozen()) == 1)
     return plan
 }
 
@@ -850,7 +850,7 @@ function compilerCoreRenderLLVMNominalLayouts(tables: CompilerSyntaxTables, inde
         }
         declarationRow: declarationRow + 1
     }
-    let optionalPayloads: RawBuffer(rawBufferCreate(capacity: 8, stride: 4))
+    let optionalPayloads: Buffer<Int>(bufferCreateInt(capacity: 8))
     state functionRow: Int(0)
     while functionRow < compilerIntTableRowCount(table: tables.functions) {
         let functionSyntaxID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 0))
@@ -864,8 +864,8 @@ function compilerCoreRenderLLVMNominalLayouts(tables: CompilerSyntaxTables, inde
                 let payloadSyntaxID: Int(compilerIntTableValue(table: tables.declarations, row: payloadDeclarationRow, column: 0))
                 state alreadyRendered: Bool(false)
                 state payloadIndex: Int(0)
-                while payloadIndex < rawBufferCount(buffer: optionalPayloads) {
-                    if rawBufferLoadInt(buffer: optionalPayloads, index: payloadIndex) == payloadSyntaxID { alreadyRendered: true }
+                while payloadIndex < optionalPayloads.count {
+                    if optionalPayloads.element(index: payloadIndex) == payloadSyntaxID { alreadyRendered: true }
                     payloadIndex: payloadIndex + 1
                 }
                 if !alreadyRendered {
@@ -873,7 +873,7 @@ function compilerCoreRenderLLVMNominalLayouts(tables: CompilerSyntaxTables, inde
                     let payloadTypeName: String(compilerNominalLLVMTypeName(tables: tables, declarationRow: payloadDeclarationRow))
                     if optionalTypeName != String("") {
                         rawBufferAppendText(buffer: layouts, text: "\(optionalTypeName) = type { i1, \(payloadTypeName) }\n")
-                        rawBufferAppendInt(buffer: optionalPayloads, value: payloadSyntaxID)
+                        optionalPayloads.append(element: payloadSyntaxID)
                         layoutCount: layoutCount + 1
                     }
                 }
@@ -882,7 +882,7 @@ function compilerCoreRenderLLVMNominalLayouts(tables: CompilerSyntaxTables, inde
         }
         functionRow: functionRow + 1
     }
-    rawBufferDestroy(buffer: optionalPayloads)
+    optionalPayloads.destroy()
     if layoutCount > 0 { rawBufferAppendText(buffer: layouts, text: String("\n")) }
     let rendered: String(rawBufferMaterializeText(buffer: layouts))
     rawBufferDestroy(buffer: layouts)
@@ -909,8 +909,8 @@ function compilerFunctionReturnABI(tables: CompilerSyntaxTables, index: Compiler
 }
 
 function compilerFunctionOwnerConstructName(tables: CompilerSyntaxTables, functionRow: Int): String {
-    if functionRow < 0 || functionRow >= rawBufferCount(buffer: tables.functionOwners) { return String("") }
-    let ownerSyntaxID: Int(rawBufferLoadInt(buffer: tables.functionOwners, index: functionRow))
+    if functionRow < 0 || functionRow >= tables.functionOwners.count { return String("") }
+    let ownerSyntaxID: Int(tables.functionOwners.element(index: functionRow))
     if ownerSyntaxID < 0 { return String("") }
     let ownerDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: ownerSyntaxID))
     if ownerDeclarationRow < 0 || compilerIntTableValue(table: tables.declarations, row: ownerDeclarationRow, column: 2) != compilerSyntaxKindConstruct() { return String("") }
@@ -1248,9 +1248,9 @@ function compilerBodyGraphZeroStateFrozen(): Int { return 0 }
 function compilerBodyGraphZeroStateValid(): Int { return 1 }
 
 function compilerBodyGraphZeroIsFrozenAndValid(arena: CompilerBodyArena): Bool {
-    return rawBufferCount(buffer: arena.graphZeroState) == compilerBodyGraphZeroStateCount()
-        && rawBufferLoadInt(buffer: arena.graphZeroState, index: compilerBodyGraphZeroStateFrozen()) == 1
-        && rawBufferLoadInt(buffer: arena.graphZeroState, index: compilerBodyGraphZeroStateValid()) == 1
+    return arena.graphZeroState.count == compilerBodyGraphZeroStateCount()
+        && arena.graphZeroState.element(index: compilerBodyGraphZeroStateFrozen()) == 1
+        && arena.graphZeroState.element(index: compilerBodyGraphZeroStateValid()) == 1
         && compilerIntTableIsComplete(table: arena.graphZeroCFGRegions)
         && compilerIntTableIsComplete(table: arena.graphZeroMIRDependencies)
         && compilerIntTableIsComplete(table: arena.graphZeroMIRFrontiers)
@@ -1357,3 +1357,4 @@ function compilerBodyTelemetryAppending(left: CompilerBodyTelemetry, right: Comp
 function compilerTypedLLVMHelpersValue(value: CompilerTypedLLVMHelpers): CompilerLLVMHelperFunctions {
     return value.helpers
 }
+

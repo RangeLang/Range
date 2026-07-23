@@ -27,7 +27,7 @@ function compilerGraphDeltaCreate(): CompilerGraphDelta {
         facts: compilerIntTableCreate(columnCount: compilerGraphFactColumnCount(), estimatedRowCount: 256),
         generatedFunctions: compilerIntTableCreate(columnCount: compilerGraphGeneratedFunctionColumnCount(), estimatedRowCount: 32),
         generatedMembers: compilerIntTableCreate(columnCount: compilerGraphGeneratedMemberColumnCount(), estimatedRowCount: 32),
-        failures: rawBufferCreate(capacity: 1, stride: 4)
+        failures: bufferCreateInt(capacity: 1)
     )
 }
 
@@ -37,12 +37,12 @@ function compilerGraphDeltaDestroy(delta: CompilerGraphDelta): Int {
     if compilerIntTableDestroy(table: delta.facts) != 0 { graphDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: delta.generatedFunctions) != 0 { graphDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: delta.generatedMembers) != 0 { graphDestroyStatus: 0 - 1 }
-    if rawBufferDestroy(buffer: delta.failures) != 0 { graphDestroyStatus: 0 - 1 }
+    if delta.failures.destroy() != 0 { graphDestroyStatus: 0 - 1 }
     return graphDestroyStatus
 }
 
 function compilerGraphDeltaPoison(delta: CompilerGraphDelta): Int {
-    return rawBufferAppendInt(buffer: delta.failures, value: 1)
+    return delta.failures.append(element: 1)
 }
 
 function compilerGraphDeltaAppend(delta: CompilerGraphDelta, table: CompilerIntTable, value: Int): Int {
@@ -220,7 +220,7 @@ function compilerPlotterBuild(tables: CompilerSyntaxTables, delta: CompilerGraph
 }
 
 function compilerGraphDeltaIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Bool {
-    if rawBufferCount(buffer: delta.failures) != 0 || !compilerIntTableIsComplete(table: delta.nodes) || !compilerIntTableIsComplete(table: delta.facts)
+    if delta.failures.count != 0 || !compilerIntTableIsComplete(table: delta.nodes) || !compilerIntTableIsComplete(table: delta.facts)
         || !compilerIntTableIsComplete(table: delta.generatedFunctions) { return false }
     let graphNodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
     if graphNodeCount != compilerIntTableRowCount(table: tables.syntaxIndex) { return false }
@@ -337,7 +337,7 @@ function compilerSemanticGraphCreate(): CompilerSemanticGraph {
         specializations: compilerIntTableCreate(columnCount: compilerSemanticSpecializationColumnCount(), estimatedRowCount: 64),
         parameterEffects: compilerIntTableCreate(columnCount: compilerSemanticParameterEffectColumnCount(), estimatedRowCount: 64),
         accessEffects: compilerIntTableCreate(columnCount: compilerSemanticAccessEffectColumnCount(), estimatedRowCount: 64),
-        failures: rawBufferCreate(capacity: 1, stride: 4)
+        failures: bufferCreateInt(capacity: 1)
     )
 }
 
@@ -348,12 +348,12 @@ function compilerSemanticGraphDestroy(semantics: CompilerSemanticGraph): Int {
     if compilerIntTableDestroy(table: semantics.specializations) != 0 { semanticDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: semantics.parameterEffects) != 0 { semanticDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: semantics.accessEffects) != 0 { semanticDestroyStatus: 0 - 1 }
-    if rawBufferDestroy(buffer: semantics.failures) != 0 { semanticDestroyStatus: 0 - 1 }
+    if semantics.failures.destroy() != 0 { semanticDestroyStatus: 0 - 1 }
     return semanticDestroyStatus
 }
 
 function compilerSemanticGraphPoison(semantics: CompilerSemanticGraph): Int {
-    return rawBufferAppendInt(buffer: semantics.failures, value: 1)
+    return semantics.failures.append(element: 1)
 }
 
 function compilerSemanticAppend(semantics: CompilerSemanticGraph, table: CompilerIntTable, value: Int): Int {
@@ -1312,7 +1312,7 @@ function compilerSemanticBuild(tables: CompilerSyntaxTables, delta: CompilerGrap
 }
 
 function compilerSemanticGraphIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, semantics: CompilerSemanticGraph): Bool {
-    if rawBufferCount(buffer: semantics.failures) != 0
+    if semantics.failures.count != 0
         || !compilerIntTableIsComplete(table: semantics.resolutions)
         || !compilerIntTableIsComplete(table: semantics.nodeTypes)
         || !compilerIntTableIsComplete(table: semantics.specializations)

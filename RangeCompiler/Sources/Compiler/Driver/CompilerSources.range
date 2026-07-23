@@ -397,3 +397,4 @@ function compilerSourceNextMarkerCandidateFromCandidate(source: String, marker: 
     return compilerSourceNextMarkerCandidateFromCandidate(source: source, marker: marker, candidate: stringIndexOf(source: source, needle: marker, start: candidate + 1))
 }
 
+

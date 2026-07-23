@@ -1,0 +1,4 @@
+@main {
+    let value: String("Range")
+    return value.byte(index: 0)
+}

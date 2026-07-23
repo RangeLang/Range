@@ -1,0 +1,6 @@
+@builtin(.storage)
+construct String {
+    function byte(index: Int): Int {
+        return stringByteAt(source: self, index: index)
+    }
+}

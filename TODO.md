@@ -49,5 +49,44 @@
     - [x] Migrate function-call edge owner/target storage, including probe,
       typed, and emission edge pairs, to `Buffer<Int>` and promote its
       independently verified fixed-point seed.
+    - [x] Migrate every remaining compiler-owned integer buffer, including
+      syntax indexes, failure vectors, Body/ownership scratch state, LLVM
+      reachability state, ABI plans, and instance-edge storage, then promote
+      and independently verify the byte-identical fixed-point seed.
+    - [ ] Replace the remaining byte-oriented text builders with a typed
+      `Buffer<Int<8, .unsigned>>`-backed `String`.
+      - [ ] Move function-local compiler text builders only after mutable
+        String append is canonical.
+        - A direct immutable-String migration was rejected: the same 2.65 MB
+          source-set compile rose from about 120 seconds to more than 385
+          seconds, even though it remained semantically valid.
+      - [ ] Replace the three shared accumulators for LLVM body blocks,
+        functions, and globals after mutable String storage can cross function
+        boundaries without falling back to RawBuffer.
+      - [ ] Make the builtin String type and an authored
+        `String { state bytes: Buffer<Int<8, .unsigned>> }` declaration share
+        one canonical type identity, layout, construction path, and member
+        surface.
+        - [x] Add the pointer-ABI `String.range` baseline, resolve authored
+          members through that canonical declaration without changing the
+          primitive runtime type identity, and prove `"Range".byte(index: 0)`
+          dispatches through the authored method.
+        - [x] Promote the baseline into the accepted self-hosted seed and
+          verify candidate Stage 2/Stage 3 byte identity, accepted-seed
+          integrity, and compiler progression fixed point.
+        - [ ] Replace the pointer-compatible shell with the Buffer field only
+          after ABI planning no longer reclassifies existing String returns as
+          native aggregates.
+        - [ ] Give non-generic member functions owner-qualified LLVM symbols;
+          `String.count` currently collides with another authored `count`.
+      - [ ] Move length, indexing, comparison, slicing, concatenation, and
+        append behavior onto the authored String surface, then cut their
+        compiler runtime builtin cases over.
+      - [x] Remove `RangeCompiler/Runtime/RangeString.c` from the runtime
+        manifest and every proof link.
+        - Its transient allocation and legacy byte/search compatibility
+          entry points temporarily live in `RangeCompilerHost.c`; this removes
+          the standalone String runtime owner without claiming those entry
+          points are Range-authored yet.
   - [ ] Delete raw runtime entry points only after no accepted compiler or Core
     path consumes them.

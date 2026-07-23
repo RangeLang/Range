@@ -374,17 +374,17 @@ function compilerBodyArenaTypeArgumentExpectedCountForTypeID(arena: CompilerBody
     return 0
 }
 
-function compilerBodyArenaTypeInstanceArgumentsMatch(arena: CompilerBodyArena, typeID: Int, argumentCount: Int, argumentIDs: RawBuffer): Bool {
+function compilerBodyArenaTypeInstanceArgumentsMatch(arena: CompilerBodyArena, typeID: Int, argumentCount: Int, argumentIDs: Buffer<Int>): Bool {
     if compilerBodyArenaTypeArgumentCountForTypeID(arena: arena, typeID: typeID) != argumentCount { return false }
     state ordinal: Int(0)
     while ordinal < argumentCount {
-        if compilerBodyArenaTypeArgumentValueForTypeID(arena: arena, typeID: typeID, ordinal: ordinal) != rawBufferLoadInt(buffer: argumentIDs, index: ordinal) { return false }
+        if compilerBodyArenaTypeArgumentValueForTypeID(arena: arena, typeID: typeID, ordinal: ordinal) != argumentIDs.element(index: ordinal) { return false }
         ordinal: ordinal + 1
     }
     return true
 }
 
-function compilerBodyArenaTypeInstanceFind(arena: CompilerBodyArena, typeKind: Int, nominalSyntaxID: Int, argumentCount: Int, argumentIDs: RawBuffer): Int {
+function compilerBodyArenaTypeInstanceFind(arena: CompilerBodyArena, typeKind: Int, nominalSyntaxID: Int, argumentCount: Int, argumentIDs: Buffer<Int>): Int {
     state row: Int(0)
     while row < compilerIntTableRowCount(table: arena.typeInstances) {
         if compilerIntTableValue(table: arena.typeInstances, row: row, column: compilerBodyTypeInstanceKindColumn()) == typeKind
@@ -403,10 +403,17 @@ function compilerBodyArenaArrayDeclarationSyntaxID(arena: CompilerBodyArena): In
     return syntaxID
 }
 
-function compilerBodyArenaTypeInstanceInternStructuralAtSpan(arena: CompilerBodyArena, typeKind: Int, nominalSyntaxID: Int, fileID: Int, start: Int, end: Int, argumentIDs: RawBuffer): Int {
+function compilerBodyArenaStringDeclarationSyntaxID(arena: CompilerBodyArena): Int {
+    let declarationRow: Int(compilerDeclarationIndexLookup(tables: arena.tables, index: arena.declarationIndex, name: String("String"), kindTag: compilerSyntaxKindConstruct()))
+    if declarationRow < 0
+        || compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 13) != compilerBuiltinPolicyStorage() { return 0 - 1 }
+    return compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 0)
+}
+
+function compilerBodyArenaTypeInstanceInternStructuralAtSpan(arena: CompilerBodyArena, typeKind: Int, nominalSyntaxID: Int, fileID: Int, start: Int, end: Int, argumentIDs: Buffer<Int>): Int {
     if typeKind <= compilerBodyTypeUnknown() || typeKind > compilerBodyTypeLast()
         || fileID < 0 || start < 0 || end < start { return 0 - 1 }
-    let argumentCount: Int(rawBufferCount(buffer: argumentIDs))
+    let argumentCount: Int(argumentIDs.count)
     let existing: Int(compilerBodyArenaTypeInstanceFind(arena: arena, typeKind: typeKind, nominalSyntaxID: nominalSyntaxID, argumentCount: argumentCount, argumentIDs: argumentIDs))
     if existing >= 0 { return existing }
     let typeID: Int(compilerIntTableRowCount(table: arena.typeInstances))
@@ -420,7 +427,7 @@ function compilerBodyArenaTypeInstanceInternStructuralAtSpan(arena: CompilerBody
     return typeID
 }
 
-function compilerBodyArenaTypeInstanceInternStructural(arena: CompilerBodyArena, typeKind: Int, nominalSyntaxID: Int, sourceNodeID: Int, argumentIDs: RawBuffer): Int {
+function compilerBodyArenaTypeInstanceInternStructural(arena: CompilerBodyArena, typeKind: Int, nominalSyntaxID: Int, sourceNodeID: Int, argumentIDs: Buffer<Int>): Int {
     if sourceNodeID < 0 || sourceNodeID >= compilerIntTableRowCount(table: arena.nodes) { return 0 - 1 }
     return compilerBodyArenaTypeInstanceInternStructuralAtSpan(arena: arena, typeKind: typeKind, nominalSyntaxID: nominalSyntaxID, fileID: arena.fileID, start: compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 4), end: compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 5), argumentIDs: argumentIDs)
 }
@@ -430,22 +437,22 @@ function compilerBodyArenaExpressionConcreteTypeID(arena: CompilerBodyArena, nod
     if resolvedTypeID >= 0 { return resolvedTypeID }
     let typeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: nodeID))
     if typeKind != compilerBodyTypeInt() && typeKind != compilerBodyTypeUnsigned8() && typeKind != compilerBodyTypeBool() && typeKind != compilerBodyTypeFloat() && typeKind != compilerBodyTypeFloat32() && typeKind != compilerBodyTypeString() { return 0 - 1 }
-    let noArguments: RawBuffer(rawBufferCreate(capacity: 0, stride: 4))
+    let noArguments: Buffer<Int>(bufferCreateInt(capacity: 0))
     let typeID: Int(compilerBodyArenaTypeInstanceInternStructural(arena: arena, typeKind: typeKind, nominalSyntaxID: 0 - 1, sourceNodeID: nodeID, argumentIDs: noArguments))
-    rawBufferDestroy(buffer: noArguments)
+    noArguments.destroy()
     return typeID
 }
 
 function compilerBodyArenaArrayTypeID(arena: CompilerBodyArena, sourceNodeID: Int, elementTypeID: Int): Int {
     let arraySyntaxID: Int(compilerBodyArenaArrayDeclarationSyntaxID(arena: arena))
     if arraySyntaxID == 0 - 1 || elementTypeID < 0 { return 0 - 1 }
-    let arguments: RawBuffer(rawBufferCreate(capacity: 1, stride: 4))
-    if rawBufferAppendInt(buffer: arguments, value: elementTypeID) != 0 {
-        rawBufferDestroy(buffer: arguments)
+    let arguments: Buffer<Int>(bufferCreateInt(capacity: 1))
+    if arguments.append(element: elementTypeID) != 0 {
+        arguments.destroy()
         return 0 - 1
     }
     let typeID: Int(compilerBodyArenaTypeInstanceInternStructural(arena: arena, typeKind: compilerBodyTypeConstruct(), nominalSyntaxID: arraySyntaxID, sourceNodeID: sourceNodeID, argumentIDs: arguments))
-    rawBufferDestroy(buffer: arguments)
+    arguments.destroy()
     return typeID
 }
 
@@ -477,19 +484,19 @@ function compilerBodyArenaTypeIDForMemberTypeReference(arena: CompilerBodyArena,
         if declarationKind == compilerSyntaxKindEnum() { typeKind: compilerBodyTypeEnum() }
     }
     if typeKind == compilerBodyTypeUnknown() { return 0 - 1 }
-    let argumentIDs: RawBuffer(rawBufferCreate(capacity: compilerIntTableValue(table: arena.tables.typeReferences, row: typeReferenceID, column: compilerSyntaxTypeReferenceChildCountColumn()) + 1, stride: 4))
+    let argumentIDs: Buffer<Int>(bufferCreateInt(capacity: compilerIntTableValue(table: arena.tables.typeReferences, row: typeReferenceID, column: compilerSyntaxTypeReferenceChildCountColumn()) + 1))
     state childOrdinal: Int(0)
     state childRow: Int(typeReferenceID + 1)
     while childRow < compilerIntTableRowCount(table: arena.tables.typeReferences) {
         if compilerIntTableValue(table: arena.tables.typeReferences, row: childRow, column: compilerSyntaxTypeReferenceParentColumn()) == typeReferenceID {
             if compilerIntTableValue(table: arena.tables.typeReferences, row: childRow, column: compilerSyntaxTypeReferenceOrdinalColumn()) != childOrdinal
                 || compilerIntTableValue(table: arena.tables.typeReferences, row: childRow, column: compilerSyntaxTypeReferenceKindColumn()) == compilerSyntaxTypeReferenceValue() {
-                rawBufferDestroy(buffer: argumentIDs)
+                argumentIDs.destroy()
                 return 0 - 1
             }
             let childTypeID: Int(compilerBodyArenaTypeIDForMemberTypeReference(arena: arena, receiverTypeID: receiverTypeID, ownerSyntaxID: ownerSyntaxID, typeReferenceID: childRow, fileID: fileID, start: start, end: end))
-            if childTypeID < 0 || rawBufferAppendInt(buffer: argumentIDs, value: childTypeID) != 0 {
-                rawBufferDestroy(buffer: argumentIDs)
+            if childTypeID < 0 || argumentIDs.append(element: childTypeID) != 0 {
+                argumentIDs.destroy()
                 return 0 - 1
             }
             childOrdinal: childOrdinal + 1
@@ -498,11 +505,11 @@ function compilerBodyArenaTypeIDForMemberTypeReference(arena: CompilerBodyArena,
     }
     let expectedChildCount: Int(compilerIntTableValue(table: arena.tables.typeReferences, row: typeReferenceID, column: compilerSyntaxTypeReferenceChildCountColumn()))
     if childOrdinal != expectedChildCount {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     let typeID: Int(compilerBodyArenaTypeInstanceInternStructuralAtSpan(arena: arena, typeKind: typeKind, nominalSyntaxID: nominalSyntaxID, fileID: fileID, start: start, end: end, argumentIDs: argumentIDs))
-    rawBufferDestroy(buffer: argumentIDs)
+    argumentIDs.destroy()
     return typeID
 }
 
@@ -520,12 +527,12 @@ function compilerBodyArenaTypeIDIsArray(arena: CompilerBodyArena, typeID: Int): 
         && compilerBodyArenaTypeArgumentCountForTypeID(arena: arena, typeID: typeID) == 1
 }
 
-function compilerBodyArenaAppendTypeArguments(arena: CompilerBodyArena, typeID: Int, argumentIDs: RawBuffer): Int {
+function compilerBodyArenaAppendTypeArguments(arena: CompilerBodyArena, typeID: Int, argumentIDs: Buffer<Int>): Int {
     state ordinal: Int(0)
-    while ordinal < rawBufferCount(buffer: argumentIDs) {
+    while ordinal < argumentIDs.count {
         if compilerIntTableAppend(table: arena.typeArguments, value: typeID) != 0 { return 0 - 1 }
         if compilerIntTableAppend(table: arena.typeArguments, value: ordinal) != 0 { return 0 - 1 }
-        if compilerIntTableAppend(table: arena.typeArguments, value: rawBufferLoadInt(buffer: argumentIDs, index: ordinal)) != 0 { return 0 - 1 }
+        if compilerIntTableAppend(table: arena.typeArguments, value: argumentIDs.element(index: ordinal)) != 0 { return 0 - 1 }
         ordinal: ordinal + 1
     }
     return 0
@@ -571,58 +578,58 @@ function compilerBodyArenaTypeInstanceIntern(arena: CompilerBodyArena, fileID: I
     }
     let actualArgumentCount: Int(compilerBodyArenaTypeArgumentCountForSpan(arena: arena, fileID: fileID, start: normalizedRange.start, end: normalizedRange.end))
     if actualArgumentCount < 0 || actualArgumentCount != expectedArgumentCount { return 0 - 1 }
-    let argumentIDs: RawBuffer(rawBufferCreate(capacity: actualArgumentCount + 1, stride: 4))
+    let argumentIDs: Buffer<Int>(bufferCreateInt(capacity: actualArgumentCount + 1))
     state argumentOrdinal: Int(0)
     if typeKind == compilerBodyTypeUnsigned8() || typeKind == compilerBodyTypeFloat32() || compilerFloatTypeIs64(typeName: normalizedTypeName) { argumentOrdinal: actualArgumentCount }
     while argumentOrdinal < actualArgumentCount {
         let argumentRange: CompilerSourceRange(compilerBodyArenaTypeArgumentRangeForSpan(arena: arena, fileID: fileID, start: normalizedRange.start, end: normalizedRange.end, ordinal: argumentOrdinal))
         let argumentTypeID: Int(compilerBodyArenaTypeInstanceIntern(arena: arena, fileID: fileID, start: argumentRange.start, end: argumentRange.end))
         if argumentRange.start < 0 || argumentTypeID < 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+            argumentIDs.destroy()
             return 0 - 1
         }
-        if rawBufferAppendInt(buffer: argumentIDs, value: argumentTypeID) != 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+        if argumentIDs.append(element: argumentTypeID) != 0 {
+            argumentIDs.destroy()
             return 0 - 1
         }
         argumentOrdinal: argumentOrdinal + 1
     }
-    let internedArgumentCount: Int(rawBufferCount(buffer: argumentIDs))
+    let internedArgumentCount: Int(argumentIDs.count)
     let existing: Int(compilerBodyArenaTypeInstanceFind(arena: arena, typeKind: typeKind, nominalSyntaxID: nominalSyntaxID, argumentCount: internedArgumentCount, argumentIDs: argumentIDs))
     if existing >= 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return existing
     }
     let typeID: Int(compilerIntTableRowCount(table: arena.typeInstances))
     if compilerIntTableAppend(table: arena.typeInstances, value: typeID) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: arena.typeInstances, value: fileID) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: arena.typeInstances, value: normalizedRange.start) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: arena.typeInstances, value: normalizedRange.end) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: arena.typeInstances, value: typeKind) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: arena.typeInstances, value: nominalSyntaxID) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerBodyArenaAppendTypeArguments(arena: arena, typeID: typeID, argumentIDs: argumentIDs) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
-    rawBufferDestroy(buffer: argumentIDs)
+    argumentIDs.destroy()
     return typeID
 }
 
@@ -662,17 +669,17 @@ function compilerReachableTypeKeyArgumentValue(typeKeyArguments: CompilerIntTabl
     return 0 - 1
 }
 
-function compilerReachableTypeKeyArgumentsMatch(typeKeyArguments: CompilerIntTable, typeKeyID: Int, argumentCount: Int, argumentIDs: RawBuffer): Bool {
+function compilerReachableTypeKeyArgumentsMatch(typeKeyArguments: CompilerIntTable, typeKeyID: Int, argumentCount: Int, argumentIDs: Buffer<Int>): Bool {
     if compilerReachableTypeKeyArgumentCount(typeKeyArguments: typeKeyArguments, typeKeyID: typeKeyID) != argumentCount { return false }
     state ordinal: Int(0)
     while ordinal < argumentCount {
-        if compilerReachableTypeKeyArgumentValue(typeKeyArguments: typeKeyArguments, typeKeyID: typeKeyID, ordinal: ordinal) != rawBufferLoadInt(buffer: argumentIDs, index: ordinal) { return false }
+        if compilerReachableTypeKeyArgumentValue(typeKeyArguments: typeKeyArguments, typeKeyID: typeKeyID, ordinal: ordinal) != argumentIDs.element(index: ordinal) { return false }
         ordinal: ordinal + 1
     }
     return true
 }
 
-function compilerReachableTypeKeyFind(typeKeys: CompilerIntTable, typeKeyArguments: CompilerIntTable, typeKind: Int, nominalSyntaxID: Int, argumentCount: Int, argumentIDs: RawBuffer): Int {
+function compilerReachableTypeKeyFind(typeKeys: CompilerIntTable, typeKeyArguments: CompilerIntTable, typeKind: Int, nominalSyntaxID: Int, argumentCount: Int, argumentIDs: Buffer<Int>): Int {
     state row: Int(0)
     while row < compilerIntTableRowCount(table: typeKeys) {
         if compilerIntTableValue(table: typeKeys, row: row, column: compilerReachableTypeKeyKindColumn()) == typeKind
@@ -690,23 +697,23 @@ function compilerReachableTypeKeyFindFromArena(typeKeys: CompilerIntTable, typeK
     let nominalSyntaxID: Int(compilerIntTableValue(table: arena.typeInstances, row: typeID, column: compilerBodyTypeInstanceNominalSyntaxColumn()))
     let argumentCount: Int(compilerBodyArenaTypeArgumentCountForTypeID(arena: arena, typeID: typeID))
     if argumentCount < 0 { return 0 - 1 }
-    let argumentIDs: RawBuffer(rawBufferCreate(capacity: argumentCount + 1, stride: 4))
+    let argumentIDs: Buffer<Int>(bufferCreateInt(capacity: argumentCount + 1))
     state ordinal: Int(0)
     while ordinal < argumentCount {
         let argumentTypeID: Int(compilerBodyArenaTypeArgumentValueForTypeID(arena: arena, typeID: typeID, ordinal: ordinal))
         let argumentKeyID: Int(compilerReachableTypeKeyFindFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: argumentTypeID))
         if argumentKeyID < 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+            argumentIDs.destroy()
             return 0 - 1
         }
-        if rawBufferAppendInt(buffer: argumentIDs, value: argumentKeyID) != 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+        if argumentIDs.append(element: argumentKeyID) != 0 {
+            argumentIDs.destroy()
             return 0 - 1
         }
         ordinal: ordinal + 1
     }
     let result: Int(compilerReachableTypeKeyFind(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, typeKind: typeKind, nominalSyntaxID: nominalSyntaxID, argumentCount: argumentCount, argumentIDs: argumentIDs))
-    rawBufferDestroy(buffer: argumentIDs)
+    argumentIDs.destroy()
     return result
 }
 
@@ -716,77 +723,77 @@ function compilerReachableTypeKeyInternFromArena(typeKeys: CompilerIntTable, typ
     let nominalSyntaxID: Int(compilerIntTableValue(table: arena.typeInstances, row: typeID, column: compilerBodyTypeInstanceNominalSyntaxColumn()))
     let argumentCount: Int(compilerBodyArenaTypeArgumentCountForTypeID(arena: arena, typeID: typeID))
     if argumentCount < 0 { return 0 - 1 }
-    let argumentIDs: RawBuffer(rawBufferCreate(capacity: argumentCount + 1, stride: 4))
+    let argumentIDs: Buffer<Int>(bufferCreateInt(capacity: argumentCount + 1))
     state ordinal: Int(0)
     while ordinal < argumentCount {
         let argumentTypeID: Int(compilerBodyArenaTypeArgumentValueForTypeID(arena: arena, typeID: typeID, ordinal: ordinal))
         let argumentKeyID: Int(compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: argumentTypeID))
         if argumentKeyID < 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+            argumentIDs.destroy()
             return 0 - 1
         }
-        if rawBufferAppendInt(buffer: argumentIDs, value: argumentKeyID) != 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+        if argumentIDs.append(element: argumentKeyID) != 0 {
+            argumentIDs.destroy()
             return 0 - 1
         }
         ordinal: ordinal + 1
     }
     let existing: Int(compilerReachableTypeKeyFind(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, typeKind: typeKind, nominalSyntaxID: nominalSyntaxID, argumentCount: argumentCount, argumentIDs: argumentIDs))
     if existing >= 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return existing
     }
     let keyID: Int(compilerIntTableRowCount(table: typeKeys))
     let firstArgumentRow: Int(compilerIntTableRowCount(table: typeKeyArguments))
     if compilerIntTableAppend(table: typeKeys, value: keyID) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: typeKeys, value: typeKind) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: typeKeys, value: nominalSyntaxID) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: typeKeys, value: firstArgumentRow) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: typeKeys, value: argumentCount) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: typeKeys, value: compilerIntTableValue(table: arena.typeInstances, row: typeID, column: compilerBodyTypeInstanceFileColumn())) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: typeKeys, value: compilerIntTableValue(table: arena.typeInstances, row: typeID, column: compilerBodyTypeInstanceStartColumn())) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: typeKeys, value: compilerIntTableValue(table: arena.typeInstances, row: typeID, column: compilerBodyTypeInstanceEndColumn())) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     ordinal: 0
     while ordinal < argumentCount {
         if compilerIntTableAppend(table: typeKeyArguments, value: keyID) != 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+            argumentIDs.destroy()
             return 0 - 1
         }
         if compilerIntTableAppend(table: typeKeyArguments, value: ordinal) != 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+            argumentIDs.destroy()
             return 0 - 1
         }
-        if compilerIntTableAppend(table: typeKeyArguments, value: rawBufferLoadInt(buffer: argumentIDs, index: ordinal)) != 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+        if compilerIntTableAppend(table: typeKeyArguments, value: argumentIDs.element(index: ordinal)) != 0 {
+            argumentIDs.destroy()
             return 0 - 1
         }
         ordinal: ordinal + 1
     }
-    rawBufferDestroy(buffer: argumentIDs)
+    argumentIDs.destroy()
     return keyID
 }
 
@@ -846,7 +853,7 @@ function compilerReachableTypeKeysAreValid(typeKeys: CompilerIntTable, typeKeyAr
     return true
 }
 
-function compilerBodyArenaTypeInstanceFindInTables(typeInstances: CompilerIntTable, typeArguments: CompilerIntTable, typeKind: Int, nominalSyntaxID: Int, argumentCount: Int, argumentIDs: RawBuffer): Int {
+function compilerBodyArenaTypeInstanceFindInTables(typeInstances: CompilerIntTable, typeArguments: CompilerIntTable, typeKind: Int, nominalSyntaxID: Int, argumentCount: Int, argumentIDs: Buffer<Int>): Int {
     state row: Int(0)
     while row < compilerIntTableRowCount(table: typeInstances) {
         if compilerIntTableValue(table: typeInstances, row: row, column: compilerBodyTypeInstanceKindColumn()) == typeKind
@@ -855,7 +862,7 @@ function compilerBodyArenaTypeInstanceFindInTables(typeInstances: CompilerIntTab
             state ordinal: Int(0)
             state matches: Bool(true)
             while ordinal < argumentCount {
-                if compilerBodyArenaTypeArgumentValueForTypeIDTables(typeArguments: typeArguments, typeID: row, ordinal: ordinal) != rawBufferLoadInt(buffer: argumentIDs, index: ordinal) { matches: false }
+                if compilerBodyArenaTypeArgumentValueForTypeIDTables(typeArguments: typeArguments, typeID: row, ordinal: ordinal) != argumentIDs.element(index: ordinal) { matches: false }
                 ordinal: ordinal + 1
             }
             if matches { return row }
@@ -888,17 +895,17 @@ function compilerBodyArenaTypeArgumentValueForTypeIDTables(typeArguments: Compil
 function compilerBodyArenaImportTypeKeyIntoTables(typeInstances: CompilerIntTable, typeArguments: CompilerIntTable, typeKeys: CompilerIntTable, typeKeyArguments: CompilerIntTable, typeKeyID: Int): Int {
     if typeKeyID < 0 || typeKeyID >= compilerIntTableRowCount(table: typeKeys) { return 0 - 1 }
     let argumentCount: Int(compilerIntTableValue(table: typeKeys, row: typeKeyID, column: compilerReachableTypeKeyArgumentCountColumn()))
-    let argumentIDs: RawBuffer(rawBufferCreate(capacity: argumentCount + 1, stride: 4))
+    let argumentIDs: Buffer<Int>(bufferCreateInt(capacity: argumentCount + 1))
     state ordinal: Int(0)
     while ordinal < argumentCount {
         let childKeyID: Int(compilerReachableTypeKeyArgumentValue(typeKeyArguments: typeKeyArguments, typeKeyID: typeKeyID, ordinal: ordinal))
         let childTypeID: Int(compilerBodyArenaImportTypeKeyIntoTables(typeInstances: typeInstances, typeArguments: typeArguments, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, typeKeyID: childKeyID))
         if childTypeID < 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+            argumentIDs.destroy()
             return 0 - 1
         }
-        if rawBufferAppendInt(buffer: argumentIDs, value: childTypeID) != 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+        if argumentIDs.append(element: childTypeID) != 0 {
+            argumentIDs.destroy()
             return 0 - 1
         }
         ordinal: ordinal + 1
@@ -907,51 +914,51 @@ function compilerBodyArenaImportTypeKeyIntoTables(typeInstances: CompilerIntTabl
     let nominalSyntaxID: Int(compilerIntTableValue(table: typeKeys, row: typeKeyID, column: compilerReachableTypeKeyNominalColumn()))
     let existing: Int(compilerBodyArenaTypeInstanceFindInTables(typeInstances: typeInstances, typeArguments: typeArguments, typeKind: typeKind, nominalSyntaxID: nominalSyntaxID, argumentCount: argumentCount, argumentIDs: argumentIDs))
     if existing >= 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return existing
     }
     let localTypeID: Int(compilerIntTableRowCount(table: typeInstances))
     if compilerIntTableAppend(table: typeInstances, value: localTypeID) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: typeInstances, value: compilerIntTableValue(table: typeKeys, row: typeKeyID, column: compilerReachableTypeKeyFileColumn())) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: typeInstances, value: compilerIntTableValue(table: typeKeys, row: typeKeyID, column: compilerReachableTypeKeyStartColumn())) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: typeInstances, value: compilerIntTableValue(table: typeKeys, row: typeKeyID, column: compilerReachableTypeKeyEndColumn())) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: typeInstances, value: typeKind) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     if compilerIntTableAppend(table: typeInstances, value: nominalSyntaxID) != 0 {
-        rawBufferDestroy(buffer: argumentIDs)
+        argumentIDs.destroy()
         return 0 - 1
     }
     ordinal: 0
     while ordinal < argumentCount {
         if compilerIntTableAppend(table: typeArguments, value: localTypeID) != 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+            argumentIDs.destroy()
             return 0 - 1
         }
         if compilerIntTableAppend(table: typeArguments, value: ordinal) != 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+            argumentIDs.destroy()
             return 0 - 1
         }
-        if compilerIntTableAppend(table: typeArguments, value: rawBufferLoadInt(buffer: argumentIDs, index: ordinal)) != 0 {
-            rawBufferDestroy(buffer: argumentIDs)
+        if compilerIntTableAppend(table: typeArguments, value: argumentIDs.element(index: ordinal)) != 0 {
+            argumentIDs.destroy()
             return 0 - 1
         }
         ordinal: ordinal + 1
     }
-    rawBufferDestroy(buffer: argumentIDs)
+    argumentIDs.destroy()
     return localTypeID
 }
 
@@ -1047,15 +1054,15 @@ function compilerBodyArenaSpecializedTypeKindForSpan(arena: CompilerBodyArena, r
 }
 
 function compilerBodyArenaFunctionOwnerSyntaxID(arena: CompilerBodyArena, functionID: Int): Int {
-    if functionID < 0 || functionID >= rawBufferCount(buffer: arena.tables.functionOwners) { return 0 - 1 }
-    return rawBufferLoadInt(buffer: arena.tables.functionOwners, index: functionID)
+    if functionID < 0 || functionID >= arena.tables.functionOwners.count { return 0 - 1 }
+    return arena.tables.functionOwners.element(index: functionID)
 }
 
 function compilerBodyArenaReceiverConstructSyntaxID(arena: CompilerBodyArena): Int {
     if arena.ownerKind != compilerBodyArenaOwnerFunction()
         || arena.ownerFunctionRow < 0
-        || arena.ownerFunctionRow >= rawBufferCount(buffer: arena.tables.functionOwners) { return 0 - 1 }
-    let ownerSyntaxID: Int(rawBufferLoadInt(buffer: arena.tables.functionOwners, index: arena.ownerFunctionRow))
+        || arena.ownerFunctionRow >= arena.tables.functionOwners.count { return 0 - 1 }
+    let ownerSyntaxID: Int(arena.tables.functionOwners.element(index: arena.ownerFunctionRow))
     let ownerDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: arena.tables, syntaxID: ownerSyntaxID))
     if ownerDeclarationRow < 0 || compilerIntTableValue(table: arena.tables.declarations, row: ownerDeclarationRow, column: 2) != compilerSyntaxKindConstruct() { return 0 - 1 }
     return ownerSyntaxID
@@ -1371,21 +1378,21 @@ function compilerBodyArenaLexicalParentRegion(arena: CompilerBodyArena, regionNo
     if regionNodeID < 0 || regionNodeID >= compilerIntTableRowCount(table: arena.nodes)
         || compilerIntTableValue(table: arena.nodes, row: regionNodeID, column: 1) != compilerSyntaxKindLexicalRegion() { return 0 - 2 }
     if regionNodeID == arena.rootNodeID { return 0 - 1 }
-    if rawBufferCount(buffer: arena.parentNodes) != compilerIntTableRowCount(table: arena.nodes)
-        || rawBufferCount(buffer: arena.parentRoles) != compilerIntTableRowCount(table: arena.nodes) { return 0 - 2 }
-    state ownerStatementNodeID: Int(rawBufferLoadInt(buffer: arena.parentNodes, index: regionNodeID))
-    let ownerRole: Int(rawBufferLoadInt(buffer: arena.parentRoles, index: regionNodeID))
+    if arena.parentNodes.count != compilerIntTableRowCount(table: arena.nodes)
+        || arena.parentRoles.count != compilerIntTableRowCount(table: arena.nodes) { return 0 - 2 }
+    state ownerStatementNodeID: Int(arena.parentNodes.element(index: regionNodeID))
+    let ownerRole: Int(arena.parentRoles.element(index: regionNodeID))
     if ownerRole == compilerSyntaxRoleSwitchBody() {
         let caseNodeID: Int(ownerStatementNodeID)
-        if caseNodeID < 0 || caseNodeID >= rawBufferCount(buffer: arena.parentNodes)
-            || rawBufferLoadInt(buffer: arena.parentRoles, index: caseNodeID) != compilerSyntaxRoleSwitchCase() { return 0 - 2 }
-        ownerStatementNodeID: rawBufferLoadInt(buffer: arena.parentNodes, index: caseNodeID)
+        if caseNodeID < 0 || caseNodeID >= arena.parentNodes.count
+            || arena.parentRoles.element(index: caseNodeID) != compilerSyntaxRoleSwitchCase() { return 0 - 2 }
+        ownerStatementNodeID: arena.parentNodes.element(index: caseNodeID)
     } else if ownerRole != compilerSyntaxRoleThenRegion() && ownerRole != compilerSyntaxRoleElseRegion() && ownerRole != compilerSyntaxRoleWhileBody() {
         return 0 - 2
     }
-    if ownerStatementNodeID < 0 || ownerStatementNodeID >= rawBufferCount(buffer: arena.parentNodes)
-        || rawBufferLoadInt(buffer: arena.parentRoles, index: ownerStatementNodeID) != compilerSyntaxRoleStatement() { return 0 - 2 }
-    let parentRegionNodeID: Int(rawBufferLoadInt(buffer: arena.parentNodes, index: ownerStatementNodeID))
+    if ownerStatementNodeID < 0 || ownerStatementNodeID >= arena.parentNodes.count
+        || arena.parentRoles.element(index: ownerStatementNodeID) != compilerSyntaxRoleStatement() { return 0 - 2 }
+    let parentRegionNodeID: Int(arena.parentNodes.element(index: ownerStatementNodeID))
     if parentRegionNodeID < 0 || parentRegionNodeID >= compilerIntTableRowCount(table: arena.nodes)
         || compilerIntTableValue(table: arena.nodes, row: parentRegionNodeID, column: 1) != compilerSyntaxKindLexicalRegion() { return 0 - 2 }
     return parentRegionNodeID
@@ -1935,7 +1942,7 @@ function compilerBodyArenaRewriteDerivedReadAsApplication(arena: CompilerBodyAre
     }
     if receiverEdgeRow < 0
         || arena.edges.values.update(element: calleeNodeID, index: receiverEdgeRow * compilerBodyArenaEdgeColumnCount()) != 0
-        || rawBufferStoreInt(buffer: arena.parentNodes, index: receiverNodeID, value: calleeNodeID) != 0
+        || arena.parentNodes.update(element: calleeNodeID, index: receiverNodeID) != 0
         || arena.nodes.values.update(element: compilerSyntaxKindApplication(), index: nodeID * compilerBodyArenaNodeColumnCount() + 1) != 0
         || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: nodeID, childNodeID: calleeNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0) != 0 { return 0 - 1 }
     return calleeNodeID
@@ -1964,7 +1971,7 @@ function compilerBodyArenaRewriteImplicitMemberRead(arena: CompilerBodyArena, in
     if receiverNodeID < 0
         || arena.nodes.values.update(element: compilerSyntaxKindMemberRead(), index: nodeID * compilerBodyArenaNodeColumnCount() + 1) != 0
         || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: nodeID, childNodeID: receiverNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0) != 0
-        || compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: receiverNodeID, targetKind: compilerBodyResolutionLocalSymbol(), targetID: receiverSymbolID, typeKind: compilerBodyTypeConstruct(), typeID: receiverTypeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
+        || compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: receiverNodeID, targetKind: compilerBodyResolutionLocalSymbol(), targetID: receiverSymbolID, typeKind: compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: receiverTypeID), typeID: receiverTypeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
     return receiverNodeID
 }
 
@@ -2001,11 +2008,14 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
         let receiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
         if receiverNodeID < 0 || compilerBodyArenaResolveExpression(arena: arena, index: index, nodeID: receiverNodeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
         let receiverResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: receiverNodeID))
-        if receiverResolutionRow < 0 || compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTypeKindColumn()) != compilerBodyTypeConstruct() { return 0 - 1 }
+        if receiverResolutionRow < 0 { return 0 - 1 }
+        let receiverTypeKind: Int(compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTypeKindColumn()))
+        if receiverTypeKind != compilerBodyTypeConstruct() && receiverTypeKind != compilerBodyTypeString() { return 0 - 1 }
         let memberName: String(compilerBodyArenaNodeText(arena: arena, nodeID: nodeID))
         let receiverTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTypeIDColumn()))
         if receiverTypeID < 0 || receiverTypeID >= compilerIntTableRowCount(table: arena.typeInstances) { return 0 - 1 }
-        let receiverConstructSyntaxID: Int(compilerIntTableValue(table: arena.typeInstances, row: receiverTypeID, column: compilerBodyTypeInstanceNominalSyntaxColumn()))
+        state receiverConstructSyntaxID: Int(compilerIntTableValue(table: arena.typeInstances, row: receiverTypeID, column: compilerBodyTypeInstanceNominalSyntaxColumn()))
+        if receiverTypeKind == compilerBodyTypeString() { receiverConstructSyntaxID: compilerBodyArenaStringDeclarationSyntaxID(arena: arena) }
         if compilerBodyArenaTypeIDIsArray(arena: arena, typeID: receiverTypeID) && memberName == String("count") {
             return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: nodeID, targetKind: compilerBodyResolutionArrayCount(), targetID: 0, typeKind: compilerBodyTypeInt(), typeID: 0 - 1, regionNodeID: regionNodeID)
         }
@@ -2070,6 +2080,11 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
                 let memberReceiverConstructSyntaxID: Int(compilerIntTableValue(table: arena.typeInstances, row: memberCallReceiverTypeID, column: compilerBodyTypeInstanceNominalSyntaxColumn()))
                 if memberReceiverConstructSyntaxID < 0 { return 0 - 1 }
                 memberFunctionID: compilerDeclarationIndexMemberFunctionLookup(tables: arena.tables, index: index, parentSyntaxID: memberReceiverConstructSyntaxID, name: calleeName)
+            } else if memberCallReceiverTypeKind == compilerBodyTypeString() {
+                let memberReceiverConstructSyntaxID: Int(compilerBodyArenaStringDeclarationSyntaxID(arena: arena))
+                if memberReceiverConstructSyntaxID >= 0 {
+                    memberFunctionID: compilerDeclarationIndexMemberFunctionLookup(tables: arena.tables, index: index, parentSyntaxID: memberReceiverConstructSyntaxID, name: calleeName)
+                }
             }
             if memberFunctionID >= 0 {
                 if !compilerBodyArenaCallLabelsMatchFunction(arena: arena, applicationNodeID: nodeID, functionID: memberFunctionID) { return 0 - 1 }
@@ -2589,7 +2604,7 @@ function compilerBodyArenaRecordFailureNode(arena: CompilerBodyArena, nodeID: In
     let localStart: Int(compilerIntTableValue(table: arena.nodes, row: nodeID, column: 4))
     let globalStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: localStart))
     if globalStart < 0 { return 0 - 1 }
-    return rawBufferAppendInt(buffer: arena.failures, value: globalStart)
+    return arena.failures.append(element: globalStart)
 }
 
 function compilerBodyArenaResolveExpressionRecordingFailure(arena: CompilerBodyArena, index: CompilerDeclarationIndex, nodeID: Int, regionNodeID: Int): Int {
@@ -2644,11 +2659,11 @@ function compilerBodyArenaBuildRegionSymbols(arena: CompilerBodyArena, index: Co
                     enumCaseCount: compilerBodyArenaEnumCaseCount(arena: arena, enumSyntaxID: enumSyntaxID)
                     if enumSyntaxID < 0 || enumCaseCount <= 0 { return 0 - 1 }
                 }
-                let seenEnumCases: RawBuffer(rawBufferCreate(capacity: enumCaseCount, stride: 4))
+                let seenEnumCases: Buffer<Int>(bufferCreateInt(capacity: enumCaseCount))
                 state seenInitialization: Int(0)
                 while seenInitialization < enumCaseCount {
-                    if rawBufferAppendInt(buffer: seenEnumCases, value: 0) != 0 {
-                        rawBufferDestroy(buffer: seenEnumCases)
+                    if seenEnumCases.append(element: 0) != 0 {
+                        seenEnumCases.destroy()
                         return 0 - 1
                     }
                     seenInitialization: seenInitialization + 1
@@ -2664,51 +2679,51 @@ function compilerBodyArenaBuildRegionSymbols(arena: CompilerBodyArena, index: Co
                     } else {
                         let caseRegionNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: caseNodeID, role: compilerSyntaxRoleSwitchBody(), ordinal: 0))
                         if caseRegionNodeID < 0 {
-                            rawBufferDestroy(buffer: seenEnumCases)
+                            seenEnumCases.destroy()
                             return 0 - 1
                         }
                         if compilerIntTableValue(table: arena.nodes, row: caseNodeID, column: 10) == 0 {
                             let patternNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: caseNodeID, role: compilerSyntaxRoleSwitchPattern(), ordinal: 0))
                             if patternNodeID < 0 {
-                                rawBufferDestroy(buffer: seenEnumCases)
+                                seenEnumCases.destroy()
                                 return 0 - 1
                             }
                             if subjectTypeKind == compilerBodyTypeEnum() {
                                 let enumMemberRow: Int(compilerBodyArenaResolveEnumCasePattern(arena: arena, index: index, patternNodeID: patternNodeID, enumTypeID: subjectTypeID, parentRegionNodeID: regionNodeID, caseRegionNodeID: caseRegionNodeID))
                                 if enumMemberRow < 0 || enumMemberRow >= compilerIntTableRowCount(table: arena.tables.members) {
-                                    rawBufferDestroy(buffer: seenEnumCases)
+                                    seenEnumCases.destroy()
                                     return 0 - 1
                                 }
                                 let enumCaseOrdinal: Int(compilerIntTableValue(table: arena.tables.members, row: enumMemberRow, column: 3))
                                 if enumCaseOrdinal < 0 || enumCaseOrdinal >= enumCaseCount {
-                                    rawBufferDestroy(buffer: seenEnumCases)
+                                    seenEnumCases.destroy()
                                     return 0 - 1
                                 }
-                                if rawBufferLoadInt(buffer: seenEnumCases, index: enumCaseOrdinal) != 0 {
-                                    rawBufferDestroy(buffer: seenEnumCases)
+                                if seenEnumCases.element(index: enumCaseOrdinal) != 0 {
+                                    seenEnumCases.destroy()
                                     return 0 - 1
                                 }
-                                if rawBufferStoreInt(buffer: seenEnumCases, index: enumCaseOrdinal, value: 1) != 0 {
-                                    rawBufferDestroy(buffer: seenEnumCases)
+                                if seenEnumCases.update(element: 1, index: enumCaseOrdinal) != 0 {
+                                    seenEnumCases.destroy()
                                     return 0 - 1
                                 }
                                 seenEnumCaseCount: seenEnumCaseCount + 1
                             } else if compilerBodyArenaResolveExpressionRecordingFailure(arena: arena, index: index, nodeID: patternNodeID, regionNodeID: regionNodeID) != 0 {
-                                rawBufferDestroy(buffer: seenEnumCases)
+                                seenEnumCases.destroy()
                                 return 0 - 1
                             }
                             let patternTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: patternNodeID))
                             let patternTypeID: Int(compilerBodyArenaExpressionTypeID(arena: arena, nodeID: patternNodeID))
                             if patternTypeKind != subjectTypeKind
                                 || ((subjectTypeKind == compilerBodyTypeConstruct() || subjectTypeKind == compilerBodyTypeEnum()) && patternTypeID != subjectTypeID) {
-                                rawBufferDestroy(buffer: seenEnumCases)
+                                seenEnumCases.destroy()
                                 return 0 - 1
                             }
                         } else {
                             defaultCount: defaultCount + 1
                         }
                         if compilerBodyArenaBuildRegionSymbols(arena: arena, index: index, regionNodeID: caseRegionNodeID) != 0 {
-                            rawBufferDestroy(buffer: seenEnumCases)
+                            seenEnumCases.destroy()
                             return 0 - 1
                         }
                         caseOrdinal: caseOrdinal + 1
@@ -2720,7 +2735,7 @@ function compilerBodyArenaBuildRegionSymbols(arena: CompilerBodyArena, index: Co
                 } else if defaultCount != 1 {
                     switchCasesValid: false
                 }
-                if rawBufferDestroy(buffer: seenEnumCases) != 0 || !switchCasesValid { return 0 - 1 }
+                if seenEnumCases.destroy() != 0 || !switchCasesValid { return 0 - 1 }
             } else if kind == compilerSyntaxKindAssignment() {
                 let targetNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleAssignmentTarget(), ordinal: 0))
                 let valueNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleAssignedValue(), ordinal: 0))

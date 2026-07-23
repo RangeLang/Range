@@ -340,7 +340,7 @@ function compilerBodyArenaBuildCFGSwitch(arena: CompilerBodyArena, regionNodeID:
         defaultIsImplicitPattern: true
     }
     if defaultCaseNodeID < 0 || patternCount < 0 { return CompilerBodyCFGResult(blockID: initialBlockID, isTerminated: false, isValid: false) }
-    let openBodyBlocks: RawBuffer(rawBufferCreate(capacity: caseCount, stride: 4))
+    let openBodyBlocks: Buffer<Int>(bufferCreateInt(capacity: caseCount))
     state testBlockID: Int(initialBlockID)
     state caseOrdinal: Int(0)
     state processedPatterns: Int(0)
@@ -380,7 +380,7 @@ function compilerBodyArenaBuildCFGSwitch(arena: CompilerBodyArena, regionNodeID:
                     if !bodyResult.isValid {
                         valid: false
                     } else if !bodyResult.isTerminated {
-                        if rawBufferAppendInt(buffer: openBodyBlocks, value: bodyResult.blockID) != 0 { valid: false }
+                        if openBodyBlocks.append(element: bodyResult.blockID) != 0 { valid: false }
                     }
                     testBlockID: falseBlockID
                     processedPatterns: processedPatterns + 1
@@ -410,14 +410,14 @@ function compilerBodyArenaBuildCFGSwitch(arena: CompilerBodyArena, regionNodeID:
             if defaultBlockID < 0 || !defaultResult.isValid {
                 valid: false
             } else if !defaultResult.isTerminated {
-                if rawBufferAppendInt(buffer: openBodyBlocks, value: defaultResult.blockID) != 0 { valid: false }
+                if openBodyBlocks.append(element: defaultResult.blockID) != 0 { valid: false }
             }
         }
     }
     state resultBlockID: Int(initialBlockID)
     state resultTerminated: Bool(false)
     if valid {
-        if rawBufferCount(buffer: openBodyBlocks) == 0 {
+        if openBodyBlocks.count == 0 {
             resultTerminated: true
         } else {
             let continuationBlockID: Int(compilerBodyArenaCFGAppendBlock(arena: arena, regionNodeID: regionNodeID, firstStatementOrdinal: continuationStatementOrdinal))
@@ -425,8 +425,8 @@ function compilerBodyArenaBuildCFGSwitch(arena: CompilerBodyArena, regionNodeID:
                 valid: false
             } else {
                 state openOrdinal: Int(0)
-                while valid && openOrdinal < rawBufferCount(buffer: openBodyBlocks) {
-                    let openBlockID: Int(rawBufferLoadInt(buffer: openBodyBlocks, index: openOrdinal))
+                while valid && openOrdinal < openBodyBlocks.count {
+                    let openBlockID: Int(openBodyBlocks.element(index: openOrdinal))
                     if compilerBodyArenaCFGSetBlock(arena: arena, blockID: openBlockID, statementCount: 0, terminatorKind: compilerBodyCFGTerminatorFallthrough(), terminatorSourceNodeID: switchNodeID) != 0
                         || compilerBodyArenaCFGAppendEdge(arena: arena, fromBlockID: openBlockID, toBlockID: continuationBlockID, role: compilerBodyCFGEdgeFallthrough(), ordinal: 0) != 0 { valid: false }
                     openOrdinal: openOrdinal + 1
@@ -435,7 +435,7 @@ function compilerBodyArenaBuildCFGSwitch(arena: CompilerBodyArena, regionNodeID:
             }
         }
     }
-    if rawBufferDestroy(buffer: openBodyBlocks) != 0 { valid: false }
+    if openBodyBlocks.destroy() != 0 { valid: false }
     return CompilerBodyCFGResult(blockID: resultBlockID, isTerminated: resultTerminated, isValid: valid)
 }
 
@@ -804,11 +804,11 @@ function compilerBodyArenaCFGIsValid(arena: CompilerBodyArena): Bool {
             || role < compilerBodyCFGEdgeTrue() || role > compilerBodyCFGEdgeBackedge() { return false }
         validationEdgeRow: validationEdgeRow + 1
     }
-    let expectedScheduleOrdinals: RawBuffer(rawBufferCreate(capacity: blockCount, stride: 4))
+    let expectedScheduleOrdinals: Buffer<Int>(bufferCreateInt(capacity: blockCount))
     state scheduleValidationStatus: Int(0)
     state scheduleBlockRow: Int(0)
     while scheduleBlockRow < blockCount && scheduleValidationStatus == 0 {
-        if rawBufferAppendInt(buffer: expectedScheduleOrdinals, value: 0) != 0 { scheduleValidationStatus: 0 - 1 }
+        if expectedScheduleOrdinals.append(element: 0) != 0 { scheduleValidationStatus: 0 - 1 }
         scheduleBlockRow: scheduleBlockRow + 1
     }
     state scheduleRow: Int(0)
@@ -818,7 +818,7 @@ function compilerBodyArenaCFGIsValid(arena: CompilerBodyArena): Bool {
         let scheduleAction: Int(compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleActionColumn()))
         state expectedScheduleOrdinal: Int(0 - 1)
         if scheduleBlockID >= 0 && scheduleBlockID < blockCount {
-            expectedScheduleOrdinal: rawBufferLoadInt(buffer: expectedScheduleOrdinals, index: scheduleBlockID)
+            expectedScheduleOrdinal: expectedScheduleOrdinals.element(index: scheduleBlockID)
         }
         if compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleIDColumn()) != scheduleRow
             || scheduleBlockID < 0 || scheduleBlockID >= blockCount
@@ -826,67 +826,67 @@ function compilerBodyArenaCFGIsValid(arena: CompilerBodyArena): Bool {
             || scheduleAction < compilerBodyCFGScheduleEvaluateNode() || scheduleAction > compilerBodyCFGScheduleSwitchPayloadBind()
             || compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleOrdinalColumn()) != expectedScheduleOrdinal {
             scheduleValidationStatus: 0 - 1
-        } else if rawBufferStoreInt(buffer: expectedScheduleOrdinals, index: scheduleBlockID, value: expectedScheduleOrdinal + 1) != 0 {
+        } else if expectedScheduleOrdinals.update(element: expectedScheduleOrdinal + 1, index: scheduleBlockID) != 0 {
             scheduleValidationStatus: 0 - 1
         }
         scheduleRow: scheduleRow + 1
     }
-    if rawBufferDestroy(buffer: expectedScheduleOrdinals) != 0 { scheduleValidationStatus: 0 - 1 }
+    if expectedScheduleOrdinals.destroy() != 0 { scheduleValidationStatus: 0 - 1 }
     return scheduleValidationStatus == 0
 }
 
-function compilerBodyArenaCFGScheduleBuildBlockIndex(arena: CompilerBodyArena, blockStarts: RawBuffer, blockCounts: RawBuffer, scheduleRows: RawBuffer): Int {
+function compilerBodyArenaCFGScheduleBuildBlockIndex(arena: CompilerBodyArena, blockStarts: Buffer<Int>, blockCounts: Buffer<Int>, scheduleRows: Buffer<Int>): Int {
     let blockCount: Int(compilerIntTableRowCount(table: arena.cfgBlocks))
     let scheduleCount: Int(compilerIntTableRowCount(table: arena.cfgSchedule))
-    if rawBufferCount(buffer: blockStarts) != 0 || rawBufferCount(buffer: blockCounts) != 0 || rawBufferCount(buffer: scheduleRows) != 0 { return 0 - 1 }
+    if blockStarts.count != 0 || blockCounts.count != 0 || scheduleRows.count != 0 { return 0 - 1 }
     state blockID: Int(0)
     while blockID < blockCount {
-        if rawBufferAppendInt(buffer: blockStarts, value: 0) != 0
-            || rawBufferAppendInt(buffer: blockCounts, value: 0) != 0 { return 0 - 1 }
+        if blockStarts.append(element: 0) != 0
+            || blockCounts.append(element: 0) != 0 { return 0 - 1 }
         blockID: blockID + 1
     }
     state scheduleRow: Int(0)
     while scheduleRow < scheduleCount {
         let scheduleBlockID: Int(compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleBlockColumn()))
         if scheduleBlockID < 0 || scheduleBlockID >= blockCount { return 0 - 1 }
-        let priorCount: Int(rawBufferLoadInt(buffer: blockCounts, index: scheduleBlockID))
-        if rawBufferStoreInt(buffer: blockCounts, index: scheduleBlockID, value: priorCount + 1) != 0 { return 0 - 1 }
+        let priorCount: Int(blockCounts.element(index: scheduleBlockID))
+        if blockCounts.update(element: priorCount + 1, index: scheduleBlockID) != 0 { return 0 - 1 }
         scheduleRow: scheduleRow + 1
     }
     state nextStart: Int(0)
     blockID: 0
     while blockID < blockCount {
-        if rawBufferStoreInt(buffer: blockStarts, index: blockID, value: nextStart) != 0 { return 0 - 1 }
-        nextStart: nextStart + rawBufferLoadInt(buffer: blockCounts, index: blockID)
+        if blockStarts.update(element: nextStart, index: blockID) != 0 { return 0 - 1 }
+        nextStart: nextStart + blockCounts.element(index: blockID)
         blockID: blockID + 1
     }
     if nextStart != scheduleCount { return 0 - 1 }
     scheduleRow: 0
     while scheduleRow < scheduleCount {
-        if rawBufferAppendInt(buffer: scheduleRows, value: 0 - 1) != 0 { return 0 - 1 }
+        if scheduleRows.append(element: 0 - 1) != 0 { return 0 - 1 }
         scheduleRow: scheduleRow + 1
     }
     scheduleRow: 0
     while scheduleRow < scheduleCount {
         let scheduleBlockID: Int(compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleBlockColumn()))
         let scheduleOrdinal: Int(compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleOrdinalColumn()))
-        let scheduleIndex: Int(rawBufferLoadInt(buffer: blockStarts, index: scheduleBlockID) + scheduleOrdinal)
-        if scheduleOrdinal < 0 || scheduleOrdinal >= rawBufferLoadInt(buffer: blockCounts, index: scheduleBlockID)
+        let scheduleIndex: Int(blockStarts.element(index: scheduleBlockID) + scheduleOrdinal)
+        if scheduleOrdinal < 0 || scheduleOrdinal >= blockCounts.element(index: scheduleBlockID)
             || scheduleIndex < 0 || scheduleIndex >= scheduleCount
-            || rawBufferLoadInt(buffer: scheduleRows, index: scheduleIndex) != 0 - 1
-            || rawBufferStoreInt(buffer: scheduleRows, index: scheduleIndex, value: scheduleRow) != 0 { return 0 - 1 }
+            || scheduleRows.element(index: scheduleIndex) != 0 - 1
+            || scheduleRows.update(element: scheduleRow, index: scheduleIndex) != 0 { return 0 - 1 }
         scheduleRow: scheduleRow + 1
     }
     return 0
 }
 
-function compilerBodyArenaCFGForwardPredecessorBuildIndex(arena: CompilerBodyArena, blockStarts: RawBuffer, blockCounts: RawBuffer, predecessorBlocks: RawBuffer): Int {
+function compilerBodyArenaCFGForwardPredecessorBuildIndex(arena: CompilerBodyArena, blockStarts: Buffer<Int>, blockCounts: Buffer<Int>, predecessorBlocks: Buffer<Int>): Int {
     let blockCount: Int(compilerIntTableRowCount(table: arena.cfgBlocks))
-    if rawBufferCount(buffer: blockStarts) != 0 || rawBufferCount(buffer: blockCounts) != 0 || rawBufferCount(buffer: predecessorBlocks) != 0 { return 0 - 1 }
+    if blockStarts.count != 0 || blockCounts.count != 0 || predecessorBlocks.count != 0 { return 0 - 1 }
     state blockID: Int(0)
     while blockID < blockCount {
-        if rawBufferAppendInt(buffer: blockStarts, value: 0) != 0
-            || rawBufferAppendInt(buffer: blockCounts, value: 0) != 0 { return 0 - 1 }
+        if blockStarts.append(element: 0) != 0
+            || blockCounts.append(element: 0) != 0 { return 0 - 1 }
         blockID: blockID + 1
     }
     state edgeRow: Int(0)
@@ -894,28 +894,28 @@ function compilerBodyArenaCFGForwardPredecessorBuildIndex(arena: CompilerBodyAre
         if compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeRoleColumn()) != compilerBodyCFGEdgeBackedge() {
             let targetBlockID: Int(compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeToColumn()))
             if targetBlockID < 0 || targetBlockID >= blockCount { return 0 - 1 }
-            let priorCount: Int(rawBufferLoadInt(buffer: blockCounts, index: targetBlockID))
-            if rawBufferStoreInt(buffer: blockCounts, index: targetBlockID, value: priorCount + 1) != 0 { return 0 - 1 }
+            let priorCount: Int(blockCounts.element(index: targetBlockID))
+            if blockCounts.update(element: priorCount + 1, index: targetBlockID) != 0 { return 0 - 1 }
         }
         edgeRow: edgeRow + 1
     }
     state nextStart: Int(0)
     blockID: 0
     while blockID < blockCount {
-        if rawBufferStoreInt(buffer: blockStarts, index: blockID, value: nextStart) != 0 { return 0 - 1 }
-        nextStart: nextStart + rawBufferLoadInt(buffer: blockCounts, index: blockID)
+        if blockStarts.update(element: nextStart, index: blockID) != 0 { return 0 - 1 }
+        nextStart: nextStart + blockCounts.element(index: blockID)
         blockID: blockID + 1
     }
     state predecessorIndex: Int(0)
     while predecessorIndex < nextStart {
-        if rawBufferAppendInt(buffer: predecessorBlocks, value: 0 - 1) != 0 { return 0 - 1 }
+        if predecessorBlocks.append(element: 0 - 1) != 0 { return 0 - 1 }
         predecessorIndex: predecessorIndex + 1
     }
-    let writeOrdinals: RawBuffer(rawBufferCreate(capacity: blockCount, stride: 4))
+    let writeOrdinals: Buffer<Int>(bufferCreateInt(capacity: blockCount))
     state status: Int(0)
     blockID: 0
     while blockID < blockCount && status == 0 {
-        if rawBufferAppendInt(buffer: writeOrdinals, value: 0) != 0 { status: 0 - 1 }
+        if writeOrdinals.append(element: 0) != 0 { status: 0 - 1 }
         blockID: blockID + 1
     }
     edgeRow: 0
@@ -923,15 +923,15 @@ function compilerBodyArenaCFGForwardPredecessorBuildIndex(arena: CompilerBodyAre
         if compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeRoleColumn()) != compilerBodyCFGEdgeBackedge() {
             let sourceBlockID: Int(compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeFromColumn()))
             let targetBlockID: Int(compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeToColumn()))
-            let ordinal: Int(rawBufferLoadInt(buffer: writeOrdinals, index: targetBlockID))
-            let destination: Int(rawBufferLoadInt(buffer: blockStarts, index: targetBlockID) + ordinal)
-            if sourceBlockID < 0 || sourceBlockID >= blockCount || destination < 0 || destination >= rawBufferCount(buffer: predecessorBlocks)
-                || rawBufferStoreInt(buffer: predecessorBlocks, index: destination, value: sourceBlockID) != 0
-                || rawBufferStoreInt(buffer: writeOrdinals, index: targetBlockID, value: ordinal + 1) != 0 { status: 0 - 1 }
+            let ordinal: Int(writeOrdinals.element(index: targetBlockID))
+            let destination: Int(blockStarts.element(index: targetBlockID) + ordinal)
+            if sourceBlockID < 0 || sourceBlockID >= blockCount || destination < 0 || destination >= predecessorBlocks.count
+                || predecessorBlocks.update(element: sourceBlockID, index: destination) != 0
+                || writeOrdinals.update(element: ordinal + 1, index: targetBlockID) != 0 { status: 0 - 1 }
         }
         edgeRow: edgeRow + 1
     }
-    if rawBufferDestroy(buffer: writeOrdinals) != 0 { status: 0 - 1 }
+    if writeOrdinals.destroy() != 0 { status: 0 - 1 }
     return status
 }
 

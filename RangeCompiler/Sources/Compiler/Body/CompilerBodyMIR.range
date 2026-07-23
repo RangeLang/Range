@@ -139,15 +139,15 @@ function compilerBodyMIRBuildOptionalInjection(arena: CompilerBodyArena, sourceN
 }
 
 function compilerBodyMIRBuildMemberReceiverAddress(arena: CompilerBodyArena, receiverNodeID: Int, blockID: Int): Int {
-    let memberPath: RawBuffer(rawBufferCreate(capacity: 4, stride: 4))
+    let memberPath: Buffer<Int>(bufferCreateInt(capacity: 4))
     state currentNodeID: Int(receiverNodeID)
     state resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: currentNodeID))
     state targetKind: Int(0 - 1)
     if resolutionRow >= 0 { targetKind: compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) }
     while resolutionRow >= 0 && targetKind == compilerBodyResolutionMember() {
         if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) != compilerBodyTypeConstruct()
-            || rawBufferAppendInt(buffer: memberPath, value: currentNodeID) != 0 {
-            rawBufferDestroy(buffer: memberPath)
+            || memberPath.append(element: currentNodeID) != 0 {
+            memberPath.destroy()
             return 0 - 1
         }
         currentNodeID: compilerBodyArenaChild(arena: arena, ownerNodeID: currentNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0)
@@ -157,7 +157,7 @@ function compilerBodyMIRBuildMemberReceiverAddress(arena: CompilerBodyArena, rec
     }
     if resolutionRow < 0 || targetKind != compilerBodyResolutionLocalSymbol()
         || compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()) != compilerBodyTypeConstruct() {
-        rawBufferDestroy(buffer: memberPath)
+        memberPath.destroy()
         return 0 - 1
     }
     let symbolID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
@@ -165,13 +165,13 @@ function compilerBodyMIRBuildMemberReceiverAddress(arena: CompilerBodyArena, rec
     state storageID: Int(0 - 1)
     if symbolKind != compilerBodySymbolReceiver() { storageID: compilerBodyStorageForSymbol(arena: arena, symbolID: symbolID) }
     if symbolKind != compilerBodySymbolReceiver() && storageID < 0 {
-        rawBufferDestroy(buffer: memberPath)
+        memberPath.destroy()
         return 0 - 1
     }
     state addressValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueReceiverAddress(), typeKind: compilerBodyTypeConstruct(), typeID: compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeIDColumn()), sourceNodeID: currentNodeID, provenanceKind: compilerBodyMemorySubjectSymbol(), provenanceID: symbolID))
-    state pathIndex: Int(rawBufferCount(buffer: memberPath) - 1)
+    state pathIndex: Int(memberPath.count - 1)
     while addressValueID >= 0 && pathIndex >= 0 {
-        let memberNodeID: Int(rawBufferLoadInt(buffer: memberPath, index: pathIndex))
+        let memberNodeID: Int(memberPath.element(index: pathIndex))
         let memberResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: memberNodeID))
         if memberResolutionRow < 0 {
             addressValueID: 0 - 1
@@ -190,7 +190,7 @@ function compilerBodyMIRBuildMemberReceiverAddress(arena: CompilerBodyArena, rec
         }
         pathIndex: pathIndex - 1
     }
-    if rawBufferDestroy(buffer: memberPath) != 0 { return 0 - 1 }
+    if memberPath.destroy() != 0 { return 0 - 1 }
     return addressValueID
 }
 
@@ -487,7 +487,7 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
             || resolutionTargetKind == compilerBodyResolutionMacroGraphQuery()
             || (resolutionTargetKind == compilerBodyResolutionMacroTargetOperation() && targetID != compilerMacroTargetOperationExpand())
             || resolutionTargetKind == compilerBodyResolutionMacroTargetQueryInvalid() { callOperandCount: callOperandCount + 1 }
-        let argumentValues: RawBuffer(rawBufferCreate(capacity: callOperandCount, stride: 4))
+        let argumentValues: Buffer<Int>(bufferCreateInt(capacity: callOperandCount))
         if ordinaryMemberFunctionCall
             || resolutionTargetKind == compilerBodyResolutionMemberRuntimeBuiltin()
             || resolutionTargetKind == compilerBodyResolutionMacroCapability()
@@ -497,26 +497,28 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
             || resolutionTargetKind == compilerBodyResolutionMacroTargetQueryInvalid() {
             let memberCallReceiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: calleeNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
             if memberCallReceiverNodeID < 0 {
-                rawBufferDestroy(buffer: argumentValues)
+                argumentValues.destroy()
                 return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
             }
             if ordinaryMemberFunctionCall {
                 let memberCallReceiverTypeID: Int(compilerBodyArenaExpressionTypeID(arena: arena, nodeID: memberCallReceiverNodeID))
+                let memberCallReceiverTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: memberCallReceiverNodeID))
                 state memberCallReceiverValueID: Int(0 - 1)
-                if compilerBodyArenaTypeIDIsOpaqueStorage(arena: arena, typeID: memberCallReceiverTypeID) {
+                if memberCallReceiverTypeKind == compilerBodyTypeString()
+                    || compilerBodyArenaTypeIDIsOpaqueStorage(arena: arena, typeID: memberCallReceiverTypeID) {
                     let memberCallReceiverValue: CompilerBodyMIRValueResult(compilerBodyMIRBuildExpression(arena: arena, nodeID: memberCallReceiverNodeID, blockID: blockID))
                     if memberCallReceiverValue.isValid { memberCallReceiverValueID: memberCallReceiverValue.valueID }
                 } else {
                     memberCallReceiverValueID: compilerBodyMIRBuildMemberReceiverAddress(arena: arena, receiverNodeID: memberCallReceiverNodeID, blockID: blockID)
                 }
-                if memberCallReceiverValueID < 0 || rawBufferAppendInt(buffer: argumentValues, value: memberCallReceiverValueID) != 0 {
-                    rawBufferDestroy(buffer: argumentValues)
+                if memberCallReceiverValueID < 0 || argumentValues.append(element: memberCallReceiverValueID) != 0 {
+                    argumentValues.destroy()
                     return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
                 }
             } else {
                 let memberCallReceiverValue: CompilerBodyMIRValueResult(compilerBodyMIRBuildExpression(arena: arena, nodeID: memberCallReceiverNodeID, blockID: blockID))
-                if !memberCallReceiverValue.isValid || rawBufferAppendInt(buffer: argumentValues, value: memberCallReceiverValue.valueID) != 0 {
-                    rawBufferDestroy(buffer: argumentValues)
+                if !memberCallReceiverValue.isValid || argumentValues.append(element: memberCallReceiverValue.valueID) != 0 {
+                    argumentValues.destroy()
                     return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
                 }
             }
@@ -526,8 +528,8 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
             let argumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleArgument(), ordinal: ordinal))
             let argumentValueNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: argumentNodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0))
             let argumentValue: CompilerBodyMIRValueResult(compilerBodyMIRBuildExpression(arena: arena, nodeID: argumentValueNodeID, blockID: blockID))
-            if !argumentValue.isValid || rawBufferAppendInt(buffer: argumentValues, value: argumentValue.valueID) != 0 {
-                rawBufferDestroy(buffer: argumentValues)
+            if !argumentValue.isValid || argumentValues.append(element: argumentValue.valueID) != 0 {
+                argumentValues.destroy()
                 return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
             }
             ordinal: ordinal + 1
@@ -541,16 +543,16 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
                 valueOrdinal: compilerBodyArenaConstructArgumentOrdinalForMemberOrdinal(arena: arena, applicationNodeID: nodeID, constructSyntaxID: targetID, memberOrdinal: ordinal)
             }
             if valueOrdinal < 0 {
-                rawBufferDestroy(buffer: argumentValues)
+                argumentValues.destroy()
                 return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
             }
-            if compilerBodyMIRAppendOperand(arena: arena, operationID: callOperationID, ordinal: ordinal, valueID: rawBufferLoadInt(buffer: argumentValues, index: valueOrdinal), role: compilerBodyMIROperandArgument()) != 0 {
-                rawBufferDestroy(buffer: argumentValues)
+            if compilerBodyMIRAppendOperand(arena: arena, operationID: callOperationID, ordinal: ordinal, valueID: argumentValues.element(index: valueOrdinal), role: compilerBodyMIROperandArgument()) != 0 {
+                argumentValues.destroy()
                 return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
             }
             ordinal: ordinal + 1
         }
-        rawBufferDestroy(buffer: argumentValues)
+        argumentValues.destroy()
         state callOperationKind: Int(compilerBodyMIROperationDirectCall())
         if resolutionTargetKind == compilerBodyResolutionConstruct() { callOperationKind: compilerBodyMIROperationConstruct() }
         if resolutionTargetKind == compilerBodyResolutionMacroCapability() { callOperationKind: compilerBodyMIROperationMacroDiagnostic() }
@@ -647,8 +649,8 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
 
 function compilerBodyMIRTraversalContains(arena: CompilerBodyArena, blockID: Int): Bool {
     state index: Int(0)
-    while index < rawBufferCount(buffer: arena.mirTraversal) {
-        if rawBufferLoadInt(buffer: arena.mirTraversal, index: index) == blockID { return true }
+    while index < arena.mirTraversal.count {
+        if arena.mirTraversal.element(index: index) == blockID { return true }
         index: index + 1
     }
     return false
@@ -703,7 +705,7 @@ function compilerBodyMIRBuildTraversal(arena: CompilerBodyArena, blockID: Int): 
     if blockID < 0 || blockID >= compilerIntTableRowCount(table: arena.cfgBlocks) { return 0 - 1 }
     if compilerBodyMIRTraversalContains(arena: arena, blockID: blockID) { return 0 }
     if blockID != 0 && !compilerBodyMIRAllForwardPredecessorsVisited(arena: arena, blockID: blockID) { return 0 }
-    if rawBufferAppendInt(buffer: arena.mirTraversal, value: blockID) != 0 { return 0 - 1 }
+    if arena.mirTraversal.append(element: blockID) != 0 { return 0 - 1 }
     let terminatorKind: Int(compilerIntTableValue(table: arena.cfgBlocks, row: blockID, column: compilerBodyCFGBlockTerminatorKindColumn()))
     if terminatorKind == compilerBodyCFGTerminatorCondition() {
         if compilerBodyMIRBuildTraversal(arena: arena, blockID: compilerBodyMIRCFGTarget(arena: arena, blockID: blockID, role: compilerBodyCFGEdgeTrue())) != 0 { return 0 - 1 }
@@ -1170,13 +1172,13 @@ function compilerBodyGraphZeroAppendControlDependencies(arena: CompilerBodyArena
 }
 
 function compilerBodyGraphZeroFreezeMIR(arena: CompilerBodyArena): Int {
-    if rawBufferLoadInt(buffer: arena.graphZeroState, index: compilerBodyGraphZeroStateFrozen()) != 0 { return 0 - 1 }
+    if arena.graphZeroState.element(index: compilerBodyGraphZeroStateFrozen()) != 0 { return 0 - 1 }
     let operationCount: Int(compilerIntTableRowCount(table: arena.mirOperations))
-    let depths: RawBuffer(rawBufferCreate(capacity: operationCount + 1, stride: 4))
+    let depths: Buffer<Int>(bufferCreateInt(capacity: operationCount + 1))
     state operationID: Int(0)
     while operationID < operationCount {
-        if rawBufferAppendInt(buffer: depths, value: 1) != 0 {
-            rawBufferDestroy(buffer: depths)
+        if depths.append(element: 1) != 0 {
+            depths.destroy()
             return 0 - 1
         }
         operationID: operationID + 1
@@ -1190,14 +1192,14 @@ function compilerBodyGraphZeroFreezeMIR(arena: CompilerBodyArena): Int {
                 && compilerIntTableValue(table: arena.graphZeroMIRDependencies, row: dependencyRow, column: compilerBodyGraphZeroMIRDependencyKindColumn()) != compilerBodyGraphZeroMIRDependencyLoopCarried() {
                 let producer: Int(compilerIntTableValue(table: arena.graphZeroMIRDependencies, row: dependencyRow, column: compilerBodyGraphZeroMIRDependencyProducerColumn()))
                 if producer >= 0 && producer < operationID {
-                    let candidate: Int(rawBufferLoadInt(buffer: depths, index: producer) + 1)
+                    let candidate: Int(depths.element(index: producer) + 1)
                     if candidate > depth { depth: candidate }
                 }
             }
             dependencyRow: dependencyRow + 1
         }
-        if rawBufferStoreInt(buffer: depths, index: operationID, value: depth) != 0 {
-            rawBufferDestroy(buffer: depths)
+        if depths.update(element: depth, index: operationID) != 0 {
+            depths.destroy()
             return 0 - 1
         }
         let blockID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationID, column: compilerBodyMIROperationBlockColumn()))
@@ -1208,15 +1210,15 @@ function compilerBodyGraphZeroFreezeMIR(arena: CompilerBodyArena): Int {
             || compilerIntTableAppend(table: arena.graphZeroMIRFrontiers, value: blockID) != 0
             || compilerIntTableAppend(table: arena.graphZeroMIRFrontiers, value: depth) != 0
             || compilerIntTableAppend(table: arena.graphZeroMIRFrontiers, value: operationID) != 0 {
-            rawBufferDestroy(buffer: depths)
+            depths.destroy()
             return 0 - 1
         }
         operationID: operationID + 1
     }
-    let destroyStatus: Int(rawBufferDestroy(buffer: depths))
+    let destroyStatus: Int(depths.destroy())
     if destroyStatus != 0
-        || rawBufferStoreInt(buffer: arena.graphZeroState, index: compilerBodyGraphZeroStateValid(), value: 1) != 0
-        || rawBufferStoreInt(buffer: arena.graphZeroState, index: compilerBodyGraphZeroStateFrozen(), value: 1) != 0 { return 0 - 1 }
+        || arena.graphZeroState.update(element: 1, index: compilerBodyGraphZeroStateValid()) != 0
+        || arena.graphZeroState.update(element: 1, index: compilerBodyGraphZeroStateFrozen()) != 0 { return 0 - 1 }
     return 0
 }
 
@@ -1225,25 +1227,25 @@ function compilerBodyMIRBuild(arena: CompilerBodyArena): Int {
         || !compilerBodyArenaSymbolsAndResolutionsAreValid(arena: arena)
         || !compilerBodyArenaCFGIsValid(arena: arena) { return 0 - 1 }
     let blockCount: Int(compilerIntTableRowCount(table: arena.cfgBlocks))
-    let scheduleStarts: RawBuffer(rawBufferCreate(capacity: blockCount, stride: 4))
-    let scheduleCounts: RawBuffer(rawBufferCreate(capacity: blockCount, stride: 4))
-    let scheduleRows: RawBuffer(rawBufferCreate(capacity: compilerIntTableRowCount(table: arena.cfgSchedule), stride: 4))
+    let scheduleStarts: Buffer<Int>(bufferCreateInt(capacity: blockCount))
+    let scheduleCounts: Buffer<Int>(bufferCreateInt(capacity: blockCount))
+    let scheduleRows: Buffer<Int>(bufferCreateInt(capacity: compilerIntTableRowCount(table: arena.cfgSchedule)))
     state status: Int(compilerBodyArenaCFGScheduleBuildBlockIndex(arena: arena, blockStarts: scheduleStarts, blockCounts: scheduleCounts, scheduleRows: scheduleRows))
     if status == 0 { status: compilerBodyMIRBuildWithScheduleIndex(arena: arena, scheduleStarts: scheduleStarts, scheduleCounts: scheduleCounts, scheduleRows: scheduleRows) }
-    if rawBufferDestroy(buffer: scheduleStarts) != 0 { status: 0 - 1 }
-    if rawBufferDestroy(buffer: scheduleCounts) != 0 { status: 0 - 1 }
-    if rawBufferDestroy(buffer: scheduleRows) != 0 { status: 0 - 1 }
+    if scheduleStarts.destroy() != 0 { status: 0 - 1 }
+    if scheduleCounts.destroy() != 0 { status: 0 - 1 }
+    if scheduleRows.destroy() != 0 { status: 0 - 1 }
     return status
 }
 
-function compilerBodyMIRBuildWithScheduleIndex(arena: CompilerBodyArena, scheduleStarts: RawBuffer, scheduleCounts: RawBuffer, scheduleRows: RawBuffer): Int {
+function compilerBodyMIRBuildWithScheduleIndex(arena: CompilerBodyArena, scheduleStarts: Buffer<Int>, scheduleCounts: Buffer<Int>, scheduleRows: Buffer<Int>): Int {
     if !compilerBodyMemoryIsFrozenAndValid(arena: arena)
         || !compilerBodyArenaSymbolsAndResolutionsAreValid(arena: arena)
-        || rawBufferCount(buffer: scheduleStarts) != compilerIntTableRowCount(table: arena.cfgBlocks)
-        || rawBufferCount(buffer: scheduleCounts) != rawBufferCount(buffer: scheduleStarts)
-        || rawBufferCount(buffer: scheduleRows) != compilerIntTableRowCount(table: arena.cfgSchedule) { return 0 - 1 }
+        || scheduleStarts.count != compilerIntTableRowCount(table: arena.cfgBlocks)
+        || scheduleCounts.count != scheduleStarts.count
+        || scheduleRows.count != compilerIntTableRowCount(table: arena.cfgSchedule) { return 0 - 1 }
     if compilerBodyMIRInitializeBlocks(arena: arena) != 0 || compilerBodyMIRBuildTraversal(arena: arena, blockID: 0) != 0
-        || rawBufferCount(buffer: arena.mirTraversal) != compilerIntTableRowCount(table: arena.cfgBlocks) { return 0 - 1 }
+        || arena.mirTraversal.count != compilerIntTableRowCount(table: arena.cfgBlocks) { return 0 - 1 }
     state symbolRow: Int(0)
     while symbolRow < compilerIntTableRowCount(table: arena.symbols) {
         let symbolKind: Int(compilerIntTableValue(table: arena.symbols, row: symbolRow, column: compilerBodySymbolKindColumn()))
@@ -1256,18 +1258,18 @@ function compilerBodyMIRBuildWithScheduleIndex(arena: CompilerBodyArena, schedul
         symbolRow: symbolRow + 1
     }
     state traversalIndex: Int(0)
-    while traversalIndex < rawBufferCount(buffer: arena.mirTraversal) {
-        let cfgBlockID: Int(rawBufferLoadInt(buffer: arena.mirTraversal, index: traversalIndex))
+    while traversalIndex < arena.mirTraversal.count {
+        let cfgBlockID: Int(arena.mirTraversal.element(index: traversalIndex))
         let firstOperation: Int(compilerIntTableRowCount(table: arena.mirOperations))
         if compilerBodyMIRAppendJoinPhis(arena: arena, blockID: cfgBlockID) != 0 { return 0 - 1 }
         if compilerBodyMIRAppendLoopPhis(arena: arena, blockID: cfgBlockID) != 0 { return 0 - 1 }
         if compilerIntTableValue(table: arena.cfgBlocks, row: cfgBlockID, column: compilerBodyCFGBlockStatementCountColumn()) != 0 { return 0 - 1 }
-        let scheduleStart: Int(rawBufferLoadInt(buffer: scheduleStarts, index: cfgBlockID))
-        let scheduleCount: Int(rawBufferLoadInt(buffer: scheduleCounts, index: cfgBlockID))
-        if scheduleStart < 0 || scheduleCount < 0 || scheduleStart + scheduleCount > rawBufferCount(buffer: scheduleRows) { return 0 - 1 }
+        let scheduleStart: Int(scheduleStarts.element(index: cfgBlockID))
+        let scheduleCount: Int(scheduleCounts.element(index: cfgBlockID))
+        if scheduleStart < 0 || scheduleCount < 0 || scheduleStart + scheduleCount > scheduleRows.count { return 0 - 1 }
         state scheduleOrdinal: Int(0)
         while scheduleOrdinal < scheduleCount {
-            let matchingScheduleRow: Int(rawBufferLoadInt(buffer: scheduleRows, index: scheduleStart + scheduleOrdinal))
+            let matchingScheduleRow: Int(scheduleRows.element(index: scheduleStart + scheduleOrdinal))
             if matchingScheduleRow < 0 { return 0 - 1 }
             let scheduleStatus: Int(compilerBodyMIRExecuteScheduleAction(arena: arena, scheduleRow: matchingScheduleRow))
             if scheduleStatus != 0 { return scheduleStatus }

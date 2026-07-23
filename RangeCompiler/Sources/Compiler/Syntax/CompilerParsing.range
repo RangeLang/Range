@@ -1584,3 +1584,4 @@ function compilerCoreParseFunctionDeclarationPartsWithEnd(source: String, keywor
     return CompilerFunctionDeclarationParts(nameToken: nameToken, genericRange: genericRange, parameterRange: parameterRange, returnType: returnType, bodyRange: bodyRange)
 }
 
+

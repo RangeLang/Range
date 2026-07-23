@@ -33,7 +33,6 @@ fi
 
 RUNTIME_SOURCES=(
     "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerHost.c"
-    "$REPO_ROOT/RangeCompiler/Runtime/RangeString.c"
     "$REPO_ROOT/RangeCompiler/Runtime/RangeRawBuffer.c"
     "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerMetrics.c"
 )

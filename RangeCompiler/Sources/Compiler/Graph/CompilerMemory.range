@@ -48,7 +48,7 @@ function compilerMemoryGraphCreate(): CompilerMemoryGraph {
         runtimePartitions: compilerIntTableCreate(columnCount: compilerMemoryRuntimePartitionColumnCount(), estimatedRowCount: 32),
         runtimeValues: compilerIntTableCreate(columnCount: compilerMemoryRuntimeValueColumnCount(), estimatedRowCount: 64),
         representationChanges: compilerIntTableCreate(columnCount: compilerMemoryRepresentationChangeColumnCount(), estimatedRowCount: 32),
-        failures: rawBufferCreate(capacity: 1, stride: 4)
+        failures: bufferCreateInt(capacity: 1)
     )
 }
 
@@ -63,12 +63,12 @@ function compilerMemoryGraphDestroy(memory: CompilerMemoryGraph): Int {
     if compilerIntTableDestroy(table: memory.runtimePartitions) != 0 { memoryDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: memory.runtimeValues) != 0 { memoryDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: memory.representationChanges) != 0 { memoryDestroyStatus: 0 - 1 }
-    if rawBufferDestroy(buffer: memory.failures) != 0 { memoryDestroyStatus: 0 - 1 }
+    if memory.failures.destroy() != 0 { memoryDestroyStatus: 0 - 1 }
     return memoryDestroyStatus
 }
 
 function compilerMemoryGraphPoison(memory: CompilerMemoryGraph): Int {
-    return rawBufferAppendInt(buffer: memory.failures, value: 1)
+    return memory.failures.append(element: 1)
 }
 
 function compilerMemoryAppend(memory: CompilerMemoryGraph, table: CompilerIntTable, value: Int): Int {
@@ -387,7 +387,7 @@ function compilerMemoryMacroFamilyRepresentationsAreValid(tables: CompilerSyntax
         || !compilerIntTableIsComplete(table: memory.runtimePartitions)
         || !compilerIntTableIsComplete(table: memory.runtimeValues)
         || !compilerIntTableIsComplete(table: memory.representationChanges)
-        || rawBufferCount(buffer: memory.failures) != 0 { return false }
+        || memory.failures.count != 0 { return false }
     let familyCount: Int(compilerIntTableRowCount(table: memory.macroFamilies))
     let memberCount: Int(compilerIntTableRowCount(table: memory.macroFamilyMembers))
     let representationCount: Int(compilerIntTableRowCount(table: memory.runtimeRepresentations))
@@ -1466,7 +1466,7 @@ function compilerMemoryRegionKindIsOwned(delta: CompilerGraphDelta, regionNodeID
 }
 
 function compilerMemoryGraphIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, semantics: CompilerSemanticGraph, memory: CompilerMemoryGraph): Bool {
-    if rawBufferCount(buffer: memory.failures) != 0
+    if memory.failures.count != 0
         || !compilerIntTableIsComplete(table: memory.layouts)
         || !compilerIntTableIsComplete(table: memory.storages)
         || !compilerIntTableIsComplete(table: memory.decisions)
@@ -1678,7 +1678,7 @@ function compilerMemoryRenderMacroFamilySnapshot(memory: CompilerMemoryGraph): S
     let tab: String(compilerCoreTabCharacter())
     let newline: String(compilerCoreNewlineCharacter())
     state validText: String("true")
-    if rawBufferCount(buffer: memory.failures) != 0 { validText: String("false") }
+    if memory.failures.count != 0 { validText: String("false") }
     let families: String(compilerTypedSyntaxRenderRawTable(name: String("memoryMacroFamily"), table: memory.macroFamilies))
     let members: String(compilerTypedSyntaxRenderRawTable(name: String("memoryMacroFamilyMember"), table: memory.macroFamilyMembers))
     let representations: String(compilerTypedSyntaxRenderRawTable(name: String("memoryRuntimeRepresentation"), table: memory.runtimeRepresentations))
