@@ -20,7 +20,7 @@ Swift, Bun, TypeScript 7, and Range. The evaluation matrix currently covers:
 - **Convolution / 1D Three Tap**: a circular integer stencil over eight samples.
 - **Constructs / Raw Struct Race**: a local Range construct whose identity is
   proven unobservable and eliminated against optimized inline C, C++, Rust,
-  Go, and Swift values.
+  Go, and Swift values using the same 32-bit integer width as Range `Int`.
 - **Constructs / Identity**: eight-level identity chains, shared binding
   mutation, and repeated child replacement.
 - **Recursion / Fibonacci**: repeated binary recursion across alternating depths.
@@ -79,8 +79,11 @@ compiled with `RANGE_IDENTITY_ENABLE_STATS`; the timed Range binaries contain
 no counter or reporting instrumentation.
 
 The raw struct race answers whether graph proof can remove Range's unused
-identity and compete with the cheapest inline representations. The identity
-rows separately compare reference-shaped storage and mutation. A
+identity and compete with the cheapest inline representations. Its peer
+implementations use explicit 32-bit fields, counters, and accumulators so the
+hot-loop arithmetic lowering is comparable rather than measuring different
+constant-remainder sequences. The identity rows separately compare
+reference-shaped storage and mutation. A
 Range row remains `notEmitted` when the current compiler cannot lower a
 workload; the runner never substitutes a weaker Range program or accepts an
 incorrect checksum.

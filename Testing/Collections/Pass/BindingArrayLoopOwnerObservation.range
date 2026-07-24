@@ -1,0 +1,16 @@
+construct MutableArrayView {
+    binding values: [Int]
+}
+
+@main {
+    state numbers: [0]
+    let view: MutableArrayView(values: $numbers)
+    state index: Int(0)
+    state checksum: Int(0)
+    while index < 3 {
+        view.values[0]: index + 1
+        checksum: checksum + numbers[0]
+        index: index + 1
+    }
+    return checksum
+}

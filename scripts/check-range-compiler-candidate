@@ -606,7 +606,7 @@ audit_native_arrays() {
     local stage_directory="$3"
     local kind source expected first second first_error second_error llvm linked run_output run_error
 
-    for kind in index count enum-payload argument binding-read mutation-int mutation-enum mutation-member mutation-nested-member mutation-let-owner mutation-let-intermediate mutation-binding; do
+    for kind in index count enum-payload argument binding-read mutation-int mutation-enum mutation-member mutation-nested-member mutation-let-owner mutation-let-intermediate mutation-binding mutation-loop mutation-binding-loop-owner-observation; do
         source="$ARRAY_INDEX_SOURCE"
         expected=2
         if [[ "$kind" == count ]]; then
@@ -642,6 +642,12 @@ audit_native_arrays() {
         elif [[ "$kind" == mutation-binding ]]; then
             source="$ARRAY_BINDING_MUTATION_SOURCE"
             expected=7
+        elif [[ "$kind" == mutation-loop ]]; then
+            source="$ARRAY_LOOP_MUTATION_SOURCE"
+            expected=3
+        elif [[ "$kind" == mutation-binding-loop-owner-observation ]]; then
+            source="$ARRAY_BINDING_LOOP_OBSERVATION_SOURCE"
+            expected=6
         fi
         first="$WORK_ROOT/$stage_label.array.$kind.first.ll"
         second="$WORK_ROOT/$stage_label.array.$kind.repeat.ll"
@@ -5414,6 +5420,8 @@ main() {
     ARRAY_LET_INTERMEDIATE_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/LetIntermediateIdentityStateArrayIndexedAssignment.range"
     ARRAY_BINDING_READ_SOURCE="$REPO_ROOT/Testing/Collections/Pass/BindingArrayRead.range"
     ARRAY_BINDING_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/BindingArrayIndexedAssignment.range"
+    ARRAY_LOOP_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ArrayStateLoopIndexedAssignment.range"
+    ARRAY_BINDING_LOOP_OBSERVATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/BindingArrayLoopOwnerObservation.range"
     ARRAY_IMMUTABLE_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableArrayIndexedAssignment.range"
     ARRAY_IMMUTABLE_MEMBER_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableConstructArrayMemberIndexedAssignment.range"
     ARRAY_IMMUTABLE_BINDING_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableBindingArraySourceIndexedAssignment.range"

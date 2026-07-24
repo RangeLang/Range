@@ -1365,41 +1365,42 @@ def cases() -> list[BenchmarkCase]:
             subcategory="Raw Struct Race",
             leaf="Identity construct versus inline pair",
             unit="constructions",
-            description="A local Range construct whose unobservable identity is eliminated versus optimized inline C, C++, Rust, Go, and Swift values",
+            description="A local Range construct whose unobservable identity is eliminated versus optimized inline 32-bit C, C++, Rust, Go, and Swift values",
             expected_output=constructs_output(small),
             expected_exit_code=0,
             range_expected_exit_code=int(constructs_output(small)) % 251,
             n=small,
             c=rf"""
+                #include <inttypes.h>
                 #include <stdint.h>
                 #include <stdio.h>
                 #include <stdlib.h>
-                typedef struct {{ int x; int y; }} Pair;
+                typedef struct {{ int32_t x; int32_t y; }} Pair;
                 int main(int argc, char **argv) {{
-                    int n = argc > 1 ? atoi(argv[1]) : {small};
-                    int64_t acc = 0;
-                    for (int i = 0; i < n; i++) {{
+                    int32_t n = argc > 1 ? (int32_t)atoi(argv[1]) : {small};
+                    int32_t acc = 0;
+                    for (int32_t i = 0; i < n; i++) {{
                         Pair pair = (Pair){{i, i + 1}};
                         acc = (acc + pair.x + pair.y) % 1000003;
                     }}
-                    printf("%lld\n", (long long)acc);
+                    printf("%" PRId32 "\n", acc);
                 }}
             """,
             cxx=rf"""
                 #include <cstdlib>
                 #include <iostream>
-                struct Pair {{ long long x; long long y; }};
+                struct Pair {{ std::int32_t x; std::int32_t y; }};
                 int main(int argc, char **argv) {{
-                    int n = argc > 1 ? std::atoi(argv[1]) : {small}; long long acc = 0;
-                    for (int i = 0; i < n; ++i) {{ Pair pair{{i, i + 1}}; acc = (acc + pair.x + pair.y) % 1000003; }}
+                    std::int32_t n = argc > 1 ? static_cast<std::int32_t>(std::atoi(argv[1])) : {small}; std::int32_t acc = 0;
+                    for (std::int32_t i = 0; i < n; ++i) {{ Pair pair{{i, i + 1}}; acc = (acc + pair.x + pair.y) % 1000003; }}
                     std::cout << acc << '\n';
                 }}
             """,
             rust=rf"""
-                struct Pair {{ x: i64, y: i64 }}
+                struct Pair {{ x: i32, y: i32 }}
                 fn main() {{
-                    let n: i64 = std::env::args().nth(1).and_then(|v| v.parse().ok()).unwrap_or({small});
-                    let mut acc: i64 = 0;
+                    let n: i32 = std::env::args().nth(1).and_then(|v| v.parse().ok()).unwrap_or({small});
+                    let mut acc: i32 = 0;
                     for i in 0..n {{
                         let pair = Pair {{ x: i, y: i + 1 }};
                         acc = (acc + pair.x + pair.y) % 1_000_003;
@@ -1410,18 +1411,18 @@ def cases() -> list[BenchmarkCase]:
             go=rf"""
                 package main
                 import ("fmt"; "os"; "strconv")
-                type Pair struct {{ x, y int64 }}
+                type Pair struct {{ x, y int32 }}
                 func main() {{
-                    n := {small}; if len(os.Args) > 1 {{ n, _ = strconv.Atoi(os.Args[1]) }}
-                    var acc int64; for i := 0; i < n; i++ {{ pair := Pair{{int64(i), int64(i+1)}}; acc = (acc + pair.x + pair.y) % 1000003 }}
+                    n := int32({small}); if len(os.Args) > 1 {{ parsed, _ := strconv.ParseInt(os.Args[1], 10, 32); n = int32(parsed) }}
+                    var acc int32; for i := int32(0); i < n; i++ {{ pair := Pair{{i, i+1}}; acc = (acc + pair.x + pair.y) % 1000003 }}
                     fmt.Println(acc)
                 }}
             """,
             swift=rf"""
-                struct Pair {{ let x: Int; let y: Int }}
-                let n = CommandLine.arguments.dropFirst().first.flatMap(Int.init) ?? {small}
-                var i = 0
-                var acc = 0
+                struct Pair {{ let x: Int32; let y: Int32 }}
+                let n = CommandLine.arguments.dropFirst().first.flatMap(Int32.init) ?? {small}
+                var i: Int32 = 0
+                var acc: Int32 = 0
                 while i < n {{
                     let pair = Pair(x: i, y: i + 1)
                     acc = (acc + pair.x + pair.y) % 1_000_003
@@ -1611,7 +1612,7 @@ def cases() -> list[BenchmarkCase]:
             subcategory="Identity",
             leaf="Shared binding mutation",
             unit="mutations",
-            description="Mutate one state cell through its owner and observe every update through a second stable binding path",
+            description="Mutate one array cell through a stable binding path and observe every update through its original owner path",
             expected_output=identity_replacement_output(small),
             expected_exit_code=0,
             range_expected_exit_code=int(identity_replacement_output(small)) % 251,

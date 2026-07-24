@@ -136,15 +136,14 @@
           - [x] Link identical Range LLVM against both the arena and the
             benchmark-only legacy `malloc` allocator, recording allocation and
             chunk telemetry for each successful Range row.
-          - [ ] Make loop-carried mutation through a construct binding lower
-            correctly; the shared binding benchmark currently remains
-            `notEmitted` after the scalar path returned stale data and the
-            Array binding path failed entry lowering.
+          - [x] Make loop-carried mutation through a construct binding lower
+            correctly, including observing an indexed write through the
+            original owner path.
           - [ ] Add a separate dynamic-dispatch matrix for C function pointers,
             C++ virtual calls, Rust trait objects, Swift protocols, Go
             interfaces, and Range once callable protocol values have a real
             runtime surface; do not mix dispatch cost into allocation results.
-          - [ ] Run and publish a stable multi-sample Constructs evaluation
+          - [x] Run and publish a stable multi-sample Constructs evaluation
             before choosing another chunk size or claiming a speedup.
       - [ ] Move length, indexing, comparison, slicing, concatenation, and
         append behavior onto the authored String surface, then cut their

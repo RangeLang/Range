@@ -1,0 +1,9 @@
+@main {
+    state numbers: [0]
+    state index: Int(0)
+    while index < 3 {
+        numbers[0]: index + 1
+        index: index + 1
+    }
+    return numbers[0]
+}
