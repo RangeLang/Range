@@ -1,5 +1,11 @@
 @builtin(.storage)
 construct String {
+    state bytes: Buffer<Int<8, .unsigned>>
+
+    derived count: Int {
+        bytes.count
+    }
+
     function byte(index: Int): Int {
         return stringByteAt(source: self, index: index)
     }

@@ -545,7 +545,40 @@ function compilerMemoryEffectRowForParameter(semantics: CompilerSemanticGraph, p
     return 0 - 1
 }
 
+function compilerRuntimeABITransparentStorageMemberRow(tables: CompilerSyntaxTables, constructNodeID: Int): Int {
+    let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: constructNodeID))
+    if declarationRow < 0
+        || compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 2) != compilerSyntaxKindConstruct()
+        || compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 13) != compilerBuiltinPolicyStorage() { return 0 - 1 }
+    let declarationFileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
+    let declarationName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: declarationFileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
+    if declarationName != String("String") { return 0 - 1 }
+    state transparentMemberRow: Int(0 - 1)
+    state storedMemberCount: Int(0)
+    state memberRow: Int(0)
+    while memberRow < compilerIntTableRowCount(table: tables.members) {
+        if compilerIntTableValue(table: tables.members, row: memberRow, column: 2) == constructNodeID {
+            let memberKind: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 12))
+            if memberKind == compilerSyntaxMemberKindLet()
+                || memberKind == compilerSyntaxMemberKindState()
+                || memberKind == compilerSyntaxMemberKindBinding() {
+                storedMemberCount: storedMemberCount + 1
+                let memberFileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
+                let memberName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: memberFileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 6), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 7)))
+                let memberType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: memberFileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
+                if memberKind == compilerSyntaxMemberKindState()
+                    && memberName == String("bytes")
+                    && memberType == String("Buffer<Int<8, .unsigned>>") { transparentMemberRow: memberRow }
+            }
+        }
+        memberRow: memberRow + 1
+    }
+    if storedMemberCount != 1 { return 0 - 1 }
+    return transparentMemberRow
+}
+
 function compilerMemoryConstructFieldCount(tables: CompilerSyntaxTables, semantics: CompilerSemanticGraph, constructNodeID: Int): Int {
+    if compilerRuntimeABITransparentStorageMemberRow(tables: tables, constructNodeID: constructNodeID) >= 0 { return 0 }
     state memoryMemberRow: Int(0)
     state memoryFieldCount: Int(0)
     let memoryMemberCount: Int(compilerIntTableRowCount(table: tables.members))
@@ -578,6 +611,9 @@ function compilerRuntimeABIConstructKind(tables: CompilerSyntaxTables, construct
     if runtimeConstructRow < 0
         || compilerIntTableValue(table: tables.declarations, row: runtimeConstructRow, column: 2) != compilerSyntaxKindConstruct()
         || compilerIntTableValue(table: tables.declarations, row: runtimeConstructRow, column: 13) != compilerBuiltinPolicyStorage() { return compilerRuntimeABINone() }
+    if compilerRuntimeABITransparentStorageMemberRow(tables: tables, constructNodeID: constructNodeID) >= 0 {
+        return compilerRuntimeABIOpaqueStorage()
+    }
     state runtimeMemberRow: Int(0)
     let runtimeMemberCount: Int(compilerIntTableRowCount(table: tables.members))
     while runtimeMemberRow < runtimeMemberCount {

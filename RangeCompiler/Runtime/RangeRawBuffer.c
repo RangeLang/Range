@@ -5,19 +5,108 @@
 #include <string.h>
 
 void *stringTransientAllocate(size_t size);
+size_t stringTransientAllocationIndex(void *allocation);
+void *stringTransientReallocateAt(void *allocation, size_t size, size_t allocationIndex);
 void compilerMetricsObserveRawBufferAppend(size_t bytes);
 void compilerMetricsObserveRawBufferMaterialize(size_t bytes);
 void compilerMetricsObserveRawBufferReallocation(size_t bytesCopied);
 
 typedef struct RangeRawBuffer {
+    uint64_t magic;
     size_t count;
     size_t capacity;
     size_t stride;
     unsigned char *data;
+    size_t transientDataIndex;
 } RangeRawBuffer;
 
+static const uint64_t rangeRawBufferOwnedMagic = UINT64_C(0x52414E4745425546);
+static const uint64_t rangeRawBufferStaticMagic = UINT64_C(0x52414E4745425547);
+static const uint64_t rangeRawBufferTransientMagic = UINT64_C(0x52414E4745425548);
+
+static int rangeRawBufferHasMagic(const RangeRawBuffer *buffer) {
+    return buffer
+        && (buffer->magic == rangeRawBufferOwnedMagic
+            || buffer->magic == rangeRawBufferStaticMagic
+            || buffer->magic == rangeRawBufferTransientMagic);
+}
+
+char *rangeStringData(void *opaqueValue) {
+    RangeRawBuffer *buffer = opaqueValue;
+    if (rangeRawBufferHasMagic(buffer) && buffer->stride == 1 && buffer->data) {
+        return (char *)buffer->data;
+    }
+    if (!opaqueValue) {
+        return "";
+    }
+    abort();
+}
+
+size_t rangeStringSize(void *opaqueValue) {
+    RangeRawBuffer *buffer = opaqueValue;
+    if (rangeRawBufferHasMagic(buffer) && buffer->stride == 1 && buffer->data) {
+        return buffer->count;
+    }
+    if (!opaqueValue) {
+        return 0;
+    }
+    abort();
+}
+
+void *rangeStringCreateTransientCopy(const char *source, size_t count) {
+    if (!source && count != 0) {
+        return NULL;
+    }
+    RangeRawBuffer *buffer = stringTransientAllocate(sizeof(RangeRawBuffer));
+    unsigned char *data = stringTransientAllocate(count + 1);
+    if (!buffer || !data) {
+        return NULL;
+    }
+    buffer->magic = rangeRawBufferTransientMagic;
+    buffer->count = count;
+    buffer->capacity = count;
+    buffer->stride = 1;
+    buffer->data = data;
+    buffer->transientDataIndex = stringTransientAllocationIndex(data);
+    if (count > 0) {
+        memcpy(data, source, count);
+    }
+    data[count] = 0;
+    return buffer;
+}
+
+void *rangeStringCreateTransientView(const char *source, size_t count) {
+    if (!source && count != 0) {
+        return NULL;
+    }
+    RangeRawBuffer *buffer = stringTransientAllocate(sizeof(RangeRawBuffer));
+    if (!buffer) {
+        return NULL;
+    }
+    buffer->magic = rangeRawBufferStaticMagic;
+    buffer->count = count;
+    buffer->capacity = count;
+    buffer->stride = 1;
+    buffer->data = (unsigned char *)(source ? source : "");
+    buffer->transientDataIndex = SIZE_MAX;
+    return buffer;
+}
+
+void *rangeStringEmpty(void) {
+    static unsigned char emptyData[1] = {0};
+    static RangeRawBuffer empty = {
+        .magic = UINT64_C(0x52414E4745425547),
+        .count = 0,
+        .capacity = 0,
+        .stride = 1,
+        .data = emptyData,
+        .transientDataIndex = SIZE_MAX
+    };
+    return &empty;
+}
+
 static int32_t rawBufferReserve(RangeRawBuffer *buffer, size_t additional) {
-    if (!buffer || !buffer->data || buffer->stride == 0
+    if (!rangeRawBufferHasMagic(buffer) || !buffer->data || buffer->stride == 0
         || buffer->count > buffer->capacity
         || buffer->count > SIZE_MAX - additional) {
         return -1;
@@ -40,7 +129,23 @@ static int32_t rawBufferReserve(RangeRawBuffer *buffer, size_t additional) {
         return -1;
     }
 
-    unsigned char *data = realloc(buffer->data, capacity * buffer->stride + 1);
+    unsigned char *data = NULL;
+    if (buffer->magic == rangeRawBufferTransientMagic) {
+        data = stringTransientReallocateAt(
+            buffer->data,
+            capacity * buffer->stride + 1,
+            buffer->transientDataIndex
+        );
+    } else if (buffer->magic == rangeRawBufferStaticMagic) {
+        data = malloc(capacity * buffer->stride + 1);
+        if (data && buffer->count > 0) {
+            memcpy(data, buffer->data, buffer->count * buffer->stride);
+        }
+        buffer->magic = rangeRawBufferOwnedMagic;
+        buffer->transientDataIndex = SIZE_MAX;
+    } else {
+        data = realloc(buffer->data, capacity * buffer->stride + 1);
+    }
     if (!data) {
         abort();
     }
@@ -71,9 +176,11 @@ void *rawBufferCreate(int32_t requestedCapacity, int32_t requestedStride) {
         abort();
     }
 
+    buffer->magic = rangeRawBufferOwnedMagic;
     buffer->capacity = capacity;
     buffer->stride = stride;
     buffer->data[0] = 0;
+    buffer->transientDataIndex = SIZE_MAX;
     return buffer;
 }
 
@@ -192,13 +299,14 @@ int32_t rawBufferStoreUnsigned8(void *opaqueBuffer, int32_t index, uint8_t value
     return 0;
 }
 
-int32_t rawBufferAppendText(void *opaqueBuffer, char *text) {
+int32_t rawBufferAppendText(void *opaqueBuffer, void *text) {
     RangeRawBuffer *buffer = opaqueBuffer;
     if (!buffer || buffer->stride != 1 || !text) {
         return -1;
     }
 
-    size_t length = strlen(text);
+    char *textData = rangeStringData(text);
+    size_t length = rangeStringSize(text);
     size_t oldCount = buffer->count;
     int32_t reserveResult = rawBufferReserve(buffer, length);
     if (reserveResult < 0) {
@@ -206,7 +314,7 @@ int32_t rawBufferAppendText(void *opaqueBuffer, char *text) {
     }
 
     if (length > 0) {
-        memcpy(buffer->data + buffer->count, text, length);
+        memcpy(buffer->data + buffer->count, textData, length);
         buffer->count += length;
     }
     buffer->data[buffer->count] = 0;
@@ -227,9 +335,11 @@ int32_t rawBufferAppendTextInt(void *opaqueBuffer, int32_t value) {
     return rawBufferAppendText(opaqueBuffer, text);
 }
 
-int32_t rawBufferAppendTextCharacter(void *opaqueBuffer, char *source, int32_t index) {
+int32_t rawBufferAppendTextCharacter(void *opaqueBuffer, void *source, int32_t index) {
     RangeRawBuffer *buffer = opaqueBuffer;
-    if (!buffer || buffer->stride != 1 || !source || index < 0 || source[index] == 0) {
+    char *sourceData = rangeStringData(source);
+    size_t sourceCount = rangeStringSize(source);
+    if (!buffer || buffer->stride != 1 || !source || index < 0 || (size_t)index >= sourceCount) {
         return -1;
     }
 
@@ -239,7 +349,7 @@ int32_t rawBufferAppendTextCharacter(void *opaqueBuffer, char *source, int32_t i
         return -1;
     }
 
-    buffer->data[buffer->count] = (unsigned char)source[index];
+    buffer->data[buffer->count] = (unsigned char)sourceData[index];
     buffer->count += 1;
     buffer->data[buffer->count] = 0;
 
@@ -250,26 +360,28 @@ int32_t rawBufferAppendTextCharacter(void *opaqueBuffer, char *source, int32_t i
     return 0;
 }
 
-char *rawBufferMaterializeText(void *opaqueBuffer) {
+void *rawBufferMaterializeText(void *opaqueBuffer) {
     RangeRawBuffer *buffer = opaqueBuffer;
     if (!buffer || buffer->stride != 1) {
-        return "";
+        return rangeStringEmpty();
     }
 
     compilerMetricsObserveRawBufferMaterialize(buffer->count);
-    char *text = stringTransientAllocate(buffer->count + 1);
+    void *text = rangeStringCreateTransientCopy((char *)buffer->data, buffer->count);
     if (!text) {
         abort();
     }
-
-    memcpy(text, buffer->data, buffer->count + 1);
     return text;
 }
 
 int32_t rawBufferDestroy(void *opaqueBuffer) {
     RangeRawBuffer *buffer = opaqueBuffer;
-    if (!buffer) {
+    if (!rangeRawBufferHasMagic(buffer)) {
         return -1;
+    }
+    if (buffer->magic == rangeRawBufferStaticMagic
+        || buffer->magic == rangeRawBufferTransientMagic) {
+        return 0;
     }
 
     free(buffer->data);

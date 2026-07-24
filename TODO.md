@@ -74,11 +74,14 @@
         - [x] Promote the baseline into the accepted self-hosted seed and
           verify candidate Stage 2/Stage 3 byte identity, accepted-seed
           integrity, and compiler progression fixed point.
-        - [ ] Replace the pointer-compatible shell with the Buffer field only
-          after ABI planning no longer reclassifies existing String returns as
-          native aggregates.
-        - [ ] Give non-generic member functions owner-qualified LLVM symbols;
-          `String.count` currently collides with another authored `count`.
+        - [x] Replace the pointer-compatible shell with a transparent
+          `Buffer<Int<8, .unsigned>>` field while preserving the one-pointer
+          String ABI.
+          - [x] Emit literal, transient, command-line, file, interpolation,
+            conversion, and metrics Strings as Buffer descriptors; reject the
+            former raw `char *` representation at the runtime boundary.
+        - [x] Give member functions owner-qualified LLVM symbols and prove
+          `String.count` can coexist with the generic `Buffer.count`.
       - [ ] Move length, indexing, comparison, slicing, concatenation, and
         append behavior onto the authored String surface, then cut their
         compiler runtime builtin cases over.

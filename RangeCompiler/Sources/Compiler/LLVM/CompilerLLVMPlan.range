@@ -443,7 +443,7 @@ function compilerCoreLLVMDirectCallSignatureAudit(tables: CompilerSyntaxTables, 
         let signatureRow: Int(compilerReachableFunctionInstanceSignatureRow(signatures: functionInstanceSignatures, instanceID: instanceID))
         if declarationRow < 0 || signatureRow < 0 { return instanceID * 1000 + 2 }
         let fileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
-        let baseName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
+        let baseName: String(compilerFunctionLLVMBaseName(tables: tables, functionRow: functionRow))
         let receiverKeyID: Int(compilerIntTableValue(table: functionInstances, row: instanceID, column: compilerReachableFunctionInstanceReceiverKeyColumn()))
         state name: String(baseName)
         if receiverKeyID >= 0 {
@@ -555,6 +555,7 @@ function compilerCoreAppendLLVMFunctionDeclarationsTyped(tables: CompilerSyntaxT
 function compilerCoreAppendLLVMFunctionDeclarationTyped(tables: CompilerSyntaxTables, declarationRow: Int, functionRow: Int, selection: CompilerFunctionSelection, outputBuffer: RawBuffer): Int {
     let fileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
     let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
+    let symbolName: String(compilerFunctionLLVMBaseName(tables: tables, functionRow: functionRow))
     if compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 13) != compilerBuiltinPolicyNone()
         && compilerBodyRuntimeBuiltinID(name: name) != compilerBodyRuntimeBuiltinNone() { return 0 }
     if compilerFunctionSelectionContains(selection: selection, functionRow: functionRow) {
@@ -562,7 +563,7 @@ function compilerCoreAppendLLVMFunctionDeclarationTyped(tables: CompilerSyntaxTa
     }
     let returnType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.functions, row: functionRow, column: 6), localEnd: compilerIntTableValue(table: tables.functions, row: functionRow, column: 7)))
     let parameters: String(compilerCoreLLVMFunctionParameterTextTyped(tables: tables, functionRow: functionRow))
-    rawBufferAppendText(buffer: outputBuffer, text: "declare \(compilerCoreLLVMTypeNameForRangeType(typeName: returnType)) @\(name)(\(parameters))\n")
+    rawBufferAppendText(buffer: outputBuffer, text: "declare \(compilerCoreLLVMTypeNameForRangeType(typeName: returnType)) @\(symbolName)(\(parameters))\n")
     return 1
 }
 

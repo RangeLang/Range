@@ -11,6 +11,13 @@
 
 extern char **environ;
 
+char *rangeStringData(void *value);
+size_t rangeStringSize(void *value);
+void *rangeStringCreateTransientCopy(const char *source, size_t count);
+void *rangeStringCreateTransientView(const char *source, size_t count);
+void *rangeStringEmpty(void);
+int32_t rawBufferAppendText(void *buffer, void *text);
+
 static void **transientStringAllocations = NULL;
 static size_t transientStringAllocationCount = 0;
 static size_t transientStringAllocationCapacity = 0;
@@ -95,7 +102,13 @@ int32_t stringTransientRegionReset(int32_t mark) {
     return 0;
 }
 
-bool stringHasPrefix(char *source, int32_t start, char *prefix) {
+int32_t stringPrint(void *value) {
+    return puts(rangeStringData(value));
+}
+
+bool stringHasPrefix(void *opaqueSource, int32_t start, void *opaquePrefix) {
+    char *source = rangeStringData(opaqueSource);
+    char *prefix = rangeStringData(opaquePrefix);
     if (!source || !prefix || start < 0) {
         return false;
     }
@@ -110,7 +123,9 @@ bool stringHasPrefix(char *source, int32_t start, char *prefix) {
     return true;
 }
 
-int32_t stringFindFrom(char *source, int32_t start, char *needle) {
+int32_t stringFindFrom(void *opaqueSource, int32_t start, void *opaqueNeedle) {
+    char *source = rangeStringData(opaqueSource);
+    char *needle = rangeStringData(opaqueNeedle);
     if (!source || !needle || start < 0) {
         return -1;
     }
@@ -121,7 +136,9 @@ int32_t stringFindFrom(char *source, int32_t start, char *needle) {
     return (int32_t)(match - source);
 }
 
-int32_t stringFindFirstOf(char *source, int32_t start, char *characters) {
+int32_t stringFindFirstOf(void *opaqueSource, int32_t start, void *opaqueCharacters) {
+    char *source = rangeStringData(opaqueSource);
+    char *characters = rangeStringData(opaqueCharacters);
     if (!source || !characters || start < 0) {
         return -1;
     }
@@ -132,58 +149,54 @@ int32_t stringFindFirstOf(char *source, int32_t start, char *characters) {
     return (int32_t)(match - source);
 }
 
-char *stringViewFrom(char *source, int32_t start) {
-    if (!source || start < 0) {
-        return "";
+void *stringViewFrom(void *opaqueSource, int32_t start) {
+    char *source = rangeStringData(opaqueSource);
+    size_t sourceCount = rangeStringSize(opaqueSource);
+    if (!source || start < 0 || (size_t)start > sourceCount) {
+        return rangeStringEmpty();
     }
-    return source + start;
+    return rangeStringCreateTransientView(source + start, sourceCount - (size_t)start);
 }
 
-char *stringCharacterAt(char *source, int32_t index) {
-    static char characters[256][2];
-    if (!source || index < 0) {
-        return "";
+void *stringCharacterAt(void *opaqueSource, int32_t index) {
+    char *source = rangeStringData(opaqueSource);
+    size_t sourceCount = rangeStringSize(opaqueSource);
+    if (!source || index < 0 || (size_t)index >= sourceCount) {
+        return rangeStringEmpty();
     }
-    unsigned char character = (unsigned char)source[index];
-    if (!character) {
-        return "";
-    }
-    characters[character][0] = (char)character;
-    return characters[character];
+    return rangeStringCreateTransientCopy(source + index, 1);
 }
 
-char *stringSliceUnchecked(char *source, int32_t start, int32_t end) {
-    if (!source || start < 0 || end < start) {
-        return "";
+void *stringSliceUnchecked(void *opaqueSource, int32_t start, int32_t end) {
+    char *source = rangeStringData(opaqueSource);
+    size_t sourceCount = rangeStringSize(opaqueSource);
+    if (!source || start < 0 || end < start || (size_t)end > sourceCount) {
+        return rangeStringEmpty();
     }
     size_t count = (size_t)(end - start);
-    char *slice = stringTransientAllocate(count + 1);
-    if (!slice) {
-        return "";
-    }
-    memcpy(slice, source + start, count);
-    slice[count] = 0;
-    return slice;
+    return rangeStringCreateTransientCopy(source + start, count);
 }
 
-int32_t stringByteAt(char *source, int32_t index) {
-    if (!source || index < 0) {
+int32_t stringByteAt(void *opaqueSource, int32_t index) {
+    char *source = rangeStringData(opaqueSource);
+    if (!source || index < 0 || (size_t)index >= rangeStringSize(opaqueSource)) {
         return 0;
     }
     return (int32_t)(unsigned char)source[index];
 }
 
 int32_t stringFindByteOf(
-    char *source,
+    void *opaqueSource,
     int32_t start,
     int32_t first,
     int32_t second,
     int32_t third
 ) {
+    char *source = rangeStringData(opaqueSource);
     if (!source || start < 0) {
         return -1;
     }
-    size_t length = strlen(source);
+    size_t length = rangeStringSize(opaqueSource);
     if ((size_t)start >= length) {
         return -1;
     }
@@ -209,43 +222,48 @@ int32_t commandLineArgumentCount(void) {
     return *_NSGetArgc() - 1;
 }
 
-char *commandLineArgument(int32_t index) {
+void *commandLineArgument(int32_t index) {
     int32_t actual = index + 1;
     int argc = *_NSGetArgc();
     char **argv = *_NSGetArgv();
     if (actual < 0 || actual >= argc) {
-        return "";
+        return rangeStringEmpty();
     }
-    return argv[actual];
+    return rangeStringCreateTransientCopy(argv[actual], strlen(argv[actual]));
 }
 
-char *readFile(char *path) {
+void *readFile(void *opaquePath) {
+    char *path = rangeStringData(opaquePath);
     FILE *file = fopen(path, "rb");
     if (!file) {
-        return "";
+        return rangeStringEmpty();
     }
     if (fseek(file, 0, SEEK_END) != 0) {
         fclose(file);
-        return "";
+        return rangeStringEmpty();
     }
     long size = ftell(file);
     if (size < 0) {
         fclose(file);
-        return "";
+        return rangeStringEmpty();
     }
     rewind(file);
     char *buffer = malloc((size_t)size + 1);
     if (!buffer) {
         fclose(file);
-        return "";
+        return rangeStringEmpty();
     }
     size_t readCount = fread(buffer, 1, (size_t)size, file);
     buffer[readCount] = 0;
     fclose(file);
-    return buffer;
+    void *result = rangeStringCreateTransientCopy(buffer, readCount);
+    free(buffer);
+    return result ? result : rangeStringEmpty();
 }
 
-int32_t writeFile(char *path, char *text) {
+int32_t writeFile(void *opaquePath, void *opaqueText) {
+    char *path = rangeStringData(opaquePath);
+    char *text = rangeStringData(opaqueText);
     if (!path || !text) {
         return 73;
     }
@@ -268,7 +286,7 @@ int32_t writeFile(char *path, char *text) {
         free(temporaryPath);
         return 73;
     }
-    size_t length = strlen(text);
+    size_t length = rangeStringSize(opaqueText);
     size_t written = fwrite(text, 1, length, file);
     int closeStatus = fclose(file);
     if (written != length || closeStatus != 0) {
@@ -383,7 +401,9 @@ static int32_t rangeProcessSpawn(char *executable, RangeProcessArguments argumen
     return spawnStatus == 0 ? 0 : 126;
 }
 
-int32_t runProcess(char *executable, char *argumentRecords) {
+int32_t runProcess(void *opaqueExecutable, void *opaqueArgumentRecords) {
+    char *executable = rangeStringData(opaqueExecutable);
+    char *argumentRecords = rangeStringData(opaqueArgumentRecords);
     RangeProcessArguments arguments;
     int32_t decodeStatus = rangeProcessArgumentsDecode(argumentRecords, &arguments);
     if (decodeStatus != 0) {
@@ -400,7 +420,8 @@ int32_t runProcess(char *executable, char *argumentRecords) {
     return exitStatus;
 }
 
-int32_t runProcessBatch(char *planRecords, int32_t maximumParallelism) {
+int32_t runProcessBatch(void *opaquePlanRecords, int32_t maximumParallelism) {
+    char *planRecords = rangeStringData(opaquePlanRecords);
     if (maximumParallelism <= 0 || maximumParallelism > 64) {
         return 64;
     }
@@ -463,18 +484,21 @@ int32_t runProcessBatch(char *planRecords, int32_t maximumParallelism) {
     return result;
 }
 
-int32_t stringLength(char *value) {
-    if (!value) {
-        return 0;
+int32_t stringLength(void *value) {
+    size_t count = rangeStringSize(value);
+    if (count > INT32_MAX) {
+        abort();
     }
-    return (int32_t)strlen(value);
+    return (int32_t)count;
 }
 
-int32_t stringIndexOf(char *source, char *needle, int32_t start) {
+int32_t stringIndexOf(void *opaqueSource, void *opaqueNeedle, int32_t start) {
+    char *source = rangeStringData(opaqueSource);
+    char *needle = rangeStringData(opaqueNeedle);
     if (!source || !needle) {
         return 0;
     }
-    int32_t length = (int32_t)strlen(source);
+    int32_t length = stringLength(opaqueSource);
     if (start < 0) {
         start = 0;
     }
@@ -488,155 +512,82 @@ int32_t stringIndexOf(char *source, char *needle, int32_t start) {
     return (int32_t)(match - source);
 }
 
-int32_t stringEqual(char *left, char *right) {
-    if (!left || !right) {
-        return left == right;
+int32_t stringEqual(void *opaqueLeft, void *opaqueRight) {
+    char *left = rangeStringData(opaqueLeft);
+    char *right = rangeStringData(opaqueRight);
+    size_t leftCount = rangeStringSize(opaqueLeft);
+    size_t rightCount = rangeStringSize(opaqueRight);
+    if (leftCount != rightCount) {
+        return 0;
     }
-    return strcmp(left, right) == 0;
+    return leftCount == 0 || memcmp(left, right, leftCount) == 0;
 }
 
-int32_t stringCompare(char *left, char *right) {
-    if (!left) {
-        left = "";
+int32_t stringCompare(void *opaqueLeft, void *opaqueRight) {
+    char *left = rangeStringData(opaqueLeft);
+    char *right = rangeStringData(opaqueRight);
+    size_t leftCount = rangeStringSize(opaqueLeft);
+    size_t rightCount = rangeStringSize(opaqueRight);
+    size_t sharedCount = leftCount < rightCount ? leftCount : rightCount;
+    int compared = sharedCount > 0 ? memcmp(left, right, sharedCount) : 0;
+    if (compared != 0) {
+        return compared;
     }
-    if (!right) {
-        right = "";
+    if (leftCount == rightCount) {
+        return 0;
     }
-    return (int32_t)strcmp(left, right);
+    return leftCount < rightCount ? -1 : 1;
 }
 
-char *stringConcat(char *left, char *right) {
-    if (!left) {
-        left = "";
+void *stringConcat(void *opaqueLeft, void *opaqueRight) {
+    char *left = rangeStringData(opaqueLeft);
+    char *right = rangeStringData(opaqueRight);
+    size_t leftLength = rangeStringSize(opaqueLeft);
+    size_t rightLength = rangeStringSize(opaqueRight);
+    if (leftLength > SIZE_MAX - rightLength) {
+        abort();
     }
-    if (!right) {
-        right = "";
-    }
-    size_t leftLength = strlen(left);
-    size_t rightLength = strlen(right);
-    char *buffer = stringTransientAllocate(leftLength + rightLength + 1);
-    if (!buffer) {
-        return "";
+    char *joined = stringTransientAllocate(leftLength + rightLength + 1);
+    if (!joined) {
+        return rangeStringEmpty();
     }
     compilerMetricsObserveStringConcat(leftLength + rightLength);
-    memcpy(buffer, left, leftLength);
-    memcpy(buffer + leftLength, right, rightLength);
-    buffer[leftLength + rightLength] = 0;
-    return buffer;
+    memcpy(joined, left, leftLength);
+    memcpy(joined + leftLength, right, rightLength);
+    joined[leftLength + rightLength] = 0;
+    return rangeStringCreateTransientCopy(joined, leftLength + rightLength);
 }
 
-typedef struct RangeOwnedStringHeader {
-    uint64_t magic;
-    size_t length;
-    size_t capacity;
-    size_t transientAllocationIndex;
-} RangeOwnedStringHeader;
-
-static const uint64_t rangeOwnedStringMagic = UINT64_C(0x52414E4745535452);
-
-static size_t rangeOwnedStringCapacity(size_t required) {
-    size_t capacity = 16;
-    while (capacity < required) {
-        if (capacity > SIZE_MAX / 2) {
-            return required;
-        }
-        capacity *= 2;
-    }
-    return capacity;
-}
-
-char *stringOwnedCopy(char *source) {
-    if (!source) {
-        source = "";
-    }
-    size_t length = strlen(source);
-    size_t capacity = rangeOwnedStringCapacity(length);
-    if (capacity > SIZE_MAX - sizeof(RangeOwnedStringHeader) - 1) {
-        abort();
-    }
-    RangeOwnedStringHeader *header = stringTransientAllocate(
-        sizeof(RangeOwnedStringHeader) + capacity + 1
+void *stringOwnedCopy(void *source) {
+    return rangeStringCreateTransientCopy(
+        rangeStringData(source),
+        rangeStringSize(source)
     );
-    if (!header) {
-        return "";
-    }
-    header->magic = rangeOwnedStringMagic;
-    header->length = length;
-    header->capacity = capacity;
-    header->transientAllocationIndex = stringTransientAllocationIndex(header);
-    char *buffer = (char *)(header + 1);
-    memcpy(buffer, source, length + 1);
-    return buffer;
 }
 
-char *stringAppendOwned(char *left, char *right) {
-    if (!left || !right) {
+void *stringAppendOwned(void *opaqueLeft, void *opaqueRight) {
+    if (rawBufferAppendText(opaqueLeft, opaqueRight) != 0) {
         abort();
     }
-    RangeOwnedStringHeader *header = ((RangeOwnedStringHeader *)left) - 1;
-    if (header->magic != rangeOwnedStringMagic || header->length > header->capacity) {
-        abort();
-    }
-
-    size_t rightLength = strlen(right);
-    if (rightLength > SIZE_MAX - header->length) {
-        abort();
-    }
-    size_t required = header->length + rightLength;
-    uintptr_t leftAddress = (uintptr_t)left;
-    uintptr_t rightAddress = (uintptr_t)right;
-    bool rightAliasesLeft = rightAddress >= leftAddress
-        && rightAddress <= leftAddress + header->length;
-    size_t rightOffset = rightAliasesLeft ? (size_t)(rightAddress - leftAddress) : 0;
-
-    if (required > header->capacity) {
-        size_t capacity = rangeOwnedStringCapacity(required);
-        if (capacity > SIZE_MAX - sizeof(RangeOwnedStringHeader) - 1) {
-            abort();
-        }
-        size_t transientAllocationIndex = header->transientAllocationIndex;
-        header = stringTransientReallocateAt(
-            header,
-            sizeof(RangeOwnedStringHeader) + capacity + 1,
-            transientAllocationIndex
-        );
-        if (!header) {
-            return "";
-        }
-        header->capacity = capacity;
-        header->transientAllocationIndex = transientAllocationIndex;
-        left = (char *)(header + 1);
-        if (rightAliasesLeft) {
-            right = left + rightOffset;
-        }
-    }
-
-    compilerMetricsObserveStringConcat(rightLength);
-    memmove(left + header->length, right, rightLength);
-    header->length = required;
-    left[required] = 0;
-    return left;
+    return opaqueLeft;
 }
 
-char *stringFromInt(int32_t value) {
+void *stringFromInt(int32_t value) {
     char buffer[32];
     snprintf(buffer, sizeof(buffer), "%d", value);
     size_t length = strlen(buffer);
-    char *copy = stringTransientAllocate(length + 1);
-    if (!copy) {
-        return "";
-    }
-    memcpy(copy, buffer, length + 1);
-    return copy;
+    return rangeStringCreateTransientCopy(buffer, length);
 }
 
-char *stringFromBool(bool value) {
-    return value ? "true" : "false";
+void *stringFromBool(bool value) {
+    return value
+        ? rangeStringCreateTransientCopy("true", 4)
+        : rangeStringCreateTransientCopy("false", 5);
 }
 
 typedef struct RangeConstructField {
     char *name;
-    char *ptrValue;
+    void *ptrValue;
     int32_t intValue;
     bool boolValue;
     int32_t kind;
@@ -693,7 +644,8 @@ static RangeConstructField *rangeConstructEnsureField(RangeConstructObject *obje
     return field;
 }
 
-void *rangeConstructCreate(char *name) {
+void *rangeConstructCreate(void *opaqueName) {
+    char *name = rangeStringData(opaqueName);
     RangeConstructObject *object = stringTransientAllocate(sizeof(RangeConstructObject));
     if (!object) {
         return NULL;
@@ -704,7 +656,8 @@ void *rangeConstructCreate(char *name) {
     return object;
 }
 
-void *rangeConstructSetPtr(void *opaque, char *name, char *value) {
+void *rangeConstructSetPtr(void *opaque, void *opaqueName, void *value) {
+    char *name = rangeStringData(opaqueName);
     RangeConstructObject *object = (RangeConstructObject *)opaque;
     RangeConstructField *field = rangeConstructEnsureField(object, name);
     if (field) {
@@ -714,7 +667,8 @@ void *rangeConstructSetPtr(void *opaque, char *name, char *value) {
     return opaque;
 }
 
-void *rangeConstructSetInt(void *opaque, char *name, int32_t value) {
+void *rangeConstructSetInt(void *opaque, void *opaqueName, int32_t value) {
+    char *name = rangeStringData(opaqueName);
     RangeConstructObject *object = (RangeConstructObject *)opaque;
     RangeConstructField *field = rangeConstructEnsureField(object, name);
     if (field) {
@@ -724,7 +678,8 @@ void *rangeConstructSetInt(void *opaque, char *name, int32_t value) {
     return opaque;
 }
 
-void *rangeConstructSetBool(void *opaque, char *name, bool value) {
+void *rangeConstructSetBool(void *opaque, void *opaqueName, bool value) {
+    char *name = rangeStringData(opaqueName);
     RangeConstructObject *object = (RangeConstructObject *)opaque;
     RangeConstructField *field = rangeConstructEnsureField(object, name);
     if (field) {
@@ -734,16 +689,18 @@ void *rangeConstructSetBool(void *opaque, char *name, bool value) {
     return opaque;
 }
 
-char *rangeConstructGetPtr(void *opaque, char *name) {
+void *rangeConstructGetPtr(void *opaque, void *opaqueName) {
+    char *name = rangeStringData(opaqueName);
     RangeConstructObject *object = (RangeConstructObject *)opaque;
     RangeConstructField *field = rangeConstructLookupField(object, name);
     if (!field || field->kind != 0 || !field->ptrValue) {
-        return "";
+        return rangeStringEmpty();
     }
     return field->ptrValue;
 }
 
-int32_t rangeConstructGetInt(void *opaque, char *name) {
+int32_t rangeConstructGetInt(void *opaque, void *opaqueName) {
+    char *name = rangeStringData(opaqueName);
     RangeConstructObject *object = (RangeConstructObject *)opaque;
     RangeConstructField *field = rangeConstructLookupField(object, name);
     if (!field || field->kind != 1) {
@@ -752,7 +709,8 @@ int32_t rangeConstructGetInt(void *opaque, char *name) {
     return field->intValue;
 }
 
-bool rangeConstructGetBool(void *opaque, char *name) {
+bool rangeConstructGetBool(void *opaque, void *opaqueName) {
+    char *name = rangeStringData(opaqueName);
     RangeConstructObject *object = (RangeConstructObject *)opaque;
     RangeConstructField *field = rangeConstructLookupField(object, name);
     if (!field || field->kind != 2) {
@@ -761,24 +719,18 @@ bool rangeConstructGetBool(void *opaque, char *name) {
     return field->boolValue;
 }
 
-char *stringCharacter(char *value, int32_t index) {
-    if (!value || index < 0 || index >= (int32_t)strlen(value)) {
-        return "";
+void *stringCharacter(void *opaqueValue, int32_t index) {
+    char *value = rangeStringData(opaqueValue);
+    size_t valueCount = rangeStringSize(opaqueValue);
+    if (!value || index < 0 || (size_t)index >= valueCount) {
+        return rangeStringEmpty();
     }
-    char *buffer = stringTransientAllocate(2);
-    if (!buffer) {
-        return "";
-    }
-    buffer[0] = value[index];
-    buffer[1] = 0;
-    return buffer;
+    return rangeStringCreateTransientCopy(value + index, 1);
 }
 
-char *stringSubstring(char *value, int32_t start, int32_t end) {
-    if (!value) {
-        return "";
-    }
-    int32_t length = (int32_t)strlen(value);
+void *stringSubstring(void *opaqueValue, int32_t start, int32_t end) {
+    char *value = rangeStringData(opaqueValue);
+    int32_t length = stringLength(opaqueValue);
     if (start < 0) {
         start = 0;
     }
@@ -789,12 +741,6 @@ char *stringSubstring(char *value, int32_t start, int32_t end) {
         end = length;
     }
     size_t count = (size_t)(end - start);
-    char *buffer = stringTransientAllocate(count + 1);
-    if (!buffer) {
-        return "";
-    }
     compilerMetricsObserveStringSubstring((size_t)length, count);
-    memcpy(buffer, value + start, count);
-    buffer[count] = 0;
-    return buffer;
+    return rangeStringCreateTransientCopy(value + start, count);
 }

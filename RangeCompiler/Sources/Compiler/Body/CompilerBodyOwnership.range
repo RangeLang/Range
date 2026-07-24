@@ -1901,7 +1901,13 @@ function compilerBodyArenaOwnedPathForValue(arena: CompilerBodyArena, valueNodeI
     let receiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: valueNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
     if receiverNodeID < 0 || receiverNodeID == valueNodeID { return 0 - 1 }
     let receiverPathID: Int(compilerBodyArenaOwnedPathForValue(arena: arena, valueNodeID: receiverNodeID))
-    if receiverPathID >= 0 { return compilerBodyOwnedPathFindChild(paths: arena.ownedPaths, parentPathID: receiverPathID, memberRow: memberRow) }
+    if receiverPathID >= 0 {
+        let receiverTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: receiverNodeID))
+        let stringSyntaxID: Int(compilerBodyArenaStringDeclarationSyntaxID(arena: arena))
+        let transparentStringMemberRow: Int(compilerRuntimeABITransparentStorageMemberRow(tables: arena.tables, constructNodeID: stringSyntaxID))
+        if receiverTypeKind == compilerBodyTypeString() && memberRow == transparentStringMemberRow { return receiverPathID }
+        return compilerBodyOwnedPathFindChild(paths: arena.ownedPaths, parentPathID: receiverPathID, memberRow: memberRow)
+    }
     return 0 - 1
 }
 
@@ -2935,17 +2941,27 @@ function compilerBodyArenaOwnedPathApplyInstanceEffects(arena: CompilerBodyArena
             let pathID: Int(compilerBodyArenaCallBoundaryPath(arena: arena, applicationNodeID: applicationNodeID, calleeNodeID: calleeNodeID, baseKind: baseKind, ordinal: ordinal))
             let effectPathID: Int(compilerIntTableValue(table: effects, row: effectRow, column: compilerBodyFunctionInstanceEffectPathColumn()))
             let effectKind: Int(compilerIntTableValue(table: effects, row: effectRow, column: compilerBodyFunctionInstanceEffectKindColumn()))
-            if pathID < 0 { return 0 - 1 }
-            if effectKind == compilerBodyOwnedEffectConsume() && compilerBodyArenaValueCarriesBindingReference(arena: arena, valueNodeID: valueNodeID) { return 0 - 1 }
-            let effectTargetPathID: Int(compilerBodyArenaOwnedPathFollowEffectPath(arena: arena, basePathID: pathID, effectPaths: effectPaths, effectPathID: effectPathID))
-            let expectedStorageKeyID: Int(compilerIntTableValue(table: effects, row: effectRow, column: compilerBodyFunctionInstanceEffectStorageKeyColumn()))
-            if effectTargetPathID < 0 || expectedStorageKeyID < 0
-                || compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: compilerIntTableValue(table: arena.ownedPaths, row: effectTargetPathID, column: compilerBodyOwnedPathTypeColumn())) != expectedStorageKeyID { return 0 - 1 }
-            let canonicalEffectTargetPathID: Int(compilerBodyArenaOwnedPathApplyEffectThroughAlias(arena: arena, states: states, origins: origins, pathID: effectTargetPathID, effectKind: effectKind))
-            if canonicalEffectTargetPathID < 0 { return 0 - 1 }
-            let factKind: Int(compilerBodyArenaOwnedMemoryFactForEffect(effectKind: effectKind))
-            if recordFacts && factKind >= 0 {
-                if compilerBodyMemoryAppendFact(arena: arena, phase: compilerBodyMemoryPhasePassEscape(), kind: factKind, sourceNodeID: applicationNodeID, subjectKind: compilerBodyMemorySubjectOwnedPath(), subjectID: canonicalEffectTargetPathID, auxID: targetInstanceID) < 0 { return 0 - 1 }
+            let projectedMemberRow: Int(compilerBodyArenaMemberRowForValue(arena: arena, valueNodeID: valueNodeID))
+            let stringSyntaxID: Int(compilerBodyArenaStringDeclarationSyntaxID(arena: arena))
+            let transparentStringMemberRow: Int(compilerRuntimeABITransparentStorageMemberRow(tables: arena.tables, constructNodeID: stringSyntaxID))
+            let isUntrackedTransparentStringProjection: Bool(pathID < 0 && projectedMemberRow == transparentStringMemberRow)
+            if !isUntrackedTransparentStringProjection {
+                if pathID < 0 { return 0 - 1 }
+                if effectKind == compilerBodyOwnedEffectConsume() && compilerBodyArenaValueCarriesBindingReference(arena: arena, valueNodeID: valueNodeID) { return 0 - 1 }
+                let effectTargetPathID: Int(compilerBodyArenaOwnedPathFollowEffectPath(arena: arena, basePathID: pathID, effectPaths: effectPaths, effectPathID: effectPathID))
+                let expectedStorageKeyID: Int(compilerIntTableValue(table: effects, row: effectRow, column: compilerBodyFunctionInstanceEffectStorageKeyColumn()))
+                if effectTargetPathID < 0 || expectedStorageKeyID < 0 { return 0 - 1 }
+                state actualStorageKeyID: Int(compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: compilerIntTableValue(table: arena.ownedPaths, row: effectTargetPathID, column: compilerBodyOwnedPathTypeColumn())))
+                if actualStorageKeyID != expectedStorageKeyID && projectedMemberRow == transparentStringMemberRow {
+                    actualStorageKeyID: compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: compilerBodyArenaExpressionTypeID(arena: arena, nodeID: valueNodeID))
+                }
+                if actualStorageKeyID != expectedStorageKeyID { return 0 - 1 }
+                let canonicalEffectTargetPathID: Int(compilerBodyArenaOwnedPathApplyEffectThroughAlias(arena: arena, states: states, origins: origins, pathID: effectTargetPathID, effectKind: effectKind))
+                if canonicalEffectTargetPathID < 0 { return 0 - 1 }
+                let factKind: Int(compilerBodyArenaOwnedMemoryFactForEffect(effectKind: effectKind))
+                if recordFacts && factKind >= 0 {
+                    if compilerBodyMemoryAppendFact(arena: arena, phase: compilerBodyMemoryPhasePassEscape(), kind: factKind, sourceNodeID: applicationNodeID, subjectKind: compilerBodyMemorySubjectOwnedPath(), subjectID: canonicalEffectTargetPathID, auxID: targetInstanceID) < 0 { return 0 - 1 }
+                }
             }
         }
         effectRow: effectRow + 1
@@ -3879,6 +3895,10 @@ function compilerReachableLLVMStateAppendEffectCallMappingForValue(reachability:
     if valueNodeID < 0 || valueNodeID >= compilerIntTableRowCount(table: arena.nodes) { return 0 - 1 }
     let pathID: Int(compilerBodyArenaOwnedPathForValue(arena: arena, valueNodeID: valueNodeID))
     if pathID < 0 {
+        let projectedMemberRow: Int(compilerBodyArenaMemberRowForValue(arena: arena, valueNodeID: valueNodeID))
+        let stringSyntaxID: Int(compilerBodyArenaStringDeclarationSyntaxID(arena: arena))
+        let transparentStringMemberRow: Int(compilerRuntimeABITransparentStorageMemberRow(tables: arena.tables, constructNodeID: stringSyntaxID))
+        if projectedMemberRow == transparentStringMemberRow { return 0 }
         let valueTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID))
         if valueTypeKind == compilerBodyTypeUnknown() { return 0 - 1 }
         if valueTypeKind != compilerBodyTypeConstruct() { return 0 }

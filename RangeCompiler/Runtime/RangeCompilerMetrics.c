@@ -6,6 +6,10 @@
 #include <time.h>
 
 void *stringTransientAllocate(size_t size);
+const char *rangeStringData(void *value);
+size_t rangeStringSize(void *value);
+void *rangeStringCreateTransientView(const char *data, size_t size);
+void *rangeStringEmpty(void);
 
 typedef struct RangeCompilerFunctionMetrics {
     int32_t functionID;
@@ -81,12 +85,12 @@ static uint64_t elapsedMilliseconds(struct timespec start, struct timespec end) 
     return seconds * 1000 + (uint64_t)(nanoseconds > 0 ? nanoseconds : 0) / 1000000;
 }
 
-static int32_t tracePhase(char *name) {
+static int32_t tracePhase(void *nameValue) {
     const char *enabled = getenv("RANGE_COMPILER_PHASE_TRACE");
     if (!enabled || strcmp(enabled, "1") != 0) return 0;
     struct timespec now;
     if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) return -1;
-    if (!name) name = "";
+    const char *name = rangeStringData(nameValue);
     if (!phaseTraceInitialized) {
         initializeTraceClock();
         if (!phaseTraceInitialized) return -1;
@@ -102,7 +106,7 @@ static int32_t tracePhase(char *name) {
     return 0;
 }
 
-static int32_t traceFunction(int32_t functionID, char *name) {
+static int32_t traceFunction(int32_t functionID, void *nameValue) {
     const char *enabled = getenv("RANGE_COMPILER_FUNCTION_TRACE");
     if (!enabled || strcmp(enabled, "1") != 0) return 0;
     struct timespec now;
@@ -111,7 +115,7 @@ static int32_t traceFunction(int32_t functionID, char *name) {
         initializeTraceClock();
         if (!phaseTraceInitialized) return -1;
     }
-    if (!name) name = "";
+    const char *name = rangeStringData(nameValue);
     fprintf(stderr, "compilerFunction\tfunctionID=%d\tname=%s\telapsedMilliseconds=%llu\ttotalMilliseconds=%llu\n",
         functionID, name,
         (unsigned long long)elapsedMilliseconds(phaseTracePrior, now),
@@ -145,9 +149,9 @@ static uint64_t delta(uint64_t value, uint64_t baseline) {
     return value >= baseline ? value - baseline : 0;
 }
 
-int32_t compilerMetricsFunctionBegin(int32_t functionID, char *name) {
-    if (functionID < 0) return tracePhase(name);
-    if (traceFunction(functionID, name) != 0) return -1;
+int32_t compilerMetricsFunctionBegin(int32_t functionID, void *nameValue) {
+    if (functionID < 0) return tracePhase(nameValue);
+    if (traceFunction(functionID, nameValue) != 0) return -1;
     if (!metrics.enabled || metrics.activeFunction) return metrics.enabled ? -1 : 0;
     if (metrics.functionCount == metrics.functionCapacity) {
         size_t capacity = metrics.functionCapacity > 0 ? metrics.functionCapacity * 2 : 64;
@@ -160,8 +164,8 @@ int32_t compilerMetricsFunctionBegin(int32_t functionID, char *name) {
     RangeCompilerFunctionMetrics *function = &metrics.functions[metrics.functionCount++];
     memset(function, 0, sizeof(*function));
     function->functionID = functionID;
-    if (!name) name = "";
-    size_t length = strlen(name);
+    const char *name = rangeStringData(nameValue);
+    size_t length = rangeStringSize(nameValue);
     function->name = malloc(length + 1);
     if (!function->name) abort();
     memcpy(function->name, name, length + 1);
@@ -248,13 +252,13 @@ void compilerMetricsObserveRawBufferReallocation(size_t liveBytes) {
     metrics.rawBufferReallocationBytes += liveBytes;
 }
 
-char *compilerMetricsReport(void) {
+void *compilerMetricsReport(void) {
     size_t capacity = 1024;
     for (size_t index = 0; index < metrics.functionCount; index += 1) {
         capacity += 640 + strlen(metrics.functions[index].name);
     }
     char *report = stringTransientAllocate(capacity);
-    if (!report) return "";
+    if (!report) return rangeStringEmpty();
     size_t used = (size_t)snprintf(report, capacity,
         "compilerCostMetrics\tenabled=%d\tstringConcatCalls=%llu\tstringConcatBytes=%llu"
         "\tstringSubstringCalls=%llu\tstringSubstringSourceBytes=%llu\tstringSubstringResultBytes=%llu"
@@ -298,5 +302,5 @@ char *compilerMetricsReport(void) {
         if (written < 0 || (size_t)written >= capacity - used) break;
         used += (size_t)written;
     }
-    return report;
+    return rangeStringCreateTransientView(report, used);
 }

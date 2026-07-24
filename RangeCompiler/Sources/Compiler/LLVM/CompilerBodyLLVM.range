@@ -151,7 +151,7 @@ function compilerBodyLLVMValue(emitter: CompilerBodyLLVMEmitter, valueID: Int): 
     if kind == compilerBodyLLVMValueReceiverPointer() { return CompilerLLVMValue(text: String("%self"), typeName: String("ptr")) }
     if kind == compilerBodyLLVMValueStoragePointer() { return CompilerLLVMValue(text: "%storage\(aux)", typeName: String("ptr")) }
     if kind == compilerBodyLLVMValueTemporary() { return CompilerLLVMValue(text: "%r\(number)", typeName: typeName) }
-    if kind == compilerBodyLLVMValueGlobalString() { return CompilerLLVMValue(text: "getelementptr inbounds ([\(aux) x i8], ptr @.str.\(number), i32 0, i32 0)", typeName: String("ptr")) }
+    if kind == compilerBodyLLVMValueGlobalString() { return CompilerLLVMValue(text: "@.str.\(number)", typeName: String("ptr")) }
     if kind == compilerBodyLLVMValueAlias() { return compilerBodyLLVMValue(emitter: emitter, valueID: aux) }
     return CompilerLLVMValue(text: String(""), typeName: String(""))
 }
@@ -161,7 +161,7 @@ function compilerBodyLLVMEmitterAppendInstruction(emitter: CompilerBodyLLVMEmitt
     if instruction.operation == String("call") {
         rendered: "\(instruction.result) = call \(instruction.typeName) @\(instruction.left)(\(instruction.right))"
     } else if instruction.operation == String("puts") {
-        rendered: "\(instruction.result) = call i32 @puts(ptr \(instruction.left))"
+        rendered: "\(instruction.result) = call i32 @stringPrint(ptr \(instruction.left))"
     } else if instruction.operation == String("phi") {
         rendered: "\(instruction.result) = phi \(instruction.typeName) \(instruction.left), \(instruction.right)"
     } else {
@@ -198,10 +198,7 @@ function compilerBodyArenaTypeStructuralFingerprint(arena: CompilerBodyArena, ty
 }
 
 function compilerBodyLLVMFunctionName(arena: CompilerBodyArena, functionID: Int): String {
-    let syntaxID: Int(compilerIntTableValue(table: arena.tables.functions, row: functionID, column: 0))
-    let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: arena.tables, syntaxID: syntaxID))
-    let fileID: Int(compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 1))
-    return compilerTypedSyntaxLocalText(tables: arena.tables, fileID: fileID, localStart: compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 8))
+    return compilerFunctionLLVMBaseName(tables: arena.tables, functionRow: functionID)
 }
 
 function compilerBodyLLVMFunctionNameForReceiver(arena: CompilerBodyArena, functionID: Int, receiverTypeID: Int): String {
@@ -788,6 +785,13 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
     }
     if operationKind == compilerBodyMIROperationMemberRead() {
         let plannedMemberReceiverValueID: Int(compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0))
+        let plannedMemberTargetID: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationTargetIDColumn()))
+        let stringSyntaxID: Int(compilerBodyArenaStringDeclarationSyntaxID(arena: emitter.arena))
+        let transparentStringMemberRow: Int(compilerRuntimeABITransparentStorageMemberRow(tables: emitter.arena.tables, constructNodeID: stringSyntaxID))
+        if compilerIntTableValue(table: emitter.arena.mirValues, row: plannedMemberReceiverValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeString()
+            && plannedMemberTargetID == transparentStringMemberRow {
+            return compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueAlias(), number: 0 - 1, aux: plannedMemberReceiverValueID)
+        }
         let plannedMemberReceiverValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: plannedMemberReceiverValueID))
         if plannedMemberReceiverValue.typeName != String("ptr") {
             if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary, aux: 0 - 1) != 0
@@ -1234,6 +1238,8 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
     }
     if operationKind == compilerBodyMIROperationMemberRead() {
         let memberAssignmentRow: Int(compilerBodyLLVMValueAssignmentRow(emitter: emitter, valueID: resultValueID))
+        if memberAssignmentRow >= 0
+            && compilerIntTableValue(table: emitter.valueAssignments, row: memberAssignmentRow, column: compilerBodyLLVMValueAssignmentKindColumn()) == compilerBodyLLVMValueAlias() { return 0 }
         let memberReceiverValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0)))
         if memberAssignmentRow < 0 || memberReceiverValue.text == String("") { return 0 - 1 }
         let memberCallTemporary: Int(compilerIntTableValue(table: emitter.valueAssignments, row: memberAssignmentRow, column: compilerBodyLLVMValueAssignmentNumberColumn()))
@@ -1491,7 +1497,8 @@ function compilerBodyLLVMEmitterRenderGlobals(emitter: CompilerBodyLLVMEmitter):
         if descriptorKind == compilerBodyLLVMGlobalDescriptorStringLiteral() { descriptorContent: compilerCoreStringLiteralContent(text: descriptorText) }
         if descriptorKind == compilerBodyLLVMGlobalDescriptorStringSegment() { descriptorContent: compilerCoreDecodeStringLiteralContent(content: descriptorText) }
         let renderedText: String(compilerCoreLLVMGlobalStringRenderedText(text: compilerCoreStatementRecordEncodeValue(value: descriptorContent)))
-        rawBufferAppendText(buffer: output, text: "@.str.\(temporary) = private unnamed_addr constant [\(byteCount) x i8] c\"\(renderedText)\\00\"\n")
+        rawBufferAppendText(buffer: output, text: "@.str.bytes.\(temporary) = private unnamed_addr constant [\(byteCount) x i8] c\"\(renderedText)\\00\"\n")
+        rawBufferAppendText(buffer: output, text: "@.str.\(temporary) = private global { i64, i64, i64, i64, ptr, i64 } { i64 5927104652607903047, i64 \(byteCount - 1), i64 \(byteCount - 1), i64 1, ptr getelementptr inbounds ([\(byteCount) x i8], ptr @.str.bytes.\(temporary), i32 0, i32 0), i64 -1 }\n")
         row: row + 1
     }
     return compilerCoreRawBufferMaterializeAndDestroy(buffer: output)
@@ -2038,10 +2045,9 @@ function compilerCoreLLVMLowerHelperFunctionTypedObserved(context: CompilerLLVML
 
 function compilerCoreRenderLLVMHelperFunctionTyped(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, declarationRow: Int, functionRow: Int, functionName: String, returnLLVMType: String, parameterText: String, block: CompilerLLVMLoweredBlock, abiPlan: CompilerModuleABIPlan): String {
     let fileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
-    let declarationName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
     let returnType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.functions, row: functionRow, column: 6), localEnd: compilerIntTableValue(table: tables.functions, row: functionRow, column: 7)))
     let functionBlock: CompilerLLVMBasicBlock(compilerCoreMainLLVMBasicBlock(block: block))
-    state renderedName: String(declarationName)
+    state renderedName: String(compilerFunctionLLVMBaseName(tables: tables, functionRow: functionRow))
     state llvmReturnType: String(compilerCoreLLVMTypeNameForRangeType(typeName: returnType))
     state renderedParameterText: String("")
     if functionName != String("") {
@@ -2165,7 +2171,7 @@ function compilerCoreRenderLLVMInstructionRecord(record: String): String {
     }
 
     if operation == String("puts") {
-        return "\(result) = call i32 @puts(ptr \(left))"
+        return "\(result) = call i32 @stringPrint(ptr \(left))"
     }
 
     if operation == String("phi") {
@@ -2209,7 +2215,7 @@ function compilerCoreRawBufferMaterializeAndDestroy(buffer: RawBuffer): String {
 }
 
 function compilerCoreRenderLLVMRuntimeDeclarations(records: String, renderedFunctions: String): String {
-    let baseDeclarations: String("declare i32 @puts(ptr)\ndeclare i32 @stringLength(ptr)\ndeclare i32 @stringIndexOf(ptr, ptr, i32)\ndeclare i32 @stringEqual(ptr, ptr)\ndeclare i32 @stringCompare(ptr, ptr)\ndeclare i1 @stringHasPrefix(ptr, i32, ptr)\ndeclare i32 @stringFindFrom(ptr, i32, ptr)\ndeclare i32 @stringFindFirstOf(ptr, i32, ptr)\ndeclare ptr @stringViewFrom(ptr, i32)\ndeclare ptr @stringSliceUnchecked(ptr, i32, i32)\ndeclare ptr @stringCharacterAt(ptr, i32)\ndeclare i32 @stringByteAt(ptr, i32)\ndeclare i32 @stringFindByteOf(ptr, i32, i32, i32, i32)\ndeclare i32 @stringTransientRegionMark()\ndeclare i32 @stringTransientRegionReset(i32)\ndeclare ptr @commandLineArgument(i32)\ndeclare i32 @commandLineArgumentCount()\ndeclare ptr @readFile(ptr)\ndeclare i32 @writeFile(ptr, ptr)\ndeclare i32 @runProcess(ptr, ptr)\ndeclare i32 @runProcessBatch(ptr, i32)\ndeclare ptr @stringCharacter(ptr, i32)\ndeclare ptr @stringSubstring(ptr, i32, i32)\ndeclare ptr @stringConcat(ptr, ptr)\ndeclare ptr @stringOwnedCopy(ptr)\ndeclare ptr @stringAppendOwned(ptr, ptr)\ndeclare ptr @stringFromInt(i32)\ndeclare ptr @stringFromBool(i1)\ndeclare ptr @bufferCreateInt(i32)\ndeclare ptr @bufferCreateUnsigned8(i32)\ndeclare ptr @rawBufferCreate(i32, i32)\ndeclare i32 @rawBufferAppendInt(ptr, i32)\ndeclare i32 @rawBufferAppendRandomBytes(ptr, i32)\ndeclare i32 @rawBufferAppendUnsigned8(ptr, i8)\ndeclare i8 @rawBufferLoadUnsigned8(ptr, i32)\ndeclare i32 @rawBufferStoreUnsigned8(ptr, i32, i8)\ndeclare i32 @rawBufferCount(ptr)\ndeclare i32 @rawBufferLoadInt(ptr, i32)\ndeclare i32 @rawBufferStoreInt(ptr, i32, i32)\ndeclare i32 @rawBufferAppendText(ptr, ptr)\ndeclare i32 @rawBufferAppendTextInt(ptr, i32)\ndeclare i32 @rawBufferAppendTextCharacter(ptr, ptr, i32)\ndeclare ptr @rawBufferMaterializeText(ptr)\ndeclare i32 @rawBufferDestroy(ptr)\n")
+    let baseDeclarations: String("declare i32 @stringPrint(ptr)\ndeclare i32 @stringLength(ptr)\ndeclare i32 @stringIndexOf(ptr, ptr, i32)\ndeclare i32 @stringEqual(ptr, ptr)\ndeclare i32 @stringCompare(ptr, ptr)\ndeclare i1 @stringHasPrefix(ptr, i32, ptr)\ndeclare i32 @stringFindFrom(ptr, i32, ptr)\ndeclare i32 @stringFindFirstOf(ptr, i32, ptr)\ndeclare ptr @stringViewFrom(ptr, i32)\ndeclare ptr @stringSliceUnchecked(ptr, i32, i32)\ndeclare ptr @stringCharacterAt(ptr, i32)\ndeclare i32 @stringByteAt(ptr, i32)\ndeclare i32 @stringFindByteOf(ptr, i32, i32, i32, i32)\ndeclare i32 @stringTransientRegionMark()\ndeclare i32 @stringTransientRegionReset(i32)\ndeclare ptr @commandLineArgument(i32)\ndeclare i32 @commandLineArgumentCount()\ndeclare ptr @readFile(ptr)\ndeclare i32 @writeFile(ptr, ptr)\ndeclare i32 @runProcess(ptr, ptr)\ndeclare i32 @runProcessBatch(ptr, i32)\ndeclare ptr @stringCharacter(ptr, i32)\ndeclare ptr @stringSubstring(ptr, i32, i32)\ndeclare ptr @stringConcat(ptr, ptr)\ndeclare ptr @stringOwnedCopy(ptr)\ndeclare ptr @stringAppendOwned(ptr, ptr)\ndeclare ptr @stringFromInt(i32)\ndeclare ptr @stringFromBool(i1)\ndeclare ptr @bufferCreateInt(i32)\ndeclare ptr @bufferCreateUnsigned8(i32)\ndeclare ptr @rawBufferCreate(i32, i32)\ndeclare i32 @rawBufferAppendInt(ptr, i32)\ndeclare i32 @rawBufferAppendRandomBytes(ptr, i32)\ndeclare i32 @rawBufferAppendUnsigned8(ptr, i8)\ndeclare i8 @rawBufferLoadUnsigned8(ptr, i32)\ndeclare i32 @rawBufferStoreUnsigned8(ptr, i32, i8)\ndeclare i32 @rawBufferCount(ptr)\ndeclare i32 @rawBufferLoadInt(ptr, i32)\ndeclare i32 @rawBufferStoreInt(ptr, i32, i32)\ndeclare i32 @rawBufferAppendText(ptr, ptr)\ndeclare i32 @rawBufferAppendTextInt(ptr, i32)\ndeclare i32 @rawBufferAppendTextCharacter(ptr, ptr, i32)\ndeclare ptr @rawBufferMaterializeText(ptr)\ndeclare i32 @rawBufferDestroy(ptr)\n")
     state trapDeclaration: String("")
     if compilerCoreRecordContains(record: renderedFunctions, text: String("@llvm.trap()"))
         || compilerCoreRecordContains(record: records, text: String("@llvm.trap()")) {
@@ -2312,4 +2318,3 @@ function compilerCoreRenderLLVMTerminator(terminal: CompilerLLVMTerminator): Str
 
     return String("ret i32 0")
 }
-

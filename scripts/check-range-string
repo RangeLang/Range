@@ -36,6 +36,18 @@ LLVM="$BUILD_ROOT/StringByteStorage.ll"
 
 "$CANDIDATE_COMPILER" emit-llvm "$SOURCE_SET" "$LLVM"
 /usr/bin/grep -q 'call i32 @stringByteAt(ptr' "$LLVM"
+/usr/bin/grep -q 'define i32 @String__byte(ptr' "$LLVM"
+/usr/bin/grep -q 'define i32 @String__count(ptr' "$LLVM"
+/usr/bin/grep -q 'define i32 @Buffer__count' "$LLVM"
+/usr/bin/grep -q 'call i32 @Buffer__count' "$LLVM"
+if /usr/bin/grep -Eq '(^| )@(byte|count)\(' "$LLVM"; then
+    echo "Unqualified authored member symbol remained in String LLVM." >&2
+    exit 1
+fi
+if /usr/bin/grep -Fq 'call ptr @rangeConstructGetPtr(' "$LLVM"; then
+    echo "String.bytes used dynamic field lookup instead of a transparent Buffer projection." >&2
+    exit 1
+fi
 
 clang -Wno-override-module -x ir "$LLVM" -x c \
     "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerHost.c" \
@@ -47,9 +59,9 @@ set +e
 "$BUILD_ROOT/StringByteStorage"
 range_exit=$?
 set -e
-if [[ "$range_exit" -ne 82 ]]; then
-    echo "Authored String byte access failed: expected 82, got $range_exit" >&2
+if [[ "$range_exit" -ne 92 ]]; then
+    echo "Authored Buffer-backed String byte/count access failed: expected 92, got $range_exit" >&2
     exit 1
 fi
 
-echo "Authored String pointer-ABI byte access verified."
+echo "Owner-qualified Buffer-backed String byte/count access verified."

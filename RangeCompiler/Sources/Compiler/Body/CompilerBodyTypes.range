@@ -517,7 +517,12 @@ function compilerBodyArenaTypeIDForMemberRow(arena: CompilerBodyArena, receiverT
     if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: arena.tables.members)
         || !compilerSyntaxMemberHasTypeReference(tables: arena.tables, memberRow: memberRow)
         || compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 14) != compilerSyntaxTypeTargetReference() { return 0 - 1 }
-    return compilerBodyArenaTypeIDForMemberTypeReference(arena: arena, receiverTypeID: receiverTypeID, ownerSyntaxID: compilerSyntaxMemberTypeOwnerSyntaxID(tables: arena.tables, memberRow: memberRow), typeReferenceID: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 15), fileID: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 1), start: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 8), end: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 9))
+    let fileID: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 1))
+    let start: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 8))
+    let end: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 9))
+    let concreteTypeID: Int(compilerBodyArenaTypeInstanceIntern(arena: arena, fileID: fileID, start: start, end: end))
+    if concreteTypeID >= 0 { return concreteTypeID }
+    return compilerBodyArenaTypeIDForMemberTypeReference(arena: arena, receiverTypeID: receiverTypeID, ownerSyntaxID: compilerSyntaxMemberTypeOwnerSyntaxID(tables: arena.tables, memberRow: memberRow), typeReferenceID: compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 15), fileID: fileID, start: start, end: end)
 }
 
 function compilerBodyArenaTypeIDIsArray(arena: CompilerBodyArena, typeID: Int): Bool {
@@ -1112,7 +1117,9 @@ function compilerBodyArenaNominalTypeID(arena: CompilerBodyArena, name: String):
 function compilerBodyArenaSymbolTypeKind(arena: CompilerBodyArena, symbolID: Int): Int {
     if symbolID < 0 || symbolID >= compilerIntTableRowCount(table: arena.symbols) { return compilerBodyTypeUnknown() }
     let symbolKind: Int(compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolKindColumn()))
-    if symbolKind == compilerBodySymbolReceiver() { return compilerBodyTypeConstruct() }
+    if symbolKind == compilerBodySymbolReceiver() {
+        return compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: compilerBodyArenaReceiverTypeID(arena: arena))
+    }
     if symbolKind == compilerBodySymbolEnumPayloadBinding() {
         let declarationNodeID: Int(compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolDeclarationColumn()))
         let resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: declarationNodeID))

@@ -133,7 +133,7 @@ function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("compilerMetricsFunctionBegin") { return compilerBodyRuntimeBuiltinCompilerMetricsFunctionBegin() }
     if name == String("compilerMetricsFunctionEnd") { return compilerBodyRuntimeBuiltinCompilerMetricsFunctionEnd() }
     if name == String("compilerMetricsReport") { return compilerBodyRuntimeBuiltinCompilerMetricsReport() }
-    if name == String("print") || name == String("puts") { return compilerBodyRuntimeBuiltinPrint() }
+    if name == String("print") || name == String("stringPrint") { return compilerBodyRuntimeBuiltinPrint() }
     if name == String("writeFile") { return compilerBodyRuntimeBuiltinWriteFile() }
     if name == String("rawBufferAppendRandomBytes") { return compilerBodyRuntimeBuiltinRawBufferAppendRandomBytes() }
     if name == String("rawBufferAppendUnsigned8") { return compilerBodyRuntimeBuiltinRawBufferAppendUnsigned8() }
@@ -179,7 +179,7 @@ function compilerBodyRuntimeBuiltinName(id: Int): String {
     if id == compilerBodyRuntimeBuiltinCompilerMetricsFunctionBegin() { return String("compilerMetricsFunctionBegin") }
     if id == compilerBodyRuntimeBuiltinCompilerMetricsFunctionEnd() { return String("compilerMetricsFunctionEnd") }
     if id == compilerBodyRuntimeBuiltinCompilerMetricsReport() { return String("compilerMetricsReport") }
-    if id == compilerBodyRuntimeBuiltinPrint() { return String("puts") }
+    if id == compilerBodyRuntimeBuiltinPrint() { return String("stringPrint") }
     if id == compilerBodyRuntimeBuiltinWriteFile() { return String("writeFile") }
     if id == compilerBodyRuntimeBuiltinRawBufferAppendRandomBytes() { return String("rawBufferAppendRandomBytes") }
     if id == compilerBodyRuntimeBuiltinRawBufferAppendUnsigned8() { return String("rawBufferAppendUnsigned8") }
@@ -918,6 +918,18 @@ function compilerFunctionOwnerConstructName(tables: CompilerSyntaxTables, functi
     return compilerTypedSyntaxLocalText(tables: tables, fileID: ownerFileID, localStart: compilerIntTableValue(table: tables.declarations, row: ownerDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: ownerDeclarationRow, column: 8))
 }
 
+function compilerFunctionLLVMBaseName(tables: CompilerSyntaxTables, functionRow: Int): String {
+    if functionRow < 0 || functionRow >= compilerIntTableRowCount(table: tables.functions) { return String("") }
+    let syntaxID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 0))
+    let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: syntaxID))
+    if declarationRow < 0 { return String("") }
+    let fileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
+    let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
+    let ownerName: String(compilerFunctionOwnerConstructName(tables: tables, functionRow: functionRow))
+    if ownerName == String("") { return name }
+    return "\(ownerName)__\(name)"
+}
+
 function compilerFunctionHasAggregateParameterABI(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, functionRow: Int): Bool {
     if functionRow < 0 || functionRow >= compilerIntTableRowCount(table: tables.functions) { return false }
     let firstParameterRow: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 2))
@@ -1357,4 +1369,3 @@ function compilerBodyTelemetryAppending(left: CompilerBodyTelemetry, right: Comp
 function compilerTypedLLVMHelpersValue(value: CompilerTypedLLVMHelpers): CompilerLLVMHelperFunctions {
     return value.helpers
 }
-
