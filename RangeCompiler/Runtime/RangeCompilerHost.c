@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <spawn.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +23,78 @@ static void **transientStringAllocations = NULL;
 static size_t transientStringAllocationCount = 0;
 static size_t transientStringAllocationCapacity = 0;
 static int32_t transientStringRegionDepth = 0;
+
+typedef struct RangeConstructIdentityArenaChunk {
+    struct RangeConstructIdentityArenaChunk *next;
+    size_t used;
+    size_t capacity;
+    max_align_t alignment;
+    unsigned char bytes[];
+} RangeConstructIdentityArenaChunk;
+
+static RangeConstructIdentityArenaChunk *rangeIdentityArenaChunks = NULL;
+static bool rangeIdentityArenaActive = false;
+static bool rangeIdentityArenaRegisteredForExit = false;
+
+void rangeIdentityArenaDestroy(void);
+
+static void rangeIdentityArenaDestroyAtExit(void) {
+    rangeIdentityArenaDestroy();
+}
+
+void rangeIdentityArenaBegin(void) {
+    if (rangeIdentityArenaActive || rangeIdentityArenaChunks) {
+        abort();
+    }
+    rangeIdentityArenaActive = true;
+    if (!rangeIdentityArenaRegisteredForExit) {
+        if (atexit(rangeIdentityArenaDestroyAtExit) != 0) {
+            abort();
+        }
+        rangeIdentityArenaRegisteredForExit = true;
+    }
+}
+
+void rangeIdentityArenaDestroy(void) {
+    RangeConstructIdentityArenaChunk *chunk = rangeIdentityArenaChunks;
+    while (chunk) {
+        RangeConstructIdentityArenaChunk *next = chunk->next;
+        free(chunk);
+        chunk = next;
+    }
+    rangeIdentityArenaChunks = NULL;
+    rangeIdentityArenaActive = false;
+}
+
+static void *rangeIdentityArenaAllocate(size_t size) {
+    const size_t alignment = _Alignof(max_align_t);
+    if (size == 0 || size > SIZE_MAX - (alignment - 1)) {
+        abort();
+    }
+    const size_t alignedSize = (size + alignment - 1) & ~(alignment - 1);
+    RangeConstructIdentityArenaChunk *chunk = rangeIdentityArenaChunks;
+    if (!chunk || alignedSize > chunk->capacity - chunk->used) {
+        const size_t defaultCapacity = 64 * 1024;
+        const size_t capacity = alignedSize > defaultCapacity
+            ? alignedSize
+            : defaultCapacity;
+        if (capacity > SIZE_MAX - sizeof(RangeConstructIdentityArenaChunk)) {
+            abort();
+        }
+        chunk = malloc(sizeof(RangeConstructIdentityArenaChunk) + capacity);
+        if (!chunk) {
+            abort();
+        }
+        chunk->next = rangeIdentityArenaChunks;
+        chunk->used = 0;
+        chunk->capacity = capacity;
+        rangeIdentityArenaChunks = chunk;
+    }
+    void *identity = chunk->bytes + chunk->used;
+    chunk->used += alignedSize;
+    memset(identity, 0, size);
+    return identity;
+}
 
 void *stringTransientAllocate(size_t size) {
     void *allocation = malloc(size);
@@ -661,12 +734,16 @@ void *rangeConstructIdentityCreate(uint64_t byteCount) {
     if ((uint64_t)size != byteCount || size == 0) {
         abort();
     }
-    void *identity = malloc(size);
-    if (!identity) {
-        abort();
+    if (!rangeIdentityArenaActive) {
+        /*
+         * Bootstrap seeds emitted before the arena lifecycle calls still use
+         * this ABI. Lazily opening the process arena lets those seeds reproduce
+         * the first arena-aware compiler; newly emitted programs begin and
+         * destroy the arena explicitly from main.
+         */
+        rangeIdentityArenaBegin();
     }
-    memset(identity, 0, size);
-    return identity;
+    return rangeIdentityArenaAllocate(size);
 }
 
 void *rangeConstructSetPtr(void *opaque, void *opaqueName, void *value) {

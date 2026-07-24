@@ -116,11 +116,17 @@
           - [x] Promote the target-cell checkpoint into the accepted seed and
             verify seed reproduction plus LLVM/executable progression fixed
             point.
-        - [ ] Move identity allocation from the temporary host `malloc`
+        - [x] Move identity allocation from the temporary host `malloc`
           baseline into a compiler-owned arena with an explicit bulk lifetime.
-          - Identity storage must remain separate from transient String
-            regions; resetting one of those regions previously exposed the
-            exact use-after-free boundary during fixed-point compilation.
+          - [x] Allocate max-aligned, zeroed identities from 64 KiB bump
+            chunks and release all chunks at the generated program boundary.
+          - [x] Keep identity storage separate from transient String regions
+            and prove a String-region reset cannot invalidate live identities.
+          - [x] Emit one arena begin at `main` entry and an arena destroy before
+            every return, while retaining lazy allocation only as a bridge for
+            pre-arena bootstrap seeds.
+          - [x] Promote the arena-aware compiler seed after proving the extra
+            bootstrap turn reaches a byte-identical LLVM fixed point.
         - [ ] Benchmark representative shallow, deeply nested, and
           mutation-heavy construct workloads before claiming a universal
           runtime speedup.

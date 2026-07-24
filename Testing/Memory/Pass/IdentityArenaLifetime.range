@@ -1,0 +1,13 @@
+construct IdentityArenaLeaf {
+    state value: Int
+}
+
+construct IdentityArenaRoot {
+    let leaf: IdentityArenaLeaf
+}
+
+@main {
+    let root: IdentityArenaRoot(leaf: IdentityArenaLeaf(value: 3))
+    root.leaf.value: 7
+    return root.leaf.value
+}
