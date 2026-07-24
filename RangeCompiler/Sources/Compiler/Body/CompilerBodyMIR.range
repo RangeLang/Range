@@ -367,7 +367,13 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         if resolutionTargetKind != compilerBodyResolutionMember() { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
         let memberRow: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
         if !compilerBodyMemoryHasFact(arena: arena, kind: compilerBodyMemoryFactMemberRead(), sourceNodeID: nodeID, subjectID: nodeID) { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
-        let receiverValue: CompilerBodyMIRValueResult(compilerBodyMIRBuildExpression(arena: arena, nodeID: receiverNodeID, blockID: blockID))
+        state receiverValue: CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
+        let receiverRootSymbolID: Int(compilerBodyArenaIdentityPathRootSymbol(arena: arena, nodeID: receiverNodeID))
+        if compilerBodyArenaSymbolHasMemberWrite(arena: arena, symbolID: receiverRootSymbolID) {
+            let receiverAddressValueID: Int(compilerBodyMIRBuildMemberReceiverAddress(arena: arena, receiverNodeID: receiverNodeID, blockID: blockID))
+            receiverValue: CompilerBodyMIRValueResult(valueID: receiverAddressValueID, isValid: receiverAddressValueID >= 0)
+        }
+        if !receiverValue.isValid { receiverValue: compilerBodyMIRBuildExpression(arena: arena, nodeID: receiverNodeID, blockID: blockID) }
         if !receiverValue.isValid { return receiverValue }
         let memberTypeKind: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeKindColumn()))
         let memberValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueLocal(), typeKind: memberTypeKind, typeID: compilerBodyMIRNominalTypeID(typeKind: memberTypeKind, typeID: compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeIDColumn())), sourceNodeID: nodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: nodeID))
@@ -771,6 +777,7 @@ function compilerBodyMIRCommitMemberAssignment(arena: CompilerBodyArena, stateme
     let targetNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleAssignmentTarget(), ordinal: 0))
     let resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: targetNodeID))
     if targetNodeID < 0 || resolutionRow < 0
+        || compilerBodyArenaMutableMemberSymbolForTarget(arena: arena, targetNodeID: targetNodeID) < 0
         || compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionMember()
         || !compilerBodyMemoryHasFact(arena: arena, kind: compilerBodyMemoryFactMemberWrite(), sourceNodeID: targetNodeID, subjectID: targetNodeID) { return 0 - 1 }
     let memberRow: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
@@ -779,11 +786,9 @@ function compilerBodyMIRCommitMemberAssignment(arena: CompilerBodyArena, stateme
     let receiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: targetNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
     let receiverResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: receiverNodeID))
     if receiverNodeID < 0 || receiverResolutionRow < 0
-        || compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionLocalSymbol()
         || compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTypeKindColumn()) != compilerBodyTypeConstruct() { return 0 - 1 }
-    let receiverSymbolID: Int(compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTargetIDColumn()))
-    if receiverSymbolID < 0 || receiverSymbolID >= compilerIntTableRowCount(table: arena.symbols)
-        || compilerIntTableValue(table: arena.symbols, row: receiverSymbolID, column: compilerBodySymbolKindColumn()) != compilerBodySymbolReceiver() { return 0 - 1 }
+    let receiverTargetKind: Int(compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTargetKindColumn()))
+    if receiverTargetKind != compilerBodyResolutionLocalSymbol() && receiverTargetKind != compilerBodyResolutionMember() { return 0 - 1 }
     let receiverTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTypeIDColumn()))
     let memberTypeID: Int(compilerBodyArenaTypeIDForMemberRow(arena: arena, receiverTypeID: receiverTypeID, memberRow: memberRow))
     let memberTypeKind: Int(compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: memberTypeID))
@@ -791,7 +796,7 @@ function compilerBodyMIRCommitMemberAssignment(arena: CompilerBodyArena, stateme
         || compilerIntTableValue(table: arena.mirValues, row: assignedValueID, column: compilerBodyMIRValueTypeColumn()) != memberTypeKind
         || (memberTypeKind == compilerBodyTypeConstruct() && compilerIntTableValue(table: arena.mirValues, row: assignedValueID, column: compilerBodyMIRValueTypeIDColumn()) != memberTypeID) { return 0 - 1 }
     let receiverAddressValueID: Int(compilerBodyMIRBuildMemberReceiverAddress(arena: arena, receiverNodeID: receiverNodeID, blockID: blockID))
-    let resultValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueReceiverAddress(), typeKind: compilerBodyTypeConstruct(), typeID: receiverTypeID, sourceNodeID: statementNodeID, provenanceKind: compilerBodyMemorySubjectSymbol(), provenanceID: receiverSymbolID))
+    let resultValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueReceiverAddress(), typeKind: compilerBodyTypeConstruct(), typeID: receiverTypeID, sourceNodeID: statementNodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: receiverAddressValueID))
     let operationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
     let firstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
     if receiverAddressValueID < 0 || resultValueID < 0
@@ -1593,7 +1598,6 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
             let receiverTypeID: Int(compilerIntTableValue(table: arena.mirValues, row: receiverValueID, column: compilerBodyMIRValueTypeIDColumn()))
             let memberTypeID: Int(compilerBodyArenaTypeIDForMemberRow(arena: arena, receiverTypeID: receiverTypeID, memberRow: validationTargetID))
             let memberTypeKind: Int(compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: memberTypeID))
-            let receiverProvenanceID: Int(compilerIntTableValue(table: arena.mirValues, row: receiverValueID, column: compilerBodyMIRValueProvenanceIDColumn()))
             if validationTargetKind != compilerBodyMIROperationTargetNone()
                 || validationTargetID < 0 || validationTargetID >= compilerIntTableRowCount(table: arena.tables.members)
                 || compilerIntTableValue(table: arena.tables.members, row: validationTargetID, column: 12) != compilerSyntaxMemberKindState()
@@ -1607,10 +1611,9 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                 || (memberTypeKind == compilerBodyTypeConstruct() && compilerIntTableValue(table: arena.mirValues, row: assignedValueID, column: compilerBodyMIRValueTypeIDColumn()) != memberTypeID)
                 || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueKindColumn()) != compilerBodyMIRValueReceiverAddress()
                 || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeConstruct()
+                || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeIDColumn()) != receiverTypeID
                 || receiverTypeID < 0 || receiverTypeID >= compilerIntTableRowCount(table: arena.typeInstances)
                 || compilerIntTableValue(table: arena.typeInstances, row: receiverTypeID, column: compilerBodyTypeInstanceNominalSyntaxColumn()) != compilerIntTableValue(table: arena.tables.members, row: validationTargetID, column: 2)
-                || receiverProvenanceID < 0 || receiverProvenanceID >= compilerIntTableRowCount(table: arena.symbols)
-                || compilerIntTableValue(table: arena.symbols, row: receiverProvenanceID, column: compilerBodySymbolKindColumn()) != compilerBodySymbolReceiver()
                 || assignmentResolutionRow < 0
                 || compilerIntTableValue(table: arena.resolutions, row: assignmentResolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionMember()
                 || compilerIntTableValue(table: arena.resolutions, row: assignmentResolutionRow, column: compilerBodyResolutionTargetIDColumn()) != validationTargetID

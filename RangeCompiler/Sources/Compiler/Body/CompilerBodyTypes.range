@@ -2519,6 +2519,7 @@ function compilerBodyArenaMutableArraySymbolForTarget(arena: CompilerBodyArena, 
     if arrayNodeID < 0
         || !compilerBodyArenaTypeIDIsArray(arena: arena, typeID: compilerBodyArenaExpressionTypeID(arena: arena, nodeID: arrayNodeID)) { return 0 - 1 }
     state ownerNodeID: Int(arrayNodeID)
+    state targetMemberResolved: Bool(false)
     while ownerNodeID >= 0 && compilerIntTableValue(table: arena.nodes, row: ownerNodeID, column: 1) == compilerSyntaxKindMemberRead() {
         let memberResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: ownerNodeID))
         if memberResolutionRow < 0
@@ -2526,11 +2527,16 @@ function compilerBodyArenaMutableArraySymbolForTarget(arena: CompilerBodyArena, 
         let memberRow: Int(compilerIntTableValue(table: arena.resolutions, row: memberResolutionRow, column: compilerBodyResolutionTargetIDColumn()))
         if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: arena.tables.members) { return 0 - 1 }
         let memberKind: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 12))
-        if memberKind == compilerSyntaxMemberKindBinding() {
-            if ownerNodeID != arrayNodeID { return 0 - 1 }
-            return compilerBodyArenaBindingSourceSymbolForMemberAccess(arena: arena, memberAccessNodeID: ownerNodeID)
+        if !targetMemberResolved {
+            if memberKind == compilerSyntaxMemberKindBinding() {
+                return compilerBodyArenaBindingSourceSymbolForMemberAccess(arena: arena, memberAccessNodeID: ownerNodeID)
+            }
+            if memberKind != compilerSyntaxMemberKindState() { return 0 - 1 }
+            targetMemberResolved: true
+        } else {
+            if (memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState())
+                || compilerMemoryMemberRepresentation(tables: arena.tables, memberRow: memberRow) != compilerMemoryMemberRepresentationIdentity() { return 0 - 1 }
         }
-        if memberKind != compilerSyntaxMemberKindState() { return 0 - 1 }
         ownerNodeID: compilerBodyArenaChild(arena: arena, ownerNodeID: ownerNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0)
     }
     if ownerNodeID < 0 || compilerIntTableValue(table: arena.nodes, row: ownerNodeID, column: 1) != compilerSyntaxKindIdentifier() { return 0 - 1 }
@@ -2538,9 +2544,77 @@ function compilerBodyArenaMutableArraySymbolForTarget(arena: CompilerBodyArena, 
     if ownerResolutionRow < 0
         || compilerIntTableValue(table: arena.resolutions, row: ownerResolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionLocalSymbol() { return 0 - 1 }
     let symbolID: Int(compilerIntTableValue(table: arena.resolutions, row: ownerResolutionRow, column: compilerBodyResolutionTargetIDColumn()))
-    if symbolID < 0 || symbolID >= compilerIntTableRowCount(table: arena.symbols)
-        || compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolKindColumn()) != compilerBodySymbolState() { return 0 - 1 }
+    if symbolID < 0 || symbolID >= compilerIntTableRowCount(table: arena.symbols) { return 0 - 1 }
+    let symbolKind: Int(compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolKindColumn()))
+    if targetMemberResolved {
+        if symbolKind != compilerBodySymbolLet() && symbolKind != compilerBodySymbolState() { return 0 - 1 }
+    } else if symbolKind != compilerBodySymbolState() { return 0 - 1 }
     return symbolID
+}
+
+function compilerBodyArenaMutableMemberSymbolForTarget(arena: CompilerBodyArena, targetNodeID: Int): Int {
+    if targetNodeID < 0 || targetNodeID >= compilerIntTableRowCount(table: arena.nodes)
+        || compilerIntTableValue(table: arena.nodes, row: targetNodeID, column: 1) != compilerSyntaxKindMemberRead() { return 0 - 1 }
+    let targetResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: targetNodeID))
+    if targetResolutionRow < 0
+        || compilerIntTableValue(table: arena.resolutions, row: targetResolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionMember() { return 0 - 1 }
+    let targetMemberRow: Int(compilerIntTableValue(table: arena.resolutions, row: targetResolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+    if targetMemberRow < 0 || targetMemberRow >= compilerIntTableRowCount(table: arena.tables.members)
+        || compilerIntTableValue(table: arena.tables.members, row: targetMemberRow, column: 12) != compilerSyntaxMemberKindState() { return 0 - 1 }
+    state ownerNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: targetNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
+    while ownerNodeID >= 0 && compilerIntTableValue(table: arena.nodes, row: ownerNodeID, column: 1) == compilerSyntaxKindMemberRead() {
+        let memberResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: ownerNodeID))
+        if memberResolutionRow < 0
+            || compilerIntTableValue(table: arena.resolutions, row: memberResolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionMember() { return 0 - 1 }
+        let memberRow: Int(compilerIntTableValue(table: arena.resolutions, row: memberResolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+        if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: arena.tables.members) { return 0 - 1 }
+        let memberKind: Int(compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 12))
+        if (memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState())
+            || compilerMemoryMemberRepresentation(tables: arena.tables, memberRow: memberRow) != compilerMemoryMemberRepresentationIdentity() { return 0 - 1 }
+        ownerNodeID: compilerBodyArenaChild(arena: arena, ownerNodeID: ownerNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0)
+    }
+    if ownerNodeID < 0 || compilerIntTableValue(table: arena.nodes, row: ownerNodeID, column: 1) != compilerSyntaxKindIdentifier() { return 0 - 1 }
+    let ownerResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: ownerNodeID))
+    if ownerResolutionRow < 0
+        || compilerIntTableValue(table: arena.resolutions, row: ownerResolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionLocalSymbol() { return 0 - 1 }
+    let symbolID: Int(compilerIntTableValue(table: arena.resolutions, row: ownerResolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+    if symbolID < 0 || symbolID >= compilerIntTableRowCount(table: arena.symbols) { return 0 - 1 }
+    let symbolKind: Int(compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolKindColumn()))
+    if symbolKind != compilerBodySymbolLet() && symbolKind != compilerBodySymbolState() && symbolKind != compilerBodySymbolReceiver() { return 0 - 1 }
+    return symbolID
+}
+
+function compilerBodyArenaIdentityPathRootSymbol(arena: CompilerBodyArena, nodeID: Int): Int {
+    state ownerNodeID: Int(nodeID)
+    while ownerNodeID >= 0 && compilerIntTableValue(table: arena.nodes, row: ownerNodeID, column: 1) == compilerSyntaxKindMemberRead() {
+        let memberResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: ownerNodeID))
+        if memberResolutionRow < 0
+            || compilerIntTableValue(table: arena.resolutions, row: memberResolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionMember() { return 0 - 1 }
+        let memberRow: Int(compilerIntTableValue(table: arena.resolutions, row: memberResolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+        if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: arena.tables.members)
+            || compilerMemoryMemberRepresentation(tables: arena.tables, memberRow: memberRow) != compilerMemoryMemberRepresentationIdentity() { return 0 - 1 }
+        ownerNodeID: compilerBodyArenaChild(arena: arena, ownerNodeID: ownerNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0)
+    }
+    if ownerNodeID < 0 || compilerIntTableValue(table: arena.nodes, row: ownerNodeID, column: 1) != compilerSyntaxKindIdentifier() { return 0 - 1 }
+    let resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: ownerNodeID))
+    if resolutionRow < 0
+        || compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionLocalSymbol() { return 0 - 1 }
+    let symbolID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+    if symbolID < 0 || symbolID >= compilerIntTableRowCount(table: arena.symbols) { return 0 - 1 }
+    return symbolID
+}
+
+function compilerBodyArenaSymbolHasMemberWrite(arena: CompilerBodyArena, symbolID: Int): Bool {
+    if symbolID < 0 || symbolID >= compilerIntTableRowCount(table: arena.symbols) { return false }
+    state factRow: Int(0)
+    while factRow < compilerIntTableRowCount(table: arena.memoryFacts) {
+        if compilerIntTableValue(table: arena.memoryFacts, row: factRow, column: compilerBodyMemoryFactKindColumn()) == compilerBodyMemoryFactMemberWrite() {
+            let targetNodeID: Int(compilerIntTableValue(table: arena.memoryFacts, row: factRow, column: compilerBodyMemoryFactSourceColumn()))
+            if compilerBodyArenaMutableMemberSymbolForTarget(arena: arena, targetNodeID: targetNodeID) == symbolID { return true }
+        }
+        factRow: factRow + 1
+    }
+    return false
 }
 
 function compilerBodyArenaEnumCaseCount(arena: CompilerBodyArena, enumSyntaxID: Int): Int {
@@ -2757,16 +2831,8 @@ function compilerBodyArenaBuildRegionSymbols(arena: CompilerBodyArena, index: Co
                     writableSymbolID: compilerBodyArenaMutableArraySymbolForTarget(arena: arena, targetNodeID: targetNodeID)
                     if writableSymbolID < 0 || !compilerBodyArenaExpressionTypesMatch(arena: arena, leftNodeID: targetNodeID, rightNodeID: valueNodeID) { return 0 - 1 }
                 } else if targetKind == compilerSyntaxKindMemberRead() {
-                    let receiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: targetNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
-                    let memberResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: targetNodeID))
-                    let receiverResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: receiverNodeID))
-                    if receiverNodeID >= 0
-                        && memberResolutionRow >= 0
-                        && receiverResolutionRow >= 0
-                        && compilerIntTableValue(table: arena.nodes, row: receiverNodeID, column: 1) == compilerSyntaxKindIdentifier()
-                        && compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTargetKindColumn()) == compilerBodyResolutionLocalSymbol()
-                        && compilerIntTableValue(table: arena.symbols, row: compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTargetIDColumn()), column: compilerBodySymbolKindColumn()) == compilerBodySymbolReceiver()
-                        && compilerIntTableValue(table: arena.tables.members, row: compilerIntTableValue(table: arena.resolutions, row: memberResolutionRow, column: compilerBodyResolutionTargetIDColumn()), column: 12) == compilerSyntaxMemberKindState() { writableSymbolID: compilerIntTableValue(table: arena.resolutions, row: receiverResolutionRow, column: compilerBodyResolutionTargetIDColumn()) }
+                    writableSymbolID: compilerBodyArenaMutableMemberSymbolForTarget(arena: arena, targetNodeID: targetNodeID)
+                    if writableSymbolID < 0 || !compilerBodyArenaExpressionTypesMatch(arena: arena, leftNodeID: targetNodeID, rightNodeID: valueNodeID) { return 0 - 1 }
                 }
                 if targetKind == compilerSyntaxKindIdentifier() {
                     if writableSymbolID < 0 || compilerIntTableValue(table: arena.symbols, row: writableSymbolID, column: compilerBodySymbolKindColumn()) != compilerBodySymbolState() { return 0 - 1 }

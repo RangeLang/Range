@@ -2,12 +2,12 @@ construct MutableArrayLeaf {
     state values: [Int]
 }
 
-construct ImmutableArrayRoot {
+construct StableArrayRoot {
     let leaf: MutableArrayLeaf
 }
 
 @main {
-    state root: ImmutableArrayRoot(leaf: MutableArrayLeaf(values: [1, 2, 3]))
+    let root: StableArrayRoot(leaf: MutableArrayLeaf(values: [1, 2, 3]))
     root.leaf.values[1]: 7
     return root.leaf.values[1]
 }

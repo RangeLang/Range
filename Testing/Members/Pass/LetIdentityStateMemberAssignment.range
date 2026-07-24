@@ -1,0 +1,9 @@
+construct UserEditor {
+    state name: Int
+}
+
+@main {
+    let editor: UserEditor(name: 3)
+    editor.name: 7
+    return editor.name
+}

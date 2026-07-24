@@ -606,7 +606,7 @@ audit_native_arrays() {
     local stage_directory="$3"
     local kind source expected first second first_error second_error llvm linked run_output run_error
 
-    for kind in index count enum-payload argument binding-read mutation-int mutation-enum mutation-member mutation-nested-member mutation-binding; do
+    for kind in index count enum-payload argument binding-read mutation-int mutation-enum mutation-member mutation-nested-member mutation-let-owner mutation-let-intermediate mutation-binding; do
         source="$ARRAY_INDEX_SOURCE"
         expected=2
         if [[ "$kind" == count ]]; then
@@ -633,6 +633,12 @@ audit_native_arrays() {
         elif [[ "$kind" == mutation-nested-member ]]; then
             source="$ARRAY_NESTED_MEMBER_MUTATION_SOURCE"
             expected=7
+        elif [[ "$kind" == mutation-let-owner ]]; then
+            source="$ARRAY_LET_OWNER_MUTATION_SOURCE"
+            expected=7
+        elif [[ "$kind" == mutation-let-intermediate ]]; then
+            source="$ARRAY_LET_INTERMEDIATE_MUTATION_SOURCE"
+            expected=7
         elif [[ "$kind" == mutation-binding ]]; then
             source="$ARRAY_BINDING_MUTATION_SOURCE"
             expected=7
@@ -658,9 +664,9 @@ audit_native_arrays() {
         if /usr/bin/grep -Eq 'call .*@(rangeConstruct(Create|Get|Set)|rawBufferCreate|malloc|calloc|realloc)' "$first"; then
             fail "$stage_label native Array $kind introduced dynamic-record or allocator calls"
         fi
-        if [[ "$kind" == mutation-nested-member ]]; then
+        if [[ "$kind" == mutation-nested-member || "$kind" == mutation-let-intermediate ]]; then
             /usr/bin/grep -Fq 'call ptr @rangeConstructIdentityCreate(i64 ' "$first" \
-                || fail "$stage_label native Array nested mutation omitted its direct identity link"
+                || fail "$stage_label native Array $kind omitted its direct identity link"
         elif /usr/bin/grep -Fq 'call ptr @rangeConstructIdentityCreate(i64 ' "$first"; then
             fail "$stage_label native Array $kind introduced an unexpected identity allocation"
         fi
@@ -679,7 +685,7 @@ audit_native_arrays() {
             /usr/bin/grep -Eq 'alloca %Range\.(NumberToken|MutableNumberToken)' "$first" \
                 || fail "$stage_label native enum Array did not specialize backing storage to its element layout"
         fi
-        if [[ "$kind" == mutation-int || "$kind" == mutation-enum || "$kind" == mutation-member || "$kind" == mutation-nested-member || "$kind" == mutation-binding ]]; then
+        if [[ "$kind" == mutation-int || "$kind" == mutation-enum || "$kind" == mutation-member || "$kind" == mutation-nested-member || "$kind" == mutation-let-owner || "$kind" == mutation-let-intermediate || "$kind" == mutation-binding ]]; then
             /usr/bin/grep -Fq 'array.store.' "$first" \
                 || fail "$stage_label native Array $kind omitted the indexed store operation"
             /usr/bin/grep -Eq 'store (i32|%Range\.MutableNumberToken) .*ptr %array\.store\.' "$first" \
@@ -769,13 +775,8 @@ audit_native_arrays() {
     fi
 
     local immutable_member_kind immutable_member_source immutable_member_output immutable_member_error
-    for immutable_member_kind in field owner intermediate; do
+    for immutable_member_kind in field; do
         immutable_member_source="$ARRAY_IMMUTABLE_MEMBER_SOURCE"
-        if [[ "$immutable_member_kind" == owner ]]; then
-            immutable_member_source="$ARRAY_IMMUTABLE_MEMBER_OWNER_SOURCE"
-        elif [[ "$immutable_member_kind" == intermediate ]]; then
-            immutable_member_source="$ARRAY_IMMUTABLE_MEMBER_INTERMEDIATE_SOURCE"
-        fi
         immutable_member_output="$WORK_ROOT/$stage_label.array.immutable-member-$immutable_member_kind.out"
         immutable_member_error="$WORK_ROOT/$stage_label.array.immutable-member-$immutable_member_kind.err"
         run_capture "$executable" "$immutable_member_source" "$immutable_member_output" "$immutable_member_error"
@@ -798,7 +799,52 @@ audit_native_arrays() {
     if /usr/bin/grep -Fq 'define ' "$escape_output"; then
         fail "$stage_label native Array return escape emitted LLVM"
     fi
-    echo "$stage_label native Array: pass (generic pointer/count value, typed lexical storage, count/index/store, enum payload, arbitrary-depth mutable-member and direct binding-source mutation, executable read/write bounds traps, immutable field/intermediate/owner/binding-source and return-escape rejection, deterministic)"
+    echo "$stage_label native Array: pass (generic pointer/count value, typed lexical storage, count/index/store, enum payload, target-cell mutation through stable identity paths and direct bindings, executable read/write bounds traps, immutable target/binding-source and return-escape rejection, deterministic)"
+}
+
+audit_identity_member_mutation() {
+    local stage_label="$1"
+    local executable="$2"
+    local stage_directory="$3"
+    local first="$WORK_ROOT/$stage_label.identity-member.first.ll"
+    local second="$WORK_ROOT/$stage_label.identity-member.repeat.ll"
+    local first_error="$WORK_ROOT/$stage_label.identity-member.first.err"
+    local second_error="$WORK_ROOT/$stage_label.identity-member.repeat.err"
+    local linked="$stage_directory/IdentityMemberMutation"
+    local run_output="$WORK_ROOT/$stage_label.identity-member.run.out"
+    local run_error="$WORK_ROOT/$stage_label.identity-member.run.err"
+
+    run_capture "$executable" "$IDENTITY_MEMBER_MUTATION_SOURCE" "$first" "$first_error"
+    require_successful_output "$stage_label identity member mutation" "$first" "$first_error"
+    run_capture "$executable" "$IDENTITY_MEMBER_MUTATION_SOURCE" "$second" "$second_error"
+    require_successful_output "$stage_label repeated identity member mutation" "$second" "$second_error"
+    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label identity member mutation was not deterministic"
+    /usr/bin/grep -Fq '%Range.UserEditor = type { i32 }' "$first" \
+        || fail "$stage_label identity member mutation omitted its typed construct layout"
+    /usr/bin/grep -Fq 'insertvalue %Range.UserEditor' "$first" \
+        || fail "$stage_label identity member mutation omitted its typed member update"
+    validate_llvm "$first"
+    link_llvm "$first" "$linked"
+    if "$linked" > "$run_output" 2> "$run_error"; then
+        RUN_STATUS=0
+    else
+        RUN_STATUS=$?
+    fi
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label identity member mutation exited $RUN_STATUS"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label identity member mutation wrote output"
+
+    local immutable_output="$WORK_ROOT/$stage_label.identity-member.immutable.out"
+    local immutable_error="$WORK_ROOT/$stage_label.identity-member.immutable.err"
+    run_capture "$executable" "$IDENTITY_MEMBER_IMMUTABLE_SOURCE" "$immutable_output" "$immutable_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label immutable identity member mutation exited $RUN_STATUS"
+    [[ ! -s "$immutable_error" ]] || fail "$stage_label immutable identity member mutation wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$immutable_output" \
+        || fail "$stage_label immutable identity member mutation missed the semantic diagnostic"
+    if /usr/bin/grep -Fq 'define ' "$immutable_output"; then
+        fail "$stage_label immutable identity member mutation emitted LLVM"
+    fi
+
+    echo "$stage_label identity member mutation: pass (stable local identity, exact state-cell update, immutable target rejection, deterministic)"
 }
 
 audit_storage_switches() {
@@ -5096,6 +5142,7 @@ audit_stage() {
     audit_body_syntax_split "$stage_label" "$executable" "$stage_directory"
     audit_smoke "$stage_label" "$executable" "$stage_directory"
     audit_native_arrays "$stage_label" "$executable" "$stage_directory"
+    audit_identity_member_mutation "$stage_label" "$executable" "$stage_directory"
     audit_range_cli "$stage_label" "$executable"
     audit_construct_initialization_syntax "$stage_label" "$executable"
     audit_buffer_element_layouts "$stage_label" "$executable"
@@ -5343,14 +5390,16 @@ main() {
     ARRAY_ENUM_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ReturnEnumArrayStateIndexedAssignment.range"
     ARRAY_MEMBER_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ConstructMemberArrayIndexedAssignment.range"
     ARRAY_NESTED_MEMBER_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/NestedConstructMemberArrayIndexedAssignment.range"
+    ARRAY_LET_OWNER_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/LetIdentityContainingStateArrayIndexedAssignment.range"
+    ARRAY_LET_INTERMEDIATE_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/LetIntermediateIdentityStateArrayIndexedAssignment.range"
     ARRAY_BINDING_READ_SOURCE="$REPO_ROOT/Testing/Collections/Pass/BindingArrayRead.range"
     ARRAY_BINDING_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Pass/BindingArrayIndexedAssignment.range"
     ARRAY_IMMUTABLE_MUTATION_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableArrayIndexedAssignment.range"
     ARRAY_IMMUTABLE_MEMBER_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableConstructArrayMemberIndexedAssignment.range"
-    ARRAY_IMMUTABLE_MEMBER_OWNER_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableConstructContainingArrayIndexedAssignment.range"
-    ARRAY_IMMUTABLE_MEMBER_INTERMEDIATE_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableIntermediateConstructArrayIndexedAssignment.range"
     ARRAY_IMMUTABLE_BINDING_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ImmutableBindingArraySourceIndexedAssignment.range"
     ARRAY_WRITE_OUT_OF_BOUNDS_SOURCE="$REPO_ROOT/Testing/Collections/Fail/ArrayWriteOutOfBounds.range"
+    IDENTITY_MEMBER_MUTATION_SOURCE="$REPO_ROOT/Testing/Members/Pass/LetIdentityStateMemberAssignment.range"
+    IDENTITY_MEMBER_IMMUTABLE_SOURCE="$REPO_ROOT/Testing/Members/Fail/LetIdentityLetMemberAssignment.range"
     REDUNDANT_CONSTRUCT_INITIALIZATION_SOURCE="$REPO_ROOT/Testing/Types/Fail/RedundantConstructInitialization.range"
     ARRAY_ARGUMENT_SOURCE="$WORK_ROOT/ArrayArgument.range"
     /usr/bin/printf '%s\n' \

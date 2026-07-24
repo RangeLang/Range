@@ -104,6 +104,18 @@
           prove nested RootValue and Array mutation use the direct link.
         - [x] Promote and independently verify a byte-identical Stage 2/Stage 3
           fixed point.
+        - [x] Make mutation target the final stored cell rather than requiring
+          every traversed identity relationship to be `state`.
+          - [x] Allow `let` roots and intermediate `let` identity links to
+            reach a final `state` Array member while preserving rejection for
+            a final `let` Array or immutable binding source.
+          - [x] Extend direct member assignment beyond implicit `self`, prove
+            `let editor` can update `state name`, and reload identities with
+            graph-recorded member writes so later reads observe the update
+            without forcing every compiler member read through storage.
+          - [x] Promote the target-cell checkpoint into the accepted seed and
+            verify seed reproduction plus LLVM/executable progression fixed
+            point.
         - [ ] Move identity allocation from the temporary host `malloc`
           baseline into a compiler-owned arena with an explicit bulk lifetime.
           - Identity storage must remain separate from transient String
