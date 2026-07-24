@@ -94,13 +94,24 @@
             explicit `storage.bytes.count` projection.
         - [x] Give member functions owner-qualified LLVM symbols and prove
           `String.count` can coexist with the generic `Buffer.count`.
-      - [ ] Cut identity-bearing ordinary construct members over from
+      - [x] Cut identity-bearing ordinary construct members over from
         recursively embedded LLVM aggregates to the canonical ID/reference
         representation.
-        - The graph now classifies these members as identity-bearing, but the
-          current native emitter still recursively embeds their value
-          aggregates. Do not treat the classification proof as the physical
-          ABI cutover.
+        - [x] Store one direct typed pointer per ordinary construct
+          relationship; box at construction and state replacement, then use
+          direct typed loads for reads and nested mutation.
+        - [x] Reject the legacy name-keyed `rangeConstructGet*` lookup path and
+          prove nested RootValue and Array mutation use the direct link.
+        - [x] Promote and independently verify a byte-identical Stage 2/Stage 3
+          fixed point.
+        - [ ] Move identity allocation from the temporary host `malloc`
+          baseline into a compiler-owned arena with an explicit bulk lifetime.
+          - Identity storage must remain separate from transient String
+            regions; resetting one of those regions previously exposed the
+            exact use-after-free boundary during fixed-point compilation.
+        - [ ] Benchmark representative shallow, deeply nested, and
+          mutation-heavy construct workloads before claiming a universal
+          runtime speedup.
       - [ ] Move length, indexing, comparison, slicing, concatenation, and
         append behavior onto the authored String surface, then cut their
         compiler runtime builtin cases over.

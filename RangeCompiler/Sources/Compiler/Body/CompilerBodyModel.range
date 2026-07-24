@@ -702,6 +702,8 @@ function compilerNominalLLVMMemberFieldTypeNameAtDepth(tables: CompilerSyntaxTab
     let declarationFileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
     let declarationName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: declarationFileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
     if declarationKind == compilerSyntaxKindConstruct()
+        && compilerMemoryMemberRepresentation(tables: tables, memberRow: memberRow) == compilerMemoryMemberRepresentationIdentity() { return String("ptr") }
+    if declarationKind == compilerSyntaxKindConstruct()
         && compilerRuntimeABIConstructKind(tables: tables, constructNodeID: targetID) == compilerRuntimeABIOpaqueStorage() { return String("ptr") }
     if declarationKind == compilerSyntaxKindConstruct()
         && compilerNominalLLVMLayoutIsSupportedAtDepth(tables: tables, declarationRow: declarationRow, depth: depth + 1) { return "%Range.\(declarationName)" }

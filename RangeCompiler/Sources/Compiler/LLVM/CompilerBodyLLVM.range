@@ -93,6 +93,25 @@ function compilerBodyLLVMStorageTypeName(arena: CompilerBodyArena, storageID: In
     return compilerBodyLLVMNominalTypeNameForTypeID(arena: arena, typeID: compilerIntTableValue(table: arena.storages, row: storageID, column: compilerBodyStorageTypeIDColumn()))
 }
 
+function compilerBodyLLVMMemberUsesIdentity(arena: CompilerBodyArena, memberRow: Int): Bool {
+    return compilerMemoryMemberRepresentation(tables: arena.tables, memberRow: memberRow) == compilerMemoryMemberRepresentationIdentity()
+}
+
+function compilerBodyLLVMConstructIdentityFieldCount(arena: CompilerBodyArena, typeID: Int): Int {
+    if typeID < 0 || typeID >= compilerIntTableRowCount(table: arena.typeInstances) { return 0 - 1 }
+    let constructSyntaxID: Int(compilerIntTableValue(table: arena.typeInstances, row: typeID, column: compilerBodyTypeInstanceNominalSyntaxColumn()))
+    state count: Int(0)
+    state ordinal: Int(0)
+    let memberCount: Int(compilerBodyArenaConstructMemberCount(arena: arena, constructSyntaxID: constructSyntaxID))
+    while ordinal < memberCount {
+        let memberRow: Int(compilerBodyArenaConstructMemberRowAtOrdinal(arena: arena, constructSyntaxID: constructSyntaxID, ordinal: ordinal))
+        if memberRow < 0 { return 0 - 1 }
+        if compilerBodyLLVMMemberUsesIdentity(arena: arena, memberRow: memberRow) { count: count + 1 }
+        ordinal: ordinal + 1
+    }
+    return count
+}
+
 function compilerBodyLLVMValueTypeName(arena: CompilerBodyArena, valueID: Int): String {
     if compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueKindColumn()) == compilerBodyMIRValueReceiverAddress() { return String("ptr") }
     let typeKind: Int(compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueTypeColumn()))
@@ -760,8 +779,11 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
     let plannedTemporary: Int(emitter.runtimeState.element(index: compilerBodyLLVMEmitterNextTemporary()))
     if operationKind == compilerBodyMIROperationMemberAssign() {
         let receiverValueID: Int(compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0))
+        let memberRow: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationTargetIDColumn()))
+        state temporaryCount: Int(2)
+        if compilerBodyLLVMMemberUsesIdentity(arena: emitter.arena, memberRow: memberRow) { temporaryCount: 3 }
         if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueAlias(), number: plannedTemporary, aux: receiverValueID) != 0
-            || emitter.runtimeState.update(element: plannedTemporary + 2, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
+            || emitter.runtimeState.update(element: plannedTemporary + temporaryCount, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
         return 0
     }
     if operationKind == compilerBodyMIROperationStringGlobal() {
@@ -793,14 +815,19 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
             return compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueAlias(), number: 0 - 1, aux: plannedMemberReceiverValueID)
         }
         let plannedMemberReceiverValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: plannedMemberReceiverValueID))
+        let plannedMemberUsesIdentity: Bool(compilerBodyLLVMMemberUsesIdentity(arena: emitter.arena, memberRow: plannedMemberTargetID))
         if plannedMemberReceiverValue.typeName != String("ptr") {
-            if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary, aux: 0 - 1) != 0
-                || emitter.runtimeState.update(element: plannedTemporary + 1, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
+            state plannedMemberTemporaryCount: Int(1)
+            if plannedMemberUsesIdentity { plannedMemberTemporaryCount: 2 }
+            if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + plannedMemberTemporaryCount - 1, aux: 0 - 1) != 0
+                || emitter.runtimeState.update(element: plannedTemporary + plannedMemberTemporaryCount, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
             return 0
         }
         if compilerIntTableValue(table: emitter.arena.mirValues, row: plannedMemberReceiverValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeConstruct() {
-            if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + 1, aux: 0 - 1) != 0
-                || emitter.runtimeState.update(element: plannedTemporary + 2, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
+            state plannedPointerMemberTemporaryCount: Int(2)
+            if plannedMemberUsesIdentity { plannedPointerMemberTemporaryCount: 3 }
+            if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + plannedPointerMemberTemporaryCount - 1, aux: 0 - 1) != 0
+                || emitter.runtimeState.update(element: plannedTemporary + plannedPointerMemberTemporaryCount, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
             return 0
         }
         let plannedMemberSourceNodeID: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationSourceColumn()))
@@ -822,9 +849,11 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
         if transparentMemberRow >= 0 && fieldCount == 1 {
             return compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueAlias(), number: 0 - 1, aux: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0))
         }
+        let identityFieldCount: Int(compilerBodyLLVMConstructIdentityFieldCount(arena: emitter.arena, typeID: constructTypeID))
         if fieldCount < 1
-            || compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + fieldCount - 1, aux: 0 - 1) != 0
-            || emitter.runtimeState.update(element: plannedTemporary + fieldCount, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
+            || identityFieldCount < 0
+            || compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + fieldCount + identityFieldCount - 1, aux: 0 - 1) != 0
+            || emitter.runtimeState.update(element: plannedTemporary + fieldCount + identityFieldCount, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
         return 0
     }
     if operationKind == compilerBodyMIROperationEnumConstruct() {
@@ -853,6 +882,15 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
     if operationKind == compilerBodyMIROperationOptionalSome() {
         if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + 1, aux: 0 - 1) != 0 { return 0 - 1 }
         return emitter.runtimeState.update(element: plannedTemporary + 2, index: compilerBodyLLVMEmitterNextTemporary())
+    }
+    if operationKind == compilerBodyMIROperationMemberAddress() {
+        let memberRow: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationTargetIDColumn()))
+        state memberAddressTemporaryCount: Int(1)
+        if compilerBodyLLVMMemberUsesIdentity(arena: emitter.arena, memberRow: memberRow) { memberAddressTemporaryCount: 2 }
+        if compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + memberAddressTemporaryCount - 1, aux: 0 - 1) != 0 {
+            return 0 - 1
+        }
+        return emitter.runtimeState.update(element: plannedTemporary + memberAddressTemporaryCount, index: compilerBodyLLVMEmitterNextTemporary())
     }
     state resultTemporary: Int(plannedTemporary)
     state consumedTemporaryCount: Int(1)
@@ -944,6 +982,11 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         let memberOrdinal: Int(compilerBodyArenaStoredMemberOrdinal(arena: emitter.arena, memberRow: memberRow))
         if assignmentRow < 0 || baseValue.text == String("") || baseValue.typeName != String("ptr") || aggregateTypeName == String("") || memberOrdinal < 0 { return 0 - 1 }
         let temporary: Int(compilerIntTableValue(table: emitter.valueAssignments, row: assignmentRow, column: compilerBodyLLVMValueAssignmentNumberColumn()))
+        if compilerBodyLLVMMemberUsesIdentity(arena: emitter.arena, memberRow: memberRow) {
+            if rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(temporary - 1) = getelementptr inbounds \(aggregateTypeName), ptr \(baseValue.text), i32 0, i32 \(memberOrdinal)\n") != 0
+                || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(temporary) = load ptr, ptr %r\(temporary - 1)\n") != 0 { return 0 - 1 }
+            return 0
+        }
         return rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(temporary) = getelementptr inbounds \(aggregateTypeName), ptr \(baseValue.text), i32 0, i32 \(memberOrdinal)\n")
     }
     if operationKind == compilerBodyMIROperationMemberAssign() {
@@ -959,6 +1002,15 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         let assignmentTemporary: Int(compilerIntTableValue(table: emitter.valueAssignments, row: memberAssignmentRow, column: compilerBodyLLVMValueAssignmentNumberColumn()))
         let assignedValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: assignedValueID))
         if assignedValue.text == String("") { return 0 - 1 }
+        if compilerBodyLLVMMemberUsesIdentity(arena: emitter.arena, memberRow: memberRow) {
+            if assignedValue.typeName == String("ptr")
+                || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(assignmentTemporary) = call ptr @rangeConstructIdentityCreate(i64 ptrtoint (ptr getelementptr (\(assignedValue.typeName), ptr null, i32 1) to i64))\n") != 0
+                || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  store \(assignedValue.typeName) \(assignedValue.text), ptr %r\(assignmentTemporary)\n") != 0
+                || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(assignmentTemporary + 1) = load \(aggregateTypeName), ptr \(receiverValue.text)\n") != 0
+                || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(assignmentTemporary + 2) = insertvalue \(aggregateTypeName) %r\(assignmentTemporary + 1), ptr %r\(assignmentTemporary), \(memberOrdinal)\n") != 0
+                || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  store \(aggregateTypeName) %r\(assignmentTemporary + 2), ptr \(receiverValue.text)\n") != 0 { return 0 - 1 }
+            return 0
+        }
         if rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(assignmentTemporary) = load \(aggregateTypeName), ptr \(receiverValue.text)\n") != 0
             || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(assignmentTemporary + 1) = insertvalue \(aggregateTypeName) %r\(assignmentTemporary), \(assignedValue.typeName) \(assignedValue.text), \(memberOrdinal)\n") != 0
             || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  store \(aggregateTypeName) %r\(assignmentTemporary + 1), ptr \(receiverValue.text)\n") != 0 { return 0 - 1 }
@@ -972,18 +1024,36 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         let constructTypeName: String(compilerBodyLLVMValueTypeName(arena: emitter.arena, valueID: resultValueID))
         if constructAssignmentRow < 0 || fieldCount < 1 || constructTypeName == String("") { return 0 - 1 }
         let finalTemporary: Int(compilerIntTableValue(table: emitter.valueAssignments, row: constructAssignmentRow, column: compilerBodyLLVMValueAssignmentNumberColumn()))
-        let firstTemporary: Int(finalTemporary - fieldCount + 1)
+        let constructTypeID: Int(compilerIntTableValue(table: emitter.arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeIDColumn()))
+        if constructTypeID < 0 || constructTypeID >= compilerIntTableRowCount(table: emitter.arena.typeInstances) { return 0 - 1 }
+        let constructSyntaxID: Int(compilerIntTableValue(table: emitter.arena.typeInstances, row: constructTypeID, column: compilerBodyTypeInstanceNominalSyntaxColumn()))
+        let identityFieldCount: Int(compilerBodyLLVMConstructIdentityFieldCount(arena: emitter.arena, typeID: constructTypeID))
+        if identityFieldCount < 0 { return 0 - 1 }
+        let firstTemporary: Int(finalTemporary - fieldCount - identityFieldCount + 1)
+        state nextTemporary: Int(firstTemporary)
         state aggregateOperand: String("poison")
         state constructOrdinal: Int(0)
         while constructOrdinal < fieldCount {
             let fieldValueID: Int(compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: constructOrdinal))
             let fieldValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: fieldValueID))
-            if fieldValue.text == String("") { return 0 - 1 }
-            let temporary: Int(firstTemporary + constructOrdinal)
-            if rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(temporary) = insertvalue \(constructTypeName) \(aggregateOperand), \(fieldValue.typeName) \(fieldValue.text), \(constructOrdinal)\n") != 0 { return 0 - 1 }
-            aggregateOperand: "%r\(temporary)"
+            let memberRow: Int(compilerBodyArenaConstructMemberRowAtOrdinal(arena: emitter.arena, constructSyntaxID: constructSyntaxID, ordinal: constructOrdinal))
+            if fieldValue.text == String("") || memberRow < 0 { return 0 - 1 }
+            state storedFieldTypeName: String(fieldValue.typeName)
+            state storedFieldValue: String(fieldValue.text)
+            if compilerBodyLLVMMemberUsesIdentity(arena: emitter.arena, memberRow: memberRow) {
+                if fieldValue.typeName == String("ptr")
+                    || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(nextTemporary) = call ptr @rangeConstructIdentityCreate(i64 ptrtoint (ptr getelementptr (\(fieldValue.typeName), ptr null, i32 1) to i64))\n") != 0
+                    || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  store \(fieldValue.typeName) \(fieldValue.text), ptr %r\(nextTemporary)\n") != 0 { return 0 - 1 }
+                storedFieldTypeName: String("ptr")
+                storedFieldValue: "%r\(nextTemporary)"
+                nextTemporary: nextTemporary + 1
+            }
+            if rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(nextTemporary) = insertvalue \(constructTypeName) \(aggregateOperand), \(storedFieldTypeName) \(storedFieldValue), \(constructOrdinal)\n") != 0 { return 0 - 1 }
+            aggregateOperand: "%r\(nextTemporary)"
+            nextTemporary: nextTemporary + 1
             constructOrdinal: constructOrdinal + 1
         }
+        if nextTemporary != finalTemporary + 1 { return 0 - 1 }
         return 0
     }
     if operationKind == compilerBodyMIROperationEnumConstruct() {
@@ -1255,6 +1325,14 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
             if nativeMemberRow < 0 { return 0 - 1 }
             let nativeMemberOrdinal: Int(compilerBodyArenaStoredMemberOrdinal(arena: emitter.arena, memberRow: nativeMemberRow))
             if nativeMemberOrdinal < 0 { return 0 - 1 }
+            if compilerBodyLLVMMemberUsesIdentity(arena: emitter.arena, memberRow: nativeMemberRow) {
+                let memberIdentityTemporary: Int(memberCallTemporary - 1)
+                let memberResultType: String(compilerBodyLLVMValueTypeName(arena: emitter.arena, valueID: resultValueID))
+                if memberResultType == String("")
+                    || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(memberIdentityTemporary) = extractvalue \(memberReceiverValue.typeName) \(memberReceiverValue.text), \(nativeMemberOrdinal)\n") != 0
+                    || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(memberCallTemporary) = load \(memberResultType), ptr %r\(memberIdentityTemporary)\n") != 0 { return 0 - 1 }
+                return 0
+            }
             return rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(memberCallTemporary) = extractvalue \(memberReceiverValue.typeName) \(memberReceiverValue.text), \(nativeMemberOrdinal)\n")
         }
         let memberReceiverValueID: Int(compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0))
@@ -1263,10 +1341,17 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
             let memberReceiverAggregateType: String(compilerBodyLLVMNominalTypeNameForTypeID(arena: emitter.arena, typeID: memberReceiverTypeID))
             let nativeMemberRow: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationTargetIDColumn()))
             let nativeMemberOrdinal: Int(compilerBodyArenaStoredMemberOrdinal(arena: emitter.arena, memberRow: nativeMemberRow))
-            let memberLoadTemporary: Int(memberCallTemporary - 1)
+            state memberLoadTemporary: Int(memberCallTemporary - 1)
+            if compilerBodyLLVMMemberUsesIdentity(arena: emitter.arena, memberRow: nativeMemberRow) { memberLoadTemporary: memberCallTemporary - 2 }
             if memberReceiverAggregateType == String("") || nativeMemberRow < 0 || nativeMemberOrdinal < 0
-                || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(memberLoadTemporary) = load \(memberReceiverAggregateType), ptr \(memberReceiverValue.text)\n") != 0
-                || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(memberCallTemporary) = extractvalue \(memberReceiverAggregateType) %r\(memberLoadTemporary), \(nativeMemberOrdinal)\n") != 0 { return 0 - 1 }
+                || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(memberLoadTemporary) = load \(memberReceiverAggregateType), ptr \(memberReceiverValue.text)\n") != 0 { return 0 - 1 }
+            if compilerBodyLLVMMemberUsesIdentity(arena: emitter.arena, memberRow: nativeMemberRow) {
+                let memberIdentityTemporary: Int(memberCallTemporary - 1)
+                let memberResultType: String(compilerBodyLLVMValueTypeName(arena: emitter.arena, valueID: resultValueID))
+                if memberResultType == String("")
+                    || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(memberIdentityTemporary) = extractvalue \(memberReceiverAggregateType) %r\(memberLoadTemporary), \(nativeMemberOrdinal)\n") != 0
+                    || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(memberCallTemporary) = load \(memberResultType), ptr %r\(memberIdentityTemporary)\n") != 0 { return 0 - 1 }
+            } else if rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(memberCallTemporary) = extractvalue \(memberReceiverAggregateType) %r\(memberLoadTemporary), \(nativeMemberOrdinal)\n") != 0 { return 0 - 1 }
             return 0
         }
         let memberGlobalTemporary: Int(memberCallTemporary - 1)
@@ -2234,11 +2319,20 @@ function compilerCoreRenderLLVMRuntimeDeclarations(records: String, renderedFunc
 }
 
 function compilerCoreRenderLLVMDynamicConstructDeclarations(records: String, renderedFunctions: String): String {
-    if compilerCoreRecordContains(record: renderedFunctions, text: String("@rangeConstruct"))
-        || compilerCoreRecordContains(record: records, text: String("rangeConstruct")) {
-        return String("declare ptr @rangeConstructCreate(ptr)\ndeclare ptr @rangeConstructSetPtr(ptr, ptr, ptr)\ndeclare ptr @rangeConstructSetInt(ptr, ptr, i32)\ndeclare ptr @rangeConstructSetBool(ptr, ptr, i1)\ndeclare ptr @rangeConstructGetPtr(ptr, ptr)\ndeclare i32 @rangeConstructGetInt(ptr, ptr)\ndeclare i1 @rangeConstructGetBool(ptr, ptr)\n")
+    state declarations: String("")
+    if compilerCoreRecordContains(record: renderedFunctions, text: String("@rangeConstructIdentityCreate"))
+        || compilerCoreRecordContains(record: records, text: String("rangeConstructIdentityCreate")) {
+        declarations: "declare ptr @rangeConstructIdentityCreate(i64)\n"
     }
-    return String("")
+    if compilerCoreRecordContains(record: renderedFunctions, text: String("@rangeConstructCreate"))
+        || compilerCoreRecordContains(record: renderedFunctions, text: String("@rangeConstructSet"))
+        || compilerCoreRecordContains(record: renderedFunctions, text: String("@rangeConstructGet"))
+        || compilerCoreRecordContains(record: records, text: String("rangeConstructCreate"))
+        || compilerCoreRecordContains(record: records, text: String("rangeConstructSet"))
+        || compilerCoreRecordContains(record: records, text: String("rangeConstructGet")) {
+        declarations: "\(declarations)declare ptr @rangeConstructCreate(ptr)\ndeclare ptr @rangeConstructSetPtr(ptr, ptr, ptr)\ndeclare ptr @rangeConstructSetInt(ptr, ptr, i32)\ndeclare ptr @rangeConstructSetBool(ptr, ptr, i1)\ndeclare ptr @rangeConstructGetPtr(ptr, ptr)\ndeclare i32 @rangeConstructGetInt(ptr, ptr)\ndeclare i1 @rangeConstructGetBool(ptr, ptr)\n"
+    }
+    return declarations
 }
 
 function compilerCoreRenderLLVMRuntimeDeclarationsTyped(records: String, renderedFunctions: String, runtimeRequirements: Int): String {

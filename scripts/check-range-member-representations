@@ -51,13 +51,21 @@ LLVM="$BUILD_ROOT/MemberRepresentations.ll"
 "$CANDIDATE_COMPILER" emit-llvm "$SOURCE_SET" "$LLVM"
 
 /usr/bin/grep -q 'call i32 @Buffer__count' "$LLVM"
-if /usr/bin/grep -Fq 'rangeConstructGetPtr' "$LLVM"; then
+if /usr/bin/grep -Fq 'call ptr @rangeConstructGetPtr' "$LLVM"; then
     echo "Transparent storage projection used an identity lookup." >&2
     exit 1
 fi
 
 /usr/bin/grep -Eq '%Range\.InlineNumber = type \{ i32 \}' "$LLVM"
 /usr/bin/grep -Eq 'extractvalue %Range\.InlineNumber .* 0' "$LLVM"
+/usr/bin/grep -Eq '%Range\.IdentityOwner = type \{ ptr \}' "$LLVM"
+/usr/bin/grep -Fq 'call ptr @rangeConstructIdentityCreate(i64 ' "$LLVM"
+/usr/bin/grep -Eq 'store %Range\.IdentityLeaf .* ptr %r' "$LLVM"
+/usr/bin/grep -Eq 'load %Range\.IdentityLeaf, ptr %r' "$LLVM"
+if /usr/bin/grep -Fq '%Range.IdentityOwner = type { %Range.IdentityLeaf }' "$LLVM"; then
+    echo "Identity-bearing member remained recursively embedded." >&2
+    exit 1
+fi
 if /usr/bin/grep -Fq '%Range.ByteStorageView = type' "$LLVM"; then
     echo "Transparent storage wrapper emitted a physical aggregate." >&2
     exit 1
@@ -78,4 +86,4 @@ if [[ "$range_exit" -ne 12 ]]; then
     exit 1
 fi
 
-echo "Inline, identity, and transparent member representations verified."
+echo "Inline values, direct identity links, and transparent storage verified."

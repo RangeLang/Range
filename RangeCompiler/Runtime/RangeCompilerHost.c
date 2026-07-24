@@ -656,6 +656,19 @@ void *rangeConstructCreate(void *opaqueName) {
     return object;
 }
 
+void *rangeConstructIdentityCreate(uint64_t byteCount) {
+    size_t size = (size_t)byteCount;
+    if ((uint64_t)size != byteCount || size == 0) {
+        abort();
+    }
+    void *identity = malloc(size);
+    if (!identity) {
+        abort();
+    }
+    memset(identity, 0, size);
+    return identity;
+}
+
 void *rangeConstructSetPtr(void *opaque, void *opaqueName, void *value) {
     char *name = rangeStringData(opaqueName);
     RangeConstructObject *object = (RangeConstructObject *)opaque;

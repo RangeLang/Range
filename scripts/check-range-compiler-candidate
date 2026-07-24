@@ -655,8 +655,14 @@ audit_native_arrays() {
             || fail "$stage_label native Array $kind omitted the generic pointer/count layout"
         /usr/bin/grep -Eq 'alloca (i32|%Range\.(NumberToken|MutableNumberToken)), i32 [1-9][0-9]*' "$first" \
             || fail "$stage_label native Array $kind omitted typed lexical backing storage"
-        if /usr/bin/grep -Eq 'call .*@(rangeConstruct|rawBufferCreate|malloc|calloc|realloc)' "$first"; then
+        if /usr/bin/grep -Eq 'call .*@(rangeConstruct(Create|Get|Set)|rawBufferCreate|malloc|calloc|realloc)' "$first"; then
             fail "$stage_label native Array $kind introduced dynamic-record or allocator calls"
+        fi
+        if [[ "$kind" == mutation-nested-member ]]; then
+            /usr/bin/grep -Fq 'call ptr @rangeConstructIdentityCreate(i64 ' "$first" \
+                || fail "$stage_label native Array nested mutation omitted its direct identity link"
+        elif /usr/bin/grep -Fq 'call ptr @rangeConstructIdentityCreate(i64 ' "$first"; then
+            fail "$stage_label native Array $kind introduced an unexpected identity allocation"
         fi
         if [[ "$kind" == count ]]; then
             /usr/bin/grep -Eq 'extractvalue %Range\.Array .* 1' "$first" \
@@ -3160,8 +3166,10 @@ audit_root_value_positive() {
     if [[ "$kind" == nested-inline ]]; then
         /usr/bin/grep -Fq '%Range.RootNestedInner = type { ptr }' "$first" \
             || fail "$stage_label nested RootValue omitted its inner layout"
-        /usr/bin/grep -Fq '%Range.RootNestedOuter = type { %Range.RootNestedInner }' "$first" \
-            || fail "$stage_label nested RootValue omitted its outer layout"
+        /usr/bin/grep -Fq '%Range.RootNestedOuter = type { ptr }' "$first" \
+            || fail "$stage_label nested RootValue omitted its direct identity-link layout"
+        /usr/bin/grep -Fq 'call ptr @rangeConstructIdentityCreate(i64 ' "$first" \
+            || fail "$stage_label nested RootValue omitted identity-link allocation"
     fi
     if [[ "$kind" == inline-local-return ]]; then
         /usr/bin/grep -Fq '%Range.RootLocalHolder = type { ptr }' "$first" \
@@ -3183,12 +3191,20 @@ audit_root_value_positive() {
         /usr/bin/grep -Fq '%Range.RootBoundaryForwardPair = type { ptr, ptr }' "$first" \
             || fail "$stage_label two-input boundary forward omitted its exact pair layout"
     fi
-    local forbidden
-    for forbidden in rangeConstruct malloc calloc realloc free; do
+    local forbidden forbidden_construct_symbol
+    for forbidden in malloc calloc realloc free; do
         if /usr/bin/grep -Fq "$forbidden" "$first"; then
             fail "$stage_label RootValue $kind emitted forbidden dynamic/allocator symbol: $forbidden"
         fi
     done
+    for forbidden_construct_symbol in rangeConstructCreate rangeConstructGet rangeConstructSet; do
+        if /usr/bin/grep -Fq "$forbidden_construct_symbol" "$first"; then
+            fail "$stage_label RootValue $kind emitted forbidden name-keyed construct symbol: $forbidden_construct_symbol"
+        fi
+    done
+    if [[ "$kind" != nested-inline ]] && /usr/bin/grep -Fq 'rangeConstructIdentityCreate' "$first"; then
+        fail "$stage_label RootValue $kind emitted an unexpected identity allocation"
+    fi
 
     /bin/mkdir -p "$stage_directory"
     /bin/cp "$first" "$llvm"
@@ -5052,10 +5068,10 @@ audit_member_representations() {
         /bin/cat "$error" >&2
         fail "$stage_label member representation proof failed"
     }
-    /usr/bin/grep -Fq 'Inline, identity, and transparent member representations verified.' "$output" \
+    /usr/bin/grep -Fq 'Inline values, direct identity links, and transparent storage verified.' "$output" \
         || fail "$stage_label member representation proof omitted its checkpoint"
     [[ ! -s "$error" ]] || fail "$stage_label member representation proof wrote stderr"
-    echo "$stage_label member representations: pass (inline core value, identity-bearing construct relationship, transparent storage projection)"
+    echo "$stage_label member representations: pass (inline core value, direct typed identity link, transparent storage projection)"
 }
 
 audit_stage() {
