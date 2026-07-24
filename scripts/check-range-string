@@ -64,4 +64,44 @@ if [[ "$range_exit" -ne 92 ]]; then
     exit 1
 fi
 
-echo "Owner-qualified Buffer-backed String byte/count access verified."
+MUTABLE_SOURCE_SET="$BUILD_ROOT/StringMutableSourceSet.range"
+MUTABLE_LLVM="$BUILD_ROOT/StringMutableBuffer.ll"
+
+/usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$MUTABLE_SOURCE_SET"
+/usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Memory/RawBuffer.range' >> "$MUTABLE_SOURCE_SET"
+/bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range" >> "$MUTABLE_SOURCE_SET"
+/usr/bin/printf '\n%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Memory/Buffer.range' >> "$MUTABLE_SOURCE_SET"
+/bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/Buffer.range" >> "$MUTABLE_SOURCE_SET"
+/usr/bin/printf '\n%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Text/String.range' >> "$MUTABLE_SOURCE_SET"
+/bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/String.range" >> "$MUTABLE_SOURCE_SET"
+/usr/bin/printf '\n%s\n' 'compilerSourceFile\trole=project\tpath=Project/StringMutableBuffer.range' >> "$MUTABLE_SOURCE_SET"
+/bin/cat "$REPO_ROOT/Testing/Strings/Pass/StringMutableBuffer.range" >> "$MUTABLE_SOURCE_SET"
+/usr/bin/printf '\n' >> "$MUTABLE_SOURCE_SET"
+
+"$CANDIDATE_COMPILER" emit-llvm "$MUTABLE_SOURCE_SET" "$MUTABLE_LLVM"
+/usr/bin/grep -q 'call ptr @stringOwnedCopy(ptr' "$MUTABLE_LLVM"
+/usr/bin/grep -q 'call i32 @String__append(ptr' "$MUTABLE_LLVM"
+/usr/bin/grep -q 'call i32 @String__destroy(ptr' "$MUTABLE_LLVM"
+/usr/bin/grep -q 'call i32 @stringAppendStorage(ptr' "$MUTABLE_LLVM"
+/usr/bin/grep -q 'call i32 @stringDestroy(ptr' "$MUTABLE_LLVM"
+if /usr/bin/grep -Eq 'call ptr @(stringConcat|stringAppendOwned)\(' "$MUTABLE_LLVM"; then
+    echo "Mutable String append lowered through immutable String concatenation." >&2
+    exit 1
+fi
+
+clang -Wno-override-module -x ir "$MUTABLE_LLVM" -x c \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerHost.c" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeRawBuffer.c" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerMetrics.c" \
+    -o "$BUILD_ROOT/StringMutableBuffer"
+
+set +e
+"$BUILD_ROOT/StringMutableBuffer"
+mutable_exit=$?
+set -e
+if [[ "$mutable_exit" -ne 84 ]]; then
+    echo "Mutable Buffer-backed String append failed: expected 84, got $mutable_exit" >&2
+    exit 1
+fi
+
+echo "Owner-qualified Buffer-backed String access and in-place append verified."

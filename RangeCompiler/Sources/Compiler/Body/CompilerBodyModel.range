@@ -98,7 +98,9 @@ function compilerBodyRuntimeBuiltinRunProcess(): Int { return 39 }
 function compilerBodyRuntimeBuiltinRunProcessBatch(): Int { return 40 }
 function compilerBodyRuntimeBuiltinBufferCreateInt(): Int { return 41 }
 function compilerBodyRuntimeBuiltinBufferCreateUnsigned8(): Int { return 42 }
-function compilerBodyRuntimeBuiltinCount(): Int { return 42 }
+function compilerBodyRuntimeBuiltinStringAppendStorage(): Int { return 43 }
+function compilerBodyRuntimeBuiltinStringDestroy(): Int { return 44 }
+function compilerBodyRuntimeBuiltinCount(): Int { return 44 }
 
 function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("stringTransientRegionMark") { return compilerBodyRuntimeBuiltinStringTransientRegionMark() }
@@ -143,6 +145,8 @@ function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("runProcessBatch") { return compilerBodyRuntimeBuiltinRunProcessBatch() }
     if name == String("bufferCreateInt") { return compilerBodyRuntimeBuiltinBufferCreateInt() }
     if name == String("bufferCreateUnsigned8") { return compilerBodyRuntimeBuiltinBufferCreateUnsigned8() }
+    if name == String("stringAppendStorage") { return compilerBodyRuntimeBuiltinStringAppendStorage() }
+    if name == String("stringDestroy") { return compilerBodyRuntimeBuiltinStringDestroy() }
     return compilerBodyRuntimeBuiltinNone()
 }
 
@@ -189,6 +193,8 @@ function compilerBodyRuntimeBuiltinName(id: Int): String {
     if id == compilerBodyRuntimeBuiltinRunProcessBatch() { return String("runProcessBatch") }
     if id == compilerBodyRuntimeBuiltinBufferCreateInt() { return String("bufferCreateInt") }
     if id == compilerBodyRuntimeBuiltinBufferCreateUnsigned8() { return String("bufferCreateUnsigned8") }
+    if id == compilerBodyRuntimeBuiltinStringAppendStorage() { return String("stringAppendStorage") }
+    if id == compilerBodyRuntimeBuiltinStringDestroy() { return String("stringDestroy") }
     return String("")
 }
 
@@ -223,7 +229,8 @@ function compilerBodyRuntimeBuiltinParameterCount(id: Int): Int {
         || id == compilerBodyRuntimeBuiltinCommandLineArgument()
         || id == compilerBodyRuntimeBuiltinReadFile()
         || id == compilerBodyRuntimeBuiltinCompilerMetricsSetEnabled()
-        || id == compilerBodyRuntimeBuiltinPrint() { return 1 }
+        || id == compilerBodyRuntimeBuiltinPrint()
+        || id == compilerBodyRuntimeBuiltinStringDestroy() { return 1 }
     if id == compilerBodyRuntimeBuiltinBufferCreateInt()
         || id == compilerBodyRuntimeBuiltinBufferCreateUnsigned8() { return 1 }
     if id == compilerBodyRuntimeBuiltinStringHasPrefix()

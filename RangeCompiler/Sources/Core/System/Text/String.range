@@ -6,7 +6,21 @@ construct String {
         bytes.count
     }
 
+    function append(text: String): Int {
+        return stringAppendStorage(destination: self, text: text)
+    }
+
     function byte(index: Int): Int {
         return stringByteAt(source: self, index: index)
     }
+
+    function destroy(): Int {
+        return stringDestroy(value: self)
+    }
 }
+
+@builtin(.write)
+function stringAppendStorage(destination: String, text: String): Int
+
+@builtin(.destroy)
+function stringDestroy(value: String): Int

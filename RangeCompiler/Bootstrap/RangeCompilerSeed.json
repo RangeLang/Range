@@ -33,7 +33,7 @@
     {
       "path": "RangeCompiler/Sources/Core/System/Text/String.range",
       "role": "core",
-      "sha256": "fbd37169d285befb27fe95a04bf5aff3c0db9dd9153c72c5c7b3a6699507631f"
+      "sha256": "e9d838a03fc71e4097871c9854ad12a41108a99e69caf36637c30baf1dbbc034"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Body/CompilerBodyCFG.range",
@@ -149,7 +149,7 @@
     },
     {
       "path": "RangeCompiler/Runtime/RangeRawBuffer.c",
-      "sha256": "49afdf2e9bf4f00e61d6beccc4a3b7f75bf584b2ba4345e586bdc3c182470b56"
+      "sha256": "deaf37d11032a7387390e5aa8b07851af6d807202acec9142ad8485895538e9f"
     },
     {
       "path": "RangeCompiler/Runtime/RangeCompilerMetrics.c",

@@ -388,3 +388,11 @@ int32_t rawBufferDestroy(void *opaqueBuffer) {
     free(buffer);
     return 0;
 }
+
+int32_t stringAppendStorage(void *destination, void *text) {
+    return rawBufferAppendText(destination, text);
+}
+
+int32_t stringDestroy(void *value) {
+    return rawBufferDestroy(value);
+}

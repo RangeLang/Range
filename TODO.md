@@ -60,6 +60,16 @@
         - A direct immutable-String migration was rejected: the same 2.65 MB
           source-set compile rose from about 120 seconds to more than 385
           seconds, even though it remained semantically valid.
+        - [x] Add in-place `stringAppendStorage` and `stringDestroy`
+          operations over the canonical `Buffer<Int<8, .unsigned>>`
+          representation, with a focused runtime proof that distinguishes
+          immutable literal views from owned mutable `state` text.
+        - [x] Forward write and destroy effects through authored transparent
+          `String` methods, including automatic owned storage for
+          `state value: String("Hello")`.
+        - [ ] Restore the broader `check-root-value` gate; the focused String
+          proof passes, but the current candidate rejects the full Stage 2
+          source set during `enumPayloadLink` with `invalidEnumPayloadType`.
       - [ ] Replace the three shared accumulators for LLVM body blocks,
         functions, and globals after mutable String storage can cross function
         boundaries without falling back to RawBuffer.

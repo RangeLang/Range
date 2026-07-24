@@ -1,0 +1,7 @@
+@main {
+    state value: String("Hello")
+    value.append(text: String(" Range!"))
+    let result: Int(value.byte(index: 0) + value.count)
+    value.destroy()
+    return result
+}
