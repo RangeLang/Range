@@ -914,6 +914,34 @@ function compilerBodyArenaTypeIDIsOpaqueStorage(arena: CompilerBodyArena, typeID
     return nominalSyntaxID >= 0 && compilerRuntimeABIConstructKind(tables: arena.tables, constructNodeID: nominalSyntaxID) == compilerRuntimeABIOpaqueStorage()
 }
 
+function compilerBodyArenaTransparentStorageBaseTypeID(arena: CompilerBodyArena, typeID: Int): Int {
+    state currentTypeID: Int(typeID)
+    state depth: Int(0)
+    let maximumDepth: Int(compilerIntTableRowCount(table: arena.typeInstances) + 1)
+    while depth < maximumDepth
+        && currentTypeID >= 0
+        && currentTypeID < compilerIntTableRowCount(table: arena.typeInstances)
+        && compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: currentTypeID) == compilerBodyTypeConstruct() {
+        let transparentMemberRow: Int(compilerBodyArenaTransparentStorageMemberRowForType(arena: arena, typeKind: compilerBodyTypeConstruct(), typeID: currentTypeID))
+        if transparentMemberRow < 0 { return currentTypeID }
+        let nextTypeID: Int(compilerBodyArenaTypeIDForMemberRow(arena: arena, receiverTypeID: currentTypeID, memberRow: transparentMemberRow))
+        if nextTypeID < 0 || nextTypeID == currentTypeID { return 0 - 1 }
+        currentTypeID: nextTypeID
+        depth: depth + 1
+    }
+    if depth >= maximumDepth { return 0 - 1 }
+    return currentTypeID
+}
+
+function compilerBodyArenaStorageRepresentationsMatch(arena: CompilerBodyArena, leftTypeID: Int, rightTypeID: Int, typeKeys: CompilerIntTable, typeKeyArguments: CompilerIntTable): Bool {
+    let leftBaseTypeID: Int(compilerBodyArenaTransparentStorageBaseTypeID(arena: arena, typeID: leftTypeID))
+    let rightBaseTypeID: Int(compilerBodyArenaTransparentStorageBaseTypeID(arena: arena, typeID: rightTypeID))
+    if leftBaseTypeID < 0 || rightBaseTypeID < 0 { return false }
+    let leftKeyID: Int(compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: leftBaseTypeID))
+    let rightKeyID: Int(compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: rightBaseTypeID))
+    return leftKeyID >= 0 && leftKeyID == rightKeyID
+}
+
 function compilerBodyArenaOwnedFieldTypeID(arena: CompilerBodyArena, receiverTypeID: Int, memberRow: Int): Int {
     if receiverTypeID < 0 || receiverTypeID >= compilerIntTableRowCount(table: arena.typeInstances)
         || memberRow < 0 || memberRow >= compilerIntTableRowCount(table: arena.tables.members) { return 0 - 1 }
@@ -1731,7 +1759,8 @@ function compilerBodyArenaAppendOwnedPathDescendants(arena: CompilerBodyArena, r
                 let fieldTypeID: Int(compilerBodyArenaTypeIDForMemberRow(arena: arena, receiverTypeID: typeID, memberRow: memberRow))
                 let fieldTrackedStatus: Int(compilerBodyArenaTypeTrackedStorageStatus(arena: arena, typeID: fieldTypeID))
                 if fieldTrackedStatus < 0 { return 0 - 1 }
-                if fieldTrackedStatus == 1 {
+                if fieldTrackedStatus == 1
+                    && memberRow != compilerBodyArenaTransparentStorageMemberRowForType(arena: arena, typeKind: compilerBodyTypeConstruct(), typeID: typeID) {
                     state childPolicy: Int(policy)
                     if memberKind == compilerSyntaxMemberKindBinding() { childPolicy: compilerBodyOwnedPathPolicyAlias() }
                     let childPathID: Int(compilerBodyOwnedPathAppend(paths: arena.ownedPaths, rootKind: rootKind, rootID: rootID, parentPathID: parentPathID, memberRow: memberRow, typeID: fieldTypeID, policy: childPolicy))
@@ -1903,12 +1932,39 @@ function compilerBodyArenaOwnedPathForValue(arena: CompilerBodyArena, valueNodeI
     let receiverPathID: Int(compilerBodyArenaOwnedPathForValue(arena: arena, valueNodeID: receiverNodeID))
     if receiverPathID >= 0 {
         let receiverTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: receiverNodeID))
-        let stringSyntaxID: Int(compilerBodyArenaStringDeclarationSyntaxID(arena: arena))
-        let transparentStringMemberRow: Int(compilerRuntimeABITransparentStorageMemberRow(tables: arena.tables, constructNodeID: stringSyntaxID))
-        if receiverTypeKind == compilerBodyTypeString() && memberRow == transparentStringMemberRow { return receiverPathID }
+        let receiverTypeID: Int(compilerBodyArenaExpressionTypeID(arena: arena, nodeID: receiverNodeID))
+        let transparentMemberRow: Int(compilerBodyArenaTransparentStorageMemberRowForType(arena: arena, typeKind: receiverTypeKind, typeID: receiverTypeID))
+        if memberRow == transparentMemberRow { return receiverPathID }
         return compilerBodyOwnedPathFindChild(paths: arena.ownedPaths, parentPathID: receiverPathID, memberRow: memberRow)
     }
     return 0 - 1
+}
+
+function compilerBodyArenaTransparentStorageMemberRowForType(arena: CompilerBodyArena, typeKind: Int, typeID: Int): Int {
+    state constructSyntaxID: Int(0 - 1)
+    if typeKind == compilerBodyTypeString() {
+        constructSyntaxID: compilerBodyArenaStringDeclarationSyntaxID(arena: arena)
+    } else if typeKind == compilerBodyTypeConstruct()
+        && typeID >= 0
+        && typeID < compilerIntTableRowCount(table: arena.typeInstances) {
+        constructSyntaxID: compilerIntTableValue(table: arena.typeInstances, row: typeID, column: compilerBodyTypeInstanceNominalSyntaxColumn())
+    }
+    if constructSyntaxID < 0 { return 0 - 1 }
+    return compilerRuntimeABITransparentStorageMemberRow(tables: arena.tables, constructNodeID: constructSyntaxID)
+}
+
+function compilerBodyArenaMemberProjectionIsTransparent(arena: CompilerBodyArena, valueNodeID: Int): Bool {
+    if valueNodeID < 0
+        || valueNodeID >= compilerIntTableRowCount(table: arena.nodes)
+        || compilerIntTableValue(table: arena.nodes, row: valueNodeID, column: 1) != compilerSyntaxKindMemberRead() { return false }
+    let memberRow: Int(compilerBodyArenaMemberRowForValue(arena: arena, valueNodeID: valueNodeID))
+    let receiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: valueNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
+    if memberRow < 0 || receiverNodeID < 0 { return false }
+    return memberRow == compilerBodyArenaTransparentStorageMemberRowForType(
+        arena: arena,
+        typeKind: compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: receiverNodeID),
+        typeID: compilerBodyArenaExpressionTypeID(arena: arena, nodeID: receiverNodeID)
+    )
 }
 
 function compilerBodyArenaUngroupedValueNodeID(arena: CompilerBodyArena, valueNodeID: Int): Int {
@@ -2561,9 +2617,7 @@ function compilerBodyArenaOwnedPathMoveValue(arena: CompilerBodyArena, sourceRoo
     if sourceLeafCount <= 0 || sourceLeafCount != destinationLeafCount { return 0 - 1 }
     let sourceRootTypeID: Int(compilerIntTableValue(table: arena.ownedPaths, row: sourceRootPathID, column: compilerBodyOwnedPathTypeColumn()))
     let destinationRootTypeID: Int(compilerIntTableValue(table: arena.ownedPaths, row: destinationRootPathID, column: compilerBodyOwnedPathTypeColumn()))
-    let sourceRootKeyID: Int(compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: sourceRootTypeID))
-    let destinationRootKeyID: Int(compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: destinationRootTypeID))
-    if sourceRootKeyID < 0 || sourceRootKeyID != destinationRootKeyID { return 0 - 1 }
+    if !compilerBodyArenaStorageRepresentationsMatch(arena: arena, leftTypeID: sourceRootTypeID, rightTypeID: destinationRootTypeID, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments) { return 0 - 1 }
     if !compilerBodyArenaOwnedPathSubtreeIsAbsentAt(arena: arena, states: states, origins: origins, rootPathID: destinationRootPathID, blockID: 0 - 1, pathCount: compilerIntTableRowCount(table: arena.ownedPaths)) { return 0 - 1 }
     state sourcePathRow: Int(0)
     while sourcePathRow < compilerIntTableRowCount(table: arena.ownedPaths) {
@@ -2585,9 +2639,7 @@ function compilerBodyArenaOwnedPathMoveValue(arena: CompilerBodyArena, sourceRoo
                 || (sourcePolicy == compilerBodyOwnedPathPolicyBorrowed()
                     && !compilerBodyArenaOwnedPathOriginIsBoundary(arena: arena, originPathID: sourceOriginPathID))
                 || compilerBodyArenaOwnedPathOrigin(origins: origins, pathID: destinationPathID) != compilerBodyOwnedOriginUnknown() { return 0 - 1 }
-            let sourceKeyID: Int(compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: sourceTypeID))
-            let destinationKeyID: Int(compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: compilerIntTableValue(table: arena.ownedPaths, row: destinationPathID, column: compilerBodyOwnedPathTypeColumn())))
-            if sourceKeyID < 0 || sourceKeyID != destinationKeyID { return 0 - 1 }
+            if !compilerBodyArenaStorageRepresentationsMatch(arena: arena, leftTypeID: sourceTypeID, rightTypeID: compilerIntTableValue(table: arena.ownedPaths, row: destinationPathID, column: compilerBodyOwnedPathTypeColumn()), typeKeys: typeKeys, typeKeyArguments: typeKeyArguments) { return 0 - 1 }
         }
         sourcePathRow: sourcePathRow + 1
     }
@@ -2619,8 +2671,7 @@ function compilerBodyArenaOwnedPathMoveRootValue(arena: CompilerBodyArena, sourc
     if sourceLeafCount <= 0 || sourceLeafCount != destinationLeafCount { return 0 - 1 }
     let sourceRootTypeID: Int(compilerIntTableValue(table: arena.ownedPaths, row: sourceRootPathID, column: compilerBodyOwnedPathTypeColumn()))
     let destinationRootTypeID: Int(compilerIntTableValue(table: arena.ownedPaths, row: destinationRootPathID, column: compilerBodyOwnedPathTypeColumn()))
-    if compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: sourceRootTypeID) < 0
-        || compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: sourceRootTypeID) != compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: destinationRootTypeID) { return 0 - 1 }
+    if !compilerBodyArenaStorageRepresentationsMatch(arena: arena, leftTypeID: sourceRootTypeID, rightTypeID: destinationRootTypeID, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments) { return 0 - 1 }
     if !compilerBodyArenaOwnedPathSubtreeIsAbsentAt(arena: arena, states: states, origins: origins, rootPathID: destinationRootPathID, blockID: 0 - 1, pathCount: compilerIntTableRowCount(table: arena.ownedPaths)) { return 0 - 1 }
     state sourcePathRow: Int(0)
     while sourcePathRow < compilerIntTableRowCount(table: arena.ownedPaths) {
@@ -2634,8 +2685,7 @@ function compilerBodyArenaOwnedPathMoveRootValue(arena: CompilerBodyArena, sourc
                 || !compilerBodyArenaTypeIDIsOpaqueStorage(arena: arena, typeID: compilerIntTableValue(table: arena.ownedPaths, row: destinationPathID, column: compilerBodyOwnedPathTypeColumn()))
                 || compilerBodyArenaOwnedPathState(states: states, pathID: sourcePathRow) != compilerBodyOwnedPathLive()
                 || compilerBodyArenaOwnedPathState(states: states, pathID: destinationPathID) != compilerBodyOwnedPathAbsent()
-                || compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: sourceTypeID) < 0
-                || compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: sourceTypeID) != compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: compilerIntTableValue(table: arena.ownedPaths, row: destinationPathID, column: compilerBodyOwnedPathTypeColumn())) { return 0 - 1 }
+                || !compilerBodyArenaStorageRepresentationsMatch(arena: arena, leftTypeID: sourceTypeID, rightTypeID: compilerIntTableValue(table: arena.ownedPaths, row: destinationPathID, column: compilerBodyOwnedPathTypeColumn()), typeKeys: typeKeys, typeKeyArguments: typeKeyArguments) { return 0 - 1 }
             if sourcePolicy == compilerBodyOwnedPathPolicyOwned() {
                 let sourceOriginPathID: Int(compilerBodyArenaOwnedPathOrigin(origins: origins, pathID: sourcePathRow))
                 if compilerIntTableValue(table: arena.ownedPaths, row: destinationPathID, column: compilerBodyOwnedPathPolicyColumn()) != compilerBodyOwnedPathPolicyOwned()
@@ -2840,15 +2890,17 @@ function compilerBodyArenaOwnedPathApplyConstructMoveCommit(arena: CompilerBodyA
                 let memberTrackedStatus: Int(compilerBodyArenaTypeTrackedStorageStatus(arena: arena, typeID: memberTypeID))
                 if memberTypeID < 0 || memberTrackedStatus < 0 { return 0 - 1 }
                 if memberTrackedStatus == 1 {
-                let destinationPathID: Int(compilerBodyOwnedPathFindChild(paths: arena.ownedPaths, parentPathID: resultRootPathID, memberRow: memberRow))
+                let isTransparentMember: Bool(memberRow == compilerBodyArenaTransparentStorageMemberRowForType(arena: arena, typeKind: compilerBodyTypeConstruct(), typeID: resultTypeID))
+                state destinationPathID: Int(compilerBodyOwnedPathFindChild(paths: arena.ownedPaths, parentPathID: resultRootPathID, memberRow: memberRow))
+                if isTransparentMember {
+                    destinationPathID: resultRootPathID
+                }
                 let valueNodeID: Int(compilerBodyArenaConstructArgumentValueForMember(arena: arena, applicationNodeID: applicationNodeID, memberRow: memberRow))
                 let sourcePathID: Int(compilerBodyArenaOwnedPathForValue(arena: arena, valueNodeID: valueNodeID))
                 if destinationPathID < 0 || valueNodeID < 0 || sourcePathID < 0 { return 0 - 1 }
                 let sourceTypeID: Int(compilerIntTableValue(table: arena.ownedPaths, row: sourcePathID, column: compilerBodyOwnedPathTypeColumn()))
-                let sourceTypeKeyID: Int(compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: sourceTypeID))
-                let destinationTypeKeyID: Int(compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: memberTypeID))
-                if sourceTypeKeyID < 0 || sourceTypeKeyID != destinationTypeKeyID
-                    || compilerIntTableValue(table: arena.ownedPaths, row: destinationPathID, column: compilerBodyOwnedPathTypeColumn()) != memberTypeID { return 0 - 1 }
+                if !compilerBodyArenaStorageRepresentationsMatch(arena: arena, leftTypeID: sourceTypeID, rightTypeID: memberTypeID, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments)
+                    || (!isTransparentMember && compilerIntTableValue(table: arena.ownedPaths, row: destinationPathID, column: compilerBodyOwnedPathTypeColumn()) != memberTypeID) { return 0 - 1 }
                 if memberKind == compilerSyntaxMemberKindBinding() {
                     let canonicalSourcePathID: Int(compilerBodyArenaBindingAliasCanonicalPath(arena: arena, pathID: sourcePathID))
                     let canonicalDestinationPathID: Int(compilerBodyArenaBindingAliasCanonicalPath(arena: arena, pathID: destinationPathID))
@@ -2942,17 +2994,16 @@ function compilerBodyArenaOwnedPathApplyInstanceEffects(arena: CompilerBodyArena
             let effectPathID: Int(compilerIntTableValue(table: effects, row: effectRow, column: compilerBodyFunctionInstanceEffectPathColumn()))
             let effectKind: Int(compilerIntTableValue(table: effects, row: effectRow, column: compilerBodyFunctionInstanceEffectKindColumn()))
             let projectedMemberRow: Int(compilerBodyArenaMemberRowForValue(arena: arena, valueNodeID: valueNodeID))
-            let stringSyntaxID: Int(compilerBodyArenaStringDeclarationSyntaxID(arena: arena))
-            let transparentStringMemberRow: Int(compilerRuntimeABITransparentStorageMemberRow(tables: arena.tables, constructNodeID: stringSyntaxID))
-            let isUntrackedTransparentStringProjection: Bool(pathID < 0 && projectedMemberRow == transparentStringMemberRow)
-            if !isUntrackedTransparentStringProjection {
+            let isTransparentProjection: Bool(compilerBodyArenaMemberProjectionIsTransparent(arena: arena, valueNodeID: valueNodeID))
+            let isUntrackedTransparentProjection: Bool(pathID < 0 && isTransparentProjection)
+            if !isUntrackedTransparentProjection {
                 if pathID < 0 { return 0 - 1 }
                 if effectKind == compilerBodyOwnedEffectConsume() && compilerBodyArenaValueCarriesBindingReference(arena: arena, valueNodeID: valueNodeID) { return 0 - 1 }
                 let effectTargetPathID: Int(compilerBodyArenaOwnedPathFollowEffectPath(arena: arena, basePathID: pathID, effectPaths: effectPaths, effectPathID: effectPathID))
                 let expectedStorageKeyID: Int(compilerIntTableValue(table: effects, row: effectRow, column: compilerBodyFunctionInstanceEffectStorageKeyColumn()))
                 if effectTargetPathID < 0 || expectedStorageKeyID < 0 { return 0 - 1 }
                 state actualStorageKeyID: Int(compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: compilerIntTableValue(table: arena.ownedPaths, row: effectTargetPathID, column: compilerBodyOwnedPathTypeColumn())))
-                if actualStorageKeyID != expectedStorageKeyID && projectedMemberRow == transparentStringMemberRow {
+                if actualStorageKeyID != expectedStorageKeyID && isTransparentProjection {
                     actualStorageKeyID: compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: compilerBodyArenaExpressionTypeID(arena: arena, nodeID: valueNodeID))
                 }
                 if actualStorageKeyID != expectedStorageKeyID { return 0 - 1 }
@@ -3639,7 +3690,7 @@ function compilerBodyArenaOwnedPathEvaluateBlock(arena: CompilerBodyArena, block
                             let targetKind: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()))
                             if targetKind == compilerBodyResolutionConstruct() {
                                 let constructMoveStatus: Int(compilerBodyArenaOwnedPathApplyConstructMove(arena: arena, applicationNodeID: nodeID, states: states, origins: origins, effectPaths: effectPaths, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, recordFacts: recordFacts))
-                                if constructMoveStatus != 0 { status: 0 - 1 }
+                                if constructMoveStatus != 0 { status: constructMoveStatus }
                             }
                             let contractRow: Int(compilerBodyRuntimeCallContractFind(contracts: arena.runtimeCallContracts, callNodeID: nodeID))
                             if status == 0 && contractRow >= 0 {
@@ -3833,7 +3884,8 @@ function compilerBodyArenaValidateOwnedPaths(arena: CompilerBodyArena, typeKeys:
                 if status != 0 { failureStage: 11 }
             }
             if status == 0 {
-                if compilerBodyArenaOwnedPathEvaluateBlock(arena: arena, blockID: nextBlockID, states: states, origins: origins, scheduleStarts: scheduleStarts, scheduleCounts: scheduleCounts, scheduleRows: scheduleRows, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, effects: effects, effectPaths: effectPaths, returnSummaries: returnSummaries, returnLeaves: returnLeaves, applyInstanceEffects: applyInstanceEffects, recordFacts: recordFacts) != 0 {
+                let blockEvaluationStatus: Int(compilerBodyArenaOwnedPathEvaluateBlock(arena: arena, blockID: nextBlockID, states: states, origins: origins, scheduleStarts: scheduleStarts, scheduleCounts: scheduleCounts, scheduleRows: scheduleRows, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, effects: effects, effectPaths: effectPaths, returnSummaries: returnSummaries, returnLeaves: returnLeaves, applyInstanceEffects: applyInstanceEffects, recordFacts: recordFacts))
+                if blockEvaluationStatus != 0 {
                     status: 0 - 1
                     failureStage: 12
                 }
@@ -3895,10 +3947,7 @@ function compilerReachableLLVMStateAppendEffectCallMappingForValue(reachability:
     if valueNodeID < 0 || valueNodeID >= compilerIntTableRowCount(table: arena.nodes) { return 0 - 1 }
     let pathID: Int(compilerBodyArenaOwnedPathForValue(arena: arena, valueNodeID: valueNodeID))
     if pathID < 0 {
-        let projectedMemberRow: Int(compilerBodyArenaMemberRowForValue(arena: arena, valueNodeID: valueNodeID))
-        let stringSyntaxID: Int(compilerBodyArenaStringDeclarationSyntaxID(arena: arena))
-        let transparentStringMemberRow: Int(compilerRuntimeABITransparentStorageMemberRow(tables: arena.tables, constructNodeID: stringSyntaxID))
-        if projectedMemberRow == transparentStringMemberRow { return 0 }
+        if compilerBodyArenaMemberProjectionIsTransparent(arena: arena, valueNodeID: valueNodeID) { return 0 }
         let valueTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID))
         if valueTypeKind == compilerBodyTypeUnknown() { return 0 - 1 }
         if valueTypeKind != compilerBodyTypeConstruct() { return 0 }

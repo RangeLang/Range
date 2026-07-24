@@ -80,8 +80,27 @@
           - [x] Emit literal, transient, command-line, file, interpolation,
             conversion, and metrics Strings as Buffer descriptors; reject the
             former raw `char *` representation at the runtime boundary.
+          - [x] Replace the String-named lowering exception with a structural
+            transparent-storage rule: a `.storage` construct with one stored
+            `.storage` member aliases that member's handle for construction,
+            projection, and ownership.
+          - [x] Classify stored members as inline core values, identity-bearing
+            ordinary constructs, or transparent storage projections, and
+            protect all three decisions with one focused compiler proof.
+          - [x] Promote the generalized representation checkpoint into the
+            accepted seed and independently verify compiler progression.
+          - [ ] Forward receiver effects through arbitrary transparent derived
+            members so `storage.count` is as ownership-complete as the
+            explicit `storage.bytes.count` projection.
         - [x] Give member functions owner-qualified LLVM symbols and prove
           `String.count` can coexist with the generic `Buffer.count`.
+      - [ ] Cut identity-bearing ordinary construct members over from
+        recursively embedded LLVM aggregates to the canonical ID/reference
+        representation.
+        - The graph now classifies these members as identity-bearing, but the
+          current native emitter still recursively embeds their value
+          aggregates. Do not treat the classification proof as the physical
+          ABI cutover.
       - [ ] Move length, indexing, comparison, slicing, concatenation, and
         append behavior onto the authored String surface, then cut their
         compiler runtime builtin cases over.

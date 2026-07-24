@@ -30,6 +30,10 @@ function compilerSourceRequestsMemoryGraph(source: String): Bool {
     return hasRangePrefix(source: source, start: 0, prefix: String("compilerMemoryGraph"))
 }
 
+function compilerSourceRequestsMemberRepresentations(source: String): Bool {
+    return hasRangePrefix(source: source, start: 0, prefix: String("compilerMemberRepresentations"))
+}
+
 function compilerSourceRequestsTypedIR(source: String): Bool {
     return hasRangePrefix(source: source, start: 0, prefix: String("compilerTypedIR"))
 }

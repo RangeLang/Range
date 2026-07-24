@@ -36,6 +36,10 @@ function compilerMemoryRuntimeValuePresent(): Int { return 1 }
 function compilerMemoryRepresentationChangePartitionAdded(): Int { return 1 }
 function compilerMemoryRepresentationChangeValueInserted(): Int { return 2 }
 function compilerMemoryRepresentationChangeValueRemoved(): Int { return 3 }
+function compilerMemoryMemberRepresentationInvalid(): Int { return 0 }
+function compilerMemoryMemberRepresentationInline(): Int { return 1 }
+function compilerMemoryMemberRepresentationIdentity(): Int { return 2 }
+function compilerMemoryMemberRepresentationTransparent(): Int { return 3 }
 
 function compilerMemoryGraphCreate(): CompilerMemoryGraph {
     return CompilerMemoryGraph(
@@ -550,9 +554,6 @@ function compilerRuntimeABITransparentStorageMemberRow(tables: CompilerSyntaxTab
     if declarationRow < 0
         || compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 2) != compilerSyntaxKindConstruct()
         || compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 13) != compilerBuiltinPolicyStorage() { return 0 - 1 }
-    let declarationFileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
-    let declarationName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: declarationFileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
-    if declarationName != String("String") { return 0 - 1 }
     state transparentMemberRow: Int(0 - 1)
     state storedMemberCount: Int(0)
     state memberRow: Int(0)
@@ -564,17 +565,86 @@ function compilerRuntimeABITransparentStorageMemberRow(tables: CompilerSyntaxTab
                 || memberKind == compilerSyntaxMemberKindBinding() {
                 storedMemberCount: storedMemberCount + 1
                 let memberFileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
-                let memberName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: memberFileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 6), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 7)))
-                let memberType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: memberFileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
+                let memberType: CompilerSemanticType(compilerSemanticTypeFromSpan(tables: tables, fileID: memberFileID, typeStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 8), typeEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
                 if memberKind == compilerSyntaxMemberKindState()
-                    && memberName == String("bytes")
-                    && memberType == String("Buffer<Int<8, .unsigned>>") { transparentMemberRow: memberRow }
+                    && compilerSemanticTypeKind(type: memberType) == compilerSemanticTypeConstruct() {
+                    let memberDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: compilerSemanticTypeDeclaration(type: memberType)))
+                    if memberDeclarationRow >= 0
+                        && compilerIntTableValue(table: tables.declarations, row: memberDeclarationRow, column: 2) == compilerSyntaxKindConstruct()
+                        && compilerIntTableValue(table: tables.declarations, row: memberDeclarationRow, column: 13) == compilerBuiltinPolicyStorage() { transparentMemberRow: memberRow }
+                }
             }
         }
         memberRow: memberRow + 1
     }
     if storedMemberCount != 1 { return 0 - 1 }
     return transparentMemberRow
+}
+
+function compilerMemoryMemberRepresentation(tables: CompilerSyntaxTables, memberRow: Int): Int {
+    if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: tables.members) { return compilerMemoryMemberRepresentationInvalid() }
+    let memberKind: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 12))
+    if memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState() {
+        return compilerMemoryMemberRepresentationInvalid()
+    }
+    let ownerSyntaxID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 2))
+    if compilerRuntimeABITransparentStorageMemberRow(tables: tables, constructNodeID: ownerSyntaxID) == memberRow {
+        return compilerMemoryMemberRepresentationTransparent()
+    }
+    let memberType: CompilerSemanticType(compilerSemanticTypeFromSpan(tables: tables, fileID: compilerIntTableValue(table: tables.members, row: memberRow, column: 1), typeStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 8), typeEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
+    if compilerSemanticTypeKind(type: memberType) == compilerSemanticTypeInt()
+        || compilerSemanticTypeKind(type: memberType) == compilerSemanticTypeFloat() {
+        return compilerMemoryMemberRepresentationInline()
+    }
+    if compilerSemanticTypeKind(type: memberType) == compilerSemanticTypeConstruct() {
+        if compilerRuntimeABIConstructKind(tables: tables, constructNodeID: compilerSemanticTypeDeclaration(type: memberType)) == compilerRuntimeABIOpaqueStorage() {
+            return compilerMemoryMemberRepresentationInline()
+        }
+        return compilerMemoryMemberRepresentationIdentity()
+    }
+    return compilerMemoryMemberRepresentationInvalid()
+}
+
+function compilerMemoryMemberRepresentationName(representation: Int): String {
+    if representation == compilerMemoryMemberRepresentationInline() { return String("inline") }
+    if representation == compilerMemoryMemberRepresentationIdentity() { return String("identity") }
+    if representation == compilerMemoryMemberRepresentationTransparent() { return String("transparent") }
+    return String("invalid")
+}
+
+function compilerMemoryMemberRepresentationSummary(source: String): String {
+    let tables: CompilerSyntaxTables(compilerSyntaxTablesCreate(source: source))
+    let captureStatus: Int(compilerTypedDeclarationsCapture(source: source, tables: tables))
+    state output: String("")
+    if captureStatus != 0 || !compilerSyntaxTablesIsValid(tables: tables) {
+        output: compilerNativeDiagnostic(kind: String("invalidTypedSyntaxSnapshot"))
+    } else if compilerMacroLink(tables: tables) != 0 || compilerIntTableRowCount(table: tables.macroDiagnostics) != 0 {
+        output: compilerMacroRenderDiagnostics(tables: tables)
+    } else {
+        state representedCount: Int(0)
+        state representedRows: String("")
+        state memberRow: Int(0)
+        while memberRow < compilerIntTableRowCount(table: tables.members) {
+            let representation: Int(compilerMemoryMemberRepresentation(tables: tables, memberRow: memberRow))
+            if representation != compilerMemoryMemberRepresentationInvalid() {
+                let ownerSyntaxID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 2))
+                let ownerDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: ownerSyntaxID))
+                let memberFileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
+                if ownerDeclarationRow >= 0 {
+                    let ownerFileID: Int(compilerIntTableValue(table: tables.declarations, row: ownerDeclarationRow, column: 1))
+                    let ownerName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: ownerFileID, localStart: compilerIntTableValue(table: tables.declarations, row: ownerDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: ownerDeclarationRow, column: 8)))
+                    let memberName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: memberFileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 6), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 7)))
+                    representedRows: "\(representedRows)memberRepresentation\towner=\(ownerName)\tmember=\(memberName)\tkind=\(compilerMemoryMemberRepresentationName(representation: representation))\n"
+                    representedCount: representedCount + 1
+                }
+            }
+            memberRow: memberRow + 1
+        }
+        output: "memberRepresentations\tvalid=true\tcount=\(representedCount)\n\(representedRows)"
+    }
+    let destroyStatus: Int(compilerSyntaxTablesDestroy(tables: tables))
+    if destroyStatus != 0 { return compilerNativeDiagnostic(kind: String("memberRepresentationOwnershipFailure")) }
+    return output
 }
 
 function compilerMemoryConstructFieldCount(tables: CompilerSyntaxTables, semantics: CompilerSemanticGraph, constructNodeID: Int): Int {
@@ -841,11 +911,18 @@ function compilerMemoryBuildInitializeDecisions(tables: CompilerSyntaxTables, de
             compilerMemoryGraphPoison(memory: memory)
             return 0 - 1
         }
-        if compilerRuntimeABIConstructKind(tables: tables, constructNodeID: memoryInitializeTypeNodeID) == compilerRuntimeABIOpaqueStorage()
-            && (compilerSemanticResolutionKind(semantics: semantics, useNodeID: memoryInitializerNodeID) != compilerSemanticResolutionFunction()
-                || compilerRuntimeABIFunctionRole(tables: tables, functionNodeID: compilerSemanticResolutionTarget(semantics: semantics, useNodeID: memoryInitializerNodeID)) != compilerRuntimeABIFunctionCreate()) {
-            compilerMemoryGraphPoison(memory: memory)
-            return 0 - 1
+        if compilerRuntimeABIConstructKind(tables: tables, constructNodeID: memoryInitializeTypeNodeID) == compilerRuntimeABIOpaqueStorage() {
+            let memoryInitializerResolutionKind: Int(compilerSemanticResolutionKind(semantics: semantics, useNodeID: memoryInitializerNodeID))
+            let memoryInitializerIsTransparentConstruction: Bool(
+                compilerRuntimeABITransparentStorageMemberRow(tables: tables, constructNodeID: memoryInitializeTypeNodeID) >= 0
+                    && memoryInitializerResolutionKind == compilerSemanticResolutionConstruct()
+            )
+            if !memoryInitializerIsTransparentConstruction
+                && (memoryInitializerResolutionKind != compilerSemanticResolutionFunction()
+                    || compilerRuntimeABIFunctionRole(tables: tables, functionNodeID: compilerSemanticResolutionTarget(semantics: semantics, useNodeID: memoryInitializerNodeID)) != compilerRuntimeABIFunctionCreate()) {
+                compilerMemoryGraphPoison(memory: memory)
+                return 0 - 1
+            }
         }
         if compilerMemoryAppendDecision(memory: memory, decisionKind: compilerMemoryDecisionInitialize(), nodeID: memoryInitializerNodeID, storageID: memoryInitializeStorageID, typeNodeID: memoryInitializeTypeNodeID, value: 1, originNodeID: memoryInitializeLocalNodeID) != 0 {
             return 0 - 1
@@ -1635,9 +1712,16 @@ function compilerMemoryGraphIsValid(tables: CompilerSyntaxTables, delta: Compile
                     || compilerIntTableValue(table: semantics.nodeTypes, row: memoryValidationDecisionNodeID, column: 1) != compilerIntTableValue(table: semantics.nodeTypes, row: memoryValidationDecisionLocalNodeID, column: 1)
                     || compilerIntTableValue(table: semantics.nodeTypes, row: memoryValidationDecisionNodeID, column: 2) != memoryValidationDecisionTypeNodeID) { return false }
             if memoryValidationDecisionKind == compilerMemoryDecisionInitialize()
-                && compilerRuntimeABIConstructKind(tables: tables, constructNodeID: memoryValidationDecisionTypeNodeID) == compilerRuntimeABIOpaqueStorage()
-                && (compilerSemanticResolutionKind(semantics: semantics, useNodeID: memoryValidationDecisionNodeID) != compilerSemanticResolutionFunction()
-                    || compilerRuntimeABIFunctionRole(tables: tables, functionNodeID: compilerSemanticResolutionTarget(semantics: semantics, useNodeID: memoryValidationDecisionNodeID)) != compilerRuntimeABIFunctionCreate()) { return false }
+                && compilerRuntimeABIConstructKind(tables: tables, constructNodeID: memoryValidationDecisionTypeNodeID) == compilerRuntimeABIOpaqueStorage() {
+                let memoryValidationInitializerResolutionKind: Int(compilerSemanticResolutionKind(semantics: semantics, useNodeID: memoryValidationDecisionNodeID))
+                let memoryValidationInitializerIsTransparentConstruction: Bool(
+                    compilerRuntimeABITransparentStorageMemberRow(tables: tables, constructNodeID: memoryValidationDecisionTypeNodeID) >= 0
+                        && memoryValidationInitializerResolutionKind == compilerSemanticResolutionConstruct()
+                )
+                if !memoryValidationInitializerIsTransparentConstruction
+                    && (memoryValidationInitializerResolutionKind != compilerSemanticResolutionFunction()
+                        || compilerRuntimeABIFunctionRole(tables: tables, functionNodeID: compilerSemanticResolutionTarget(semantics: semantics, useNodeID: memoryValidationDecisionNodeID)) != compilerRuntimeABIFunctionCreate()) { return false }
+            }
             if memoryValidationDecisionKind == compilerMemoryDecisionBorrow()
                 && compilerSemanticResolutionTarget(semantics: semantics, useNodeID: memoryValidationDecisionOriginNodeID) != memoryValidationDecisionLocalNodeID { return false }
             if memoryValidationDecisionKind == compilerMemoryDecisionEscape()

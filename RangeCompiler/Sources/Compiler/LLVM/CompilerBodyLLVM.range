@@ -786,10 +786,10 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
     if operationKind == compilerBodyMIROperationMemberRead() {
         let plannedMemberReceiverValueID: Int(compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0))
         let plannedMemberTargetID: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationTargetIDColumn()))
-        let stringSyntaxID: Int(compilerBodyArenaStringDeclarationSyntaxID(arena: emitter.arena))
-        let transparentStringMemberRow: Int(compilerRuntimeABITransparentStorageMemberRow(tables: emitter.arena.tables, constructNodeID: stringSyntaxID))
-        if compilerIntTableValue(table: emitter.arena.mirValues, row: plannedMemberReceiverValueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeString()
-            && plannedMemberTargetID == transparentStringMemberRow {
+        let plannedMemberReceiverTypeKind: Int(compilerIntTableValue(table: emitter.arena.mirValues, row: plannedMemberReceiverValueID, column: compilerBodyMIRValueTypeColumn()))
+        let plannedMemberReceiverTypeID: Int(compilerIntTableValue(table: emitter.arena.mirValues, row: plannedMemberReceiverValueID, column: compilerBodyMIRValueTypeIDColumn()))
+        let transparentMemberRow: Int(compilerBodyArenaTransparentStorageMemberRowForType(arena: emitter.arena, typeKind: plannedMemberReceiverTypeKind, typeID: plannedMemberReceiverTypeID))
+        if plannedMemberTargetID == transparentMemberRow {
             return compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueAlias(), number: 0 - 1, aux: plannedMemberReceiverValueID)
         }
         let plannedMemberReceiverValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: plannedMemberReceiverValueID))
@@ -817,6 +817,11 @@ function compilerBodyLLVMEmitterPlanOperation(emitter: CompilerBodyLLVMEmitter, 
     }
     if operationKind == compilerBodyMIROperationConstruct() {
         let fieldCount: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationOperandCountColumn()))
+        let constructTypeID: Int(compilerIntTableValue(table: emitter.arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeIDColumn()))
+        let transparentMemberRow: Int(compilerBodyArenaTransparentStorageMemberRowForType(arena: emitter.arena, typeKind: compilerBodyTypeConstruct(), typeID: constructTypeID))
+        if transparentMemberRow >= 0 && fieldCount == 1 {
+            return compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueAlias(), number: 0 - 1, aux: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0))
+        }
         if fieldCount < 1
             || compilerBodyLLVMAppendValueAssignment(emitter: emitter, valueID: resultValueID, kind: compilerBodyLLVMValueTemporary(), number: plannedTemporary + fieldCount - 1, aux: 0 - 1) != 0
             || emitter.runtimeState.update(element: plannedTemporary + fieldCount, index: compilerBodyLLVMEmitterNextTemporary()) != 0 { return 0 - 1 }
@@ -961,6 +966,8 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
     }
     if operationKind == compilerBodyMIROperationConstruct() {
         let constructAssignmentRow: Int(compilerBodyLLVMValueAssignmentRow(emitter: emitter, valueID: resultValueID))
+        if constructAssignmentRow >= 0
+            && compilerIntTableValue(table: emitter.valueAssignments, row: constructAssignmentRow, column: compilerBodyLLVMValueAssignmentKindColumn()) == compilerBodyLLVMValueAlias() { return 0 }
         let fieldCount: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationOperandCountColumn()))
         let constructTypeName: String(compilerBodyLLVMValueTypeName(arena: emitter.arena, valueID: resultValueID))
         if constructAssignmentRow < 0 || fieldCount < 1 || constructTypeName == String("") { return 0 - 1 }

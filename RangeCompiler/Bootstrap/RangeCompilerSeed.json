@@ -2,12 +2,12 @@
   "formatVersion": 1,
   "seed": {
     "path": "RangeCompiler/Bootstrap/RangeCompilerSeed.ll",
-    "bytes": 6019277,
-    "sha256": "2ce349440d95c511ce958c4f8e7c371dfe1fa34c513cbd353bf2d5eb470b74fc"
+    "bytes": 6039325,
+    "sha256": "4301105ff384b03c8292606c379c7808b23e52675ec68ffe69c4e63ea34bc568"
   },
   "expectedStage3LLVM": {
-    "bytes": 6019277,
-    "sha256": "2ce349440d95c511ce958c4f8e7c371dfe1fa34c513cbd353bf2d5eb470b74fc"
+    "bytes": 6039325,
+    "sha256": "4301105ff384b03c8292606c379c7808b23e52675ec68ffe69c4e63ea34bc568"
   },
   "compilerSources": [
     {
@@ -53,7 +53,7 @@
     {
       "path": "RangeCompiler/Sources/Compiler/Body/CompilerBodyOwnership.range",
       "role": "project",
-      "sha256": "8a59a088420cfc1def2e136cea35ae8dcc25b4f8192c8adca7cb1d12248a9916"
+      "sha256": "ab4a081d04999b4287242d67bc6e3dd19aa63f9ea1ce396d814aeec7f3b3f495"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Body/CompilerBodyParsing.range",
@@ -68,7 +68,7 @@
     {
       "path": "RangeCompiler/Sources/Compiler/Driver/Compiler.range",
       "role": "project",
-      "sha256": "94c514cbd63ad94be3b7f0085aadfc8b98e613f85f1fe38bdb9fbb4207fc94e3"
+      "sha256": "a243f4204c1f6e89a1135d14f727540ce75ad7c9a792064b8d6361aa8fcf8a2b"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Driver/CompilerBuildPlan.range",
@@ -83,7 +83,7 @@
     {
       "path": "RangeCompiler/Sources/Compiler/Driver/CompilerDirectives.range",
       "role": "project",
-      "sha256": "2f0a69e0186298a292dd430165be2de8031d31fba0e5ddbe873d1f1075b99300"
+      "sha256": "903fd65e30bf6a76842181d5941d35a68d687739527b8be1f9a3ed7f9c172c4e"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Driver/CompilerSources.range",
@@ -108,7 +108,7 @@
     {
       "path": "RangeCompiler/Sources/Compiler/Graph/CompilerMemory.range",
       "role": "project",
-      "sha256": "2f7bd8937a62dfca63b35c098b8942a24db744b1aa8db511e0db73bcc2e57e9a"
+      "sha256": "ec234685d318a0c3c2b7c1f7fbec7b46700b77fe1958dec8852f2d432bd7595e"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Graph/CompilerTypedIR.range",
@@ -118,7 +118,7 @@
     {
       "path": "RangeCompiler/Sources/Compiler/LLVM/CompilerBodyLLVM.range",
       "role": "project",
-      "sha256": "78d9cc7529e1785d95451f63bc86757bcd40ee42ddd8cf7e9eb6389cd475d7e9"
+      "sha256": "ee897a170a5c0161378df94d6ec6e2c35ac439a031773fbd07c3c4a8bf6d54d9"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/LLVM/CompilerLLVMPlan.range",

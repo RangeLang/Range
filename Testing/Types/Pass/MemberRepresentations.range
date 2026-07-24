@@ -1,0 +1,29 @@
+@builtin(.storage)
+construct ByteStorageView {
+    state bytes: Buffer<Int<8, .unsigned>>
+
+    derived count: Int {
+        bytes.count
+    }
+}
+
+construct InlineNumber {
+    let value: Int
+}
+
+construct IdentityLeaf {
+    let value: Int
+}
+
+construct IdentityOwner {
+    let leaf: IdentityLeaf
+}
+
+@main {
+    let storage: ByteStorageView(bytes: bufferCreateUnsigned8(capacity: 0))
+    let inline: InlineNumber(value: 5)
+    let identity: IdentityOwner(leaf: IdentityLeaf(value: 7))
+    let result: Int(storage.bytes.count + inline.value + identity.leaf.value)
+    storage.bytes.destroy()
+    return result
+}

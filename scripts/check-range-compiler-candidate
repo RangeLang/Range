@@ -5039,6 +5039,25 @@ audit_buffer_element_layouts() {
     echo "$stage_label generic Buffer: pass (one declaration, Int/i32 and Int<8, .unsigned>/i8 layout-selected append/read/write, return, destruction)"
 }
 
+audit_member_representations() {
+    local stage_label="$1"
+    local executable="$2"
+    local output="$WORK_ROOT/$stage_label.member-representations.out"
+    local error="$WORK_ROOT/$stage_label.member-representations.err"
+
+    local status=0
+    "$REPO_ROOT/scripts/check-range-member-representations" "$executable" > "$output" 2> "$error" || status=$?
+    [[ "$status" -eq 0 ]] || {
+        /bin/cat "$output" >&2
+        /bin/cat "$error" >&2
+        fail "$stage_label member representation proof failed"
+    }
+    /usr/bin/grep -Fq 'Inline, identity, and transparent member representations verified.' "$output" \
+        || fail "$stage_label member representation proof omitted its checkpoint"
+    [[ ! -s "$error" ]] || fail "$stage_label member representation proof wrote stderr"
+    echo "$stage_label member representations: pass (inline core value, identity-bearing construct relationship, transparent storage projection)"
+}
+
 audit_stage() {
     local stage_label="$1"
     local executable="$2"
@@ -5064,6 +5083,7 @@ audit_stage() {
     audit_range_cli "$stage_label" "$executable"
     audit_construct_initialization_syntax "$stage_label" "$executable"
     audit_buffer_element_layouts "$stage_label" "$executable"
+    audit_member_representations "$stage_label" "$executable"
     audit_storage_switches "$stage_label" "$executable" "$stage_directory"
     audit_recursive_enum_declarations "$stage_label" "$executable" "$stage_directory"
     audit_native_payload_enum_abi "$stage_label" "$executable" "$stage_directory"

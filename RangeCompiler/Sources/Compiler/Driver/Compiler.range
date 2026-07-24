@@ -44,6 +44,10 @@ function compileRangeNativeSourceDirectiveOutput(source: String): String {
         return compilerMemorySummary(source: source)
     }
 
+    if compilerSourceRequestsMemberRepresentations(source: source) {
+        return compilerMemoryMemberRepresentationSummary(source: source)
+    }
+
     if compilerSourceRequestsTypedIR(source: source) {
         return compilerTypedIRSummary(source: source)
     }
