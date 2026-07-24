@@ -97,7 +97,19 @@
                             "wallMilliseconds": { "type": "number", "minimum": 0 },
                             "cpuMilliseconds": { "type": "number", "minimum": 0 },
                             "peakRssKilobytes": { "type": "integer", "minimum": 0 },
-                            "output": { "type": "string" }
+                            "output": { "type": "string" },
+                            "identityAllocator": {
+                              "type": "object",
+                              "required": ["mode", "allocations", "requestedBytes", "usedBytes", "chunks", "reservedBytes"],
+                              "properties": {
+                                "mode": { "enum": ["arena", "malloc"] },
+                                "allocations": { "type": "integer", "minimum": 0 },
+                                "requestedBytes": { "type": "integer", "minimum": 0 },
+                                "usedBytes": { "type": "integer", "minimum": 0 },
+                                "chunks": { "type": "integer", "minimum": 0 },
+                                "reservedBytes": { "type": "integer", "minimum": 0 }
+                              }
+                            }
                           }
                         }
                       }

@@ -18,7 +18,11 @@ Swift, Bun, TypeScript 7, and Range. The evaluation matrix currently covers:
 - **Strings**: incremental string growth and length tracking.
 - **Collections**: array creation, traversal, branching, and reduction.
 - **Convolution / 1D Three Tap**: a circular integer stencil over eight samples.
-- **Constructs**: short-lived value construction and member access.
+- **Constructs / Raw Struct Race**: a local Range construct whose identity is
+  proven unobservable and eliminated against optimized inline C, C++, Rust,
+  Go, and Swift values.
+- **Constructs / Identity**: eight-level identity chains, shared binding
+  mutation, and repeated child replacement.
 - **Recursion / Fibonacci**: repeated binary recursion across alternating depths.
 - **Function Calls**: small reusable calls and predictable branching.
 
@@ -61,6 +65,25 @@ test a specific compiler artifact explicitly. The emitted `Main.ll` is relinked
 with `clang -O3` and the manifest-pinned Range runtime sources. This keeps
 Range's measured native artifact at the same optimization level as the C, C++,
 and Rust rows without changing Range's normal command-line defaults.
+
+Construct cases that allocate Range identities also link the identical emitted
+LLVM a second time with `RANGE_IDENTITY_USE_MALLOC_BASELINE`. The normal
+`Range` row therefore measures the 64 KiB arena, while `Range malloc` measures
+the former one-`malloc`-per-identity behavior without changing lowering,
+construct layout, or the workload. Both rows report identity allocation count,
+requested bytes, aligned bytes used, chunk count, and reserved bytes in the
+result artifact. Every Range-capable Constructs leaf declares its expected
+identity-allocation count, including zero for the raw struct race, and the run
+fails if telemetry disagrees. Telemetry comes from separate validation binaries
+compiled with `RANGE_IDENTITY_ENABLE_STATS`; the timed Range binaries contain
+no counter or reporting instrumentation.
+
+The raw struct race answers whether graph proof can remove Range's unused
+identity and compete with the cheapest inline representations. The identity
+rows separately compare reference-shaped storage and mutation. A
+Range row remains `notEmitted` when the current compiler cannot lower a
+workload; the runner never substitutes a weaker Range program or accepts an
+incorrect checksum.
 
 An evaluation can still report `Range skipped` when the current native compiler
 cannot lower that language surface. The setup diagnostic is the capability

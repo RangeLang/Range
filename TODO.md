@@ -130,6 +130,22 @@
         - [ ] Benchmark representative shallow, deeply nested, and
           mutation-heavy construct workloads before claiming a universal
           runtime speedup.
+          - [x] Add the raw inline-struct race, eight-level identity chain,
+            shared binding mutation, and repeated child replacement to the
+            canonical speed runner.
+          - [x] Link identical Range LLVM against both the arena and the
+            benchmark-only legacy `malloc` allocator, recording allocation and
+            chunk telemetry for each successful Range row.
+          - [ ] Make loop-carried mutation through a construct binding lower
+            correctly; the shared binding benchmark currently remains
+            `notEmitted` after the scalar path returned stale data and the
+            Array binding path failed entry lowering.
+          - [ ] Add a separate dynamic-dispatch matrix for C function pointers,
+            C++ virtual calls, Rust trait objects, Swift protocols, Go
+            interfaces, and Range once callable protocol values have a real
+            runtime surface; do not mix dispatch cost into allocation results.
+          - [ ] Run and publish a stable multi-sample Constructs evaluation
+            before choosing another chunk size or claiming a speedup.
       - [ ] Move length, indexing, comparison, slicing, concatenation, and
         append behavior onto the authored String surface, then cut their
         compiler runtime builtin cases over.

@@ -25,10 +25,10 @@ RESULTS = BENCH / "results"
 SITE_RESULTS = ROOT / "Website" / "public" / "benchmarks.json"
 SEED_MANIFEST = ROOT / "RangeCompiler" / "Bootstrap" / "RangeCompilerSeed.json"
 STAGE2_COMPILER = (
-    ROOT / "RangeCompiler" / "Range" / "Programs" / "Compiler" / ".range" / "Build" / "stage2" / "RangeCompiler"
+    ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "stage2" / "RangeCompiler"
 )
 STAGE3_COMPILER = (
-    ROOT / "RangeCompiler" / "Range" / "Programs" / "Compiler" / ".range" / "Build" / "stage3" / "RangeCompiler"
+    ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "stage3" / "RangeCompiler"
 )
 ITERATIONS = int(os.environ.get("N", "1000000"))
 RUNS = int(os.environ.get("RUNS", "5"))
@@ -59,6 +59,8 @@ class BenchmarkCase:
     swift: str
     typescript: str
     range_source: str
+    include_range_malloc_baseline: bool = False
+    expected_range_identity_allocations: int | None = None
 
 
 @dataclass(frozen=True)
@@ -66,6 +68,8 @@ class BenchTarget:
     language: str
     command: list[str]
     expected_exit_code: int = 0
+    environment: dict[str, str] | None = None
+    identity_allocator: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -74,6 +78,8 @@ class Measurement:
     cpu_seconds: float
     peak_rss_kb: int
     output: str
+    stderr: str = ""
+    identity_allocator: dict[str, object] | None = None
 
 
 def run_command(
@@ -99,14 +105,19 @@ def measured_command(
     command: list[str],
     cwd: Path = ROOT,
     expected_exit_code: int = 0,
+    env: dict[str, str] | None = None,
 ) -> Measurement:
     started = time.perf_counter()
+    process_env = os.environ.copy()
+    if env:
+        process_env.update(env)
 
     with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as stdout_file:
         with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as stderr_file:
             process = subprocess.Popen(
                 command,
                 cwd=cwd,
+                env=process_env,
                 text=True,
                 stdout=stdout_file,
                 stderr=stderr_file,
@@ -134,6 +145,7 @@ def measured_command(
         cpu_seconds=cpu_seconds,
         peak_rss_kb=peak_rss_kb(usage.ru_maxrss),
         output=stdout.strip() or f"exit:{returncode}",
+        stderr=stderr.strip(),
     )
 
 
@@ -219,28 +231,22 @@ construct Project {{
 
 
 def integer_loop_output(n: int) -> str:
-    acc = 1
-    for i in range(n):
-        acc = (acc + i * 3 + 1) % 1_000_003
-    return str(acc)
+    return str((1 + 3 * n * (n - 1) // 2 + n) % 1_000_003)
 
 
 def if_loop_output(n: int) -> str:
-    acc = 1
-    for i in range(n):
-        if i % 4 != 0:
-            acc = (acc + i * 3 + 1) % 1_000_003
-    return str(acc)
+    skipped = (n + 3) // 4
+    full_sum = 3 * n * (n - 1) // 2 + n
+    skipped_sum = 6 * skipped * (skipped - 1) + skipped
+    return str((1 + full_sum - skipped_sum) % 1_000_003)
 
 
 def if_else_loop_output(n: int) -> str:
-    acc = 1
-    for i in range(n):
-        if i % 2 == 0:
-            acc = (acc + i * 3 + 1) % 1_000_003
-        else:
-            acc = (acc + i * 5 + 2) % 1_000_003
-    return str(acc)
+    even_count = (n + 1) // 2
+    odd_count = n // 2
+    even_sum = 3 * even_count * (even_count - 1) + even_count
+    odd_sum = 5 * odd_count * (odd_count - 1) + 7 * odd_count
+    return str((1 + even_sum + odd_sum) % 1_000_003)
 
 
 def generic_calls_output(n: int) -> str:
@@ -249,23 +255,34 @@ def generic_calls_output(n: int) -> str:
 
 
 def collections_output(n: int) -> str:
-    values = (0, 1, 2, 3, 4, 5, 6, 7)
-    return str(sum(value * 2 for value in (values[index % 8] for index in range(n)) if value % 2 == 0))
+    contributions = (0, 0, 4, 0, 8, 0, 12, 0)
+    cycles, remainder = divmod(n, len(contributions))
+    return str(cycles * sum(contributions) + sum(contributions[:remainder]))
 
 
 def convolution_output(n: int) -> str:
     values = (1, 3, 5, 7, 11, 13, 17, 19)
-    acc = 0
-    for i in range(n):
-        center = i % len(values)
-        left = (center - 1) % len(values)
-        right = (center + 1) % len(values)
-        acc = (acc + values[left] + values[center] * 2 + values[right]) % 1_000_003
-    return str(acc)
+    contributions = tuple(
+        values[(center - 1) % len(values)]
+        + values[center] * 2
+        + values[(center + 1) % len(values)]
+        for center in range(len(values))
+    )
+    cycles, remainder = divmod(n, len(contributions))
+    total = cycles * sum(contributions) + sum(contributions[:remainder])
+    return str(total % 1_000_003)
 
 
 def constructs_output(n: int) -> str:
     return str((n * n) % 1_000_003)
+
+
+def identity_deep_output(n: int) -> str:
+    return str((n * (n - 1) // 2) % 1_000_003)
+
+
+def identity_replacement_output(n: int) -> str:
+    return str((n * (n + 1) // 2) % 1_000_003)
 
 
 def fibonacci(value: int) -> int:
@@ -303,6 +320,7 @@ def selected_cases() -> list[BenchmarkCase]:
 def cases() -> list[BenchmarkCase]:
     n = ITERATIONS
     small = max(1, n // 10)
+    deep = max(1, n // 100)
     recursion_repeats = max(1, n // 10_000)
     recursion_depth = 20
 
@@ -1344,10 +1362,10 @@ def cases() -> list[BenchmarkCase]:
         BenchmarkCase(
             name="constructs",
             category="Constructs",
-            subcategory="Value Construction",
-            leaf="Pair construction",
+            subcategory="Raw Struct Race",
+            leaf="Identity construct versus inline pair",
             unit="constructions",
-            description="Short-lived value construction and member access",
+            description="A local Range construct whose unobservable identity is eliminated versus optimized inline C, C++, Rust, Go, and Swift values",
             expected_output=constructs_output(small),
             expected_exit_code=0,
             range_expected_exit_code=int(constructs_output(small)) % 251,
@@ -1435,6 +1453,331 @@ def cases() -> list[BenchmarkCase]:
                     return acc % 251
                 }}
             """,
+            expected_range_identity_allocations=0,
+        ),
+        BenchmarkCase(
+            name="constructs_deep_identity",
+            category="Constructs",
+            subcategory="Identity",
+            leaf="Eight-level nested chain",
+            unit="chains",
+            description="Build and traverse an eight-level stable-identity chain; Range arena and legacy malloc use identical generated LLVM",
+            expected_output=identity_deep_output(deep),
+            expected_exit_code=0,
+            range_expected_exit_code=int(identity_deep_output(deep)) % 251,
+            n=deep,
+            c=rf"""
+                #include <inttypes.h>
+                #include <stdint.h>
+                #include <stdio.h>
+                #include <stdlib.h>
+                typedef struct L0 {{ int64_t value; }} L0;
+                typedef struct L1 {{ L0 *child; }} L1;
+                typedef struct L2 {{ L1 *child; }} L2;
+                typedef struct L3 {{ L2 *child; }} L3;
+                typedef struct L4 {{ L3 *child; }} L4;
+                typedef struct L5 {{ L4 *child; }} L5;
+                typedef struct L6 {{ L5 *child; }} L6;
+                typedef struct L7 {{ L6 *child; }} L7;
+                static volatile uintptr_t identity_sink;
+                int main(int argc, char **argv) {{
+                    int64_t n = argc > 1 ? atoll(argv[1]) : {deep}, checksum = 0;
+                    for (int64_t i = 0; i < n; ++i) {{
+                        L0 *l0 = malloc(sizeof(*l0)); *l0 = (L0){{i}};
+                        L1 *l1 = malloc(sizeof(*l1)); *l1 = (L1){{l0}};
+                        L2 *l2 = malloc(sizeof(*l2)); *l2 = (L2){{l1}};
+                        L3 *l3 = malloc(sizeof(*l3)); *l3 = (L3){{l2}};
+                        L4 *l4 = malloc(sizeof(*l4)); *l4 = (L4){{l3}};
+                        L5 *l5 = malloc(sizeof(*l5)); *l5 = (L5){{l4}};
+                        L6 *l6 = malloc(sizeof(*l6)); *l6 = (L6){{l5}};
+                        L7 *l7 = malloc(sizeof(*l7)); *l7 = (L7){{l6}};
+                        identity_sink ^= (uintptr_t)l7;
+                        checksum = (checksum + l7->child->child->child->child->child->child->child->value) % 1000003;
+                    }}
+                    printf("%" PRId64 "\n", checksum);
+                }}
+            """,
+            cxx=rf"""
+                #include <cstdint>
+                #include <cstdlib>
+                #include <iostream>
+                struct L0 {{ std::int64_t value; }}; struct L1 {{ L0 *child; }};
+                struct L2 {{ L1 *child; }}; struct L3 {{ L2 *child; }};
+                struct L4 {{ L3 *child; }}; struct L5 {{ L4 *child; }};
+                struct L6 {{ L5 *child; }}; struct L7 {{ L6 *child; }};
+                static volatile std::uintptr_t identity_sink;
+                int main(int argc,char**argv){{
+                    std::int64_t n=argc>1?std::atoll(argv[1]):{deep},checksum=0;
+                    for(std::int64_t i=0;i<n;++i){{
+                        auto l0=new L0{{i}};auto l1=new L1{{l0}};auto l2=new L2{{l1}};auto l3=new L3{{l2}};
+                        auto l4=new L4{{l3}};auto l5=new L5{{l4}};auto l6=new L6{{l5}};auto l7=new L7{{l6}};
+                        identity_sink^=reinterpret_cast<std::uintptr_t>(l7);
+                        checksum=(checksum+l7->child->child->child->child->child->child->child->value)%1000003;
+                    }}
+                    std::cout<<checksum<<'\n';
+                }}
+            """,
+            rust=rf"""
+                struct L0{{value:i64}} struct L1{{child:Box<L0>}} struct L2{{child:Box<L1>}}
+                struct L3{{child:Box<L2>}} struct L4{{child:Box<L3>}} struct L5{{child:Box<L4>}}
+                struct L6{{child:Box<L5>}} struct L7{{child:Box<L6>}}
+                fn main(){{
+                    let n:i64=std::env::args().nth(1).and_then(|v|v.parse().ok()).unwrap_or({deep});
+                    let mut checksum=0i64;
+                    for i in 0..n{{
+                        let l0=Box::new(L0{{value:i}});let l1=Box::new(L1{{child:l0}});
+                        let l2=Box::new(L2{{child:l1}});let l3=Box::new(L3{{child:l2}});
+                        let l4=Box::new(L4{{child:l3}});let l5=Box::new(L5{{child:l4}});
+                        let l6=Box::new(L6{{child:l5}});let root=Box::new(L7{{child:l6}});
+                        checksum=(checksum+root.child.child.child.child.child.child.child.value)%1_000_003;
+                        std::hint::black_box(Box::leak(root));
+                    }}
+                    println!("{{checksum}}");
+                }}
+            """,
+            go=rf"""
+                package main
+                import("fmt";"os";"strconv")
+                type L0 struct{{value int64}};type L1 struct{{child *L0}};type L2 struct{{child *L1}}
+                type L3 struct{{child *L2}};type L4 struct{{child *L3}};type L5 struct{{child *L4}}
+                type L6 struct{{child *L5}};type L7 struct{{child *L6}}
+                var retained []*L7
+                func main(){{
+                    n:=int64({deep});if len(os.Args)>1{{n,_=strconv.ParseInt(os.Args[1],10,64)}}
+                    var checksum int64
+                    for i:=int64(0);i<n;i++{{
+                        l0:=&L0{{i}};l1:=&L1{{l0}};l2:=&L2{{l1}};l3:=&L3{{l2}}
+                        l4:=&L4{{l3}};l5:=&L5{{l4}};l6:=&L6{{l5}};root:=&L7{{l6}}
+                        retained=append(retained,root)
+                        checksum=(checksum+root.child.child.child.child.child.child.child.value)%1000003
+                    }}
+                    fmt.Println(checksum)
+                }}
+            """,
+            swift=rf"""
+                final class L0{{let value:Int;init(_ value:Int){{self.value=value}}}}
+                final class L1{{let child:L0;init(_ child:L0){{self.child=child}}}}
+                final class L2{{let child:L1;init(_ child:L1){{self.child=child}}}}
+                final class L3{{let child:L2;init(_ child:L2){{self.child=child}}}}
+                final class L4{{let child:L3;init(_ child:L3){{self.child=child}}}}
+                final class L5{{let child:L4;init(_ child:L4){{self.child=child}}}}
+                final class L6{{let child:L5;init(_ child:L5){{self.child=child}}}}
+                final class L7{{let child:L6;init(_ child:L6){{self.child=child}}}}
+                let n=CommandLine.arguments.dropFirst().first.flatMap(Int.init) ?? {deep}
+                var retained:[L7]=[];retained.reserveCapacity(n);var checksum=0
+                for i in 0..<n{{
+                    let root=L7(L6(L5(L4(L3(L2(L1(L0(i))))))))
+                    retained.append(root)
+                    checksum=(checksum+root.child.child.child.child.child.child.child.value)%1_000_003
+                }}
+                print(checksum)
+            """,
+            typescript=rf"""
+                type Node={{value?:number,child?:Node}};
+                const n=Number((globalThis as any).Bun.argv[2]??{deep}),retained:Node[]=[];let checksum=0;
+                for(let i=0;i<n;i++){{
+                    let root:Node={{value:i}};for(let depth=0;depth<7;depth++)root={{child:root}};
+                    retained.push(root);let leaf=root;while(leaf.child)leaf=leaf.child;
+                    checksum=(checksum+(leaf.value??0))%1000003;
+                }}
+                console.log(checksum);
+            """,
+            range_source=rf"""
+                construct L0 {{ let value: Int }}
+                construct L1 {{ let child: L0 }}
+                construct L2 {{ let child: L1 }}
+                construct L3 {{ let child: L2 }}
+                construct L4 {{ let child: L3 }}
+                construct L5 {{ let child: L4 }}
+                construct L6 {{ let child: L5 }}
+                construct L7 {{ let child: L6 }}
+                @main {{
+                    state i: Int(0)
+                    state checksum: Int(0)
+                    while i < {deep} {{
+                        let root: L7(child: L6(child: L5(child: L4(child: L3(child: L2(child: L1(child: L0(value: i))))))))
+                        checksum: (checksum + root.child.child.child.child.child.child.child.value) % 1000003
+                        i: i + 1
+                    }}
+                    return checksum % 251
+                }}
+            """,
+            include_range_malloc_baseline=True,
+            expected_range_identity_allocations=deep * 7,
+        ),
+        BenchmarkCase(
+            name="constructs_shared_binding_mutation",
+            category="Constructs",
+            subcategory="Identity",
+            leaf="Shared binding mutation",
+            unit="mutations",
+            description="Mutate one state cell through its owner and observe every update through a second stable binding path",
+            expected_output=identity_replacement_output(small),
+            expected_exit_code=0,
+            range_expected_exit_code=int(identity_replacement_output(small)) % 251,
+            n=small,
+            c=rf"""
+                #include <inttypes.h>
+                #include <stdint.h>
+                #include <stdio.h>
+                #include <stdlib.h>
+                typedef struct{{int64_t value;}}Counter;typedef struct{{int64_t *value;}}View;
+                int main(int argc,char**argv){{
+                    int64_t n=argc>1?atoll(argv[1]):{small},checksum=0;
+                    Counter *counter=malloc(sizeof(*counter));counter->value=0;
+                    View *view=malloc(sizeof(*view));view->value=&counter->value;
+                    for(int64_t i=0;i<n;i++){{counter->value=i+1;checksum=(checksum+*view->value)%1000003;}}
+                    printf("%" PRId64 "\n",checksum);
+                }}
+            """,
+            cxx=rf"""
+                #include <cstdint>
+                #include <cstdlib>
+                #include <iostream>
+                struct Counter{{std::int64_t value;}};struct View{{std::int64_t *value;}};
+                int main(int argc,char**argv){{
+                    std::int64_t n=argc>1?std::atoll(argv[1]):{small},checksum=0;
+                    auto counter=new Counter{{0}};auto view=new View{{&counter->value}};
+                    for(std::int64_t i=0;i<n;++i){{counter->value=i+1;checksum=(checksum+*view->value)%1000003;}}
+                    std::cout<<checksum<<'\n';
+                }}
+            """,
+            rust=rf"""
+                struct Counter{{value:i64}}
+                fn main(){{
+                    let n:i64=std::env::args().nth(1).and_then(|v|v.parse().ok()).unwrap_or({small});
+                    let mut counter=Box::new(Counter{{value:0}});let view:*const i64=&counter.value;let mut checksum=0i64;
+                    for i in 0..n{{counter.value=i+1;checksum=(checksum+unsafe{{*view}})%1_000_003;}}
+                    println!("{{checksum}}");
+                }}
+            """,
+            go=rf"""
+                package main
+                import("fmt";"os";"strconv")
+                type Counter struct{{value int64}};type View struct{{value *int64}}
+                func main(){{
+                    n:=int64({small});if len(os.Args)>1{{n,_=strconv.ParseInt(os.Args[1],10,64)}}
+                    counter:=&Counter{{0}};view:=&View{{&counter.value}};var checksum int64
+                    for i:=int64(0);i<n;i++{{counter.value=i+1;checksum=(checksum+*view.value)%1000003}}
+                    fmt.Println(checksum)
+                }}
+            """,
+            swift=rf"""
+                final class Counter{{var value:Int=0}}
+                final class View{{let counter:Counter;init(_ counter:Counter){{self.counter=counter}};var value:Int{{counter.value}}}}
+                let n=CommandLine.arguments.dropFirst().first.flatMap(Int.init) ?? {small}
+                let counter=Counter(),view=View(counter);var checksum=0
+                for i in 0..<n{{counter.value=i+1;checksum=(checksum+view.value)%1_000_003}}
+                print(checksum)
+            """,
+            typescript=rf"""
+                const n=Number((globalThis as any).Bun.argv[2]??{small});
+                const counter={{value:0}},view={{counter}};let checksum=0;
+                for(let i=0;i<n;i++){{counter.value=i+1;checksum=(checksum+view.counter.value)%1000003;}}
+                console.log(checksum);
+            """,
+            range_source=rf"""
+                construct View {{ binding values: [Int] }}
+                @main {{
+                    state values: [0]
+                    let view: View(values: $values)
+                    state i: Int(0)
+                    state checksum: Int(0)
+                    while i < {small} {{
+                        view.values[0]: i + 1
+                        checksum: (checksum + values[0]) % 1000003
+                        i: i + 1
+                    }}
+                    return checksum % 251
+                }}
+            """,
+            expected_range_identity_allocations=0,
+        ),
+        BenchmarkCase(
+            name="constructs_state_replacement",
+            category="Constructs",
+            subcategory="Identity",
+            leaf="Repeated child replacement",
+            unit="replacements",
+            description="Replace a state-owned child identity repeatedly; equivalent languages may reclaim unreachable children while Range bulk-reclaims its arena at exit",
+            expected_output=identity_replacement_output(small),
+            expected_exit_code=0,
+            range_expected_exit_code=int(identity_replacement_output(small)) % 251,
+            n=small,
+            c=rf"""
+                #include <inttypes.h>
+                #include <stdint.h>
+                #include <stdio.h>
+                #include <stdlib.h>
+                typedef struct{{int64_t value;}}Child;typedef struct{{Child *child;}}Root;
+                int main(int argc,char**argv){{
+                    int64_t n=argc>1?atoll(argv[1]):{small},checksum=0;Root root={{malloc(sizeof(Child))}};root.child->value=0;
+                    for(int64_t i=0;i<n;i++){{Child*next=malloc(sizeof(*next));next->value=i+1;free(root.child);root.child=next;checksum=(checksum+root.child->value)%1000003;}}
+                    printf("%" PRId64 "\n",checksum);free(root.child);
+                }}
+            """,
+            cxx=rf"""
+                #include <cstdint>
+                #include <cstdlib>
+                #include <iostream>
+                #include <memory>
+                struct Child{{std::int64_t value;}};struct Root{{std::unique_ptr<Child> child;}};
+                int main(int argc,char**argv){{
+                    std::int64_t n=argc>1?std::atoll(argv[1]):{small},checksum=0;Root root{{std::make_unique<Child>(Child{{0}})}};
+                    for(std::int64_t i=0;i<n;++i){{root.child=std::make_unique<Child>(Child{{i+1}});checksum=(checksum+root.child->value)%1000003;}}
+                    std::cout<<checksum<<'\n';
+                }}
+            """,
+            rust=rf"""
+                struct Child{{value:i64}}struct Root{{child:Box<Child>}}
+                fn main(){{
+                    let n:i64=std::env::args().nth(1).and_then(|v|v.parse().ok()).unwrap_or({small});
+                    let mut root=Root{{child:Box::new(Child{{value:0}})}};let mut checksum=0i64;
+                    for i in 0..n{{root.child=Box::new(Child{{value:i+1}});checksum=(checksum+root.child.value)%1_000_003;}}
+                    println!("{{checksum}}");
+                }}
+            """,
+            go=rf"""
+                package main
+                import("fmt";"os";"strconv")
+                type Child struct{{value int64}};type Root struct{{child *Child}}
+                func main(){{
+                    n:=int64({small});if len(os.Args)>1{{n,_=strconv.ParseInt(os.Args[1],10,64)}}
+                    root:=Root{{&Child{{0}}}};var checksum int64
+                    for i:=int64(0);i<n;i++{{root.child=&Child{{i+1}};checksum=(checksum+root.child.value)%1000003}}
+                    fmt.Println(checksum)
+                }}
+            """,
+            swift=rf"""
+                final class Child{{let value:Int;init(_ value:Int){{self.value=value}}}}
+                final class Root{{var child:Child;init(_ child:Child){{self.child=child}}}}
+                let n=CommandLine.arguments.dropFirst().first.flatMap(Int.init) ?? {small}
+                let root=Root(Child(0));var checksum=0
+                for i in 0..<n{{root.child=Child(i+1);checksum=(checksum+root.child.value)%1_000_003}}
+                print(checksum)
+            """,
+            typescript=rf"""
+                const n=Number((globalThis as any).Bun.argv[2]??{small});const root={{child:{{value:0}}}};let checksum=0;
+                for(let i=0;i<n;i++){{root.child={{value:i+1}};checksum=(checksum+root.child.value)%1000003;}}
+                console.log(checksum);
+            """,
+            range_source=rf"""
+                construct Child {{ let value: Int }}
+                construct Root {{ state child: Child }}
+                @main {{
+                    let root: Root(child: Child(value: 0))
+                    state i: Int(0)
+                    state checksum: Int(0)
+                    while i < {small} {{
+                        root.child: Child(value: i + 1)
+                        checksum: (checksum + root.child.value) % 1000003
+                        i: i + 1
+                    }}
+                    return checksum % 251
+                }}
+            """,
+            include_range_malloc_baseline=True,
+            expected_range_identity_allocations=small + 1,
         ),
         BenchmarkCase(
             name="fibonacci_recursion",
@@ -1633,6 +1976,65 @@ def verified_range_compiler() -> Path | None:
     return None
 
 
+def identity_allocator_telemetry(stderr: str) -> dict[str, object] | None:
+    prefix = "rangeIdentityAllocator "
+    line = next((item for item in stderr.splitlines() if item.startswith(prefix)), None)
+    if line is None:
+        return None
+    fields: dict[str, object] = {}
+    for component in line[len(prefix):].split():
+        if "=" not in component:
+            continue
+        key, value = component.split("=", 1)
+        fields[key] = int(value) if value.isdigit() else value
+    return fields
+
+
+def validate_range_identity_allocator(
+    case: BenchmarkCase,
+    range_llvm: Path,
+    runtime_inputs: list[str],
+    validation_binary: Path,
+    mode: str,
+) -> dict[str, object]:
+    compile_flags = ["-DRANGE_IDENTITY_ENABLE_STATS=1"]
+    if mode == "malloc":
+        compile_flags.append("-DRANGE_IDENTITY_USE_MALLOC_BASELINE=1")
+    if not timed_setup(
+        f"{case.name} Range {mode} allocator validation link",
+        [
+            "clang",
+            "-O3",
+            "-mcpu=native",
+            "-Wno-override-module",
+            *compile_flags,
+            str(range_llvm),
+            *runtime_inputs,
+            "-o",
+            str(validation_binary),
+        ],
+    ):
+        raise SystemExit(f"{case.name} could not link its {mode} allocator validation binary")
+    validation = measured_command(
+        [str(validation_binary)],
+        expected_exit_code=case.range_expected_exit_code,
+        env={"RANGE_IDENTITY_ALLOCATOR_STATS": "1"},
+    )
+    telemetry = identity_allocator_telemetry(validation.stderr)
+    if telemetry is None:
+        raise SystemExit(f"{case.name} Range {mode} allocator validation omitted telemetry")
+    if telemetry.get("mode") != mode:
+        raise SystemExit(
+            f"{case.name} Range allocator reported mode {telemetry.get('mode')!r}; expected {mode!r}"
+        )
+    if telemetry.get("allocations") != case.expected_range_identity_allocations:
+        raise SystemExit(
+            f"{case.name} Range {mode} allocator reported {telemetry.get('allocations')} "
+            f"identity allocations; expected {case.expected_range_identity_allocations}"
+        )
+    return telemetry
+
+
 def build_case(
     case: BenchmarkCase,
     range_cli: Path,
@@ -1727,6 +2129,9 @@ def build_case(
     range_llvm = range_project / ".range" / "Build" / "llvm" / "Main.ll"
     range_source = range_project / "Playground.range"
     optimized_range_binary = range_binary.with_name(range_binary.name + "-O3")
+    malloc_range_binary = range_binary.with_name(range_binary.name + "-malloc-O3")
+    arena_validation_binary = range_binary.with_name(range_binary.name + "-arena-validation")
+    malloc_validation_binary = range_binary.with_name(range_binary.name + "-malloc-validation")
     range_llvm.parent.mkdir(parents=True, exist_ok=True)
     native_compiler = verified_range_compiler()
     if native_compiler:
@@ -1743,6 +2148,16 @@ def build_case(
         )
 
     if emitted and range_llvm.is_file():
+        runtime_inputs = range_runtime_inputs()
+        arena_telemetry = None
+        if case.expected_range_identity_allocations is not None:
+            arena_telemetry = validate_range_identity_allocator(
+                case,
+                range_llvm,
+                runtime_inputs,
+                arena_validation_binary,
+                "arena",
+            )
         if timed_setup(
             f"{case.name} Range optimized link",
             [
@@ -1751,7 +2166,7 @@ def build_case(
                 "-mcpu=native",
                 "-Wno-override-module",
                 str(range_llvm),
-                *range_runtime_inputs(),
+                *runtime_inputs,
                 "-o",
                 str(optimized_range_binary),
             ],
@@ -1761,6 +2176,36 @@ def build_case(
                     "Range",
                     [str(optimized_range_binary)],
                     case.range_expected_exit_code,
+                    identity_allocator=arena_telemetry,
+                )
+            )
+        if case.include_range_malloc_baseline and timed_setup(
+            f"{case.name} Range legacy malloc link",
+            [
+                "clang",
+                "-O3",
+                "-mcpu=native",
+                "-Wno-override-module",
+                "-DRANGE_IDENTITY_USE_MALLOC_BASELINE=1",
+                str(range_llvm),
+                *runtime_inputs,
+                "-o",
+                str(malloc_range_binary),
+            ],
+        ):
+            malloc_telemetry = validate_range_identity_allocator(
+                case,
+                range_llvm,
+                runtime_inputs,
+                malloc_validation_binary,
+                "malloc",
+            )
+            targets.append(
+                BenchTarget(
+                    "Range malloc",
+                    [str(malloc_range_binary)],
+                    case.range_expected_exit_code,
+                    identity_allocator=malloc_telemetry,
                 )
             )
     elif emitted:
@@ -1784,6 +2229,7 @@ def measure_targets(targets: list[BenchTarget]) -> list[Measurement]:
     cpu_samples: list[list[float]] = [[] for _ in targets]
     rss_samples: list[list[int]] = [[] for _ in targets]
     outputs = ["" for _ in targets]
+    stderr_outputs = ["" for _ in targets]
 
     # Measuring one language's entire sample block before the next made results
     # sensitive to frequency, thermal, and background-load drift. Rotate the
@@ -1801,6 +2247,7 @@ def measure_targets(targets: list[BenchTarget]) -> list[Measurement]:
             result = measured_command(
                 target.command,
                 expected_exit_code=target.expected_exit_code,
+                env=target.environment,
             )
             wall_samples[target_index].append(result.wall_seconds)
             cpu_samples[target_index].append(result.cpu_seconds)
@@ -1812,6 +2259,12 @@ def measure_targets(targets: list[BenchTarget]) -> list[Measurement]:
                     f"{current_output} != {outputs[target_index]}"
                 )
             outputs[target_index] = current_output
+            if stderr_outputs[target_index] and result.stderr != stderr_outputs[target_index]:
+                raise SystemExit(
+                    f"{target.language} produced inconsistent diagnostics: "
+                    f"{result.stderr!r} != {stderr_outputs[target_index]!r}"
+                )
+            stderr_outputs[target_index] = result.stderr
 
     return [
         Measurement(
@@ -1819,6 +2272,8 @@ def measure_targets(targets: list[BenchTarget]) -> list[Measurement]:
             cpu_seconds=statistics.median(cpu_samples[index]),
             peak_rss_kb=median_int(rss_samples[index]),
             output=outputs[index],
+            stderr=stderr_outputs[index],
+            identity_allocator=targets[index].identity_allocator,
         )
         for index in target_indices
     ]
@@ -1880,23 +2335,25 @@ def benchmark_artifact(
             key=lambda row: row[1].wall_seconds,
         ):
             observed_languages.add(language)
-            measurements.append(
-                {
-                    "language": language,
-                    "status": "passed",
-                    "wallMilliseconds": round(measurement.wall_seconds * 1000, 4),
-                    "cpuMilliseconds": round(measurement.cpu_seconds * 1000, 4),
-                    "peakRssKilobytes": measurement.peak_rss_kb,
-                    "relativeToFastest": round(
-                        measurement.wall_seconds / fastest_wall if fastest_wall else 1.0,
-                        4,
-                    ),
-                    "relativeToC": round(wall_relative, 4),
-                    "cpuRelativeToC": round(cpu_relative, 4),
-                    "memoryRelativeToC": round(rss_relative, 4),
-                    "output": output,
-                }
-            )
+            measurement_record: dict[str, object] = {
+                "language": language,
+                "status": "passed",
+                "wallMilliseconds": round(measurement.wall_seconds * 1000, 4),
+                "cpuMilliseconds": round(measurement.cpu_seconds * 1000, 4),
+                "peakRssKilobytes": measurement.peak_rss_kb,
+                "relativeToFastest": round(
+                    measurement.wall_seconds / fastest_wall if fastest_wall else 1.0,
+                    4,
+                ),
+                "relativeToC": round(wall_relative, 4),
+                "cpuRelativeToC": round(cpu_relative, 4),
+                "memoryRelativeToC": round(rss_relative, 4),
+                "output": output,
+            }
+            allocator_telemetry = measurement.identity_allocator
+            if allocator_telemetry is not None:
+                measurement_record["identityAllocator"] = allocator_telemetry
+            measurements.append(measurement_record)
 
         range_result = next(
             (measurement for measurement in measurements if measurement["language"] == "Range"),
@@ -2050,7 +2507,7 @@ def main() -> int:
         for target, measurement in zip(targets, measurements, strict=True):
             expected_output = (
                 f"exit:{case.range_expected_exit_code}"
-                if target.language == "Range"
+                if target.language.startswith("Range")
                 else case.expected_output
             )
             if measurement.output != expected_output:
@@ -2058,6 +2515,22 @@ def main() -> int:
                     f"{case.name} {target.language} produced {measurement.output!r}; "
                     f"expected {expected_output!r}"
                 )
+            if target.language.startswith("Range") and case.expected_range_identity_allocations is not None:
+                telemetry = measurement.identity_allocator
+                expected_mode = "malloc" if target.language == "Range malloc" else "arena"
+                if telemetry is None:
+                    raise SystemExit(f"{case.name} {target.language} omitted identity allocator telemetry")
+                if telemetry.get("mode") != expected_mode:
+                    raise SystemExit(
+                        f"{case.name} {target.language} reported allocator mode "
+                        f"{telemetry.get('mode')!r}; expected {expected_mode!r}"
+                    )
+                if telemetry.get("allocations") != case.expected_range_identity_allocations:
+                    raise SystemExit(
+                        f"{case.name} {target.language} reported "
+                        f"{telemetry.get('allocations')} identity allocations; "
+                        f"expected {case.expected_range_identity_allocations}"
+                    )
             if target.language == "C":
                 wall_baselines["C"] = measurement.wall_seconds
                 cpu_baselines["C"] = measurement.cpu_seconds

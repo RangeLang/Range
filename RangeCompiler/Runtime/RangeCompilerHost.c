@@ -35,6 +35,13 @@ typedef struct RangeConstructIdentityArenaChunk {
 static RangeConstructIdentityArenaChunk *rangeIdentityArenaChunks = NULL;
 static bool rangeIdentityArenaActive = false;
 static bool rangeIdentityArenaRegisteredForExit = false;
+#if defined(RANGE_IDENTITY_ENABLE_STATS)
+static uint64_t rangeIdentityAllocationCount = 0;
+static uint64_t rangeIdentityRequestedBytes = 0;
+static uint64_t rangeIdentityUsedBytes = 0;
+static uint64_t rangeIdentityChunkCount = 0;
+static uint64_t rangeIdentityReservedBytes = 0;
+#endif
 
 void rangeIdentityArenaDestroy(void);
 
@@ -47,6 +54,13 @@ void rangeIdentityArenaBegin(void) {
         abort();
     }
     rangeIdentityArenaActive = true;
+#if defined(RANGE_IDENTITY_ENABLE_STATS)
+    rangeIdentityAllocationCount = 0;
+    rangeIdentityRequestedBytes = 0;
+    rangeIdentityUsedBytes = 0;
+    rangeIdentityChunkCount = 0;
+    rangeIdentityReservedBytes = 0;
+#endif
     if (!rangeIdentityArenaRegisteredForExit) {
         if (atexit(rangeIdentityArenaDestroyAtExit) != 0) {
             abort();
@@ -56,6 +70,25 @@ void rangeIdentityArenaBegin(void) {
 }
 
 void rangeIdentityArenaDestroy(void) {
+#if defined(RANGE_IDENTITY_ENABLE_STATS)
+    if (rangeIdentityArenaActive && getenv("RANGE_IDENTITY_ALLOCATOR_STATS")) {
+#if defined(RANGE_IDENTITY_USE_MALLOC_BASELINE)
+        const char *mode = "malloc";
+#else
+        const char *mode = "arena";
+#endif
+        fprintf(
+            stderr,
+            "rangeIdentityAllocator mode=%s allocations=%llu requestedBytes=%llu usedBytes=%llu chunks=%llu reservedBytes=%llu\n",
+            mode,
+            (unsigned long long)rangeIdentityAllocationCount,
+            (unsigned long long)rangeIdentityRequestedBytes,
+            (unsigned long long)rangeIdentityUsedBytes,
+            (unsigned long long)rangeIdentityChunkCount,
+            (unsigned long long)rangeIdentityReservedBytes
+        );
+    }
+#endif
     RangeConstructIdentityArenaChunk *chunk = rangeIdentityArenaChunks;
     while (chunk) {
         RangeConstructIdentityArenaChunk *next = chunk->next;
@@ -66,6 +99,7 @@ void rangeIdentityArenaDestroy(void) {
     rangeIdentityArenaActive = false;
 }
 
+#if !defined(RANGE_IDENTITY_USE_MALLOC_BASELINE)
 static void *rangeIdentityArenaAllocate(size_t size) {
     const size_t alignment = _Alignof(max_align_t);
     if (size == 0 || size > SIZE_MAX - (alignment - 1)) {
@@ -89,12 +123,20 @@ static void *rangeIdentityArenaAllocate(size_t size) {
         chunk->used = 0;
         chunk->capacity = capacity;
         rangeIdentityArenaChunks = chunk;
+#if defined(RANGE_IDENTITY_ENABLE_STATS)
+        rangeIdentityChunkCount += 1;
+        rangeIdentityReservedBytes += capacity;
+#endif
     }
     void *identity = chunk->bytes + chunk->used;
     chunk->used += alignedSize;
+#if defined(RANGE_IDENTITY_ENABLE_STATS)
+    rangeIdentityUsedBytes += alignedSize;
+#endif
     memset(identity, 0, size);
     return identity;
 }
+#endif
 
 void *stringTransientAllocate(size_t size) {
     void *allocation = malloc(size);
@@ -743,7 +785,25 @@ void *rangeConstructIdentityCreate(uint64_t byteCount) {
          */
         rangeIdentityArenaBegin();
     }
+#if defined(RANGE_IDENTITY_USE_MALLOC_BASELINE)
+#if defined(RANGE_IDENTITY_ENABLE_STATS)
+    rangeIdentityAllocationCount += 1;
+    rangeIdentityRequestedBytes += byteCount;
+    rangeIdentityUsedBytes += byteCount;
+#endif
+    void *identity = malloc(size);
+    if (!identity) {
+        abort();
+    }
+    memset(identity, 0, size);
+    return identity;
+#else
+#if defined(RANGE_IDENTITY_ENABLE_STATS)
+    rangeIdentityAllocationCount += 1;
+    rangeIdentityRequestedBytes += byteCount;
+#endif
     return rangeIdentityArenaAllocate(size);
+#endif
 }
 
 void *rangeConstructSetPtr(void *opaque, void *opaqueName, void *value) {
