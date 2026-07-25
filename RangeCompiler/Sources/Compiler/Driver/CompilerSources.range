@@ -96,7 +96,7 @@ function compilerSourceStoreCreate(source: String): CompilerSourceStore {
             status: compilerSourceStoreAppendBundledFiles(source: source, files: files, firstMarker: firstMarker)
         }
     }
-    return CompilerSourceStore(source: source, files: files, isValid: status == 0)
+    return CompilerSourceStore(source: $source, files: files, isValid: status == 0)
 }
 
 function compilerSourceStoreAppendBundledFiles(source: String, files: CompilerIntTable, firstMarker: CompilerSourceMarker): Int {
@@ -396,5 +396,4 @@ function compilerSourceNextMarkerCandidateFromCandidate(source: String, marker: 
     }
     return compilerSourceNextMarkerCandidateFromCandidate(source: source, marker: marker, candidate: stringIndexOf(source: source, needle: marker, start: candidate + 1))
 }
-
 

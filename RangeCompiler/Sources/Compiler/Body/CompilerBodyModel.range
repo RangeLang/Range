@@ -499,6 +499,7 @@ function compilerBodyCFGScheduleOptionalJoin(): Int { return 4 }
 function compilerBodyCFGScheduleStatementCommit(): Int { return 5 }
 function compilerBodyCFGScheduleSwitchMatch(): Int { return 6 }
 function compilerBodyCFGScheduleSwitchPayloadBind(): Int { return 7 }
+function compilerBodyCFGScheduleOptionalFallback(): Int { return 8 }
 
 function compilerBodyStorageColumnCount(): Int { return 6 }
 function compilerBodyStorageIDColumn(): Int { return 0 }
@@ -1020,6 +1021,7 @@ function compilerBodyMemoryFactUniqueBorrow(): Int { return 22 }
 function compilerBodyMemoryFactConsume(): Int { return 23 }
 function compilerBodyMemoryFactBindingAlias(): Int { return 24 }
 function compilerBodyMemoryFactEnumPayloadBorrow(): Int { return 25 }
+function compilerBodyMemoryFactResourceDestroy(): Int { return 26 }
 function compilerBodyMemorySubjectSymbol(): Int { return 1 }
 function compilerBodyMemorySubjectNode(): Int { return 2 }
 function compilerBodyMemorySubjectFunction(): Int { return 3 }
@@ -1063,6 +1065,7 @@ function compilerBodyBindingAliasSourceNodeColumn(): Int { return 4 }
 function compilerBodyBindingAliasProvenanceColumn(): Int { return 5 }
 function compilerBodyBindingAliasProvenanceExplicit(): Int { return 1 }
 function compilerBodyBindingAliasProvenanceReturnedCall(): Int { return 2 }
+function compilerBodyBindingAliasProvenanceNestedCarrier(): Int { return 3 }
 function compilerBodyRuntimeCallContractColumnCount(): Int { return 5 }
 function compilerBodyRuntimeCallContractCallNodeColumn(): Int { return 0 }
 function compilerBodyRuntimeCallContractFunctionColumn(): Int { return 1 }

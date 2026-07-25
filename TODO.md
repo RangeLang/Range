@@ -1,5 +1,28 @@
 # TODO
 
+Priority and dependency order live in [MILESTONES.md](MILESTONES.md). This file
+owns the actionable checkboxes for the active and deliberately deferred work.
+
+## Baseline Integrity
+
+- [ ] Give optional coalescing an ownership phi for tracked aggregate values.
+  - The value CFG already joins `payload ?? fallback`, but the ownership graph
+    must move the selected branch's owned leaves into one joined result and
+    destroy only the unselected branch's live leaves.
+  - Prove both locally created and boundary-forwarded payload/fallback pairs,
+    including aggregates with multiple independently owned String leaves.
+- [ ] Reconcile the accepted seed manifest with the current compiler inputs.
+  - `scripts/range check-seed-integrity` currently stops at the
+    `CompilerBodyMIR.range` source hash.
+- [ ] Run the complete validation ladder and promote one reproducible accepted
+  seed after the manifest is repaired.
+  - [x] `scripts/range check-build-plan`
+  - [x] `scripts/range check-root-value --controls`
+  - [x] `scripts/range check-compiler-smoke`
+  - [ ] `scripts/range check-compiler-candidate`
+  - [ ] `scripts/range check-stage2-compiler`
+  - [ ] `scripts/range compiler progression`
+
 ## Repository Layout
 
 - [ ] Adopt the proposed top-level ownership layout.
@@ -67,9 +90,12 @@
         - [x] Forward write and destroy effects through authored transparent
           `String` methods, including automatic owned storage for
           `state value: String("Hello")`.
-        - [ ] Restore the broader `check-root-value` gate; the focused String
-          proof passes, but the current candidate rejects the full Stage 2
-          source set during `enumPayloadLink` with `invalidEnumPayloadType`.
+        - [x] Restore the broader `check-root-value` gate and its complete
+          positive/rejection control set.
+        - [ ] Insert deterministic automatic destruction for owned String
+          storage at every valid scope exit.
+          - Remove the normal-code requirement for `value.destroy()` while
+            retaining destruction as an internal ownership effect.
       - [ ] Replace the three shared accumulators for LLVM body blocks,
         functions, and globals after mutable String storage can cross function
         boundaries without falling back to RawBuffer.

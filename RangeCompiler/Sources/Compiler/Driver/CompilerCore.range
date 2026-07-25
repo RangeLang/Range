@@ -126,7 +126,7 @@ construct CompilerLLVMLoweredBlock {
 }
 
 construct CompilerProgram {
-    let source: String
+    binding source: String
     let hasMainBlock: Bool
     let mainAttributeStart: Int
     let mainBlock: CompilerBlock
@@ -137,7 +137,7 @@ construct CompilerProgram {
 }
 
 construct CompilerTokenCursor {
-    let source: String
+    binding source: String
     let index: Int
 }
 
@@ -165,7 +165,7 @@ construct CompilerIntTable {
 }
 
 construct CompilerSourceStore {
-    let source: String
+    binding source: String
     let files: CompilerIntTable
     let isValid: Bool
 }

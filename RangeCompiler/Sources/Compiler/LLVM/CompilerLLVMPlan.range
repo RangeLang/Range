@@ -36,7 +36,7 @@ function compilerCoreLLVMSelectedHelperAuditAppendingTypedFunction(tables: Compi
         maxName: name
     }
     if reason == String("") {
-        return CompilerLLVMHelperAudit(selectedCount: audit.selectedCount + 1, lowerableCount: audit.lowerableCount + 1, excludedCount: audit.excludedCount, maxBodyLength: maxLength, maxBodyName: maxName, details: audit.details)
+        return CompilerLLVMHelperAudit(selectedCount: audit.selectedCount + 1, lowerableCount: audit.lowerableCount + 1, excludedCount: audit.excludedCount, maxBodyLength: maxLength, maxBodyName: maxName, details: "\(audit.details)")
     }
     let detail: String("excluded\tname=\(name)\treason=\(reason)\tbodyLength=\(bodyLength)\n")
     return CompilerLLVMHelperAudit(selectedCount: audit.selectedCount + 1, lowerableCount: audit.lowerableCount, excludedCount: audit.excludedCount + 1, maxBodyLength: maxLength, maxBodyName: maxName, details: "\(audit.details)\(detail)")
@@ -269,10 +269,15 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
             }
             return "compilerError\tkind=invalidOwnedReturnSummary\tfunctionRow=\(returnFailureFunctionRow)\tfailureKind=\(returnFailureName)\tdetail=\(returnFailureDetail)"
         }
-        if failureStage == 6 || (failureStage >= 6000 && failureStage < 7000) {
+        if failureStage == 2 || failureStage == 6 || (failureStage >= 6000 && failureStage < 7000) {
             let failureFunctionRow: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureFunction()))
             let failureInstanceID: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureInstance()))
             let failureDetail: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureDetail()))
+            let failureCallNode: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureCallNode()))
+            let failureValueNode: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureValueNode()))
+            let failureValueKind: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureValueKind()))
+            let failureValueStart: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureValueStart()))
+            let failureValueEnd: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureValueEnd()))
             if failureFunctionRow >= 0 && failureFunctionRow < compilerIntTableRowCount(table: reachability.context.tables.functions) {
                 let failureSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: failureFunctionRow, column: 0))
                 let failureDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: failureSyntaxID))
@@ -281,7 +286,7 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
                     let failureFunctionName: String(compilerTypedSyntaxLocalText(tables: reachability.context.tables, fileID: failureFileID, localStart: compilerIntTableValue(table: reachability.context.tables.declarations, row: failureDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: reachability.context.tables.declarations, row: failureDeclarationRow, column: 8)))
                     state ownedPathStage: Int(0 - 1)
                     if failureStage >= 6000 { ownedPathStage: failureStage - 6000 }
-                    return "compilerError\tkind=invalidFunctionReachability\tstage=6\tfunctionRow=\(failureFunctionRow)\tfunction=\(failureFunctionName)\tinstanceID=\(failureInstanceID)\tdetail=\(failureDetail)\townedPathStage=\(ownedPathStage)"
+                    return "compilerError\tkind=invalidFunctionReachability\tstage=\(failureStage)\tfunctionRow=\(failureFunctionRow)\tfunction=\(failureFunctionName)\tinstanceID=\(failureInstanceID)\tdetail=\(failureDetail)\tcallNode=\(failureCallNode)\tvalueNode=\(failureValueNode)\tvalueKind=\(failureValueKind)\tvalueStart=\(failureValueStart)\tvalueEnd=\(failureValueEnd)\townedPathStage=\(ownedPathStage)"
                 }
             }
         }
@@ -517,7 +522,8 @@ function compilerCoreLLVMNativeEntryTextFromParts(usage: String, globals: String
 }
 
 function compilerCoreMainLLVM(block: CompilerLLVMLoweredBlock): String {
-    let fallbackProgram: CompilerProgram(source: String(""), hasMainBlock: false, mainAttributeStart: 0, mainBlock: block.block, mainStatementRecords: String(""), mainStatementSummary: String(""), declarationRecords: block.declarationRecords, declarationSummary: String(""))
+    let emptySource: String("")
+    let fallbackProgram: CompilerProgram(source: $emptySource, hasMainBlock: false, mainAttributeStart: 0, mainBlock: block.block, mainStatementRecords: String(""), mainStatementSummary: String(""), declarationRecords: block.declarationRecords, declarationSummary: String(""))
     let module: CompilerLLVMModule(compilerCoreLLVMModule(program: fallbackProgram, block: block))
     return compilerCoreRenderLLVMModule(module: module)
 }
@@ -678,7 +684,12 @@ function compilerReachableLLVMReturnFailureDetail(): Int { return 19 }
 function compilerReachableLLVMFunctionFailureFunction(): Int { return 20 }
 function compilerReachableLLVMFunctionFailureInstance(): Int { return 21 }
 function compilerReachableLLVMFunctionFailureDetail(): Int { return 22 }
-function compilerReachableLLMCounterCount(): Int { return 23 }
+function compilerReachableLLVMFunctionFailureCallNode(): Int { return 23 }
+function compilerReachableLLVMFunctionFailureValueNode(): Int { return 24 }
+function compilerReachableLLVMFunctionFailureValueKind(): Int { return 25 }
+function compilerReachableLLVMFunctionFailureValueStart(): Int { return 26 }
+function compilerReachableLLVMFunctionFailureValueEnd(): Int { return 27 }
+function compilerReachableLLMCounterCount(): Int { return 28 }
 
 function compilerReachableLLVMReturnFailureDependency(): Int { return 1 }
 function compilerReachableLLVMReturnFailureProof(): Int { return 2 }
@@ -936,6 +947,11 @@ function compilerReachableLLVMStateCreate(context: CompilerLLVMLoweringContext):
     counters.update(element: 0 - 1, index: compilerReachableLLVMReturnFailureFunction())
     counters.update(element: 0 - 1, index: compilerReachableLLVMFunctionFailureFunction())
     counters.update(element: 0 - 1, index: compilerReachableLLVMFunctionFailureInstance())
+    counters.update(element: 0 - 1, index: compilerReachableLLVMFunctionFailureCallNode())
+    counters.update(element: 0 - 1, index: compilerReachableLLVMFunctionFailureValueNode())
+    counters.update(element: 0 - 1, index: compilerReachableLLVMFunctionFailureValueKind())
+    counters.update(element: 0 - 1, index: compilerReachableLLVMFunctionFailureValueStart())
+    counters.update(element: 0 - 1, index: compilerReachableLLVMFunctionFailureValueEnd())
     let abiCapabilities: Buffer<Int>(bufferCreateInt(capacity: functionCount))
     let abiActivation: Buffer<Int>(bufferCreateInt(capacity: functionCount))
     let abiReturnModes: Buffer<Int>(bufferCreateInt(capacity: functionCount))
@@ -1733,8 +1749,7 @@ function compilerReachableLLVMStateSeedEntryRoots(reachability: CompilerReachabl
         if maybeMain == nil {
             status: 101
         } else {
-            let fallbackMain: CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0)
-            let mainBlock: CompilerMainBlock(maybeMain ?? fallbackMain)
+            let mainBlock: CompilerMainBlock(maybeMain ?? CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
             if arena.ownerFunctionRow != 0 - 1 { status: 102 }
             if status == 0 && arena.ownerDeclarationSyntaxID != mainBlock.attributeStart { status: 103 }
             if status == 0 && arena.fileID != compilerSourceStoreFileIDAtGlobalOffset(store: reachability.context.tables.sourceStore, globalOffset: mainBlock.attributeStart) { status: 104 }

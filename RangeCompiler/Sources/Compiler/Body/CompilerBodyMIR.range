@@ -776,6 +776,12 @@ function compilerBodyMIRBuildScheduledOptionalJoin(arena: CompilerBodyArena, nod
     return CompilerBodyMIRValueResult(valueID: resultValueID, isValid: true)
 }
 
+function compilerBodyMIRBuildScheduledOptionalFallback(arena: CompilerBodyArena, nodeID: Int, blockID: Int): CompilerBodyMIRValueResult {
+    let rightNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleRightOperand(), ordinal: 0))
+    if rightNodeID < 0 { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
+    return compilerBodyMIRBuildExpression(arena: arena, nodeID: rightNodeID, blockID: blockID)
+}
+
 function compilerBodyMIRCommitMemberAssignment(arena: CompilerBodyArena, statementNodeID: Int, blockID: Int, assignedValueID: Int): Int {
     let targetNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: statementNodeID, role: compilerSyntaxRoleAssignmentTarget(), ordinal: 0))
     let resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: targetNodeID))
@@ -860,6 +866,112 @@ function compilerBodyMIRAppendStringOwnedCopy(arena: CompilerBodyArena, sourceNo
         || compilerBodyMIRAppendOperand(arena: arena, operationID: operationID, ordinal: 0, valueID: sourceValueID, role: compilerBodyMIROperandArgument()) != 0
         || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: compilerBodyMIROperationStringOwnedCopy(), resultValueID: copiedValueID, sourceNodeID: sourceNodeID, firstOperand: firstOperand, operandCount: 1, targetKind: compilerBodyMIROperationTargetNone(), targetID: 0 - 1) != operationID { return 0 - 1 }
     return copiedValueID
+}
+
+function compilerBodyMIRBlockExitsLexicalStringState(arena: CompilerBodyArena, symbolID: Int, blockID: Int): Bool {
+    if symbolID < 0 || symbolID >= compilerIntTableRowCount(table: arena.symbols)
+        || blockID < 0 || blockID >= compilerIntTableRowCount(table: arena.cfgBlocks)
+        || (compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolKindColumn()) != compilerBodySymbolLet()
+            && compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolKindColumn()) != compilerBodySymbolState())
+        || compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: compilerBodyArenaSymbolTypeID(arena: arena, symbolID: symbolID)) != compilerBodyTypeString() { return false }
+    let rootPathID: Int(compilerBodyOwnedPathFind(paths: arena.ownedPaths, rootKind: compilerBodyOwnedPathRootSymbol(), rootID: symbolID, memberRow: 0 - 1))
+    if rootPathID < 0 { return false }
+    state outgoingCount: Int(0)
+    state edgeRow: Int(0)
+    while edgeRow < compilerIntTableRowCount(table: arena.cfgEdges) {
+        if compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeFromColumn()) == blockID {
+            outgoingCount: outgoingCount + 1
+            let targetBlockID: Int(compilerIntTableValue(table: arena.cfgEdges, row: edgeRow, column: compilerBodyCFGEdgeToColumn()))
+            if !compilerBodyArenaOwnedPathRootEdgeExitsLexicalActivation(arena: arena, sourceBlockID: blockID, targetBlockID: targetBlockID, rootPathID: rootPathID) { return false }
+        }
+        edgeRow: edgeRow + 1
+    }
+    return outgoingCount > 0
+}
+
+function compilerBodyMIRAppendImplicitLexicalStringStateDestructions(arena: CompilerBodyArena, blockID: Int): Int {
+    state symbolID: Int(0)
+    while symbolID < compilerIntTableRowCount(table: arena.symbols) {
+        if compilerBodyMIRBlockExitsLexicalStringState(arena: arena, symbolID: symbolID, blockID: blockID) {
+            let stringValueID: Int(compilerBodyMIRValueForSymbolAtBlock(arena: arena, symbolID: symbolID, blockID: blockID))
+            let declarationNodeID: Int(compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolDeclarationColumn()))
+            let destroyResultValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueCall(), typeKind: compilerBodyTypeInt(), typeID: 0 - 1, sourceNodeID: declarationNodeID, provenanceKind: compilerBodyMemorySubjectSymbol(), provenanceID: symbolID))
+            let destroyOperationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
+            let destroyFirstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
+            if stringValueID < 0 || destroyResultValueID < 0
+                || compilerBodyMIRAppendOperand(arena: arena, operationID: destroyOperationID, ordinal: 0, valueID: stringValueID, role: compilerBodyMIROperandArgument()) != 0
+                || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: compilerBodyMIROperationDirectCall(), resultValueID: destroyResultValueID, sourceNodeID: declarationNodeID, firstOperand: destroyFirstOperand, operandCount: 1, targetKind: compilerBodyMIROperationTargetRuntimeBuiltin(), targetID: compilerBodyRuntimeBuiltinStringDestroy()) != destroyOperationID { return 0 - 1 }
+        }
+        symbolID: symbolID + 1
+    }
+    return 0
+}
+
+function compilerBodyMIRValueForOwnedSymbolPathAtBlock(arena: CompilerBodyArena, pathID: Int, blockID: Int, sourceNodeID: Int): Int {
+    if pathID < 0 || pathID >= compilerIntTableRowCount(table: arena.ownedPaths) { return 0 - 1 }
+    let memberPath: Buffer<Int>(bufferCreateInt(capacity: 4))
+    state currentPathID: Int(pathID)
+    while currentPathID >= 0 && compilerIntTableValue(table: arena.ownedPaths, row: currentPathID, column: compilerBodyOwnedPathParentColumn()) >= 0 {
+        if memberPath.append(element: compilerIntTableValue(table: arena.ownedPaths, row: currentPathID, column: compilerBodyOwnedPathMemberColumn())) != 0 {
+            memberPath.destroy()
+            return 0 - 1
+        }
+        currentPathID: compilerIntTableValue(table: arena.ownedPaths, row: currentPathID, column: compilerBodyOwnedPathParentColumn())
+    }
+    if currentPathID < 0 {
+        memberPath.destroy()
+        return 0 - 1
+    }
+    let rootKind: Int(compilerIntTableValue(table: arena.ownedPaths, row: currentPathID, column: compilerBodyOwnedPathRootKindColumn()))
+    let rootID: Int(compilerIntTableValue(table: arena.ownedPaths, row: currentPathID, column: compilerBodyOwnedPathRootIDColumn()))
+    state valueID: Int(0 - 1)
+    if rootKind == compilerBodyOwnedPathRootSymbol() {
+        valueID: compilerBodyMIRValueForSymbolAtBlock(arena: arena, symbolID: rootID, blockID: blockID)
+    } else if rootKind == compilerBodyOwnedPathRootValue() {
+        valueID: compilerBodyMIRExpressionValue(arena: arena, nodeID: rootID, action: compilerBodyCFGScheduleEvaluateNode())
+        if valueID < 0 { valueID: compilerBodyMIRExpressionValue(arena: arena, nodeID: rootID, action: compilerBodyCFGScheduleOptionalJoin()) }
+    }
+    state memberIndex: Int(memberPath.count - 1)
+    while valueID >= 0 && memberIndex >= 0 {
+        let memberRow: Int(memberPath.element(index: memberIndex))
+        let childPathID: Int(compilerBodyOwnedPathFindChild(paths: arena.ownedPaths, parentPathID: currentPathID, memberRow: memberRow))
+        state memberTypeID: Int(0 - 1)
+        if childPathID >= 0 { memberTypeID: compilerIntTableValue(table: arena.ownedPaths, row: childPathID, column: compilerBodyOwnedPathTypeColumn()) }
+        let memberValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueLocal(), typeKind: compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: memberTypeID), typeID: memberTypeID, sourceNodeID: sourceNodeID, provenanceKind: compilerBodyMemorySubjectOwnedPath(), provenanceID: pathID))
+        let operationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
+        let firstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
+        if memberTypeID < 0 || memberValueID < 0
+            || compilerBodyMIRAppendOperand(arena: arena, operationID: operationID, ordinal: 0, valueID: valueID, role: compilerBodyMIROperandArgument()) != 0
+            || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: compilerBodyMIROperationMemberRead(), resultValueID: memberValueID, sourceNodeID: sourceNodeID, firstOperand: firstOperand, operandCount: 1, targetKind: compilerBodyMIROperationTargetNone(), targetID: memberRow) != operationID {
+            valueID: 0 - 1
+        } else {
+            valueID: memberValueID
+            currentPathID: childPathID
+        }
+        memberIndex: memberIndex - 1
+    }
+    if memberPath.destroy() != 0 { return 0 - 1 }
+    return valueID
+}
+
+function compilerBodyMIRAppendImplicitStringStateDestructions(arena: CompilerBodyArena, returnNodeID: Int, blockID: Int): Int {
+    state factRow: Int(0)
+    while factRow < compilerIntTableRowCount(table: arena.memoryFacts) {
+        if compilerIntTableValue(table: arena.memoryFacts, row: factRow, column: compilerBodyMemoryFactKindColumn()) == compilerBodyMemoryFactResourceDestroy()
+            && compilerIntTableValue(table: arena.memoryFacts, row: factRow, column: compilerBodyMemoryFactAuxColumn()) == blockID {
+            let pathID: Int(compilerIntTableValue(table: arena.memoryFacts, row: factRow, column: compilerBodyMemoryFactSubjectIDColumn()))
+            let sourceNodeID: Int(compilerIntTableValue(table: arena.memoryFacts, row: factRow, column: compilerBodyMemoryFactSourceColumn()))
+            let stringValueID: Int(compilerBodyMIRValueForOwnedSymbolPathAtBlock(arena: arena, pathID: pathID, blockID: blockID, sourceNodeID: sourceNodeID))
+            let destroyResultValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueCall(), typeKind: compilerBodyTypeInt(), typeID: 0 - 1, sourceNodeID: sourceNodeID, provenanceKind: compilerBodyMemorySubjectOwnedPath(), provenanceID: pathID))
+            let destroyOperationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
+            let destroyFirstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
+            if stringValueID < 0 || destroyResultValueID < 0
+                || compilerBodyMIRAppendOperand(arena: arena, operationID: destroyOperationID, ordinal: 0, valueID: stringValueID, role: compilerBodyMIROperandArgument()) != 0
+                || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: compilerBodyMIROperationDirectCall(), resultValueID: destroyResultValueID, sourceNodeID: sourceNodeID, firstOperand: destroyFirstOperand, operandCount: 1, targetKind: compilerBodyMIROperationTargetRuntimeBuiltin(), targetID: compilerBodyRuntimeBuiltinStringDestroy()) != destroyOperationID { return 0 - 1 }
+        }
+        factRow: factRow + 1
+    }
+    return 0
 }
 
 function compilerBodyMIRMarkStringAppendChainOwned(arena: CompilerBodyArena, valueID: Int, symbolID: Int): Bool {
@@ -1109,6 +1221,7 @@ function compilerBodyMIRExecuteScheduleAction(arena: CompilerBodyArena, schedule
     if action == compilerBodyCFGScheduleStatementCommit() { result: compilerBodyMIRCommitScheduledStatement(arena: arena, statementNodeID: nodeID, blockID: blockID) }
     if action == compilerBodyCFGScheduleSwitchMatch() { result: compilerBodyMIRBuildScheduledSwitchMatch(arena: arena, caseNodeID: nodeID, blockID: blockID) }
     if action == compilerBodyCFGScheduleSwitchPayloadBind() { result: compilerBodyMIRBuildScheduledSwitchPayloadBind(arena: arena, bindingNodeID: nodeID, blockID: blockID) }
+    if action == compilerBodyCFGScheduleOptionalFallback() { result: compilerBodyMIRBuildScheduledOptionalFallback(arena: arena, nodeID: nodeID, blockID: blockID) }
     let nodeKind: Int(compilerIntTableValue(table: arena.nodes, row: nodeID, column: 1))
     if !result.isValid { return 0 - (action * 1000000 + nodeKind * 10000 + nodeID + 1) }
     if compilerBodyMIRAppendExpressionValue(arena: arena, nodeID: nodeID, action: action, valueID: result.valueID, blockID: blockID) < 0 { return 0 - (8000000 + nodeKind * 10000 + nodeID + 1) }
@@ -1301,7 +1414,11 @@ function compilerBodyMIRBuildWithScheduleIndex(arena: CompilerBodyArena, schedul
                 terminatorOperandCount: 1
                 terminatorValueID: compilerBodyMIRExpressionValue(arena: arena, nodeID: terminatorSourceNodeID, action: compilerBodyCFGScheduleStatementCommit())
             }
+            if compilerBodyMIRAppendImplicitStringStateDestructions(arena: arena, returnNodeID: terminatorSourceNodeID, blockID: cfgBlockID) != 0 { return 0 - 1 }
         }
+        if cfgTerminatorKind != compilerBodyCFGTerminatorReturn()
+            && (compilerBodyMIRAppendImplicitStringStateDestructions(arena: arena, returnNodeID: terminatorSourceNodeID, blockID: cfgBlockID) != 0
+                || compilerBodyMIRAppendImplicitLexicalStringStateDestructions(arena: arena, blockID: cfgBlockID) != 0) { return 0 - 1 }
         let terminatorOperationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
         let terminatorFirstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
         if terminatorOperandCount == 1 {
@@ -1353,7 +1470,7 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
         let expressionResultValueID: Int(compilerIntTableValue(table: arena.mirExpressionValues, row: expressionValueRow, column: compilerBodyMIRExpressionValueValueColumn()))
         let expressionBlockID: Int(compilerIntTableValue(table: arena.mirExpressionValues, row: expressionValueRow, column: compilerBodyMIRExpressionValueBlockColumn()))
         if expressionNodeID < 0 || expressionNodeID >= compilerIntTableRowCount(table: arena.nodes)
-            || expressionAction < compilerBodyCFGScheduleEvaluateNode() || expressionAction > compilerBodyCFGScheduleSwitchPayloadBind()
+            || expressionAction < compilerBodyCFGScheduleEvaluateNode() || expressionAction > compilerBodyCFGScheduleOptionalFallback()
             || expressionResultValueID < 0 || expressionResultValueID >= valueCount
             || expressionBlockID < 0 || expressionBlockID >= compilerIntTableRowCount(table: arena.mirBlocks) { return 2 }
         state matchingScheduleCount: Int(0)

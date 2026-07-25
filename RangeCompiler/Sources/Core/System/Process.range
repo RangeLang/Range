@@ -13,7 +13,7 @@ function processArgumentRecord(value: String): String {
 }
 
 function processPlan(executable: String): ProcessPlan {
-    return ProcessPlan(executable: executable, arguments: String(""))
+    return ProcessPlan(executable: "\(executable)", arguments: String(""))
 }
 
 function processPlanAppendingArgument(plan: ProcessPlan, argument: String): ProcessPlan {

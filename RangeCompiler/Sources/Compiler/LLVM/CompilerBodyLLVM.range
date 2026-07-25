@@ -1680,8 +1680,7 @@ function compilerBodyArenaValidationCode(arena: CompilerBodyArena): Int {
         if arena.ownerFunctionRow != 0 - 1 { return 3 }
         let maybeMain: Optional<CompilerMainBlock>(compilerCoreParseMainBlock(source: arena.tables.sourceStore.source))
         if maybeMain == nil { return 4 }
-        let fallbackMain: CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0)
-        let mainBlock: CompilerMainBlock(maybeMain ?? fallbackMain)
+        let mainBlock: CompilerMainBlock(maybeMain ?? CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
         if arena.ownerDeclarationSyntaxID != mainBlock.attributeStart
             || arena.fileID != compilerSourceStoreFileIDAtGlobalOffset(store: arena.tables.sourceStore, globalOffset: mainBlock.attributeStart)
             || arena.bodyStart != mainBlock.bodyStart
@@ -1754,8 +1753,7 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
         if arena.ownerFunctionRow != 0 - 1 { return false }
         let maybeMain: Optional<CompilerMainBlock>(compilerCoreParseMainBlock(source: arena.tables.sourceStore.source))
         if maybeMain == nil { return false }
-        let fallbackMain: CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0)
-        let mainBlock: CompilerMainBlock(maybeMain ?? fallbackMain)
+        let mainBlock: CompilerMainBlock(maybeMain ?? CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
         if arena.ownerDeclarationSyntaxID != mainBlock.attributeStart
             || arena.fileID != compilerSourceStoreFileIDAtGlobalOffset(store: arena.tables.sourceStore, globalOffset: mainBlock.attributeStart)
             || arena.bodyStart != mainBlock.bodyStart
@@ -1983,19 +1981,11 @@ function compilerCoreLLVMLowerEntryTyped(context: CompilerLLVMLoweringContext, r
             valid: false
         }
     }
-    state emission: CompilerBodyLLVMEmissionResult(block: failureBlock, renderedGlobals: String(""), runtimeRequirements: 0, isValid: false)
+    state emission: CompilerBodyLLVMEmissionResult(block: compilerCoreLLVMTypedEntryFailureBlock(arena: arena, initialTemporaryIndex: initialTemporaryIndex), renderedGlobals: String(""), runtimeRequirements: 0, isValid: false)
     if valid { emission: compilerBodyLLVMEmit(arena: arena, initialTemporary: initialTemporaryIndex, initialBranch: 0, abiPlan: abiPlan, typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments, functionInstances: reachability.functionInstances, functionInstanceSignatures: reachability.functionInstanceSignatures, functionInstanceSignatureParameters: reachability.functionInstanceSignatureParameters) }
     if valid && !emission.isValid {
         failureStage: 11
         valid: false
-    }
-    state loweredBlock: CompilerLLVMLoweredBlock(failureBlock)
-    state renderedGlobals: String("")
-    state runtimeRequirements: Int(0)
-    if valid {
-        loweredBlock: emission.block
-        renderedGlobals: emission.renderedGlobals
-        runtimeRequirements: emission.runtimeRequirements
     }
     let destroyStatus: Int(compilerBodyArenaDestroy(arena: arena))
     if destroyStatus != 0 {
@@ -2005,7 +1995,7 @@ function compilerCoreLLVMLowerEntryTyped(context: CompilerLLVMLoweringContext, r
     if !valid {
         return CompilerTypedBodyLowering(block: failureBlock, renderedGlobals: String(""), runtimeRequirements: 0, telemetry: CompilerBodyTelemetry(supportedCount: 0, typedParseAttempts: 1, typedParseSuccesses: 0, legacyParses: 0, arenaCreates: 1, arenaDestroys: 1, recordBytes: 0, committedFailures: 1), failureStage: failureStage, functionName: String(""), returnLLVMType: String(""), parameterText: String(""), isValid: false)
     }
-    return CompilerTypedBodyLowering(block: loweredBlock, renderedGlobals: renderedGlobals, runtimeRequirements: runtimeRequirements, telemetry: CompilerBodyTelemetry(supportedCount: 1, typedParseAttempts: 1, typedParseSuccesses: 1, legacyParses: 0, arenaCreates: 1, arenaDestroys: 1, recordBytes: 0, committedFailures: 0), failureStage: 0, functionName: String(""), returnLLVMType: String(""), parameterText: String(""), isValid: true)
+    return CompilerTypedBodyLowering(block: emission.block, renderedGlobals: emission.renderedGlobals, runtimeRequirements: emission.runtimeRequirements, telemetry: CompilerBodyTelemetry(supportedCount: 1, typedParseAttempts: 1, typedParseSuccesses: 1, legacyParses: 0, arenaCreates: 1, arenaDestroys: 1, recordBytes: 0, committedFailures: 0), failureStage: 0, functionName: String(""), returnLLVMType: String(""), parameterText: String(""), isValid: true)
 }
 
 function compilerCoreLLVMLowerHelperFunctionTypedObserved(context: CompilerLLVMLoweringContext, functionRow: Int, instanceID: Int, receiverTypeKeyID: Int, typeKeys: CompilerIntTable, typeKeyArguments: CompilerIntTable, functionInstances: CompilerIntTable, functionInstanceSignatures: CompilerIntTable, functionInstanceSignatureParameters: CompilerIntTable, functionInstanceEffects: CompilerIntTable, functionInstanceEffectPaths: CompilerIntTable, functionInstanceReturnSummaries: CompilerIntTable, functionInstanceReturnLeaves: CompilerIntTable, expectedSignatureFirst: Int, expectedSignatureSecond: Int, initialTemporaryIndex: Int, edgeOwners: Buffer<Int>, edgeTargets: Buffer<Int>, abiPlan: CompilerModuleABIPlan): CompilerTypedBodyLowering {

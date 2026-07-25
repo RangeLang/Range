@@ -136,25 +136,24 @@ function compilerCoreLLVMGlobalStringRenderedText(text: String): String {
 
 function compilerCoreLLVMGlobalStringRenderedTextFromIndex(text: String, sourceIndex: Int, output: String): String {
     let textLength: Int(stringLength(value: text))
-    if sourceIndex >= textLength {
-        return output
+    state cursor: Int(sourceIndex)
+    state rendered: String("\(output)")
+    while cursor < textLength {
+        let character: String(text.character(index: cursor))
+        if character == compilerCoreNewlineCharacter() {
+            rendered: "\(rendered)\\0A"
+        } else if character == compilerCoreTabCharacter() {
+            rendered: "\(rendered)\\09"
+        } else if isRangeQuote(character: character) {
+            rendered: "\(rendered)\\22"
+        } else if character == compilerCoreSingleBackslash() {
+            rendered: "\(rendered)\\5C"
+        } else {
+            rendered: "\(rendered)\(character)"
+        }
+        cursor: cursor + 1
     }
-
-    let character: String(text.character(index: sourceIndex))
-    if character == compilerCoreNewlineCharacter() {
-        return compilerCoreLLVMGlobalStringRenderedTextFromIndex(text: text, sourceIndex: sourceIndex + 1, output: "\(output)\\0A")
-    }
-    if character == compilerCoreTabCharacter() {
-        return compilerCoreLLVMGlobalStringRenderedTextFromIndex(text: text, sourceIndex: sourceIndex + 1, output: "\(output)\\09")
-    }
-    if isRangeQuote(character: character) {
-        return compilerCoreLLVMGlobalStringRenderedTextFromIndex(text: text, sourceIndex: sourceIndex + 1, output: "\(output)\\22")
-    }
-    if character == compilerCoreSingleBackslash() {
-        return compilerCoreLLVMGlobalStringRenderedTextFromIndex(text: text, sourceIndex: sourceIndex + 1, output: "\(output)\\5C")
-    }
-
-    return compilerCoreLLVMGlobalStringRenderedTextFromIndex(text: text, sourceIndex: sourceIndex + 1, output: "\(output)\(character)")
+    return rendered
 }
 
 function compilerCoreLLVMLocalRecord(name: String, operand: String, typeName: String): String {
@@ -388,21 +387,19 @@ function compilerCoreParseMainBlock(source: String): Optional<CompilerMainBlock>
         return nil
     }
 
-    let fallbackCursor: CompilerTokenCursor(source: source, index: 0)
-    let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: fallbackCursor))
-    let token: RangeLexedToken(maybeToken ?? fallbackToken)
+    let fallbackCursor: CompilerTokenCursor(source: $source, index: 0)
+    let token: RangeLexedToken(maybeToken ?? compilerFallbackToken(cursor: fallbackCursor))
     return compilerCoreParseMainBlockBody(source: source, token: token)
 }
 
 function compilerCoreFindMainAttributeToken(source: String): Optional<RangeLexedToken> {
-    state cursor: CompilerTokenCursor(source: source, index: 0)
+    state cursor: CompilerTokenCursor(source: $source, index: 0)
     while true {
         let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
         if maybeToken == nil {
             return nil
         }
-        let fallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
-        let token: RangeLexedToken(maybeToken ?? fallback)
+        let token: RangeLexedToken(maybeToken ?? compilerFallbackToken(cursor: cursor))
         if compilerCoreTokenIsMainAttribute(token: token) {
             return token
         }
@@ -432,8 +429,7 @@ function compilerCoreParseMainBlockBody(source: String, token: RangeLexedToken):
         return nil
     }
 
-    let bodyFallback: CompilerSourceRange(start: token.end, end: token.end, next: token.end)
-    let body: CompilerSourceRange(maybeBody ?? bodyFallback)
+    let body: CompilerSourceRange(maybeBody ?? CompilerSourceRange(start: token.end, end: token.end, next: token.end))
     return compilerCoreMainBlockFromRange(attributeStart: token.start, body: body)
 }
 
@@ -500,8 +496,7 @@ function compilerCoreParseStatementsIntoRawBuffers(program: CompilerProgram, blo
             if maybeStatement == nil {
                 sourceIndex: sourceIndex + 1
             } else {
-                let fallback: CompilerStatement(compilerCoreMissingStatement(start: sourceIndex, end: sourceIndex + 1))
-                let statement: CompilerStatement(maybeStatement ?? fallback)
+                let statement: CompilerStatement(maybeStatement ?? compilerCoreMissingStatement(start: sourceIndex, end: sourceIndex + 1))
                 rawBufferAppendText(buffer: recordsBuffer, text: compilerCoreStatementRecord(statement: statement))
                 rawBufferAppendText(buffer: summaryBuffer, text: String("statement"))
                 rawBufferAppendTextInt(buffer: summaryBuffer, value: statementCount)
@@ -844,7 +839,7 @@ function parseCompilerBlock(program: CompilerProgram, block: CompilerBlock): Com
 }
 
 function parseCompilerStatement(program: CompilerProgram, start: Int, bodyEnd: Int): Optional<CompilerStatement> {
-    let cursor: CompilerTokenCursor(source: program.source, index: start)
+    let cursor: CompilerTokenCursor(source: $program.source, index: start)
     let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     return parseCompilerStatementWithToken(program: program, cursor: cursor, maybeToken: maybeToken, bodyEnd: bodyEnd)
 }
@@ -854,8 +849,7 @@ function parseCompilerStatementWithToken(program: CompilerProgram, cursor: Compi
         return nil
     }
 
-    let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursor))
-    let token: RangeLexedToken(maybeToken ?? fallbackToken)
+    let token: RangeLexedToken(maybeToken ?? compilerFallbackToken(cursor: cursor))
     let tokenStart: Int(compilerCoreRangeTokenStart(token: token))
     if tokenStart >= bodyEnd {
         return nil
@@ -957,8 +951,7 @@ function parseCompilerReturnStatement(cursor: CompilerTokenCursor, keyword: Rang
 function parseCompilerReturnStatementExpressionCore(source: String, keyword: RangeLexedToken, expressionStart: Int, bodyEnd: Int): Optional<CompilerStatement> {
     let maybeExpression: Optional<CompilerExpression>(parseCompilerExpression(source: source, start: expressionStart, limit: bodyEnd))
     if maybeExpression == nil { return nil }
-    let expressionFallback: CompilerExpression(compilerCoreMissingExpression(start: expressionStart))
-    let expression: CompilerExpression(maybeExpression ?? expressionFallback)
+    let expression: CompilerExpression(maybeExpression ?? compilerCoreMissingExpression(start: expressionStart))
     return compilerCoreReturnStatementFromExpression(keyword: keyword, expression: expression)
 }
 
@@ -1049,8 +1042,7 @@ function parseCompilerIdentifierStatement(program: CompilerProgram, cursor: Comp
         return nil
     }
 
-    let targetFallback: CompilerExpression(compilerCoreMissingExpression(start: token.start))
-    let target: CompilerExpression(maybeTarget ?? targetFallback)
+    let target: CompilerExpression(maybeTarget ?? compilerCoreMissingExpression(start: token.start))
     return parseCompilerIdentifierStatementWithTarget(cursor: cursor, token: token, target: target, bodyEnd: bodyEnd)
 }
 
@@ -1070,8 +1062,7 @@ function parseCompilerIdentifierStatementWithTarget(cursor: CompilerTokenCursor,
     if maybeValue == nil {
         return nil
     }
-    let valueFallback: CompilerExpression(compilerCoreMissingExpression(start: valueStart))
-    let value: CompilerExpression(maybeValue ?? valueFallback)
+    let value: CompilerExpression(maybeValue ?? compilerCoreMissingExpression(start: valueStart))
     return parseCompilerAssignmentStatement(token: token, target: target, value: value)
 }
 
@@ -1123,13 +1114,12 @@ function compilerCoreExpressionStatement(expression: CompilerExpression): Compil
 }
 
 function parseCompilerStatementLegacy(program: CompilerProgram, start: Int, bodyEnd: Int): Optional<CompilerStatement> {
-    let cursor: CompilerTokenCursor(source: program.source, index: start)
+    let cursor: CompilerTokenCursor(source: $program.source, index: start)
     let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeToken == nil {
         return nil
     }
-    let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursor))
-    let token: RangeLexedToken(maybeToken ?? fallbackToken)
+    let token: RangeLexedToken(maybeToken ?? compilerFallbackToken(cursor: cursor))
     if token.start >= bodyEnd {
         return nil
     }
@@ -1167,8 +1157,7 @@ function parseCompilerStatementLegacy(program: CompilerProgram, start: Int, body
         if maybeExpression == nil {
             return nil
         }
-        let expressionFallback: CompilerExpression(compilerCoreMissingExpression(start: expressionCursor.index))
-        let expression: CompilerExpression(maybeExpression ?? expressionFallback)
+        let expression: CompilerExpression(maybeExpression ?? compilerCoreMissingExpression(start: expressionCursor.index))
         return CompilerStatement(
             kind: String("return"),
             name: String(""),
@@ -1200,9 +1189,8 @@ function parseCompilerStatementLegacy(program: CompilerProgram, start: Int, body
         if maybeTarget == nil {
             return nil
         }
-        let targetFallback: CompilerExpression(compilerCoreMissingExpression(start: token.start))
-        let target: CompilerExpression(maybeTarget ?? targetFallback)
-        let colonCursor: CompilerTokenCursor(source: cursor.source, index: target.end)
+        let target: CompilerExpression(maybeTarget ?? compilerCoreMissingExpression(start: token.start))
+        let colonCursor: CompilerTokenCursor(source: $cursor.source, index: target.end)
         let maybeColon: Optional<RangeLexedToken>(compilerCursorPeek(cursor: colonCursor))
         if maybeColon == nil {
             return CompilerStatement(
@@ -1226,8 +1214,7 @@ function parseCompilerStatementLegacy(program: CompilerProgram, start: Int, body
                 end: target.end
             )
         }
-        let colonFallback: RangeLexedToken(compilerFallbackToken(cursor: colonCursor))
-        let colonToken: RangeLexedToken(maybeColon ?? colonFallback)
+        let colonToken: RangeLexedToken(maybeColon ?? compilerFallbackToken(cursor: colonCursor))
         if colonToken.kind != .colon {
             return CompilerStatement(
                 kind: String("expression"),
@@ -1255,8 +1242,7 @@ function parseCompilerStatementLegacy(program: CompilerProgram, start: Int, body
         if maybeValue == nil {
             return nil
         }
-        let valueFallback: CompilerExpression(compilerCoreMissingExpression(start: valueCursor.index))
-        let value: CompilerExpression(maybeValue ?? valueFallback)
+        let value: CompilerExpression(maybeValue ?? compilerCoreMissingExpression(start: valueCursor.index))
         let targetName: String(compilerCoreIdentifierExpressionRecordName(record: target.record, fallbackSummary: target.summary))
         return CompilerStatement(
             kind: String("assignment"),
@@ -1290,9 +1276,8 @@ function parseCompilerControlBlockStatement(program: CompilerProgram, cursor: Co
         return nil
     }
 
-    let conditionFallback: CompilerExpression(compilerCoreMissingExpression(start: conditionCursor.index))
-    let condition: CompilerExpression(maybeCondition ?? conditionFallback)
-    state blockCursor: CompilerTokenCursor(source: cursor.source, index: condition.end)
+    let condition: CompilerExpression(maybeCondition ?? compilerCoreMissingExpression(start: conditionCursor.index))
+    state blockCursor: CompilerTokenCursor(source: $cursor.source, index: condition.end)
     state sawLeftBrace: Bool(false)
     state blockStart: Int(0)
     state blockEnd: Int(0)
@@ -1307,15 +1292,13 @@ function parseCompilerControlBlockStatement(program: CompilerProgram, cursor: Co
             return nil
         }
 
-        let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: blockCursor))
-        let token: RangeLexedToken(maybeToken ?? fallbackToken)
+        let token: RangeLexedToken(maybeToken ?? compilerFallbackToken(cursor: blockCursor))
         if token.kind == .leftBrace {
             let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: blockCursor, leftKind: .leftBrace, rightKind: .rightBrace))
             if maybeRange == nil {
                 return nil
             }
-            let rangeFallback: CompilerSourceRange(start: token.end, end: token.end, next: token.end)
-            let range: CompilerSourceRange(maybeRange ?? rangeFallback)
+            let range: CompilerSourceRange(maybeRange ?? CompilerSourceRange(start: token.end, end: token.end, next: token.end))
             blockStart: range.start
             blockEnd: range.end
             nextIndex: range.next
@@ -1329,22 +1312,19 @@ function parseCompilerControlBlockStatement(program: CompilerProgram, cursor: Co
         return nil
     }
 
-    let elseCursor: CompilerTokenCursor(source: cursor.source, index: nextIndex)
+    let elseCursor: CompilerTokenCursor(source: $cursor.source, index: nextIndex)
     let maybeElseToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: elseCursor))
     if maybeElseToken != nil && keyword.text == String("if") {
-        let elseTokenFallback: RangeLexedToken(compilerFallbackToken(cursor: elseCursor))
-        let elseToken: RangeLexedToken(maybeElseToken ?? elseTokenFallback)
+        let elseToken: RangeLexedToken(maybeElseToken ?? compilerFallbackToken(cursor: elseCursor))
         if elseToken.kind == .keyword && elseToken.text == String("else") {
             let elseBlockCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: elseCursor, token: elseToken))
             let maybeElseBodyToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: elseBlockCursor))
             if maybeElseBodyToken != nil {
-                let elseBodyTokenFallback: RangeLexedToken(compilerFallbackToken(cursor: elseBlockCursor))
-                let elseBodyToken: RangeLexedToken(maybeElseBodyToken ?? elseBodyTokenFallback)
+                let elseBodyToken: RangeLexedToken(maybeElseBodyToken ?? compilerFallbackToken(cursor: elseBlockCursor))
                 if elseBodyToken.kind == .leftBrace {
                     let maybeElseRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: elseBlockCursor, leftKind: .leftBrace, rightKind: .rightBrace))
                     if maybeElseRange != nil {
-                        let elseRangeFallback: CompilerSourceRange(start: elseToken.end, end: elseToken.end, next: elseToken.end)
-                        let elseRange: CompilerSourceRange(maybeElseRange ?? elseRangeFallback)
+                        let elseRange: CompilerSourceRange(maybeElseRange ?? CompilerSourceRange(start: elseToken.end, end: elseToken.end, next: elseToken.end))
                         elseBlockStart: elseRange.start
                         elseBlockEnd: elseRange.end
                         nextIndex: elseRange.next
@@ -1353,8 +1333,7 @@ function parseCompilerControlBlockStatement(program: CompilerProgram, cursor: Co
                 if elseBodyToken.kind == .keyword && elseBodyToken.text == String("if") {
                     let maybeNestedIf: Optional<CompilerStatement>(parseCompilerControlBlockStatement(program: program, cursor: elseBlockCursor, keyword: elseBodyToken, bodyEnd: bodyEnd))
                     if maybeNestedIf != nil {
-                        let nestedIfFallback: CompilerStatement(compilerCoreMissingStatement(start: elseBodyToken.start, end: elseBodyToken.end))
-                        let nestedIf: CompilerStatement(maybeNestedIf ?? nestedIfFallback)
+                        let nestedIf: CompilerStatement(maybeNestedIf ?? compilerCoreMissingStatement(start: elseBodyToken.start, end: elseBodyToken.end))
                         elseBlockStart: nestedIf.start
                         elseBlockEnd: nestedIf.end
                         nextIndex: nestedIf.end
@@ -1399,17 +1378,15 @@ function parseCompilerLocalBindingStatement(cursor: CompilerTokenCursor, keyword
 }
 
 function compilerCoreCallArgumentsStartWithLabel(source: String, start: Int, end: Int): Bool {
-    let labelCursor: CompilerTokenCursor(source: source, index: start)
+    let labelCursor: CompilerTokenCursor(source: $source, index: start)
     let maybeLabelToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: labelCursor))
     if maybeLabelToken == nil { return false }
-    let labelFallbackToken: RangeLexedToken(compilerFallbackToken(cursor: labelCursor))
-    let labelToken: RangeLexedToken(maybeLabelToken ?? labelFallbackToken)
+    let labelToken: RangeLexedToken(maybeLabelToken ?? compilerFallbackToken(cursor: labelCursor))
     if labelToken.start >= end || (labelToken.kind != .identifier && labelToken.kind != .keyword) { return false }
     let afterLabelCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: labelCursor, token: labelToken))
     let maybeLabelColon: Optional<RangeLexedToken>(compilerCursorPeek(cursor: afterLabelCursor))
     if maybeLabelColon == nil { return false }
-    let labelColonFallback: RangeLexedToken(compilerFallbackToken(cursor: afterLabelCursor))
-    let labelColon: RangeLexedToken(maybeLabelColon ?? labelColonFallback)
+    let labelColon: RangeLexedToken(maybeLabelColon ?? compilerFallbackToken(cursor: afterLabelCursor))
     return labelColon.start < end && labelColon.kind == .colon
 }
 
@@ -1419,8 +1396,7 @@ function parseCompilerLocalBindingStatementCore(cursor: CompilerTokenCursor, key
     if maybeName == nil {
         return nil
     }
-    let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursorState))
-    let nameToken: RangeLexedToken(maybeName ?? fallbackToken)
+    let nameToken: RangeLexedToken(maybeName ?? compilerFallbackToken(cursor: cursorState))
     if nameToken.kind != .identifier {
         return nil
     }
@@ -1430,8 +1406,7 @@ function parseCompilerLocalBindingStatementCore(cursor: CompilerTokenCursor, key
     if maybeColon == nil {
         return nil
     }
-    let colonFallback: RangeLexedToken(compilerFallbackToken(cursor: cursorState))
-    let colonToken: RangeLexedToken(maybeColon ?? colonFallback)
+    let colonToken: RangeLexedToken(maybeColon ?? compilerFallbackToken(cursor: cursorState))
     if colonToken.kind != .colon {
         return nil
     }
@@ -1441,24 +1416,21 @@ function parseCompilerLocalBindingStatementCore(cursor: CompilerTokenCursor, key
     if maybeType == nil {
         return nil
     }
-    let typeFallback: CompilerTypeReference(text: String(""), start: cursorState.index, end: cursorState.index)
-    let typeReference: CompilerTypeReference(maybeType ?? typeFallback)
-    cursorState: CompilerTokenCursor(source: cursor.source, index: typeReference.end)
+    let typeReference: CompilerTypeReference(maybeType ?? CompilerTypeReference(text: String(""), start: cursorState.index, end: cursorState.index))
+    cursorState: CompilerTokenCursor(source: $cursor.source, index: typeReference.end)
 
     let maybeLeftParen: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursorState))
     if maybeLeftParen == nil {
         return nil
     }
-    let leftParenFallback: RangeLexedToken(compilerFallbackToken(cursor: cursorState))
-    let leftParenToken: RangeLexedToken(maybeLeftParen ?? leftParenFallback)
+    let leftParenToken: RangeLexedToken(maybeLeftParen ?? compilerFallbackToken(cursor: cursorState))
     if leftParenToken.kind != .leftParen {
         return nil
     }
     let initializerOpenCursor: CompilerTokenCursor(cursorState)
     let maybeInitializerRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: initializerOpenCursor, leftKind: .leftParen, rightKind: .rightParen))
     if maybeInitializerRange == nil { return nil }
-    let initializerRangeFallback: CompilerSourceRange(start: leftParenToken.end, end: leftParenToken.end, next: leftParenToken.end)
-    let initializerRange: CompilerSourceRange(maybeInitializerRange ?? initializerRangeFallback)
+    let initializerRange: CompilerSourceRange(maybeInitializerRange ?? CompilerSourceRange(start: leftParenToken.end, end: leftParenToken.end, next: leftParenToken.end))
     cursorState: compilerCursorAdvance(cursor: cursorState, token: leftParenToken)
 
     state expression: CompilerExpression(compilerCoreMissingExpression(start: cursorState.index))
@@ -1475,13 +1447,11 @@ function parseCompilerLocalBindingStatementCore(cursor: CompilerTokenCursor, key
         if maybeBindingExpression == nil {
             return nil
         }
-        let bindingExpressionFallback: CompilerExpression(compilerCoreMissingExpression(start: cursorState.index))
-        expression: maybeBindingExpression ?? bindingExpressionFallback
-        cursorState: CompilerTokenCursor(source: cursor.source, index: expression.end)
+        expression: maybeBindingExpression ?? compilerCoreMissingExpression(start: cursorState.index)
+        cursorState: CompilerTokenCursor(source: $cursor.source, index: expression.end)
         let maybeBindingRightParen: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursorState))
         if maybeBindingRightParen == nil { return nil }
-        let bindingRightParenFallback: RangeLexedToken(compilerFallbackToken(cursor: cursorState))
-        let bindingRightParenToken: RangeLexedToken(maybeBindingRightParen ?? bindingRightParenFallback)
+        let bindingRightParenToken: RangeLexedToken(maybeBindingRightParen ?? compilerFallbackToken(cursor: cursorState))
         if bindingRightParenToken.kind != .rightParen { return nil }
         bindingEnd: bindingRightParenToken.end
     }
@@ -1575,9 +1545,8 @@ function parseCompilerExpression(source: String, start: Int, limit: Int): Option
 function parseCompilerExpressionAtPrecedenceCore(source: String, start: Int, limit: Int, minimumPrecedence: Int): Optional<CompilerExpression> {
     let maybeLeftExpression: Optional<CompilerExpression>(parseCompilerPrefixExpressionCore(source: source, start: start, limit: limit))
     if maybeLeftExpression == nil { return nil }
-    let leftFallback: CompilerExpression(compilerCoreMissingExpression(start: start))
-    state leftExpression: CompilerExpression(maybeLeftExpression ?? leftFallback)
-    state cursor: CompilerTokenCursor(source: source, index: leftExpression.end)
+    state leftExpression: CompilerExpression(maybeLeftExpression ?? compilerCoreMissingExpression(start: start))
+    state cursor: CompilerTokenCursor(source: $source, index: leftExpression.end)
 
     while cursor.index < limit {
         let maybeOperator: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
@@ -1585,8 +1554,7 @@ function parseCompilerExpressionAtPrecedenceCore(source: String, start: Int, lim
             return leftExpression
         }
 
-        let operatorFallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
-        let operatorToken: RangeLexedToken(maybeOperator ?? operatorFallback)
+        let operatorToken: RangeLexedToken(maybeOperator ?? compilerFallbackToken(cursor: cursor))
         if !compilerCoreIsBinaryOperator(token: operatorToken) {
             return leftExpression
         }
@@ -1604,8 +1572,7 @@ function parseCompilerExpressionAtPrecedenceCore(source: String, start: Int, lim
 
         let maybeRightExpression: Optional<CompilerExpression>(parseCompilerExpressionAtPrecedenceCore(source: source, start: operatorToken.end, limit: limit, minimumPrecedence: rightMinimumPrecedence))
         if maybeRightExpression == nil { return nil }
-        let rightFallback: CompilerExpression(compilerCoreMissingExpression(start: operatorToken.end))
-        let rightExpression: CompilerExpression(maybeRightExpression ?? rightFallback)
+        let rightExpression: CompilerExpression(maybeRightExpression ?? compilerCoreMissingExpression(start: operatorToken.end))
         let binaryRecord: String(compilerCoreExpressionRecord(kind: String("binary"), value: operatorToken.text, left: leftExpression.record, right: rightExpression.record, arguments: String(""), start: leftExpression.start, end: rightExpression.end))
         leftExpression: CompilerExpression(
             kind: String("binary"),
@@ -1615,20 +1582,19 @@ function parseCompilerExpressionAtPrecedenceCore(source: String, start: Int, lim
             start: leftExpression.start,
             end: rightExpression.end
         )
-        cursor: CompilerTokenCursor(source: source, index: rightExpression.end)
+        cursor: CompilerTokenCursor(source: $source, index: rightExpression.end)
     }
 
     return leftExpression
 }
 
 function parseCompilerPrefixExpressionCore(source: String, start: Int, limit: Int): Optional<CompilerExpression> {
-    let cursor: CompilerTokenCursor(source: source, index: start)
+    let cursor: CompilerTokenCursor(source: $source, index: start)
     let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeToken == nil {
         return nil
     }
-    let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursor))
-    let token: RangeLexedToken(maybeToken ?? fallbackToken)
+    let token: RangeLexedToken(maybeToken ?? compilerFallbackToken(cursor: cursor))
     if token.start >= limit {
         return nil
     }
@@ -1636,14 +1602,12 @@ function parseCompilerPrefixExpressionCore(source: String, start: Int, limit: In
     if token.kind == .leftParen {
         let maybeGroupedExpression: Optional<CompilerExpression>(parseCompilerExpressionAtPrecedenceCore(source: source, start: token.end, limit: limit, minimumPrecedence: 0))
         if maybeGroupedExpression == nil { return nil }
-        let groupedFallback: CompilerExpression(compilerCoreMissingExpression(start: token.end))
-        let groupedExpression: CompilerExpression(maybeGroupedExpression ?? groupedFallback)
+        let groupedExpression: CompilerExpression(maybeGroupedExpression ?? compilerCoreMissingExpression(start: token.end))
         let maybeRightParen: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: groupedExpression.end))
         if maybeRightParen == nil {
             return nil
         }
-        let rightParenFallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
-        let rightParenToken: RangeLexedToken(maybeRightParen ?? rightParenFallback)
+        let rightParenToken: RangeLexedToken(maybeRightParen ?? compilerFallbackToken(cursor: cursor))
         if rightParenToken.kind != .rightParen {
             return nil
         }
@@ -1654,8 +1618,7 @@ function parseCompilerPrefixExpressionCore(source: String, start: Int, limit: In
     if compilerCoreIsPrefixOperator(token: token) {
         let maybeOperand: Optional<CompilerExpression>(parseCompilerExpressionAtPrecedenceCore(source: source, start: token.end, limit: limit, minimumPrecedence: 7))
         if maybeOperand == nil { return nil }
-        let operandFallback: CompilerExpression(compilerCoreMissingExpression(start: token.end))
-        let operand: CompilerExpression(maybeOperand ?? operandFallback)
+        let operand: CompilerExpression(maybeOperand ?? compilerCoreMissingExpression(start: token.end))
         let prefixRecord: String(compilerCoreExpressionRecord(kind: String("prefix"), value: token.text, left: operand.record, right: String(""), arguments: String(""), start: token.start, end: operand.end))
         let prefixLegacyExpression: CompilerExpression(
             kind: String("prefix"),
@@ -1672,7 +1635,7 @@ function parseCompilerPrefixExpressionCore(source: String, start: Int, limit: In
 }
 
 function parseCompilerPostfixExpressionCore(source: String, start: Int, limit: Int): Optional<CompilerExpression> {
-    let cursor: CompilerTokenCursor(source: source, index: start)
+    let cursor: CompilerTokenCursor(source: $source, index: start)
     let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeToken == nil {
         return nil
@@ -1693,8 +1656,7 @@ function parseCompilerPostfixExpressionCore(source: String, start: Int, limit: I
         let nameCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: cursor, token: token))
         let maybeName: Optional<RangeLexedToken>(compilerCursorPeek(cursor: nameCursor))
         if maybeName == nil { return nil }
-        let nameFallback: RangeLexedToken(compilerFallbackToken(cursor: nameCursor))
-        let nameToken: RangeLexedToken(maybeName ?? nameFallback)
+        let nameToken: RangeLexedToken(maybeName ?? compilerFallbackToken(cursor: nameCursor))
         if nameToken.kind != .identifier { return nil }
         let bindingRecord: String(compilerCoreExpressionRecord(kind: String("bindingReference"), value: nameToken.text, left: String(""), right: String(""), arguments: String(""), start: token.start, end: nameToken.end))
         return CompilerExpression(kind: String("bindingReference"), value: nameToken.text, summary: String("bindingReference((nameToken.text))"), record: bindingRecord, start: token.start, end: nameToken.end)
@@ -1728,16 +1690,14 @@ function parseCompilerPostfixExpressionCore(source: String, start: Int, limit: I
             let completedPostfixExpression: CompilerExpression(kind: kind, value: value, summary: summary, record: record, start: token.start, end: expressionEnd)
             return completedPostfixExpression
         }
-        let suffixFallback: RangeLexedToken(compilerFallbackToken(cursor: suffixCursor))
-        let suffixToken: RangeLexedToken(maybeSuffix ?? suffixFallback)
+        let suffixToken: RangeLexedToken(maybeSuffix ?? compilerFallbackToken(cursor: suffixCursor))
         if suffixToken.kind == .dot {
             let memberCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: suffixCursor, token: suffixToken))
             let maybeMember: Optional<RangeLexedToken>(compilerCursorPeek(cursor: memberCursor))
             if maybeMember == nil {
                 return nil
             }
-            let memberFallback: RangeLexedToken(compilerFallbackToken(cursor: memberCursor))
-            let memberToken: RangeLexedToken(maybeMember ?? memberFallback)
+            let memberToken: RangeLexedToken(maybeMember ?? compilerFallbackToken(cursor: memberCursor))
             if memberToken.kind != .identifier && memberToken.kind != .keyword {
                 return nil
             }
@@ -1753,20 +1713,18 @@ function parseCompilerPostfixExpressionCore(source: String, start: Int, limit: I
             if maybeArguments == nil {
                 return nil
             }
-            let argumentsFallback: CompilerSourceRange(start: suffixToken.end, end: suffixToken.end, next: suffixToken.end)
-            let argumentsRange: CompilerSourceRange(maybeArguments ?? argumentsFallback)
+            let argumentsRange: CompilerSourceRange(maybeArguments ?? CompilerSourceRange(start: suffixToken.end, end: suffixToken.end, next: suffixToken.end))
             let calleeRecord: String(record)
             let arguments: CompilerCallArguments(parseCompilerCallArgumentsCore(source: source, start: argumentsRange.start, end: argumentsRange.end))
             kind: String("call")
             summary: "call(\(summary),arguments=[\(arguments.summary)])"
             expressionEnd: argumentsRange.next
             record: compilerCoreExpressionRecord(kind: kind, value: value, left: calleeRecord, right: String(""), arguments: arguments.records, start: token.start, end: expressionEnd)
-            suffixCursor: CompilerTokenCursor(source: source, index: argumentsRange.next)
+            suffixCursor: CompilerTokenCursor(source: $source, index: argumentsRange.next)
         } else if suffixToken.kind == .leftBracket {
             let maybeIndex: Optional<CompilerExpression>(parseCompilerExpression(source: source, start: suffixToken.end, limit: limit))
             if maybeIndex == nil { return nil }
-            let indexFallback: CompilerExpression(compilerCoreMissingExpression(start: suffixToken.end))
-            let index: CompilerExpression(maybeIndex ?? indexFallback)
+            let index: CompilerExpression(maybeIndex ?? compilerCoreMissingExpression(start: suffixToken.end))
             let maybeRightBracket: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: index.end))
             if maybeRightBracket == nil {
                 return nil
@@ -1781,7 +1739,7 @@ function parseCompilerPostfixExpressionCore(source: String, start: Int, limit: I
             summary: "index(\(summary),\(index.summary))"
             expressionEnd: rightBracketToken.end
             record: compilerCoreExpressionRecord(kind: kind, value: value, left: baseRecord, right: index.record, arguments: String(""), start: token.start, end: expressionEnd)
-            suffixCursor: CompilerTokenCursor(source: source, index: rightBracketToken.end)
+            suffixCursor: CompilerTokenCursor(source: $source, index: rightBracketToken.end)
         } else {
             let stoppedPostfixExpression: CompilerExpression(kind: kind, value: value, summary: summary, record: record, start: token.start, end: expressionEnd)
             return stoppedPostfixExpression
@@ -1791,4 +1749,3 @@ function parseCompilerPostfixExpressionCore(source: String, start: Int, limit: I
     let finalPostfixExpression: CompilerExpression(kind: kind, value: value, summary: summary, record: record, start: token.start, end: expressionEnd)
     return finalPostfixExpression
 }
-

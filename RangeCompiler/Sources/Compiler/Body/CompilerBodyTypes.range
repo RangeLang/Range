@@ -13,10 +13,10 @@ function compilerBodyArenaAppendSymbol(arena: CompilerBodyArena, kind: Int, decl
 
 function compilerBodyArenaTypeOuterName(typeName: String): String {
     let length: Int(stringLength(value: typeName))
-    if length > 1 && typeName.substring(start: length - 1, end: length) == String("?") { return String("Optional") }
+    if length > 1 && typeName.substring(start: length - 1, end: length) == String("?") { return "\(String("Optional"))" }
     let genericStart: Int(stringIndexOf(source: typeName, needle: String("<"), start: 0))
-    if genericStart < 0 { return typeName }
-    return typeName.substring(start: 0, end: genericStart)
+    if genericStart < 0 { return "\(typeName)" }
+    return "\(typeName.substring(start: 0, end: genericStart))"
 }
 
 function compilerBodyArenaGenericArgumentText(typeName: String, ordinal: Int): String {
@@ -1103,8 +1103,7 @@ function compilerBodyArenaSymbolIsCapturedMacroParameter(arena: CompilerBodyAren
     let parameterStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.tables.macroParameters, row: parameterRow, column: 3)))
     let maybeAttribute: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: parameterStart))
     if maybeAttribute == nil { return false }
-    let fallback: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: parameterStart)))
-    let attribute: RangeLexedToken(maybeAttribute ?? fallback)
+    let attribute: RangeLexedToken(maybeAttribute ?? compilerFallbackToken(cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: parameterStart)))
     return attribute.kind == .macroAttribute && attribute.text == String("@capture")
 }
 
@@ -1877,10 +1876,9 @@ function compilerBodyArenaExplicitArrayElementTypeID(arena: CompilerBodyArena, a
             if typeGlobalStart < 0 || typeGlobalEnd <= typeGlobalStart + 2
                 || stringByteAt(source: arena.tables.sourceStore.source, index: typeGlobalStart) != 91
                 || stringByteAt(source: arena.tables.sourceStore.source, index: typeGlobalEnd - 1) != 93 { return 0 - 1 }
-            let maybeElementType: Optional<CompilerTypeReference>(compilerCoreParseTypeReference(cursor: CompilerTokenCursor(source: arena.tables.sourceStore.source, index: typeGlobalStart + 1)))
+            let maybeElementType: Optional<CompilerTypeReference>(compilerCoreParseTypeReference(cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: typeGlobalStart + 1)))
             if maybeElementType == nil { return 0 - 1 }
-            let fallback: CompilerTypeReference(text: String(""), start: typeGlobalStart + 1, end: typeGlobalStart + 1)
-            let elementType: CompilerTypeReference(maybeElementType ?? fallback)
+            let elementType: CompilerTypeReference(maybeElementType ?? CompilerTypeReference(text: String(""), start: typeGlobalStart + 1, end: typeGlobalStart + 1))
             if elementType.end != typeGlobalEnd - 1 { return 0 - 1 }
             let elementLocalStart: Int(compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: elementType.start))
             let elementLocalEnd: Int(compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: elementType.end))
