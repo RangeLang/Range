@@ -4467,7 +4467,9 @@ function compilerBodyArenaValidateOwnedPaths(arena: CompilerBodyArena, typeKeys:
     let pathCount: Int(compilerIntTableRowCount(table: arena.ownedPaths))
     if applyInstanceEffects
         && compilerBodyArenaPrepareReturnedAliasTopology(arena: arena, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, returnSummaries: returnSummaries, returnLeaves: returnLeaves, effectPaths: effectPaths) != 0 { return 0 - 1 }
-    if !compilerIntTableIsComplete(table: arena.ownedPaths) || !compilerBodyArenaBindingAliasesAreValid(arena: arena) { return 0 - 2 }
+    if !compilerIntTableIsComplete(table: arena.ownedPaths) { return 0 - 2 }
+    let bindingAliasCode: Int(compilerBodyArenaBindingAliasValidationCode(arena: arena))
+    if bindingAliasCode != 0 { return 0 - (10000 + bindingAliasCode) }
     if pathCount == 0 { return 0 }
     let blockCount: Int(compilerIntTableRowCount(table: arena.cfgBlocks))
     let stateCapacity: Int(pathCount + blockCount * pathCount + blockCount)

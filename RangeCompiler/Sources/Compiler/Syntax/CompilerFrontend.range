@@ -1842,14 +1842,16 @@ function compilerSyntaxAppendGenericParameter(tables: CompilerSyntaxTables, owne
 function compilerTypedSyntaxGenericValueParameterEnd(source: String, typeEnd: Int, genericEnd: Int): Int {
     let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: typeEnd))
     if maybeToken == nil { return typeEnd }
-    let token: RangeLexedToken(maybeToken ?? compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: typeEnd)))
+    let aliasFallbackToken1: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: typeEnd)))
+    let token: RangeLexedToken(maybeToken ?? aliasFallbackToken1)
     if token.kind != .equal { return typeEnd }
     state cursor: Int(token.end)
     state parameterEnd: Int(token.end)
     while cursor < genericEnd {
         let maybeDefaultToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: cursor))
         if maybeDefaultToken == nil { return 0 - 1 }
-        let defaultToken: RangeLexedToken(maybeDefaultToken ?? compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: cursor)))
+        let aliasFallbackToken2: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: cursor)))
+        let defaultToken: RangeLexedToken(maybeDefaultToken ?? aliasFallbackToken2)
         if defaultToken.kind == .comma || defaultToken.kind == .greater { return parameterEnd }
         parameterEnd: defaultToken.end
         cursor: defaultToken.end
@@ -1863,7 +1865,8 @@ function compilerTypedSyntaxCaptureGenericParameters(source: String, tables: Com
     }
     let maybeLeft: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: genericRange.start))
     if maybeLeft == nil { return CompilerGenericParameterCapture(count: 0, fingerprint: baseFingerprint, isValid: false) }
-    let left: RangeLexedToken(maybeLeft ?? compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: genericRange.start)))
+    let aliasFallbackToken3: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: genericRange.start)))
+    let left: RangeLexedToken(maybeLeft ?? aliasFallbackToken3)
     if left.kind != .less || left.start != genericRange.start { return CompilerGenericParameterCapture(count: 0, fingerprint: baseFingerprint, isValid: false) }
     state cursor: Int(left.end)
     state ordinal: Int(0)
@@ -1873,7 +1876,8 @@ function compilerTypedSyntaxCaptureGenericParameters(source: String, tables: Com
     while valid && cursor < genericRange.end {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: cursor))
         if maybeToken == nil { valid: false } else {
-            let token: RangeLexedToken(maybeToken ?? compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: cursor)))
+            let aliasFallbackToken4: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: cursor)))
+            let token: RangeLexedToken(maybeToken ?? aliasFallbackToken4)
             if token.kind == .greater {
                 if expectingName || token.start != genericRange.end - 1 || ordinal == 0 { valid: false } else { cursor: token.end }
             } else if !expectingName {
@@ -2416,7 +2420,8 @@ function compilerMacroExpansionTargetSplice(source: String, start: Int): Optiona
 function compilerMacroExpansionSyntaxSplice(source: String, start: Int): Optional<CompilerSourceRange> {
     let maybeHash: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: start))
     if maybeHash == nil { return nil }
-    let hash: RangeLexedToken(maybeHash ?? compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: start)))
+    let aliasFallbackToken5: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: start)))
+    let hash: RangeLexedToken(maybeHash ?? aliasFallbackToken5)
     if hash.kind != .hash { return nil }
     let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: $source, index: hash.end), leftKind: .leftParen, rightKind: .rightParen))
     if maybeRange == nil { return nil }
@@ -2502,7 +2507,8 @@ function compilerTypedSyntaxCaptureMacroExpansionExtension(source: String, table
     while memberCursor < extensionBody.end {
         let maybeMemberToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: memberCursor))
         if maybeMemberToken == nil { return CompilerMacroExpansionExtensionCaptureStep(nextTemplateOrdinal: nextTemplateOrdinal, captured: captured, isValid: false) }
-        let memberToken: RangeLexedToken(maybeMemberToken ?? compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: memberCursor)))
+        let aliasFallbackToken6: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: memberCursor)))
+        let memberToken: RangeLexedToken(maybeMemberToken ?? aliasFallbackToken6)
         if memberToken.start >= extensionBody.end {
             memberCursor: extensionBody.end
         } else if memberToken.text == String("function") {
@@ -2565,7 +2571,8 @@ function compilerTypedSyntaxCaptureMacroExpansionTemplates(source: String, table
         if token.kind == .macroAttribute && token.text == String("@expand") {
             let maybeBrace: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: token.end))
             if maybeBrace == nil { return 0 - 1 }
-            let brace: RangeLexedToken(maybeBrace ?? compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: token.end)))
+            let aliasFallbackToken7: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: token.end)))
+            let brace: RangeLexedToken(maybeBrace ?? aliasFallbackToken7)
             if brace.kind != .leftBrace { return 0 - 1 }
             let maybeExpansion: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: $source, index: brace.start), leftKind: .leftBrace, rightKind: .rightBrace))
             if maybeExpansion == nil { return 0 - 1 }
@@ -2979,7 +2986,8 @@ function compilerTypedSyntaxCaptureMacroWithPolicy(source: String, tables: Compi
 function compilerTypedSyntaxMacroParameterEnd(source: String, typeEnd: Int, parameterRangeEnd: Int): Int {
     let maybeEqual: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: typeEnd))
     if maybeEqual == nil { return typeEnd }
-    let equal: RangeLexedToken(maybeEqual ?? compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: typeEnd)))
+    let aliasFallbackToken8: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: typeEnd)))
+    let equal: RangeLexedToken(maybeEqual ?? aliasFallbackToken8)
     if equal.start >= parameterRangeEnd || equal.kind != .equal { return typeEnd }
     state cursor: Int(equal.end)
     state result: Int(equal.end)
@@ -2989,7 +2997,8 @@ function compilerTypedSyntaxMacroParameterEnd(source: String, typeEnd: Int, para
     while cursor < parameterRangeEnd {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: cursor))
         if maybeToken == nil { return 0 - 1 }
-        let token: RangeLexedToken(maybeToken ?? compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: cursor)))
+        let aliasFallbackToken9: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: cursor)))
+        let token: RangeLexedToken(maybeToken ?? aliasFallbackToken9)
         if token.start >= parameterRangeEnd { return result }
         if token.kind == .comma && parenDepth == 0 && bracketDepth == 0 && braceDepth == 0 { return result }
         if token.kind == .leftParen { parenDepth: parenDepth + 1 }
