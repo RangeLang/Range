@@ -1,0 +1,8 @@
+compilerPlotter
+compilerSourceFile\trole=project\tpath=Project/MacroNominalWarning.range
+
+macro observed(): Construct -> Void {}
+
+@observed
+@missing
+construct Item {}

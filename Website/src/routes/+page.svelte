@@ -13,7 +13,7 @@
           <a href="/benchmarks">Benchmarks</a><a href="/updates/string-lowering">Updates</a><a href={githubUrl} target="_blank" rel="noreferrer">GitHub</a>
         </range-spline-nav>
       </header>
-      <range-scale aria-hidden="true" endpoint-gap="8" endpoint-gap-end="16" division-base="3" division-levels="3" mark-length="5" mark-thickness="0.25" pinch="0.27" pinch-falloff="0.16" pinch-strength="0.9" snap-hysteresis="0.08" snap-to-marks="true"></range-scale>
+      <range-scale aria-hidden="true" endpoint-gap="8" endpoint-gap-end="16" division-base="3" division-levels="3" mark-length="5" mark-thickness="0.25" zero-drag-falloff="0.38" zero-drag-limit="0.42"></range-scale>
       <range-optical-guide aria-hidden="true"></range-optical-guide>
       <section class="landingHero" aria-labelledby="range-title">
         <h1 id="range-title"><span class="landingIndex" data-scale-end><span>1</span></span><span class="rangeTitleWord">Range</span><span class="rangePerformanceAnchor" aria-hidden="true"></span></h1>

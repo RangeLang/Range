@@ -1918,10 +1918,38 @@ function compilerBodyArenaDestroy(arena: CompilerBodyArena): Int {
     let graphZeroStateStatus: Int(arena.graphZeroState.destroy())
     let mirTraversalStatus: Int(arena.mirTraversal.destroy())
     let failureStatus: Int(arena.failures.destroy())
-    if nodeStatus != 0 || edgeStatus != 0 || parentNodeStatus != 0 || parentRoleStatus != 0 || symbolStatus != 0 || resolutionStatus != 0 || typeInstanceStatus != 0 || typeArgumentStatus != 0
-        || cfgBlockStatus != 0 || cfgEdgeStatus != 0 || cfgScheduleStatus != 0 || controlDecisionStatus != 0 || controlRegionStatus != 0 || graphZeroCFGRegionStatus != 0 || storageStatus != 0 || ownedPathStatus != 0 || bindingAliasStatus != 0 || runtimeContractStatus != 0 || ownedReturnTransferStatus != 0 || memoryStatus != 0 || memoryStateStatus != 0
-        || mirValueStatus != 0 || mirBlockStatus != 0 || mirStatus != 0 || mirOperandStatus != 0 || mirVersionStatus != 0 || mirExpressionValueStatus != 0 || graphZeroMIRDependencyStatus != 0 || graphZeroMIRFrontierStatus != 0 || graphZeroStateStatus != 0 || mirTraversalStatus != 0
-        || failureStatus != 0 { return 0 - 1 }
+    if nodeStatus != 0 { return 0 - 1 }
+    if edgeStatus != 0 { return 0 - 2 }
+    if parentNodeStatus != 0 { return 0 - 3 }
+    if parentRoleStatus != 0 { return 0 - 4 }
+    if symbolStatus != 0 { return 0 - 5 }
+    if resolutionStatus != 0 { return 0 - 6 }
+    if typeInstanceStatus != 0 { return 0 - 7 }
+    if typeArgumentStatus != 0 { return 0 - 8 }
+    if cfgBlockStatus != 0 { return 0 - 9 }
+    if cfgEdgeStatus != 0 { return 0 - 10 }
+    if cfgScheduleStatus != 0 { return 0 - 11 }
+    if controlDecisionStatus != 0 { return 0 - 12 }
+    if controlRegionStatus != 0 { return 0 - 13 }
+    if graphZeroCFGRegionStatus != 0 { return 0 - 14 }
+    if storageStatus != 0 { return 0 - 15 }
+    if ownedPathStatus != 0 { return 0 - 16 }
+    if bindingAliasStatus != 0 { return 0 - 17 }
+    if runtimeContractStatus != 0 { return 0 - 18 }
+    if ownedReturnTransferStatus != 0 { return 0 - 19 }
+    if memoryStatus != 0 { return 0 - 20 }
+    if memoryStateStatus != 0 { return 0 - 21 }
+    if mirValueStatus != 0 { return 0 - 22 }
+    if mirBlockStatus != 0 { return 0 - 23 }
+    if mirStatus != 0 { return 0 - 24 }
+    if mirOperandStatus != 0 { return 0 - 25 }
+    if mirVersionStatus != 0 { return 0 - 26 }
+    if mirExpressionValueStatus != 0 { return 0 - 27 }
+    if graphZeroMIRDependencyStatus != 0 { return 0 - 28 }
+    if graphZeroMIRFrontierStatus != 0 { return 0 - 29 }
+    if graphZeroStateStatus != 0 { return 0 - 30 }
+    if mirTraversalStatus != 0 { return 0 - 31 }
+    if failureStatus != 0 { return 0 - 32 }
     return 0
 }
 
@@ -2081,8 +2109,9 @@ function compilerCoreLLVMLowerHelperFunctionTypedObserved(context: CompilerLLVML
             }
         }
         if typedValid {
-            if compilerReachableLLVMStateBindPlannedFunctionInstancesForArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, functionInstances: functionInstances, functionInstanceSignatures: functionInstanceSignatures, arena: arena) != 0 {
-                typedFailureStage: 8
+            let bindStatus: Int(compilerReachableLLVMStateBindPlannedFunctionInstancesForArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, functionInstances: functionInstances, functionInstanceSignatures: functionInstanceSignatures, arena: arena))
+            if bindStatus != 0 {
+                typedFailureStage: 80000 + (0 - bindStatus)
                 typedValid: false
             }
         }

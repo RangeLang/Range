@@ -56,7 +56,7 @@ function compilerBodyArenaGenericArgumentCount(typeName: String): Int {
 }
 
 function compilerBuiltinTargetPointerBits(): Int {
-    return 64
+    return targetPointerBits()
 }
 
 function compilerProjectDefaultsReasonNone(): Int { return 0 }
@@ -119,29 +119,7 @@ function compilerProjectIntegerBits(typeName: String, fallbackBits: Int): Int {
     return 0 - 1
 }
 
-function compilerProjectDefaultsResolve(tables: CompilerSyntaxTables): CompilerProjectDefaults {
-    let pointerBits: Int(compilerBuiltinTargetPointerBits())
-    state projectTargetSyntaxID: Int(0 - 1)
-    state projectApplicationCount: Int(0)
-    state applicationRow: Int(0)
-    while applicationRow < compilerIntTableRowCount(table: tables.macroApplications) {
-        if compilerProjectMacroApplicationName(tables: tables, applicationRow: applicationRow) == String("project") {
-            let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12))
-            let targetKind: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 13))
-            if targetSyntaxID >= 0 && targetKind == compilerSyntaxKindConstruct() {
-                projectTargetSyntaxID: targetSyntaxID
-                projectApplicationCount: projectApplicationCount + 1
-            }
-        }
-        applicationRow: applicationRow + 1
-    }
-    if projectApplicationCount > 1 {
-        return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: pointerBits, integerWasOverridden: false, boolWasOverridden: false, reason: compilerProjectDefaultsReasonDuplicateProject(), relatedRow: 0 - 1, isValid: false)
-    }
-    if projectApplicationCount == 0 {
-        return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: 32, integerWasOverridden: false, boolWasOverridden: false, reason: compilerProjectDefaultsReasonNone(), relatedRow: 0 - 1, isValid: true)
-    }
-
+function compilerProjectDefaultsForTarget(tables: CompilerSyntaxTables, projectTargetSyntaxID: Int, pointerBits: Int): CompilerProjectDefaults {
     state integerBits: Int(pointerBits)
     state integerCount: Int(0)
     state integerWasOverridden: Bool(false)
@@ -184,6 +162,31 @@ function compilerProjectDefaultsResolve(tables: CompilerSyntaxTables): CompilerP
         memberRow: memberRow + 1
     }
     return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: integerBits, integerWasOverridden: integerWasOverridden, boolWasOverridden: boolWasOverridden, reason: compilerProjectDefaultsReasonNone(), relatedRow: 0 - 1, isValid: true)
+}
+
+function compilerProjectDefaultsResolve(tables: CompilerSyntaxTables): CompilerProjectDefaults {
+    let pointerBits: Int(compilerBuiltinTargetPointerBits())
+    state projectTargetSyntaxID: Int(0 - 1)
+    state projectApplicationCount: Int(0)
+    state applicationRow: Int(0)
+    while applicationRow < compilerIntTableRowCount(table: tables.macroApplications) {
+        if compilerProjectMacroApplicationName(tables: tables, applicationRow: applicationRow) == String("project") {
+            let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12))
+            let targetKind: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 13))
+            if targetSyntaxID >= 0 && targetKind == compilerSyntaxKindConstruct() {
+                projectTargetSyntaxID: targetSyntaxID
+                projectApplicationCount: projectApplicationCount + 1
+            }
+        }
+        applicationRow: applicationRow + 1
+    }
+    if projectApplicationCount > 1 {
+        return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: pointerBits, integerWasOverridden: false, boolWasOverridden: false, reason: compilerProjectDefaultsReasonDuplicateProject(), relatedRow: 0 - 1, isValid: false)
+    }
+    if projectApplicationCount == 0 {
+        return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: 32, integerWasOverridden: false, boolWasOverridden: false, reason: compilerProjectDefaultsReasonNone(), relatedRow: 0 - 1, isValid: true)
+    }
+    return compilerProjectDefaultsForTarget(tables: tables, projectTargetSyntaxID: projectTargetSyntaxID, pointerBits: pointerBits)
 }
 
 function compilerProjectIntegerLLVMTypeName(tables: CompilerSyntaxTables): String {
@@ -2811,7 +2814,7 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
             }
         }
         if interpolationOrdinal == 0 { return 0 - 1 }
-        return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: nodeID, targetKind: compilerBodyResolutionOperator(), targetID: kind, typeKind: compilerBodyTypeString(), typeID: 0 - 1, regionNodeID: regionNodeID)
+        return 0
     }
     if kind == compilerSyntaxKindIntegerLiteral() || kind == compilerSyntaxKindDoubleLiteral() || kind == compilerSyntaxKindStringLiteral() || kind == compilerSyntaxKindStringSegment() || kind == compilerSyntaxKindBoolLiteral() { return 0 }
     if kind == compilerSyntaxKindGrouping() {

@@ -5,20 +5,14 @@ construct Construct {
 
     @graph(.declaration)
     @field
+    @member
     construct Declaration {
         let identifier: Identifier
         let self: NominalTypeReference
         let macros: [Macro.Application]
         let generics: [Generic]
         let conformances: [NominalTypeReference]
-        let lets: [Let]
-        let states: [State]
-        let bindings: [Binding]
-        let deriveds: [Derived]
-        let fields: [GraphIdentity]
-        let functions: [Function.Declaration]
-        let constructs: [Construct.Declaration]
-        let extensions: [Extension]
+        let members: [@member]
 
         function expand(_ expansion: () -> [@syntax])
     }

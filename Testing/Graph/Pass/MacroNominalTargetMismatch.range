@@ -1,0 +1,7 @@
+compilerPlotter
+compilerSourceFile\trole=project\tpath=Project/MacroNominalTargetMismatch.range
+
+macro observed(): Function -> Void {}
+
+@observed
+construct Item {}

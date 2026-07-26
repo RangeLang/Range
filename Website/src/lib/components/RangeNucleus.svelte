@@ -39,12 +39,17 @@
     { name: "C4", frequency: 261.63 },
   ];
   const intervalNote = { name: "A2", frequency: 110 };
-  const lowerIntervalNote = { name: "E2", frequency: 82.41 };
   const intervalResonance = { name: "B2", frequency: 123.47 };
-  const lowerIntervalResonance = { name: "F♯2", frequency: 92.5 };
+  const spiralSteps = [
+    { conceptID: "shape", value: 4, note: { name: "B2", frequency: 123.47 } },
+    { conceptID: "ownership", value: 8, note: { name: "D3", frequency: 146.83 } },
+    { conceptID: "capability", value: 16, note: { name: "E3", frequency: 164.81 } },
+  ] as const;
   let selectedID = $state<ConceptID>("shape");
   let looping = $state(false);
-  let lowerPulseEnabled = $state(false);
+  let spiralTrackEnabled = $state(true);
+  let spiralActiveIndex = $state(-1);
+  let spiralStepIndex = 0;
   let selected = $derived(concepts[selectedID]);
   let rhythmPulse = $state(0);
   const rhythmDuration = 1.8 + 1.8 / 3;
@@ -53,7 +58,6 @@
   let reverbResonance: BiquadFilterNode | undefined;
   let activeOscillators: OscillatorNode[] = [];
   let loopTimer: number | undefined;
-  let lowerLoopTimer: number | undefined;
 
   const center = 382;
   const centerY = 320;
@@ -93,6 +97,23 @@
       x: center + geometry.direction.x * radius,
       y: centerY + geometry.direction.y * radius,
     };
+  }
+
+  function spiralPoint(progress: number) {
+    const value = 4 * Math.pow(4, progress);
+    const angle = ((-90 + 240 * progress) * Math.PI) / 180;
+    const radius = numericRadius(value);
+    return {
+      x: center + Math.cos(angle) * radius,
+      y: centerY + Math.sin(angle) * radius,
+    };
+  }
+
+  function spiralPathData() {
+    return Array.from({ length: 65 }, (_, index) => {
+      const point = spiralPoint(index / 64);
+      return `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`;
+    }).join(" ");
   }
 
   function valueAtRadius(radius: number) {
@@ -185,9 +206,7 @@
 
   function stopPlayback() {
     if (loopTimer !== undefined) window.clearTimeout(loopTimer);
-    if (lowerLoopTimer !== undefined) window.clearTimeout(lowerLoopTimer);
     loopTimer = undefined;
-    lowerLoopTimer = undefined;
     activeOscillators.forEach((oscillator) => {
       try {
         oscillator.stop();
@@ -197,6 +216,8 @@
     });
     activeOscillators = [];
     rhythmPulse = 0;
+    spiralStepIndex = 0;
+    spiralActiveIndex = -1;
     looping = false;
   }
 
@@ -249,6 +270,12 @@
       0.4,
       intervalResonance.frequency,
     );
+    if (spiralTrackEnabled) {
+      const spiralStep = spiralSteps[spiralStepIndex];
+      playSpiralTone(spiralStep.note.frequency);
+      spiralActiveIndex = spiralStepIndex;
+      spiralStepIndex = (spiralStepIndex + 1) % spiralSteps.length;
+    }
     rhythmPulse += 1;
     loopTimer = window.setTimeout(() => {
       if (!looping) return;
@@ -258,25 +285,31 @@
     }, rhythmDuration * 1000);
   }
 
-  function playLowerIntervalNote() {
-    if (!looping || !lowerPulseEnabled) return;
-    playTone(
-      lowerIntervalNote.frequency,
-      2.8,
-      0.34,
-      lowerIntervalResonance.frequency,
-    );
-    lowerLoopTimer = window.setTimeout(
-      playLowerIntervalNote,
-      rhythmDuration * 1.5 * 1000,
-    );
+  function playSpiralTone(frequency: number) {
+    if (!looping || !audioContext) return;
+    const startAt = audioContext.currentTime + 0.12;
+    const noteEnd = startAt + 0.72;
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency, startAt);
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.09, startAt + 0.13);
+    gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+    oscillator.start(startAt);
+    oscillator.stop(noteEnd + 0.02);
+    activeOscillators.push(oscillator);
+    oscillator.onended = () => {
+      activeOscillators = activeOscillators.filter((active) => active !== oscillator);
+    };
   }
 
-  function toggleLowerPulse() {
-    lowerPulseEnabled = !lowerPulseEnabled;
-    if (lowerLoopTimer !== undefined) window.clearTimeout(lowerLoopTimer);
-    lowerLoopTimer = undefined;
-    if (looping && lowerPulseEnabled) playLowerIntervalNote();
+  function toggleSpiralTrack() {
+    spiralTrackEnabled = !spiralTrackEnabled;
+    if (!spiralTrackEnabled) spiralActiveIndex = -1;
   }
 
   async function startPlayback() {
@@ -286,7 +319,6 @@
     if (audioContext.state === "suspended") await audioContext.resume();
     looping = true;
     playIntervalNote();
-    if (lowerPulseEnabled) playLowerIntervalNote();
   }
 
   function selectConcept(conceptID: ConceptID) {
@@ -328,15 +360,15 @@
     <div class="pathPlayback">
       <div class="playbackControls" role="group" aria-label="Interval note playback">
         <button
-          class="playbackControl lowerPulseControl"
-          class:enabled={lowerPulseEnabled}
+          class="playbackControl spiralTrackControl"
+          class:enabled={spiralTrackEnabled}
           type="button"
-          aria-label="Lower pulse"
-          aria-pressed={lowerPulseEnabled}
-          onclick={toggleLowerPulse}
+          aria-label="Spiral track"
+          aria-pressed={spiralTrackEnabled}
+          onclick={toggleSpiralTrack}
         >
           <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M3 5.5h10M5 8.5h6M7 11.5h2"></path>
+            <path d="M12.8 7.9c0 2.7-2.2 4.8-4.9 4.8S3.2 10.6 3.2 8s2.1-4.3 4.5-4.3c2.2 0 3.7 1.5 3.7 3.4 0 1.7-1.3 2.8-2.8 2.8-1.3 0-2.2-.8-2.2-1.9 0-.9.7-1.5 1.5-1.5"></path>
           </svg>
         </button>
         <button
@@ -380,6 +412,15 @@
       {/each}
     </g>
 
+    <path
+      class="valueSpiral"
+      class:enabled={spiralTrackEnabled}
+      class:playing={spiralTrackEnabled && looping}
+      d={spiralPathData()}
+      aria-hidden="true"
+      style={`--rhythm-duration: ${rhythmDuration}s`}
+    ></path>
+
     {#each conceptIDs as conceptID}
       {@const concept = concepts[conceptID]}
       {@const branchActive = looping && selectedID === conceptID}
@@ -403,6 +444,10 @@
           {@const point = branchPoint(conceptID, concept, value)}
           <g
             class="numberNode"
+            class:spiralStepActive={spiralTrackEnabled &&
+              looping &&
+              spiralSteps[spiralActiveIndex]?.conceptID === conceptID &&
+              spiralSteps[spiralActiveIndex]?.value === value}
             transform={`translate(${point.x} ${point.y})`}
           >
             <title>{conceptID} {value} · {noteForValue(concept, value).name}</title>
@@ -431,10 +476,6 @@
     </g>
   </svg>
 
-  <div class="graphLegend" aria-hidden="true">
-    <span><i class="activeSwatch"></i>selected shape</span>
-    <span>ring distance follows numeric magnitude</span>
-  </div>
 </section>
 
 <style>
@@ -542,19 +583,20 @@
     fill: currentColor;
   }
 
-  .lowerPulseControl {
+  .spiralTrackControl {
     background: color-mix(in oklch, var(--range-accent) 42%, var(--paper));
   }
 
-  .lowerPulseControl.enabled {
+  .spiralTrackControl.enabled {
     background: var(--range-accent-ink);
     color: var(--paper);
   }
 
-  .lowerPulseControl path {
+  .spiralTrackControl path {
     fill: none;
     stroke: currentColor;
     stroke-linecap: round;
+    stroke-linejoin: round;
     stroke-width: 1.5;
   }
 
@@ -580,6 +622,28 @@
     margin-top: 8px;
   }
 
+  .valueSpiral {
+    fill: none;
+    opacity: 0.3;
+    stroke: oklch(0.78 0.025 236);
+    stroke-dasharray: 2 7;
+    stroke-linecap: round;
+    stroke-width: 1;
+    transition:
+      opacity 220ms ease,
+      stroke 220ms ease;
+  }
+
+  .valueSpiral.enabled {
+    opacity: 0.62;
+    stroke: var(--range-accent);
+  }
+
+  .valueSpiral.playing {
+    animation: spiral-flow var(--rhythm-duration) linear infinite;
+    stroke: var(--range-playing-accent);
+  }
+
   .sourceNucleus,
   .conceptBranch {
     transition: color 220ms ease;
@@ -602,8 +666,14 @@
   }
 
   .sourceNucleus.activeSource .numberNode text,
-  .conceptBranch.active .numberNode text {
+  .conceptBranch.active .numberNode text,
+  .numberNode.spiralStepActive text {
     fill: currentColor;
+  }
+
+  .numberNode.spiralStepActive text {
+    color: var(--range-playing-accent);
+    font-weight: 800;
   }
 
   .sourceNucleus text,
@@ -667,6 +737,12 @@
     }
   }
 
+  @keyframes spiral-flow {
+    to {
+      stroke-dashoffset: -18;
+    }
+  }
+
   @keyframes rhythm-color-b {
     0% {
       color: oklch(0.61 0.13 236);
@@ -695,34 +771,6 @@
     fill: color-mix(in oklch, var(--muted) 68%, var(--paper));
     font-family: var(--font-geist-mono);
     font-size: 9px;
-  }
-
-  .graphLegend {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px 24px;
-    color: var(--muted);
-    font-family: var(--font-geist-mono);
-    font-size: 11px;
-  }
-
-  .graphLegend span {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-  }
-
-  .activeSwatch {
-    width: 10px;
-    height: 10px;
-    display: inline-block;
-    border-radius: 50%;
-  }
-
-  .activeSwatch {
-    border: 0;
-    background: var(--range-accent);
   }
 
   @media (prefers-reduced-motion: reduce) {

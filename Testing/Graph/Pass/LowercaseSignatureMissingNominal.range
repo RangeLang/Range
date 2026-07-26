@@ -1,0 +1,6 @@
+compilerPlotter
+compilerSourceFile\trole=project\tpath=Project/LowercaseSignatureMissingNominal.range
+
+function accept(value: missingType): Int {
+    return 0
+}

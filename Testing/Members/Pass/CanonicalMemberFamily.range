@@ -1,0 +1,19 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/Macro/Member.range
+open macro member(): Declaration | Member -> Void {}
+compilerSourceFile\trole=project\tpath=Project/Model.range
+construct Model {
+    @member
+    let title: String
+
+    @member
+    state count: Int
+
+    let members: [@member]
+}
+
+@member
+construct Child {}
+
+@member
+function render(): Void {}

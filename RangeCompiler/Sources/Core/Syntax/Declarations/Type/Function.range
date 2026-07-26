@@ -5,9 +5,11 @@ construct Function {
 
     @graph(.declaration)
     @field
+    @member
     construct Declaration {
         let identity: GraphIdentity
         let parent: GraphIdentity?
+        let macros: [Macro.Application]
         let identifier: Identifier
         let generics: [Generic]
         let parameters: [Parameter.Declaration]

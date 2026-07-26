@@ -309,8 +309,9 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
                 }
             }
         }
-        if failureStage >= 300000 && failureStage < 400000 {
-            return "compilerError\tkind=invalidEntryOwnedPaths\tdetail=\(failureStage - 300000)"
+        if failureStage == 300000 {
+            let entryOwnedPathDetail: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureDetail()))
+            return "compilerError\tkind=invalidEntryOwnedPaths\tdetail=\(entryOwnedPathDetail)"
         }
         if failureStage >= 200000 && failureStage < 300000 {
             let blockedFunctionRow: Int(failureStage - 200000)
@@ -1045,6 +1046,11 @@ function compilerReachableLLVMStateSetInvalidAt(reachability: CompilerReachableL
     return compilerReachableLLVMStateSetInvalid(reachability: reachability)
 }
 
+function compilerReachableLLVMStateSetEntryOwnedPathFailure(reachability: CompilerReachableLLVMState, detail: Int): Int {
+    if reachability.counters.update(element: detail, index: compilerReachableLLVMFunctionFailureDetail()) != 0 { return 0 - 1 }
+    return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 300000)
+}
+
 function compilerReachableLLVMStateSetReturnFailure(reachability: CompilerReachableLLVMState, kind: Int, functionRow: Int, detail: Int): Int {
     if kind < compilerReachableLLVMReturnFailureDependency() || kind > compilerReachableLLVMReturnFailurePassLimit() { return 0 - 1 }
     if reachability.counters.update(element: kind, index: compilerReachableLLVMReturnFailureKind()) != 0
@@ -1337,8 +1343,9 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
         }
     }
     if capable {
-        if compilerReachableLLVMStateBindPlannedFunctionInstancesForArena(typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments, functionInstances: reachability.functionInstances, functionInstanceSignatures: reachability.functionInstanceSignatures, arena: arena) != 0 {
-            failureStage: 8
+        let bindStatus: Int(compilerReachableLLVMStateBindPlannedFunctionInstancesForArena(typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments, functionInstances: reachability.functionInstances, functionInstanceSignatures: reachability.functionInstanceSignatures, arena: arena))
+        if bindStatus != 0 {
+            failureStage: 80000 + (0 - bindStatus)
             capable: false
         }
     }
@@ -1854,7 +1861,7 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("abiComponents.end"))
     if compilerReachableLLVMStateRefreshCapabilityCounter(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 42) }
     let entryOwnedPathStatus: Int(compilerReachableLLVMStateValidateEntryOwnedPaths(reachability: reachability))
-    if entryOwnedPathStatus != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 300000 + entryOwnedPathStatus) }
+    if entryOwnedPathStatus != 0 { return compilerReachableLLVMStateSetEntryOwnedPathFailure(reachability: reachability, detail: entryOwnedPathStatus) }
     let closureTransientMark: Int(stringTransientRegionMark())
     state activationWorkIndex: Int(reachability.worklist.count)
     while activationWorkIndex < reachability.worklist.count {

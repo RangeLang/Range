@@ -1,0 +1,11 @@
+compilerPlotter
+compilerSourceFile\trole=project\tpath=Project/MissingNominalWarning.range
+
+construct Box<Element> {}
+
+construct Known {}
+
+construct Uses {
+    state resolved: Box<Known>
+    state missing: Box<Missing>
+}

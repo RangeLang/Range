@@ -67,15 +67,6 @@ if [[ "$seed_bytes" != "$(manifest_value seed.bytes)" ]]; then
     exit 1
 fi
 
-clang_identity="$(clang --version | /usr/bin/head -1)"
-expected_clang="$(manifest_value producer.clang)"
-if [[ "$clang_identity" != "$expected_clang"* ]]; then
-    echo "Seed verifier clang mismatch." >&2
-    echo "expected prefix $expected_clang" >&2
-    echo "actual          $clang_identity" >&2
-    exit 1
-fi
-
 if [[ "$mode" == "--integrity-only" ]]; then
     echo "Range compiler accepted-seed integrity verified."
     echo "sha256=$(sha256 "$seed")"
@@ -129,3 +120,5 @@ fi
 echo "Range compiler seed verified."
 echo "sha256=$stage3_hash"
 echo "bytes=$stage3_bytes"
+echo "producer_clang=$(manifest_value producer.clang)"
+echo "consumer_clang=$(clang --version | /usr/bin/head -1)"

@@ -35,6 +35,29 @@ export function logarithmicScalePosition(value, {
   return Math.log1p(value * intervalCount) / Math.log1p(intervalCount);
 }
 
+export function dragZeroWithFalloff(position, {
+  value = position,
+  drag = 0,
+  falloff = 0.38,
+} = {}) {
+  for (const [number, label] of [
+    [position, "position"],
+    [value, "value"],
+    [drag, "drag"],
+    [falloff, "falloff"],
+  ]) assertFiniteNumber(number, label);
+  if (position < 0 || position > 1) throw new RangeError("position must be within [0, 1]");
+  if (value < 0 || value > 1) throw new RangeError("value must be within [0, 1]");
+  if (drag < 0 || drag >= 1) throw new RangeError("drag must be within [0, 1)");
+  if (falloff <= 0 || falloff > 1) throw new RangeError("falloff must be within (0, 1]");
+  if (drag === 0 || value >= falloff) return position;
+
+  const falloffProgress = value / falloff;
+  const influence = Math.pow(1 - falloffProgress * falloffProgress, 2);
+  const compressedPosition = drag + (1 - drag) * position;
+  return position + (compressedPosition - position) * influence;
+}
+
 export function sphericalPinchInfluence(value, {
   center = 0.27,
   coreRadius = 0,
@@ -288,11 +311,11 @@ export function createRangeMarks(config = {}) {
   return logicalMarks.map((mark) => ({
     ...mark,
     anchored: mark.position === 0 || mark.position === 1,
-    position: mark.position,
-    width: pinchMarkerWidth(mark.position, {
-      center: config.pinch,
-      falloff: config.pinchFalloff,
-      strength: config.pinchStrength,
+    position: dragZeroWithFalloff(mark.position, {
+      value: mark.value,
+      drag: config.zeroDrag,
+      falloff: config.zeroDragFalloff,
     }),
+    width: 1,
   }));
 }

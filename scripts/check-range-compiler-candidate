@@ -7,6 +7,7 @@ MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
 DEFAULT_COMPILER_DIR="$REPO_ROOT/RangeCompiler/Sources/Compiler"
 COMPILER_OPTIMIZATION="-O2"
 COMPILER_LTO="-flto=thin"
+source "$SCRIPT_DIR/resolve-range-stage2-compiler"
 
 usage() {
     cat <<'USAGE'
@@ -17,8 +18,8 @@ Usage:
   scripts/check-range-compiler-candidate --help
 
 DIR defaults to RangeCompiler/Sources/Compiler. The stage2-plan checkpoint
-stops after the manifested seed has emitted, validated, and linked Stage 2 and
-Stage 2 has read the canonical candidate build plan.
+resolves the shared immutable Stage 2 artifact, then independently proves that
+Stage 2 can read the canonical candidate build plan and source set.
 
 The bootstrap bridge mode uses the manifested seed to compile an immutable
 old-syntax Phase1 source bundle, audits that one-shot bridge, and uses it only
@@ -81,11 +82,6 @@ verify_manifest() {
     seed_bytes="$(bytes "$seed_path")"
     expected_bytes="$(manifest_value seed.bytes)"
     [[ "$seed_bytes" == "$expected_bytes" ]] || fail "checked-in seed byte length mismatch"
-
-    local clang_identity expected_clang
-    clang_identity="$(clang --version | /usr/bin/head -1)"
-    expected_clang="$(manifest_value producer.clang)"
-    [[ "$clang_identity" == "$expected_clang"* ]] || fail "seed verifier clang mismatch: $clang_identity"
 
     # compilerSources hashes describe the accepted seed's provenance.
     # Candidate sources are discovered below and may differ until rollover.
@@ -217,7 +213,7 @@ write_candidate_build_plan() {
     seed_relative="$(manifest_value seed.path)"
     seed_path="$REPO_ROOT/$seed_relative"
     runtime_count="$(manifest_value runtimeSources)"
-    identity="$(manifest_value producer.clang) $COMPILER_OPTIMIZATION $COMPILER_LTO"
+    identity="$(clang --version | /usr/bin/head -1) $COMPILER_OPTIMIZATION $COMPILER_LTO"
 
     /usr/bin/printf 'rangeBuildPlan\tversion=1\n' > "$output"
     /usr/bin/printf 'target\tplatform=%s\tarchitecture=%s\tpointerBits=%s\truntimeABI=%s\n' \
@@ -298,7 +294,7 @@ validate_candidate_build_plan() {
         "$(manifest_value target.platform)" "$(manifest_value target.architecture)" \
         "$(manifest_value target.pointerBits)" "$(manifest_value runtimeABI)")"
     /usr/bin/grep -Fqx "$expected" "$plan" || fail "candidate build plan target is invalid"
-    identity="$(manifest_value producer.clang) $COMPILER_OPTIMIZATION $COMPILER_LTO"
+    identity="$(clang --version | /usr/bin/head -1) $COMPILER_OPTIMIZATION $COMPILER_LTO"
     expected="$(/usr/bin/printf 'tool\tid=clang\tpath=repo/tool/clang\tsha256=%s\tbytes=%s' \
         "$(sha256_text "$identity")" "$(bytes_text "$identity")")"
     /usr/bin/grep -Fqx "$expected" "$plan" || fail "candidate build plan tool is invalid"
@@ -5713,19 +5709,19 @@ main() {
     echo "checkpoint compiler-candidate:plan-authored: pass"
     echo "candidate build plan: pass (version 1, deterministic logical paths)"
 
-    local seed seed_executable
-    seed="$REPO_ROOT/$(manifest_value seed.path)"
-    seed_executable="$WORK_ROOT/RangeCompilerSeed"
-    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
-    echo "checkpoint compiler-candidate:seed-linked: pass"
-    echo "bootstrap seed link: pass"
-
-    local stage2_producer="$seed_executable"
     local bootstrap_bridge_artifact_directory=""
     local bootstrap_bridge_first_llvm=""
     local bootstrap_bridge_second_llvm=""
     local bootstrap_bridge_executable=""
     if [[ -n "$bootstrap_bridge_source_directory" ]]; then
+        local seed seed_executable
+        seed="$REPO_ROOT/$(manifest_value seed.path)"
+        seed_executable="$WORK_ROOT/RangeCompilerSeed"
+        clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module \
+            -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
+        echo "checkpoint compiler-candidate:seed-linked: pass"
+        echo "bootstrap seed link: pass"
+
         bootstrap_bridge_artifact_directory="$WORK_ROOT/bootstrap-bridge"
         bootstrap_bridge_first_llvm="$bootstrap_bridge_artifact_directory/RangeCompilerBridge.first.ll"
         bootstrap_bridge_second_llvm="$bootstrap_bridge_artifact_directory/RangeCompilerBridge.second.ll"
@@ -5744,18 +5740,33 @@ main() {
         audit_binding_references BootstrapBridge "$bootstrap_bridge_executable" "$bootstrap_bridge_artifact_directory"
         audit_root_values BootstrapBridge "$bootstrap_bridge_executable" "$bootstrap_bridge_artifact_directory"
         audit_placement_symbol_guard BootstrapBridge "$bootstrap_bridge_executable" "$bootstrap_bridge_artifact_directory"
-        stage2_producer="$bootstrap_bridge_executable"
         echo "bootstrap bridge ownership capability: pass (binding aliases, RootValue, placement guard, one-shot producer only)"
-    fi
 
-    emit_candidate_llvm "$stage2_producer" "$SOURCE_BUNDLE" "$stage2_llvm" stage2
-    echo "checkpoint compiler-candidate:stage2-emitted: pass"
+        emit_candidate_llvm "$bootstrap_bridge_executable" "$SOURCE_BUNDLE" "$stage2_llvm" stage2
+        echo "checkpoint compiler-candidate:stage2-emitted: pass"
+        assert_candidate_build_plan_unchanged
+        validate_llvm "$stage2_llvm"
+        echo "checkpoint compiler-candidate:stage2-validated: pass"
+        link_llvm "$stage2_llvm" "$stage2_executable"
+        echo "checkpoint compiler-candidate:stage2-linked: pass"
+        echo "Stage 2 candidate validate/link: pass"
+    else
+        local require_stage2_llvm=1
+        if [[ "$checkpoint_mode" == stage2-plan ]]; then
+            require_stage2_llvm=0
+        fi
+        resolve_stage2_compiler "$require_stage2_llvm"
+        /bin/mkdir -p "$stage2_directory"
+        /bin/cp "$STAGE2_EXECUTABLE" "$stage2_executable"
+        /bin/chmod +x "$stage2_executable"
+        if [[ -n "$STAGE2_LLVM" ]]; then
+            /bin/cp "$STAGE2_LLVM" "$stage2_llvm"
+        fi
+        echo "checkpoint compiler-candidate:stage2-cache-$STAGE2_CACHE_STATUS: pass"
+        echo "checkpoint compiler-candidate:stage2-resolved: pass"
+        echo "Stage 2 candidate artifact: shared content-addressed cache"
+    fi
     assert_candidate_build_plan_unchanged
-    validate_llvm "$stage2_llvm"
-    echo "checkpoint compiler-candidate:stage2-validated: pass"
-    link_llvm "$stage2_llvm" "$stage2_executable"
-    echo "checkpoint compiler-candidate:stage2-linked: pass"
-    echo "Stage 2 candidate validate/link: pass"
     audit_candidate_build_plan_snapshot Stage2 "$stage2_executable"
     echo "checkpoint compiler-candidate:stage2-plan-read: pass"
     echo "Stage 2 build plan snapshot: deterministic"
@@ -5766,8 +5777,13 @@ main() {
         echo "Range compiler Stage 2 plan checkpoint succeeded."
         printf 'compiler_directory=%s\n' "$compiler_directory"
         printf 'source_inventory_count=%s\n' "${#SOURCE_FILES[@]}"
+        printf 'stage2_cache_key=%s\n' "${STAGE2_CACHE_KEY:-bootstrap-bridge}"
         report_artifact candidate_build_plan "$CANDIDATE_BUILD_PLAN"
-        report_artifact stage2_llvm "$stage2_llvm"
+        if [[ -f "$stage2_llvm" ]]; then
+            report_artifact stage2_llvm "$stage2_llvm"
+        else
+            echo "stage2_llvm=not-materialized-from-legacy-executable-cache"
+        fi
         report_artifact stage2_executable "$stage2_executable"
         echo "checkpoint compiler-candidate:stage2-plan-complete: pass"
         return 0

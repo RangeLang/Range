@@ -271,7 +271,7 @@ function compilerSyntaxBuiltinTypeGenericParameterKind(typeID: Int, ordinal: Int
     return 0 - 1
 }
 
-function compilerSyntaxTypeReferenceColumnCount(): Int { return 10 }
+function compilerSyntaxTypeReferenceColumnCount(): Int { return 12 }
 function compilerSyntaxTypeReferenceOwnerColumn(): Int { return 0 }
 function compilerSyntaxTypeReferenceParentColumn(): Int { return 1 }
 function compilerSyntaxTypeReferenceOrdinalColumn(): Int { return 2 }
@@ -282,6 +282,8 @@ function compilerSyntaxTypeReferenceFingerprintFirstColumn(): Int { return 6 }
 function compilerSyntaxTypeReferenceFingerprintSecondColumn(): Int { return 7 }
 function compilerSyntaxTypeReferenceChildCountColumn(): Int { return 8 }
 function compilerSyntaxTypeReferenceDepthColumn(): Int { return 9 }
+function compilerSyntaxTypeReferenceNameStartColumn(): Int { return 10 }
+function compilerSyntaxTypeReferenceNameEndColumn(): Int { return 11 }
 function compilerSyntaxTypeReferenceNamed(): Int { return 1 }
 function compilerSyntaxTypeReferenceApplication(): Int { return 2 }
 function compilerSyntaxTypeReferenceArray(): Int { return 3 }
@@ -291,6 +293,8 @@ function compilerSyntaxTypeReferenceTargetNone(): Int { return 0 }
 function compilerSyntaxTypeReferenceTargetBuiltin(): Int { return 1 }
 function compilerSyntaxTypeReferenceTargetDeclaration(): Int { return 2 }
 function compilerSyntaxTypeReferenceTargetGenericParameter(): Int { return 3 }
+function compilerSyntaxTypeReferenceTargetMissing(): Int { return 4 }
+function compilerSyntaxTypeReferenceTargetAmbiguous(): Int { return 5 }
 
 function compilerSyntaxRoleStatement(): Int { return 1 }
 function compilerSyntaxRoleInitializer(): Int { return 2 }
@@ -2717,7 +2721,9 @@ function compilerTypedSyntaxCapture(source: String, tables: CompilerSyntaxTables
 }
 
 function compilerTypedDeclarationsCapture(source: String, tables: CompilerSyntaxTables): Int {
-    return compilerTypedSyntaxCaptureWithPolicy(source: source, tables: tables, captureBodies: false, captureMain: false)
+    let captureStatus: Int(compilerTypedSyntaxCaptureWithPolicy(source: source, tables: tables, captureBodies: false, captureMain: false))
+    if captureStatus != 0 { return captureStatus }
+    return compilerSyntaxRejectMissingTypeReferences(tables: tables)
 }
 
 function compilerBuiltinPolicyNone(): Int { return 0 }
@@ -3966,13 +3972,30 @@ function compilerSyntaxBuiltinTypeIDForName(name: String): Int {
     return 0 - 1
 }
 
-function compilerSyntaxDeclarationSyntaxIDForTypeName(tables: CompilerSyntaxTables, typeName: String): Int {
+function compilerSyntaxDeclarationMatchCountForTypeNameInParent(tables: CompilerSyntaxTables, typeName: String, parentSyntaxID: Int): Int {
+    state matchCount: Int(0)
+    state declarationRow: Int(0)
+    while declarationRow < compilerIntTableRowCount(table: tables.declarations) {
+        let declarationKind: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 2))
+        if (declarationKind == compilerSyntaxKindConstruct() || declarationKind == compilerSyntaxKindEnum())
+            && compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 3) == parentSyntaxID {
+            let declarationFileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
+            let declarationName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: declarationFileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
+            if declarationName == typeName { matchCount: matchCount + 1 }
+        }
+        declarationRow: declarationRow + 1
+    }
+    return matchCount
+}
+
+function compilerSyntaxDeclarationSyntaxIDForTypeNameInParent(tables: CompilerSyntaxTables, typeName: String, parentSyntaxID: Int): Int {
     state matchSyntaxID: Int(0 - 1)
     state matchCount: Int(0)
     state declarationRow: Int(0)
     while declarationRow < compilerIntTableRowCount(table: tables.declarations) {
         let declarationKind: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 2))
-        if declarationKind == compilerSyntaxKindConstruct() || declarationKind == compilerSyntaxKindEnum() {
+        if (declarationKind == compilerSyntaxKindConstruct() || declarationKind == compilerSyntaxKindEnum())
+            && compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 3) == parentSyntaxID {
             let declarationFileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
             let declarationName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: declarationFileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)))
             if declarationName == typeName {
@@ -3982,8 +4005,31 @@ function compilerSyntaxDeclarationSyntaxIDForTypeName(tables: CompilerSyntaxTabl
         }
         declarationRow: declarationRow + 1
     }
+    if matchCount > 1 { return 0 - 2 }
     if matchCount != 1 { return 0 - 1 }
     return matchSyntaxID
+}
+
+function compilerSyntaxDeclarationParentForSyntaxID(tables: CompilerSyntaxTables, syntaxID: Int): Int {
+    let row: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: syntaxID))
+    if row < 0 { return 0 - 1 }
+    return compilerIntTableValue(table: tables.declarations, row: row, column: 3)
+}
+
+function compilerSyntaxDeclarationSyntaxIDForTypeNameInScope(tables: CompilerSyntaxTables, typeName: String, scopeSyntaxID: Int): Int {
+    state scope: Int(scopeSyntaxID)
+    state depth: Int(0)
+    while scope >= 0 && depth < 32 {
+        let localMatch: Int(compilerSyntaxDeclarationSyntaxIDForTypeNameInParent(tables: tables, typeName: typeName, parentSyntaxID: scope))
+        if localMatch != 0 - 1 { return localMatch }
+        scope: compilerSyntaxDeclarationParentForSyntaxID(tables: tables, syntaxID: scope)
+        depth: depth + 1
+    }
+    return compilerSyntaxDeclarationSyntaxIDForTypeNameInParent(tables: tables, typeName: typeName, parentSyntaxID: 0 - 1)
+}
+
+function compilerSyntaxDeclarationSyntaxIDForTypeName(tables: CompilerSyntaxTables, typeName: String): Int {
+    return compilerSyntaxDeclarationSyntaxIDForTypeNameInScope(tables: tables, typeName: typeName, scopeSyntaxID: 0 - 1)
 }
 
 function compilerSyntaxTypeReferenceGenericParameterForName(tables: CompilerSyntaxTables, ownerSyntaxID: Int, name: String): Int {
@@ -4016,7 +4062,7 @@ function compilerSyntaxGenericParameterKindForOrdinal(tables: CompilerSyntaxTabl
     return 0 - 1
 }
 
-function compilerSyntaxTypeReferenceAppend(tables: CompilerSyntaxTables, ownerMemberRow: Int, parentNodeID: Int, ordinal: Int, kind: Int, targetKind: Int, targetID: Int, childCount: Int, depth: Int, fingerprint: CompilerFingerprint): Int {
+function compilerSyntaxTypeReferenceAppend(tables: CompilerSyntaxTables, ownerMemberRow: Int, parentNodeID: Int, ordinal: Int, kind: Int, targetKind: Int, targetID: Int, childCount: Int, depth: Int, nameStart: Int, nameEnd: Int, fingerprint: CompilerFingerprint): Int {
     let nodeID: Int(compilerIntTableRowCount(table: tables.typeReferences))
     if compilerIntTableAppend(table: tables.typeReferences, value: ownerMemberRow) != 0
         || compilerIntTableAppend(table: tables.typeReferences, value: parentNodeID) != 0
@@ -4027,7 +4073,9 @@ function compilerSyntaxTypeReferenceAppend(tables: CompilerSyntaxTables, ownerMe
         || compilerIntTableAppend(table: tables.typeReferences, value: fingerprint.first) != 0
         || compilerIntTableAppend(table: tables.typeReferences, value: fingerprint.second) != 0
         || compilerIntTableAppend(table: tables.typeReferences, value: childCount) != 0
-        || compilerIntTableAppend(table: tables.typeReferences, value: depth) != 0 { return 0 - 1 }
+        || compilerIntTableAppend(table: tables.typeReferences, value: depth) != 0
+        || compilerIntTableAppend(table: tables.typeReferences, value: nameStart) != 0
+        || compilerIntTableAppend(table: tables.typeReferences, value: nameEnd) != 0 { return 0 - 1 }
     return nodeID
 }
 
@@ -4040,11 +4088,20 @@ function compilerSyntaxTypeReferenceBuildExpected(tables: CompilerSyntaxTables, 
     state childCount: Int(0)
     state childRangeStart: Int(0 - 1)
     state childRangeEnd: Int(0 - 1)
+    state nameStart: Int(normalized.start)
+    state nameEnd: Int(normalized.end)
     let firstByte: Int(stringByteAt(source: typeName, index: normalized.start))
     let lastByte: Int(stringByteAt(source: typeName, index: normalized.end - 1))
     let outerRange: CompilerSourceRange(compilerSemanticGenericOuterNameRangeInText(text: typeName, typeRange: normalized))
     state name: String(typeName.substring(start: normalized.start, end: normalized.end))
-    if expectedGenericKind == compilerSyntaxGenericParameterValueKind() {
+    state expectedValue: Bool(expectedGenericKind == compilerSyntaxGenericParameterValueKind())
+    if expectedGenericKind == 0
+        && (firstByte == 34 || firstByte == 39 || firstByte == 45 || firstByte == 46
+            || (firstByte >= 48 && firstByte <= 57)
+            || (firstByte >= 97 && firstByte <= 122)) {
+        expectedValue: true
+    }
+    if expectedValue {
         kind: compilerSyntaxTypeReferenceValue()
     } else if lastByte == 63 {
         kind: compilerSyntaxTypeReferenceOptional()
@@ -4059,6 +4116,8 @@ function compilerSyntaxTypeReferenceBuildExpected(tables: CompilerSyntaxTables, 
     } else if outerRange.start >= 0 {
         kind: compilerSyntaxTypeReferenceApplication()
         name: typeName.substring(start: outerRange.start, end: outerRange.end)
+        nameStart: outerRange.start
+        nameEnd: outerRange.end
         state argumentRange: CompilerSourceRange(compilerSemanticGenericArgumentRangeInText(text: typeName, typeRange: normalized, ordinal: 0))
         while argumentRange.start >= 0 {
             childCount: childCount + 1
@@ -4072,15 +4131,20 @@ function compilerSyntaxTypeReferenceBuildExpected(tables: CompilerSyntaxTables, 
             targetKind: compilerSyntaxTypeReferenceTargetBuiltin()
             targetID: builtinTypeID
         } else {
-            let declarationSyntaxID: Int(compilerSyntaxDeclarationSyntaxIDForTypeName(tables: tables, typeName: name))
+            let declarationSyntaxID: Int(compilerSyntaxDeclarationSyntaxIDForTypeNameInScope(tables: tables, typeName: name, scopeSyntaxID: ownerSyntaxID))
             if declarationSyntaxID >= 0 {
                 targetKind: compilerSyntaxTypeReferenceTargetDeclaration()
                 targetID: declarationSyntaxID
+            } else if declarationSyntaxID == 0 - 2 {
+                targetKind: compilerSyntaxTypeReferenceTargetAmbiguous()
             } else {
                 let genericParameterRow: Int(compilerSyntaxTypeReferenceGenericParameterForName(tables: tables, ownerSyntaxID: ownerSyntaxID, name: name))
-                if genericParameterRow < 0 || kind != compilerSyntaxTypeReferenceNamed() { return 0 - 1 }
-                targetKind: compilerSyntaxTypeReferenceTargetGenericParameter()
-                targetID: genericParameterRow
+                if genericParameterRow >= 0 && kind == compilerSyntaxTypeReferenceNamed() {
+                    targetKind: compilerSyntaxTypeReferenceTargetGenericParameter()
+                    targetID: genericParameterRow
+                } else {
+                    targetKind: compilerSyntaxTypeReferenceTargetMissing()
+                }
             }
         }
     } else if kind != compilerSyntaxTypeReferenceValue() {
@@ -4097,10 +4161,8 @@ function compilerSyntaxTypeReferenceBuildExpected(tables: CompilerSyntaxTables, 
     fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: targetKind)
     fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: targetID)
     fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: childCount)
-    if kind == compilerSyntaxTypeReferenceValue() {
-        fingerprint: compilerFingerprintAppendText(fingerprint: fingerprint, tag: 121, text: name)
-    }
-    let nodeID: Int(compilerSyntaxTypeReferenceAppend(tables: tables, ownerMemberRow: ownerMemberRow, parentNodeID: parentNodeID, ordinal: ordinal, kind: kind, targetKind: targetKind, targetID: targetID, childCount: childCount, depth: depth, fingerprint: fingerprint))
+    fingerprint: compilerFingerprintAppendText(fingerprint: fingerprint, tag: 121, text: name)
+    let nodeID: Int(compilerSyntaxTypeReferenceAppend(tables: tables, ownerMemberRow: ownerMemberRow, parentNodeID: parentNodeID, ordinal: ordinal, kind: kind, targetKind: targetKind, targetID: targetID, childCount: childCount, depth: depth, nameStart: nameStart, nameEnd: nameEnd, fingerprint: fingerprint))
     if nodeID < 0 { return 0 - 1 }
     state childOrdinal: Int(0)
     while childOrdinal < childCount {
@@ -4108,7 +4170,7 @@ function compilerSyntaxTypeReferenceBuildExpected(tables: CompilerSyntaxTables, 
         if kind == compilerSyntaxTypeReferenceApplication() {
             nestedRange: compilerSemanticGenericArgumentRangeInText(text: typeName, typeRange: normalized, ordinal: childOrdinal)
         }
-        state childExpectedKind: Int(compilerSyntaxGenericParameterTypeKind())
+        state childExpectedKind: Int(0)
         if targetKind == compilerSyntaxTypeReferenceTargetDeclaration() {
             childExpectedKind: compilerSyntaxGenericParameterKindForOrdinal(tables: tables, ownerSyntaxID: targetID, ordinal: childOrdinal)
         } else if targetKind == compilerSyntaxTypeReferenceTargetBuiltin() {
@@ -4203,6 +4265,27 @@ function compilerSyntaxLinkMemberTypeTargets(tables: CompilerSyntaxTables): Int 
     return 0
 }
 
+function compilerSyntaxRejectMissingTypeReferences(tables: CompilerSyntaxTables): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.typeReferences) {
+        let targetKind: Int(compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceTargetKindColumn()))
+        if targetKind == compilerSyntaxTypeReferenceTargetMissing() || targetKind == compilerSyntaxTypeReferenceTargetAmbiguous() {
+            let ownerMemberRow: Int(compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceOwnerColumn()))
+            if ownerMemberRow < 0 || ownerMemberRow >= compilerIntTableRowCount(table: tables.members) { return 0 - 1 }
+            let fileID: Int(compilerIntTableValue(table: tables.members, row: ownerMemberRow, column: 1))
+            let typeStart: Int(compilerIntTableValue(table: tables.members, row: ownerMemberRow, column: 8))
+            let localStart: Int(typeStart + compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceNameStartColumn()))
+            let localEnd: Int(typeStart + compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceNameEndColumn()))
+            let globalStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: localStart))
+            let globalEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: localEnd))
+            compilerSyntaxTablesFailureAnnotateGlobal(tables: tables, phase: compilerSyntaxFailurePhaseEnumPayloadLink(), reason: compilerSyntaxFailureReasonInvalidEnumPayloadType(), fileID: fileID, start: globalStart, end: globalEnd, relatedRow: ownerMemberRow)
+            return 0 - 1
+        }
+        row: row + 1
+    }
+    return 0
+}
+
 function compilerSyntaxEnumPayloadOwnerSyntaxID(tables: CompilerSyntaxTables, payloadRow: Int): Int {
     if payloadRow < 0 || payloadRow >= compilerIntTableRowCount(table: tables.members) { return 0 - 1 }
     if compilerIntTableValue(table: tables.members, row: payloadRow, column: 12) != compilerSyntaxMemberKindEnumCasePayload() { return 0 - 1 }
@@ -4258,8 +4341,11 @@ function compilerSyntaxTypeReferencesAreValid(tables: CompilerSyntaxTables): Boo
         let targetID: Int(compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceTargetIDColumn()))
         let childCount: Int(compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceChildCountColumn()))
         let depth: Int(compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceDepthColumn()))
-        if ownerMemberRow < 0 || ownerMemberRow >= compilerIntTableRowCount(table: tables.members)
-            || !compilerSyntaxMemberHasTypeReference(tables: tables, memberRow: ownerMemberRow)
+        let nameStart: Int(compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceNameStartColumn()))
+        let nameEnd: Int(compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceNameEndColumn()))
+        if ownerMemberRow < 0 || ownerMemberRow >= compilerIntTableRowCount(table: tables.members) { return false }
+        let ownerTypeLength: Int(compilerIntTableValue(table: tables.members, row: ownerMemberRow, column: 9) - compilerIntTableValue(table: tables.members, row: ownerMemberRow, column: 8))
+        if !compilerSyntaxMemberHasTypeReference(tables: tables, memberRow: ownerMemberRow)
             || kind < compilerSyntaxTypeReferenceNamed() || kind > compilerSyntaxTypeReferenceValue()
             || depth < 0 || depth >= 32
             || (parentNodeID < 0 && (ordinal != 0 || depth != 0))
@@ -4269,11 +4355,14 @@ function compilerSyntaxTypeReferencesAreValid(tables: CompilerSyntaxTables): Boo
             || (kind == compilerSyntaxTypeReferenceValue() && childCount != 0)
             || ((kind == compilerSyntaxTypeReferenceArray() || kind == compilerSyntaxTypeReferenceOptional()) && childCount != 1)
             || (kind == compilerSyntaxTypeReferenceApplication() && childCount <= 0)
-            || targetKind < compilerSyntaxTypeReferenceTargetNone() || targetKind > compilerSyntaxTypeReferenceTargetGenericParameter()
+            || targetKind < compilerSyntaxTypeReferenceTargetNone() || targetKind > compilerSyntaxTypeReferenceTargetAmbiguous()
             || (targetKind == compilerSyntaxTypeReferenceTargetBuiltin() && (targetID < compilerSyntaxBuiltinTypeInt() || targetID > compilerSyntaxBuiltinTypeFloat()))
             || (targetKind == compilerSyntaxTypeReferenceTargetDeclaration() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: tables.syntaxIndex)))
             || (targetKind == compilerSyntaxTypeReferenceTargetGenericParameter() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: tables.genericParameters)))
+            || (targetKind == compilerSyntaxTypeReferenceTargetMissing() && (targetID != 0 - 1 || (kind != compilerSyntaxTypeReferenceNamed() && kind != compilerSyntaxTypeReferenceApplication())))
+            || (targetKind == compilerSyntaxTypeReferenceTargetAmbiguous() && (targetID != 0 - 1 || (kind != compilerSyntaxTypeReferenceNamed() && kind != compilerSyntaxTypeReferenceApplication())))
             || (targetKind == compilerSyntaxTypeReferenceTargetNone() && kind != compilerSyntaxTypeReferenceArray() && kind != compilerSyntaxTypeReferenceOptional() && kind != compilerSyntaxTypeReferenceValue())
+            || nameStart < 0 || nameEnd <= nameStart || nameEnd > ownerTypeLength
             || (compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceFingerprintFirstColumn()) == 0 && compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceFingerprintSecondColumn()) == 0) { return false }
         if targetKind == compilerSyntaxTypeReferenceTargetDeclaration() {
             let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: targetID))
@@ -4362,7 +4451,10 @@ function compilerSyntaxEnumDirectPayloadCyclesAreAbsent(tables: CompilerSyntaxTa
                                 valid: false
                             } else if compilerIntTableValue(table: tables.syntaxIndex, row: targetSyntaxID, column: 0) == compilerSyntaxKindEnum()
                                 && resolvedBySyntaxID.element(index: targetSyntaxID) == 0 { blocked: true }
-                        } else if targetKind != compilerSyntaxTypeReferenceTargetBuiltin() && targetKind != compilerSyntaxTypeReferenceTargetGenericParameter() {
+                        } else if targetKind != compilerSyntaxTypeReferenceTargetBuiltin()
+                            && targetKind != compilerSyntaxTypeReferenceTargetGenericParameter()
+                            && targetKind != compilerSyntaxTypeReferenceTargetMissing()
+                            && targetKind != compilerSyntaxTypeReferenceTargetAmbiguous() {
                             valid: false
                         }
                     }
@@ -6988,6 +7080,7 @@ function compilerSyntaxTablesAreStructurallyValid(tables: CompilerSyntaxTables):
     state expectedSyntaxCount: Int(0)
     expectedSyntaxCount: compilerIntTableRowCount(table: tables.declarations) + compilerIntTableRowCount(table: tables.members) + compilerIntTableRowCount(table: tables.parameters) + compilerIntTableRowCount(table: tables.bodyNodes)
     if syntaxCount != expectedSyntaxCount {
+        compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 1)
         return false
     }
     state functionDeclarationCount: Int(0)
@@ -6999,26 +7092,62 @@ function compilerSyntaxTablesAreStructurallyValid(tables: CompilerSyntaxTables):
         declarationRow: declarationRow + 1
     }
     if functionDeclarationCount != compilerIntTableRowCount(table: tables.functions) {
+        compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 2)
         return false
     }
     state syntaxID: Int(0)
     while syntaxID < syntaxCount {
         if !compilerSyntaxFacetIsValid(tables: tables, syntaxID: syntaxID) {
+            compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 3)
             return false
         }
         syntaxID: syntaxID + 1
     }
-    return compilerSyntaxDeclarationsAreValid(tables: tables)
-        && compilerSyntaxMembersAreValid(tables: tables)
-        && compilerSyntaxEnumPayloadTypesAreValid(tables: tables)
-        && compilerSyntaxTypeReferencesAreValid(tables: tables)
-        && compilerSyntaxEnumDirectPayloadCyclesAreAbsent(tables: tables)
-        && compilerSyntaxFunctionsAreValid(tables: tables)
-        && compilerSyntaxParametersAreValid(tables: tables)
-        && compilerSyntaxGenericParametersAreValid(tables: tables)
-        && compilerMacroTablesAreStructurallyValid(tables: tables)
-        && compilerSyntaxBodyNodesAreValid(tables: tables)
-        && compilerSyntaxBodyEdgesAreValid(tables: tables)
+    if !compilerSyntaxDeclarationsAreValid(tables: tables) {
+        compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 10)
+        return false
+    }
+    if !compilerSyntaxMembersAreValid(tables: tables) {
+        compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 11)
+        return false
+    }
+    if !compilerSyntaxEnumPayloadTypesAreValid(tables: tables) {
+        compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 12)
+        return false
+    }
+    if !compilerSyntaxTypeReferencesAreValid(tables: tables) {
+        compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 13)
+        return false
+    }
+    if !compilerSyntaxEnumDirectPayloadCyclesAreAbsent(tables: tables) {
+        compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 14)
+        return false
+    }
+    if !compilerSyntaxFunctionsAreValid(tables: tables) {
+        compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 15)
+        return false
+    }
+    if !compilerSyntaxParametersAreValid(tables: tables) {
+        compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 16)
+        return false
+    }
+    if !compilerSyntaxGenericParametersAreValid(tables: tables) {
+        compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 17)
+        return false
+    }
+    if !compilerMacroTablesAreStructurallyValid(tables: tables) {
+        compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 18)
+        return false
+    }
+    if !compilerSyntaxBodyNodesAreValid(tables: tables) {
+        compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 19)
+        return false
+    }
+    if !compilerSyntaxBodyEdgesAreValid(tables: tables) {
+        compilerSyntaxTablesFailureAnnotate(tables: tables, phase: compilerSyntaxFailurePhaseStructuralValidation(), reason: compilerSyntaxFailureReasonInvalidTableStructure(), fileID: 0 - 1, start: 0 - 1, end: 0 - 1, relatedRow: 20)
+        return false
+    }
+    return true
 }
 
 function compilerSyntaxKindName(kindTag: Int): String {
@@ -7099,5 +7228,7 @@ function compilerSyntaxTypeReferenceTargetName(kind: Int): String {
     if kind == compilerSyntaxTypeReferenceTargetBuiltin() { return String("builtin") }
     if kind == compilerSyntaxTypeReferenceTargetDeclaration() { return String("declaration") }
     if kind == compilerSyntaxTypeReferenceTargetGenericParameter() { return String("genericParameter") }
+    if kind == compilerSyntaxTypeReferenceTargetMissing() { return String("missing") }
+    if kind == compilerSyntaxTypeReferenceTargetAmbiguous() { return String("ambiguous") }
     return String("unknown")
 }

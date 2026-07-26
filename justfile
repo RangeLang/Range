@@ -19,12 +19,12 @@ candidate:
   scripts/range check-compiler-candidate
 
 check:
-  bash -n scripts/range scripts/range-native scripts/check-range-compiler-cache scripts/check-range-compiler-candidate scripts/verify-range-compiler-seed
+  bash -n scripts/range scripts/range-native scripts/resolve-range-stage2-compiler scripts/check-range-root-value scripts/check-range-compiler-cache scripts/check-range-compiler-candidate scripts/verify-range-compiler-seed
   scripts/range check-stage2-compiler
   scripts/range compiler progression
 
 check-fast:
-  bash -n scripts/range scripts/range-native scripts/check-range-unsigned8 scripts/check-range-float-widths scripts/check-range-compiler-cache scripts/check-range-compiler-candidate scripts/verify-range-compiler-seed
+  bash -n scripts/range scripts/range-native scripts/resolve-range-stage2-compiler scripts/check-range-root-value scripts/check-range-unsigned8 scripts/check-range-float-widths scripts/check-range-compiler-cache scripts/check-range-compiler-candidate scripts/verify-range-compiler-seed
   scripts/check-range-unsigned8
   scripts/check-range-float-widths
   scripts/check-range-compiler-cache

@@ -6,8 +6,12 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 ## Website
 
 - [x] Position the homepage 0-to-1 measure on a zero-safe logarithmic scale.
-  - [x] Use the same non-linear positions for canvas marks and pointer
-    snapping, and verify the rendered endpoint alignment.
+  - [x] Use those non-linear positions for canvas marks and verify the rendered
+    endpoint alignment.
+  - [x] Replace the detached pointer pinch with direct dragging of the authored
+    `0` endpoint.
+    - [x] Pull nearby marks by logical value with a compact falloff, keep every
+      dash the same length, and spring the zero endpoint home on release.
 - [x] Add an interactive concentric nucleus graph to the Svelte homepage.
   - [x] Render one shared source nucleus with persistent concept branches.
   - [x] Add an explicit `Shape(1, 2, 4)` branch and expand the radial
@@ -21,20 +25,19 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [x] Leave silence between the short note and the next interval.
     - [x] Keep one fixed A2 note in an audible low register with enough gain
       for laptop speakers, independent of the active concept.
-    - [x] Add an optional longer E2 sub-pulse every 3.6 seconds with a stable
-      relationship to A2.
-      - [x] Form a 3:2 polyrhythm against the 2.4-second primary clock, with
-        both pulses meeting every 7.2 seconds.
     - [x] Send the note through a strong five-second stereo reverb tail that
       overlaps and layers beneath multiple 2.4-second pulses.
       - [x] Mix the output at 90% wet reverb and 10% direct dry tone.
       - [x] Filter the wet return through a rumble cut and a resonant low-pass
-        that moves one scale step above each pulse: A2 → B2 and E2 → F-sharp
-        2.
+        that moves one scale step above the base pulse: A2 → B2.
       - [x] Use a smooth exponential tail and restrained resonance so
         overlapping sine-bass pulses do not pump or rumble.
   - [x] Place every branch node on a shared concentric numeric scale where the
     `8 → 16` ring interval is twice `4 → 8`, which is twice `2 → 4`.
+  - [x] Add a toggleable synchronized spiral track through the existing
+    `4 → 8 → 16` nodes.
+    - [x] Follow an expanding value-derived spiral and advance a rising
+      B2 → D3 → E3 sine phrase once per 2.4-second clock step.
   - [x] Render straight radial connectors from value-aware dash segments whose
     lengths and gaps expand with the local base-2 logarithmic magnitude.
   - [x] Keep numeric labels on the top SVG layer with a glyph-shaped paper
@@ -54,12 +57,22 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 - [ ] Move unsized scalar defaults into the `@project` macro.
   - [x] Add the host-backed target pointer-width builtin and a bootstrap-safe
     resolver hook for missing `integer`/`bool` defaults.
-  - [ ] After seed promotion, make the resolver hook call
+  - [x] After seed promotion, make the resolver hook call
     `targetPointerBits()` directly instead of its accepted-seed 64-bit value.
+  - [x] Define lowercase `project` in Range and execute its real macro body.
+    - The macro records exact `integer` and `bool` member reads, then uses
+      `@expand` to add only the missing `state integer: Int` and
+      `state bool: Bool` declarations.
+    - Focused fixtures prove the empty-project expansion and preservation of
+      an explicit `state integer: Int<4>` override.
   - [x] Allow `state integer: Int<4>` and full signed-width forms to override
     the project integer default without an `override` keyword.
   - [ ] Route every bare and partially specialized `Int` use through the
     resolved project default instead of LLVM `i32` literals.
+  - [ ] Resolve bare `String` through a project-provided encoding default.
+    - Model an explicit override as `String<.utf8>` (and later other
+      `TextEncoding` cases) while keeping logical String elements semantic
+      characters rather than physical code units.
   - [ ] Materialize and validate the complete predefined scalar-member set.
   - [x] Prove default, override, duplicate, wrong-binding, and wrong-type
     behavior through supported compiler fixtures.
@@ -92,9 +105,45 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     sources to the bootstrap manifest after the parser-capable seed is
     reproducibly promoted.
   - [ ] Expose compiler declarations through one canonical typed meta-model.
-    - `Construct.members` should be the typed view of the compiler's canonical
-      member collection; `@member` and `@field` classify or validate those
-      values instead of creating parallel declaration representations.
+    - [x] Define lowercase `member` for `Declaration | Member` and annotate the
+      direct `Let`, `State`, `Binding`, `Derived`, nested `Construct`,
+      `Function`, `Enum`, and `Extension` syntax representations.
+    - [x] Replace `Construct.Declaration`'s parallel per-kind arrays with the
+      canonical `members: [@member]` collection.
+    - [x] Prove one macro-family representation retains mixed authored
+      `let`, `state`, `construct`, and `function` values.
+    - [x] Normalize parser-backed declaration envelopes in the direct syntax
+      model.
+      - [x] Carry leading macro applications on function, enum, and parameter
+        declarations alongside their authored identifiers and callable shape.
+      - [x] Keep `let`, `state`, `binding`, and `derived` as stored declaration
+        variants with macro applications, identifier, type, and value/body
+        storage instead of inventing a callable parameter list.
+    - [ ] Execute typed views such as
+      `members.filter(all: Let) { lets in ... }` over those same values without
+      copying them into a second representation.
+    - [ ] Make the direct syntax values the semantic witnesses consumed by
+      macros and lowering, leaving integer tables as an internal compact
+      backing store rather than a parallel public model.
+    - [ ] Make authored `keyword + name` declarations the graph's canonical
+      nominal sources.
+      - [x] Cover macros, constructs, enums, authored functions, members,
+        enum cases, and ordinary local `let`/`state` declarations without
+        inventing a source for payload labels.
+      - [x] Preserve references from parsed type positions and macro
+        applications, using target-compatible macro resolution and no casing
+        heuristic.
+      - [x] Emit exact-path/span warnings for missing, ambiguous, and
+        target-mismatched references while retaining each reference as a
+        syntax witness for tools.
+      - [ ] Replace the compact graph tables as the public macro-facing model
+        only after the direct syntax values consume these proven identities.
+- [ ] Represent project remotes as ordinary Range values.
+  - [ ] Add parser and type-system semantics for variadic parameters; the
+    lexer already recognizes the `...` token.
+  - [ ] Define `Remote` and `Remotes` in Range, then replace the placeholder
+    `[Remote]([])` project field with a variadic value such as
+    `Remotes("https://github.com/...", "...")`.
 - [ ] Remove source-alias ownership conflicts from parser fallback tokens.
   - [x] Replace the enum-payload and balanced-range loop token/cursor
     aggregates with scalar token coordinates and cursor indices.
@@ -130,9 +179,52 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] `scripts/range check-build-plan`
   - [x] `scripts/range check-root-value --controls`
   - [x] `scripts/range check-compiler-smoke`
-  - [ ] `scripts/range check-compiler-candidate`
+  - [x] `scripts/range check-compiler-candidate`
   - [ ] `scripts/range check-stage2-compiler`
   - [x] `scripts/range compiler progression`
+- [x] Resolve accepted-seed Stage 2 once per compiler-source change.
+  - [x] Share one content-addressed resolver between root-value, smoke, and the
+    ordinary compiler-candidate path; keep bootstrap-bridge production
+    separate because it has a different producer.
+  - [x] Key the immutable artifact by the accepted seed, ordered runtime set,
+    compiler source bundle and inventory, target/toolchain identity, and exact
+    Clang invocation flags.
+  - [x] Keep root-value and smoke proofs independent while reusing the same
+    Stage 2 executable and cache key.
+    - The final verified shared-cache reuse completed root-value in 3.49
+      seconds and smoke in 3.72 seconds with cache key
+      `22ef98c2c4267c598b7677af4ff9725b46e831fbe705632aeda60b2f25586660`.
+  - [ ] Remove the labeled schema-1 executable-only compatibility lookup after
+    the next compiler-source miss publishes the first schema-2 LLVM plus
+    executable entry; bound cleanup of quarantined invalid entries then.
+  - [ ] Consider per-function compiler-output caching only after artifact-level
+    reuse proves insufficient.
+- [ ] Promote the latest accepted seed as the runnable `range` compiler.
+  - [ ] Make `range compile <folder>` discover the project, Core, Foundation,
+    framework, and generated source graph and compile it with the immutable
+    accepted compiler artifact.
+    - [x] Add the supported `range compile <file-or-folder>` bootstrap path
+      with deterministic recursive project discovery, accepted Core sources,
+      and the shared immutable compiler artifact.
+    - [ ] Move Foundation, framework, generated-source, and dependency graph
+      discovery behind the Range-authored project macro.
+  - [ ] Give the artifact a compiler version plus content hash, target, runtime
+    ABI, and source-manifest identity; keep its LLVM as reproducibility
+    evidence rather than the only usable seed.
+  - [ ] Make compiler generation N produce the candidate executable for
+    generation N+1, then promote only after the fixed-point and candidate
+    gates pass.
+  - [ ] Reuse the same content-addressed executable in the public command and
+    all proof gates without reusing proof results.
+- [ ] Remove Clang as a compiler-semantic dependency.
+  - [x] Stop requiring the consumer's exact Clang version to equal the
+    producer version recorded in the accepted-seed manifest.
+  - [ ] Keep fixed-point LLVM generation independent of the installed C
+    compiler; test runtime linking as a separate target-toolchain capability.
+  - [ ] Move the remaining C runtime surface into Range-authored Core/runtime
+    code.
+  - [ ] Replace the temporary Clang LLVM validation/link provider with a
+    versioned, replaceable object/link backend.
 
 ## Repository Layout
 

@@ -3,7 +3,10 @@ construct Enum {
     let declaration: Declaration
 
     @graph(.declaration)
+    @member
     construct Declaration {
+        let macros: [Macro.Application]
+        let identifier: Identifier
         let self: NominalTypeReference
         let generics: [Generic]
         let cases: [Case]
@@ -12,6 +15,7 @@ construct Enum {
     }
 
     @graph(.declaration)
+    @member
     construct Case {
         let identifier: Identifier
         let associatedValues: [AssociatedValue]

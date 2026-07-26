@@ -1,4 +1,5 @@
 @syntax
+@member
 construct Extension {
     let target: NominalTypeReference
     let conformances: [NominalTypeReference]

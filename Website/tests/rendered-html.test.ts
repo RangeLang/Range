@@ -40,11 +40,13 @@ describe("SvelteKit routes", () => {
     expect(html).toContain("a love letter to electrons, logic and abstraction");
     expect(html).toContain("<range-spline-nav");
     expect(html).toContain("<range-scale");
+    expect(html).toContain('zero-drag-falloff="0.38"');
+    expect(html).not.toContain('pinch="');
     expect(html).toContain(">Cardinality</h2>");
     expect(html).toContain("shared source nucleus");
     expect(html).toContain("Play interval note");
     expect(html).toContain("Stop interval note");
-    expect(html).toContain("Lower pulse");
+    expect(html).toContain("Spiral track");
     expect(html).not.toContain("source() →");
     expect(html).not.toContain("Program melody");
     expect(html).toContain('href="/benchmarks"');
@@ -128,9 +130,8 @@ test("keeps the scale math deterministic", async () => {
   const {
     createRangeMarks,
     createScaleMarks,
+    dragZeroWithFalloff,
     logarithmicScalePosition,
-    pinchMarkerWidth,
-    snapScalePosition,
   } = await import("../public/range-scale-math.js");
   const logicalMarks = createScaleMarks({ divisionBase: 3, divisionLevels: 3 });
   expect(logicalMarks).toHaveLength(28);
@@ -141,14 +142,18 @@ test("keeps the scale math deterministic", async () => {
   expect(logicalMarks[7].position).toBe(logarithmicScalePosition(7 / 27));
   expect(logicalMarks[1].position - logicalMarks[0].position)
     .toBeGreaterThan(logicalMarks[27].position - logicalMarks[26].position);
-  const warpedMarks = createRangeMarks({ pinch: 0.27, pinchFalloff: 0.16, pinchStrength: 0.9 });
-  expect(warpedMarks[7].position).toBe(logarithmicScalePosition(7 / 27));
-  expect(warpedMarks[7].width).toBe(pinchMarkerWidth(warpedMarks[7].position, { center: 0.27, falloff: 0.16, strength: 0.9 }));
-  expect(Math.min(...warpedMarks.map((mark: any) => mark.width))).toBeLessThan(warpedMarks[0].width);
-  expect(warpedMarks.every((mark: any, index: number) => mark.value === index / 27)).toBe(true);
-  expect(warpedMarks.every((mark: any) => mark.measure === 1)).toBe(true);
-  expect(snapScalePosition(logicalMarks[7].position)).toEqual({
-    index: 7,
-    position: logicalMarks[7].position,
+  const draggedMarks = createRangeMarks({
+    zeroDrag: 0.2,
+    zeroDragFalloff: 0.38,
   });
+  expect(draggedMarks[0].position).toBe(0.2);
+  expect(draggedMarks[7].position).toBeGreaterThan(logicalMarks[7].position);
+  expect(draggedMarks[11].position).toBe(logicalMarks[11].position);
+  expect(draggedMarks[27].position).toBe(1);
+  expect(draggedMarks.every((mark: any) => mark.width === 1)).toBe(true);
+  expect(draggedMarks.every((mark: any, index: number) => mark.value === index / 27)).toBe(true);
+  expect(draggedMarks.every((mark: any, index: number) => (
+    index === 0 || mark.position >= draggedMarks[index - 1].position
+  ))).toBe(true);
+  expect(dragZeroWithFalloff(0, { value: 0, drag: 0.2 })).toBe(0.2);
 });

@@ -5,6 +5,7 @@ construct Parameter {
 
     @graph(.declaration)
     construct Declaration {
+        let macros: [Macro.Application]
         let externalName: String?
         let localName: String
         let type: TypeReference

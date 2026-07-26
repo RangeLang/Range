@@ -1,0 +1,22 @@
+compilerPlotter
+compilerSourceFile\trole=project\tpath=Project/NominalDeclarationKinds.range
+
+macro observed(): Construct -> Void {}
+
+enum Flag {
+    case on
+}
+
+construct Model {
+    let fixed: Int
+    state changing: Int
+    binding shared: Int
+
+    derived computed: Int {
+        self.fixed
+    }
+
+    function transform(value: Int): Int {
+        return value
+    }
+}

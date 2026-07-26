@@ -1,5 +1,7 @@
 function compilerGraphNodeColumnCount(): Int { return 8 }
 function compilerGraphFactColumnCount(): Int { return 5 }
+function compilerGraphNominalColumnCount(): Int { return 10 }
+function compilerGraphNominalReferenceColumnCount(): Int { return 14 }
 function compilerGraphGeneratedFunctionColumnCount(): Int { return 25 }
 function compilerGraphGeneratedMemberColumnCount(): Int { return 24 }
 function compilerGraphGeneratedKindFunction(): Int { return 1 }
@@ -20,11 +22,30 @@ function compilerGraphFacetArgument(): Int { return 7 }
 function compilerGraphFacetMainAnnotation(): Int { return 8 }
 function compilerGraphFacetApplication(): Int { return 9 }
 function compilerGraphFacetRegion(): Int { return 10 }
+function compilerGraphNominalRoleMemberType(): Int { return 1 }
+function compilerGraphNominalRoleParameterType(): Int { return 2 }
+function compilerGraphNominalRoleFunctionReturn(): Int { return 3 }
+function compilerGraphNominalRoleLocalType(): Int { return 4 }
+function compilerGraphNominalRoleGenericConstraint(): Int { return 5 }
+function compilerGraphNominalRoleMacroApplication(): Int { return 6 }
+function compilerGraphNominalTargetMismatch(): Int { return 6 }
+function compilerGraphNominalMissingTarget(): Int { return 7 }
+function compilerGraphNominalKindConstruct(): Int { return 1 }
+function compilerGraphNominalKindEnum(): Int { return 2 }
+function compilerGraphNominalKindFunction(): Int { return 3 }
+function compilerGraphNominalKindMacro(): Int { return 4 }
+function compilerGraphNominalKindLet(): Int { return 5 }
+function compilerGraphNominalKindState(): Int { return 6 }
+function compilerGraphNominalKindBinding(): Int { return 7 }
+function compilerGraphNominalKindDerived(): Int { return 8 }
+function compilerGraphNominalKindCase(): Int { return 9 }
 
 function compilerGraphDeltaCreate(): CompilerGraphDelta {
     return CompilerGraphDelta(
         nodes: compilerIntTableCreate(columnCount: compilerGraphNodeColumnCount(), estimatedRowCount: 256),
         facts: compilerIntTableCreate(columnCount: compilerGraphFactColumnCount(), estimatedRowCount: 256),
+        nominals: compilerIntTableCreate(columnCount: compilerGraphNominalColumnCount(), estimatedRowCount: 128),
+        nominalReferences: compilerIntTableCreate(columnCount: compilerGraphNominalReferenceColumnCount(), estimatedRowCount: 128),
         generatedFunctions: compilerIntTableCreate(columnCount: compilerGraphGeneratedFunctionColumnCount(), estimatedRowCount: 32),
         generatedMembers: compilerIntTableCreate(columnCount: compilerGraphGeneratedMemberColumnCount(), estimatedRowCount: 32),
         failures: bufferCreateInt(capacity: 1)
@@ -35,6 +56,8 @@ function compilerGraphDeltaDestroy(delta: CompilerGraphDelta): Int {
     state graphDestroyStatus: Int(0)
     if compilerIntTableDestroy(table: delta.nodes) != 0 { graphDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: delta.facts) != 0 { graphDestroyStatus: 0 - 1 }
+    if compilerIntTableDestroy(table: delta.nominals) != 0 { graphDestroyStatus: 0 - 1 }
+    if compilerIntTableDestroy(table: delta.nominalReferences) != 0 { graphDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: delta.generatedFunctions) != 0 { graphDestroyStatus: 0 - 1 }
     if compilerIntTableDestroy(table: delta.generatedMembers) != 0 { graphDestroyStatus: 0 - 1 }
     if delta.failures.destroy() != 0 { graphDestroyStatus: 0 - 1 }
@@ -190,6 +213,562 @@ function compilerPlotterAppendBodyFacts(tables: CompilerSyntaxTables, delta: Com
     return 0
 }
 
+function compilerGraphNominalIDForSyntaxID(delta: CompilerGraphDelta, syntaxID: Int): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: delta.nominals) {
+        if compilerIntTableValue(table: delta.nominals, row: row, column: 2) == syntaxID { return row }
+        row: row + 1
+    }
+    return 0 - 1
+}
+
+function compilerGraphDeltaAppendNominal(delta: CompilerGraphDelta, kind: Int, syntaxID: Int, sourceRow: Int, parentNominalID: Int, fileID: Int, start: Int, end: Int, fingerprint: CompilerFingerprint): Int {
+    let nominalID: Int(compilerIntTableRowCount(table: delta.nominals))
+    if kind < compilerGraphNominalKindConstruct() || kind > compilerGraphNominalKindCase()
+        || syntaxID < 0 - 1 || sourceRow < 0 || parentNominalID < 0 - 1 || parentNominalID >= nominalID
+        || fileID < 0 || start < 0 || end <= start
+        || (fingerprint.first == 0 && fingerprint.second == 0) {
+        compilerGraphDeltaPoison(delta: delta)
+        return 0 - 1
+    }
+    if compilerGraphDeltaAppend(delta: delta, table: delta.nominals, value: nominalID) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominals, value: kind) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominals, value: syntaxID) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominals, value: sourceRow) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominals, value: parentNominalID) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominals, value: fileID) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominals, value: start) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominals, value: end) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominals, value: fingerprint.first) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominals, value: fingerprint.second) != 0 { return 0 - 1 }
+    return nominalID
+}
+
+function compilerGraphNominalKindForDeclaration(tables: CompilerSyntaxTables, declarationRow: Int): Int {
+    let kind: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 2))
+    if kind == compilerSyntaxKindConstruct() { return compilerGraphNominalKindConstruct() }
+    if kind == compilerSyntaxKindEnum() { return compilerGraphNominalKindEnum() }
+    if kind == compilerSyntaxKindFunction() {
+        let syntaxID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 0))
+        let functionRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 1))
+        if functionRow >= 0 && functionRow < compilerIntTableRowCount(table: tables.functions)
+            && compilerIntTableValue(table: tables.functions, row: functionRow, column: compilerSyntaxFunctionDerivedColumn()) == 0 {
+            return compilerGraphNominalKindFunction()
+        }
+    }
+    return 0 - 1
+}
+
+function compilerGraphNominalKindForMember(memberKind: Int): Int {
+    if memberKind == compilerSyntaxMemberKindLet() { return compilerGraphNominalKindLet() }
+    if memberKind == compilerSyntaxMemberKindState() { return compilerGraphNominalKindState() }
+    if memberKind == compilerSyntaxMemberKindBinding() { return compilerGraphNominalKindBinding() }
+    if memberKind == compilerSyntaxMemberKindDerived() { return compilerGraphNominalKindDerived() }
+    if memberKind == compilerSyntaxMemberKindEnumCase() { return compilerGraphNominalKindCase() }
+    return 0 - 1
+}
+
+function compilerGraphNominalKindForLocalBinding(localKind: Int): Int {
+    if localKind == compilerSyntaxLocalKindLet() { return compilerGraphNominalKindLet() }
+    if localKind == compilerSyntaxLocalKindState() { return compilerGraphNominalKindState() }
+    return 0 - 1
+}
+
+function compilerPlotterAppendDeclarationNominals(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.declarations) {
+        let nominalKind: Int(compilerGraphNominalKindForDeclaration(tables: tables, declarationRow: row))
+        if nominalKind >= 0 {
+            let parentSyntaxID: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 3))
+            state parentNominalID: Int(0 - 1)
+            if parentSyntaxID >= 0 { parentNominalID: compilerGraphNominalIDForSyntaxID(delta: delta, syntaxID: parentSyntaxID) }
+            let fingerprint: CompilerFingerprint(
+                first: compilerIntTableValue(table: tables.declarations, row: row, column: 11),
+                second: compilerIntTableValue(table: tables.declarations, row: row, column: 12)
+            )
+            if compilerGraphDeltaAppendNominal(
+                delta: delta,
+                kind: nominalKind,
+                syntaxID: compilerIntTableValue(table: tables.declarations, row: row, column: 0),
+                sourceRow: row,
+                parentNominalID: parentNominalID,
+                fileID: compilerIntTableValue(table: tables.declarations, row: row, column: 1),
+                start: compilerIntTableValue(table: tables.declarations, row: row, column: 7),
+                end: compilerIntTableValue(table: tables.declarations, row: row, column: 8),
+                fingerprint: fingerprint
+            ) < 0 { return 0 - 1 }
+        }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerPlotterAppendMemberNominals(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.members) {
+        let memberKind: Int(compilerIntTableValue(table: tables.members, row: row, column: 12))
+        let nominalKind: Int(compilerGraphNominalKindForMember(memberKind: memberKind))
+        if nominalKind >= 0 {
+            let parentSyntaxID: Int(compilerIntTableValue(table: tables.members, row: row, column: 2))
+            let parentNominalID: Int(compilerGraphNominalIDForSyntaxID(delta: delta, syntaxID: parentSyntaxID))
+            if parentNominalID < 0 { return 0 - 1 }
+            let fingerprint: CompilerFingerprint(
+                first: compilerIntTableValue(table: tables.members, row: row, column: 10),
+                second: compilerIntTableValue(table: tables.members, row: row, column: 11)
+            )
+            if compilerGraphDeltaAppendNominal(
+                delta: delta,
+                kind: nominalKind,
+                syntaxID: compilerIntTableValue(table: tables.members, row: row, column: 0),
+                sourceRow: row,
+                parentNominalID: parentNominalID,
+                fileID: compilerIntTableValue(table: tables.members, row: row, column: 1),
+                start: compilerIntTableValue(table: tables.members, row: row, column: 6),
+                end: compilerIntTableValue(table: tables.members, row: row, column: 7),
+                fingerprint: fingerprint
+            ) < 0 { return 0 - 1 }
+        } else if memberKind != compilerSyntaxMemberKindEnumCasePayload() {
+            return 0 - 1
+        }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerPlotterAppendLocalNominals(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.bodyNodes) {
+        let syntaxID: Int(compilerIntTableValue(table: tables.bodyNodes, row: row, column: 0))
+        if compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 0) == compilerSyntaxKindLocalBinding() {
+            let localKind: Int(compilerIntTableValue(table: tables.bodyNodes, row: row, column: 10))
+            let nominalKind: Int(compilerGraphNominalKindForLocalBinding(localKind: localKind))
+            if nominalKind < 0 { return 0 - 1 }
+            let fileID: Int(compilerIntTableValue(table: tables.bodyNodes, row: row, column: 1))
+            let nameStart: Int(compilerIntTableValue(table: tables.bodyNodes, row: row, column: 6))
+            let nameEnd: Int(compilerIntTableValue(table: tables.bodyNodes, row: row, column: 7))
+            let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: nameStart, localEnd: nameEnd))
+            state fingerprint: CompilerFingerprint(compilerSyntaxDeclarationBaseFingerprint(tables: tables, fileID: fileID, kindTag: compilerSyntaxKindLocalBinding(), name: name))
+            fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: localKind)
+            fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: compilerIntTableValue(table: tables.bodyNodes, row: row, column: 2))
+            fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: compilerIntTableValue(table: tables.bodyNodes, row: row, column: 3))
+            fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: compilerIntTableValue(table: tables.bodyNodes, row: row, column: 4))
+            let scopeSyntaxID: Int(compilerPlotterNominalScopeForBodyNode(tables: tables, bodyRow: row))
+            state parentNominalID: Int(0 - 1)
+            if scopeSyntaxID >= 0 { parentNominalID: compilerGraphNominalIDForSyntaxID(delta: delta, syntaxID: scopeSyntaxID) }
+            if compilerGraphDeltaAppendNominal(
+                delta: delta,
+                kind: nominalKind,
+                syntaxID: syntaxID,
+                sourceRow: row,
+                parentNominalID: parentNominalID,
+                fileID: fileID,
+                start: nameStart,
+                end: nameEnd,
+                fingerprint: fingerprint
+            ) < 0 { return 0 - 1 }
+        }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerPlotterAppendMacroNominals(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.macroDeclarations) {
+        let fingerprint: CompilerFingerprint(
+            first: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 20),
+            second: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 21)
+        )
+        if compilerGraphDeltaAppendNominal(
+            delta: delta,
+            kind: compilerGraphNominalKindMacro(),
+            syntaxID: 0 - 1,
+            sourceRow: row,
+            parentNominalID: 0 - 1,
+            fileID: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 1),
+            start: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 4),
+            end: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 5),
+            fingerprint: fingerprint
+        ) < 0 { return 0 - 1 }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerPlotterAppendNominalDeclarations(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
+    if compilerPlotterAppendDeclarationNominals(tables: tables, delta: delta) != 0 { return 0 - 1 }
+    if compilerPlotterAppendMemberNominals(tables: tables, delta: delta) != 0 { return 0 - 1 }
+    if compilerPlotterAppendLocalNominals(tables: tables, delta: delta) != 0 { return 0 - 1 }
+    return compilerPlotterAppendMacroNominals(tables: tables, delta: delta)
+}
+
+function compilerGraphDeltaNominalPriorCount(delta: CompilerGraphDelta, ownerNodeID: Int, role: Int): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: delta.nominalReferences) {
+        if compilerIntTableValue(table: delta.nominalReferences, row: row, column: 1) == ownerNodeID
+            && compilerIntTableValue(table: delta.nominalReferences, row: row, column: 2) == role { count: count + 1 }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerGraphDeltaNominalPriorCountBefore(delta: CompilerGraphDelta, row: Int, ownerNodeID: Int, role: Int): Int {
+    state count: Int(0)
+    state priorRow: Int(0)
+    while priorRow < row {
+        if compilerIntTableValue(table: delta.nominalReferences, row: priorRow, column: 1) == ownerNodeID
+            && compilerIntTableValue(table: delta.nominalReferences, row: priorRow, column: 2) == role { count: count + 1 }
+        priorRow: priorRow + 1
+    }
+    return count
+}
+
+function compilerGraphDeltaAppendNominalReference(delta: CompilerGraphDelta, ownerNodeID: Int, role: Int, sourceReferenceID: Int, parentSourceReferenceID: Int, kind: Int, targetKind: Int, targetID: Int, fileID: Int, start: Int, end: Int, fingerprint: CompilerFingerprint): Int {
+    let nominalID: Int(compilerIntTableRowCount(table: delta.nominalReferences))
+    let ordinal: Int(compilerGraphDeltaNominalPriorCount(delta: delta, ownerNodeID: ownerNodeID, role: role))
+    if ownerNodeID < 0 - 1 || ownerNodeID >= compilerIntTableRowCount(table: delta.nodes)
+        || (ownerNodeID < 0 && role != compilerGraphNominalRoleMacroApplication())
+        || role < compilerGraphNominalRoleMemberType() || role > compilerGraphNominalRoleMacroApplication()
+        || sourceReferenceID < 0 - 1 || parentSourceReferenceID < 0 - 1
+        || kind != compilerSyntaxTypeReferenceNamed() && kind != compilerSyntaxTypeReferenceApplication()
+        || targetKind < compilerSyntaxTypeReferenceTargetBuiltin() || targetKind > compilerGraphNominalMissingTarget()
+        || (targetKind == compilerSyntaxTypeReferenceTargetMissing() && targetID != 0 - 1)
+        || (targetKind == compilerSyntaxTypeReferenceTargetAmbiguous() && targetID != 0 - 1)
+        || ((targetKind == compilerGraphNominalTargetMismatch() || targetKind == compilerGraphNominalMissingTarget())
+            && (targetID < 0 - 1 || targetID >= compilerIntTableRowCount(table: delta.nominals)))
+        || fileID < 0 || start < 0 || end <= start || ordinal < 0
+        || (fingerprint.first == 0 && fingerprint.second == 0) {
+        compilerGraphDeltaPoison(delta: delta)
+        return 0 - 1
+    }
+    if compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: nominalID) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: ownerNodeID) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: role) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: ordinal) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: sourceReferenceID) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: parentSourceReferenceID) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: kind) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: targetKind) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: targetID) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: fileID) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: start) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: end) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: fingerprint.first) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.nominalReferences, value: fingerprint.second) != 0 { return 0 - 1 }
+    return nominalID
+}
+
+function compilerPlotterAppendMemberTypeNominals(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.typeReferences) {
+        if compilerPlotterTypeReferenceIsNominal(tables: tables, row: row) {
+            let ownerMemberRow: Int(compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceOwnerColumn()))
+            if ownerMemberRow < 0 || ownerMemberRow >= compilerIntTableRowCount(table: tables.members) { return 0 - 1 }
+            let fileID: Int(compilerIntTableValue(table: tables.members, row: ownerMemberRow, column: 1))
+            let ownerNodeID: Int(compilerIntTableValue(table: tables.members, row: ownerMemberRow, column: 0))
+            let typeStart: Int(compilerIntTableValue(table: tables.members, row: ownerMemberRow, column: 8))
+            let start: Int(typeStart + compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceNameStartColumn()))
+            let end: Int(typeStart + compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceNameEndColumn()))
+            let fingerprint: CompilerFingerprint(
+                first: compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceFingerprintFirstColumn()),
+                second: compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceFingerprintSecondColumn())
+            )
+            state targetKind: Int(compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceTargetKindColumn()))
+            state targetID: Int(compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceTargetIDColumn()))
+            if targetKind == compilerSyntaxTypeReferenceTargetDeclaration() {
+                targetID: compilerGraphNominalIDForSyntaxID(delta: delta, syntaxID: targetID)
+                if targetID < 0 { return 0 - 1 }
+            } else if targetKind == compilerSyntaxTypeReferenceTargetBuiltin() {
+                let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: start, localEnd: end))
+                let declarationSyntaxID: Int(compilerSyntaxDeclarationSyntaxIDForTypeNameInScope(tables: tables, typeName: name, scopeSyntaxID: compilerSyntaxMemberTypeOwnerSyntaxID(tables: tables, memberRow: ownerMemberRow)))
+                if declarationSyntaxID >= 0 {
+                    targetKind: compilerSyntaxTypeReferenceTargetDeclaration()
+                    targetID: compilerGraphNominalIDForSyntaxID(delta: delta, syntaxID: declarationSyntaxID)
+                    if targetID < 0 { return 0 - 1 }
+                }
+            }
+            if compilerGraphDeltaAppendNominalReference(
+                delta: delta,
+                ownerNodeID: ownerNodeID,
+                role: compilerGraphNominalRoleMemberType(),
+                sourceReferenceID: row,
+                parentSourceReferenceID: compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceParentColumn()),
+                kind: compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceKindColumn()),
+                targetKind: targetKind,
+                targetID: targetID,
+                fileID: fileID,
+                start: start,
+                end: end,
+                fingerprint: fingerprint
+            ) < 0 { return 0 - 1 }
+        }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerPlotterNominalScopeForBodyNode(tables: CompilerSyntaxTables, bodyRow: Int): Int {
+    if bodyRow < 0 || bodyRow >= compilerIntTableRowCount(table: tables.bodyNodes) { return 0 - 1 }
+    state ownerSyntaxID: Int(compilerIntTableValue(table: tables.bodyNodes, row: bodyRow, column: 2))
+    state depth: Int(0)
+    while ownerSyntaxID >= 0 && ownerSyntaxID < compilerIntTableRowCount(table: tables.syntaxIndex) && depth < 32 {
+        let ownerKind: Int(compilerIntTableValue(table: tables.syntaxIndex, row: ownerSyntaxID, column: 0))
+        if ownerKind == compilerSyntaxKindFunction() { return ownerSyntaxID }
+        if ownerKind == compilerSyntaxKindEntry() || ownerKind == compilerSyntaxKindMainAnnotation() { return 0 - 1 }
+        if ownerKind < compilerSyntaxKindEntry() || ownerKind > compilerSyntaxKindLastBody() { return 0 - 1 }
+        let ownerBodyRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: ownerSyntaxID, column: 1))
+        ownerSyntaxID: compilerIntTableValue(table: tables.bodyNodes, row: ownerBodyRow, column: 2)
+        depth: depth + 1
+    }
+    return 0 - 1
+}
+
+function compilerPlotterAppendScannedNominal(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, ownerNodeID: Int, scopeSyntaxID: Int, role: Int, fileID: Int, start: Int, end: Int, name: String, application: Bool): Int {
+    state kind: Int(compilerSyntaxTypeReferenceNamed())
+    if application { kind: compilerSyntaxTypeReferenceApplication() }
+    state targetKind: Int(compilerSyntaxTypeReferenceTargetMissing())
+    state targetID: Int(0 - 1)
+    let declarationID: Int(compilerSyntaxDeclarationSyntaxIDForTypeNameInScope(tables: tables, typeName: name, scopeSyntaxID: scopeSyntaxID))
+    if declarationID >= 0 {
+        targetKind: compilerSyntaxTypeReferenceTargetDeclaration()
+        targetID: compilerGraphNominalIDForSyntaxID(delta: delta, syntaxID: declarationID)
+        if targetID < 0 { return 0 - 1 }
+    } else if declarationID == 0 - 2 {
+        targetKind: compilerSyntaxTypeReferenceTargetAmbiguous()
+    } else {
+        let builtinID: Int(compilerSyntaxBuiltinTypeIDForName(name: name))
+        if builtinID >= 0 {
+            targetKind: compilerSyntaxTypeReferenceTargetBuiltin()
+            targetID: builtinID
+        } else {
+            let genericParameterRow: Int(compilerSyntaxTypeReferenceGenericParameterForName(tables: tables, ownerSyntaxID: scopeSyntaxID, name: name))
+            if genericParameterRow >= 0 {
+                targetKind: compilerSyntaxTypeReferenceTargetGenericParameter()
+                targetID: genericParameterRow
+            }
+        }
+    }
+    state fingerprint: CompilerFingerprint(compilerFingerprintInitial())
+    fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: ownerNodeID)
+    fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: role)
+    fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: kind)
+    fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: targetKind)
+    fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: targetID)
+    fingerprint: compilerFingerprintAppendText(fingerprint: fingerprint, tag: 141, text: name)
+    if compilerGraphDeltaAppendNominalReference(delta: delta, ownerNodeID: ownerNodeID, role: role, sourceReferenceID: 0 - 1, parentSourceReferenceID: 0 - 1, kind: kind, targetKind: targetKind, targetID: targetID, fileID: fileID, start: start, end: end, fingerprint: fingerprint) < 0 { return 0 - 1 }
+    return 0
+}
+
+function compilerPlotterAppendNominalsInTypeRange(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, ownerNodeID: Int, scopeSyntaxID: Int, role: Int, fileID: Int, localStart: Int, localEnd: Int): Int {
+    let globalStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: localStart))
+    let globalEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: localEnd))
+    if globalStart < 0 || globalEnd <= globalStart { return 0 - 1 }
+    state cursor: Int(globalStart)
+    state previousWasDot: Bool(false)
+    while cursor < globalEnd {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: cursor))
+        if maybeToken == nil { return 0 - 1 }
+        let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: cursor))
+        if token.start >= globalEnd {
+            cursor: globalEnd
+        } else {
+            if token.kind == .identifier && !previousWasDot {
+                let maybeFollowing: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: token.end))
+                state followedByColon: Bool(false)
+                state application: Bool(false)
+                if maybeFollowing != nil {
+                    let following: RangeLexedToken(maybeFollowing ?? compilerFallbackTokenAt(index: token.end))
+                    followedByColon: following.start < globalEnd && following.kind == .colon
+                    application: following.start < globalEnd && following.kind == .less
+                }
+                if !followedByColon {
+                    let localNameStart: Int(compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: token.start))
+                    let localNameEnd: Int(compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: token.end))
+                    if compilerPlotterAppendScannedNominal(tables: tables, delta: delta, ownerNodeID: ownerNodeID, scopeSyntaxID: scopeSyntaxID, role: role, fileID: fileID, start: localNameStart, end: localNameEnd, name: token.text, application: application) != 0 { return 0 - 1 }
+                }
+            }
+            previousWasDot: token.kind == .dot
+            cursor: token.end
+        }
+    }
+    return 0
+}
+
+function compilerPlotterAppendSignatureNominals(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
+    state parameterRow: Int(0)
+    while parameterRow < compilerIntTableRowCount(table: tables.parameters) {
+        let parameterFunctionRow: Int(compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 2))
+        let ownerNodeID: Int(compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 0))
+        let scopeSyntaxID: Int(compilerPlotterFunctionSyntaxID(tables: tables, functionID: parameterFunctionRow))
+        if compilerPlotterAppendNominalsInTypeRange(tables: tables, delta: delta, ownerNodeID: ownerNodeID, scopeSyntaxID: scopeSyntaxID, role: compilerGraphNominalRoleParameterType(), fileID: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 1), localStart: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 8), localEnd: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 9)) != 0 { return 0 - 1 }
+        parameterRow: parameterRow + 1
+    }
+    state returnFunctionRow: Int(0)
+    while returnFunctionRow < compilerIntTableRowCount(table: tables.functions) {
+        let returnStart: Int(compilerIntTableValue(table: tables.functions, row: returnFunctionRow, column: 6))
+        let returnEnd: Int(compilerIntTableValue(table: tables.functions, row: returnFunctionRow, column: 7))
+        if returnEnd > returnStart {
+            let functionSyntaxID: Int(compilerIntTableValue(table: tables.functions, row: returnFunctionRow, column: 0))
+            if compilerPlotterAppendNominalsInTypeRange(tables: tables, delta: delta, ownerNodeID: functionSyntaxID, scopeSyntaxID: functionSyntaxID, role: compilerGraphNominalRoleFunctionReturn(), fileID: compilerIntTableValue(table: tables.functions, row: returnFunctionRow, column: 1), localStart: returnStart, localEnd: returnEnd) != 0 { return 0 - 1 }
+        }
+        returnFunctionRow: returnFunctionRow + 1
+    }
+    return 0
+}
+
+function compilerPlotterAppendLocalTypeNominals(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
+    state bodyRow: Int(0)
+    while bodyRow < compilerIntTableRowCount(table: tables.bodyNodes) {
+        let syntaxID: Int(compilerIntTableValue(table: tables.bodyNodes, row: bodyRow, column: 0))
+        let kind: Int(compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 0))
+        let typeStart: Int(compilerIntTableValue(table: tables.bodyNodes, row: bodyRow, column: 8))
+        let typeEnd: Int(compilerIntTableValue(table: tables.bodyNodes, row: bodyRow, column: 9))
+        if kind == compilerSyntaxKindLocalBinding() && typeEnd > typeStart {
+            if compilerPlotterAppendNominalsInTypeRange(tables: tables, delta: delta, ownerNodeID: syntaxID, scopeSyntaxID: compilerPlotterNominalScopeForBodyNode(tables: tables, bodyRow: bodyRow), role: compilerGraphNominalRoleLocalType(), fileID: compilerIntTableValue(table: tables.bodyNodes, row: bodyRow, column: 1), localStart: typeStart, localEnd: typeEnd) != 0 { return 0 - 1 }
+        }
+        bodyRow: bodyRow + 1
+    }
+    return 0
+}
+
+function compilerPlotterAppendGenericConstraintNominals(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.genericParameters) {
+        if compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterKindColumn()) == compilerSyntaxGenericParameterValueKind() {
+            let ownerSyntaxID: Int(compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterOwnerColumn()))
+            let fileID: Int(compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterFileColumn()))
+            let nameEnd: Int(compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterNameEndColumn()))
+            let parameterEnd: Int(compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterEndColumn()))
+            let globalNameEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: nameEnd))
+            let globalParameterEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: parameterEnd))
+            let maybeColon: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: globalNameEnd))
+            if maybeColon == nil { return 0 - 1 }
+            let colon: RangeLexedToken(maybeColon ?? compilerFallbackTokenAt(index: globalNameEnd))
+            if colon.kind != .colon { return 0 - 1 }
+            let maybeType: Optional<CompilerTypeReference>(compilerCoreParseTypeReferenceWithEnd(cursor: CompilerTokenCursor(source: $tables.sourceStore.source, index: colon.end), end: globalParameterEnd))
+            if maybeType == nil { return 0 - 1 }
+            let type: CompilerTypeReference(maybeType ?? CompilerTypeReference(text: String(""), start: colon.end, end: colon.end))
+            let localTypeStart: Int(compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: type.start))
+            let localTypeEnd: Int(compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: type.end))
+            if compilerPlotterAppendNominalsInTypeRange(tables: tables, delta: delta, ownerNodeID: ownerSyntaxID, scopeSyntaxID: ownerSyntaxID, role: compilerGraphNominalRoleGenericConstraint(), fileID: fileID, localStart: localTypeStart, localEnd: localTypeEnd) != 0 { return 0 - 1 }
+        }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerGraphNominalIDForMacroRow(delta: CompilerGraphDelta, macroRow: Int): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: delta.nominals) {
+        if compilerIntTableValue(table: delta.nominals, row: row, column: 1) == compilerGraphNominalKindMacro()
+            && compilerIntTableValue(table: delta.nominals, row: row, column: 3) == macroRow { return row }
+        row: row + 1
+    }
+    return 0 - 1
+}
+
+function compilerPlotterMacroApplicationOwnerNodeID(tables: CompilerSyntaxTables, applicationRow: Int): Int {
+    if applicationRow < 0 || applicationRow >= compilerIntTableRowCount(table: tables.macroApplications) { return 0 - 1 }
+    let fileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
+    let applicationEnd: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 3))
+    state ownerNodeID: Int(0 - 1)
+    state ownerStart: Int(2147483647)
+    state syntaxID: Int(0)
+    while syntaxID < compilerIntTableRowCount(table: tables.syntaxIndex) {
+        if compilerMacroSyntaxNodeFileID(tables: tables, syntaxID: syntaxID) == fileID {
+            let candidateStart: Int(compilerMacroSyntaxNodeStart(tables: tables, syntaxID: syntaxID))
+            if candidateStart >= applicationEnd && candidateStart < ownerStart {
+                ownerNodeID: syntaxID
+                ownerStart: candidateStart
+            }
+        }
+        syntaxID: syntaxID + 1
+    }
+    return ownerNodeID
+}
+
+function compilerPlotterAppendMacroApplicationNominals(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
+    state applicationRow: Int(0)
+    while applicationRow < compilerIntTableRowCount(table: tables.macroApplications) {
+        let fileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
+        let start: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 4))
+        let end: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 5))
+        let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: start, localEnd: end))
+        let ownerNodeID: Int(compilerPlotterMacroApplicationOwnerNodeID(tables: tables, applicationRow: applicationRow))
+        state macroTargetKind: Int(0 - 1)
+        if ownerNodeID >= 0 { macroTargetKind: compilerIntTableValue(table: tables.syntaxIndex, row: ownerNodeID, column: 0) }
+        state nameMatchCount: Int(0)
+        state compatibleMatchCount: Int(0)
+        state firstNameMacroRow: Int(0 - 1)
+        state matchedMacroRow: Int(0 - 1)
+        state macroRow: Int(0)
+        while macroRow < compilerIntTableRowCount(table: tables.macroDeclarations) {
+            let candidateFileID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: macroRow, column: 1))
+            let candidateName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: candidateFileID, localStart: compilerIntTableValue(table: tables.macroDeclarations, row: macroRow, column: 4), localEnd: compilerIntTableValue(table: tables.macroDeclarations, row: macroRow, column: 5)))
+            if candidateName == name {
+                if nameMatchCount == 0 { firstNameMacroRow: macroRow }
+                nameMatchCount: nameMatchCount + 1
+                if macroTargetKind >= 0 && compilerMacroTargetDeclarationAccepts(tables: tables, declarationRow: macroRow, targetKind: macroTargetKind, depth: 0) {
+                    compatibleMatchCount: compatibleMatchCount + 1
+                    matchedMacroRow: macroRow
+                }
+            }
+            macroRow: macroRow + 1
+        }
+        state targetKind: Int(compilerSyntaxTypeReferenceTargetMissing())
+        state targetID: Int(0 - 1)
+        if compatibleMatchCount == 1 {
+            targetKind: compilerSyntaxTypeReferenceTargetDeclaration()
+            targetID: compilerGraphNominalIDForMacroRow(delta: delta, macroRow: matchedMacroRow)
+            if targetID < 0 { return 0 - 1 }
+        } else if compatibleMatchCount > 1 {
+            targetKind: compilerSyntaxTypeReferenceTargetAmbiguous()
+        } else if nameMatchCount > 0 {
+            if ownerNodeID < 0 {
+                targetKind: compilerGraphNominalMissingTarget()
+            } else {
+                targetKind: compilerGraphNominalTargetMismatch()
+            }
+            if nameMatchCount == 1 {
+                targetID: compilerGraphNominalIDForMacroRow(delta: delta, macroRow: firstNameMacroRow)
+                if targetID < 0 { return 0 - 1 }
+            }
+        }
+        state fingerprint: CompilerFingerprint(
+            first: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 17),
+            second: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 18)
+        )
+        if fingerprint.first == 0 && fingerprint.second == 0 {
+            fingerprint: compilerFingerprintAppendText(fingerprint: compilerFingerprintInitial(), tag: 151, text: name)
+        }
+        if compilerGraphDeltaAppendNominalReference(
+            delta: delta,
+            ownerNodeID: ownerNodeID,
+            role: compilerGraphNominalRoleMacroApplication(),
+            sourceReferenceID: applicationRow,
+            parentSourceReferenceID: 0 - 1,
+            kind: compilerSyntaxTypeReferenceNamed(),
+            targetKind: targetKind,
+            targetID: targetID,
+            fileID: fileID,
+            start: start,
+            end: end,
+            fingerprint: fingerprint
+        ) < 0 { return 0 - 1 }
+        applicationRow: applicationRow + 1
+    }
+    return 0
+}
+
+function compilerPlotterAppendNominalReferences(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
+    if compilerPlotterAppendMemberTypeNominals(tables: tables, delta: delta) != 0 { return 0 - 1 }
+    if compilerPlotterAppendSignatureNominals(tables: tables, delta: delta) != 0 { return 0 - 1 }
+    if compilerPlotterAppendLocalTypeNominals(tables: tables, delta: delta) != 0 { return 0 - 1 }
+    if compilerPlotterAppendGenericConstraintNominals(tables: tables, delta: delta) != 0 { return 0 - 1 }
+    return compilerPlotterAppendMacroApplicationNominals(tables: tables, delta: delta)
+}
+
 function compilerPlotterBuild(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
     if !compilerSyntaxTablesIsValid(tables: tables) {
         compilerGraphDeltaPoison(delta: delta)
@@ -216,14 +795,93 @@ function compilerPlotterBuild(tables: CompilerSyntaxTables, delta: CompilerGraph
         }
         plotSubjectSyntaxID: plotSubjectSyntaxID + 1
     }
-    return 0
+    if compilerPlotterAppendNominalDeclarations(tables: tables, delta: delta) != 0 { return 0 - 1 }
+    return compilerPlotterAppendNominalReferences(tables: tables, delta: delta)
+}
+
+function compilerPlotterExpectedNominalCount(tables: CompilerSyntaxTables): Int {
+    state count: Int(compilerIntTableRowCount(table: tables.macroDeclarations))
+    state declarationRow: Int(0)
+    while declarationRow < compilerIntTableRowCount(table: tables.declarations) {
+        if compilerGraphNominalKindForDeclaration(tables: tables, declarationRow: declarationRow) >= 0 { count: count + 1 }
+        declarationRow: declarationRow + 1
+    }
+    state memberRow: Int(0)
+    while memberRow < compilerIntTableRowCount(table: tables.members) {
+        if compilerGraphNominalKindForMember(memberKind: compilerIntTableValue(table: tables.members, row: memberRow, column: 12)) >= 0 { count: count + 1 }
+        memberRow: memberRow + 1
+    }
+    state bodyRow: Int(0)
+    while bodyRow < compilerIntTableRowCount(table: tables.bodyNodes) {
+        let syntaxID: Int(compilerIntTableValue(table: tables.bodyNodes, row: bodyRow, column: 0))
+        if compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 0) == compilerSyntaxKindLocalBinding() { count: count + 1 }
+        bodyRow: bodyRow + 1
+    }
+    return count
+}
+
+function compilerPlotterNominalSourceIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, nominalRow: Int): Bool {
+    let nominalKind: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 1))
+    let nominalSyntaxID: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 2))
+    let sourceRow: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 3))
+    let parentNominalID: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 4))
+    let fileID: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 5))
+    let start: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 6))
+    let end: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 7))
+    if nominalKind == compilerGraphNominalKindMacro() {
+        return nominalSyntaxID == 0 - 1 && sourceRow >= 0 && sourceRow < compilerIntTableRowCount(table: tables.macroDeclarations)
+            && parentNominalID == 0 - 1
+            && fileID == compilerIntTableValue(table: tables.macroDeclarations, row: sourceRow, column: 1)
+            && start == compilerIntTableValue(table: tables.macroDeclarations, row: sourceRow, column: 4)
+            && end == compilerIntTableValue(table: tables.macroDeclarations, row: sourceRow, column: 5)
+    }
+    if nominalSyntaxID < 0 || nominalSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
+        || compilerGraphNominalIDForSyntaxID(delta: delta, syntaxID: nominalSyntaxID) != nominalRow { return false }
+    let syntaxKind: Int(compilerIntTableValue(table: tables.syntaxIndex, row: nominalSyntaxID, column: 0))
+    if syntaxKind == compilerSyntaxKindConstruct() || syntaxKind == compilerSyntaxKindFunction() || syntaxKind == compilerSyntaxKindEnum() {
+        if sourceRow < 0 || sourceRow >= compilerIntTableRowCount(table: tables.declarations)
+            || compilerIntTableValue(table: tables.declarations, row: sourceRow, column: 0) != nominalSyntaxID
+            || compilerGraphNominalKindForDeclaration(tables: tables, declarationRow: sourceRow) != nominalKind
+            || fileID != compilerIntTableValue(table: tables.declarations, row: sourceRow, column: 1)
+            || start != compilerIntTableValue(table: tables.declarations, row: sourceRow, column: 7)
+            || end != compilerIntTableValue(table: tables.declarations, row: sourceRow, column: 8) { return false }
+        let parentSyntaxID: Int(compilerIntTableValue(table: tables.declarations, row: sourceRow, column: 3))
+        state expectedParentNominalID: Int(0 - 1)
+        if parentSyntaxID >= 0 { expectedParentNominalID: compilerGraphNominalIDForSyntaxID(delta: delta, syntaxID: parentSyntaxID) }
+        return parentNominalID == expectedParentNominalID
+    }
+    if syntaxKind == compilerSyntaxKindMember() {
+        if sourceRow < 0 || sourceRow >= compilerIntTableRowCount(table: tables.members)
+            || compilerIntTableValue(table: tables.members, row: sourceRow, column: 0) != nominalSyntaxID
+            || compilerGraphNominalKindForMember(memberKind: compilerIntTableValue(table: tables.members, row: sourceRow, column: 12)) != nominalKind
+            || fileID != compilerIntTableValue(table: tables.members, row: sourceRow, column: 1)
+            || start != compilerIntTableValue(table: tables.members, row: sourceRow, column: 6)
+            || end != compilerIntTableValue(table: tables.members, row: sourceRow, column: 7) { return false }
+        return parentNominalID == compilerGraphNominalIDForSyntaxID(delta: delta, syntaxID: compilerIntTableValue(table: tables.members, row: sourceRow, column: 2))
+    }
+    if syntaxKind == compilerSyntaxKindLocalBinding() {
+        if sourceRow < 0 || sourceRow >= compilerIntTableRowCount(table: tables.bodyNodes)
+            || compilerIntTableValue(table: tables.bodyNodes, row: sourceRow, column: 0) != nominalSyntaxID
+            || compilerGraphNominalKindForLocalBinding(localKind: compilerIntTableValue(table: tables.bodyNodes, row: sourceRow, column: 10)) != nominalKind
+            || fileID != compilerIntTableValue(table: tables.bodyNodes, row: sourceRow, column: 1)
+            || start != compilerIntTableValue(table: tables.bodyNodes, row: sourceRow, column: 6)
+            || end != compilerIntTableValue(table: tables.bodyNodes, row: sourceRow, column: 7) { return false }
+        let scopeSyntaxID: Int(compilerPlotterNominalScopeForBodyNode(tables: tables, bodyRow: sourceRow))
+        state expectedParentNominalID: Int(0 - 1)
+        if scopeSyntaxID >= 0 { expectedParentNominalID: compilerGraphNominalIDForSyntaxID(delta: delta, syntaxID: scopeSyntaxID) }
+        return parentNominalID == expectedParentNominalID
+    }
+    return false
 }
 
 function compilerGraphDeltaIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Bool {
     if delta.failures.count != 0 || !compilerIntTableIsComplete(table: delta.nodes) || !compilerIntTableIsComplete(table: delta.facts)
-        || !compilerIntTableIsComplete(table: delta.generatedFunctions) { return false }
+        || !compilerIntTableIsComplete(table: delta.nominals) || !compilerIntTableIsComplete(table: delta.nominalReferences)
+        || !compilerIntTableIsComplete(table: delta.generatedFunctions)
+        || !compilerIntTableIsComplete(table: delta.generatedMembers) { return false }
     let graphNodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
     if graphNodeCount != compilerIntTableRowCount(table: tables.syntaxIndex) { return false }
+    if compilerIntTableRowCount(table: delta.nominals) != compilerPlotterExpectedNominalCount(tables: tables) { return false }
     let expectedGraphFactCount: Int(compilerIntTableRowCount(table: tables.members) + compilerIntTableRowCount(table: tables.parameters) + compilerIntTableRowCount(table: tables.bodyEdges))
     if compilerIntTableRowCount(table: delta.facts) != expectedGraphFactCount { return false }
     state graphNodeRow: Int(0)
@@ -276,16 +934,197 @@ function compilerGraphDeltaIsValid(tables: CompilerSyntaxTables, delta: Compiler
         previousGraphOrdinal: graphFactOrdinal
         graphFactRow: graphFactRow + 1
     }
+    state nominalRow: Int(0)
+    while nominalRow < compilerIntTableRowCount(table: delta.nominals) {
+        let nominalKind: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 1))
+        let nominalSyntaxID: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 2))
+        let nominalSourceRow: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 3))
+        let nominalParentID: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 4))
+        let nominalFileID: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 5))
+        let nominalStart: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 6))
+        let nominalEnd: Int(compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 7))
+        if compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 0) != nominalRow
+            || nominalKind < compilerGraphNominalKindConstruct() || nominalKind > compilerGraphNominalKindCase()
+            || nominalParentID < 0 - 1 || nominalParentID >= nominalRow
+            || compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: nominalFileID, localOffset: nominalStart) < 0
+            || compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: nominalFileID, localOffset: nominalEnd) < 0
+            || nominalEnd <= nominalStart
+            || (compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 8) == 0
+                && compilerIntTableValue(table: delta.nominals, row: nominalRow, column: 9) == 0) { return false }
+        if !compilerPlotterNominalSourceIsValid(tables: tables, delta: delta, nominalRow: nominalRow) { return false }
+        nominalRow: nominalRow + 1
+    }
+    state referenceRow: Int(0)
+    while referenceRow < compilerIntTableRowCount(table: delta.nominalReferences) {
+        let ownerNodeID: Int(compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 1))
+        let role: Int(compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 2))
+        let ordinal: Int(compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 3))
+        let sourceReferenceID: Int(compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 4))
+        let parentSourceReferenceID: Int(compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 5))
+        let referenceKind: Int(compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 6))
+        let targetKind: Int(compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 7))
+        let targetID: Int(compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 8))
+        let fileID: Int(compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 9))
+        let start: Int(compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 10))
+        let end: Int(compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 11))
+        if compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 0) != referenceRow
+            || ownerNodeID < 0 - 1 || ownerNodeID >= graphNodeCount
+            || (ownerNodeID < 0 && role != compilerGraphNominalRoleMacroApplication())
+            || role < compilerGraphNominalRoleMemberType() || role > compilerGraphNominalRoleMacroApplication()
+            || ordinal != compilerGraphDeltaNominalPriorCountBefore(delta: delta, row: referenceRow, ownerNodeID: ownerNodeID, role: role)
+            || (referenceKind != compilerSyntaxTypeReferenceNamed() && referenceKind != compilerSyntaxTypeReferenceApplication())
+            || targetKind < compilerSyntaxTypeReferenceTargetBuiltin() || targetKind > compilerGraphNominalMissingTarget()
+            || (targetKind == compilerSyntaxTypeReferenceTargetDeclaration() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: delta.nominals)))
+            || (targetKind == compilerSyntaxTypeReferenceTargetBuiltin() && (targetID < compilerSyntaxBuiltinTypeInt() || targetID > compilerSyntaxBuiltinTypeFloat()))
+            || (targetKind == compilerSyntaxTypeReferenceTargetGenericParameter() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: tables.genericParameters)))
+            || ((targetKind == compilerSyntaxTypeReferenceTargetMissing() || targetKind == compilerSyntaxTypeReferenceTargetAmbiguous()) && targetID != 0 - 1)
+            || ((targetKind == compilerGraphNominalTargetMismatch() || targetKind == compilerGraphNominalMissingTarget())
+                && (targetID < 0 - 1 || targetID >= compilerIntTableRowCount(table: delta.nominals)))
+            || compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: start) < 0
+            || compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: end) < 0
+            || end <= start
+            || (compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 12) == 0
+                && compilerIntTableValue(table: delta.nominalReferences, row: referenceRow, column: 13) == 0) { return false }
+        if role == compilerGraphNominalRoleMacroApplication() {
+            if sourceReferenceID < 0 || sourceReferenceID >= compilerIntTableRowCount(table: tables.macroApplications)
+                || parentSourceReferenceID != 0 - 1
+                || fileID != compilerIntTableValue(table: tables.macroApplications, row: sourceReferenceID, column: 1)
+                || start != compilerIntTableValue(table: tables.macroApplications, row: sourceReferenceID, column: 4)
+                || end != compilerIntTableValue(table: tables.macroApplications, row: sourceReferenceID, column: 5) { return false }
+        } else if sourceReferenceID >= 0 {
+            if sourceReferenceID >= compilerIntTableRowCount(table: tables.typeReferences)
+                || parentSourceReferenceID < 0 - 1 || parentSourceReferenceID >= compilerIntTableRowCount(table: tables.typeReferences) { return false }
+        } else if parentSourceReferenceID != 0 - 1 {
+            return false
+        }
+        if (targetKind == compilerGraphNominalTargetMismatch() || targetKind == compilerGraphNominalMissingTarget())
+            && targetID >= 0
+            && compilerIntTableValue(table: delta.nominals, row: targetID, column: 1) != compilerGraphNominalKindMacro() { return false }
+        referenceRow: referenceRow + 1
+    }
     return true
 }
 
-function compilerPlotterRenderSnapshot(delta: CompilerGraphDelta): String {
+function compilerPlotterTypeReferenceIsNominal(tables: CompilerSyntaxTables, row: Int): Bool {
+    if row < 0 || row >= compilerIntTableRowCount(table: tables.typeReferences) { return false }
+    let kind: Int(compilerIntTableValue(table: tables.typeReferences, row: row, column: compilerSyntaxTypeReferenceKindColumn()))
+    return kind == compilerSyntaxTypeReferenceNamed() || kind == compilerSyntaxTypeReferenceApplication()
+}
+
+function compilerGraphNominalKindName(kind: Int): String {
+    if kind == compilerGraphNominalKindConstruct() { return String("construct") }
+    if kind == compilerGraphNominalKindEnum() { return String("enum") }
+    if kind == compilerGraphNominalKindFunction() { return String("function") }
+    if kind == compilerGraphNominalKindMacro() { return String("macro") }
+    if kind == compilerGraphNominalKindLet() { return String("let") }
+    if kind == compilerGraphNominalKindState() { return String("state") }
+    if kind == compilerGraphNominalKindBinding() { return String("binding") }
+    if kind == compilerGraphNominalKindDerived() { return String("derived") }
+    if kind == compilerGraphNominalKindCase() { return String("case") }
+    return String("unknown")
+}
+
+function compilerGraphNominalRoleName(role: Int): String {
+    if role == compilerGraphNominalRoleMemberType() { return String("memberType") }
+    if role == compilerGraphNominalRoleParameterType() { return String("parameterType") }
+    if role == compilerGraphNominalRoleFunctionReturn() { return String("functionReturn") }
+    if role == compilerGraphNominalRoleLocalType() { return String("localType") }
+    if role == compilerGraphNominalRoleGenericConstraint() { return String("genericConstraint") }
+    if role == compilerGraphNominalRoleMacroApplication() { return String("macroApplication") }
+    return String("unknown")
+}
+
+function compilerGraphNominalTargetName(kind: Int): String {
+    if kind == compilerGraphNominalTargetMismatch() { return String("targetMismatch") }
+    if kind == compilerGraphNominalMissingTarget() { return String("missingTarget") }
+    return compilerSyntaxTypeReferenceTargetName(kind: kind)
+}
+
+function compilerPlotterNominalWarningCount(delta: CompilerGraphDelta): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: delta.nominalReferences) {
+        let targetKind: Int(compilerIntTableValue(table: delta.nominalReferences, row: row, column: 7))
+        if targetKind == compilerSyntaxTypeReferenceTargetMissing() || targetKind == compilerSyntaxTypeReferenceTargetAmbiguous()
+            || targetKind == compilerGraphNominalTargetMismatch() || targetKind == compilerGraphNominalMissingTarget() {
+            count: count + 1
+        }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerPlotterRenderNominalDeclarations(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): String {
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    state output: String("")
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: delta.nominals) {
+        let kind: Int(compilerIntTableValue(table: delta.nominals, row: row, column: 1))
+        let fileID: Int(compilerIntTableValue(table: delta.nominals, row: row, column: 5))
+        let start: Int(compilerIntTableValue(table: delta.nominals, row: row, column: 6))
+        let end: Int(compilerIntTableValue(table: delta.nominals, row: row, column: 7))
+        let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: start, localEnd: end))
+        let path: String(stringSubstring(source: tables.sourceStore.source, start: compilerSourceStoreFilePathStart(store: tables.sourceStore, fileID: fileID), end: compilerSourceStoreFilePathEnd(store: tables.sourceStore, fileID: fileID)))
+        output: "\(output)graphNominal\(tab)id=\(row)\(tab)keyword=\(compilerGraphNominalKindName(kind: kind))\(tab)name=\(name)\(tab)syntaxID=\(compilerIntTableValue(table: delta.nominals, row: row, column: 2))\(tab)parentNominalID=\(compilerIntTableValue(table: delta.nominals, row: row, column: 4))\(tab)fileID=\(fileID)\(tab)path=\(path)\(tab)start=\(start)\(tab)end=\(end)\(newline)"
+        row: row + 1
+    }
+    return output
+}
+
+function compilerPlotterRenderNominalReferences(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): String {
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    state output: String("")
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: delta.nominalReferences) {
+        let targetKind: Int(compilerIntTableValue(table: delta.nominalReferences, row: row, column: 7))
+        let targetID: Int(compilerIntTableValue(table: delta.nominalReferences, row: row, column: 8))
+        let fileID: Int(compilerIntTableValue(table: delta.nominalReferences, row: row, column: 9))
+        let start: Int(compilerIntTableValue(table: delta.nominalReferences, row: row, column: 10))
+        let end: Int(compilerIntTableValue(table: delta.nominalReferences, row: row, column: 11))
+        let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: start, localEnd: end))
+        let path: String(stringSubstring(source: tables.sourceStore.source, start: compilerSourceStoreFilePathStart(store: tables.sourceStore, fileID: fileID), end: compilerSourceStoreFilePathEnd(store: tables.sourceStore, fileID: fileID)))
+        state declared: Bool(true)
+        state applicable: Bool(true)
+        state targetNominalID: Int(0 - 1)
+        if targetKind == compilerSyntaxTypeReferenceTargetMissing() { declared: false }
+        if targetKind == compilerSyntaxTypeReferenceTargetMissing() || targetKind == compilerSyntaxTypeReferenceTargetAmbiguous()
+            || targetKind == compilerGraphNominalTargetMismatch() || targetKind == compilerGraphNominalMissingTarget() { applicable: false }
+        if targetKind == compilerSyntaxTypeReferenceTargetDeclaration()
+            || ((targetKind == compilerGraphNominalTargetMismatch() || targetKind == compilerGraphNominalMissingTarget()) && targetID >= 0) { targetNominalID: targetID }
+        let role: Int(compilerIntTableValue(table: delta.nominalReferences, row: row, column: 2))
+        state expectedKinds: String("construct,enum")
+        if role == compilerGraphNominalRoleMacroApplication() { expectedKinds: String("macro") }
+        let sourceReferenceID: Int(compilerIntTableValue(table: delta.nominalReferences, row: row, column: 4))
+        state sourceKind: String("signatureRange")
+        if role == compilerGraphNominalRoleMacroApplication() { sourceKind: String("macroApplication") }
+        if role != compilerGraphNominalRoleMacroApplication() && sourceReferenceID >= 0 { sourceKind: String("typeReference") }
+        output: "\(output)graphNominalReference\(tab)id=\(row)\(tab)ownerNodeID=\(compilerIntTableValue(table: delta.nominalReferences, row: row, column: 1))\(tab)role=\(compilerGraphNominalRoleName(role: role))\(tab)expectedKinds=\(expectedKinds)\(tab)name=\(name)\(tab)targetKind=\(compilerGraphNominalTargetName(kind: targetKind))\(tab)targetID=\(targetID)\(tab)targetNominalID=\(targetNominalID)\(tab)declared=\(declared)\(tab)applicable=\(applicable)\(tab)fileID=\(fileID)\(tab)path=\(path)\(tab)start=\(start)\(tab)end=\(end)\(tab)sourceKind=\(sourceKind)\(tab)sourceReferenceID=\(sourceReferenceID)\(tab)parentSourceReferenceID=\(compilerIntTableValue(table: delta.nominalReferences, row: row, column: 5))\(newline)"
+        if !applicable {
+            state warningKind: String("missingNominal")
+            if targetKind == compilerSyntaxTypeReferenceTargetAmbiguous() { warningKind: String("ambiguousNominal") }
+            if targetKind == compilerGraphNominalTargetMismatch() { warningKind: String("nominalTargetMismatch") }
+            if targetKind == compilerGraphNominalMissingTarget() { warningKind: String("nominalMissingTarget") }
+            output: "\(output)graphWarning\(tab)severity=warning\(tab)kind=\(warningKind)\(tab)referenceID=\(row)\(tab)expectedKinds=\(expectedKinds)\(tab)name=\(name)\(tab)fileID=\(fileID)\(tab)path=\(path)\(tab)start=\(start)\(tab)end=\(end)\(newline)"
+        }
+        row: row + 1
+    }
+    return output
+}
+
+function compilerPlotterRenderSnapshot(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): String {
     let plotterTab: String(compilerCoreTabCharacter())
     let plotterNewline: String(compilerCoreNewlineCharacter())
     let plotterNodes: String(compilerTypedSyntaxRenderRawTable(name: String("graphNode"), table: delta.nodes))
     let plotterFacts: String(compilerTypedSyntaxRenderRawTable(name: String("graphFact"), table: delta.facts))
+    let plotterNominalTable: String(compilerTypedSyntaxRenderRawTable(name: String("graphNominal"), table: delta.nominals))
+    let plotterNominalReferenceTable: String(compilerTypedSyntaxRenderRawTable(name: String("graphNominalReference"), table: delta.nominalReferences))
     let plotterGenerated: String(compilerTypedSyntaxRenderRawTable(name: String("generatedFunction"), table: delta.generatedFunctions))
-    return "graphDelta\(plotterTab)valid=true\(plotterTab)nodeCount=\(compilerIntTableRowCount(table: delta.nodes))\(plotterTab)factCount=\(compilerIntTableRowCount(table: delta.facts))\(plotterTab)generatedFunctionCount=\(compilerIntTableRowCount(table: delta.generatedFunctions))\(plotterNewline)\(plotterNodes)\(plotterFacts)\(plotterGenerated)"
+    let plotterGeneratedMembers: String(compilerTypedSyntaxRenderRawTable(name: String("generatedMember"), table: delta.generatedMembers))
+    let plotterNominals: String(compilerPlotterRenderNominalDeclarations(tables: tables, delta: delta))
+    let plotterReferences: String(compilerPlotterRenderNominalReferences(tables: tables, delta: delta))
+    return "graphDelta\(plotterTab)valid=true\(plotterTab)nodeCount=\(compilerIntTableRowCount(table: delta.nodes))\(plotterTab)factCount=\(compilerIntTableRowCount(table: delta.facts))\(plotterTab)generatedFunctionCount=\(compilerIntTableRowCount(table: delta.generatedFunctions))\(plotterTab)nominalCount=\(compilerIntTableRowCount(table: delta.nominals))\(plotterTab)nominalReferenceCount=\(compilerIntTableRowCount(table: delta.nominalReferences))\(plotterTab)warningCount=\(compilerPlotterNominalWarningCount(delta: delta))\(plotterTab)generatedMemberCount=\(compilerIntTableRowCount(table: delta.generatedMembers))\(plotterNewline)\(plotterNodes)\(plotterFacts)\(plotterNominalTable)\(plotterNominalReferenceTable)\(plotterGenerated)\(plotterGeneratedMembers)\(plotterNominals)\(plotterReferences)"
 }
 
 function compilerPlotterSummary(source: String): String {
@@ -294,13 +1133,13 @@ function compilerPlotterSummary(source: String): String {
     let plotterDelta: CompilerGraphDelta(compilerGraphDeltaCreate())
     state plotterSummary: String("")
     if plotterCaptureStatus != 0 || !compilerSyntaxTablesIsValid(tables: plotterTables) {
-        plotterSummary: String("compilerError\tkind=invalidTypedSyntaxSnapshot\n")
+        plotterSummary: compilerInvalidTypedDeclarationsDiagnostic(tables: plotterTables)
     } else {
         let plotterBuildStatus: Int(compilerPlotterBuild(tables: plotterTables, delta: plotterDelta))
         if plotterBuildStatus != 0 || !compilerGraphDeltaIsValid(tables: plotterTables, delta: plotterDelta) {
             plotterSummary: String("compilerError\tkind=invalidGraphDelta\n")
         } else {
-            plotterSummary: compilerPlotterRenderSnapshot(delta: plotterDelta)
+            plotterSummary: compilerPlotterRenderSnapshot(tables: plotterTables, delta: plotterDelta)
         }
     }
     let plotterDeltaDestroyStatus: Int(compilerGraphDeltaDestroy(delta: plotterDelta))

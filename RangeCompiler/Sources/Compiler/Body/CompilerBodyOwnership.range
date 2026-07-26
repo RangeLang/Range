@@ -936,8 +936,12 @@ function compilerBodyMemoryHasFact(arena: CompilerBodyArena, kind: Int, sourceNo
 }
 
 function compilerBodyArenaTypeIDIsOpaqueStorage(arena: CompilerBodyArena, typeID: Int): Bool {
-    if typeID < 0 || typeID >= compilerIntTableRowCount(table: arena.typeInstances)
-        || compilerIntTableValue(table: arena.typeInstances, row: typeID, column: compilerBodyTypeInstanceKindColumn()) != compilerBodyTypeConstruct() { return false }
+    if typeID < 0 || typeID >= compilerIntTableRowCount(table: arena.typeInstances) { return false }
+    let typeKind: Int(compilerIntTableValue(table: arena.typeInstances, row: typeID, column: compilerBodyTypeInstanceKindColumn()))
+    if typeKind == compilerBodyTypeString() {
+        return compilerBodyArenaStringDeclarationSyntaxID(arena: arena) < 0
+    }
+    if typeKind != compilerBodyTypeConstruct() { return false }
     let nominalSyntaxID: Int(compilerIntTableValue(table: arena.typeInstances, row: typeID, column: compilerBodyTypeInstanceNominalSyntaxColumn()))
     return nominalSyntaxID >= 0 && compilerRuntimeABIConstructKind(tables: arena.tables, constructNodeID: nominalSyntaxID) == compilerRuntimeABIOpaqueStorage()
 }
@@ -1840,6 +1844,7 @@ function compilerBodyArenaAppendOwnedPathDescendants(arena: CompilerBodyArena, r
     if typeID < 0 || typeID >= compilerIntTableRowCount(table: arena.typeInstances) { return 0 - 1 }
     let typeKind: Int(compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: typeID))
     if typeKind != compilerBodyTypeConstruct() && typeKind != compilerBodyTypeString() { return 0 }
+    if compilerBodyArenaTypeIDIsOpaqueStorage(arena: arena, typeID: typeID) { return 0 }
     if compilerBodyArenaTypeIDIsOptional(arena: arena, typeID: typeID) {
         let payloadTypeID: Int(compilerBodyArenaTypeArgumentValueForTypeID(arena: arena, typeID: typeID, ordinal: 0))
         let payloadTrackedStatus: Int(compilerBodyArenaTypeTrackedStorageStatus(arena: arena, typeID: payloadTypeID))
@@ -4653,20 +4658,20 @@ function compilerBodyArenaValidateOwnedPaths(arena: CompilerBodyArena, typeKeys:
                     }
                     predecessorOrdinal: predecessorOrdinal + 1
                 }
-                if status != 0 { failureStage: 1100000 + (0 - status) }
+                if status != 0 { failureStage: 11 }
             }
             if status == 0 {
                 let blockEvaluationStatus: Int(compilerBodyArenaOwnedPathEvaluateBlock(arena: arena, blockID: nextBlockID, states: states, origins: origins, scheduleStarts: scheduleStarts, scheduleCounts: scheduleCounts, scheduleRows: scheduleRows, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, effects: effects, effectPaths: effectPaths, returnSummaries: returnSummaries, returnLeaves: returnLeaves, applyInstanceEffects: applyInstanceEffects, recordFacts: recordFacts))
                 if blockEvaluationStatus != 0 {
                     status: 0 - 1
-                    failureStage: 1200 + (0 - blockEvaluationStatus)
+                    failureStage: 12
                 }
             }
             if status == 0 {
                 let expirationStatus: Int(compilerBodyArenaOwnedPathExpireEvaluationTemporaries(arena: arena, blockID: nextBlockID, states: states, origins: origins, pathRoots: pathRoots, canonicalPaths: canonicalPaths, evaluationProducers: evaluationProducers, projection: projectionB, returnSummaries: returnSummaries, recordFacts: recordFacts))
                 if expirationStatus != 0 {
                     status: 0 - 1
-                    failureStage: 1300000 + (0 - expirationStatus)
+                    failureStage: 13
                 }
             }
             if status == 0 {
@@ -4678,7 +4683,7 @@ function compilerBodyArenaValidateOwnedPaths(arena: CompilerBodyArena, typeKeys:
                         let terminalStatus: Int(compilerBodyArenaOwnedPathCurrentStateTerminalStatus(arena: arena, states: states, origins: origins, pathRoots: pathRoots))
                         if terminalStatus != 0 {
                             status: 0 - 1
-                            failureStage: 1400000 + (0 - terminalStatus)
+                            failureStage: 14
                         }
                     }
                 }
@@ -4700,7 +4705,7 @@ function compilerBodyArenaValidateOwnedPaths(arena: CompilerBodyArena, typeKeys:
         let backedgeStatus: Int(compilerBodyArenaOwnedPathBackedgeStatus(arena: arena, states: states, origins: origins, pathRoots: pathRoots, canonicalPaths: canonicalPaths, predecessorStarts: predecessorStarts, predecessorCounts: predecessorCounts, predecessorBlocks: predecessorBlocks, projectionA: projectionA, projectionB: projectionB, blockCount: blockCount, pathCount: pathCount))
         if backedgeStatus != 0 {
             status: 0 - 1
-            failureStage: 160000000 + (0 - backedgeStatus)
+            failureStage: 16
         }
     }
     if status == 0 && !compilerBodyArenaOwnedPathTerminalStatesAreConsistent(arena: arena, states: states, origins: origins, pathRoots: pathRoots, blockCount: blockCount, pathCount: pathCount) {
@@ -5078,8 +5083,9 @@ function compilerReachableLLVMStateBuildOwnedReturnSummaries(reachability: Compi
             let cycleWorkIndex: Int(compilerReachableLLVMStateUnknownConstructCycleWorkIndex(reachability: reachability))
             if cycleWorkIndex >= 0 {
                 let cycleFunctionRow: Int(reachability.worklist.element(index: cycleWorkIndex))
+                let cycleInstanceID: Int(compilerReachableLLVMStateWorklistInstanceID(reachability: reachability, workIndex: cycleWorkIndex))
                 let cycleBuildStatus: Int(compilerReachableLLVMStateBuildOwnedReturnSummaryForWorkItem(reachability: reachability, workIndex: cycleWorkIndex))
-                if cycleBuildStatus != 0 { return compilerReachableLLVMStateSetReturnFailure(reachability: reachability, kind: compilerReachableLLVMReturnFailureProof(), functionRow: cycleFunctionRow, detail: 0 - cycleBuildStatus) }
+                if cycleBuildStatus != 0 { return compilerReachableLLVMStateSetReturnFailure(reachability: reachability, kind: compilerReachableLLVMReturnFailureUnresolved(), functionRow: cycleFunctionRow, detail: cycleInstanceID) }
                 changed: true
             } else if cycleWorkIndex < 0 - 1 {
                 return compilerReachableLLVMStateSetReturnFailure(reachability: reachability, kind: compilerReachableLLVMReturnFailureDependency(), functionRow: 0 - 1, detail: 0 - cycleWorkIndex)
@@ -5267,7 +5273,7 @@ function compilerReachableLLVMStateValidateFunctionInstanceEffectsForWorkItem(re
     if status == 0 && compilerReachableLLVMStateProjectValidatedEffectsForArena(reachability: reachability, arena: arena, instanceID: instanceID, validatedEffects: validatedEffects) != 0 { status: 7 }
     let destroyStatus: Int(compilerBodyArenaDestroy(arena: arena))
     if status == 0 {
-        if destroyStatus != 0 { status: 8 }
+        if destroyStatus != 0 { status: 8000 + (0 - destroyStatus) }
     }
     state result: Int(0)
     if status != 0 { result: 0 - status }

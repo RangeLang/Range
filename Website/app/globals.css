@@ -388,7 +388,12 @@ html.range-route-performance.range-route-backward::view-transition-old(range-per
 
 .landingNav [data-scale-zero] {
   font-size: 14.6px;
+  cursor: ns-resize;
+  touch-action: none;
+  transform: translateY(var(--range-zero-drag-y, 0px));
+  user-select: none;
   view-transition-name: range-zero-index;
+  will-change: transform;
 }
 
 range-spline-nav {

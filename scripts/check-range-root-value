@@ -5,9 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Source the candidate harness so this checkpoint uses its canonical source
 # discovery, RootValue fixture writer, compiler invocation, and LLVM helpers.
 source "$SCRIPT_DIR/check-range-compiler-candidate"
-
-CACHE_ROOT="${RANGE_STAGE2_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Library/Caches}/Range/stage2-compiler}"
-CACHE_SCHEMA=1
+source "$SCRIPT_DIR/resolve-range-stage2-compiler"
 
 usage() {
     cat <<'USAGE'
@@ -88,6 +86,249 @@ check_target_pointer_bits_runtime() {
     echo "ProjectDefaults target-pointer-bits-runtime: pass"
 }
 
+check_range_native_project_macro() {
+    local fixture="$REPO_ROOT/Testing/ProjectDefaults/Pass/RangeNativeProject.range"
+    local override_fixture="$REPO_ROOT/Testing/ProjectDefaults/Pass/RangeNativeProjectOverride.range"
+    local output="$WORK_ROOT/project-defaults-range-native.out"
+    local override_output="$WORK_ROOT/project-defaults-range-native-override.out"
+    local error="$WORK_ROOT/project-defaults-range-native.err"
+    local integer_count bool_count override_integer_count override_bool_count
+
+    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "Range-native project macro did not compile"
+    [[ ! -s "$error" ]] || fail "Range-native project macro wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=2' "$output" \
+        || fail "Range-native project macro did not execute through target capabilities"
+    /usr/bin/grep -Fq $'name=integer\tmemberKind=state\ttype=Int' "$output" \
+        || fail "Range-native project macro did not expand the integer default"
+    /usr/bin/grep -Fq $'name=bool\tmemberKind=state\ttype=Bool' "$output" \
+        || fail "Range-native project macro did not expand the bool default"
+    /usr/bin/grep -Fq $'readDependencyCount=2' "$output" \
+        || fail "Range-native project macro did not record both member reads"
+    integer_count="$(/usr/bin/grep -F -c $'name=integer\tmemberKind=state\ttype=Int' "$output" || true)"
+    bool_count="$(/usr/bin/grep -F -c $'name=bool\tmemberKind=state\ttype=Bool' "$output" || true)"
+    [[ "$integer_count" -eq 1 && "$bool_count" -eq 1 ]] \
+        || fail "Range-native project macro did not expand exactly one integer and one bool default"
+    "$STAGE2_EXECUTABLE" compile "$override_fixture" > "$override_output" 2> "$error" \
+        || fail "Range-native project override did not compile"
+    [[ ! -s "$error" ]] || fail "Range-native project override wrote stderr"
+    /usr/bin/grep -Fq $'projectDefaults\tvalid=true\ttargetPointerBits=64\tintegerBits=4\tintegerOverridden=true\tboolOverridden=false' "$override_output" \
+        || fail "Range-native project macro did not preserve the explicit integer override"
+    /usr/bin/grep -Fq $'name=bool\tmemberKind=state\ttype=Bool' "$override_output" \
+        || fail "Range-native project macro did not expand the missing bool default"
+    override_integer_count="$(/usr/bin/grep -F -c $'name=integer\tmemberKind=state\ttype=Int' "$override_output" || true)"
+    override_bool_count="$(/usr/bin/grep -F -c $'name=bool\tmemberKind=state\ttype=Bool' "$override_output" || true)"
+    [[ "$override_integer_count" -eq 0 && "$override_bool_count" -eq 1 ]] \
+        || fail "Range-native project macro did not preserve one integer override and expand exactly one bool default"
+    echo "ProjectDefaults range-native-project: pass"
+}
+
+check_canonical_member_family() {
+    local fixture="$REPO_ROOT/Testing/Members/Pass/CanonicalMemberFamily.range"
+    local output="$WORK_ROOT/member-family-canonical.out"
+    local error="$WORK_ROOT/member-family-canonical.err"
+
+    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "Canonical @member family did not compile"
+    [[ ! -s "$error" ]] || fail "Canonical @member family wrote stderr"
+    /usr/bin/grep -Fq $'macroFamilyMemory\tvalid=true\tfamilyCount=1\tmemberCount=4\trepresentationCount=1\tpartitionCount=1\tvalueCount=4' "$output" \
+        || fail "Canonical @member family did not retain all direct representations"
+    echo "Members canonical-family: pass"
+}
+
+check_canonical_declaration_envelopes() {
+    local bundle="$WORK_ROOT/declaration-envelope-models.range"
+    local output="$WORK_ROOT/declaration-envelope-models.out"
+    local error="$WORK_ROOT/declaration-envelope-models.err"
+    local relative expectation path name
+    local -a model_sources=(
+        RangeCompiler/Sources/Core/Syntax/Declarations/Type/Function.range
+        RangeCompiler/Sources/Core/Syntax/Declarations/Type/Enum.range
+        RangeCompiler/Sources/Core/Syntax/Declarations/Type/Parameter.range
+        RangeCompiler/Sources/Core/Syntax/Declarations/Property/Let.range
+        RangeCompiler/Sources/Core/Syntax/Declarations/Property/State.range
+        RangeCompiler/Sources/Core/Syntax/Declarations/Property/Binding.range
+        RangeCompiler/Sources/Core/Syntax/Declarations/Property/Derived.range
+    )
+    local -a expectations=(
+        'Function.range|macros'
+        'Function.range|identifier'
+        'Function.range|parameters'
+        'Function.range|returnType'
+        'Function.range|body'
+        'Enum.range|macros'
+        'Enum.range|identifier'
+        'Parameter.range|macros'
+        'Let.range|macros'
+        'Let.range|identifier'
+        'Let.range|type'
+        'Let.range|value'
+        'State.range|macros'
+        'State.range|identifier'
+        'State.range|type'
+        'State.range|value'
+        'Binding.range|macros'
+        'Binding.range|identifier'
+        'Binding.range|type'
+        'Binding.range|getterBody'
+        'Binding.range|setterBody'
+        'Derived.range|macros'
+        'Derived.range|identifier'
+        'Derived.range|type'
+        'Derived.range|body'
+    )
+
+    /usr/bin/printf '%s\n' 'compilerPlotter' > "$bundle"
+    for relative in "${model_sources[@]}"; do
+        /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "$relative" >> "$bundle"
+        /bin/cat "$REPO_ROOT/$relative" >> "$bundle"
+        /usr/bin/printf '\n' >> "$bundle"
+    done
+    "$STAGE2_EXECUTABLE" compile "$bundle" > "$output" 2> "$error" \
+        || fail "Canonical declaration-envelope models did not compile"
+    [[ ! -s "$error" ]] || fail "Canonical declaration-envelope models wrote stderr"
+    for expectation in "${expectations[@]}"; do
+        path="${expectation%%|*}"
+        name="${expectation#*|}"
+        /usr/bin/grep -F $'graphNominal\t' "$output" \
+            | /usr/bin/grep -F "keyword=let"$'\t'"name=$name" \
+            | /usr/bin/grep -F "path=RangeCompiler/Sources/Core/" \
+            | /usr/bin/grep -F "/$path" > /dev/null \
+            || fail "Canonical declaration envelope omitted $path let $name"
+    done
+    echo "Members declaration-envelopes: pass"
+}
+
+check_missing_nominal_graph_warning() {
+    local fixture="$REPO_ROOT/Testing/Graph/Pass/MissingNominalWarning.range"
+    local declarations_fixture="$REPO_ROOT/Testing/Graph/Pass/NominalDeclarationKinds.range"
+    local local_declarations_fixture="$REPO_ROOT/Testing/Graph/Pass/LocalNominalDeclarations.range"
+    local lowercase_fixture="$REPO_ROOT/Testing/Graph/Pass/LowercaseSignatureMissingNominal.range"
+    local macro_fixture="$REPO_ROOT/Testing/Graph/Pass/MacroNominalWarning.range"
+    local macro_mismatch_fixture="$REPO_ROOT/Testing/Graph/Pass/MacroNominalTargetMismatch.range"
+    local ambiguous_fixture="$REPO_ROOT/Testing/Graph/Pass/AmbiguousNominalWarning.range"
+    local output="$WORK_ROOT/graph-missing-nominal.out"
+    local declarations_output="$WORK_ROOT/graph-nominal-declarations.out"
+    local local_declarations_output="$WORK_ROOT/graph-local-nominal-declarations.out"
+    local lowercase_output="$WORK_ROOT/graph-lowercase-missing-nominal.out"
+    local macro_output="$WORK_ROOT/graph-macro-nominal.out"
+    local macro_mismatch_output="$WORK_ROOT/graph-macro-nominal-target-mismatch.out"
+    local ambiguous_output="$WORK_ROOT/graph-ambiguous-nominal.out"
+    local strict_fixture="$WORK_ROOT/graph-missing-nominal-strict.range"
+    local strict_output="$WORK_ROOT/graph-missing-nominal-strict.out"
+    local error="$WORK_ROOT/graph-missing-nominal.err"
+    local warning_count missing_record_count strict_status
+
+    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "Graph missing-nominal fixture did not compile"
+    [[ ! -s "$error" ]] || fail "Graph missing-nominal fixture wrote stderr"
+    /usr/bin/grep -Fq $'graphDelta\tvalid=true\tnodeCount=5\tfactCount=2\tgeneratedFunctionCount=0\tnominalCount=5\tnominalReferenceCount=4\twarningCount=1' "$output" \
+        || fail "Graph artifact omitted its complete nominal declaration, reference, and warning counts"
+    /usr/bin/grep -Fq $'graphNominal\tid=0\tkeyword=construct\tname=Box' "$output" \
+        || fail "Graph artifact omitted the construct Box nominal declaration"
+    /usr/bin/grep -F $'graphNominal\t' "$output" | /usr/bin/grep -F $'keyword=state\tname=missing' > /dev/null \
+        || fail "Graph artifact omitted the state missing nominal declaration"
+    /usr/bin/grep -Fq $'role=memberType\texpectedKinds=construct,enum\tname=Known\ttargetKind=declaration' "$output" \
+        || fail "Graph artifact omitted the declared nested nominal"
+    /usr/bin/grep -Fq $'role=memberType\texpectedKinds=construct,enum\tname=Missing\ttargetKind=missing\ttargetID=-1\ttargetNominalID=-1\tdeclared=false' "$output" \
+        || fail "Graph artifact omitted the unresolved nominal reference"
+    /usr/bin/grep -Fq $'graphWarning\tseverity=warning\tkind=missingNominal' "$output" \
+        || fail "Graph artifact omitted the missing-nominal warning"
+    /usr/bin/grep -Fq $'expectedKinds=construct,enum\tname=Missing\tfileID=0\tpath=Project/MissingNominalWarning.range\tstart=119\tend=126' "$output" \
+        || fail "Graph artifact missing-nominal warning omitted its exact source path or span"
+    warning_count="$(/usr/bin/grep -F -c $'graphWarning\tseverity=warning\tkind=missingNominal' "$output" || true)"
+    missing_record_count="$(/usr/bin/grep -F -c $'role=memberType\texpectedKinds=construct,enum\tname=Missing\ttargetKind=missing\ttargetID=-1\ttargetNominalID=-1\tdeclared=false' "$output" || true)"
+    [[ "$warning_count" -eq 1 && "$missing_record_count" -eq 1 ]] \
+        || fail "Graph artifact did not emit exactly one missing-nominal reference and warning"
+    /usr/bin/grep -v '^compilerPlotter$' "$fixture" > "$strict_fixture"
+    set +e
+    "$STAGE2_EXECUTABLE" compile "$strict_fixture" > "$strict_output" 2> "$error"
+    strict_status=$?
+    set -e
+    [[ "$strict_status" -eq 65 ]] || fail "Ordinary compilation did not reject the unresolved nominal"
+    [[ ! -s "$error" ]] || fail "Ordinary unresolved-nominal rejection wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidTypedDeclarations\tphase=enumPayloadLink\treason=invalidEnumPayloadType\trole=project\tpath=Project/MissingNominalWarning.range' "$strict_output" \
+        || fail "Ordinary compilation did not preserve the strict unresolved-nominal diagnostic"
+    ! /usr/bin/grep -Fq 'define ' "$strict_output" \
+        || fail "Ordinary unresolved-nominal compilation emitted LLVM"
+
+    "$STAGE2_EXECUTABLE" compile "$declarations_fixture" > "$declarations_output" 2> "$error" \
+        || fail "Graph nominal-declaration fixture did not compile"
+    [[ ! -s "$error" ]] || fail "Graph nominal-declaration fixture wrote stderr"
+    /usr/bin/grep -Fq $'graphDelta\tvalid=true\tnodeCount=15\tfactCount=11\tgeneratedFunctionCount=0\tnominalCount=9\tnominalReferenceCount=6\twarningCount=0' "$declarations_output" \
+        || fail "Graph artifact did not retain every keyword-plus-name declaration"
+    for declaration in \
+        $'keyword=macro\tname=observed' \
+        $'keyword=construct\tname=Model' \
+        $'keyword=enum\tname=Flag' \
+        $'keyword=case\tname=on' \
+        $'keyword=function\tname=transform' \
+        $'keyword=let\tname=fixed' \
+        $'keyword=state\tname=changing' \
+        $'keyword=binding\tname=shared' \
+        $'keyword=derived\tname=computed'; do
+        /usr/bin/grep -F $'graphNominal\t' "$declarations_output" | /usr/bin/grep -F "$declaration" > /dev/null \
+            || fail "Graph artifact omitted nominal declaration $declaration"
+    done
+
+    "$STAGE2_EXECUTABLE" compile "$local_declarations_fixture" > "$local_declarations_output" 2> "$error" \
+        || fail "Graph local nominal-declaration fixture did not compile"
+    [[ ! -s "$error" ]] || fail "Graph local nominal-declaration fixture wrote stderr"
+    /usr/bin/grep -F $'graphNominal\t' "$local_declarations_output" | /usr/bin/grep -F $'keyword=let\tname=copy' > /dev/null \
+        || fail "Graph artifact omitted the local let copy nominal declaration"
+    /usr/bin/grep -F $'graphNominal\t' "$local_declarations_output" | /usr/bin/grep -F $'keyword=state\tname=total' > /dev/null \
+        || fail "Graph artifact omitted the local state total nominal declaration"
+    [[ "$(/usr/bin/grep -F -c $'keyword=let\tname=copy' "$local_declarations_output" || true)" -eq 1 ]] \
+        || fail "Graph artifact did not emit exactly one local let nominal declaration"
+    [[ "$(/usr/bin/grep -F -c $'keyword=state\tname=total' "$local_declarations_output" || true)" -eq 1 ]] \
+        || fail "Graph artifact did not emit exactly one local state nominal declaration"
+    /usr/bin/grep -Fq $'warningCount=0' "$local_declarations_output" \
+        || fail "Graph local nominal-declaration fixture emitted an unexpected warning"
+
+    "$STAGE2_EXECUTABLE" compile "$lowercase_fixture" > "$lowercase_output" 2> "$error" \
+        || fail "Graph lowercase missing-nominal fixture did not compile"
+    [[ ! -s "$error" ]] || fail "Graph lowercase missing-nominal fixture wrote stderr"
+    /usr/bin/grep -Fq $'role=parameterType\texpectedKinds=construct,enum\tname=missingType\ttargetKind=missing\ttargetID=-1\ttargetNominalID=-1\tdeclared=false' "$lowercase_output" \
+        || fail "Graph artifact gave identifier casing semantic meaning"
+    /usr/bin/grep -Fq $'graphWarning\tseverity=warning\tkind=missingNominal' "$lowercase_output" \
+        || fail "Graph artifact omitted the lowercase missing-nominal warning"
+    [[ "$(/usr/bin/grep -F -c $'graphWarning\tseverity=warning\tkind=missingNominal' "$lowercase_output" || true)" -eq 1 ]] \
+        || fail "Graph artifact did not emit exactly one lowercase missing-nominal warning"
+
+    "$STAGE2_EXECUTABLE" compile "$macro_fixture" > "$macro_output" 2> "$error" \
+        || fail "Graph macro-nominal fixture did not compile"
+    [[ ! -s "$error" ]] || fail "Graph macro-nominal fixture wrote stderr"
+    /usr/bin/grep -Fq $'graphDelta\tvalid=true\tnodeCount=1\tfactCount=0\tgeneratedFunctionCount=0\tnominalCount=2\tnominalReferenceCount=2\twarningCount=1' "$macro_output" \
+        || fail "Graph artifact did not retain macro declarations and applications"
+    /usr/bin/grep -Fq $'role=macroApplication\texpectedKinds=macro\tname=observed\ttargetKind=declaration' "$macro_output" \
+        || fail "Graph artifact did not link the declared macro application"
+    /usr/bin/grep -Fq $'sourceKind=macroApplication\tsourceReferenceID=0\tparentSourceReferenceID=-1' "$macro_output" \
+        || fail "Graph artifact did not retain the macro application as its reference source"
+    /usr/bin/grep -Fq $'graphWarning\tseverity=warning\tkind=missingNominal' "$macro_output" \
+        || fail "Graph artifact did not warn about the undeclared macro application"
+    /usr/bin/grep -Fq $'expectedKinds=macro\tname=missing\tfileID=0\tpath=Project/MacroNominalWarning.range\tstart=52\tend=59' "$macro_output" \
+        || fail "Graph macro warning omitted its keyword, name, source path, or span"
+    [[ "$(/usr/bin/grep -F -c $'graphWarning\tseverity=warning\tkind=missingNominal' "$macro_output" || true)" -eq 1 ]] \
+        || fail "Graph artifact did not emit exactly one missing macro warning"
+
+    "$STAGE2_EXECUTABLE" compile "$macro_mismatch_fixture" > "$macro_mismatch_output" 2> "$error" \
+        || fail "Graph macro target-mismatch fixture did not compile"
+    [[ ! -s "$error" ]] || fail "Graph macro target-mismatch fixture wrote stderr"
+    /usr/bin/grep -Fq $'role=macroApplication\texpectedKinds=macro\tname=observed\ttargetKind=targetMismatch\ttargetID=1\ttargetNominalID=1\tdeclared=true\tapplicable=false' "$macro_mismatch_output" \
+        || fail "Graph artifact did not preserve target-aware macro resolution"
+    /usr/bin/grep -Fq $'graphWarning\tseverity=warning\tkind=nominalTargetMismatch' "$macro_mismatch_output" \
+        || fail "Graph artifact mislabeled a macro target mismatch as a missing declaration"
+
+    "$STAGE2_EXECUTABLE" compile "$ambiguous_fixture" > "$ambiguous_output" 2> "$error" \
+        || fail "Graph ambiguous-nominal fixture did not compile"
+    [[ ! -s "$error" ]] || fail "Graph ambiguous-nominal fixture wrote stderr"
+    /usr/bin/grep -Fq $'role=macroApplication\texpectedKinds=macro\tname=repeated\ttargetKind=ambiguous\ttargetID=-1\ttargetNominalID=-1\tdeclared=true\tapplicable=false' "$ambiguous_output" \
+        || fail "Graph artifact did not separate an ambiguous declaration from applicability"
+    /usr/bin/grep -Fq $'graphWarning\tseverity=warning\tkind=ambiguousNominal' "$ambiguous_output" \
+        || fail "Graph artifact omitted the ambiguous-nominal warning"
+    echo "Graph missing-nominal-warning: pass"
+}
+
 check_project_defaults() {
     check_project_defaults_fixture target-pointer-bits-builtin \
         Testing/ProjectDefaults/Pass/TargetPointerBitsBuiltin.range 0 \
@@ -117,6 +358,10 @@ check_project_defaults() {
         Testing/ProjectDefaults/Pass/OverriddenIntegerLowering.range \
         'sext i4 7 to i32'
     check_target_pointer_bits_runtime
+    check_range_native_project_macro
+    check_canonical_member_family
+    check_canonical_declaration_envelopes
+    check_missing_nominal_graph_warning
     echo "checkpoint root-value:project-defaults-complete: pass"
 }
 
@@ -224,105 +469,6 @@ check_storage_literals() {
     echo "checkpoint root-value:storage-literals-complete: pass"
 }
 
-write_stage2_cache_key_material() {
-    local output="$1"
-    local seed_relative seed index
-
-    seed_relative="$(manifest_value seed.path)"
-    seed="$REPO_ROOT/$seed_relative"
-    /usr/bin/printf 'schema=%s\n' "$CACHE_SCHEMA" > "$output"
-    /usr/bin/printf 'compilerOptimization=%s\n' "$COMPILER_OPTIMIZATION" >> "$output"
-    /usr/bin/printf 'compilerLTO=%s\n' "$COMPILER_LTO" >> "$output"
-    /usr/bin/printf 'clang=%s\n' "$(clang --version | /usr/bin/head -1)" >> "$output"
-    /usr/bin/printf 'seedPath=%s\nseedHash=%s\nseedBytes=%s\n' \
-        "$seed_relative" "$(sha256 "$seed")" "$(bytes "$seed")" >> "$output"
-    for index in "${!RUNTIME_INPUTS[@]}"; do
-        /usr/bin/printf 'runtime=%s\tpath=%s\tsha256=%s\tbytes=%s\n' \
-            "$index" "${RUNTIME_INPUTS[$index]#"$REPO_ROOT/"}" \
-            "$(sha256 "${RUNTIME_INPUTS[$index]}")" "$(bytes "${RUNTIME_INPUTS[$index]}")" >> "$output"
-    done
-    /usr/bin/printf 'sourceBundleHash=%s\nsourceBundleBytes=%s\n' \
-        "$(sha256 "$SOURCE_BUNDLE")" "$(bytes "$SOURCE_BUNDLE")" >> "$output"
-    for index in "${!SOURCE_FILES[@]}"; do
-        /usr/bin/printf 'source=%s\trole=%s\troot=%s\tpath=%s\tsha256=%s\tbytes=%s\n' \
-            "$index" "${SOURCE_ROLES[$index]}" "${SOURCE_ROOTS[$index]}" \
-            "${SOURCE_RELATIVE_PATHS[$index]}" "$(sha256 "${SOURCE_FILES[$index]}")" \
-            "$(bytes "${SOURCE_FILES[$index]}")" >> "$output"
-    done
-}
-
-stage2_cache_entry_is_valid() {
-    local directory="$1"
-    local expected_key="$2"
-    local executable="$directory/RangeCompiler"
-    local metadata="$directory/Metadata.txt"
-    local expected_hash expected_bytes
-
-    [[ -x "$executable" && -f "$metadata" ]] || return 1
-    /usr/bin/grep -Fxq "schema=$CACHE_SCHEMA" "$metadata" || return 1
-    /usr/bin/grep -Fxq "cacheKey=$expected_key" "$metadata" || return 1
-    expected_hash="$(/usr/bin/awk -F= '$1 == "executableHash" { print $2 }' "$metadata")"
-    expected_bytes="$(/usr/bin/awk -F= '$1 == "executableBytes" { print $2 }' "$metadata")"
-    [[ -n "$expected_hash" && -n "$expected_bytes" ]] || return 1
-    [[ "$(sha256 "$executable")" == "$expected_hash" ]] || return 1
-    [[ "$(bytes "$executable")" == "$expected_bytes" ]] || return 1
-}
-
-resolve_stage2_compiler() {
-    local key_material="$WORK_ROOT/stage2-cache-key"
-    local cache_key cache_directory cached_executable
-    local build_directory seed seed_executable stage2_llvm stage2_executable
-
-    write_stage2_cache_key_material "$key_material"
-    cache_key="$(sha256 "$key_material")"
-    cache_directory="$CACHE_ROOT/$cache_key"
-    cached_executable="$cache_directory/RangeCompiler"
-
-    if stage2_cache_entry_is_valid "$cache_directory" "$cache_key"; then
-        echo "checkpoint root-value:stage2-cache-hit: pass"
-        STAGE2_EXECUTABLE="$cached_executable"
-        STAGE2_CACHE_KEY="$cache_key"
-        echo "checkpoint root-value:stage2-resolved: pass"
-        return 0
-    fi
-
-    echo "checkpoint root-value:stage2-cache-miss: pass"
-    build_directory="$WORK_ROOT/stage2-cache-entry"
-    /bin/mkdir -p "$build_directory"
-    seed="$REPO_ROOT/$(manifest_value seed.path)"
-    seed_executable="$WORK_ROOT/RangeCompilerSeed"
-    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module \
-        -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
-    echo "checkpoint root-value:seed-linked: pass"
-
-    stage2_llvm="$build_directory/RangeCompiler.ll"
-    stage2_executable="$build_directory/RangeCompiler"
-    emit_candidate_llvm "$seed_executable" "$SOURCE_BUNDLE" "$stage2_llvm" focused-stage2
-    echo "checkpoint root-value:stage2-emitted: pass"
-    validate_llvm "$stage2_llvm"
-    echo "checkpoint root-value:stage2-validated: pass"
-    link_llvm "$stage2_llvm" "$stage2_executable"
-    echo "checkpoint root-value:stage2-linked: pass"
-
-    /usr/bin/printf 'schema=%s\ncacheKey=%s\nexecutableHash=%s\nexecutableBytes=%s\n' \
-        "$CACHE_SCHEMA" "$cache_key" "$(sha256 "$stage2_executable")" \
-        "$(bytes "$stage2_executable")" > "$build_directory/Metadata.txt"
-    /bin/mkdir -p "$CACHE_ROOT"
-    if /bin/mkdir "$cache_directory" 2>/dev/null; then
-        /bin/cp "$stage2_executable" "$cached_executable"
-        /bin/chmod +x "$cached_executable"
-        /bin/cp "$build_directory/Metadata.txt" "$cache_directory/Metadata.txt"
-    elif ! stage2_cache_entry_is_valid "$cache_directory" "$cache_key"; then
-        fail "concurrent Stage 2 cache population did not produce a valid executable"
-    fi
-    stage2_cache_entry_is_valid "$cache_directory" "$cache_key" \
-        || fail "published Stage 2 cache entry failed integrity validation"
-    echo "checkpoint root-value:stage2-cached: pass"
-    STAGE2_EXECUTABLE="$cached_executable"
-    STAGE2_CACHE_KEY="$cache_key"
-    echo "checkpoint root-value:stage2-resolved: pass"
-}
-
 check_boundary_forward_mixed() {
     local bundle="$WORK_ROOT/boundary-forward-mixed.range"
     local first="$WORK_ROOT/boundary-forward-mixed.first.ll"
@@ -398,6 +544,9 @@ main_root_value() {
         usage >&2
         return 64
     fi
+    if [[ -d "$compiler_input" && "$(cd "$compiler_input" && pwd)" == "$REPO_ROOT" ]]; then
+        compiler_input="$DEFAULT_COMPILER_DIR"
+    fi
     [[ -d "$compiler_input" ]] || fail "missing compiler directory: $compiler_input"
     compiler_directory="$(cd "$compiler_input" && pwd)"
 
@@ -424,7 +573,9 @@ main_root_value() {
     SOURCE_BUNDLE="$WORK_ROOT/RangeCompilerSourceSet.range"
     write_source_bundle "$SOURCE_BUNDLE"
     echo "checkpoint root-value:source-snapshot: pass"
-    resolve_stage2_compiler
+    resolve_stage2_compiler 0
+    echo "checkpoint root-value:stage2-cache-$STAGE2_CACHE_STATUS: pass"
+    echo "checkpoint root-value:stage2-resolved: pass"
     check_project_defaults
     check_storage_literals
     if [[ "$controls" -eq 1 ]]; then

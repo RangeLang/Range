@@ -5,7 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
 READER="$REPO_ROOT/RangeCompiler/Sources/Compiler/Driver/CompilerBuildPlan.range"
-SCHEMA_VERSION="focused-build-plan-harness-v2"
+CORE_BUFFER="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/Buffer.range"
+CORE_STRING="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/String.range"
+SCHEMA_VERSION="focused-build-plan-harness-v3"
 CACHE_ROOT="${RANGE_BUILD_PLAN_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Library/Caches}/Range/build-plan}"
 
 fail() {
@@ -52,6 +54,8 @@ verify_manifest() {
         verify_manifest_file "runtimeSources.$index" "runtime input $index"
     done
     [[ -f "$READER" ]] || fail "missing build-plan reader"
+    [[ -f "$CORE_BUFFER" ]] || fail "missing Buffer storage witness"
+    [[ -f "$CORE_STRING" ]] || fail "missing String storage witness"
 }
 
 write_harness() {
@@ -112,6 +116,12 @@ write_bundle() {
     local harness="$1"
     local output="$2"
     /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/System/Memory/Buffer.range\n' >> "$output"
+    /bin/cat "$CORE_BUFFER" >> "$output"
+    [[ -z "$(/usr/bin/tail -c 1 "$CORE_BUFFER")" ]] || /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/System/Text/String.range\n' >> "$output"
+    /bin/cat "$CORE_STRING" >> "$output"
+    [[ -z "$(/usr/bin/tail -c 1 "$CORE_STRING")" ]] || /usr/bin/printf '\n' >> "$output"
     /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=CompilerBuildPlan.range\n' >> "$output"
     /bin/cat "$READER" >> "$output"
     [[ -z "$(/usr/bin/tail -c 1 "$READER")" ]] || /usr/bin/printf '\n' >> "$output"
@@ -202,19 +212,21 @@ main() {
     write_bundle "$harness" "$bundle"
 
     local key_material="$WORK_ROOT/cache-key"
-    /usr/bin/printf 'schema=%s\nseed=%s\nreader=%s\n' "$SCHEMA_VERSION" "$(manifest_value seed.sha256)" "$(sha256 "$READER")" > "$key_material"
+    /usr/bin/printf 'schema=%s\nseed=%s\nbundle=%s\n' \
+        "$SCHEMA_VERSION" "$(manifest_value seed.sha256)" "$(sha256 "$bundle")" > "$key_material"
     local index runtime_count
     runtime_count="$(manifest_value runtimeSources)"
     for ((index = 0; index < runtime_count; index += 1)); do
         /usr/bin/printf 'runtime-%s=%s\n' "$index" "$(manifest_value "runtimeSources.$index.sha256")" >> "$key_material"
     done
-    /usr/bin/printf 'harness=%s\n' "$(sha256 "$harness")" >> "$key_material"
     local cache_key cache_directory cached_executable
     cache_key="$(sha256 "$key_material")"
     cache_directory="$CACHE_ROOT/$cache_key"
     cached_executable="$cache_directory/range-build-plan-reader"
 
-    if [[ -x "$cached_executable" ]]; then
+    if [[ -x "$cached_executable"
+        && -f "$cache_directory/cache-key"
+        && "$(/bin/cat "$cache_directory/cache-key")" == "$cache_key" ]]; then
         echo "checkpoint build-plan:cache-hit: pass"
     else
         local build_cache="$WORK_ROOT/cache-entry"

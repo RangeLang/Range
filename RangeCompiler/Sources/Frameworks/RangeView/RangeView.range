@@ -1,6 +1,6 @@
 open macro inspect(owner: String, requiresBody: Bool): Construct { target, diagnostics in
     let bodies: [Derived](
-        target.declaration.deriveds.filter { property in
+        target.declaration.members.filter(all: Derived) { property in
             property.identifier.name == "body"
         }
     )

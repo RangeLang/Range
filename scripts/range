@@ -7,17 +7,18 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 usage() {
     cat >&2 <<'USAGE'
 Usage:
-  scripts/range compiler next
-  scripts/range compiler next --cached-only
-  scripts/range compiler progression
-  scripts/range compiler progression --cached-only
-  scripts/range compiler COMMAND [ARGS...]
-  scripts/range check-build-plan
-  scripts/range check-root-value [DIR]
-  scripts/range check-compiler-smoke [DIR]
-  scripts/range check-compiler-candidate [DIR]
-  scripts/range check-seed-integrity
-  scripts/range check-stage2-compiler
+  range compile <FILE-OR-DIR>
+  range compiler next
+  range compiler next --cached-only
+  range compiler progression
+  range compiler progression --cached-only
+  range compiler COMMAND [ARGS...]
+  range check-build-plan
+  range check-root-value [DIR]
+  range check-compiler-smoke [DIR]
+  range check-compiler-candidate [DIR]
+  range check-seed-integrity
+  range check-stage2-compiler
 
 The supported native surface is the self-hosted compiler kernel and its proof
 commands. Broader language commands return only after their implementations are
@@ -33,6 +34,10 @@ fi
 shift
 
 case "$command" in
+    compile)
+        if [[ $# -ne 1 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/compile-range-project" "$1"
+        ;;
     compiler)
         compiler_command="${1:-}"
         if [[ -z "$compiler_command" ]]; then usage; exit 1; fi

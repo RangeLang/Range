@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Reuse the compiler proof harness's canonical accepted-seed verification,
+# compiler-source discovery, source bundling, and shared Stage 2 resolver.
+source "$SCRIPT_DIR/check-range-compiler-candidate"
+
+compile_project_fail() {
+    echo "range: $*" >&2
+    exit 1
+}
+
+input="${1:-}"
+[[ -n "$input" ]] || compile_project_fail "expected a .range file or project directory"
+[[ -e "$input" ]] || compile_project_fail "input does not exist: $input"
+
+WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compile.XXXXXX")"
+trap '/bin/rm -rf "$WORK_ROOT"' EXIT
+
+verify_manifest
+
+canonical_core_source_path="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range"
+[[ -f "$canonical_core_source_path" ]] || compile_project_fail "missing canonical Core source"
+CORE_SOURCE_MARKER_PATH="${canonical_core_source_path#"$REPO_ROOT/"}"
+CORE_SOURCE_PATH="$WORK_ROOT/RawBuffer.range"
+/bin/cp "$canonical_core_source_path" "$CORE_SOURCE_PATH"
+
+RUNTIME_INPUTS=()
+while IFS= read -r runtime; do
+    RUNTIME_INPUTS+=("$runtime")
+done < <(runtime_inputs)
+
+compiler_discovery_root="$WORK_ROOT/compiler-discovery"
+/bin/mkdir -p "$compiler_discovery_root"
+discover_sources "$DEFAULT_COMPILER_DIR" "$compiler_discovery_root"
+SOURCE_BUNDLE="$WORK_ROOT/RangeCompilerSourceSet.range"
+write_source_bundle "$SOURCE_BUNDLE"
+resolve_stage2_compiler 0
+
+project_bundle="$WORK_ROOT/ProjectSourceSet.range"
+/usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$project_bundle"
+
+append_source() {
+    local role="$1"
+    local logical_path="$2"
+    local source_path="$3"
+
+    if [[ "$logical_path" == *$' '* || "$logical_path" == *$'\t'* || "$logical_path" == *$'\n'* ]]; then
+        compile_project_fail "Range source paths may not contain whitespace: $logical_path"
+    fi
+    /usr/bin/printf 'compilerSourceFile\\trole=%s\\tpath=%s\n' "$role" "$logical_path" >> "$project_bundle"
+    /bin/cat "$source_path" >> "$project_bundle"
+    if [[ -n "$(/usr/bin/tail -c 1 "$source_path")" ]]; then
+        /usr/bin/printf '\n' >> "$project_bundle"
+    fi
+}
+
+compiler_source_count="$(manifest_value compilerSources)"
+for ((index = 0; index < compiler_source_count; index += 1)); do
+    role="$(manifest_value "compilerSources.$index.role")"
+    [[ "$role" == core ]] || continue
+    relative="$(manifest_value "compilerSources.$index.path")"
+    source_path="$REPO_ROOT/$relative"
+    [[ -f "$source_path" ]] || compile_project_fail "missing accepted Core source: $relative"
+    append_source core "$relative" "$source_path"
+done
+
+if [[ -d "$input" ]]; then
+    project_root="$(cd "$input" && pwd)"
+    project_paths_raw="$WORK_ROOT/project-paths.raw"
+    project_paths="$WORK_ROOT/project-paths"
+    /usr/bin/find "$project_root" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print \
+        > "$project_paths_raw"
+    while IFS= read -r source_path; do
+        [[ "$source_path" != *$'\n'* ]] \
+            || compile_project_fail "Range source paths may not contain newlines: $source_path"
+    done < "$project_paths_raw"
+    LC_ALL=C /usr/bin/sort "$project_paths_raw" > "$project_paths"
+    project_count=0
+    while IFS= read -r source_path; do
+        relative="${source_path#"$project_root/"}"
+        append_source project "$relative" "$source_path"
+        project_count=$((project_count + 1))
+    done < "$project_paths"
+    [[ "$project_count" -gt 0 ]] || compile_project_fail "no .range sources found in: $input"
+else
+    [[ "$input" == *.range ]] || compile_project_fail "input file must end in .range: $input"
+    source_path="$(cd "$(dirname "$input")" && pwd)/$(basename "$input")"
+    append_source project "$(basename "$source_path")" "$source_path"
+fi
+
+exec "$STAGE2_EXECUTABLE" compile "$project_bundle"

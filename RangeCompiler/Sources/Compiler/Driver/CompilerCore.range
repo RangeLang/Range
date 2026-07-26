@@ -400,6 +400,8 @@ construct CompilerBodySyntaxCaptureContext {
 construct CompilerGraphDelta {
     let nodes: CompilerIntTable
     let facts: CompilerIntTable
+    let nominals: CompilerIntTable
+    let nominalReferences: CompilerIntTable
     let generatedFunctions: CompilerIntTable
     let generatedMembers: CompilerIntTable
     let failures: Buffer<Int>
