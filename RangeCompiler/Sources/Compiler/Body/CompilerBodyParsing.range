@@ -291,13 +291,13 @@ function compilerBodyArenaBinaryKind(token: RangeLexedToken): Int {
 function compilerBodyArenaParseArrayLiteral(arena: CompilerBodyArena, left: RangeLexedToken, limit: Int): CompilerBodyParseResult {
     let arrayNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindArrayLiteral(), ordinal: 0, start: left.start, end: left.end, firstStart: left.start, firstEnd: left.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
     if arrayNodeID < 0 { return compilerBodyParseFailure(index: left.start) }
-    let fallback: RangeLexedToken(kind: .eof, start: left.end, end: left.end, text: String(""))
+    let fallbackIndex: Int(left.end)
     state cursor: Int(left.end)
     state ordinal: Int(0)
     while cursor < limit {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
         if maybeToken == nil { return compilerBodyParseFailure(index: cursor) }
-        let token: RangeLexedToken(maybeToken ?? fallback)
+        let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: fallbackIndex))
         if token.kind == .rightBracket {
             if arena.nodes.values.update(element: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: token.end), index: arrayNodeID * compilerBodyArenaNodeColumnCount() + 5) != 0 { return compilerBodyParseFailure(index: token.start) }
             return compilerBodyParseSuccess(nodeID: arrayNodeID, nextIndex: token.end)
@@ -307,7 +307,7 @@ function compilerBodyArenaParseArrayLiteral(arena: CompilerBodyArena, left: Rang
             || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: arrayNodeID, childNodeID: element.nodeID, role: compilerSyntaxRoleArrayElement(), ordinal: ordinal) != 0 { return compilerBodyParseFailure(index: token.start) }
         let maybeSeparator: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: element.nextIndex))
         if maybeSeparator == nil { return compilerBodyParseFailure(index: element.nextIndex) }
-        let separator: RangeLexedToken(maybeSeparator ?? fallback)
+        let separator: RangeLexedToken(maybeSeparator ?? compilerFallbackTokenAt(index: fallbackIndex))
         if separator.kind == .rightBracket {
             if arena.nodes.values.update(element: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: separator.end), index: arrayNodeID * compilerBodyArenaNodeColumnCount() + 5) != 0 { return compilerBodyParseFailure(index: separator.start) }
             return compilerBodyParseSuccess(nodeID: arrayNodeID, nextIndex: separator.end)
@@ -322,14 +322,14 @@ function compilerBodyArenaParseArrayLiteral(arena: CompilerBodyArena, left: Rang
 function compilerBodyArenaParsePrimary(arena: CompilerBodyArena, start: Int, limit: Int): CompilerBodyParseResult {
     let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: start))
     if maybeToken == nil { return compilerBodyParseFailure(index: start) }
-    let fallback: RangeLexedToken(kind: .eof, start: start, end: start, text: String(""))
-    let token: RangeLexedToken(maybeToken ?? fallback)
+    let fallbackIndex: Int(start)
+    let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: fallbackIndex))
     if token.start >= limit { return compilerBodyParseFailure(index: start) }
     if token.kind == .leftBracket { return compilerBodyArenaParseArrayLiteral(arena: arena, left: token, limit: limit) }
     if token.kind == .dot {
         let maybeName: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: token.end))
         if maybeName == nil { return compilerBodyParseFailure(index: token.end) }
-        let name: RangeLexedToken(maybeName ?? fallback)
+        let name: RangeLexedToken(maybeName ?? compilerFallbackTokenAt(index: fallbackIndex))
         if (name.kind != .identifier && name.kind != .keyword) || name.end > limit { return compilerBodyParseFailure(index: token.end) }
         let caseNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindEnumCaseValue(), ordinal: 0, start: token.start, end: name.end, firstStart: name.start, firstEnd: name.end, secondStart: token.start, secondEnd: token.end, aux: 0))
         if caseNodeID < 0 { return compilerBodyParseFailure(index: start) }
@@ -338,7 +338,7 @@ function compilerBodyArenaParsePrimary(arena: CompilerBodyArena, start: Int, lim
     if token.kind == .dollar {
         let maybeName: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: token.end))
         if maybeName == nil { return compilerBodyParseFailure(index: token.end) }
-        let name: RangeLexedToken(maybeName ?? fallback)
+        let name: RangeLexedToken(maybeName ?? compilerFallbackTokenAt(index: fallbackIndex))
         if name.kind != .identifier || name.end > limit { return compilerBodyParseFailure(index: token.end) }
         let bindingReferenceNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindBindingReference(), ordinal: 0, start: token.start, end: name.end, firstStart: name.start, firstEnd: name.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
         if bindingReferenceNodeID < 0 { return compilerBodyParseFailure(index: start) }
@@ -349,7 +349,7 @@ function compilerBodyArenaParsePrimary(arena: CompilerBodyArena, start: Int, lim
         if !grouped.isValid { return grouped }
         let maybeRight: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: grouped.nextIndex))
         if maybeRight == nil { return compilerBodyParseFailure(index: grouped.nextIndex) }
-        let right: RangeLexedToken(maybeRight ?? fallback)
+        let right: RangeLexedToken(maybeRight ?? compilerFallbackTokenAt(index: fallbackIndex))
         if right.kind != .rightParen || right.end > limit { return compilerBodyParseFailure(index: grouped.nextIndex) }
         let groupingNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindGrouping(), ordinal: 0, start: token.start, end: right.end, firstStart: token.start, firstEnd: token.end, secondStart: right.start, secondEnd: right.end, aux: 0))
         if groupingNodeID < 0 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: groupingNodeID, childNodeID: grouped.nodeID, role: compilerSyntaxRoleGroupedValue(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: start) }
@@ -372,11 +372,11 @@ function compilerBodyArenaParsePrimary(arena: CompilerBodyArena, start: Int, lim
 function compilerBodyArenaParseCallArguments(arena: CompilerBodyArena, callNodeID: Int, start: Int, limit: Int): CompilerBodyParseResult {
     state cursor: Int(start)
     state ordinal: Int(0)
-    let fallback: RangeLexedToken(kind: .eof, start: start, end: start, text: String(""))
+    let fallbackIndex: Int(start)
     while cursor < limit {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
         if maybeToken == nil { return compilerBodyParseFailure(index: cursor) }
-        let token: RangeLexedToken(maybeToken ?? fallback)
+        let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: fallbackIndex))
         if token.kind == .rightParen { return compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: token.end) }
         state valueStart: Int(0)
         valueStart: token.start
@@ -385,7 +385,7 @@ function compilerBodyArenaParseCallArguments(arena: CompilerBodyArena, callNodeI
         if token.kind == .identifier || token.kind == .keyword {
             let maybeColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: token.end))
             if maybeColon != nil {
-                let colon: RangeLexedToken(maybeColon ?? fallback)
+                let colon: RangeLexedToken(maybeColon ?? compilerFallbackTokenAt(index: fallbackIndex))
                 if colon.kind == .colon {
                     labelStart: token.start
                     labelEnd: token.end
@@ -401,7 +401,7 @@ function compilerBodyArenaParseCallArguments(arena: CompilerBodyArena, callNodeI
             || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: argumentNodeID, childNodeID: value.nodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: cursor) }
         let maybeSeparator: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: value.nextIndex))
         if maybeSeparator == nil { return compilerBodyParseFailure(index: value.nextIndex) }
-        let separator: RangeLexedToken(maybeSeparator ?? fallback)
+        let separator: RangeLexedToken(maybeSeparator ?? compilerFallbackTokenAt(index: fallbackIndex))
         if separator.kind == .rightParen { return compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: separator.end) }
         if separator.kind != .comma { return compilerBodyParseFailure(index: value.nextIndex) }
         cursor: separator.end
@@ -413,11 +413,11 @@ function compilerBodyArenaParseCallArguments(arena: CompilerBodyArena, callNodeI
 function compilerBodyArenaParseSwitchPatternArguments(arena: CompilerBodyArena, callNodeID: Int, start: Int, limit: Int): CompilerBodyParseResult {
     state cursor: Int(start)
     state ordinal: Int(0)
-    let fallback: RangeLexedToken(kind: .eof, start: start, end: start, text: String(""))
+    let fallbackIndex: Int(start)
     while cursor < limit {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
         if maybeToken == nil { return compilerBodyParseFailure(index: cursor) }
-        let token: RangeLexedToken(maybeToken ?? fallback)
+        let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: fallbackIndex))
         if token.kind == .rightParen { return compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: token.end) }
         state labelStart: Int(0 - 1)
         state labelEnd: Int(0 - 1)
@@ -425,20 +425,20 @@ function compilerBodyArenaParseSwitchPatternArguments(arena: CompilerBodyArena, 
         if token.kind == .identifier || token.kind == .keyword {
             let maybeColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: token.end))
             if maybeColon != nil {
-                let colon: RangeLexedToken(maybeColon ?? fallback)
+                let colon: RangeLexedToken(maybeColon ?? compilerFallbackTokenAt(index: fallbackIndex))
                 if colon.kind == .colon {
                     labelStart: token.start
                     labelEnd: token.end
                     let maybeBinding: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: colon.end))
                     if maybeBinding == nil { return compilerBodyParseFailure(index: colon.end) }
-                    bindingToken: maybeBinding ?? fallback
+                    bindingToken: maybeBinding ?? compilerFallbackTokenAt(index: fallbackIndex)
                 }
             }
         }
         if bindingToken.kind != .keyword || bindingToken.text != String("let") { return compilerBodyParseFailure(index: bindingToken.start) }
         let maybeName: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: bindingToken.end))
         if maybeName == nil { return compilerBodyParseFailure(index: bindingToken.end) }
-        let name: RangeLexedToken(maybeName ?? fallback)
+        let name: RangeLexedToken(maybeName ?? compilerFallbackTokenAt(index: fallbackIndex))
         if name.kind != .identifier { return compilerBodyParseFailure(index: name.start) }
         let bindingNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindIdentifier(), ordinal: ordinal, start: bindingToken.start, end: name.end, firstStart: name.start, firstEnd: name.end, secondStart: bindingToken.start, secondEnd: bindingToken.end, aux: compilerBodyEnumPatternBindingAux()))
         let argumentNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindArgument(), ordinal: ordinal, start: token.start, end: name.end, firstStart: labelStart, firstEnd: labelEnd, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
@@ -447,7 +447,7 @@ function compilerBodyArenaParseSwitchPatternArguments(arena: CompilerBodyArena, 
             || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: argumentNodeID, childNodeID: bindingNodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: cursor) }
         let maybeSeparator: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: name.end))
         if maybeSeparator == nil { return compilerBodyParseFailure(index: name.end) }
-        let separator: RangeLexedToken(maybeSeparator ?? fallback)
+        let separator: RangeLexedToken(maybeSeparator ?? compilerFallbackTokenAt(index: fallbackIndex))
         if separator.kind == .rightParen { return compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: separator.end) }
         if separator.kind != .comma { return compilerBodyParseFailure(index: separator.start) }
         cursor: separator.end
@@ -462,10 +462,10 @@ function compilerBodyArenaParseSwitchPattern(arena: CompilerBodyArena, start: In
     if compilerIntTableValue(table: arena.nodes, row: primary.nodeID, column: 1) != compilerSyntaxKindEnumCaseValue() {
         return compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: start, limit: limit, minimumPrecedence: 0)
     }
-    let fallback: RangeLexedToken(kind: .eof, start: primary.nextIndex, end: primary.nextIndex, text: String(""))
+    let fallbackIndex: Int(primary.nextIndex)
     let maybeLeft: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: primary.nextIndex))
     if maybeLeft == nil { return primary }
-    let left: RangeLexedToken(maybeLeft ?? fallback)
+    let left: RangeLexedToken(maybeLeft ?? compilerFallbackTokenAt(index: fallbackIndex))
     if left.kind != .leftParen { return primary }
     let caseStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.nodes, row: primary.nodeID, column: 4)))
     let callNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindApplication(), ordinal: 0, start: caseStart, end: left.end, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
@@ -480,16 +480,16 @@ function compilerBodyArenaParseSwitchPattern(arena: CompilerBodyArena, start: In
 function compilerBodyArenaParsePostfix(arena: CompilerBodyArena, start: Int, limit: Int): CompilerBodyParseResult {
     state result: CompilerBodyParseResult(compilerBodyArenaParsePrimary(arena: arena, start: start, limit: limit))
     if !result.isValid { return result }
-    let fallback: RangeLexedToken(kind: .eof, start: start, end: start, text: String(""))
+    let fallbackIndex: Int(start)
     state keepScanning: Bool(true)
     while keepScanning && result.nextIndex < limit {
         let maybeSuffix: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: result.nextIndex))
         if maybeSuffix == nil { return result }
-        let suffix: RangeLexedToken(maybeSuffix ?? fallback)
+        let suffix: RangeLexedToken(maybeSuffix ?? compilerFallbackTokenAt(index: fallbackIndex))
         if suffix.kind == .dot {
             let maybeMember: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: suffix.end))
             if maybeMember == nil { return compilerBodyParseFailure(index: suffix.end) }
-            let member: RangeLexedToken(maybeMember ?? fallback)
+            let member: RangeLexedToken(maybeMember ?? compilerFallbackTokenAt(index: fallbackIndex))
             if member.kind != .identifier && member.kind != .keyword { return compilerBodyParseFailure(index: suffix.end) }
             let receiverNodeID: Int(result.nodeID)
             let receiverStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.nodes, row: receiverNodeID, column: 4)))
@@ -510,7 +510,7 @@ function compilerBodyArenaParsePostfix(arena: CompilerBodyArena, start: Int, lim
             if !indexValue.isValid { return indexValue }
             let maybeRightBracket: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: indexValue.nextIndex))
             if maybeRightBracket == nil { return compilerBodyParseFailure(index: indexValue.nextIndex) }
-            let rightBracket: RangeLexedToken(maybeRightBracket ?? fallback)
+            let rightBracket: RangeLexedToken(maybeRightBracket ?? compilerFallbackTokenAt(index: fallbackIndex))
             if rightBracket.kind != .rightBracket { return compilerBodyParseFailure(index: rightBracket.start) }
             let receiverNodeID: Int(result.nodeID)
             let receiverStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.nodes, row: receiverNodeID, column: 4)))
@@ -543,12 +543,11 @@ function compilerBodyArenaParsePrefix(arena: CompilerBodyArena, start: Int, limi
 function compilerBodyArenaParseExpressionAtPrecedence(arena: CompilerBodyArena, start: Int, limit: Int, minimumPrecedence: Int): CompilerBodyParseResult {
     state left: CompilerBodyParseResult(compilerBodyArenaParsePrefix(arena: arena, start: start, limit: limit))
     if !left.isValid { return left }
-    let fallback: RangeLexedToken(kind: .eof, start: start, end: start, text: String(""))
     state keepScanning: Bool(true)
     while keepScanning && left.nextIndex < limit {
         let maybeOperator: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: left.nextIndex))
         if maybeOperator == nil { return left }
-        let operatorToken: RangeLexedToken(maybeOperator ?? fallback)
+        let operatorToken: RangeLexedToken(maybeOperator ?? compilerFallbackTokenAt(index: start))
         let binaryKind: Int(compilerBodyArenaBinaryKind(token: operatorToken))
         let precedence: Int(compilerCoreBinaryPrecedence(token: operatorToken))
         if binaryKind < 0 || precedence < minimumPrecedence {
@@ -600,10 +599,10 @@ function compilerBodyArenaParseExplicitArrayLetStatement(arena: CompilerBodyAren
     if elementType.end != bracketRange.end { return compilerBodyParseFailure(index: elementType.end) }
     let initializer: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: leftParen.end, limit: limit, minimumPrecedence: 0))
     if !initializer.isValid { return compilerBodyParseFailure(index: leftParen.end) }
-    let fallback: RangeLexedToken(kind: .eof, start: initializer.nextIndex, end: initializer.nextIndex, text: String(""))
+    let fallbackIndex: Int(initializer.nextIndex)
     let maybeRightParen: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: initializer.nextIndex))
     if maybeRightParen == nil { return compilerBodyParseFailure(index: initializer.nextIndex) }
-    let rightParen: RangeLexedToken(maybeRightParen ?? fallback)
+    let rightParen: RangeLexedToken(maybeRightParen ?? compilerFallbackTokenAt(index: fallbackIndex))
     if rightParen.kind != .rightParen { return compilerBodyParseFailure(index: rightParen.start) }
     return compilerBodyArenaAppendArrayLocal(arena: arena, keyword: keyword, name: name, typeStart: leftBracket.start, typeEnd: bracketRange.next, initializerNodeID: initializer.nodeID, localEnd: rightParen.end, ordinal: ordinal)
 }
@@ -631,16 +630,16 @@ function compilerBodyArenaInitializerRepeatsDeclaredType(arena: CompilerBodyAren
 }
 
 function compilerBodyArenaParseLetStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
-    let fallback: RangeLexedToken(kind: .eof, start: keyword.end, end: keyword.end, text: String(""))
+    let fallbackIndex: Int(keyword.end)
     let maybeName: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: keyword.end))
     if maybeName == nil { return compilerBodyParseFailure(index: keyword.end) }
-    let name: RangeLexedToken(maybeName ?? fallback)
+    let name: RangeLexedToken(maybeName ?? compilerFallbackTokenAt(index: fallbackIndex))
     let maybeColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: name.end))
     if maybeColon == nil { return compilerBodyParseFailure(index: name.end) }
-    let colon: RangeLexedToken(maybeColon ?? fallback)
+    let colon: RangeLexedToken(maybeColon ?? compilerFallbackTokenAt(index: fallbackIndex))
     let maybeAfterColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: colon.end))
     if maybeAfterColon == nil { return compilerBodyParseFailure(index: colon.end) }
-    let afterColon: RangeLexedToken(maybeAfterColon ?? fallback)
+    let afterColon: RangeLexedToken(maybeAfterColon ?? compilerFallbackTokenAt(index: fallbackIndex))
     if name.kind != .identifier || colon.kind != .colon { return compilerBodyParseFailure(index: keyword.end) }
     if afterColon.kind == .leftBracket { return compilerBodyArenaParseArrayLetStatement(arena: arena, keyword: keyword, name: name, leftBracket: afterColon, limit: limit, ordinal: ordinal) }
     let maybeType: Optional<CompilerTypeReference>(compilerCoreParseTypeReference(cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: colon.end)))
@@ -648,18 +647,18 @@ function compilerBodyArenaParseLetStatement(arena: CompilerBodyArena, keyword: R
     let typeReference: CompilerTypeReference(maybeType ?? CompilerTypeReference(text: String(""), start: colon.end, end: colon.end))
     let maybeLeftParen: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: typeReference.end))
     if maybeLeftParen == nil { return compilerBodyParseFailure(index: typeReference.end) }
-    let leftParen: RangeLexedToken(maybeLeftParen ?? fallback)
+    let leftParen: RangeLexedToken(maybeLeftParen ?? compilerFallbackTokenAt(index: fallbackIndex))
     if leftParen.kind != .leftParen { return compilerBodyParseFailure(index: keyword.end) }
     state initializer: CompilerBodyParseResult(compilerBodyParseFailure(index: leftParen.end))
     state localEnd: Int(leftParen.end)
     let maybeFirstInitializerToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: leftParen.end))
     state hasLabeledConstructArguments: Bool(false)
     if maybeFirstInitializerToken != nil {
-        let firstInitializerToken: RangeLexedToken(maybeFirstInitializerToken ?? fallback)
+        let firstInitializerToken: RangeLexedToken(maybeFirstInitializerToken ?? compilerFallbackTokenAt(index: fallbackIndex))
         if firstInitializerToken.kind == .identifier || firstInitializerToken.kind == .keyword {
             let maybeFirstInitializerColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: firstInitializerToken.end))
             if maybeFirstInitializerColon != nil {
-                let firstInitializerColon: RangeLexedToken(maybeFirstInitializerColon ?? fallback)
+                let firstInitializerColon: RangeLexedToken(maybeFirstInitializerColon ?? compilerFallbackTokenAt(index: fallbackIndex))
                 if firstInitializerColon.kind == .colon { hasLabeledConstructArguments: true }
             }
         }
@@ -680,7 +679,7 @@ function compilerBodyArenaParseLetStatement(arena: CompilerBodyArena, keyword: R
         if compilerBodyArenaInitializerRepeatsDeclaredType(arena: arena, initializerNodeID: wrappedInitializer.nodeID, typeReference: typeReference) { return compilerBodyParseFailure(index: leftParen.end) }
         let maybeRightParen: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: wrappedInitializer.nextIndex))
         if maybeRightParen == nil { return compilerBodyParseFailure(index: wrappedInitializer.nextIndex) }
-        let rightParen: RangeLexedToken(maybeRightParen ?? fallback)
+        let rightParen: RangeLexedToken(maybeRightParen ?? compilerFallbackTokenAt(index: fallbackIndex))
         if rightParen.kind != .rightParen { return compilerBodyParseFailure(index: wrappedInitializer.nextIndex) }
         initializer: wrappedInitializer
         localEnd: rightParen.end
@@ -713,10 +712,10 @@ function compilerBodyArenaParseRegionInto(arena: CompilerBodyArena, regionNodeID
 function compilerBodyArenaParseIfStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
     let condition: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: keyword.end, limit: limit, minimumPrecedence: 0))
     if !condition.isValid { return condition }
-    let fallback: RangeLexedToken(kind: .eof, start: condition.nextIndex, end: condition.nextIndex, text: String(""))
+    let fallbackIndex: Int(condition.nextIndex)
     let maybeLeftBrace: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: condition.nextIndex))
     if maybeLeftBrace == nil { return compilerBodyParseFailure(index: condition.nextIndex) }
-    let leftBrace: RangeLexedToken(maybeLeftBrace ?? fallback)
+    let leftBrace: RangeLexedToken(maybeLeftBrace ?? compilerFallbackTokenAt(index: fallbackIndex))
     if leftBrace.kind != .leftBrace { return compilerBodyParseFailure(index: condition.nextIndex) }
     let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: leftBrace.start), leftKind: .leftBrace, rightKind: .rightBrace))
     if maybeRange == nil { return compilerBodyParseFailure(index: leftBrace.start) }
@@ -732,11 +731,11 @@ function compilerBodyArenaParseIfStatement(arena: CompilerBodyArena, keyword: Ra
     if !parsedRegion.isValid { return parsedRegion }
     let maybeElse: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: range.next))
     if maybeElse == nil { return compilerBodyParseSuccess(nodeID: ifNodeID, nextIndex: range.next) }
-    let elseToken: RangeLexedToken(maybeElse ?? fallback)
+    let elseToken: RangeLexedToken(maybeElse ?? compilerFallbackTokenAt(index: fallbackIndex))
     if elseToken.text != String("else") { return compilerBodyParseSuccess(nodeID: ifNodeID, nextIndex: range.next) }
     let maybeElseStart: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: elseToken.end))
     if maybeElseStart == nil { return compilerBodyParseFailure(index: elseToken.end) }
-    let elseStart: RangeLexedToken(maybeElseStart ?? fallback)
+    let elseStart: RangeLexedToken(maybeElseStart ?? compilerFallbackTokenAt(index: fallbackIndex))
     state elseRegionNodeID: Int(0 - 1)
     state elseNext: Int(0)
     elseNext: elseStart.end
@@ -764,10 +763,10 @@ function compilerBodyArenaParseIfStatement(arena: CompilerBodyArena, keyword: Ra
 function compilerBodyArenaParseWhileStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
     let condition: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: keyword.end, limit: limit, minimumPrecedence: 0))
     if !condition.isValid { return condition }
-    let fallback: RangeLexedToken(kind: .eof, start: condition.nextIndex, end: condition.nextIndex, text: String(""))
+    let fallbackIndex: Int(condition.nextIndex)
     let maybeLeftBrace: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: condition.nextIndex))
     if maybeLeftBrace == nil { return compilerBodyParseFailure(index: condition.nextIndex) }
-    let leftBrace: RangeLexedToken(maybeLeftBrace ?? fallback)
+    let leftBrace: RangeLexedToken(maybeLeftBrace ?? compilerFallbackTokenAt(index: fallbackIndex))
     if leftBrace.kind != .leftBrace { return compilerBodyParseFailure(index: condition.nextIndex) }
     let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: leftBrace.start), leftKind: .leftBrace, rightKind: .rightBrace))
     if maybeRange == nil { return compilerBodyParseFailure(index: leftBrace.start) }
@@ -787,11 +786,11 @@ function compilerBodyArenaSwitchClauseEnd(arena: CompilerBodyArena, start: Int, 
     state braceDepth: Int(0)
     state parenthesisDepth: Int(0)
     state bracketDepth: Int(0)
-    let fallback: RangeLexedToken(kind: .eof, start: start, end: start, text: String(""))
+    let fallbackIndex: Int(start)
     while cursor < limit {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
         if maybeToken == nil { return limit }
-        let token: RangeLexedToken(maybeToken ?? fallback)
+        let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: fallbackIndex))
         if token.start >= limit { return limit }
         if braceDepth == 0 && parenthesisDepth == 0 && bracketDepth == 0
             && token.kind == .keyword && (token.text == String("case") || token.text == String("default")) { return token.start }
@@ -818,10 +817,10 @@ function compilerBodyArenaSwitchClauseEnd(arena: CompilerBodyArena, start: Int, 
 function compilerBodyArenaParseSwitchStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
     let subject: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: keyword.end, limit: limit, minimumPrecedence: 0))
     if !subject.isValid { return subject }
-    let fallback: RangeLexedToken(kind: .eof, start: subject.nextIndex, end: subject.nextIndex, text: String(""))
+    let fallbackIndex: Int(subject.nextIndex)
     let maybeLeftBrace: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: subject.nextIndex))
     if maybeLeftBrace == nil { return compilerBodyParseFailure(index: subject.nextIndex) }
-    let leftBrace: RangeLexedToken(maybeLeftBrace ?? fallback)
+    let leftBrace: RangeLexedToken(maybeLeftBrace ?? compilerFallbackTokenAt(index: fallbackIndex))
     if leftBrace.kind != .leftBrace { return compilerBodyParseFailure(index: subject.nextIndex) }
     let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: leftBrace.start), leftKind: .leftBrace, rightKind: .rightBrace))
     if maybeRange == nil { return compilerBodyParseFailure(index: leftBrace.start) }
@@ -835,7 +834,7 @@ function compilerBodyArenaParseSwitchStatement(arena: CompilerBodyArena, keyword
     while cursor < range.end {
         let maybeCaseToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
         if maybeCaseToken == nil { return compilerBodyParseFailure(index: cursor) }
-        let caseToken: RangeLexedToken(maybeCaseToken ?? fallback)
+        let caseToken: RangeLexedToken(maybeCaseToken ?? compilerFallbackTokenAt(index: fallbackIndex))
         if caseToken.start >= range.end {
             cursor: range.end
         } else {
@@ -854,7 +853,7 @@ function compilerBodyArenaParseSwitchStatement(arena: CompilerBodyArena, keyword
             }
             let maybeColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: colonSearchStart))
             if maybeColon == nil { return compilerBodyParseFailure(index: colonSearchStart) }
-            let colon: RangeLexedToken(maybeColon ?? fallback)
+            let colon: RangeLexedToken(maybeColon ?? compilerFallbackTokenAt(index: fallbackIndex))
             if colon.kind != .colon { return compilerBodyParseFailure(index: colonSearchStart) }
             let clauseEnd: Int(compilerBodyArenaSwitchClauseEnd(arena: arena, start: colon.end, limit: range.end))
             if clauseEnd < colon.end { return compilerBodyParseFailure(index: colon.end) }
@@ -885,13 +884,13 @@ function compilerBodyArenaParsedPostfixIsApplication(arena: CompilerBodyArena, n
 function compilerBodyArenaParseAssignmentStatement(arena: CompilerBodyArena, start: Int, limit: Int, ordinal: Int): CompilerBodyParseResult {
     let target: CompilerBodyParseResult(compilerBodyArenaParsePostfix(arena: arena, start: start, limit: limit))
     if !target.isValid { return target }
-    let fallback: RangeLexedToken(kind: .eof, start: target.nextIndex, end: target.nextIndex, text: String(""))
+    let fallbackIndex: Int(target.nextIndex)
     let maybeColon: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: target.nextIndex))
     if maybeColon == nil {
         if compilerBodyArenaParsedPostfixIsApplication(arena: arena, nodeID: target.nodeID, start: start, end: target.nextIndex) { return target }
         return compilerBodyParseFailure(index: target.nextIndex)
     }
-    let colon: RangeLexedToken(maybeColon ?? fallback)
+    let colon: RangeLexedToken(maybeColon ?? compilerFallbackTokenAt(index: fallbackIndex))
     if colon.start >= limit || colon.kind != .colon {
         if compilerBodyArenaParsedPostfixIsApplication(arena: arena, nodeID: target.nodeID, start: start, end: target.nextIndex) { return target }
         return compilerBodyParseFailure(index: target.nextIndex)
@@ -934,30 +933,30 @@ function compilerBodyArenaParseContextualExpandStatement(arena: CompilerBodyAren
 
 function compilerBodyArenaParseTargetDeclarationExpandStatement(arena: CompilerBodyArena, target: RangeLexedToken, limit: Int): CompilerBodyParseResult {
     state cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: target.end)
-    let fallback: RangeLexedToken(compilerFallbackToken(cursor: cursor))
+    let fallbackIndex: Int(cursor.index)
     let maybeDot1: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeDot1 == nil { return compilerBodyParseFailure(index: target.end) }
-    let dot1: RangeLexedToken(maybeDot1 ?? fallback)
+    let dot1: RangeLexedToken(maybeDot1 ?? compilerFallbackTokenAt(index: fallbackIndex))
     if dot1.kind != .dot { return compilerBodyParseFailure(index: target.end) }
     cursor: compilerCursorAdvance(cursor: cursor, token: dot1)
     let maybeDeclaration: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeDeclaration == nil { return compilerBodyParseFailure(index: dot1.end) }
-    let declaration: RangeLexedToken(maybeDeclaration ?? fallback)
+    let declaration: RangeLexedToken(maybeDeclaration ?? compilerFallbackTokenAt(index: fallbackIndex))
     if declaration.kind != .identifier || declaration.text != String("declaration") { return compilerBodyParseFailure(index: declaration.start) }
     cursor: compilerCursorAdvance(cursor: cursor, token: declaration)
     let maybeDot2: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeDot2 == nil { return compilerBodyParseFailure(index: declaration.end) }
-    let dot2: RangeLexedToken(maybeDot2 ?? fallback)
+    let dot2: RangeLexedToken(maybeDot2 ?? compilerFallbackTokenAt(index: fallbackIndex))
     if dot2.kind != .dot { return compilerBodyParseFailure(index: declaration.end) }
     cursor: compilerCursorAdvance(cursor: cursor, token: dot2)
     let maybeExpand: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeExpand == nil { return compilerBodyParseFailure(index: dot2.end) }
-    let expand: RangeLexedToken(maybeExpand ?? fallback)
+    let expand: RangeLexedToken(maybeExpand ?? compilerFallbackTokenAt(index: fallbackIndex))
     if expand.kind != .identifier || expand.text != String("expand") { return compilerBodyParseFailure(index: expand.start) }
     cursor: compilerCursorAdvance(cursor: cursor, token: expand)
     let maybeBrace: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeBrace == nil { return compilerBodyParseFailure(index: expand.end) }
-    let brace: RangeLexedToken(maybeBrace ?? fallback)
+    let brace: RangeLexedToken(maybeBrace ?? compilerFallbackTokenAt(index: fallbackIndex))
     if brace.kind != .leftBrace { return compilerBodyParseFailure(index: brace.start) }
     let maybeExpansion: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: brace.start), leftKind: .leftBrace, rightKind: .rightBrace))
     if maybeExpansion == nil { return compilerBodyParseFailure(index: brace.start) }

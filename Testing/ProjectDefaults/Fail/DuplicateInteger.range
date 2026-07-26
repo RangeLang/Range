@@ -1,0 +1,10 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/ProjectMacro.range
+macro project(): Construct -> Void {}
+compilerSourceFile\trole=project\tpath=Project.range
+@project
+construct Project {
+    state integer: Int<4>
+    state integer: Int<8>
+    state bool: Bool
+}

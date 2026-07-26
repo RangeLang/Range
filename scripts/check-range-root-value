@@ -20,8 +20,103 @@ DIR defaults to RangeCompiler/Sources/Compiler. The command resolves a
 content-addressed Stage 2 compiler for the current accepted seed, runtime, and
 compiler sources, then validates only RootValue boundary-forward-mixed.
 The controls mode runs the complete neighboring RootValue positive and negative
-fixture set against the same cached Stage 2 compiler.
+fixture set against the same cached Stage 2 compiler. Both modes first verify
+the focused @project scalar-default fixtures against that compiler.
 USAGE
+}
+
+check_project_defaults_fixture() {
+    local label="$1"
+    local relative="$2"
+    local expected_status="$3"
+    local expected_text="$4"
+    local fixture="$REPO_ROOT/$relative"
+    local output="$WORK_ROOT/project-defaults-$label.out"
+    local error="$WORK_ROOT/project-defaults-$label.err"
+    local actual_status
+
+    [[ -f "$fixture" ]] || fail "missing project-defaults fixture: $relative"
+    if "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq "$expected_status" ]] \
+        || fail "ProjectDefaults $label exited $actual_status, expected $expected_status"
+    [[ ! -s "$error" ]] || fail "ProjectDefaults $label wrote stderr"
+    /usr/bin/grep -Fq "$expected_text" "$output" \
+        || fail "ProjectDefaults $label omitted expected result: $expected_text"
+    echo "ProjectDefaults $label: pass"
+}
+
+check_project_integer_lowering() {
+    local label="$1"
+    local relative="$2"
+    local expected_instruction="$3"
+    local fixture="$REPO_ROOT/$relative"
+    local llvm="$WORK_ROOT/project-defaults-$label.ll"
+
+    [[ -f "$fixture" ]] || fail "missing project-defaults lowering fixture: $relative"
+    "$STAGE2_EXECUTABLE" emit-llvm "$fixture" "$llvm" \
+        || fail "ProjectDefaults $label did not emit LLVM"
+    /usr/bin/grep -Fq "$expected_instruction" "$llvm" \
+        || fail "ProjectDefaults $label omitted expected lowering: $expected_instruction"
+    validate_llvm "$llvm"
+    echo "ProjectDefaults $label: pass"
+}
+
+check_target_pointer_bits_runtime() {
+    local fixture="$REPO_ROOT/Testing/ProjectDefaults/Pass/TargetPointerBitsRuntime.range"
+    local llvm="$WORK_ROOT/project-defaults-target-pointer-bits-runtime.ll"
+    local executable="$WORK_ROOT/project-defaults-target-pointer-bits-runtime"
+    local actual_status
+
+    "$STAGE2_EXECUTABLE" emit-llvm "$fixture" "$llvm" \
+        || fail "ProjectDefaults target-pointer-bits-runtime did not emit LLVM"
+    /usr/bin/grep -Fq 'call i32 @targetPointerBits()' "$llvm" \
+        || fail "ProjectDefaults target-pointer-bits-runtime omitted the builtin call"
+    validate_llvm "$llvm"
+    link_llvm "$llvm" "$executable"
+    if "$executable"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 64 ]] \
+        || fail "ProjectDefaults target-pointer-bits-runtime returned $actual_status, expected 64"
+    echo "ProjectDefaults target-pointer-bits-runtime: pass"
+}
+
+check_project_defaults() {
+    check_project_defaults_fixture target-pointer-bits-builtin \
+        Testing/ProjectDefaults/Pass/TargetPointerBitsBuiltin.range 0 \
+        $'declaration\trow=0\tsyntaxID=0\tfileID=0\tkind=function'
+    check_project_defaults_fixture target-integer \
+        Testing/ProjectDefaults/Pass/TargetInteger.range 0 \
+        $'projectDefaults\tvalid=true\ttargetPointerBits=64\tintegerBits=64\tintegerOverridden=false\tboolOverridden=true'
+    check_project_defaults_fixture integer-width-override \
+        Testing/ProjectDefaults/Pass/IntegerWidthOverride.range 0 \
+        $'projectDefaults\tvalid=true\ttargetPointerBits=64\tintegerBits=4\tintegerOverridden=true\tboolOverridden=true'
+    check_project_defaults_fixture full-signed-integer \
+        Testing/ProjectDefaults/Pass/FullSignedInteger.range 0 \
+        $'projectDefaults\tvalid=true\ttargetPointerBits=64\tintegerBits=64\tintegerOverridden=true\tboolOverridden=true'
+    check_project_defaults_fixture duplicate-integer \
+        Testing/ProjectDefaults/Fail/DuplicateInteger.range 65 \
+        $'compilerError\tkind=invalidProjectDefaults\treason=duplicateInteger'
+    check_project_defaults_fixture integer-must-be-state \
+        Testing/ProjectDefaults/Fail/IntegerMustBeState.range 65 \
+        $'compilerError\tkind=invalidProjectDefaults\treason=integerMustBeState'
+    check_project_defaults_fixture invalid-integer-type \
+        Testing/ProjectDefaults/Fail/InvalidIntegerType.range 65 \
+        $'compilerError\tkind=invalidProjectDefaults\treason=invalidIntegerType'
+    check_project_integer_lowering bare-integer-lowering \
+        Testing/ProjectDefaults/Pass/BareIntegerLowering.range \
+        'trunc i64 7 to i32'
+    check_project_integer_lowering overridden-integer-lowering \
+        Testing/ProjectDefaults/Pass/OverriddenIntegerLowering.range \
+        'sext i4 7 to i32'
+    check_target_pointer_bits_runtime
+    echo "checkpoint root-value:project-defaults-complete: pass"
 }
 
 write_stage2_cache_key_material() {
@@ -225,6 +320,7 @@ main_root_value() {
     write_source_bundle "$SOURCE_BUNDLE"
     echo "checkpoint root-value:source-snapshot: pass"
     resolve_stage2_compiler
+    check_project_defaults
     if [[ "$controls" -eq 1 ]]; then
         audit_root_values Controls "$STAGE2_EXECUTABLE" "$WORK_ROOT/controls"
         echo "checkpoint root-value:controls-complete: pass"

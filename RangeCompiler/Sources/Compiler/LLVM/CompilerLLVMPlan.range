@@ -50,7 +50,7 @@ function compilerCoreTypedFunctionExclusionReason(tables: CompilerSyntaxTables, 
         return String("missingStatementRecords")
     }
     let returnType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.functions, row: functionRow, column: 6), localEnd: compilerIntTableValue(table: tables.functions, row: functionRow, column: 7)))
-    if compilerCoreLLVMTypeNameForRangeType(typeName: returnType) == String("") {
+    if compilerCoreLLVMTypeNameForRangeTypeInProject(tables: tables, typeName: returnType) == String("") {
         return String("unsupportedSignature")
     }
     let firstParameterRow: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 2))
@@ -60,7 +60,7 @@ function compilerCoreTypedFunctionExclusionReason(tables: CompilerSyntaxTables, 
         let parameterRow: Int(firstParameterRow + ordinal)
         let parameterFileID: Int(compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 1))
         let typeName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: parameterFileID, localStart: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 8), localEnd: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 9)))
-        if compilerCoreLLVMTypeNameForRangeType(typeName: typeName) == String("") {
+        if compilerCoreLLVMTypeNameForRangeTypeInProject(tables: tables, typeName: typeName) == String("") {
             return String("unsupportedSignature")
         }
         ordinal: ordinal + 1
@@ -151,6 +151,11 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
         let macroDiagnosticOutput: String(compilerMacroRenderDiagnostics(tables: tables))
         compilerSyntaxTablesDestroy(tables: tables)
         return macroDiagnosticOutput
+    }
+    let projectDefaults: CompilerProjectDefaults(compilerProjectDefaultsResolve(tables: tables))
+    if !projectDefaults.isValid {
+        compilerSyntaxTablesDestroy(tables: tables)
+        return "compilerError\tkind=invalidProjectDefaults\treason=\(compilerProjectDefaultsReasonName(reason: projectDefaults.reason))\trelatedRow=\(projectDefaults.relatedRow)"
     }
     let executionIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: tables))
     if !executionIndex.isValid {
@@ -269,7 +274,7 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
             }
             return "compilerError\tkind=invalidOwnedReturnSummary\tfunctionRow=\(returnFailureFunctionRow)\tfailureKind=\(returnFailureName)\tdetail=\(returnFailureDetail)"
         }
-        if failureStage == 2 || failureStage == 6 || (failureStage >= 6000 && failureStage < 7000) {
+        if failureStage == 2 || failureStage == 6 || (failureStage >= 6000 && failureStage < 100000) || failureStage >= 400000 {
             let failureFunctionRow: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureFunction()))
             let failureInstanceID: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureInstance()))
             let failureDetail: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureDetail()))
@@ -293,7 +298,7 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
         if failureStage >= 300000 && failureStage < 400000 {
             return "compilerError\tkind=invalidEntryOwnedPaths\tdetail=\(failureStage - 300000)"
         }
-        if failureStage >= 200000 {
+        if failureStage >= 200000 && failureStage < 300000 {
             let blockedFunctionRow: Int(failureStage - 200000)
             let blockedSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: blockedFunctionRow, column: 0))
             let blockedDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: blockedSyntaxID))
@@ -468,8 +473,8 @@ function compilerCoreLLVMDirectCallSignatureAudit(tables: CompilerSyntaxTables, 
         let returnCategory: Int(compilerIntTableValue(table: functionInstanceSignatures, row: signatureRow, column: compilerReachableFunctionInstanceSignatureReturnABICategoryColumn()))
         if receiverKeyID >= 0 && returnCategory == compilerBodyFunctionSignatureABICategoryNone() { return instanceID * 1000 + 5 }
         let returnType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.functions, row: functionRow, column: 6), localEnd: compilerIntTableValue(table: tables.functions, row: functionRow, column: 7)))
-        state llvmReturnType: String(compilerCoreLLVMTypeNameForRangeType(typeName: returnType))
-        if returnCategory == compilerBodyFunctionSignatureABICategoryInt() { llvmReturnType: String("i32") }
+        state llvmReturnType: String(compilerCoreLLVMTypeNameForRangeTypeInProject(tables: tables, typeName: returnType))
+        if returnCategory == compilerBodyFunctionSignatureABICategoryInt() { llvmReturnType: compilerProjectIntegerLLVMTypeName(tables: tables) }
         if returnCategory == compilerBodyFunctionSignatureABICategoryBool() { llvmReturnType: String("i1") }
         if returnCategory == compilerBodyFunctionSignatureABICategoryFloat() { llvmReturnType: String("double") }
         if returnCategory == compilerBodyFunctionSignatureABICategoryPointer() { llvmReturnType: String("ptr") }
@@ -569,7 +574,7 @@ function compilerCoreAppendLLVMFunctionDeclarationTyped(tables: CompilerSyntaxTa
     }
     let returnType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.functions, row: functionRow, column: 6), localEnd: compilerIntTableValue(table: tables.functions, row: functionRow, column: 7)))
     let parameters: String(compilerCoreLLVMFunctionParameterTextTyped(tables: tables, functionRow: functionRow))
-    rawBufferAppendText(buffer: outputBuffer, text: "declare \(compilerCoreLLVMTypeNameForRangeType(typeName: returnType)) @\(symbolName)(\(parameters))\n")
+    rawBufferAppendText(buffer: outputBuffer, text: "declare \(compilerCoreLLVMTypeNameForRangeTypeInProject(tables: tables, typeName: returnType)) @\(symbolName)(\(parameters))\n")
     return 1
 }
 
@@ -590,7 +595,7 @@ function compilerCoreLLVMFunctionParameterTextTyped(tables: CompilerSyntaxTables
         let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 6), localEnd: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 7)))
         let typeName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 8), localEnd: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 9)))
         if hasParameter { rawBufferAppendText(buffer: outputBuffer, text: String(", ")) }
-        rawBufferAppendText(buffer: outputBuffer, text: "\(compilerCoreLLVMTypeNameForRangeType(typeName: typeName)) %\(name)")
+        rawBufferAppendText(buffer: outputBuffer, text: "\(compilerCoreLLVMTypeNameForRangeTypeInProject(tables: tables, typeName: typeName)) %\(name)")
         hasParameter: true
         ordinal: ordinal + 1
     }
@@ -611,7 +616,7 @@ function compilerCoreLLVMNativeABITypeName(tables: CompilerSyntaxTables, index: 
     }
     let enumTypeName: String(compilerEnumLLVMTypeName(tables: tables, declarationRow: enumDeclarationRow))
     if enumTypeName != String("") { return enumTypeName }
-    return compilerCoreLLVMTypeNameForRangeType(typeName: typeName)
+    return compilerCoreLLVMTypeNameForRangeTypeInProject(tables: tables, typeName: typeName)
 }
 
 function compilerCoreLLVMFunctionParameterTextPlanned(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, functionRow: Int, abiPlan: CompilerModuleABIPlan): String {
@@ -655,7 +660,7 @@ function compilerCoreLLVMFunctionParameterLocalValuesTyped(tables: CompilerSynta
         let fileID: Int(compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 1))
         let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 6), localEnd: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 7)))
         let typeName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 8), localEnd: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 9)))
-        rawBufferAppendText(buffer: outputBuffer, text: compilerCoreLLVMLocalRecordWithRangeType(name: name, operand: "%\(name)", typeName: compilerCoreLLVMTypeNameForRangeType(typeName: typeName), rangeTypeName: typeName))
+        rawBufferAppendText(buffer: outputBuffer, text: compilerCoreLLVMLocalRecordWithRangeType(name: name, operand: "%\(name)", typeName: compilerCoreLLVMTypeNameForRangeTypeInProject(tables: tables, typeName: typeName), rangeTypeName: typeName))
         ordinal: ordinal + 1
     }
     return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)

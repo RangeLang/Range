@@ -1,0 +1,11 @@
+macro project(): Construct -> Void {}
+
+@project
+construct Configuration {
+    state integer: Int<4>
+    state bool: Bool
+}
+
+@main {
+    return 7
+}

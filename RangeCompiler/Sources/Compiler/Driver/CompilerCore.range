@@ -175,6 +175,16 @@ construct CompilerFingerprint {
     let second: Int
 }
 
+construct CompilerProjectDefaults {
+    let targetPointerBits: Int
+    let integerBits: Int
+    let integerWasOverridden: Bool
+    let boolWasOverridden: Bool
+    let reason: Int
+    let relatedRow: Int
+    let isValid: Bool
+}
+
 construct CompilerSyntaxTables {
     let sourceStore: CompilerSourceStore
     let syntaxIndex: CompilerIntTable
@@ -480,6 +490,11 @@ construct CompilerMacroApplicationParts {
     let nextIndex: Int
 }
 
+construct CompilerMacroApplicationParseResult {
+    let parts: CompilerMacroApplicationParts
+    let isValid: Bool
+}
+
 construct CompilerMacroParameterCapture {
     let count: Int
     let fingerprint: CompilerFingerprint
@@ -518,6 +533,12 @@ construct CompilerFunctionParameterTokenStep {
     let nameToken: RangeLexedToken
     let typeReference: CompilerTypeReference
     let nextIndex: Int
+}
+
+construct CompilerEnumPayloadAppendStep {
+    let nextIndex: Int
+    let fingerprint: CompilerFingerprint
+    let isValid: Bool
 }
 
 construct CompilerTypedDeclarationCaptureStep {

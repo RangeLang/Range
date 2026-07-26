@@ -1,0 +1,8 @@
+compilerMacroSnapshot
+macro project(): Construct -> Void {}
+
+@project
+construct Configuration {
+    let integer: Int<4>
+    state bool: Bool
+}

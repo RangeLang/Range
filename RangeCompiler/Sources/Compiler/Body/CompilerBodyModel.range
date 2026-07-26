@@ -100,7 +100,8 @@ function compilerBodyRuntimeBuiltinBufferCreateInt(): Int { return 41 }
 function compilerBodyRuntimeBuiltinBufferCreateUnsigned8(): Int { return 42 }
 function compilerBodyRuntimeBuiltinStringAppendStorage(): Int { return 43 }
 function compilerBodyRuntimeBuiltinStringDestroy(): Int { return 44 }
-function compilerBodyRuntimeBuiltinCount(): Int { return 44 }
+function compilerBodyRuntimeBuiltinTargetPointerBits(): Int { return 45 }
+function compilerBodyRuntimeBuiltinCount(): Int { return 45 }
 
 function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("stringTransientRegionMark") { return compilerBodyRuntimeBuiltinStringTransientRegionMark() }
@@ -147,6 +148,7 @@ function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("bufferCreateUnsigned8") { return compilerBodyRuntimeBuiltinBufferCreateUnsigned8() }
     if name == String("stringAppendStorage") { return compilerBodyRuntimeBuiltinStringAppendStorage() }
     if name == String("stringDestroy") { return compilerBodyRuntimeBuiltinStringDestroy() }
+    if name == String("targetPointerBits") { return compilerBodyRuntimeBuiltinTargetPointerBits() }
     return compilerBodyRuntimeBuiltinNone()
 }
 
@@ -195,6 +197,7 @@ function compilerBodyRuntimeBuiltinName(id: Int): String {
     if id == compilerBodyRuntimeBuiltinBufferCreateUnsigned8() { return String("bufferCreateUnsigned8") }
     if id == compilerBodyRuntimeBuiltinStringAppendStorage() { return String("stringAppendStorage") }
     if id == compilerBodyRuntimeBuiltinStringDestroy() { return String("stringDestroy") }
+    if id == compilerBodyRuntimeBuiltinTargetPointerBits() { return String("targetPointerBits") }
     return String("")
 }
 
@@ -220,7 +223,8 @@ function compilerBodyRuntimeBuiltinParameterCount(id: Int): Int {
     if id == compilerBodyRuntimeBuiltinStringTransientRegionMark()
         || id == compilerBodyRuntimeBuiltinCommandLineArgumentCount()
         || id == compilerBodyRuntimeBuiltinCompilerMetricsReset()
-        || id == compilerBodyRuntimeBuiltinCompilerMetricsReport() { return 0 }
+        || id == compilerBodyRuntimeBuiltinCompilerMetricsReport()
+        || id == compilerBodyRuntimeBuiltinTargetPointerBits() { return 0 }
     if id == compilerBodyRuntimeBuiltinStringTransientRegionReset()
         || id == compilerBodyRuntimeBuiltinRawBufferCount()
         || id == compilerBodyRuntimeBuiltinRawBufferMaterializeText()
@@ -607,7 +611,7 @@ function compilerEnumPayloadLLVMFieldTypeNameAtDepth(tables: CompilerSyntaxTable
     let targetID: Int(compilerIntTableValue(table: tables.typeReferences, row: typeReferenceID, column: compilerSyntaxTypeReferenceTargetIDColumn()))
     if referenceKind == compilerSyntaxTypeReferenceArray() { return String("%Range.Array") }
     if targetKind == compilerSyntaxTypeReferenceTargetBuiltin() {
-        if targetID == compilerSyntaxBuiltinTypeInt() { return String("i32") }
+        if targetID == compilerSyntaxBuiltinTypeInt() { return compilerProjectIntegerLLVMTypeName(tables: tables) }
         if targetID == compilerSyntaxBuiltinTypeBool() { return String("i1") }
         if targetID == compilerSyntaxBuiltinTypeString() { return String("ptr") }
         if targetID == compilerSyntaxBuiltinTypeFloat() { return String("double") }
@@ -662,7 +666,9 @@ function compilerEnumLLVMTypeName(tables: CompilerSyntaxTables, declarationRow: 
 }
 
 function compilerNominalLLVMFieldTypeNameAtDepth(tables: CompilerSyntaxTables, typeName: String, depth: Int): String {
-    if typeName == String("Int") { return String("i32") }
+    if compilerBodyArenaTypeOuterName(typeName: typeName) == String("Int") && !compilerIntegerTypeIsUnsigned8(typeName: typeName) {
+        return compilerCoreLLVMTypeNameForRangeTypeInProject(tables: tables, typeName: typeName)
+    }
     if typeName == String("Bool") { return String("i1") }
     if typeName == String("String") { return String("ptr") }
     if compilerBodyRuntimeABITypeIsOpaque(tables: tables, typeName: typeName) { return String("ptr") }
@@ -695,7 +701,7 @@ function compilerNominalLLVMMemberFieldTypeNameAtDepth(tables: CompilerSyntaxTab
     let targetID: Int(compilerIntTableValue(table: tables.typeReferences, row: typeReferenceID, column: compilerSyntaxTypeReferenceTargetIDColumn()))
     if referenceKind == compilerSyntaxTypeReferenceArray() { return String("%Range.Array") }
     if targetKind == compilerSyntaxTypeReferenceTargetBuiltin() {
-        if targetID == compilerSyntaxBuiltinTypeInt() { return String("i32") }
+        if targetID == compilerSyntaxBuiltinTypeInt() { return compilerProjectIntegerLLVMTypeName(tables: tables) }
         if targetID == compilerSyntaxBuiltinTypeBool() { return String("i1") }
         if targetID == compilerSyntaxBuiltinTypeString() { return String("ptr") }
         if targetID == compilerSyntaxBuiltinTypeFloat() { return String("double") }

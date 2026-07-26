@@ -1,0 +1,8 @@
+compilerMacroSnapshot
+macro project(): Construct -> Void {}
+
+@project
+construct Configuration {
+    state integer: String
+    state bool: Bool
+}

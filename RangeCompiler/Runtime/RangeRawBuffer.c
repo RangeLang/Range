@@ -24,6 +24,10 @@ static const uint64_t rangeRawBufferOwnedMagic = UINT64_C(0x52414E4745425546);
 static const uint64_t rangeRawBufferStaticMagic = UINT64_C(0x52414E4745425547);
 static const uint64_t rangeRawBufferTransientMagic = UINT64_C(0x52414E4745425548);
 
+int32_t targetPointerBits(void) {
+    return (int32_t)(sizeof(void *) * CHAR_BIT);
+}
+
 static int rangeRawBufferHasMagic(const RangeRawBuffer *buffer) {
     return buffer
         && (buffer->magic == rangeRawBufferOwnedMagic

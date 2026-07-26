@@ -557,12 +557,16 @@ function compilerMacroExecutionSummaryForValidIndex(tables: CompilerSyntaxTables
 }
 
 function compilerMacroSummaryForLinkedTables(tables: CompilerSyntaxTables): String {
+    let defaults: CompilerProjectDefaults(compilerProjectDefaultsResolve(tables: tables))
+    if !defaults.isValid {
+        return "compilerError\tkind=invalidProjectDefaults\treason=\(compilerProjectDefaultsReasonName(reason: defaults.reason))\trelatedRow=\(defaults.relatedRow)\n"
+    }
     let declarationIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: tables))
-    state output: String("")
+    state output: String("projectDefaults\tvalid=true\ttargetPointerBits=\(defaults.targetPointerBits)\tintegerBits=\(defaults.integerBits)\tintegerOverridden=\(defaults.integerWasOverridden)\tboolOverridden=\(defaults.boolWasOverridden)\n")
     if !declarationIndex.isValid {
         output: "compilerError\tkind=invalidDeclarationIndex\n"
     } else {
-        output: compilerMacroExecutionSummaryForValidIndex(tables: tables, index: declarationIndex)
+        output: "\(output)\(compilerMacroExecutionSummaryForValidIndex(tables: tables, index: declarationIndex))"
     }
     if compilerDeclarationIndexDestroy(index: declarationIndex) != 0 {
         output: "compilerError\tkind=macroOwnershipFailure\n"
@@ -626,6 +630,10 @@ function compilerNativeSourceSetLLVMTextForValidIndex(source: String, declaratio
 }
 
 function compilerNativeSourceSetLLVMTextForLinkedTables(source: String, declarationTables: CompilerSyntaxTables): String {
+    let defaults: CompilerProjectDefaults(compilerProjectDefaultsResolve(tables: declarationTables))
+    if !defaults.isValid {
+        return "compilerError\tkind=invalidProjectDefaults\treason=\(compilerProjectDefaultsReasonName(reason: defaults.reason))\trelatedRow=\(defaults.relatedRow)\n"
+    }
     let executionIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: declarationTables))
     state output: String("")
     if !executionIndex.isValid {
@@ -731,6 +739,10 @@ function compilerCursorAdvance(cursor: CompilerTokenCursor, token: RangeLexedTok
 
 function compilerFallbackToken(cursor: CompilerTokenCursor): RangeLexedToken {
     return RangeLexedToken(kind: .eof, start: cursor.index, end: cursor.index, text: String(""))
+}
+
+function compilerFallbackTokenAt(index: Int): RangeLexedToken {
+    return RangeLexedToken(kind: .eof, start: index, end: index, text: String(""))
 }
 
 function compilerCoreParseBalancedRange(cursor: CompilerTokenCursor, leftKind: RangeTokenKind, rightKind: RangeTokenKind): Optional<CompilerSourceRange> {
@@ -1319,7 +1331,24 @@ function compilerCoreParseAngleRangeAfterName(source: String, nameToken: RangeLe
     return nil
 }
 
-function compilerCoreParseMacroApplicationParts(source: String, macroToken: RangeLexedToken): Optional<CompilerMacroApplicationParts> {
+function compilerCoreInvalidMacroApplicationParts(index: Int): CompilerMacroApplicationParts {
+    let invalidRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: index)
+    return CompilerMacroApplicationParts(macroToken: compilerFallbackTokenAt(index: index), genericRange: invalidRange, argumentRange: invalidRange, bodyRange: invalidRange, nextIndex: index)
+}
+
+function compilerCoreOwnedMacroApplicationPartsCopy(parts: CompilerMacroApplicationParts): CompilerMacroApplicationParts {
+    state macroText: String(parts.macroToken.text)
+    let macroToken: RangeLexedToken(kind: parts.macroToken.kind, start: parts.macroToken.start, end: parts.macroToken.end, text: macroText)
+    return CompilerMacroApplicationParts(
+        macroToken: macroToken,
+        genericRange: parts.genericRange,
+        argumentRange: parts.argumentRange,
+        bodyRange: parts.bodyRange,
+        nextIndex: parts.nextIndex
+    )
+}
+
+function compilerCoreParseMacroApplicationParts(source: String, macroToken: RangeLexedToken): CompilerMacroApplicationParseResult {
     let invalidRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: macroToken))
     let cursor: CompilerTokenCursor(source: $source, index: compilerCoreRangeTokenEnd(token: macroToken))
     state genericRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: macroToken))
@@ -1334,7 +1363,7 @@ function compilerCoreParseMacroApplicationParts(source: String, macroToken: Rang
         if token.kind == .less {
             let syntheticName: RangeLexedToken(kind: .identifier, start: compilerCoreRangeTokenStart(token: macroToken) + 1, end: compilerCoreRangeTokenEnd(token: macroToken), text: stringSliceUnchecked(source: source, start: compilerCoreRangeTokenStart(token: macroToken) + 1, end: compilerCoreRangeTokenEnd(token: macroToken)))
             let maybeGeneric: Optional<CompilerSourceRange>(compilerCoreParseAngleRangeAfterName(source: source, nameToken: syntheticName))
-            if maybeGeneric == nil { return nil }
+            if maybeGeneric == nil { return CompilerMacroApplicationParseResult(parts: compilerCoreOwnedMacroApplicationPartsCopy(parts: compilerCoreInvalidMacroApplicationParts(index: token.end)), isValid: false) }
             genericRange: maybeGeneric ?? CompilerSourceRange(start: token.start, end: token.end, next: token.end)
             nextIndex: genericRange.next
         }
@@ -1347,7 +1376,7 @@ function compilerCoreParseMacroApplicationParts(source: String, macroToken: Rang
         )
         if argumentToken.kind == .leftParen {
             let maybeArgument: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: argumentCursor, leftKind: .leftParen, rightKind: .rightParen))
-            if maybeArgument == nil { return nil }
+            if maybeArgument == nil { return CompilerMacroApplicationParseResult(parts: compilerCoreOwnedMacroApplicationPartsCopy(parts: compilerCoreInvalidMacroApplicationParts(index: argumentToken.end)), isValid: false) }
             argumentRange: maybeArgument ?? CompilerSourceRange(start: argumentToken.end, end: argumentToken.end, next: argumentToken.end)
             nextIndex: argumentRange.next
         }
@@ -1360,12 +1389,12 @@ function compilerCoreParseMacroApplicationParts(source: String, macroToken: Rang
         )
         if bodyToken.kind == .leftBrace {
             let maybeBody: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: bodyCursor, leftKind: .leftBrace, rightKind: .rightBrace))
-            if maybeBody == nil { return nil }
+            if maybeBody == nil { return CompilerMacroApplicationParseResult(parts: compilerCoreOwnedMacroApplicationPartsCopy(parts: compilerCoreInvalidMacroApplicationParts(index: bodyToken.end)), isValid: false) }
             bodyRange: maybeBody ?? CompilerSourceRange(start: bodyToken.end, end: bodyToken.end, next: bodyToken.end)
             nextIndex: bodyRange.next
         }
     }
-    return CompilerMacroApplicationParts(macroToken: macroToken, genericRange: genericRange, argumentRange: argumentRange, bodyRange: bodyRange, nextIndex: nextIndex)
+    return CompilerMacroApplicationParseResult(parts: compilerCoreOwnedMacroApplicationPartsCopy(parts: CompilerMacroApplicationParts(macroToken: macroToken, genericRange: genericRange, argumentRange: argumentRange, bodyRange: bodyRange, nextIndex: nextIndex)), isValid: true)
 }
 
 function compilerCoreParseMacroCapabilityHeader(source: String, bodyRange: CompilerSourceRange): CompilerMacroCapabilityHeader {
@@ -1373,17 +1402,16 @@ function compilerCoreParseMacroCapabilityHeader(source: String, bodyRange: Compi
     if bodyRange.end <= bodyRange.start {
         return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderValid(), headerRange: invalidRange, executableBodyRange: invalidRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
     }
-    let fallback: RangeLexedToken(kind: .eof, start: bodyRange.start, end: bodyRange.start, text: String(""))
     let firstMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: bodyRange.start))
     if firstMaybe == nil {
         return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderDeclarative(), headerRange: invalidRange, executableBodyRange: bodyRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
     }
-    let first: RangeLexedToken(firstMaybe ?? fallback)
+    let first: RangeLexedToken(firstMaybe ?? compilerFallbackTokenAt(index: bodyRange.start))
     let comma1Maybe: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: first.end))
     if (first.kind != .identifier && first.kind != .keyword) || comma1Maybe == nil {
         return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderDeclarative(), headerRange: invalidRange, executableBodyRange: bodyRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
     }
-    let comma1: RangeLexedToken(comma1Maybe ?? fallback)
+    let comma1: RangeLexedToken(comma1Maybe ?? compilerFallbackTokenAt(index: first.end))
     if comma1.kind != .comma {
         if comma1.text == String("in") {
             return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: CompilerSourceRange(start: first.start, end: comma1.end, next: comma1.end), executableBodyRange: CompilerSourceRange(start: comma1.end, end: bodyRange.end, next: bodyRange.end), targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
@@ -1394,12 +1422,12 @@ function compilerCoreParseMacroCapabilityHeader(source: String, bodyRange: Compi
     if secondMaybe == nil {
         return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: invalidRange, executableBodyRange: invalidRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
     }
-    let second: RangeLexedToken(secondMaybe ?? fallback)
+    let second: RangeLexedToken(secondMaybe ?? compilerFallbackTokenAt(index: comma1.end))
     let comma2Maybe: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: second.end))
     if (second.kind != .identifier && second.kind != .keyword) || comma2Maybe == nil {
         return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: invalidRange, executableBodyRange: invalidRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
     }
-    let comma2: RangeLexedToken(comma2Maybe ?? fallback)
+    let comma2: RangeLexedToken(comma2Maybe ?? compilerFallbackTokenAt(index: second.end))
     if comma2.text == String("in") {
         if first.text == second.text {
             return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderDuplicate(), headerRange: CompilerSourceRange(start: first.start, end: comma2.end, next: comma2.end), executableBodyRange: CompilerSourceRange(start: comma2.end, end: bodyRange.end, next: bodyRange.end), targetRange: CompilerSourceRange(start: first.start, end: first.end, next: first.end), diagnosticsRange: CompilerSourceRange(start: second.start, end: second.end, next: second.end), graphRange: invalidRange)
@@ -1413,12 +1441,12 @@ function compilerCoreParseMacroCapabilityHeader(source: String, bodyRange: Compi
     if thirdMaybe == nil {
         return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: invalidRange, executableBodyRange: invalidRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
     }
-    let third: RangeLexedToken(thirdMaybe ?? fallback)
+    let third: RangeLexedToken(thirdMaybe ?? compilerFallbackTokenAt(index: comma2.end))
     let inMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: third.end))
     if (third.kind != .identifier && third.kind != .keyword) || inMaybe == nil {
         return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: invalidRange, executableBodyRange: invalidRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
     }
-    let inToken: RangeLexedToken(inMaybe ?? fallback)
+    let inToken: RangeLexedToken(inMaybe ?? compilerFallbackTokenAt(index: third.end))
     if inToken.text != String("in") {
         return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: invalidRange, executableBodyRange: invalidRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
     }
@@ -1431,8 +1459,7 @@ function compilerCoreParseMacroCapabilityHeader(source: String, bodyRange: Compi
 function compilerCoreParseMacroDeclarationParts(source: String, keyword: RangeLexedToken, visibility: Int, declarationStart: Int): Optional<CompilerMacroDeclarationParts> {
     let maybeName: Optional<RangeLexedToken>(compilerCoreParseMacroNameAfterKeyword(source: source, keyword: keyword))
     if maybeName == nil { return nil }
-    let aliasFallbackToken1: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: compilerCoreRangeTokenEnd(token: keyword))))
-    let nameToken: RangeLexedToken(maybeName ?? aliasFallbackToken1)
+    let nameToken: RangeLexedToken(maybeName ?? compilerFallbackTokenAt(index: compilerCoreRangeTokenEnd(token: keyword)))
     let invalidRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: nameToken))
     state genericRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: compilerCoreRangeTokenEnd(token: nameToken))
     let maybeGeneric: Optional<CompilerSourceRange>(compilerCoreParseAngleRangeAfterName(source: source, nameToken: nameToken))
@@ -1456,7 +1483,7 @@ function compilerCoreParseMacroDeclarationParts(source: String, keyword: RangeLe
     state targetType: CompilerTypeReference(text: String(""), start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset())
     state expansionType: CompilerTypeReference(text: String(""), start: 0 - 1, end: 0 - 1)
     state hasExpansion: Bool(false)
-    state bodyCursor: CompilerTokenCursor(separatorCursor)
+    state bodyCursor: CompilerTokenCursor(source: $source, index: separatorCursor.index)
     if separator.kind == .colon {
         let targetCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: separatorCursor, token: separator))
         let maybeTarget: Optional<CompilerTypeReference>(compilerCoreParseMacroSurfaceTypeReference(cursor: targetCursor))
@@ -1540,8 +1567,7 @@ function compilerCoreParseConstructDeclarationParts(source: String, keyword: Ran
         return nil
     }
 
-    let aliasFallbackToken2: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: keyword.end)))
-    let nameToken: RangeLexedToken(maybeName ?? aliasFallbackToken2)
+    let nameToken: RangeLexedToken(maybeName ?? compilerFallbackTokenAt(index: keyword.end))
     state genericRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: nameToken.end)
     let maybeGeneric: Optional<CompilerSourceRange>(compilerCoreParseAngleRangeAfterName(source: source, nameToken: nameToken))
     if maybeGeneric != nil {
@@ -1569,8 +1595,7 @@ function compilerCoreParseFunctionDeclarationPartsWithEnd(source: String, keywor
         return nil
     }
 
-    let aliasFallbackToken3: RangeLexedToken(compilerFallbackToken(cursor: CompilerTokenCursor(source: $source, index: keyword.end)))
-    let nameToken: RangeLexedToken(maybeName ?? aliasFallbackToken3)
+    let nameToken: RangeLexedToken(maybeName ?? compilerFallbackTokenAt(index: keyword.end))
     state genericRange: CompilerSourceRange(start: compilerMacroInvalidOffset(), end: compilerMacroInvalidOffset(), next: nameToken.end)
     let maybeGeneric: Optional<CompilerSourceRange>(compilerCoreParseAngleRangeAfterName(source: source, nameToken: nameToken))
     if maybeGeneric != nil {

@@ -55,6 +55,143 @@ function compilerBodyArenaGenericArgumentCount(typeName: String): Int {
     return count
 }
 
+function compilerBuiltinTargetPointerBits(): Int {
+    return 64
+}
+
+function compilerProjectDefaultsReasonNone(): Int { return 0 }
+function compilerProjectDefaultsReasonDuplicateProject(): Int { return 1 }
+function compilerProjectDefaultsReasonDuplicateInteger(): Int { return 2 }
+function compilerProjectDefaultsReasonIntegerMustBeState(): Int { return 3 }
+function compilerProjectDefaultsReasonInvalidIntegerType(): Int { return 4 }
+function compilerProjectDefaultsReasonDuplicateBool(): Int { return 5 }
+function compilerProjectDefaultsReasonBoolMustBeState(): Int { return 6 }
+function compilerProjectDefaultsReasonInvalidBoolType(): Int { return 7 }
+
+function compilerProjectDefaultsReasonName(reason: Int): String {
+    if reason == compilerProjectDefaultsReasonDuplicateProject() { return String("duplicateProject") }
+    if reason == compilerProjectDefaultsReasonDuplicateInteger() { return String("duplicateInteger") }
+    if reason == compilerProjectDefaultsReasonIntegerMustBeState() { return String("integerMustBeState") }
+    if reason == compilerProjectDefaultsReasonInvalidIntegerType() { return String("invalidIntegerType") }
+    if reason == compilerProjectDefaultsReasonDuplicateBool() { return String("duplicateBool") }
+    if reason == compilerProjectDefaultsReasonBoolMustBeState() { return String("boolMustBeState") }
+    if reason == compilerProjectDefaultsReasonInvalidBoolType() { return String("invalidBoolType") }
+    return String("none")
+}
+
+function compilerProjectMacroApplicationName(tables: CompilerSyntaxTables, applicationRow: Int): String {
+    if applicationRow < 0 || applicationRow >= compilerIntTableRowCount(table: tables.macroApplications) { return String("") }
+    let fileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
+    return compilerTypedSyntaxLocalText(
+        tables: tables,
+        fileID: fileID,
+        localStart: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 4),
+        localEnd: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 5))
+}
+
+function compilerProjectIntegerBits(typeName: String, fallbackBits: Int): Int {
+    let trimmed: CompilerSourceRange(compilerSemanticTrimStringRange(text: typeName, start: 0, end: stringLength(value: typeName)))
+    if trimmed.start < 0 { return 0 - 1 }
+    let normalized: String(typeName.substring(start: trimmed.start, end: trimmed.end))
+    if normalized == String("Int") { return fallbackBits }
+    if compilerBodyArenaTypeOuterName(typeName: normalized) != String("Int") { return 0 - 1 }
+    let argumentCount: Int(compilerBodyArenaGenericArgumentCount(typeName: normalized))
+    if argumentCount == 1 {
+        let widthText: String(compilerBodyArenaGenericArgumentText(typeName: normalized, ordinal: 0))
+        let width: Int(compilerCoreParseDecimalInt(value: widthText))
+        if width > 0 { return width }
+        return 0 - 1
+    }
+    if argumentCount != 2 { return 0 - 1 }
+    let firstText: String(compilerBodyArenaGenericArgumentText(typeName: normalized, ordinal: 0))
+    let secondText: String(compilerBodyArenaGenericArgumentText(typeName: normalized, ordinal: 1))
+    let first: CompilerSourceRange(compilerSemanticTrimStringRange(text: firstText, start: 0, end: stringLength(value: firstText)))
+    let second: CompilerSourceRange(compilerSemanticTrimStringRange(text: secondText, start: 0, end: stringLength(value: secondText)))
+    if first.start < 0 || second.start < 0 { return 0 - 1 }
+    if compilerSemanticStringRangeEqualsText(text: firstText, start: first.start, end: first.end, literal: String(".signed")) {
+        let width: Int(compilerCoreParseDecimalInt(value: secondText.substring(start: second.start, end: second.end)))
+        if width > 0 { return width }
+    }
+    if compilerSemanticStringRangeEqualsText(text: secondText, start: second.start, end: second.end, literal: String(".signed")) {
+        let width: Int(compilerCoreParseDecimalInt(value: firstText.substring(start: first.start, end: first.end)))
+        if width > 0 { return width }
+    }
+    return 0 - 1
+}
+
+function compilerProjectDefaultsResolve(tables: CompilerSyntaxTables): CompilerProjectDefaults {
+    let pointerBits: Int(compilerBuiltinTargetPointerBits())
+    state projectTargetSyntaxID: Int(0 - 1)
+    state projectApplicationCount: Int(0)
+    state applicationRow: Int(0)
+    while applicationRow < compilerIntTableRowCount(table: tables.macroApplications) {
+        if compilerProjectMacroApplicationName(tables: tables, applicationRow: applicationRow) == String("project") {
+            let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12))
+            let targetKind: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 13))
+            if targetSyntaxID >= 0 && targetKind == compilerSyntaxKindConstruct() {
+                projectTargetSyntaxID: targetSyntaxID
+                projectApplicationCount: projectApplicationCount + 1
+            }
+        }
+        applicationRow: applicationRow + 1
+    }
+    if projectApplicationCount > 1 {
+        return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: pointerBits, integerWasOverridden: false, boolWasOverridden: false, reason: compilerProjectDefaultsReasonDuplicateProject(), relatedRow: 0 - 1, isValid: false)
+    }
+    if projectApplicationCount == 0 {
+        return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: 32, integerWasOverridden: false, boolWasOverridden: false, reason: compilerProjectDefaultsReasonNone(), relatedRow: 0 - 1, isValid: true)
+    }
+
+    state integerBits: Int(pointerBits)
+    state integerCount: Int(0)
+    state integerWasOverridden: Bool(false)
+    state boolCount: Int(0)
+    state boolWasOverridden: Bool(false)
+    state memberRow: Int(0)
+    while memberRow < compilerIntTableRowCount(table: tables.members) {
+        if compilerIntTableValue(table: tables.members, row: memberRow, column: 2) == projectTargetSyntaxID {
+            let fileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
+            let memberName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 6), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 7)))
+            if memberName == String("integer") {
+                integerCount: integerCount + 1
+                if integerCount > 1 {
+                    return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: pointerBits, integerWasOverridden: false, boolWasOverridden: boolWasOverridden, reason: compilerProjectDefaultsReasonDuplicateInteger(), relatedRow: memberRow, isValid: false)
+                }
+                if compilerIntTableValue(table: tables.members, row: memberRow, column: 12) != compilerSyntaxMemberKindState() {
+                    return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: pointerBits, integerWasOverridden: false, boolWasOverridden: boolWasOverridden, reason: compilerProjectDefaultsReasonIntegerMustBeState(), relatedRow: memberRow, isValid: false)
+                }
+                let integerType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
+                integerBits: compilerProjectIntegerBits(typeName: integerType, fallbackBits: pointerBits)
+                if integerBits <= 0 {
+                    return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: pointerBits, integerWasOverridden: false, boolWasOverridden: boolWasOverridden, reason: compilerProjectDefaultsReasonInvalidIntegerType(), relatedRow: memberRow, isValid: false)
+                }
+                integerWasOverridden: true
+            } else if memberName == String("bool") {
+                boolCount: boolCount + 1
+                if boolCount > 1 {
+                    return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: integerBits, integerWasOverridden: integerWasOverridden, boolWasOverridden: false, reason: compilerProjectDefaultsReasonDuplicateBool(), relatedRow: memberRow, isValid: false)
+                }
+                if compilerIntTableValue(table: tables.members, row: memberRow, column: 12) != compilerSyntaxMemberKindState() {
+                    return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: integerBits, integerWasOverridden: integerWasOverridden, boolWasOverridden: false, reason: compilerProjectDefaultsReasonBoolMustBeState(), relatedRow: memberRow, isValid: false)
+                }
+                let boolType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
+                if boolType != String("Bool") {
+                    return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: integerBits, integerWasOverridden: integerWasOverridden, boolWasOverridden: false, reason: compilerProjectDefaultsReasonInvalidBoolType(), relatedRow: memberRow, isValid: false)
+                }
+                boolWasOverridden: true
+            }
+        }
+        memberRow: memberRow + 1
+    }
+    return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: integerBits, integerWasOverridden: integerWasOverridden, boolWasOverridden: boolWasOverridden, reason: compilerProjectDefaultsReasonNone(), relatedRow: 0 - 1, isValid: true)
+}
+
+function compilerProjectIntegerLLVMTypeName(tables: CompilerSyntaxTables): String {
+    let defaults: CompilerProjectDefaults(compilerProjectDefaultsResolve(tables: tables))
+    if !defaults.isValid || defaults.integerBits <= 0 { return String("") }
+    return "i\(defaults.integerBits)"
+}
+
 function compilerIntegerTypeIsUnsigned8(typeName: String): Bool {
     if compilerBodyArenaTypeOuterName(typeName: typeName) != String("Int")
         || compilerBodyArenaGenericArgumentCount(typeName: typeName) != 2 { return false }

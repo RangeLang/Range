@@ -149,7 +149,7 @@
     },
     {
       "path": "RangeCompiler/Runtime/RangeRawBuffer.c",
-      "sha256": "deaf37d11032a7387390e5aa8b07851af6d807202acec9142ad8485895538e9f"
+      "sha256": "435b1a7b77ddcb1d4b8a13d704614e353016598c5c68c166ec35ef47ae8b90de"
     },
     {
       "path": "RangeCompiler/Runtime/RangeCompilerMetrics.c",

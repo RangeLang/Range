@@ -1,0 +1,4 @@
+compilerTypedSyntax
+compilerSourceFile\trole=core\tpath=Core/System/Target.range
+@builtin(.target)
+function targetPointerBits(): Int

@@ -381,6 +381,17 @@ function compilerCoreLLVMTypeNameForRangeType(typeName: String): String {
     return String("ptr")
 }
 
+function compilerCoreLLVMTypeNameForRangeTypeInProject(tables: CompilerSyntaxTables, typeName: String): String {
+    if compilerBodyArenaTypeOuterName(typeName: typeName) == String("Int")
+        && !compilerIntegerTypeIsUnsigned8(typeName: typeName) {
+        state explicitBits: Int(compilerProjectIntegerBits(typeName: typeName, fallbackBits: 0))
+        if typeName == String("Int") { explicitBits: 0 }
+        if explicitBits > 0 { return "i\(explicitBits)" }
+        return compilerProjectIntegerLLVMTypeName(tables: tables)
+    }
+    return compilerCoreLLVMTypeNameForRangeType(typeName: typeName)
+}
+
 function compilerCoreParseMainBlock(source: String): Optional<CompilerMainBlock> {
     let maybeToken: Optional<RangeLexedToken>(compilerCoreFindMainAttributeToken(source: source))
     if maybeToken == nil {
@@ -841,10 +852,6 @@ function parseCompilerBlock(program: CompilerProgram, block: CompilerBlock): Com
 function parseCompilerStatement(program: CompilerProgram, start: Int, bodyEnd: Int): Optional<CompilerStatement> {
     let cursor: CompilerTokenCursor(source: $program.source, index: start)
     let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
-    return parseCompilerStatementWithToken(program: program, cursor: cursor, maybeToken: maybeToken, bodyEnd: bodyEnd)
-}
-
-function parseCompilerStatementWithToken(program: CompilerProgram, cursor: CompilerTokenCursor, maybeToken: Optional<RangeLexedToken>, bodyEnd: Int): Optional<CompilerStatement> {
     if maybeToken == nil {
         return nil
     }
@@ -920,7 +927,7 @@ function parseCompilerBindingKeywordStatement(cursor: CompilerTokenCursor, keywo
 }
 
 function parseCompilerJumpStatement(keyword: RangeLexedToken): Optional<CompilerStatement> {
-    return CompilerStatement(
+    return compilerCoreOwnedStatementCopy(statement: CompilerStatement(
         kind: keyword.text,
         name: String(""),
         typeName: String(""),
@@ -939,7 +946,7 @@ function parseCompilerJumpStatement(keyword: RangeLexedToken): Optional<Compiler
         summary: "kind=\(keyword.text)",
         start: keyword.start,
         end: keyword.end
-    )
+    ))
 }
 
 function parseCompilerReturnStatement(cursor: CompilerTokenCursor, keyword: RangeLexedToken, bodyEnd: Int): Optional<CompilerStatement> {
@@ -956,7 +963,7 @@ function parseCompilerReturnStatementExpressionCore(source: String, keyword: Ran
 }
 
 function compilerCoreReturnStatementFromExpression(keyword: RangeLexedToken, expression: CompilerExpression): CompilerStatement {
-    return CompilerStatement(
+    return compilerCoreOwnedStatementCopy(statement: CompilerStatement(
         kind: String("return"),
         name: String(""),
         typeName: String(""),
@@ -975,7 +982,7 @@ function compilerCoreReturnStatementFromExpression(keyword: RangeLexedToken, exp
         summary: "kind=return\texpression=\(expression.summary)",
         start: keyword.start,
         end: expression.end
-    )
+    ))
 }
 
 function parseCompilerSimpleExpression(source: String, start: Int, limit: Int): Optional<CompilerExpression> {
@@ -1020,9 +1027,11 @@ function compilerCoreIdentifierOrBoolExpressionFromToken(token: RangeLexedToken)
 
 function compilerCoreTokenExpression(token: RangeLexedToken, kind: String, value: String, summaryPrefix: String): CompilerExpression {
     let record: String(compilerCoreExpressionRecord(kind: kind, value: value, left: String(""), right: String(""), arguments: String(""), start: token.start, end: token.end))
+    state ownedKind: String(kind)
+    state ownedValue: String(value)
     return CompilerExpression(
-        kind: kind,
-        value: value,
+        kind: ownedKind,
+        value: ownedValue,
         summary: "\(summaryPrefix)(\(value))",
         record: record,
         start: token.start,
@@ -1049,12 +1058,12 @@ function parseCompilerIdentifierStatement(program: CompilerProgram, cursor: Comp
 function parseCompilerIdentifierStatementWithTarget(cursor: CompilerTokenCursor, token: RangeLexedToken, target: CompilerExpression, bodyEnd: Int): Optional<CompilerStatement> {
     let colonStart: Int(compilerCoreFirstNonWhitespaceIndex(source: cursor.source, start: target.end, end: bodyEnd))
     if colonStart >= bodyEnd {
-        return compilerCoreExpressionStatement(expression: target)
+        return compilerCoreOwnedStatementCopy(statement: compilerCoreExpressionStatement(expression: target))
     }
 
     let colonText: String(stringSubstring(source: cursor.source, start: colonStart, end: colonStart + 1))
     if colonText != String(":") {
-        return compilerCoreExpressionStatement(expression: target)
+        return compilerCoreOwnedStatementCopy(statement: compilerCoreExpressionStatement(expression: target))
     }
 
     let valueStart: Int(colonStart + 1)
@@ -1063,7 +1072,42 @@ function parseCompilerIdentifierStatementWithTarget(cursor: CompilerTokenCursor,
         return nil
     }
     let value: CompilerExpression(maybeValue ?? compilerCoreMissingExpression(start: valueStart))
-    return parseCompilerAssignmentStatement(token: token, target: target, value: value)
+    return compilerCoreOwnedStatementCopy(statement: parseCompilerAssignmentStatement(token: token, target: target, value: value))
+}
+
+function compilerCoreOwnedStatementCopy(statement: CompilerStatement): CompilerStatement {
+    state kind: String(statement.kind)
+    state name: String(statement.name)
+    state typeName: String(statement.typeName)
+    state targetSummary: String(statement.targetSummary)
+    state targetRecord: String(statement.targetRecord)
+    state expressionKind: String(statement.expressionKind)
+    state expressionValue: String(statement.expressionValue)
+    state expressionSummary: String(statement.expressionSummary)
+    state expressionRecord: String(statement.expressionRecord)
+    state bodyStatementRecords: String(statement.bodyStatementRecords)
+    state elseStatementRecords: String(statement.elseStatementRecords)
+    state summary: String(statement.summary)
+    return CompilerStatement(
+        kind: kind,
+        name: name,
+        typeName: typeName,
+        targetSummary: targetSummary,
+        targetRecord: targetRecord,
+        expressionKind: expressionKind,
+        expressionValue: expressionValue,
+        expressionSummary: expressionSummary,
+        expressionRecord: expressionRecord,
+        bodyStart: statement.bodyStart,
+        bodyEnd: statement.bodyEnd,
+        elseBodyStart: statement.elseBodyStart,
+        elseBodyEnd: statement.elseBodyEnd,
+        bodyStatementRecords: bodyStatementRecords,
+        elseStatementRecords: elseStatementRecords,
+        summary: summary,
+        start: statement.start,
+        end: statement.end
+    )
 }
 
 function parseCompilerAssignmentStatement(token: RangeLexedToken, target: CompilerExpression, value: CompilerExpression): CompilerStatement {
@@ -1312,32 +1356,34 @@ function parseCompilerControlBlockStatement(program: CompilerProgram, cursor: Co
         return nil
     }
 
-    let elseCursor: CompilerTokenCursor(source: $cursor.source, index: nextIndex)
-    let maybeElseToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: elseCursor))
-    if maybeElseToken != nil && keyword.text == String("if") {
-        let elseToken: RangeLexedToken(maybeElseToken ?? compilerFallbackToken(cursor: elseCursor))
-        if elseToken.kind == .keyword && elseToken.text == String("else") {
-            let elseBlockCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: elseCursor, token: elseToken))
-            let maybeElseBodyToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: elseBlockCursor))
-            if maybeElseBodyToken != nil {
-                let elseBodyToken: RangeLexedToken(maybeElseBodyToken ?? compilerFallbackToken(cursor: elseBlockCursor))
-                if elseBodyToken.kind == .leftBrace {
-                    let maybeElseRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: elseBlockCursor, leftKind: .leftBrace, rightKind: .rightBrace))
-                    if maybeElseRange != nil {
-                        let elseRange: CompilerSourceRange(maybeElseRange ?? CompilerSourceRange(start: elseToken.end, end: elseToken.end, next: elseToken.end))
-                        elseBlockStart: elseRange.start
-                        elseBlockEnd: elseRange.end
-                        nextIndex: elseRange.next
+    if keyword.text == String("if") {
+        let elseCursor: CompilerTokenCursor(source: $cursor.source, index: nextIndex)
+        let maybeElseToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: elseCursor))
+        if maybeElseToken != nil {
+            let elseToken: RangeLexedToken(maybeElseToken ?? compilerFallbackToken(cursor: elseCursor))
+            if elseToken.kind == .keyword && elseToken.text == String("else") {
+                let elseBlockCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: elseCursor, token: elseToken))
+                let maybeElseBodyToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: elseBlockCursor))
+                if maybeElseBodyToken != nil {
+                    let elseBodyToken: RangeLexedToken(maybeElseBodyToken ?? compilerFallbackToken(cursor: elseBlockCursor))
+                    if elseBodyToken.kind == .leftBrace {
+                        let maybeElseRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: elseBlockCursor, leftKind: .leftBrace, rightKind: .rightBrace))
+                        if maybeElseRange != nil {
+                            let elseRange: CompilerSourceRange(maybeElseRange ?? CompilerSourceRange(start: elseToken.end, end: elseToken.end, next: elseToken.end))
+                            elseBlockStart: elseRange.start
+                            elseBlockEnd: elseRange.end
+                            nextIndex: elseRange.next
+                        }
                     }
-                }
-                if elseBodyToken.kind == .keyword && elseBodyToken.text == String("if") {
-                    let maybeNestedIf: Optional<CompilerStatement>(parseCompilerControlBlockStatement(program: program, cursor: elseBlockCursor, keyword: elseBodyToken, bodyEnd: bodyEnd))
-                    if maybeNestedIf != nil {
-                        let nestedIf: CompilerStatement(maybeNestedIf ?? compilerCoreMissingStatement(start: elseBodyToken.start, end: elseBodyToken.end))
-                        elseBlockStart: nestedIf.start
-                        elseBlockEnd: nestedIf.end
-                        nextIndex: nestedIf.end
-                        nestedElseStatementRecords: compilerCoreStatementRecord(statement: nestedIf)
+                    if elseBodyToken.kind == .keyword && elseBodyToken.text == String("if") {
+                        let maybeNestedIf: Optional<CompilerStatement>(parseCompilerControlBlockStatement(program: program, cursor: elseBlockCursor, keyword: elseBodyToken, bodyEnd: bodyEnd))
+                        if maybeNestedIf != nil {
+                            let nestedIf: CompilerStatement(maybeNestedIf ?? compilerCoreMissingStatement(start: elseBodyToken.start, end: elseBodyToken.end))
+                            elseBlockStart: nestedIf.start
+                            elseBlockEnd: nestedIf.end
+                            nextIndex: nestedIf.end
+                            nestedElseStatementRecords: compilerCoreStatementRecord(statement: nestedIf)
+                        }
                     }
                 }
             }
@@ -1351,7 +1397,7 @@ function parseCompilerControlBlockStatement(program: CompilerProgram, cursor: Co
     if nestedElseStatementRecords != String("") {
         elseStatementRecords: nestedElseStatementRecords
     }
-    return CompilerStatement(
+    return compilerCoreOwnedStatementCopy(statement: CompilerStatement(
         kind: keyword.text,
         name: String(""),
         typeName: String(""),
@@ -1370,7 +1416,7 @@ function parseCompilerControlBlockStatement(program: CompilerProgram, cursor: Co
         summary: "kind=\(keyword.text)\tcondition=\(condition.summary)\tbodyStart=\(blockStart)\tbodyEnd=\(blockEnd)\tbodyStatements=[\(bodyStatements.summary)]\telseBodyStart=\(elseBlockStart)\telseBodyEnd=\(elseBlockEnd)\telseStatements=[\(elseStatements.summary)]",
         start: keyword.start,
         end: nextIndex
-    )
+    ))
 }
 
 function parseCompilerLocalBindingStatement(cursor: CompilerTokenCursor, keyword: RangeLexedToken, bodyEnd: Int): Optional<CompilerStatement> {
@@ -1427,7 +1473,7 @@ function parseCompilerLocalBindingStatementCore(cursor: CompilerTokenCursor, key
     if leftParenToken.kind != .leftParen {
         return nil
     }
-    let initializerOpenCursor: CompilerTokenCursor(cursorState)
+    let initializerOpenCursor: CompilerTokenCursor(source: $cursor.source, index: cursorState.index)
     let maybeInitializerRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: initializerOpenCursor, leftKind: .leftParen, rightKind: .rightParen))
     if maybeInitializerRange == nil { return nil }
     let initializerRange: CompilerSourceRange(maybeInitializerRange ?? CompilerSourceRange(start: leftParenToken.end, end: leftParenToken.end, next: leftParenToken.end))
@@ -1440,7 +1486,8 @@ function parseCompilerLocalBindingStatementCore(cursor: CompilerTokenCursor, key
         let implicitArguments: CompilerCallArguments(parseCompilerCallArgumentsCore(source: cursor.source, start: initializerRange.start, end: initializerRange.end))
         let implicitSummary: String("call(identifier(\(typeReference.text)),arguments=[\(implicitArguments.summary)])")
         let implicitRecord: String(compilerCoreExpressionRecord(kind: String("call"), value: typeReference.text, left: implicitCalleeRecord, right: String(""), arguments: implicitArguments.records, start: typeReference.start, end: initializerRange.next))
-        expression: CompilerExpression(kind: String("call"), value: typeReference.text, summary: implicitSummary, record: implicitRecord, start: typeReference.start, end: initializerRange.next)
+        state implicitValue: String(typeReference.text)
+        expression: CompilerExpression(kind: String("call"), value: implicitValue, summary: implicitSummary, record: implicitRecord, start: typeReference.start, end: initializerRange.next)
         bindingEnd: initializerRange.next
     } else {
         let maybeBindingExpression: Optional<CompilerExpression>(parseCompilerExpression(source: cursor.source, start: cursorState.index, limit: bodyEnd))
@@ -1456,7 +1503,7 @@ function parseCompilerLocalBindingStatementCore(cursor: CompilerTokenCursor, key
         bindingEnd: bindingRightParenToken.end
     }
 
-    return CompilerStatement(
+    return compilerCoreOwnedStatementCopy(statement: CompilerStatement(
         kind: keyword.text,
         name: nameToken.text,
         typeName: typeReference.text,
@@ -1475,7 +1522,7 @@ function parseCompilerLocalBindingStatementCore(cursor: CompilerTokenCursor, key
         summary: "kind=\(keyword.text)\tname=\(nameToken.text)\ttype=\(typeReference.text)\texpression=\(expression.summary)",
         start: keyword.start,
         end: bindingEnd
-    )
+    ))
 }
 
 function compilerCoreIsBinaryOperator(token: RangeLexedToken): Bool {
@@ -1640,8 +1687,7 @@ function parseCompilerPostfixExpressionCore(source: String, start: Int, limit: I
     if maybeToken == nil {
         return nil
     }
-    let fallbackToken: RangeLexedToken(compilerFallbackToken(cursor: cursor))
-    let token: RangeLexedToken(maybeToken ?? fallbackToken)
+    let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: cursor.index))
     if token.start >= limit {
         return nil
     }
@@ -1729,7 +1775,7 @@ function parseCompilerPostfixExpressionCore(source: String, start: Int, limit: I
             if maybeRightBracket == nil {
                 return nil
             }
-            let rightBracketToken: RangeLexedToken(maybeRightBracket ?? fallbackToken)
+            let rightBracketToken: RangeLexedToken(maybeRightBracket ?? compilerFallbackTokenAt(index: index.end))
             if rightBracketToken.kind != .rightBracket {
                 return nil
             }

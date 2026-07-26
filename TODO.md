@@ -5,6 +5,26 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 
 ## Baseline Integrity
 
+- [ ] Move unsized scalar defaults into the `@project` macro.
+  - [x] Add the host-backed target pointer-width builtin and a bootstrap-safe
+    resolver hook for missing `integer`/`bool` defaults.
+  - [ ] After seed promotion, make the resolver hook call
+    `targetPointerBits()` directly instead of its accepted-seed 64-bit value.
+  - [x] Allow `state integer: Int<4>` and full signed-width forms to override
+    the project integer default without an `override` keyword.
+  - [ ] Route every bare and partially specialized `Int` use through the
+    resolved project default instead of LLVM `i32` literals.
+  - [ ] Materialize and validate the complete predefined scalar-member set.
+  - [x] Prove default, override, duplicate, wrong-binding, and wrong-type
+    behavior through supported compiler fixtures.
+- [ ] Remove source-alias ownership conflicts from parser fallback tokens.
+  - [ ] Replace the 12 one-use `$source`-carrying fallback locals with
+    cursor-free fallback construction from their token index.
+  - [ ] Prove the change advances `scripts/range compiler progression` past
+    `compilerCoreParseConstructDeclarationParts`.
+  - [ ] Normalize branch-polymorphic `CompilerStatement` returns to one owned
+    String provenance when expression and assignment paths select different
+    boundary sources.
 - [ ] Give optional coalescing an ownership phi for tracked aggregate values.
   - The value CFG already joins `payload ?? fallback`, but the ownership graph
     must move the selected branch's owned leaves into one joined result and

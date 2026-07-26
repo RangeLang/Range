@@ -221,7 +221,7 @@ def embedded_swift_env() -> dict[str, str] | None:
 
 
 def package_manifest(name: str) -> str:
-    return f"""@Project
+    return f"""@project
 construct Project {{
     let name: Title("{name}")
     let version: Version(0.1.0)
