@@ -4,8 +4,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
-COMPILER_OPTIMIZATION="-O2"
-COMPILER_LTO="-flto=thin"
 
 mode="${1:-}"
 if [[ $# -gt 1 || ( -n "$mode" && "$mode" != "--integrity-only" ) ]]; then
@@ -43,6 +41,12 @@ if [[ "$(manifest_value formatVersion)" != "1" ]]; then
     echo "Unsupported Range compiler seed manifest." >&2
     exit 1
 fi
+if [[ "$(manifest_value compiler.name)" != "range"
+    || "$(manifest_value compiler.channel)" != "latest"
+    || -z "$(manifest_value compiler.version)" ]]; then
+    echo "Invalid Range compiler identity." >&2
+    exit 1
+fi
 
 if [[ "$(uname -m)" != "$(manifest_value target.architecture)" ]]; then
     echo "Seed target architecture mismatch." >&2
@@ -50,6 +54,7 @@ if [[ "$(uname -m)" != "$(manifest_value target.architecture)" ]]; then
 fi
 
 verify_file seed
+verify_file executable
 compiler_source_count="$(manifest_value compilerSources)"
 for ((index = 0; index < compiler_source_count; index += 1)); do
     verify_file "compilerSources.$index"
@@ -66,26 +71,28 @@ if [[ "$seed_bytes" != "$(manifest_value seed.bytes)" ]]; then
     echo "Seed byte length mismatch: $seed_relative" >&2
     exit 1
 fi
+executable_relative="$(manifest_value executable.path)"
+accepted_executable="$REPO_ROOT/$executable_relative"
+executable_bytes="$(/usr/bin/stat -f %z "$accepted_executable")"
+if [[ "$executable_bytes" != "$(manifest_value executable.bytes)" || ! -x "$accepted_executable" ]]; then
+    echo "Accepted compiler executable is invalid: $executable_relative" >&2
+    exit 1
+fi
 
 if [[ "$mode" == "--integrity-only" ]]; then
     echo "Range compiler accepted-seed integrity verified."
     echo "sha256=$(sha256 "$seed")"
     echo "bytes=$seed_bytes"
+    echo "executable=$executable_relative"
+    echo "executable_sha256=$(sha256 "$accepted_executable")"
+    echo "executable_bytes=$executable_bytes"
     exit 0
 fi
 
 build_root="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-seed-verify.XXXXXX")"
 trap '/bin/rm -rf "$build_root"' EXIT
-seed_executable="$build_root/RangeCompilerSeed"
 bundle="$build_root/RangeCompilerSourceSet.range"
 stage3="$build_root/RangeCompilerStage3.ll"
-
-runtime_inputs=()
-for ((index = 0; index < runtime_source_count; index += 1)); do
-    runtime_inputs+=("$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")")
-done
-
-clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module -x ir "$seed" -x c "${runtime_inputs[@]}" -o "$seed_executable"
 
 /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$bundle"
 for ((index = 0; index < compiler_source_count; index += 1)); do
@@ -101,7 +108,7 @@ for ((index = 0; index < compiler_source_count; index += 1)); do
     fi
 done
 
-"$seed_executable" "$bundle" > "$stage3"
+"$accepted_executable" "$bundle" > "$stage3"
 
 if ! /usr/bin/cmp -s "$seed" "$stage3"; then
     echo "Seed fixed-point verification failed: Stage 3 LLVM differs." >&2
@@ -121,4 +128,4 @@ echo "Range compiler seed verified."
 echo "sha256=$stage3_hash"
 echo "bytes=$stage3_bytes"
 echo "producer_clang=$(manifest_value producer.clang)"
-echo "consumer_clang=$(clang --version | /usr/bin/head -1)"
+echo "compiler_executable_sha256=$(sha256 "$accepted_executable")"

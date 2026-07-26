@@ -208,7 +208,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       and the shared immutable compiler artifact.
     - [ ] Move Foundation, framework, generated-source, and dependency graph
       discovery behind the Range-authored project macro.
-  - [ ] Give the artifact a compiler version plus content hash, target, runtime
+  - [x] Give the artifact a compiler version plus content hash, target, runtime
     ABI, and source-manifest identity; keep its LLVM as reproducibility
     evidence rather than the only usable seed.
   - [ ] Make compiler generation N produce the candidate executable for

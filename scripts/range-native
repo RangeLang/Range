@@ -57,6 +57,13 @@ verify_manifest_inputs() {
         exit 1
     fi
     verify_manifest_file seed
+    verify_manifest_file executable
+    local executable_path="$REPO_ROOT/$(manifest_value executable.path)"
+    if [[ ! -x "$executable_path"
+        || "$(/usr/bin/stat -f %z "$executable_path")" != "$(manifest_value executable.bytes)" ]]; then
+        echo "Accepted compiler executable is invalid: ${executable_path#"$REPO_ROOT/"}" >&2
+        exit 1
+    fi
     local index runtime_count
     runtime_count="$(manifest_value runtimeSources)"
     for ((index = 0; index < runtime_count; index += 1)); do

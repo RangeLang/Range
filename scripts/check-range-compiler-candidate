@@ -82,6 +82,11 @@ verify_manifest() {
     seed_bytes="$(bytes "$seed_path")"
     expected_bytes="$(manifest_value seed.bytes)"
     [[ "$seed_bytes" == "$expected_bytes" ]] || fail "checked-in seed byte length mismatch"
+    verify_manifest_file executable "accepted compiler executable"
+    local executable_path="$REPO_ROOT/$(manifest_value executable.path)"
+    [[ -x "$executable_path" ]] || fail "accepted compiler executable is not executable"
+    [[ "$(bytes "$executable_path")" == "$(manifest_value executable.bytes)" ]] \
+        || fail "accepted compiler executable byte length mismatch"
 
     # compilerSources hashes describe the accepted seed's provenance.
     # Candidate sources are discovered below and may differ until rollover.

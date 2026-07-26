@@ -48,6 +48,11 @@ verify_manifest() {
     verify_manifest_file seed "compiler seed"
     local seed_path="$REPO_ROOT/$(manifest_value seed.path)"
     [[ "$(bytes "$seed_path")" == "$(manifest_value seed.bytes)" ]] || fail "compiler seed byte length mismatch"
+    verify_manifest_file executable "accepted compiler executable"
+    local executable_path="$REPO_ROOT/$(manifest_value executable.path)"
+    [[ -x "$executable_path" ]] || fail "accepted compiler executable is not executable"
+    [[ "$(bytes "$executable_path")" == "$(manifest_value executable.bytes)" ]] \
+        || fail "accepted compiler executable byte length mismatch"
     local index runtime_count
     runtime_count="$(manifest_value runtimeSources)"
     for ((index = 0; index < runtime_count; index += 1)); do

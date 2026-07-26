@@ -3,10 +3,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
 
 usage() {
     cat >&2 <<'USAGE'
 Usage:
+  range version
   range compile <FILE-OR-DIR>
   range compiler next
   range compiler next --cached-only
@@ -34,6 +36,15 @@ fi
 shift
 
 case "$command" in
+    version|--version)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        compiler_name="$(/usr/bin/plutil -extract compiler.name raw -o - "$MANIFEST")"
+        compiler_version="$(/usr/bin/plutil -extract compiler.version raw -o - "$MANIFEST")"
+        compiler_channel="$(/usr/bin/plutil -extract compiler.channel raw -o - "$MANIFEST")"
+        seed_hash="$(/usr/bin/plutil -extract seed.sha256 raw -o - "$MANIFEST")"
+        /usr/bin/printf '%s %s (%s) %s\n' \
+            "$compiler_name" "$compiler_version" "$compiler_channel" "$seed_hash"
+        ;;
     compile)
         if [[ $# -ne 1 ]]; then usage; exit 1; fi
         "$REPO_ROOT/scripts/compile-range-project" "$1"
