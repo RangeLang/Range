@@ -1,0 +1,3 @@
+enum TextEncoding {
+    case utf8
+}

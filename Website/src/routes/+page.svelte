@@ -1,5 +1,6 @@
 <script lang="ts">
   import { data, githubUrl } from "$lib/benchmarks";
+  import RangeNucleus from "$lib/components/RangeNucleus.svelte";
   import GithubIcon from "$lib/components/GithubIcon.svelte";
 </script>
 
@@ -22,6 +23,7 @@
         </div>
       </section>
     </div>
+    <RangeNucleus />
     <section class="landingLinks" aria-label="Range links">
       <a href="/benchmarks"><span><strong>Benchmarks</strong><small>{data.summary.runLeafCount} generated comparisons</small></span><span>View</span></a>
       <a href="/updates/string-lowering"><span><strong>String lowering</strong><small>100k appends · 491.2 ms → 4.1 ms</small></span><span>View</span></a>

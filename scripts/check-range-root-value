@@ -21,7 +21,8 @@ content-addressed Stage 2 compiler for the current accepted seed, runtime, and
 compiler sources, then validates only RootValue boundary-forward-mixed.
 The controls mode runs the complete neighboring RootValue positive and negative
 fixture set against the same cached Stage 2 compiler. Both modes first verify
-the focused @project scalar-default fixtures against that compiler.
+the focused @project scalar-default and @storage/@literal fixtures against
+that compiler.
 USAGE
 }
 
@@ -117,6 +118,110 @@ check_project_defaults() {
         'sext i4 7 to i32'
     check_target_pointer_bits_runtime
     echo "checkpoint root-value:project-defaults-complete: pass"
+}
+
+check_storage_literals() {
+    local core_bundle="$WORK_ROOT/storage-core-source-set.range"
+    local core_output="$WORK_ROOT/storage-core-source-set.out"
+    local core_error="$WORK_ROOT/storage-core-source-set.err"
+    local llvm_output="$WORK_ROOT/storage-literal-invalid.ll"
+    local unsigned_llvm="$WORK_ROOT/storage-signedness-first-unsigned-byte.ll"
+    local unsigned_negation_llvm="$WORK_ROOT/storage-unsigned-negation.ll"
+    local command_output="$WORK_ROOT/storage-literal-invalid.out"
+    local command_error="$WORK_ROOT/storage-literal-invalid.err"
+    local actual_status
+
+    /usr/bin/printf '%s\n' 'compilerMacroSnapshot' > "$core_bundle"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/Macro/Storage.range' >> "$core_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Storage.range" >> "$core_bundle"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/Macro/Literal.range' >> "$core_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Literal.range" >> "$core_bundle"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Number/Signedness.range' >> "$core_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Number/Signedness.range" >> "$core_bundle"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Number/Int.range' >> "$core_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Number/Int.range" >> "$core_bundle"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Text/TextEncoding.range' >> "$core_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/TextEncoding.range" >> "$core_bundle"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Text/Character.range' >> "$core_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/Character.range" >> "$core_bundle"
+    "$STAGE2_EXECUTABLE" compile "$core_bundle" > "$core_output" 2> "$core_error" \
+        || fail "Range-authored storage core sources did not compile"
+    [[ ! -s "$core_error" ]] \
+        || fail "Range-authored storage core sources wrote stderr"
+    /usr/bin/grep -Fq $'literalStorage\tvalid=true\tstorageApplicationCount=1\tliteralApplicationCount=1\tnumericTargetSyntaxID=3\tdecimalTargetSyntaxID=-1\tdecimalSeparatorByte=-1' "$core_output" \
+        || fail "Range-authored storage core sources omitted their numeric literal facts"
+    echo "Range-authored storage core sources: pass"
+    check_project_defaults_fixture annotated-value-parameters \
+        Testing/Storage/Pass/AnnotatedValueParameters.range 0 \
+        $'genericParameter\trow=0\townerSyntaxID=0\townerKind=construct\tordinal=0\tfileID=0\tstart=14\tend=36\tname=signedness\tnameStart=14\tnameEnd=24\tkind=value'
+    check_project_defaults_fixture integer-descriptor \
+        Testing/Storage/Pass/IntegerDescriptorSyntax.range 0 \
+        $'literalStorage\tvalid=true\tstorageApplicationCount=1\tliteralApplicationCount=1\tnumericTargetSyntaxID=3\tdecimalTargetSyntaxID=-1\tdecimalSeparatorByte=-1'
+    check_project_defaults_fixture decimal-descriptor \
+        Testing/Storage/Pass/DecimalLiteralDescriptorSyntax.range 0 \
+        $'literalStorage\tvalid=true\tstorageApplicationCount=1\tliteralApplicationCount=1\tnumericTargetSyntaxID=-1\tdecimalTargetSyntaxID=0\tdecimalSeparatorByte=46'
+    check_project_defaults_fixture text-descriptor \
+        Testing/Storage/Pass/TextLiteralDescriptorSyntax.range 0 \
+        $'textLiteralStorage\tvalid=true\ttextTargetSyntaxID=7\tsemanticElementSyntaxID=5\tencoding=1\tcodeUnitBits=8\tcodeUnitSignedness=2'
+    check_project_defaults_fixture literal-requires-storage \
+        Testing/Storage/Fail/LiteralRequiresStorage.range 65 \
+        $'compilerError\tkind=invalidLiteralStorage\treason=literalRequiresStorage'
+    check_project_defaults_fixture invalid-numeric-shape \
+        Testing/Storage/Fail/InvalidNumericStorageShape.range 65 \
+        $'compilerError\tkind=invalidLiteralStorage\treason=invalidNumericStorageShape'
+    check_project_defaults_fixture duplicate-numeric-literal \
+        Testing/Storage/Fail/DuplicateNumericLiteral.range 65 \
+        $'compilerError\tkind=invalidLiteralStorage\treason=duplicateNumericLiteral'
+    check_project_defaults_fixture storage-must-be-empty \
+        Testing/Storage/Fail/StorageMustBeEmpty.range 65 \
+        $'compilerError\tkind=invalidLiteralStorage\treason=storageMustBeEmpty'
+    check_project_defaults_fixture text-literal-requires-storage \
+        Testing/Storage/Fail/TextLiteralRequiresStorage.range 65 \
+        $'compilerError\tkind=invalidTextLiteralStorage\treason=textLiteralRequiresStorage'
+    check_project_defaults_fixture text-invalid-physical-storage \
+        Testing/Storage/Fail/TextStorageInvalidPhysicalStorage.range 65 \
+        $'compilerError\tkind=invalidTextLiteralStorage\treason=invalidPhysicalStorage'
+    if "$STAGE2_EXECUTABLE" emit-llvm \
+        "$REPO_ROOT/Testing/Storage/Fail/LiteralRequiresStorage.range" \
+        "$llvm_output" > "$command_output" 2> "$command_error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] \
+        || fail "Storage literal LLVM rejection exited $actual_status, expected 65"
+    [[ ! -s "$command_error" ]] \
+        || fail "Storage literal LLVM rejection wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidLiteralStorage\treason=literalRequiresStorage' "$command_output" \
+        || fail "Storage literal LLVM rejection omitted the literalRequiresStorage diagnostic"
+    [[ ! -s "$llvm_output" ]] \
+        || fail "Storage literal LLVM rejection emitted an LLVM artifact"
+    echo "Storage literal LLVM rejection: pass"
+    "$STAGE2_EXECUTABLE" emit-llvm \
+        "$REPO_ROOT/Testing/Storage/Pass/SignednessFirstUnsignedByte.range" \
+        "$unsigned_llvm" \
+        || fail "Storage signedness-first unsigned byte did not emit LLVM"
+    /usr/bin/grep -Fq 'icmp eq i8 255, 255' "$unsigned_llvm" \
+        || fail "Storage signedness-first unsigned byte omitted i8 equality"
+    validate_llvm "$unsigned_llvm"
+    echo "Storage signedness-first unsigned byte: pass"
+    if "$STAGE2_EXECUTABLE" emit-llvm \
+        "$REPO_ROOT/Testing/Storage/Fail/UnsignedUnaryNegation.range" \
+        "$unsigned_negation_llvm" > "$command_output" 2> "$command_error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] \
+        || fail "Storage unsigned unary negation exited $actual_status, expected 65"
+    [[ ! -s "$command_error" ]] \
+        || fail "Storage unsigned unary negation wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$command_output" \
+        || fail "Storage unsigned unary negation omitted its rejection boundary"
+    [[ ! -s "$unsigned_negation_llvm" ]] \
+        || fail "Storage unsigned unary negation emitted an LLVM artifact"
+    echo "Storage unsigned unary negation: pass"
+    echo "checkpoint root-value:storage-literals-complete: pass"
 }
 
 write_stage2_cache_key_material() {
@@ -321,6 +426,7 @@ main_root_value() {
     echo "checkpoint root-value:source-snapshot: pass"
     resolve_stage2_compiler
     check_project_defaults
+    check_storage_literals
     if [[ "$controls" -eq 1 ]]; then
         audit_root_values Controls "$STAGE2_EXECUTABLE" "$WORK_ROOT/controls"
         echo "checkpoint root-value:controls-complete: pass"

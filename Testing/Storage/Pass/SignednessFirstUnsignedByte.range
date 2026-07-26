@@ -1,0 +1,5 @@
+@main {
+    let maximum: Int<.unsigned, 8>(255)
+    let expected: Int<.unsigned, 8>(255)
+    return maximum == expected
+}

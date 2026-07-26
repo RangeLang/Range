@@ -1,4 +1,4 @@
-import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profile=width-pinch-v1";
+import { createRangeMarks, snapScalePosition } from "./range-scale-math.js?profile=logarithmic-v1";
 
 const defaults = {
   endpointGap: 8,

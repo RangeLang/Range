@@ -1326,13 +1326,14 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         if memberAssignmentRow >= 0
             && compilerIntTableValue(table: emitter.valueAssignments, row: memberAssignmentRow, column: compilerBodyLLVMValueAssignmentKindColumn()) == compilerBodyLLVMValueAlias() { return 0 }
         let memberReceiverValue: CompilerLLVMValue(compilerBodyLLVMValue(emitter: emitter, valueID: compilerBodyLLVMOperationOperandValueID(arena: emitter.arena, operationID: operationID, ordinal: 0)))
-        if memberAssignmentRow < 0 || memberReceiverValue.text == String("") { return 0 - 1 }
+        if memberAssignmentRow < 0 { return 0 - 101 }
+        if memberReceiverValue.text == String("") { return 0 - 102 }
         let memberCallTemporary: Int(compilerIntTableValue(table: emitter.valueAssignments, row: memberAssignmentRow, column: compilerBodyLLVMValueAssignmentNumberColumn()))
         if memberReceiverValue.typeName != String("ptr") {
             let nativeMemberRow: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationTargetIDColumn()))
-            if nativeMemberRow < 0 { return 0 - 1 }
+            if nativeMemberRow < 0 { return 0 - 103 }
             let nativeMemberOrdinal: Int(compilerBodyArenaStoredMemberOrdinal(arena: emitter.arena, memberRow: nativeMemberRow))
-            if nativeMemberOrdinal < 0 { return 0 - 1 }
+            if nativeMemberOrdinal < 0 { return 0 - 104 }
             if compilerBodyLLVMMemberUsesIdentity(arena: emitter.arena, memberRow: nativeMemberRow) {
                 let memberIdentityTemporary: Int(memberCallTemporary - 1)
                 let memberResultType: String(compilerBodyLLVMValueTypeName(arena: emitter.arena, valueID: resultValueID))
@@ -1351,8 +1352,10 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
             let nativeMemberOrdinal: Int(compilerBodyArenaStoredMemberOrdinal(arena: emitter.arena, memberRow: nativeMemberRow))
             state memberLoadTemporary: Int(memberCallTemporary - 1)
             if compilerBodyLLVMMemberUsesIdentity(arena: emitter.arena, memberRow: nativeMemberRow) { memberLoadTemporary: memberCallTemporary - 2 }
-            if memberReceiverAggregateType == String("") || nativeMemberRow < 0 || nativeMemberOrdinal < 0
-                || rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(memberLoadTemporary) = load \(memberReceiverAggregateType), ptr \(memberReceiverValue.text)\n") != 0 { return 0 - 1 }
+            if memberReceiverAggregateType == String("") { return 0 - 105 }
+            if nativeMemberRow < 0 { return 0 - 106 }
+            if nativeMemberOrdinal < 0 { return 0 - 107 }
+            if rawBufferAppendText(buffer: emitter.renderedBlocks, text: "  %r\(memberLoadTemporary) = load \(memberReceiverAggregateType), ptr \(memberReceiverValue.text)\n") != 0 { return 0 - 108 }
             if compilerBodyLLVMMemberUsesIdentity(arena: emitter.arena, memberRow: nativeMemberRow) {
                 let memberIdentityTemporary: Int(memberCallTemporary - 1)
                 let memberResultType: String(compilerBodyLLVMValueTypeName(arena: emitter.arena, valueID: resultValueID))
@@ -1545,10 +1548,10 @@ function compilerBodyLLVMEmitterRenderBlock(emitter: CompilerBodyLLVMEmitter, mi
 }
 
 function compilerBodyLLVMEmitterRenderCFGDepthFirst(emitter: CompilerBodyLLVMEmitter, mirBlockID: Int, visited: Buffer<Int>): Int {
-    if mirBlockID < 0 || mirBlockID >= compilerIntTableRowCount(table: emitter.arena.mirBlocks) { return 0 - 1 }
+    if mirBlockID < 0 || mirBlockID >= compilerIntTableRowCount(table: emitter.arena.mirBlocks) { return 0 - (100000 + mirBlockID) }
     if visited.element(index: mirBlockID) == 1 { return 0 }
     if mirBlockID != 0 && !compilerBodyLLVMAllForwardPredecessorsVisited(arena: emitter.arena, blockID: mirBlockID, visited: visited) { return 0 }
-    if visited.update(element: 1, index: mirBlockID) != 0 { return 0 - 1 }
+    if visited.update(element: 1, index: mirBlockID) != 0 { return 0 - (200000 + mirBlockID) }
     let firstOperation: Int(compilerIntTableValue(table: emitter.arena.mirBlocks, row: mirBlockID, column: compilerBodyMIRBlockFirstOperationColumn()))
     let operationCount: Int(compilerIntTableValue(table: emitter.arena.mirBlocks, row: mirBlockID, column: compilerBodyMIRBlockOperationCountColumn()))
     state valid: Bool(operationCount > 0)
@@ -1569,10 +1572,19 @@ function compilerBodyLLVMEmitterRenderCFGDepthFirst(emitter: CompilerBodyLLVMEmi
     }
     state operationOffset: Int(0)
     while valid && operationOffset + 1 < operationCount {
-        if compilerBodyLLVMEmitterProcessOperation(emitter: emitter, operationID: firstOperation + operationOffset) != 0 { valid: false }
+        let operationID: Int(firstOperation + operationOffset)
+        let operationStatus: Int(compilerBodyLLVMEmitterProcessOperation(emitter: emitter, operationID: operationID))
+        if operationStatus != 0 {
+            if operationStatus <= 0 - 500000000 { return operationStatus }
+            let operationKind: Int(compilerIntTableValue(table: emitter.arena.mirOperations, row: operationID, column: compilerBodyMIROperationKindColumn()))
+            return 0 - (1000000 + operationID * 10000 + operationKind * 100 + (0 - operationStatus))
+        }
         operationOffset: operationOffset + 1
     }
-    if valid && compilerBodyLLVMEmitterRenderBlock(emitter: emitter, mirBlockID: mirBlockID) != 0 { valid: false }
+    if valid {
+        let blockStatus: Int(compilerBodyLLVMEmitterRenderBlock(emitter: emitter, mirBlockID: mirBlockID))
+        if blockStatus != 0 { return 0 - (2000000 + mirBlockID * 100 + (0 - blockStatus)) }
+    }
     if valid && emitter.runtimeState.update(element: mirBlockID, index: compilerBodyLLVMEmitterLastBlock()) != 0 { valid: false }
     if !valid { return 0 - 1 }
     let terminatorOperationID: Int(firstOperation + operationCount - 1)
@@ -1580,7 +1592,8 @@ function compilerBodyLLVMEmitterRenderCFGDepthFirst(emitter: CompilerBodyLLVMEmi
     if terminatorKind == compilerBodyMIROperationCondBranch() {
         let trueBlockID: Int(compilerBodyLLVMConditionTarget(arena: emitter.arena, blockID: cfgBlockID, outcome: compilerBodyControlOutcomeTrue()))
         let falseBlockID: Int(compilerBodyLLVMConditionTarget(arena: emitter.arena, blockID: cfgBlockID, outcome: compilerBodyControlOutcomeFalse()))
-        if compilerBodyLLVMEmitterRenderCFGDepthFirst(emitter: emitter, mirBlockID: trueBlockID, visited: visited) != 0 { return 0 - 1 }
+        let trueStatus: Int(compilerBodyLLVMEmitterRenderCFGDepthFirst(emitter: emitter, mirBlockID: trueBlockID, visited: visited))
+        if trueStatus != 0 { return trueStatus }
         return compilerBodyLLVMEmitterRenderCFGDepthFirst(emitter: emitter, mirBlockID: falseBlockID, visited: visited)
     }
     if terminatorKind == compilerBodyMIROperationBranch() {
@@ -1628,10 +1641,28 @@ function compilerBodyLLVMEmit(arena: CompilerBodyArena, initialTemporary: Int, i
     if !compilerBodyMIRIsValid(arena: arena, abiPlan: abiPlan) || !compilerBodyMemoryIsFrozenAndValid(arena: arena) { return CompilerBodyLLVMEmissionResult(block: emptyBlock, renderedGlobals: String(""), runtimeRequirements: 0, isValid: false) }
     let emitter: CompilerBodyLLVMEmitter(compilerBodyLLVMEmitterCreate(arena: arena, initialTemporary: initialTemporary, initialBranch: initialBranch, abiPlan: abiPlan, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, functionInstances: functionInstances, functionInstanceSignatures: functionInstanceSignatures, functionInstanceSignatureParameters: functionInstanceSignatureParameters))
     state valid: Bool(true)
-    if compilerBodyLLVMEmitterSeedParameters(emitter: emitter) != 0 || compilerBodyLLVMEmitterInitializeLabels(emitter: emitter) != 0 { valid: false }
+    state emissionFailureCode: Int(0)
+    let seedParametersStatus: Int(compilerBodyLLVMEmitterSeedParameters(emitter: emitter))
+    if seedParametersStatus != 0 {
+        emissionFailureCode: 100 + (0 - seedParametersStatus)
+        valid: false
+    }
+    if valid {
+        let initializeLabelsStatus: Int(compilerBodyLLVMEmitterInitializeLabels(emitter: emitter))
+        if initializeLabelsStatus != 0 {
+            emissionFailureCode: 200 + (0 - initializeLabelsStatus)
+            valid: false
+        }
+    }
     let planningVisited: Buffer<Int>(bufferCreateInt(capacity: compilerIntTableRowCount(table: arena.mirBlocks)))
     while planningVisited.count < compilerIntTableRowCount(table: arena.mirBlocks) { planningVisited.append(element: 0) }
-    if valid && compilerBodyLLVMEmitterPlanCFGDepthFirst(emitter: emitter, blockID: 0, visited: planningVisited) != 0 { valid: false }
+    if valid {
+        let planningStatus: Int(compilerBodyLLVMEmitterPlanCFGDepthFirst(emitter: emitter, blockID: 0, visited: planningVisited))
+        if planningStatus != 0 {
+            emissionFailureCode: 300 + (0 - planningStatus)
+            valid: false
+        }
+    }
     planningVisited.destroy()
     state mirBlockID: Int(0)
     state hasEntryBranch: Bool(false)
@@ -1644,7 +1675,13 @@ function compilerBodyLLVMEmit(arena: CompilerBodyArena, initialTemporary: Int, i
     state exitLabel: String("entry")
     let visited: Buffer<Int>(bufferCreateInt(capacity: compilerIntTableRowCount(table: arena.mirBlocks)))
     while visited.count < compilerIntTableRowCount(table: arena.mirBlocks) { visited.append(element: 0) }
-    if valid && compilerBodyLLVMEmitterRenderCFGDepthFirst(emitter: emitter, mirBlockID: 0, visited: visited) != 0 { valid: false }
+    if valid {
+        let renderingStatus: Int(compilerBodyLLVMEmitterRenderCFGDepthFirst(emitter: emitter, mirBlockID: 0, visited: visited))
+        if renderingStatus != 0 {
+            emissionFailureCode: 10000 + (0 - renderingStatus)
+            valid: false
+        }
+    }
     visited.destroy()
     while valid && mirBlockID < compilerIntTableRowCount(table: arena.mirBlocks) {
         let firstOperation: Int(compilerIntTableValue(table: arena.mirBlocks, row: mirBlockID, column: compilerBodyMIRBlockFirstOperationColumn()))
@@ -1681,9 +1718,14 @@ function compilerBodyLLVMEmit(arena: CompilerBodyArena, initialTemporary: Int, i
     let runtimeRequirements: Int(emitter.runtimeState.element(index: compilerBodyLLVMEmitterRuntimeRequirements()))
     let nextTemporary: Int(emitter.runtimeState.element(index: compilerBodyLLVMEmitterNextTemporary()))
     let nextBranch: Int(emitter.runtimeState.element(index: compilerBodyLLVMEmitterNextBranch()))
-    if compilerBodyLLVMEmitterDestroy(emitter: emitter) != 0 { valid: false }
+    let destroyStatus: Int(compilerBodyLLVMEmitterDestroy(emitter: emitter))
+    if destroyStatus != 0 {
+        if emissionFailureCode == 0 { emissionFailureCode: 400 + (0 - destroyStatus) }
+        valid: false
+    }
     let loweredBlock: CompilerLLVMLoweredBlock(block: CompilerBlock(start: bodyStart, end: bodyEnd), declarationRecords: String(""), renderedBlocks: renderedBlocks, instructionRecords: String(""), localValues: String(""), nextTemporary: nextTemporary, nextBranchIndex: nextBranch, exitLabel: exitLabel, hasEntryBranch: hasEntryBranch, entryBranchCondition: entryBranchCondition, entryBranchThenLabel: entryBranchThenLabel, entryBranchElseLabel: entryBranchElseLabel, hasReturn: hasReturn, returnLLVMType: returnLLVMType, returnLLVMValue: returnLLVMValue)
-    return CompilerBodyLLVMEmissionResult(block: loweredBlock, renderedGlobals: renderedGlobals, runtimeRequirements: runtimeRequirements, isValid: valid)
+    if !valid { return CompilerBodyLLVMEmissionResult(block: loweredBlock, renderedGlobals: renderedGlobals, runtimeRequirements: emissionFailureCode, isValid: false) }
+    return CompilerBodyLLVMEmissionResult(block: loweredBlock, renderedGlobals: renderedGlobals, runtimeRequirements: runtimeRequirements, isValid: true)
 }
 
 function compilerBodyArenaValidationCode(arena: CompilerBodyArena): Int {

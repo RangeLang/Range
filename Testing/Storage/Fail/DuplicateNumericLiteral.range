@@ -1,0 +1,12 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/Storage.range
+macro storage(): Construct -> Void {}
+macro literal(_ syntax: Foreign<ASCII>): Construct -> Void {}
+compilerSourceFile\trole=core\tpath=Core/Integer.range
+@storage
+@literal(.numeric)
+construct Int<signedness: Signedness, bits: Int> {}
+compilerSourceFile\trole=core\tpath=Core/OtherInteger.range
+@storage
+@literal(.numeric)
+construct OtherInteger<signedness: Signedness, bits: Int> {}

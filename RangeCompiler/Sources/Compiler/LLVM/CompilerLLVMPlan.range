@@ -171,6 +171,20 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
         compilerSyntaxTablesDestroy(tables: tables)
         return executionOutput
     }
+    let storageLiteralFacts: CompilerStorageLiteralFacts(compilerStorageLiteralFactsResolve(tables: tables))
+    if !storageLiteralFacts.isValid {
+        compilerGraphDeltaDestroy(delta: execution.graphDelta)
+        compilerDeclarationIndexDestroy(index: executionIndex)
+        compilerSyntaxTablesDestroy(tables: tables)
+        return "compilerError\tkind=invalidLiteralStorage\treason=\(compilerStorageLiteralReasonName(reason: storageLiteralFacts.reason))\trelatedRow=\(storageLiteralFacts.relatedRow)"
+    }
+    let textLiteralFacts: CompilerTextLiteralFacts(compilerTextLiteralFactsResolve(tables: tables))
+    if !textLiteralFacts.isValid {
+        compilerGraphDeltaDestroy(delta: execution.graphDelta)
+        compilerDeclarationIndexDestroy(index: executionIndex)
+        compilerSyntaxTablesDestroy(tables: tables)
+        return "compilerError\tkind=invalidTextLiteralStorage\treason=\(compilerTextLiteralReasonName(reason: textLiteralFacts.reason))\trelatedRow=\(textLiteralFacts.relatedRow)"
+    }
     if compilerGraphDeltaCommitGeneratedDeclarations(tables: tables, delta: execution.graphDelta) != 0 {
         compilerMacroRecordGeneratedFunctionCommitDiagnostic(tables: tables, delta: execution.graphDelta)
         let commitOutput: String(compilerMacroRenderDiagnostics(tables: tables))
@@ -1402,7 +1416,7 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
     if capable && !discoveredSensitiveTarget {
         let capabilityEmission: CompilerBodyLLVMEmissionResult(compilerBodyLLVMEmit(arena: arena, initialTemporary: 0, initialBranch: 0, abiPlan: candidatePlan, typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments, functionInstances: reachability.functionInstances, functionInstanceSignatures: reachability.functionInstanceSignatures, functionInstanceSignatureParameters: reachability.functionInstanceSignatureParameters))
         if !capabilityEmission.isValid {
-            failureStage: 9
+            failureStage: 900000 + capabilityEmission.runtimeRequirements
             capable: false
         }
     }

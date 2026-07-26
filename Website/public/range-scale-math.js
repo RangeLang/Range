@@ -14,6 +14,27 @@ function pinchInfluence(value, center, falloff) {
   return Math.exp(-0.5 * normalizedDistance * normalizedDistance) * taper;
 }
 
+function scaleIntervalCount(divisionBase, divisionLevels) {
+  if (!Number.isInteger(divisionBase) || divisionBase < 2) {
+    throw new RangeError("divisionBase must be an integer of at least 2");
+  }
+  if (!Number.isInteger(divisionLevels) || divisionLevels < 1 || divisionLevels > 6) {
+    throw new RangeError("divisionLevels must be an integer within [1, 6]");
+  }
+  return divisionBase ** divisionLevels;
+}
+
+export function logarithmicScalePosition(value, {
+  divisionBase = 3,
+  divisionLevels = 3,
+} = {}) {
+  assertFiniteNumber(value, "value");
+  if (value < 0 || value > 1) throw new RangeError("value must be within [0, 1]");
+
+  const intervalCount = scaleIntervalCount(divisionBase, divisionLevels);
+  return Math.log1p(value * intervalCount) / Math.log1p(intervalCount);
+}
+
 export function sphericalPinchInfluence(value, {
   center = 0.27,
   coreRadius = 0,
@@ -47,14 +68,7 @@ export function sphericalPinchInfluence(value, {
 }
 
 export function createScaleMarks({ divisionBase = 3, divisionLevels = 3 } = {}) {
-  if (!Number.isInteger(divisionBase) || divisionBase < 2) {
-    throw new RangeError("divisionBase must be an integer of at least 2");
-  }
-  if (!Number.isInteger(divisionLevels) || divisionLevels < 1 || divisionLevels > 6) {
-    throw new RangeError("divisionLevels must be an integer within [1, 6]");
-  }
-
-  const intervalCount = divisionBase ** divisionLevels;
+  const intervalCount = scaleIntervalCount(divisionBase, divisionLevels);
   const majorStride = divisionBase ** (divisionLevels - 1);
   const divisionStride = divisionLevels > 1
     ? divisionBase ** (divisionLevels - 2)
@@ -65,9 +79,13 @@ export function createScaleMarks({ divisionBase = 3, divisionLevels = 3 } = {}) 
     return {
       isRadix: isMajor || isDivision,
       measure: 1,
-      position: index / intervalCount,
+      position: logarithmicScalePosition(index / intervalCount, {
+        divisionBase,
+        divisionLevels,
+      }),
       source: "scale",
       tier: isMajor ? "major" : isDivision ? "division" : "single",
+      value: index / intervalCount,
       weight: 1,
     };
   });
@@ -147,30 +165,40 @@ export function snapScalePosition(value, {
   assertFiniteNumber(value, "value");
   assertFiniteNumber(hysteresis, "hysteresis");
   if (value < 0 || value > 1) throw new RangeError("value must be within [0, 1]");
-  if (!Number.isInteger(divisionBase) || divisionBase < 2) {
-    throw new RangeError("divisionBase must be an integer of at least 2");
-  }
-  if (!Number.isInteger(divisionLevels) || divisionLevels < 1 || divisionLevels > 6) {
-    throw new RangeError("divisionLevels must be an integer within [1, 6]");
-  }
+  const intervalCount = scaleIntervalCount(divisionBase, divisionLevels);
   if (hysteresis < 0 || hysteresis >= 0.5) {
     throw new RangeError("hysteresis must be within [0, 0.5)");
   }
 
-  const intervalCount = divisionBase ** divisionLevels;
-  const candidate = Math.min(intervalCount, Math.max(0, Math.round(value * intervalCount)));
+  const positions = Array.from(
+    { length: intervalCount + 1 },
+    (_, index) => logarithmicScalePosition(index / intervalCount, {
+      divisionBase,
+      divisionLevels,
+    }),
+  );
+  let candidate = 0;
+  while (
+    candidate < intervalCount
+    && value >= (positions[candidate] + positions[candidate + 1]) / 2
+  ) candidate += 1;
+
   let index = candidate;
   if (Number.isInteger(previousIndex) && previousIndex >= 0 && previousIndex <= intervalCount) {
     if (candidate > previousIndex) {
-      const forwardBoundary = (previousIndex + 0.5 + hysteresis) / intervalCount;
+      const nextIndex = Math.min(intervalCount, previousIndex + 1);
+      const forwardBoundary = positions[previousIndex]
+        + (0.5 + hysteresis) * (positions[nextIndex] - positions[previousIndex]);
       if (value < forwardBoundary) index = previousIndex;
     } else if (candidate < previousIndex) {
-      const backwardBoundary = (previousIndex - 0.5 - hysteresis) / intervalCount;
+      const priorIndex = Math.max(0, previousIndex - 1);
+      const backwardBoundary = positions[previousIndex]
+        - (0.5 + hysteresis) * (positions[previousIndex] - positions[priorIndex]);
       if (value > backwardBoundary) index = previousIndex;
     }
   }
 
-  return { index, position: index / intervalCount };
+  return { index, position: positions[index] };
 }
 
 export function measureWithFalloff(position, {

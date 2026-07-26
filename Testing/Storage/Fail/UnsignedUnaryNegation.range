@@ -1,0 +1,4 @@
+@main {
+    let maximum: Int<.unsigned, 8>(255)
+    return -maximum
+}

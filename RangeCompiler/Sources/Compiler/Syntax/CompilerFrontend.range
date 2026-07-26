@@ -38,6 +38,12 @@ function compilerSyntaxGenericParameterFingerprintSecondColumn(): Int { return 1
 function compilerSyntaxGenericParameterTypeKind(): Int { return 1 }
 function compilerSyntaxGenericParameterValueKind(): Int { return 2 }
 
+function compilerSyntaxGenericParameterKindName(kind: Int): String {
+    if kind == compilerSyntaxGenericParameterTypeKind() { return String("type") }
+    if kind == compilerSyntaxGenericParameterValueKind() { return String("value") }
+    return String("invalid")
+}
+
 function compilerSyntaxMacroDeclarationColumnCount(): Int { return 32 }
 function compilerSyntaxMacroParameterColumnCount(): Int { return 11 }
 function compilerSyntaxMacroApplicationColumnCount(): Int { return 19 }
@@ -48,7 +54,19 @@ function compilerSyntaxMacroInvocationColumnCount(): Int { return 35 }
 function compilerSyntaxMacroCapabilityHandleColumnCount(): Int { return 8 }
 function compilerSyntaxMacroExecutionEventColumnCount(): Int { return 12 }
 function compilerSyntaxMacroReadDependencyColumnCount(): Int { return 18 }
+function compilerFormulaFactColumnCount(): Int { return 10 }
 function compilerSyntaxMacroExpansionTemplateColumnCount(): Int { return 27 }
+
+function compilerFormulaFactStorage(): Int { return 1 }
+function compilerFormulaFactLiteral(): Int { return 2 }
+function compilerFormulaStorageInferred(): Int { return 0 }
+function compilerFormulaStorageText(): Int { return 1 }
+function compilerFormulaLiteralNumeric(): Int { return 1 }
+function compilerFormulaLiteralDecimal(): Int { return 2 }
+function compilerFormulaLiteralText(): Int { return 3 }
+function compilerFormulaEncodingUTF8(): Int { return 1 }
+function compilerFormulaSignednessSigned(): Int { return 1 }
+function compilerFormulaSignednessUnsigned(): Int { return 2 }
 
 function compilerMacroCapabilityTarget(): Int { return 1 }
 function compilerMacroCapabilityDiagnostics(): Int { return 2 }
@@ -321,6 +339,7 @@ function compilerSyntaxTablesCreate(source: String): CompilerSyntaxTables {
         macroCapabilityHandles: compilerIntTableCreate(columnCount: compilerSyntaxMacroCapabilityHandleColumnCount(), estimatedRowCount: 384),
         macroExecutionEvents: compilerIntTableCreate(columnCount: compilerSyntaxMacroExecutionEventColumnCount(), estimatedRowCount: 128),
         macroReadDependencies: compilerIntTableCreate(columnCount: compilerSyntaxMacroReadDependencyColumnCount(), estimatedRowCount: 128),
+        compilerFormulaFacts: compilerIntTableCreate(columnCount: compilerFormulaFactColumnCount(), estimatedRowCount: 32),
         macroExpansionTemplates: compilerIntTableCreate(columnCount: compilerSyntaxMacroExpansionTemplateColumnCount(), estimatedRowCount: 32),
         pendingGeneratedFunctions: compilerIntTableCreate(columnCount: compilerGraphGeneratedFunctionColumnCount(), estimatedRowCount: 32),
         pendingGeneratedMembers: compilerIntTableCreate(columnCount: compilerGraphGeneratedMemberColumnCount(), estimatedRowCount: 32),
@@ -384,6 +403,9 @@ function compilerSyntaxTablesDestroy(tables: CompilerSyntaxTables): Int {
         status: 0 - 1
     }
     if compilerIntTableDestroy(table: tables.macroReadDependencies) != 0 {
+        status: 0 - 1
+    }
+    if compilerIntTableDestroy(table: tables.compilerFormulaFacts) != 0 {
         status: 0 - 1
     }
     if compilerIntTableDestroy(table: tables.macroExpansionTemplates) != 0 {
@@ -477,6 +499,7 @@ function compilerSyntaxTablesIsValid(tables: CompilerSyntaxTables): Bool {
         && compilerIntTableIsComplete(table: tables.macroCapabilityHandles)
         && compilerIntTableIsComplete(table: tables.macroExecutionEvents)
         && compilerIntTableIsComplete(table: tables.macroReadDependencies)
+        && compilerIntTableIsComplete(table: tables.compilerFormulaFacts)
         && compilerIntTableIsComplete(table: tables.macroExpansionTemplates)
         && compilerIntTableIsComplete(table: tables.pendingGeneratedFunctions)
         && compilerIntTableIsComplete(table: tables.pendingGeneratedMembers)
@@ -535,6 +558,7 @@ function compilerSyntaxTablesEnsureFailure(tables: CompilerSyntaxTables): Int {
         && compilerIntTableIsComplete(table: tables.macroCapabilityHandles)
         && compilerIntTableIsComplete(table: tables.macroExecutionEvents)
         && compilerIntTableIsComplete(table: tables.macroReadDependencies)
+        && compilerIntTableIsComplete(table: tables.compilerFormulaFacts)
         && compilerIntTableIsComplete(table: tables.macroExpansionTemplates)
         && compilerIntTableIsComplete(table: tables.pendingGeneratedFunctions)
         && compilerIntTableIsComplete(table: tables.pendingGeneratedMembers)
@@ -1908,23 +1932,55 @@ function compilerTypedSyntaxCaptureGenericParameters(source: String, tables: Com
             } else if token.kind != .identifier {
                 valid: false
             } else {
-                let parameterFingerprint: CompilerFingerprint(compilerTypedFingerprintAppendNamedType(fingerprint: baseFingerprint, tag: 60, ordinal: ordinal, name: token.text, typeName: String("type")))
-                if compilerSyntaxAppendGenericParameter(tables: tables, ownerSyntaxID: ownerSyntaxID, ownerKind: ownerKind, ordinal: ordinal, fileID: fileID, start: token.start, end: token.end, nameStart: token.start, nameEnd: token.end, kind: compilerSyntaxGenericParameterTypeKind(), fingerprint: parameterFingerprint) != 0 {
+                let maybeFollowing: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: token.end))
+                if maybeFollowing == nil {
                     valid: false
                 } else {
-                    fingerprint: compilerTypedFingerprintAppendNamedType(fingerprint: fingerprint, tag: 60, ordinal: ordinal, name: token.text, typeName: String("type"))
-                    ordinal: ordinal + 1
-                    let maybeSeparator: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: token.end))
-                    if maybeSeparator == nil { valid: false } else {
-                        let separator: RangeLexedToken(maybeSeparator ?? compilerFallbackTokenAt(index: token.end))
-                        if separator.kind == .comma {
-                            expectingName: true
-                            cursor: separator.end
-                        } else if separator.kind == .greater && separator.start == genericRange.end - 1 {
-                            expectingName: false
-                            cursor: separator.end
-                        } else {
+                    let following: RangeLexedToken(maybeFollowing ?? compilerFallbackTokenAt(index: token.end))
+                    if following.kind == .colon {
+                        let step: CompilerFunctionParameterTokenStep(compilerCoreParseFunctionParameterToken(source: source, end: genericRange.end, token: token))
+                        let parameterEnd: Int(compilerTypedSyntaxGenericValueParameterEnd(source: source, typeEnd: step.typeReference.end, genericEnd: genericRange.end))
+                        if !step.keepScanning || !step.found || parameterEnd < step.typeReference.end {
                             valid: false
+                        } else {
+                            let authored: String(stringSubstring(source: source, start: token.start, end: parameterEnd))
+                            let parameterFingerprint: CompilerFingerprint(compilerTypedFingerprintAppendNamedType(fingerprint: baseFingerprint, tag: 60, ordinal: ordinal, name: step.nameToken.text, typeName: authored))
+                            if compilerSyntaxAppendGenericParameter(tables: tables, ownerSyntaxID: ownerSyntaxID, ownerKind: ownerKind, ordinal: ordinal, fileID: fileID, start: token.start, end: parameterEnd, nameStart: step.nameToken.start, nameEnd: step.nameToken.end, kind: compilerSyntaxGenericParameterValueKind(), fingerprint: parameterFingerprint) != 0 {
+                                valid: false
+                            } else {
+                                fingerprint: compilerTypedFingerprintAppendNamedType(fingerprint: fingerprint, tag: 60, ordinal: ordinal, name: step.nameToken.text, typeName: authored)
+                                ordinal: ordinal + 1
+                                let maybeSeparator: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: parameterEnd))
+                                if maybeSeparator == nil { valid: false } else {
+                                    let separator: RangeLexedToken(maybeSeparator ?? compilerFallbackTokenAt(index: parameterEnd))
+                                    if separator.kind == .comma {
+                                        expectingName: true
+                                        cursor: separator.end
+                                    } else if separator.kind == .greater && separator.start == genericRange.end - 1 {
+                                        expectingName: false
+                                        cursor: separator.end
+                                    } else {
+                                        valid: false
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        let parameterFingerprint: CompilerFingerprint(compilerTypedFingerprintAppendNamedType(fingerprint: baseFingerprint, tag: 60, ordinal: ordinal, name: token.text, typeName: String("type")))
+                        if compilerSyntaxAppendGenericParameter(tables: tables, ownerSyntaxID: ownerSyntaxID, ownerKind: ownerKind, ordinal: ordinal, fileID: fileID, start: token.start, end: token.end, nameStart: token.start, nameEnd: token.end, kind: compilerSyntaxGenericParameterTypeKind(), fingerprint: parameterFingerprint) != 0 {
+                            valid: false
+                        } else {
+                            fingerprint: compilerTypedFingerprintAppendNamedType(fingerprint: fingerprint, tag: 60, ordinal: ordinal, name: token.text, typeName: String("type"))
+                            ordinal: ordinal + 1
+                            if following.kind == .comma {
+                                expectingName: true
+                                cursor: following.end
+                            } else if following.kind == .greater && following.start == genericRange.end - 1 {
+                                expectingName: false
+                                cursor: following.end
+                            } else {
+                                valid: false
+                            }
                         }
                     }
                 }
@@ -3258,6 +3314,12 @@ function compilerTypedSyntaxAppendEnumCasePayload(tables: CompilerSyntaxTables, 
     return CompilerEnumPayloadAppendStep(nextIndex: step.nextIndex, fingerprint: payloadFingerprint, isValid: true)
 }
 
+function compilerTypedSyntaxParseAndAppendEnumCasePayload(source: String, tables: CompilerSyntaxTables, fileID: Int, caseRow: Int, caseSyntaxID: Int, firstStart: Int, storagePolicy: Int, payloadOrdinal: Int, fingerprint: CompilerFingerprint, parameterIndex: Int, end: Int): CompilerEnumPayloadAppendStep {
+    let parameterCursor: CompilerTokenCursor(source: $source, index: parameterIndex)
+    let step: CompilerFunctionParameterTokenStep(compilerCoreParseFunctionParameterToken(source: source, end: end, token: compilerCursorPeekOrFallback(cursor: parameterCursor)))
+    return compilerTypedSyntaxAppendEnumCasePayload(tables: tables, fileID: fileID, caseRow: caseRow, caseSyntaxID: caseSyntaxID, firstStart: firstStart, storagePolicy: storagePolicy, payloadOrdinal: payloadOrdinal, fingerprint: fingerprint, step: step)
+}
+
 function compilerTypedSyntaxCaptureEnumCasePayloads(source: String, tables: CompilerSyntaxTables, fileID: Int, caseRow: Int, start: Int, end: Int): Int {
     if caseRow < 0 || caseRow >= compilerIntTableRowCount(table: tables.members) || start >= end { return 0 - 1 }
     let caseSyntaxID: Int(compilerIntTableValue(table: tables.members, row: caseRow, column: 0))
@@ -3268,49 +3330,43 @@ function compilerTypedSyntaxCaptureEnumCasePayloads(source: String, tables: Comp
     state cursor: CompilerTokenCursor(source: $source, index: start)
     state payloadOrdinal: Int(0)
     while cursor.index < end {
-        let maybeFirst: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
-        if maybeFirst == nil { return 0 - 1 }
-        let firstToken: RangeLexedToken(maybeFirst ?? compilerFallbackTokenAt(index: cursor.index))
-        if firstToken.start >= end { return 0 - 1 }
-        let firstStart: Int(firstToken.start)
-        let firstIsBinding: Bool(firstToken.text == String("binding"))
-        let firstIsIndirect: Bool(firstToken.text == String("indirect"))
-        let afterFirstCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: cursor, token: firstToken))
+        if compilerCursorPeek(cursor: cursor) == nil { return 0 - 1 }
+        let firstStart: Int(compilerCursorPeekStartOrIndex(cursor: cursor))
+        let firstEnd: Int(compilerCursorPeekEndOrIndex(cursor: cursor))
+        if firstStart >= end { return 0 - 1 }
+        let firstIsBinding: Bool(compilerCursorPeekTextEquals(cursor: cursor, expected: String("binding")))
+        let firstIsIndirect: Bool(compilerCursorPeekTextEquals(cursor: cursor, expected: String("indirect")))
         state storagePolicy: Int(compilerSyntaxMemberStorageDirect())
-        state parameterCursor: CompilerTokenCursor(cursor)
+        state parameterIndex: Int(cursor.index)
         if firstIsBinding || firstIsIndirect {
             if firstIsBinding {
                 storagePolicy: compilerSyntaxMemberStorageBinding()
             } else {
                 storagePolicy: compilerSyntaxMemberStorageIndirect()
             }
-            parameterCursor: afterFirstCursor
+            parameterIndex: firstEnd
         }
-        let maybeParameter: Optional<RangeLexedToken>(compilerCursorPeek(cursor: parameterCursor))
-        if maybeParameter == nil { return 0 - 1 }
-        let step: CompilerFunctionParameterTokenStep(compilerCoreParseFunctionParameterToken(source: source, end: end, token: maybeParameter ?? compilerFallbackTokenAt(index: parameterCursor.index)))
-        let appendStep: CompilerEnumPayloadAppendStep(compilerTypedSyntaxAppendEnumCasePayload(tables: tables, fileID: fileID, caseRow: caseRow, caseSyntaxID: caseSyntaxID, firstStart: firstStart, storagePolicy: storagePolicy, payloadOrdinal: payloadOrdinal, fingerprint: fingerprint, step: step))
+        let parameterCursor: CompilerTokenCursor(source: $source, index: parameterIndex)
+        if compilerCursorPeek(cursor: parameterCursor) == nil { return 0 - 1 }
+        let appendStep: CompilerEnumPayloadAppendStep(compilerTypedSyntaxParseAndAppendEnumCasePayload(source: source, tables: tables, fileID: fileID, caseRow: caseRow, caseSyntaxID: caseSyntaxID, firstStart: firstStart, storagePolicy: storagePolicy, payloadOrdinal: payloadOrdinal, fingerprint: fingerprint, parameterIndex: parameterIndex, end: end))
         if !appendStep.isValid { return 0 - 1 }
         fingerprint: appendStep.fingerprint
         payloadOrdinal: payloadOrdinal + 1
-        let separatorCursor: CompilerTokenCursor(source: $source, index: appendStep.nextIndex)
-        let maybeSeparator: Optional<RangeLexedToken>(compilerCursorPeek(cursor: separatorCursor))
-        if maybeSeparator == nil { return 0 - 1 }
-        let separator: RangeLexedToken(maybeSeparator ?? compilerFallbackTokenAt(index: separatorCursor.index))
-        let separatorStart: Int(separator.start)
-        let separatorKind: RangeTokenKind(separator.kind)
-        let afterSeparatorCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: separatorCursor, token: separator))
+        let separatorIndex: Int(appendStep.nextIndex)
+        let separatorCursor: CompilerTokenCursor(source: $source, index: separatorIndex)
+        if compilerCursorPeek(cursor: separatorCursor) == nil { return 0 - 1 }
+        let separatorStart: Int(compilerCursorPeekStartOrIndex(cursor: separatorCursor))
+        let separatorEnd: Int(compilerCursorPeekEndOrIndex(cursor: separatorCursor))
+        let separatorKind: RangeTokenKind(compilerCursorPeekKindOrEOF(cursor: separatorCursor))
         if separatorStart >= end {
             cursor: CompilerTokenCursor(source: $source, index: end)
         } else {
             if separatorKind != .comma { return 0 - 1 }
-            cursor: afterSeparatorCursor
-            let maybeNext: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
-            if maybeNext == nil { return 0 - 1 }
-            let next: RangeLexedToken(maybeNext ?? compilerFallbackTokenAt(index: cursor.index))
-            let nextStart: Int(next.start)
-            let afterNextCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: cursor, token: next))
-            if nextStart >= end || afterNextCursor.index <= cursor.index { return 0 - 1 }
+            cursor: CompilerTokenCursor(source: $source, index: separatorEnd)
+            if compilerCursorPeek(cursor: cursor) == nil { return 0 - 1 }
+            let nextStart: Int(compilerCursorPeekStartOrIndex(cursor: cursor))
+            let nextEnd: Int(compilerCursorPeekEndOrIndex(cursor: cursor))
+            if nextStart >= end || nextEnd <= cursor.index { return 0 - 1 }
         }
     }
     fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: payloadOrdinal)
@@ -4949,6 +5005,38 @@ function compilerMacroExecutionTablesAreStructurallyValid(tables: CompilerSyntax
     return true
 }
 
+function compilerFormulaFactsAreStructurallyValid(tables: CompilerSyntaxTables): Bool {
+    if !compilerIntTableIsComplete(table: tables.compilerFormulaFacts) { return false }
+    let invocationCount: Int(compilerIntTableRowCount(table: tables.macroInvocations))
+    let applicationCount: Int(compilerIntTableRowCount(table: tables.macroApplications))
+    let syntaxCount: Int(compilerIntTableRowCount(table: tables.syntaxIndex))
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.compilerFormulaFacts) {
+        let kind: Int(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 1))
+        let invocationRow: Int(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 2))
+        let applicationRow: Int(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 3))
+        let targetSyntaxID: Int(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 4))
+        let category: Int(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 5))
+        if compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 0) != row
+            || (kind != compilerFormulaFactStorage() && kind != compilerFormulaFactLiteral())
+            || invocationRow < 0 || invocationRow >= invocationCount
+            || applicationRow < 0 || applicationRow >= applicationCount
+            || targetSyntaxID < 0 || targetSyntaxID >= syntaxCount
+            || compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 1) != applicationRow
+            || compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12) != targetSyntaxID
+            || category < 0 - 1 { return false }
+        if category >= 0 && kind == compilerFormulaFactStorage()
+            && category != compilerFormulaStorageInferred()
+            && category != compilerFormulaStorageText() { return false }
+        if category >= 0 && kind == compilerFormulaFactLiteral()
+            && category != compilerFormulaLiteralNumeric()
+            && category != compilerFormulaLiteralDecimal()
+            && category != compilerFormulaLiteralText() { return false }
+        row: row + 1
+    }
+    return true
+}
+
 function compilerMacroTablesAreStructurallyValid(tables: CompilerSyntaxTables): Bool {
     return compilerMacroDeclarationsAreStructurallyValid(tables: tables)
         && compilerMacroParametersAreStructurallyValid(tables: tables)
@@ -4958,6 +5046,7 @@ function compilerMacroTablesAreStructurallyValid(tables: CompilerSyntaxTables): 
         && compilerMacroCapabilitiesAreStructurallyValid(tables: tables)
         && compilerMacroExpansionTemplatesAreStructurallyValid(tables: tables)
         && compilerMacroExecutionTablesAreStructurallyValid(tables: tables)
+        && compilerFormulaFactsAreStructurallyValid(tables: tables)
 }
 
 function compilerMacroExpansionTemplateStructuralFailure(tables: CompilerSyntaxTables, row: Int, reason: Int): Bool {
@@ -5279,6 +5368,63 @@ function compilerMacroExecutionResolvedDeclaration(tables: CompilerSyntaxTables,
         edgeRow: edgeRow + 1
     }
     return 0 - 1
+}
+
+function compilerFormulaFactAppend(tables: CompilerSyntaxTables, kind: Int, invocationRow: Int, applicationRow: Int, targetSyntaxID: Int, category: Int, semanticElementSyntaxID: Int, encoding: Int, bits: Int, signedness: Int): Int {
+    let row: Int(compilerIntTableRowCount(table: tables.compilerFormulaFacts))
+    if compilerSyntaxTableAppend(tables: tables, table: tables.compilerFormulaFacts, value: row) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.compilerFormulaFacts, value: kind) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.compilerFormulaFacts, value: invocationRow) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.compilerFormulaFacts, value: applicationRow) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.compilerFormulaFacts, value: targetSyntaxID) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.compilerFormulaFacts, value: category) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.compilerFormulaFacts, value: semanticElementSyntaxID) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.compilerFormulaFacts, value: encoding) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.compilerFormulaFacts, value: bits) != 0 {
+        return 0 - 1
+    }
+    return compilerSyntaxTableAppend(tables: tables, table: tables.compilerFormulaFacts, value: signedness)
+}
+
+function compilerFormulaExecuteApplication(tables: CompilerSyntaxTables, applicationRow: Int, declarationRow: Int): Int {
+    let name: String(compilerProjectMacroApplicationName(tables: tables, applicationRow: applicationRow))
+    if name != String("storage") && name != String("literal") { return 0 }
+    let invocationRow: Int(compilerMacroExecutionAppendInvocation(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow, budget: compilerMacroExecutionBudgetDefault()))
+    if invocationRow < 0 { return 0 - 1 }
+    let identity: CompilerFingerprint(compilerMacroExecutionInvocationIdentity(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow))
+    if compilerMacroExecutionSetInvocation(tables: tables, row: invocationRow, status: compilerMacroInvocationSuccess(), diagnosticCode: 0, diagnosticFileID: 0 - 1, diagnosticStart: 0 - 1, diagnosticEnd: 0 - 1, resultIdentity: identity, mirOperationCount: 0, stepCount: 1, pipelineStatus: 0, pipelineFailureCode: 0) != 0 { return 0 - 1 }
+    let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12))
+    let argument: String(compilerMacroApplicationArgumentText(tables: tables, applicationRow: applicationRow))
+    state kind: Int(compilerFormulaFactStorage())
+    state category: Int(compilerFormulaStorageInferred())
+    state semanticElementSyntaxID: Int(0 - 1)
+    state encoding: Int(0 - 1)
+    state bits: Int(0 - 1)
+    state signedness: Int(0 - 1)
+    if name == String("storage") {
+        if argument == String(".text(encoding: .utf8, element: Character, codeUnit: Int<.unsigned, 8>)") {
+            category: compilerFormulaStorageText()
+            semanticElementSyntaxID: compilerSyntaxDeclarationSyntaxIDForTypeName(tables: tables, typeName: String("Character"))
+            encoding: compilerFormulaEncodingUTF8()
+            bits: 8
+            signedness: compilerFormulaSignednessUnsigned()
+        } else if argument != String("") {
+            category: 0 - 1
+        }
+    } else {
+        kind: compilerFormulaFactLiteral()
+        category: 0 - 1
+        if argument == String(".numeric") {
+            category: compilerFormulaLiteralNumeric()
+        } else if argument == String(".numeric.decimal(separator: \".\")") {
+            category: compilerFormulaLiteralDecimal()
+            encoding: 46
+        } else if argument == String(".text") {
+            category: compilerFormulaLiteralText()
+        }
+    }
+    if compilerFormulaFactAppend(tables: tables, kind: kind, invocationRow: invocationRow, applicationRow: applicationRow, targetSyntaxID: targetSyntaxID, category: category, semanticElementSyntaxID: semanticElementSyntaxID, encoding: encoding, bits: bits, signedness: signedness) < 0 { return 0 - 1 }
+    return 1
 }
 
 function compilerMacroExecutionInvocationIdentity(tables: CompilerSyntaxTables, applicationRow: Int, declarationRow: Int): CompilerFingerprint {
@@ -6766,10 +6912,18 @@ function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDec
     while applicationRow < compilerIntTableRowCount(table: tables.macroApplications) && status == 0 {
         let declarationRow: Int(compilerMacroExecutionResolvedDeclaration(tables: tables, applicationRow: applicationRow))
         if declarationRow >= 0 {
-            let capabilitySetID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 29))
-            let bodyStart: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 27))
-            let bodyEnd: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 28))
-            if capabilitySetID > 0 && bodyEnd > bodyStart {
+            let formulaExecutionStatus: Int(compilerFormulaExecuteApplication(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow))
+            if formulaExecutionStatus < 0 {
+                status: 0 - 1
+                diagnosticCode: compilerMacroDiagnosticBodyInvalid()
+            } else if formulaExecutionStatus > 0 {
+                invocationCount: invocationCount + 1
+                stepCount: stepCount + 1
+            } else {
+                let capabilitySetID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 29))
+                let bodyStart: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 27))
+                let bodyEnd: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 28))
+                if capabilitySetID > 0 && bodyEnd > bodyStart {
                 let invocationRow: Int(compilerMacroExecutionAppendInvocation(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow, budget: compilerMacroExecutionBudgetDefault()))
                 if invocationRow < 0 {
                     status: 0 - 1
@@ -6798,6 +6952,7 @@ function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDec
                         mirOperationCount: mirOperationCount + invocationOutcome.mirOperationCount
                         stepCount: stepCount + invocationOutcome.stepCount
                     }
+                }
                 }
             }
         }

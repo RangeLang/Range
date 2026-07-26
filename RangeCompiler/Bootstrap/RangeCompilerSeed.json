@@ -2,12 +2,12 @@
   "formatVersion": 1,
   "seed": {
     "path": "RangeCompiler/Bootstrap/RangeCompilerSeed.ll",
-    "bytes": 6501872,
-    "sha256": "92a4c1d12c2bb0f6201a6da2ebb581d4f75f65b13a799ebc60577306e2ff2503"
+    "bytes": 7292305,
+    "sha256": "c85943e4944e6ef1c281783f33b41a07876d2a3fad4d90c91a37e827700a1651"
   },
   "expectedStage3LLVM": {
-    "bytes": 6501872,
-    "sha256": "92a4c1d12c2bb0f6201a6da2ebb581d4f75f65b13a799ebc60577306e2ff2503"
+    "bytes": 7292305,
+    "sha256": "c85943e4944e6ef1c281783f33b41a07876d2a3fad4d90c91a37e827700a1651"
   },
   "compilerSources": [
     {
@@ -28,7 +28,7 @@
     {
       "path": "RangeCompiler/Sources/Core/System/Process.range",
       "role": "core",
-      "sha256": "6aa1e67f4e7fadf88d7305d27f37079bd1990d8079296fb6b6b45fe2617a1b41"
+      "sha256": "edf60ef8dd940104a77681586bfa5098b1629bfcf710d2905ba4edc1f978636f"
     },
     {
       "path": "RangeCompiler/Sources/Core/System/Text/String.range",
@@ -38,32 +38,32 @@
     {
       "path": "RangeCompiler/Sources/Compiler/Body/CompilerBodyCFG.range",
       "role": "project",
-      "sha256": "fb3889e95c1ecec181dab872cefee27d0be1931b5900afdd98b0ce7e9d925545"
+      "sha256": "6330cecd3dea78f9e7d586a1db54aa7582b0fd74d8c8248feb6efde3bb5de9ec"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Body/CompilerBodyMIR.range",
       "role": "project",
-      "sha256": "634598f6c724bece48af427f5ef4d261254296878b125d955dfbdaa1978253eb"
+      "sha256": "498c15eb560eca4a2106e8348e4884029c4408c23c745e77ee34a2a0ba10b9fd"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Body/CompilerBodyModel.range",
       "role": "project",
-      "sha256": "e56057047fe405b8f4254bd2018573fcc054f883aceb37f8d945a2bbe020e699"
+      "sha256": "47f8ae784d0fd70618d05d87a54624075882e9a36ad7e67796fd08614e242a9a"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Body/CompilerBodyOwnership.range",
       "role": "project",
-      "sha256": "ab4a081d04999b4287242d67bc6e3dd19aa63f9ea1ce396d814aeec7f3b3f495"
+      "sha256": "743a2b1d647796bf174581c87dc100508f4306bcb24b6e84e22f24e8563a64a7"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Body/CompilerBodyParsing.range",
       "role": "project",
-      "sha256": "0236cbd797698d22291e31a900101452169a07bc37ceff58612eb144d5dbd79b"
+      "sha256": "07d9e78fd59895ae10da2f19f1cbb0f6e0eae9aa199e10cf833f70e19fd54734"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Body/CompilerBodyTypes.range",
       "role": "project",
-      "sha256": "0a28da1454e55e9cb5555376970da12be2a184e4dfc68496b73718d5c46e955b"
+      "sha256": "58c5df3888585eb857b35227fd01c99143e37b7746d0f2d9c823e645c2675a19"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Driver/Compiler.range",
@@ -78,7 +78,7 @@
     {
       "path": "RangeCompiler/Sources/Compiler/Driver/CompilerCore.range",
       "role": "project",
-      "sha256": "e5ef42775f2a8ecfd502a2a91d7843239a81e45735cbebe54c4ed49423e0c796"
+      "sha256": "4a9d114c21c868b1df81cf6c8a1c428a8f58a38886a1d24769b626e1fc2dea38"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Driver/CompilerDirectives.range",
@@ -88,12 +88,12 @@
     {
       "path": "RangeCompiler/Sources/Compiler/Driver/CompilerSources.range",
       "role": "project",
-      "sha256": "c1e067f117371628850fc3ab1aebdf35140b53285c391929e47311c2359915de"
+      "sha256": "f97b901face43b9c991718c9c6ce42527367b49d8d1578c893003244426eb8dd"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Driver/CompilerTextSupport.range",
       "role": "project",
-      "sha256": "07232ddefbb2a1f34ba697570365ce0f7c09e35f3d72c0038dcad6a5856b079d"
+      "sha256": "36ba1508f2f0f95afea27b621d6a4590fd5832482a61c0182f95cbee49a56dc8"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Driver/Main.range",
@@ -118,27 +118,27 @@
     {
       "path": "RangeCompiler/Sources/Compiler/LLVM/CompilerBodyLLVM.range",
       "role": "project",
-      "sha256": "b654f2735257d7a20355626a19c14ab63389982c2f132adb78add18f8d544272"
+      "sha256": "aa6debe9ce4b433318d3abd90011452de66a9162dee72d0d71a8854a8a0767d4"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/LLVM/CompilerLLVMPlan.range",
       "role": "project",
-      "sha256": "fdce29d69b3143f23b67d91ec30699f11d1da75ef5a93f2ca34d415b59756920"
+      "sha256": "ca42ab32df3a6f06a80459ab1a6aa9a5706fbff3102df82c6a08e630d585949f"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Syntax/CompilerFrontend.range",
       "role": "project",
-      "sha256": "0e056a9563943bf111c7cb4e629d771a844f9ff3f922c16b6f9fa24896d9c73d"
+      "sha256": "865e4e33a77cbbde2aa2eea517451f1c0935ec6730789df7dd855d9c1b1d051f"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Syntax/CompilerParsing.range",
       "role": "project",
-      "sha256": "a878c57b9bdf58088d4d8540fbbc4f8d2e0bc1eee9f31e3dd0ce90455c0cf918"
+      "sha256": "2d3d793924ee0d42c7fd92bf784016959a197f632aab4de83d4261c7815d9433"
     },
     {
       "path": "RangeCompiler/Sources/Compiler/Syntax/Lexer.range",
       "role": "project",
-      "sha256": "2073a9a9d3542685881e47418c58eaaf28a3f2292158154446e9d1ad807c5a07"
+      "sha256": "a1f0406c0575a7e21e56d93d3c7d25f81a01e66c02bcdc9fd56d91069212060b"
     }
   ],
   "runtimeABI": 2,

@@ -1,0 +1,1 @@
+macro literal(_ syntax: Foreign<ASCII>): Construct -> Void {}

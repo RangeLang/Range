@@ -911,15 +911,7 @@ function parseCompilerNonControlKeywordStatement(cursor: CompilerTokenCursor, ke
         return parseCompilerJumpStatement(keyword: keyword)
     }
 
-    return parseCompilerBindingKeywordStatement(cursor: cursor, keyword: keyword, keywordText: keywordText, bodyEnd: bodyEnd)
-}
-
-function parseCompilerBindingKeywordStatement(cursor: CompilerTokenCursor, keyword: RangeLexedToken, keywordText: String, bodyEnd: Int): Optional<CompilerStatement> {
-    if keywordText == String("let") {
-        return parseCompilerLocalBindingStatement(cursor: cursor, keyword: keyword, bodyEnd: bodyEnd)
-    }
-
-    if keywordText == String("state") {
+    if keywordText == String("let") || keywordText == String("state") {
         return parseCompilerLocalBindingStatement(cursor: cursor, keyword: keyword, bodyEnd: bodyEnd)
     }
 

@@ -260,28 +260,20 @@ function rangeToken(kind: RangeTokenKind, source: String, start: Int, end: Int):
 
 function readRangeLiteralToken(source: String, start: Int): Optional<RangeLexedToken> {
     let character: String(stringCharacterAt(source: source, index: start))
-    let maybeBracketToken: Optional<RangeLexedToken>(readRangeBracketToken(source: source, start: start, character: character))
-    if maybeBracketToken != nil {
-        return maybeBracketToken
+    let bracketToken: RangeLexedToken(readRangeBracketToken(source: source, start: start, character: character))
+    if bracketToken.kind != .unknown {
+        return bracketToken
     }
 
-    let maybeOperatorToken: Optional<RangeLexedToken>(readRangeOperatorToken(source: source, start: start, character: character))
-    if maybeOperatorToken != nil {
-        return maybeOperatorToken
+    let operatorToken: RangeLexedToken(readRangeOperatorToken(source: source, start: start, character: character))
+    if operatorToken.kind != .unknown {
+        return operatorToken
     }
 
     return readRangePunctuationToken(source: source, start: start, character: character)
 }
 
-function readRangeBracketToken(source: String, start: Int, character: String): Optional<RangeLexedToken> {
-    let maybeBraceToken: Optional<RangeLexedToken>(readRangeBraceToken(source: source, start: start, character: character))
-    if maybeBraceToken != nil {
-        return maybeBraceToken
-    }
-    return readRangeSquareBracketToken(source: source, start: start, character: character)
-}
-
-function readRangeBraceToken(source: String, start: Int, character: String): Optional<RangeLexedToken> {
+function readRangeBracketToken(source: String, start: Int, character: String): RangeLexedToken {
     if character == String("{") {
         return rangeToken(kind: .leftBrace, source: source, start: start, end: start + 1)
     } else if character == String("}") {
@@ -290,104 +282,47 @@ function readRangeBraceToken(source: String, start: Int, character: String): Opt
         return rangeToken(kind: .leftParen, source: source, start: start, end: start + 1)
     } else if character == String(")") {
         return rangeToken(kind: .rightParen, source: source, start: start, end: start + 1)
-    }
-    return nil
-}
-
-function readRangeSquareBracketToken(source: String, start: Int, character: String): Optional<RangeLexedToken> {
-    if character == String("[") {
+    } else if character == String("[") {
         return rangeToken(kind: .leftBracket, source: source, start: start, end: start + 1)
     } else if character == String("]") {
         return rangeToken(kind: .rightBracket, source: source, start: start, end: start + 1)
     }
-
-    return nil
+    return rangeToken(kind: .unknown, source: source, start: start, end: start + 1)
 }
 
-function readRangeOperatorToken(source: String, start: Int, character: String): Optional<RangeLexedToken> {
-    let maybeArithmeticToken: Optional<RangeLexedToken>(readRangeArithmeticToken(source: source, start: start, character: character))
-    if maybeArithmeticToken != nil {
-        return maybeArithmeticToken
-    }
-
-    let maybeComparisonToken: Optional<RangeLexedToken>(readRangeComparisonToken(source: source, start: start, character: character))
-    if maybeComparisonToken != nil {
-        return maybeComparisonToken
-    }
-
-    return readRangeSymbolOperatorToken(source: source, start: start, character: character)
-}
-
-function readRangeArithmeticToken(source: String, start: Int, character: String): Optional<RangeLexedToken> {
-    let maybeBasicToken: Optional<RangeLexedToken>(readRangeBasicArithmeticToken(source: source, start: start, character: character))
-    if maybeBasicToken != nil {
-        return maybeBasicToken
-    }
-    return readRangeAssignmentOperatorToken(source: source, start: start, character: character)
-}
-
-function readRangeBasicArithmeticToken(source: String, start: Int, character: String): Optional<RangeLexedToken> {
+function readRangeOperatorToken(source: String, start: Int, character: String): RangeLexedToken {
     if character == String("*") {
         return rangeToken(kind: .asterisk, source: source, start: start, end: start + 1)
     } else if character == String(".") {
         return rangeToken(kind: .dot, source: source, start: start, end: start + 1)
     } else if character == String(":") {
         return rangeToken(kind: .colon, source: source, start: start, end: start + 1)
-    }
-    return nil
-}
-
-function readRangeAssignmentOperatorToken(source: String, start: Int, character: String): Optional<RangeLexedToken> {
-    if character == String("!") {
+    } else if character == String("!") {
         return rangeToken(kind: .bang, source: source, start: start, end: start + 1)
     } else if character == String("=") {
         return rangeToken(kind: .equal, source: source, start: start, end: start + 1)
     } else if character == String("-") {
         return rangeToken(kind: .minus, source: source, start: start, end: start + 1)
-    }
-    return nil
-}
-
-function readRangeComparisonToken(source: String, start: Int, character: String): Optional<RangeLexedToken> {
-    if character == String("<") {
+    } else if character == String("<") {
         return rangeToken(kind: .less, source: source, start: start, end: start + 1)
     } else if character == String(">") {
         return rangeToken(kind: .greater, source: source, start: start, end: start + 1)
     } else if character == String("+") {
         return rangeToken(kind: .plus, source: source, start: start, end: start + 1)
-    }
-    return nil
-}
-
-function readRangeSymbolOperatorToken(source: String, start: Int, character: String): Optional<RangeLexedToken> {
-    let maybePathToken: Optional<RangeLexedToken>(readRangePathOperatorToken(source: source, start: start, character: character))
-    if maybePathToken != nil {
-        return maybePathToken
-    }
-    return readRangeOtherSymbolOperatorToken(source: source, start: start, character: character)
-}
-
-function readRangePathOperatorToken(source: String, start: Int, character: String): Optional<RangeLexedToken> {
-    if character == String("/") {
+    } else if character == String("/") {
         return rangeToken(kind: .slash, source: source, start: start, end: start + 1)
     } else if character == String("&") {
         return rangeToken(kind: .ampersand, source: source, start: start, end: start + 1)
     } else if character == String("|") {
         return rangeToken(kind: .pipe, source: source, start: start, end: start + 1)
-    }
-    return nil
-}
-
-function readRangeOtherSymbolOperatorToken(source: String, start: Int, character: String): Optional<RangeLexedToken> {
-    if character == String("?") {
+    } else if character == String("?") {
         return rangeToken(kind: .question, source: source, start: start, end: start + 1)
     } else if character == String("$") {
         return rangeToken(kind: .dollar, source: source, start: start, end: start + 1)
     } else if character == String("%") {
         return rangeToken(kind: .percent, source: source, start: start, end: start + 1)
     }
-
-    return nil
+    return rangeToken(kind: .unknown, source: source, start: start, end: start + 1)
 }
 
 function readRangePunctuationToken(source: String, start: Int, character: String): Optional<RangeLexedToken> {

@@ -1,0 +1,3 @@
+compilerTypedSyntaxSnapshot
+compilerSourceFile\trole=core\tpath=Core/Integer.range
+construct Int<signedness: Signedness, bits: Int> {}

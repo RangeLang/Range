@@ -147,7 +147,8 @@ function compilerTypedSyntaxRenderSnapshot(tables: CompilerSyntaxTables): String
         let genericFingerprintFirst: Int(compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterFingerprintFirstColumn()))
         let genericFingerprintSecond: Int(compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterFingerprintSecondColumn()))
         let genericName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: genericFileID, localStart: genericNameStart, localEnd: genericNameEnd))
-        rawBufferAppendText(buffer: outputBuffer, text: "genericParameter\(tab)row=\(row)\(tab)ownerSyntaxID=\(genericOwnerSyntaxID)\(tab)ownerKind=\(compilerSyntaxKindName(kindTag: genericOwnerKind))\(tab)ordinal=\(genericOrdinal)\(tab)fileID=\(genericFileID)\(tab)start=\(genericStart)\(tab)end=\(genericEnd)\(tab)name=\(genericName)\(tab)nameStart=\(genericNameStart)\(tab)nameEnd=\(genericNameEnd)\(tab)kind=type\(tab)fingerprint=\(genericFingerprintFirst):\(genericFingerprintSecond)\(newline)")
+        let genericKind: Int(compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterKindColumn()))
+        rawBufferAppendText(buffer: outputBuffer, text: "genericParameter\(tab)row=\(row)\(tab)ownerSyntaxID=\(genericOwnerSyntaxID)\(tab)ownerKind=\(compilerSyntaxKindName(kindTag: genericOwnerKind))\(tab)ordinal=\(genericOrdinal)\(tab)fileID=\(genericFileID)\(tab)start=\(genericStart)\(tab)end=\(genericEnd)\(tab)name=\(genericName)\(tab)nameStart=\(genericNameStart)\(tab)nameEnd=\(genericNameEnd)\(tab)kind=\(compilerSyntaxGenericParameterKindName(kind: genericKind))\(tab)fingerprint=\(genericFingerprintFirst):\(genericFingerprintSecond)\(newline)")
         row: row + 1
     }
     row: 0
@@ -399,6 +400,16 @@ function compilerMacroExecutionDigest(tables: CompilerSyntaxTables): CompilerFin
         }
         row: row + 1
     }
+    digest: compilerFingerprintAppendInt(fingerprint: digest, value: tableTag + 4)
+    row: 0
+    while row < compilerIntTableRowCount(table: tables.compilerFormulaFacts) {
+        column: 0
+        while column < compilerFormulaFactColumnCount() {
+            digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: column))
+            column: column + 1
+        }
+        row: row + 1
+    }
     return digest
 }
 
@@ -517,6 +528,11 @@ function compilerMacroRenderExecutionSnapshot(tables: CompilerSyntaxTables, resu
         output: "\(output)macroInvocation\trow=\(row)\tapplicationRow=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 1))\tdeclarationRow=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 2))\ttargetSyntaxID=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 3))\tphase=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 5))\tordinal=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 6))\tstatus=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 9))\tbudget=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 8))\tmirOperationCount=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 27))\tstepCount=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 28))\tapplicationIdentity=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 29)):\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 30))\tdeclarationIdentity=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 31)):\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 32))\n"
         row: row + 1
     }
+    row: 0
+    while row < compilerIntTableRowCount(table: tables.compilerFormulaFacts) {
+        output: "\(output)compilerFormulaFact\trow=\(row)\tkind=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 1))\tinvocationRow=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 2))\tapplicationRow=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 3))\ttargetSyntaxID=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 4))\tcategory=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 5))\tsemanticElementSyntaxID=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 6))\tencoding=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 7))\tbits=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 8))\tsignedness=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 9))\n"
+        row: row + 1
+    }
     output: "\(output)\(compilerMacroRenderExecutionEvents(tables: tables))"
     output: "\(output)\(compilerMacroRenderReadDependencies(tables: tables))"
     output: "\(output)\(compilerMacroRenderGraphDelta(tables: tables, delta: result.graphDelta))"
@@ -541,11 +557,21 @@ function compilerMacroExecutionSummaryForValidIndex(tables: CompilerSyntaxTables
     state output: String("")
     if execution.status != 0 {
         output: compilerMacroRenderExecutionError(tables: tables, result: execution)
-    } else if compilerMemoryBuildMacroFamilyRepresentations(tables: tables, memory: memory) != 0
-        || !compilerMemoryMacroFamilyRepresentationsAreValid(tables: tables, memory: memory) {
-        output: "\(compilerNativeDiagnostic(kind: String("invalidMacroFamilyMemoryGraph")))\(compilerMemoryRenderMacroFamilySnapshot(memory: memory))"
     } else {
-        output: "\(compilerMacroRenderExecutionSnapshot(tables: tables, result: execution))\(compilerMacroRenderSnapshot(tables: tables))\(compilerMemoryRenderMacroFamilySnapshot(memory: memory))"
+        let storageLiteralFacts: CompilerStorageLiteralFacts(compilerStorageLiteralFactsResolve(tables: tables))
+        if !storageLiteralFacts.isValid {
+            output: "compilerError\tkind=invalidLiteralStorage\treason=\(compilerStorageLiteralReasonName(reason: storageLiteralFacts.reason))\trelatedRow=\(storageLiteralFacts.relatedRow)\n"
+        } else {
+            let textLiteralFacts: CompilerTextLiteralFacts(compilerTextLiteralFactsResolve(tables: tables))
+            if !textLiteralFacts.isValid {
+                output: "compilerError\tkind=invalidTextLiteralStorage\treason=\(compilerTextLiteralReasonName(reason: textLiteralFacts.reason))\trelatedRow=\(textLiteralFacts.relatedRow)\n"
+            } else if compilerMemoryBuildMacroFamilyRepresentations(tables: tables, memory: memory) != 0
+        || !compilerMemoryMacroFamilyRepresentationsAreValid(tables: tables, memory: memory) {
+                output: "\(compilerNativeDiagnostic(kind: String("invalidMacroFamilyMemoryGraph")))\(compilerMemoryRenderMacroFamilySnapshot(memory: memory))"
+            } else {
+                output: "literalStorage\tvalid=true\tstorageApplicationCount=\(storageLiteralFacts.storageApplicationCount)\tliteralApplicationCount=\(storageLiteralFacts.literalApplicationCount)\tnumericTargetSyntaxID=\(storageLiteralFacts.numericTargetSyntaxID)\tdecimalTargetSyntaxID=\(storageLiteralFacts.decimalTargetSyntaxID)\tdecimalSeparatorByte=\(storageLiteralFacts.decimalSeparatorByte)\ntextLiteralStorage\tvalid=true\ttextTargetSyntaxID=\(textLiteralFacts.textTargetSyntaxID)\tsemanticElementSyntaxID=\(textLiteralFacts.semanticElementSyntaxID)\tencoding=\(textLiteralFacts.encoding)\tcodeUnitBits=\(textLiteralFacts.codeUnitBits)\tcodeUnitSignedness=\(textLiteralFacts.codeUnitSignedness)\n\(compilerMacroRenderExecutionSnapshot(tables: tables, result: execution))\(compilerMacroRenderSnapshot(tables: tables))\(compilerMemoryRenderMacroFamilySnapshot(memory: memory))"
+            }
+        }
     }
     if compilerGraphDeltaDestroy(delta: execution.graphDelta) != 0 {
         output: "compilerError\tkind=macroOwnershipFailure\n"
@@ -562,11 +588,16 @@ function compilerMacroSummaryForLinkedTables(tables: CompilerSyntaxTables): Stri
         return "compilerError\tkind=invalidProjectDefaults\treason=\(compilerProjectDefaultsReasonName(reason: defaults.reason))\trelatedRow=\(defaults.relatedRow)\n"
     }
     let declarationIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: tables))
-    state output: String("projectDefaults\tvalid=true\ttargetPointerBits=\(defaults.targetPointerBits)\tintegerBits=\(defaults.integerBits)\tintegerOverridden=\(defaults.integerWasOverridden)\tboolOverridden=\(defaults.boolWasOverridden)\n")
+    state output: String("")
     if !declarationIndex.isValid {
         output: "compilerError\tkind=invalidDeclarationIndex\n"
     } else {
-        output: "\(output)\(compilerMacroExecutionSummaryForValidIndex(tables: tables, index: declarationIndex))"
+        let executionOutput: String(compilerMacroExecutionSummaryForValidIndex(tables: tables, index: declarationIndex))
+        if compilerNativeOutputIsError(output: executionOutput) {
+            output: executionOutput
+        } else {
+            output: "projectDefaults\tvalid=true\ttargetPointerBits=\(defaults.targetPointerBits)\tintegerBits=\(defaults.integerBits)\tintegerOverridden=\(defaults.integerWasOverridden)\tboolOverridden=\(defaults.boolWasOverridden)\n\(executionOutput)"
+        }
     }
     if compilerDeclarationIndexDestroy(index: declarationIndex) != 0 {
         output: "compilerError\tkind=macroOwnershipFailure\n"
@@ -606,6 +637,18 @@ function compilerNativeSourceSetLLVMTextForValidIndex(source: String, declaratio
         compilerGraphDeltaDestroy(delta: execution.graphDelta)
         compilerDeclarationIndexDestroy(index: executionIndex)
     } else {
+        let storageLiteralFacts: CompilerStorageLiteralFacts(compilerStorageLiteralFactsResolve(tables: declarationTables))
+        if !storageLiteralFacts.isValid {
+            output: "compilerError\tkind=invalidLiteralStorage\treason=\(compilerStorageLiteralReasonName(reason: storageLiteralFacts.reason))\trelatedRow=\(storageLiteralFacts.relatedRow)\n"
+            compilerGraphDeltaDestroy(delta: execution.graphDelta)
+            compilerDeclarationIndexDestroy(index: executionIndex)
+        } else {
+        let textLiteralFacts: CompilerTextLiteralFacts(compilerTextLiteralFactsResolve(tables: declarationTables))
+        if !textLiteralFacts.isValid {
+            output: "compilerError\tkind=invalidTextLiteralStorage\treason=\(compilerTextLiteralReasonName(reason: textLiteralFacts.reason))\trelatedRow=\(textLiteralFacts.relatedRow)\n"
+            compilerGraphDeltaDestroy(delta: execution.graphDelta)
+            compilerDeclarationIndexDestroy(index: executionIndex)
+        } else {
         if compilerGraphDeltaCommitGeneratedDeclarations(tables: declarationTables, delta: execution.graphDelta) != 0 {
             compilerMacroRecordGeneratedFunctionCommitDiagnostic(tables: declarationTables, delta: execution.graphDelta)
             output: compilerMacroRenderDiagnostics(tables: declarationTables)
@@ -623,6 +666,8 @@ function compilerNativeSourceSetLLVMTextForValidIndex(source: String, declaratio
                 compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("llvmPipeline.end"))
             }
             compilerGraphDeltaDestroy(delta: execution.graphDelta)
+        }
+        }
         }
     }
     if compilerMemoryGraphDestroy(memory: familyMemory) != 0 { return compilerNativeDiagnostic(kind: String("memoryOwnershipFailure")) }
@@ -737,6 +782,31 @@ function compilerCursorAdvance(cursor: CompilerTokenCursor, token: RangeLexedTok
     return CompilerTokenCursor(source: $cursor.source, index: token.end)
 }
 
+function compilerCursorPeekOrFallback(cursor: CompilerTokenCursor): RangeLexedToken {
+    let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    return maybeToken ?? compilerFallbackTokenAt(index: cursor.index)
+}
+
+function compilerCursorPeekStartOrIndex(cursor: CompilerTokenCursor): Int {
+    let token: RangeLexedToken(compilerCursorPeekOrFallback(cursor: cursor))
+    return token.start
+}
+
+function compilerCursorPeekEndOrIndex(cursor: CompilerTokenCursor): Int {
+    let token: RangeLexedToken(compilerCursorPeekOrFallback(cursor: cursor))
+    return token.end
+}
+
+function compilerCursorPeekKindOrEOF(cursor: CompilerTokenCursor): RangeTokenKind {
+    let token: RangeLexedToken(compilerCursorPeekOrFallback(cursor: cursor))
+    return token.kind
+}
+
+function compilerCursorPeekTextEquals(cursor: CompilerTokenCursor, expected: String): Bool {
+    let token: RangeLexedToken(compilerCursorPeekOrFallback(cursor: cursor))
+    return token.text == expected
+}
+
 function compilerFallbackToken(cursor: CompilerTokenCursor): RangeLexedToken {
     return RangeLexedToken(kind: .eof, start: cursor.index, end: cursor.index, text: String(""))
 }
@@ -762,32 +832,28 @@ function compilerCoreParseBalancedRange(cursor: CompilerTokenCursor, leftKind: R
 }
 
 function compilerCoreParseBalancedRangeAfterLeft(cursor: CompilerTokenCursor, leftToken: RangeLexedToken, leftKind: RangeTokenKind, rightKind: RangeTokenKind): Optional<CompilerSourceRange> {
-    let bodyCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: cursor, token: leftToken))
-    return compilerCoreParseBalancedRangeScanning(cursor: bodyCursor, rangeStart: leftToken.end, leftKind: leftKind, rightKind: rightKind, depth: 1)
+    return compilerCoreParseBalancedRangeScanning(source: $cursor.source, scanIndex: leftToken.end, rangeStart: leftToken.end, leftKind: leftKind, rightKind: rightKind, depth: 1)
 }
 
-function compilerCoreParseBalancedRangeScanning(cursor: CompilerTokenCursor, rangeStart: Int, leftKind: RangeTokenKind, rightKind: RangeTokenKind, depth: Int): Optional<CompilerSourceRange> {
-    state scanCursor: CompilerTokenCursor(cursor)
+function compilerCoreParseBalancedRangeScanning(source: String, scanIndex: Int, rangeStart: Int, leftKind: RangeTokenKind, rightKind: RangeTokenKind, depth: Int): Optional<CompilerSourceRange> {
+    state currentIndex: Int(scanIndex)
     state scanDepth: Int(depth)
 
     while true {
-        let maybeToken: Optional<RangeLexedToken>(compilerCursorPeek(cursor: scanCursor))
-        if maybeToken == nil {
-            return nil
-        }
-
-        let token: RangeLexedToken(
-            maybeToken ?? compilerFallbackToken(cursor: scanCursor)
-        )
-        if compilerCoreTokenKindEquals(token: token, kind: leftKind) {
+        let scanCursor: CompilerTokenCursor(source: $source, index: currentIndex)
+        let tokenKind: RangeTokenKind(compilerCursorPeekKindOrEOF(cursor: scanCursor))
+        if tokenKind == .eof { return nil }
+        let tokenStart: Int(compilerCursorPeekStartOrIndex(cursor: scanCursor))
+        let tokenEnd: Int(compilerCursorPeekEndOrIndex(cursor: scanCursor))
+        if tokenKind == leftKind {
             scanDepth: scanDepth + 1
-        } else if compilerCoreTokenKindEquals(token: token, kind: rightKind) {
+        } else if tokenKind == rightKind {
             scanDepth: scanDepth - 1
             if scanDepth == 0 {
-                return CompilerSourceRange(start: rangeStart, end: token.start, next: token.end)
+                return CompilerSourceRange(start: rangeStart, end: tokenStart, next: tokenEnd)
             }
         }
-        scanCursor: compilerCursorAdvance(cursor: scanCursor, token: token)
+        currentIndex: tokenEnd
     }
 
     return nil
@@ -834,8 +900,7 @@ function compilerCoreParseBalancedRangeClosingToken(cursor: CompilerTokenCursor,
 }
 
 function compilerCoreParseBalancedRangeContinue(cursor: CompilerTokenCursor, rangeStart: Int, leftKind: RangeTokenKind, rightKind: RangeTokenKind, nextDepth: Int, token: RangeLexedToken): Optional<CompilerSourceRange> {
-    let nextCursor: CompilerTokenCursor(compilerCursorAdvance(cursor: cursor, token: token))
-    return compilerCoreParseBalancedRangeScanning(cursor: nextCursor, rangeStart: rangeStart, leftKind: leftKind, rightKind: rightKind, depth: nextDepth)
+    return compilerCoreParseBalancedRangeScanning(source: $cursor.source, scanIndex: token.end, rangeStart: rangeStart, leftKind: leftKind, rightKind: rightKind, depth: nextDepth)
 }
 
 function compilerCoreBalancedRangeNextDepth(token: RangeLexedToken, leftKind: RangeTokenKind, rightKind: RangeTokenKind, depth: Int): Int {

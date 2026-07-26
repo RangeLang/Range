@@ -192,16 +192,397 @@ function compilerProjectIntegerLLVMTypeName(tables: CompilerSyntaxTables): Strin
     return "i\(defaults.integerBits)"
 }
 
+function compilerStorageLiteralReasonNone(): Int { return 0 }
+function compilerStorageLiteralReasonDuplicateStorage(): Int { return 1 }
+function compilerStorageLiteralReasonStorageTargetMustBeConstruct(): Int { return 2 }
+function compilerStorageLiteralReasonStorageMustBeEmpty(): Int { return 3 }
+function compilerStorageLiteralReasonLiteralTargetMustBeConstruct(): Int { return 4 }
+function compilerStorageLiteralReasonLiteralRequiresStorage(): Int { return 5 }
+function compilerStorageLiteralReasonUnsupportedLiteralSyntax(): Int { return 6 }
+function compilerStorageLiteralReasonDuplicateNumericLiteral(): Int { return 7 }
+function compilerStorageLiteralReasonDuplicateDecimalLiteral(): Int { return 8 }
+function compilerStorageLiteralReasonInvalidNumericStorageShape(): Int { return 9 }
+function compilerStorageLiteralReasonInvalidDecimalStorageShape(): Int { return 10 }
+function compilerStorageLiteralReasonMissingCompilerFormulaFact(): Int { return 11 }
+function compilerStorageLiteralReasonInvalidCompilerFormulaFact(): Int { return 12 }
+
+function compilerStorageLiteralReasonName(reason: Int): String {
+    if reason == compilerStorageLiteralReasonDuplicateStorage() { return String("duplicateStorage") }
+    if reason == compilerStorageLiteralReasonStorageTargetMustBeConstruct() { return String("storageTargetMustBeConstruct") }
+    if reason == compilerStorageLiteralReasonStorageMustBeEmpty() { return String("storageMustBeEmpty") }
+    if reason == compilerStorageLiteralReasonLiteralTargetMustBeConstruct() { return String("literalTargetMustBeConstruct") }
+    if reason == compilerStorageLiteralReasonLiteralRequiresStorage() { return String("literalRequiresStorage") }
+    if reason == compilerStorageLiteralReasonUnsupportedLiteralSyntax() { return String("unsupportedLiteralSyntax") }
+    if reason == compilerStorageLiteralReasonDuplicateNumericLiteral() { return String("duplicateNumericLiteral") }
+    if reason == compilerStorageLiteralReasonDuplicateDecimalLiteral() { return String("duplicateDecimalLiteral") }
+    if reason == compilerStorageLiteralReasonInvalidNumericStorageShape() { return String("invalidNumericStorageShape") }
+    if reason == compilerStorageLiteralReasonInvalidDecimalStorageShape() { return String("invalidDecimalStorageShape") }
+    if reason == compilerStorageLiteralReasonMissingCompilerFormulaFact() { return String("missingCompilerFormulaFact") }
+    if reason == compilerStorageLiteralReasonInvalidCompilerFormulaFact() { return String("invalidCompilerFormulaFact") }
+    return String("none")
+}
+
+function compilerStorageLiteralInvalid(storageApplicationCount: Int, literalApplicationCount: Int, numericTargetSyntaxID: Int, decimalTargetSyntaxID: Int, decimalSeparatorByte: Int, reason: Int, relatedRow: Int): CompilerStorageLiteralFacts {
+    return CompilerStorageLiteralFacts(storageApplicationCount: storageApplicationCount, literalApplicationCount: literalApplicationCount, numericTargetSyntaxID: numericTargetSyntaxID, decimalTargetSyntaxID: decimalTargetSyntaxID, decimalSeparatorByte: decimalSeparatorByte, reason: reason, relatedRow: relatedRow, isValid: false)
+}
+
+function compilerMacroApplicationArgumentText(tables: CompilerSyntaxTables, applicationRow: Int): String {
+    if applicationRow < 0 || applicationRow >= compilerIntTableRowCount(table: tables.macroApplications) { return String("") }
+    let fileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
+    let start: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 8))
+    let end: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 9))
+    if start < 0 || end < start { return String("") }
+    let text: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: start, localEnd: end))
+    let trimmed: CompilerSourceRange(compilerSemanticTrimStringRange(text: text, start: 0, end: stringLength(value: text)))
+    if trimmed.start < 0 { return String("") }
+    return text.substring(start: trimmed.start, end: trimmed.end)
+}
+
+function compilerStorageApplicationCountForTarget(tables: CompilerSyntaxTables, targetSyntaxID: Int): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.macroApplications) {
+        if compilerProjectMacroApplicationName(tables: tables, applicationRow: row) == String("storage")
+            && compilerIntTableValue(table: tables.macroApplications, row: row, column: 12) == targetSyntaxID {
+            count: count + 1
+        }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerStorageTargetMemberCount(tables: CompilerSyntaxTables, targetSyntaxID: Int): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.members) {
+        if compilerIntTableValue(table: tables.members, row: row, column: 2) == targetSyntaxID { count: count + 1 }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerStorageGenericParameterCount(tables: CompilerSyntaxTables, targetSyntaxID: Int): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.genericParameters) {
+        if compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterOwnerColumn()) == targetSyntaxID {
+            count: count + 1
+        }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerStorageGenericParameterRow(tables: CompilerSyntaxTables, targetSyntaxID: Int, ordinal: Int): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.genericParameters) {
+        if compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterOwnerColumn()) == targetSyntaxID
+            && compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterOrdinalColumn()) == ordinal {
+            return row
+        }
+        row: row + 1
+    }
+    return 0 - 1
+}
+
+function compilerStorageGenericParameterName(tables: CompilerSyntaxTables, row: Int): String {
+    if row < 0 || row >= compilerIntTableRowCount(table: tables.genericParameters) { return String("") }
+    let fileID: Int(compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterFileColumn()))
+    return compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterNameStartColumn()), localEnd: compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterNameEndColumn()))
+}
+
+function compilerStorageGenericParameterType(tables: CompilerSyntaxTables, row: Int): String {
+    if row < 0 || row >= compilerIntTableRowCount(table: tables.genericParameters) { return String("") }
+    let fileID: Int(compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterFileColumn()))
+    let authored: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterStartColumn()), localEnd: compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterEndColumn())))
+    let colon: Int(stringIndexOf(source: authored, needle: String(":"), start: 0))
+    if colon < 0 { return String("") }
+    let equals: Int(stringIndexOf(source: authored, needle: String("="), start: colon + 1))
+    state typeEnd: Int(stringLength(value: authored))
+    if equals >= 0 { typeEnd: equals }
+    let trimmed: CompilerSourceRange(compilerSemanticTrimStringRange(text: authored, start: colon + 1, end: typeEnd))
+    if trimmed.start < 0 { return String("") }
+    return authored.substring(start: trimmed.start, end: trimmed.end)
+}
+
+function compilerStorageGenericParameterMatches(tables: CompilerSyntaxTables, targetSyntaxID: Int, ordinal: Int, name: String, typeName: String): Bool {
+    let row: Int(compilerStorageGenericParameterRow(tables: tables, targetSyntaxID: targetSyntaxID, ordinal: ordinal))
+    return row >= 0
+        && compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterKindColumn()) == compilerSyntaxGenericParameterValueKind()
+        && compilerStorageGenericParameterName(tables: tables, row: row) == name
+        && compilerStorageGenericParameterType(tables: tables, row: row) == typeName
+}
+
+function compilerStorageNumericShapeIsValid(tables: CompilerSyntaxTables, targetSyntaxID: Int): Bool {
+    return compilerStorageGenericParameterCount(tables: tables, targetSyntaxID: targetSyntaxID) == 2
+        && compilerStorageGenericParameterMatches(tables: tables, targetSyntaxID: targetSyntaxID, ordinal: 0, name: String("signedness"), typeName: String("Signedness"))
+        && compilerStorageGenericParameterMatches(tables: tables, targetSyntaxID: targetSyntaxID, ordinal: 1, name: String("bits"), typeName: String("Int"))
+}
+
+function compilerStorageDecimalShapeIsValid(tables: CompilerSyntaxTables, targetSyntaxID: Int): Bool {
+    return compilerStorageGenericParameterCount(tables: tables, targetSyntaxID: targetSyntaxID) == 1
+        && compilerStorageGenericParameterMatches(tables: tables, targetSyntaxID: targetSyntaxID, ordinal: 0, name: String("bits"), typeName: String("Int"))
+}
+
+function compilerStorageLiteralFactsResolveApplications(tables: CompilerSyntaxTables): CompilerStorageLiteralFacts {
+    state storageApplicationCount: Int(0)
+    state literalApplicationCount: Int(0)
+    state numericTargetSyntaxID: Int(0 - 1)
+    state decimalTargetSyntaxID: Int(0 - 1)
+    state decimalSeparatorByte: Int(0 - 1)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.macroApplications) {
+        let macroName: String(compilerProjectMacroApplicationName(tables: tables, applicationRow: row))
+        if macroName == String("storage") {
+            storageApplicationCount: storageApplicationCount + 1
+            let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: row, column: 12))
+            let targetKind: Int(compilerIntTableValue(table: tables.macroApplications, row: row, column: 13))
+            let storageSyntax: String(compilerMacroApplicationArgumentText(tables: tables, applicationRow: row))
+            if targetKind != compilerSyntaxKindConstruct() {
+                return compilerStorageLiteralInvalid(storageApplicationCount: storageApplicationCount, literalApplicationCount: literalApplicationCount, numericTargetSyntaxID: numericTargetSyntaxID, decimalTargetSyntaxID: decimalTargetSyntaxID, decimalSeparatorByte: decimalSeparatorByte, reason: compilerStorageLiteralReasonStorageTargetMustBeConstruct(), relatedRow: row)
+            }
+            if compilerStorageApplicationCountForTarget(tables: tables, targetSyntaxID: targetSyntaxID) != 1 {
+                return compilerStorageLiteralInvalid(storageApplicationCount: storageApplicationCount, literalApplicationCount: literalApplicationCount, numericTargetSyntaxID: numericTargetSyntaxID, decimalTargetSyntaxID: decimalTargetSyntaxID, decimalSeparatorByte: decimalSeparatorByte, reason: compilerStorageLiteralReasonDuplicateStorage(), relatedRow: row)
+            }
+            if storageSyntax == String("")
+                && compilerStorageTargetMemberCount(tables: tables, targetSyntaxID: targetSyntaxID) != 0 {
+                return compilerStorageLiteralInvalid(storageApplicationCount: storageApplicationCount, literalApplicationCount: literalApplicationCount, numericTargetSyntaxID: numericTargetSyntaxID, decimalTargetSyntaxID: decimalTargetSyntaxID, decimalSeparatorByte: decimalSeparatorByte, reason: compilerStorageLiteralReasonStorageMustBeEmpty(), relatedRow: row)
+            }
+        }
+        row: row + 1
+    }
+    row: 0
+    while row < compilerIntTableRowCount(table: tables.macroApplications) {
+        if compilerProjectMacroApplicationName(tables: tables, applicationRow: row) == String("literal") {
+            literalApplicationCount: literalApplicationCount + 1
+            let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: row, column: 12))
+            let targetKind: Int(compilerIntTableValue(table: tables.macroApplications, row: row, column: 13))
+            if targetKind != compilerSyntaxKindConstruct() {
+                return compilerStorageLiteralInvalid(storageApplicationCount: storageApplicationCount, literalApplicationCount: literalApplicationCount, numericTargetSyntaxID: numericTargetSyntaxID, decimalTargetSyntaxID: decimalTargetSyntaxID, decimalSeparatorByte: decimalSeparatorByte, reason: compilerStorageLiteralReasonLiteralTargetMustBeConstruct(), relatedRow: row)
+            }
+            if compilerStorageApplicationCountForTarget(tables: tables, targetSyntaxID: targetSyntaxID) != 1 {
+                return compilerStorageLiteralInvalid(storageApplicationCount: storageApplicationCount, literalApplicationCount: literalApplicationCount, numericTargetSyntaxID: numericTargetSyntaxID, decimalTargetSyntaxID: decimalTargetSyntaxID, decimalSeparatorByte: decimalSeparatorByte, reason: compilerStorageLiteralReasonLiteralRequiresStorage(), relatedRow: row)
+            }
+            let literalSyntax: String(compilerMacroApplicationArgumentText(tables: tables, applicationRow: row))
+            if literalSyntax == String(".numeric") {
+                if numericTargetSyntaxID >= 0 {
+                    return compilerStorageLiteralInvalid(storageApplicationCount: storageApplicationCount, literalApplicationCount: literalApplicationCount, numericTargetSyntaxID: numericTargetSyntaxID, decimalTargetSyntaxID: decimalTargetSyntaxID, decimalSeparatorByte: decimalSeparatorByte, reason: compilerStorageLiteralReasonDuplicateNumericLiteral(), relatedRow: row)
+                }
+                if !compilerStorageNumericShapeIsValid(tables: tables, targetSyntaxID: targetSyntaxID) {
+                    return compilerStorageLiteralInvalid(storageApplicationCount: storageApplicationCount, literalApplicationCount: literalApplicationCount, numericTargetSyntaxID: numericTargetSyntaxID, decimalTargetSyntaxID: decimalTargetSyntaxID, decimalSeparatorByte: decimalSeparatorByte, reason: compilerStorageLiteralReasonInvalidNumericStorageShape(), relatedRow: row)
+                }
+                numericTargetSyntaxID: targetSyntaxID
+            } else if literalSyntax == String(".numeric.decimal(separator: \".\")") {
+                if decimalTargetSyntaxID >= 0 {
+                    return compilerStorageLiteralInvalid(storageApplicationCount: storageApplicationCount, literalApplicationCount: literalApplicationCount, numericTargetSyntaxID: numericTargetSyntaxID, decimalTargetSyntaxID: decimalTargetSyntaxID, decimalSeparatorByte: decimalSeparatorByte, reason: compilerStorageLiteralReasonDuplicateDecimalLiteral(), relatedRow: row)
+                }
+                if !compilerStorageDecimalShapeIsValid(tables: tables, targetSyntaxID: targetSyntaxID) {
+                    return compilerStorageLiteralInvalid(storageApplicationCount: storageApplicationCount, literalApplicationCount: literalApplicationCount, numericTargetSyntaxID: numericTargetSyntaxID, decimalTargetSyntaxID: decimalTargetSyntaxID, decimalSeparatorByte: decimalSeparatorByte, reason: compilerStorageLiteralReasonInvalidDecimalStorageShape(), relatedRow: row)
+                }
+                decimalTargetSyntaxID: targetSyntaxID
+                decimalSeparatorByte: 46
+            } else if literalSyntax == String(".text") {
+            } else {
+                return compilerStorageLiteralInvalid(storageApplicationCount: storageApplicationCount, literalApplicationCount: literalApplicationCount, numericTargetSyntaxID: numericTargetSyntaxID, decimalTargetSyntaxID: decimalTargetSyntaxID, decimalSeparatorByte: decimalSeparatorByte, reason: compilerStorageLiteralReasonUnsupportedLiteralSyntax(), relatedRow: row)
+            }
+        }
+        row: row + 1
+    }
+    return CompilerStorageLiteralFacts(storageApplicationCount: storageApplicationCount, literalApplicationCount: literalApplicationCount, numericTargetSyntaxID: numericTargetSyntaxID, decimalTargetSyntaxID: decimalTargetSyntaxID, decimalSeparatorByte: decimalSeparatorByte, reason: compilerStorageLiteralReasonNone(), relatedRow: 0 - 1, isValid: true)
+}
+
+function compilerStorageLiteralFactsResolve(tables: CompilerSyntaxTables): CompilerStorageLiteralFacts {
+    let applicationFacts: CompilerStorageLiteralFacts(compilerStorageLiteralFactsResolveApplications(tables: tables))
+    if !applicationFacts.isValid { return applicationFacts }
+    state storageFactCount: Int(0)
+    state literalFactCount: Int(0)
+    state numericFactTarget: Int(0 - 1)
+    state decimalFactTarget: Int(0 - 1)
+    state decimalSeparatorByte: Int(0 - 1)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.compilerFormulaFacts) {
+        let kind: Int(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 1))
+        let invocationRow: Int(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 2))
+        let applicationRow: Int(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 3))
+        let targetSyntaxID: Int(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 4))
+        let category: Int(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 5))
+        if invocationRow < 0 || invocationRow >= compilerIntTableRowCount(table: tables.macroInvocations)
+            || applicationRow < 0 || applicationRow >= compilerIntTableRowCount(table: tables.macroApplications)
+            || compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 9) != compilerMacroInvocationSuccess() {
+            return compilerStorageLiteralInvalid(storageApplicationCount: applicationFacts.storageApplicationCount, literalApplicationCount: applicationFacts.literalApplicationCount, numericTargetSyntaxID: applicationFacts.numericTargetSyntaxID, decimalTargetSyntaxID: applicationFacts.decimalTargetSyntaxID, decimalSeparatorByte: applicationFacts.decimalSeparatorByte, reason: compilerStorageLiteralReasonInvalidCompilerFormulaFact(), relatedRow: row)
+        }
+        if kind == compilerFormulaFactStorage() {
+            storageFactCount: storageFactCount + 1
+            if compilerProjectMacroApplicationName(tables: tables, applicationRow: applicationRow) != String("storage") {
+                return compilerStorageLiteralInvalid(storageApplicationCount: applicationFacts.storageApplicationCount, literalApplicationCount: applicationFacts.literalApplicationCount, numericTargetSyntaxID: applicationFacts.numericTargetSyntaxID, decimalTargetSyntaxID: applicationFacts.decimalTargetSyntaxID, decimalSeparatorByte: applicationFacts.decimalSeparatorByte, reason: compilerStorageLiteralReasonInvalidCompilerFormulaFact(), relatedRow: row)
+            }
+        } else if kind == compilerFormulaFactLiteral() {
+            literalFactCount: literalFactCount + 1
+            if compilerProjectMacroApplicationName(tables: tables, applicationRow: applicationRow) != String("literal") {
+                return compilerStorageLiteralInvalid(storageApplicationCount: applicationFacts.storageApplicationCount, literalApplicationCount: applicationFacts.literalApplicationCount, numericTargetSyntaxID: applicationFacts.numericTargetSyntaxID, decimalTargetSyntaxID: applicationFacts.decimalTargetSyntaxID, decimalSeparatorByte: applicationFacts.decimalSeparatorByte, reason: compilerStorageLiteralReasonInvalidCompilerFormulaFact(), relatedRow: row)
+            }
+            if category == compilerFormulaLiteralNumeric() { numericFactTarget: targetSyntaxID }
+            if category == compilerFormulaLiteralDecimal() {
+                decimalFactTarget: targetSyntaxID
+                decimalSeparatorByte: compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 7)
+            }
+        }
+        row: row + 1
+    }
+    if storageFactCount != applicationFacts.storageApplicationCount || literalFactCount != applicationFacts.literalApplicationCount {
+        return compilerStorageLiteralInvalid(storageApplicationCount: applicationFacts.storageApplicationCount, literalApplicationCount: applicationFacts.literalApplicationCount, numericTargetSyntaxID: applicationFacts.numericTargetSyntaxID, decimalTargetSyntaxID: applicationFacts.decimalTargetSyntaxID, decimalSeparatorByte: applicationFacts.decimalSeparatorByte, reason: compilerStorageLiteralReasonMissingCompilerFormulaFact(), relatedRow: 0 - 1)
+    }
+    if numericFactTarget != applicationFacts.numericTargetSyntaxID
+        || decimalFactTarget != applicationFacts.decimalTargetSyntaxID
+        || decimalSeparatorByte != applicationFacts.decimalSeparatorByte {
+        return compilerStorageLiteralInvalid(storageApplicationCount: applicationFacts.storageApplicationCount, literalApplicationCount: applicationFacts.literalApplicationCount, numericTargetSyntaxID: applicationFacts.numericTargetSyntaxID, decimalTargetSyntaxID: applicationFacts.decimalTargetSyntaxID, decimalSeparatorByte: applicationFacts.decimalSeparatorByte, reason: compilerStorageLiteralReasonInvalidCompilerFormulaFact(), relatedRow: 0 - 1)
+    }
+    return applicationFacts
+}
+
+function compilerTextLiteralReasonNone(): Int { return 0 }
+function compilerTextLiteralReasonDuplicateTextStorage(): Int { return 1 }
+function compilerTextLiteralReasonDuplicateTextLiteral(): Int { return 2 }
+function compilerTextLiteralReasonTextLiteralRequiresStorage(): Int { return 3 }
+function compilerTextLiteralReasonTextStorageRequiresLiteral(): Int { return 4 }
+function compilerTextLiteralReasonInvalidSemanticElement(): Int { return 5 }
+function compilerTextLiteralReasonInvalidEncoding(): Int { return 6 }
+function compilerTextLiteralReasonInvalidCodeUnit(): Int { return 7 }
+function compilerTextLiteralReasonInvalidPhysicalStorage(): Int { return 8 }
+
+function compilerTextLiteralReasonName(reason: Int): String {
+    if reason == compilerTextLiteralReasonDuplicateTextStorage() { return String("duplicateTextStorage") }
+    if reason == compilerTextLiteralReasonDuplicateTextLiteral() { return String("duplicateTextLiteral") }
+    if reason == compilerTextLiteralReasonTextLiteralRequiresStorage() { return String("textLiteralRequiresStorage") }
+    if reason == compilerTextLiteralReasonTextStorageRequiresLiteral() { return String("textStorageRequiresLiteral") }
+    if reason == compilerTextLiteralReasonInvalidSemanticElement() { return String("invalidSemanticElement") }
+    if reason == compilerTextLiteralReasonInvalidEncoding() { return String("invalidEncoding") }
+    if reason == compilerTextLiteralReasonInvalidCodeUnit() { return String("invalidCodeUnit") }
+    if reason == compilerTextLiteralReasonInvalidPhysicalStorage() { return String("invalidPhysicalStorage") }
+    return String("none")
+}
+
+function compilerTextLiteralInvalid(textTargetSyntaxID: Int, semanticElementSyntaxID: Int, encoding: Int, codeUnitBits: Int, codeUnitSignedness: Int, reason: Int, relatedRow: Int): CompilerTextLiteralFacts {
+    return CompilerTextLiteralFacts(textTargetSyntaxID: textTargetSyntaxID, semanticElementSyntaxID: semanticElementSyntaxID, encoding: encoding, codeUnitBits: codeUnitBits, codeUnitSignedness: codeUnitSignedness, reason: reason, relatedRow: relatedRow, isValid: false)
+}
+
+function compilerDeclarationNameForSyntaxID(tables: CompilerSyntaxTables, syntaxID: Int): String {
+    let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: syntaxID))
+    if declarationRow < 0 { return String("") }
+    let fileID: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1))
+    return compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7), localEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8))
+}
+
+function compilerTextEncodingUTF8Exists(tables: CompilerSyntaxTables): Bool {
+    let encodingSyntaxID: Int(compilerSyntaxDeclarationSyntaxIDForTypeName(tables: tables, typeName: String("TextEncoding")))
+    if encodingSyntaxID < 0 || compilerIntTableValue(table: tables.syntaxIndex, row: encodingSyntaxID, column: 0) != compilerSyntaxKindEnum() { return false }
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.members) {
+        if compilerIntTableValue(table: tables.members, row: row, column: 2) == encodingSyntaxID
+            && compilerIntTableValue(table: tables.members, row: row, column: 12) == compilerSyntaxMemberKindEnumCase() {
+            let fileID: Int(compilerIntTableValue(table: tables.members, row: row, column: 1))
+            let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: row, column: 6), localEnd: compilerIntTableValue(table: tables.members, row: row, column: 7)))
+            if name == String("utf8") { return true }
+        }
+        row: row + 1
+    }
+    return false
+}
+
+function compilerTextTargetHasUTF8ByteStorage(tables: CompilerSyntaxTables, targetSyntaxID: Int): Bool {
+    state matchingStateCount: Int(0)
+    state storedStateCount: Int(0)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.members) {
+        if compilerIntTableValue(table: tables.members, row: row, column: 2) == targetSyntaxID
+            && (compilerIntTableValue(table: tables.members, row: row, column: 12) == compilerSyntaxMemberKindState()
+                || compilerIntTableValue(table: tables.members, row: row, column: 12) == compilerSyntaxMemberKindLet()) {
+            storedStateCount: storedStateCount + 1
+            let fileID: Int(compilerIntTableValue(table: tables.members, row: row, column: 1))
+            let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: row, column: 6), localEnd: compilerIntTableValue(table: tables.members, row: row, column: 7)))
+            let typeName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: row, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: row, column: 9)))
+            if name == String("bytes")
+                && (typeName == String("Buffer<Int<.unsigned, 8>>") || typeName == String("Buffer<Int<8, .unsigned>>")) {
+                matchingStateCount: matchingStateCount + 1
+            }
+        }
+        row: row + 1
+    }
+    return storedStateCount == 1 && matchingStateCount == 1
+}
+
+function compilerTextLiteralFactsResolve(tables: CompilerSyntaxTables): CompilerTextLiteralFacts {
+    state storageRow: Int(0 - 1)
+    state literalRow: Int(0 - 1)
+    state storageTargetSyntaxID: Int(0 - 1)
+    state literalTargetSyntaxID: Int(0 - 1)
+    state semanticElementSyntaxID: Int(0 - 1)
+    state encoding: Int(0 - 1)
+    state bits: Int(0 - 1)
+    state signedness: Int(0 - 1)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.compilerFormulaFacts) {
+        let kind: Int(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 1))
+        let category: Int(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 5))
+        if kind == compilerFormulaFactStorage() && category == compilerFormulaStorageText() {
+            if storageRow >= 0 {
+                return compilerTextLiteralInvalid(textTargetSyntaxID: storageTargetSyntaxID, semanticElementSyntaxID: semanticElementSyntaxID, encoding: encoding, codeUnitBits: bits, codeUnitSignedness: signedness, reason: compilerTextLiteralReasonDuplicateTextStorage(), relatedRow: row)
+            }
+            storageRow: row
+            storageTargetSyntaxID: compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 4)
+            semanticElementSyntaxID: compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 6)
+            encoding: compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 7)
+            bits: compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 8)
+            signedness: compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 9)
+        }
+        if kind == compilerFormulaFactLiteral() && category == compilerFormulaLiteralText() {
+            if literalRow >= 0 {
+                return compilerTextLiteralInvalid(textTargetSyntaxID: literalTargetSyntaxID, semanticElementSyntaxID: semanticElementSyntaxID, encoding: encoding, codeUnitBits: bits, codeUnitSignedness: signedness, reason: compilerTextLiteralReasonDuplicateTextLiteral(), relatedRow: row)
+            }
+            literalRow: row
+            literalTargetSyntaxID: compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 4)
+        }
+        row: row + 1
+    }
+    if literalRow >= 0 && storageRow < 0 {
+        return compilerTextLiteralInvalid(textTargetSyntaxID: literalTargetSyntaxID, semanticElementSyntaxID: semanticElementSyntaxID, encoding: encoding, codeUnitBits: bits, codeUnitSignedness: signedness, reason: compilerTextLiteralReasonTextLiteralRequiresStorage(), relatedRow: literalRow)
+    }
+    if storageRow >= 0 && literalRow < 0 {
+        return compilerTextLiteralInvalid(textTargetSyntaxID: storageTargetSyntaxID, semanticElementSyntaxID: semanticElementSyntaxID, encoding: encoding, codeUnitBits: bits, codeUnitSignedness: signedness, reason: compilerTextLiteralReasonTextStorageRequiresLiteral(), relatedRow: storageRow)
+    }
+    if storageRow < 0 && literalRow < 0 {
+        return CompilerTextLiteralFacts(textTargetSyntaxID: 0 - 1, semanticElementSyntaxID: 0 - 1, encoding: 0 - 1, codeUnitBits: 0 - 1, codeUnitSignedness: 0 - 1, reason: compilerTextLiteralReasonNone(), relatedRow: 0 - 1, isValid: true)
+    }
+    if storageTargetSyntaxID != literalTargetSyntaxID {
+        return compilerTextLiteralInvalid(textTargetSyntaxID: storageTargetSyntaxID, semanticElementSyntaxID: semanticElementSyntaxID, encoding: encoding, codeUnitBits: bits, codeUnitSignedness: signedness, reason: compilerTextLiteralReasonTextLiteralRequiresStorage(), relatedRow: literalRow)
+    }
+    if compilerDeclarationNameForSyntaxID(tables: tables, syntaxID: semanticElementSyntaxID) != String("Character") {
+        return compilerTextLiteralInvalid(textTargetSyntaxID: storageTargetSyntaxID, semanticElementSyntaxID: semanticElementSyntaxID, encoding: encoding, codeUnitBits: bits, codeUnitSignedness: signedness, reason: compilerTextLiteralReasonInvalidSemanticElement(), relatedRow: storageRow)
+    }
+    if encoding != compilerFormulaEncodingUTF8() || !compilerTextEncodingUTF8Exists(tables: tables) {
+        return compilerTextLiteralInvalid(textTargetSyntaxID: storageTargetSyntaxID, semanticElementSyntaxID: semanticElementSyntaxID, encoding: encoding, codeUnitBits: bits, codeUnitSignedness: signedness, reason: compilerTextLiteralReasonInvalidEncoding(), relatedRow: storageRow)
+    }
+    if bits != 8 || signedness != compilerFormulaSignednessUnsigned() {
+        return compilerTextLiteralInvalid(textTargetSyntaxID: storageTargetSyntaxID, semanticElementSyntaxID: semanticElementSyntaxID, encoding: encoding, codeUnitBits: bits, codeUnitSignedness: signedness, reason: compilerTextLiteralReasonInvalidCodeUnit(), relatedRow: storageRow)
+    }
+    if !compilerTextTargetHasUTF8ByteStorage(tables: tables, targetSyntaxID: storageTargetSyntaxID) {
+        return compilerTextLiteralInvalid(textTargetSyntaxID: storageTargetSyntaxID, semanticElementSyntaxID: semanticElementSyntaxID, encoding: encoding, codeUnitBits: bits, codeUnitSignedness: signedness, reason: compilerTextLiteralReasonInvalidPhysicalStorage(), relatedRow: storageRow)
+    }
+    return CompilerTextLiteralFacts(textTargetSyntaxID: storageTargetSyntaxID, semanticElementSyntaxID: semanticElementSyntaxID, encoding: encoding, codeUnitBits: bits, codeUnitSignedness: signedness, reason: compilerTextLiteralReasonNone(), relatedRow: 0 - 1, isValid: true)
+}
+
 function compilerIntegerTypeIsUnsigned8(typeName: String): Bool {
     if compilerBodyArenaTypeOuterName(typeName: typeName) != String("Int")
         || compilerBodyArenaGenericArgumentCount(typeName: typeName) != 2 { return false }
-    let bits: String(compilerBodyArenaGenericArgumentText(typeName: typeName, ordinal: 0))
-    let signedness: String(compilerBodyArenaGenericArgumentText(typeName: typeName, ordinal: 1))
-    let bitsRange: CompilerSourceRange(compilerSemanticTrimStringRange(text: bits, start: 0, end: stringLength(value: bits)))
-    let signednessRange: CompilerSourceRange(compilerSemanticTrimStringRange(text: signedness, start: 0, end: stringLength(value: signedness)))
-    return bitsRange.start >= 0 && signednessRange.start >= 0
-        && compilerSemanticStringRangeEqualsText(text: bits, start: bitsRange.start, end: bitsRange.end, literal: String("8"))
-        && compilerSemanticStringRangeEqualsText(text: signedness, start: signednessRange.start, end: signednessRange.end, literal: String(".unsigned"))
+    let first: String(compilerBodyArenaGenericArgumentText(typeName: typeName, ordinal: 0))
+    let second: String(compilerBodyArenaGenericArgumentText(typeName: typeName, ordinal: 1))
+    let firstRange: CompilerSourceRange(compilerSemanticTrimStringRange(text: first, start: 0, end: stringLength(value: first)))
+    let secondRange: CompilerSourceRange(compilerSemanticTrimStringRange(text: second, start: 0, end: stringLength(value: second)))
+    if firstRange.start < 0 || secondRange.start < 0 { return false }
+    return (compilerSemanticStringRangeEqualsText(text: first, start: firstRange.start, end: firstRange.end, literal: String(".unsigned"))
+            && compilerSemanticStringRangeEqualsText(text: second, start: secondRange.start, end: secondRange.end, literal: String("8")))
+        || (compilerSemanticStringRangeEqualsText(text: first, start: firstRange.start, end: firstRange.end, literal: String("8"))
+            && compilerSemanticStringRangeEqualsText(text: second, start: secondRange.start, end: secondRange.end, literal: String(".unsigned")))
 }
 
 function compilerFloatTypeBitWidth(typeName: String): Int {

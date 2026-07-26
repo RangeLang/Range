@@ -1,0 +1,8 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/Storage.range
+macro storage(): Construct -> Void {}
+compilerSourceFile\trole=core\tpath=Core/Stored.range
+@storage
+construct Stored<bits: Int> {
+    state payload: Int
+}

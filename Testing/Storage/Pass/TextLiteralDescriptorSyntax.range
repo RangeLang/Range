@@ -1,0 +1,19 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/Storage.range
+macro storage(_ syntax: Foreign<ASCII>): Construct -> Void {}
+macro literal(_ syntax: Foreign<ASCII>): Construct -> Void {}
+compilerSourceFile\trole=core\tpath=Core/Text.range
+enum Signedness {
+    case signed
+    case unsigned
+}
+enum TextEncoding {
+    case utf8
+}
+construct Character {}
+construct Buffer<Element> {}
+@storage(.text(encoding: .utf8, element: Character, codeUnit: Int<.unsigned, 8>))
+@literal(.text)
+construct String {
+    state bytes: Buffer<Int<.unsigned, 8>>
+}

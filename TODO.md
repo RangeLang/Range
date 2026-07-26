@@ -3,6 +3,52 @@
 Priority and dependency order live in [MILESTONES.md](MILESTONES.md). This file
 owns the actionable checkboxes for the active and deliberately deferred work.
 
+## Website
+
+- [x] Position the homepage 0-to-1 measure on a zero-safe logarithmic scale.
+  - [x] Use the same non-linear positions for canvas marks and pointer
+    snapping, and verify the rendered endpoint alignment.
+- [x] Add an interactive concentric nucleus graph to the Svelte homepage.
+  - [x] Render one shared source nucleus with persistent concept branches.
+  - [x] Add an explicit `Shape(1, 2, 4)` branch and expand the radial
+    canvas to use the available content width.
+  - [x] Verify Svelte diagnostics, production build, server rendering, and
+    concept-picker interaction.
+  - [x] Play one short low sine note every `1.8s + (1.8s / 3)`, or 2.4
+    seconds.
+    - [x] Advance Shape → Ownership → Capability on the same boundary that
+      triggers each note.
+    - [x] Leave silence between the short note and the next interval.
+    - [x] Keep one fixed A2 note in an audible low register with enough gain
+      for laptop speakers, independent of the active concept.
+    - [x] Add an optional longer E2 sub-pulse every 3.6 seconds with a stable
+      relationship to A2.
+      - [x] Form a 3:2 polyrhythm against the 2.4-second primary clock, with
+        both pulses meeting every 7.2 seconds.
+    - [x] Send the note through a strong five-second stereo reverb tail that
+      overlaps and layers beneath multiple 2.4-second pulses.
+      - [x] Mix the output at 90% wet reverb and 10% direct dry tone.
+      - [x] Filter the wet return through a rumble cut and a resonant low-pass
+        that moves one scale step above each pulse: A2 → B2 and E2 → F-sharp
+        2.
+      - [x] Use a smooth exponential tail and restrained resonance so
+        overlapping sine-bass pulses do not pump or rumble.
+  - [x] Place every branch node on a shared concentric numeric scale where the
+    `8 → 16` ring interval is twice `4 → 8`, which is twice `2 → 4`.
+  - [x] Render straight radial connectors from value-aware dash segments whose
+    lengths and gaps expand with the local base-2 logarithmic magnitude.
+  - [x] Keep numeric labels on the top SVG layer with a glyph-shaped paper
+    knockout so rings and connector marks cannot overlap their text.
+  - [x] Highlight the active branch line, concept label, and numeric labels
+    directly in a darker, higher-chroma playback accent while leaving every
+    inactive branch muted.
+    - [x] Restart its OKLCH color envelope on every interval boundary and
+      match the animation duration to the 2.4-second playback clock.
+    - [x] Keep that rhythmic envelope within a brighter playback range while
+      retaining its chromatic contrast.
+    - [x] Alternate two distinct OKLCH rhythm contours instead of repeating
+      the same color pulse shape.
+
 ## Baseline Integrity
 
 - [ ] Move unsized scalar defaults into the `@project` macro.
@@ -17,23 +63,68 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [ ] Materialize and validate the complete predefined scalar-member set.
   - [x] Prove default, override, duplicate, wrong-binding, and wrong-type
     behavior through supported compiler fixtures.
+- [ ] Move primitive scalar identity and literal syntax into Range-authored
+  lowercase macros.
+  - [x] Accept annotated compile-time generic values without the redundant
+    `let` spelling, including
+    `Int<signedness: Signedness, bits: Int>`.
+  - [x] Capture and validate empty `@storage` declarations plus
+    `@literal(.numeric)` and
+    `@literal(.numeric.decimal(separator: "."))` registrations.
+  - [x] Reject literals without storage, invalid numeric storage shapes,
+    duplicate literal registrations, and storage constructs with instance
+    members through supported fixtures.
+  - [x] Execute lowercase `@storage` and `@literal` applications as compiler
+    formula invocations and consume their emitted facts for descriptor
+    validation.
+  - [x] Define and validate text literal facts as semantic `Character`
+    elements encoded as UTF-8 with unsigned 8-bit physical code units.
+    - [x] Prove the exact text descriptor, missing text storage, and invalid
+      physical storage through supported fixtures.
+    - [ ] Replace `String`'s bootstrap `@builtin(.storage)` annotation with
+      `@storage(.text(...))` after the formula-capable macro sources enter the
+      reproducible seed manifest.
+  - [ ] Synthesize signed and unsigned integer representations from
+    `signedness` and `bits`, including unary minus only for signed storage.
+  - [ ] Replace the native integer literal and LLVM lowering branches with
+    macro-produced representation facts.
+  - [ ] Add the Range-authored `Signedness`, `Int`, `storage`, and `literal`
+    sources to the bootstrap manifest after the parser-capable seed is
+    reproducibly promoted.
+  - [ ] Expose compiler declarations through one canonical typed meta-model.
+    - `Construct.members` should be the typed view of the compiler's canonical
+      member collection; `@member` and `@field` classify or validate those
+      values instead of creating parallel declaration representations.
 - [ ] Remove source-alias ownership conflicts from parser fallback tokens.
-  - [ ] Replace the 12 one-use `$source`-carrying fallback locals with
-    cursor-free fallback construction from their token index.
-  - [ ] Prove the change advances `scripts/range compiler progression` past
+  - [x] Replace the enum-payload and balanced-range loop token/cursor
+    aggregates with scalar token coordinates and cursor indices.
+  - [x] Prove the change advances `scripts/range compiler progression` past
     `compilerCoreParseConstructDeclarationParts`.
-  - [ ] Normalize branch-polymorphic `CompilerStatement` returns to one owned
-    String provenance when expression and assignment paths select different
-    boundary sources.
+  - [x] Remove representation-sensitive Optional ABI boundaries from the
+    single-character operator and bracket lexer classifiers.
+  - [x] Normalize function-boundary return validation for optional and
+    transient values.
+    - `nil` carries zero owned payload leaves, and transient/non-owning
+      function results use the callee return summary instead of re-inferring
+      ownership from the nominal `String` type.
+  - [x] Keep synthesized runtime calls from inheriting a source function
+    call's indirect-return storage merely because they share its source node.
+  - [x] Lower cleanup traversal through a synthetic Optional payload as
+    `OptionalPayload` MIR instead of a nominal stored-member read.
+    - MIR validation now derives the payload type from the operand's Optional
+      specialization, so the projection is valid outside `??` syntax.
+  - [x] Prove the repaired compiler reaches a stable second/third generation.
+    - The cleaned generation 2 and generation 3 LLVM are byte-identical at
+      `c85943e4944e6ef1c281783f33b41a07876d2a3fad4d90c91a37e827700a1651`.
 - [ ] Give optional coalescing an ownership phi for tracked aggregate values.
   - The value CFG already joins `payload ?? fallback`, but the ownership graph
     must move the selected branch's owned leaves into one joined result and
     destroy only the unselected branch's live leaves.
   - Prove both locally created and boundary-forwarded payload/fallback pairs,
     including aggregates with multiple independently owned String leaves.
-- [ ] Reconcile the accepted seed manifest with the current compiler inputs.
-  - `scripts/range check-seed-integrity` currently stops at the
-    `CompilerBodyMIR.range` source hash.
+- [x] Reconcile the accepted seed manifest with the current compiler inputs.
+  - The accepted seed and its complete manifested input set pass
+    `scripts/verify-range-compiler-seed`.
 - [ ] Run the complete validation ladder and promote one reproducible accepted
   seed after the manifest is repaired.
   - [x] `scripts/range check-build-plan`
@@ -41,7 +132,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] `scripts/range check-compiler-smoke`
   - [ ] `scripts/range check-compiler-candidate`
   - [ ] `scripts/range check-stage2-compiler`
-  - [ ] `scripts/range compiler progression`
+  - [x] `scripts/range compiler progression`
 
 ## Repository Layout
 

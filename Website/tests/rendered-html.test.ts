@@ -40,22 +40,29 @@ describe("SvelteKit routes", () => {
     expect(html).toContain("a love letter to electrons, logic and abstraction");
     expect(html).toContain("<range-spline-nav");
     expect(html).toContain("<range-scale");
+    expect(html).toContain(">Cardinality</h2>");
+    expect(html).toContain("shared source nucleus");
+    expect(html).toContain("Play interval note");
+    expect(html).toContain("Stop interval note");
+    expect(html).toContain("Lower pulse");
+    expect(html).not.toContain("source() →");
+    expect(html).not.toContain("Program melody");
     expect(html).toContain('href="/benchmarks"');
     expect(html).toContain('href="/updates/string-lowering"');
     expect(html).not.toContain("Benchmark suite");
   });
 
   test("renders and filters the benchmark hierarchy", async () => {
-    const response = await render("/benchmarks?category=noise");
+    const response = await render("/benchmarks?category=constructs");
     const html = await response.text();
 
     expect(response.status).toBe(200);
     expect(html).toContain("Benchmark suite");
-    expect(html).toContain("Perlin");
-    expect(html).toContain("Voronoi");
-    expect(html).toContain("12 of 12 leaves run");
-    expect(html).toContain("Range passed 12");
-    expect(html).not.toContain("Sequential modulo");
+    expect(html).toContain("Raw Struct Race");
+    expect(html).toContain("Eight-level nested chain");
+    expect(html).toContain("4 of 15 leaves run");
+    expect(html).toContain("Range passed 4");
+    expect(html).not.toContain("Depth 20 and 21");
   });
 
   test("renders an individual benchmark", async () => {
@@ -96,10 +103,10 @@ test("keeps the generated benchmark artifact complete and versioned", async () =
 
   expect(schema.required).toContain("schemaVersion");
   expect(artifact.schemaVersion).toBe(schema.properties.schemaVersion.const);
-  expect(artifact.summary.leafCount).toBe(12);
-  expect(artifact.summary.runLeafCount).toBe(12);
+  expect(artifact.summary.leafCount).toBe(15);
+  expect(artifact.summary.runLeafCount).toBe(4);
   expect(artifact.categories.length).toBeGreaterThan(0);
-  expect(artifact.categories.flatMap((category: any) => category.subcategories).flatMap((subcategory: any) => subcategory.leaves)).toHaveLength(12);
+  expect(artifact.categories.flatMap((category: any) => category.subcategories).flatMap((subcategory: any) => subcategory.leaves)).toHaveLength(15);
 });
 
 test("uses Svelte components and Bun without the legacy renderer", async () => {
@@ -118,15 +125,30 @@ test("uses Svelte components and Bun without the legacy renderer", async () => {
 });
 
 test("keeps the scale math deterministic", async () => {
-  const { createRangeMarks, createScaleMarks, pinchMarkerWidth, snapScalePosition } = await import("../public/range-scale-math.js");
+  const {
+    createRangeMarks,
+    createScaleMarks,
+    logarithmicScalePosition,
+    pinchMarkerWidth,
+    snapScalePosition,
+  } = await import("../public/range-scale-math.js");
   const logicalMarks = createScaleMarks({ divisionBase: 3, divisionLevels: 3 });
   expect(logicalMarks).toHaveLength(28);
   expect(new Set(logicalMarks.map((mark: any) => mark.measure))).toEqual(new Set([1]));
+  expect(logicalMarks[0]).toMatchObject({ position: 0, value: 0 });
+  expect(logicalMarks[27]).toMatchObject({ position: 1, value: 1 });
+  expect(logicalMarks[7].value).toBe(7 / 27);
+  expect(logicalMarks[7].position).toBe(logarithmicScalePosition(7 / 27));
+  expect(logicalMarks[1].position - logicalMarks[0].position)
+    .toBeGreaterThan(logicalMarks[27].position - logicalMarks[26].position);
   const warpedMarks = createRangeMarks({ pinch: 0.27, pinchFalloff: 0.16, pinchStrength: 0.9 });
-  expect(warpedMarks[7].position).toBe(7 / 27);
-  expect(warpedMarks[7].width).toBe(pinchMarkerWidth(7 / 27, { center: 0.27, falloff: 0.16, strength: 0.9 }));
-  expect(warpedMarks[7].width).toBeLessThan(warpedMarks[0].width);
-  expect(warpedMarks.every((mark: any, index: number) => mark.position === index / 27)).toBe(true);
+  expect(warpedMarks[7].position).toBe(logarithmicScalePosition(7 / 27));
+  expect(warpedMarks[7].width).toBe(pinchMarkerWidth(warpedMarks[7].position, { center: 0.27, falloff: 0.16, strength: 0.9 }));
+  expect(Math.min(...warpedMarks.map((mark: any) => mark.width))).toBeLessThan(warpedMarks[0].width);
+  expect(warpedMarks.every((mark: any, index: number) => mark.value === index / 27)).toBe(true);
   expect(warpedMarks.every((mark: any) => mark.measure === 1)).toBe(true);
-  expect(snapScalePosition(0.27)).toEqual({ index: 7, position: 7 / 27 });
+  expect(snapScalePosition(logicalMarks[7].position)).toEqual({
+    index: 7,
+    position: logicalMarks[7].position,
+  });
 });

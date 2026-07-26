@@ -115,6 +115,8 @@ function compilerBodyStorageForSymbol(arena: CompilerBodyArena, symbolID: Int): 
 }
 
 function compilerBodyStorageForCall(arena: CompilerBodyArena, callNodeID: Int): Int {
+    if callNodeID < 0 || callNodeID >= compilerIntTableRowCount(table: arena.nodes)
+        || compilerIntTableValue(table: arena.nodes, row: callNodeID, column: 1) != compilerSyntaxKindApplication() { return 0 - 1 }
     state row: Int(0)
     while row < compilerIntTableRowCount(table: arena.storages) {
         let ownerNodeID: Int(compilerIntTableValue(table: arena.storages, row: row, column: compilerBodyStorageOwnerNodeColumn()))
@@ -557,42 +559,57 @@ function compilerBodyOwnedReturnTransfersAreValid(arena: CompilerBodyArena): Boo
         }
         row: row + 1
     }
+    return true
+}
+
+function compilerBodyOwnedReturnTransferCountValidationCode(arena: CompilerBodyArena, returnSummaries: CompilerIntTable): Int {
     state nodeRow: Int(0)
     while nodeRow < compilerIntTableRowCount(table: arena.nodes) {
         if compilerIntTableValue(table: arena.nodes, row: nodeRow, column: 1) == compilerSyntaxKindReturn() {
             let returnValueNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeRow, role: compilerSyntaxRoleReturnValue(), ordinal: 0))
+            if returnValueNodeID < 0 { return 100 + nodeRow }
             state expectedTransferCount: Int(0)
-            if returnValueNodeID < 0 { return false }
-            let returnValueTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: returnValueNodeID))
-            if returnValueTypeKind == compilerBodyTypeConstruct() || returnValueTypeKind == compilerBodyTypeString() {
-                let returnTypeID: Int(compilerBodyArenaExpressionTypeID(arena: arena, nodeID: returnValueNodeID))
-                let trackedStatus: Int(compilerBodyArenaTypeTrackedStorageStatus(arena: arena, typeID: returnTypeID))
-                if trackedStatus < 0 { return false }
-                if trackedStatus == 1 {
-                    let sourceRootPathID: Int(compilerBodyArenaOwnedPathForValue(arena: arena, valueNodeID: returnValueNodeID))
-                    if sourceRootPathID < 0 { return false }
-                    expectedTransferCount: compilerBodyArenaOwnedPathOpaqueLeafCount(arena: arena, rootPathID: sourceRootPathID)
-                    if expectedTransferCount <= 0 { return false }
+            if !compilerBodyArenaValueIsNil(arena: arena, valueNodeID: returnValueNodeID)
+                && !compilerBodyArenaValueIsNonOwningStringView(arena: arena, valueNodeID: returnValueNodeID)
+                && !compilerBodyArenaValueHasNoTrackedFunctionReturn(arena: arena, valueNodeID: returnValueNodeID, returnSummaries: returnSummaries) {
+                let returnValueTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: returnValueNodeID))
+                if returnValueTypeKind == compilerBodyTypeConstruct() || returnValueTypeKind == compilerBodyTypeString() {
+                    let returnTypeID: Int(compilerBodyArenaExpressionTypeID(arena: arena, nodeID: returnValueNodeID))
+                    let trackedStatus: Int(compilerBodyArenaTypeTrackedStorageStatus(arena: arena, typeID: returnTypeID))
+                    if trackedStatus < 0 { return 200 + nodeRow }
+                    if trackedStatus == 1 {
+                        let sourceRootPathID: Int(compilerBodyArenaOwnedPathForValue(arena: arena, valueNodeID: returnValueNodeID))
+                        if sourceRootPathID < 0 { return 300 + nodeRow }
+                        expectedTransferCount: compilerBodyArenaOwnedPathOpaqueLeafCount(arena: arena, rootPathID: sourceRootPathID)
+                        if expectedTransferCount <= 0 { return 400 + nodeRow }
+                    }
                 }
             }
-            if compilerBodyOwnedReturnTransferCountForReturnNode(transfers: arena.ownedReturnTransfers, returnNodeID: nodeRow) != expectedTransferCount { return false }
+            let actualTransferCount: Int(compilerBodyOwnedReturnTransferCountForReturnNode(transfers: arena.ownedReturnTransfers, returnNodeID: nodeRow))
+            if actualTransferCount != expectedTransferCount { return 1000 + nodeRow * 100 + expectedTransferCount * 10 + actualTransferCount }
         }
         nodeRow: nodeRow + 1
     }
-    return true
+    return 0
 }
 
-function compilerBodyOwnedReturnTransferContractsAreValid(arena: CompilerBodyArena, typeKeys: CompilerIntTable, typeKeyArguments: CompilerIntTable, effectPaths: CompilerIntTable): Bool {
-    if !compilerBodyOwnedReturnTransfersAreValid(arena: arena) { return false }
+function compilerBodyOwnedReturnTransferContractValidationCode(arena: CompilerBodyArena, typeKeys: CompilerIntTable, typeKeyArguments: CompilerIntTable, effectPaths: CompilerIntTable, returnSummaries: CompilerIntTable): Int {
+    if !compilerBodyOwnedReturnTransfersAreValid(arena: arena) { return 1 }
+    let countValidationCode: Int(compilerBodyOwnedReturnTransferCountValidationCode(arena: arena, returnSummaries: returnSummaries))
+    if countValidationCode != 0 { return countValidationCode }
     state row: Int(0)
     while row < compilerIntTableRowCount(table: arena.ownedReturnTransfers) {
         let sourceTypeID: Int(compilerIntTableValue(table: arena.ownedReturnTransfers, row: row, column: compilerBodyOwnedReturnTransferTypeColumn()))
         let storageKeyID: Int(compilerIntTableValue(table: arena.ownedReturnTransfers, row: row, column: compilerBodyOwnedReturnTransferStorageKeyColumn()))
-        if !compilerBodyFunctionInstanceEffectPathIsValid(paths: effectPaths, pathID: compilerIntTableValue(table: arena.ownedReturnTransfers, row: row, column: compilerBodyOwnedReturnTransferReturnPathColumn()))
-            || storageKeyID != compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: sourceTypeID) { return false }
+        if !compilerBodyFunctionInstanceEffectPathIsValid(paths: effectPaths, pathID: compilerIntTableValue(table: arena.ownedReturnTransfers, row: row, column: compilerBodyOwnedReturnTransferReturnPathColumn())) { return 100 + row * 10 }
+        if storageKeyID != compilerReachableTypeKeyInternFromArena(typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, arena: arena, typeID: sourceTypeID) { return 101 + row * 10 }
         row: row + 1
     }
-    return true
+    return 0
+}
+
+function compilerBodyOwnedReturnTransferContractsAreValid(arena: CompilerBodyArena, typeKeys: CompilerIntTable, typeKeyArguments: CompilerIntTable, effectPaths: CompilerIntTable, returnSummaries: CompilerIntTable): Bool {
+    return compilerBodyOwnedReturnTransferContractValidationCode(arena: arena, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, effectPaths: effectPaths, returnSummaries: returnSummaries) == 0
 }
 
 function compilerBodyMemoryFactsAreValid(arena: CompilerBodyArena): Bool {
@@ -618,7 +635,8 @@ function compilerBodyMemoryBuildAndFreeze(arena: CompilerBodyArena, abiPlan: Com
     if passEscapeStatus != 0 { return 4000 + passEscapeStatus }
     let ownedPathValidationStatus: Int(compilerBodyArenaValidateOwnedPaths(arena: arena, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, effects: effects, effectPaths: effectPaths, returnSummaries: returnSummaries, returnLeaves: returnLeaves, applyInstanceEffects: applyInstanceEffects, recordFacts: recordOwnedFacts))
     if ownedPathValidationStatus != 0 { return 8100 + (0 - ownedPathValidationStatus) }
-    if !compilerBodyOwnedReturnTransferContractsAreValid(arena: arena, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, effectPaths: effectPaths) { return 8200 }
+    let returnContractValidationCode: Int(compilerBodyOwnedReturnTransferContractValidationCode(arena: arena, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, effectPaths: effectPaths, returnSummaries: returnSummaries))
+    if returnContractValidationCode != 0 { return 8200 + returnContractValidationCode }
     if compilerBodyMemoryBuildLifetimePhase(arena: arena) != 0 { return 5 }
     let bindingAliasFinalStatus: Int(compilerBodyArenaBindingAliasValidationCode(arena: arena))
     if bindingAliasFinalStatus != 0 { return 9000 + bindingAliasFinalStatus }
@@ -761,7 +779,9 @@ function compilerBodyMIRAppendOperation(arena: CompilerBodyArena, blockID: Int, 
     if arena.graphZeroState.element(index: compilerBodyGraphZeroStateFrozen()) != 0 { return 0 - 1 }
     let operationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
     state storageID: Int(0 - 1)
-    if kind == compilerBodyMIROperationDirectCall() { storageID: compilerBodyStorageForCall(arena: arena, callNodeID: sourceNodeID) }
+    if kind == compilerBodyMIROperationDirectCall() && targetKind == compilerBodyMIROperationTargetFunction() {
+        storageID: compilerBodyStorageForCall(arena: arena, callNodeID: sourceNodeID)
+    }
     if kind == compilerBodyMIROperationLocalValue() { storageID: compilerBodyStorageForSymbol(arena: arena, symbolID: targetID) }
     if kind == compilerBodyMIROperationReturn() { storageID: compilerBodyCalleeReturnStorage(arena: arena) }
     if compilerIntTableAppend(table: arena.mirOperations, value: operationID) != 0 { return 0 - 1 }

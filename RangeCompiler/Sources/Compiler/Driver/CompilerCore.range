@@ -185,6 +185,28 @@ construct CompilerProjectDefaults {
     let isValid: Bool
 }
 
+construct CompilerStorageLiteralFacts {
+    let storageApplicationCount: Int
+    let literalApplicationCount: Int
+    let numericTargetSyntaxID: Int
+    let decimalTargetSyntaxID: Int
+    let decimalSeparatorByte: Int
+    let reason: Int
+    let relatedRow: Int
+    let isValid: Bool
+}
+
+construct CompilerTextLiteralFacts {
+    let textTargetSyntaxID: Int
+    let semanticElementSyntaxID: Int
+    let encoding: Int
+    let codeUnitBits: Int
+    let codeUnitSignedness: Int
+    let reason: Int
+    let relatedRow: Int
+    let isValid: Bool
+}
+
 construct CompilerSyntaxTables {
     let sourceStore: CompilerSourceStore
     let syntaxIndex: CompilerIntTable
@@ -205,6 +227,7 @@ construct CompilerSyntaxTables {
     let macroCapabilityHandles: CompilerIntTable
     let macroExecutionEvents: CompilerIntTable
     let macroReadDependencies: CompilerIntTable
+    let compilerFormulaFacts: CompilerIntTable
     let macroExpansionTemplates: CompilerIntTable
     let pendingGeneratedFunctions: CompilerIntTable
     let pendingGeneratedMembers: CompilerIntTable
