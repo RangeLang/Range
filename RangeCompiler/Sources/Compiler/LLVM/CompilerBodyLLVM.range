@@ -1850,7 +1850,7 @@ function compilerBodyArenaValidationCode(arena: CompilerBodyArena): Int {
         let role: Int(compilerIntTableValue(table: arena.edges, row: edgeRow, column: 2))
         if ownerNodeID < 0 || ownerNodeID >= nodeCount { return 54 }
         if childNodeID < 0 || childNodeID >= nodeCount { return 55 }
-        if role < compilerSyntaxRoleStatement() || role > compilerSyntaxRoleArrayElement() { return 56 }
+        if role < compilerSyntaxRoleStatement() || role > compilerSyntaxRoleClosureBody() { return 56 }
         edgeRow: edgeRow + 1
     }
     return 0
@@ -1924,7 +1924,7 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
         let role: Int(compilerIntTableValue(table: arena.edges, row: edgeRow, column: 2))
         if ownerNodeID < 0 || ownerNodeID >= nodeCount
             || childNodeID < 0 || childNodeID >= nodeCount
-            || role < compilerSyntaxRoleStatement() || role > compilerSyntaxRoleArrayElement() { return false }
+            || role < compilerSyntaxRoleStatement() || role > compilerSyntaxRoleClosureBody() { return false }
         edgeRow: edgeRow + 1
     }
     return true

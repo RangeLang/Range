@@ -230,8 +230,9 @@ function compilerSyntaxKindSwitchCase(): Int { return 41 }
 function compilerSyntaxKindEnumCaseValue(): Int { return 42 }
 function compilerSyntaxKindArrayLiteral(): Int { return 43 }
 function compilerSyntaxKindDoubleLiteral(): Int { return 44 }
-function compilerSyntaxKindLastBody(): Int { return compilerSyntaxKindDoubleLiteral() }
-function compilerSyntaxKindEnum(): Int { return 45 }
+function compilerSyntaxKindClosure(): Int { return 45 }
+function compilerSyntaxKindLastBody(): Int { return compilerSyntaxKindClosure() }
+function compilerSyntaxKindEnum(): Int { return 46 }
 
 function compilerSyntaxLocalKindLet(): Int { return 1 }
 function compilerSyntaxLocalKindState(): Int { return 2 }
@@ -322,6 +323,9 @@ function compilerSyntaxRoleSwitchCase(): Int { return 24 }
 function compilerSyntaxRoleSwitchPattern(): Int { return 25 }
 function compilerSyntaxRoleSwitchBody(): Int { return 26 }
 function compilerSyntaxRoleArrayElement(): Int { return 27 }
+function compilerSyntaxRoleTrailingClosure(): Int { return 28 }
+function compilerSyntaxRoleClosureParameter(): Int { return 29 }
+function compilerSyntaxRoleClosureBody(): Int { return 30 }
 
 function compilerSyntaxTablesCreate(source: String): CompilerSyntaxTables {
     return CompilerSyntaxTables(

@@ -272,10 +272,14 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - The canonical Core source bundle now links `@syntax`,
           `@syntax?`, `[@syntax]`, and qualified nested names such as
           `Macro.Application`; `Application<Value>` defaults to `Nil`.
-        - The first current execution blocker is the predicate trailing
-          closure at `Codable.range:110` in
-          `.filter { property in ... }`. Implement closure parse/CFG/MIR and
-          compile-time invocation before nested `map` and syntax splicing.
+        - [x] Parse chained and nested trailing closures into an explicit
+          closure node with ordered parameters and a lexical body.
+          - `Codable.range:110` now crosses the former postfix parse boundary;
+            closure typing, capture materialization, CFG/MIR, and compile-time
+            invocation remain independently verifiable steps.
+        - [ ] Type closure parameters and captures, lower closure CFG/MIR, and
+          invoke predicate `filter`/`map` closures at compile time before
+          nested macro calls and syntax splicing.
       - [ ] Restore the Range-authored `Result`, encoder/decoder container,
         coding error, and JSON surfaces needed by generated implementations.
       - [ ] Prove field key overrides, exclusion, object-shape rejection, and

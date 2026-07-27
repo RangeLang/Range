@@ -477,6 +477,107 @@ function compilerBodyArenaParseSwitchPattern(arena: CompilerBodyArena, start: In
     return compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: arguments.nextIndex)
 }
 
+function compilerBodyArenaTrailingClosureParameterClauseEnd(arena: CompilerBodyArena, leftBrace: RangeLexedToken, limit: Int): Int {
+    let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: leftBrace.start), leftKind: .leftBrace, rightKind: .rightBrace))
+    if maybeRange == nil { return 0 - 1 }
+    let range: CompilerSourceRange(maybeRange ?? CompilerSourceRange(start: leftBrace.end, end: leftBrace.end, next: leftBrace.end))
+    if range.next > limit { return 0 - 1 }
+    let fallbackIndex: Int(leftBrace.start)
+    state cursor: Int(range.start)
+    state expectingParameter: Bool(true)
+    while cursor < range.end {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
+        if maybeToken == nil { return 0 - 1 }
+        let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: fallbackIndex))
+        if expectingParameter {
+            if token.kind != .identifier { return 0 - 1 }
+            cursor: token.end
+            expectingParameter: false
+        } else {
+            if token.text == String("in") { return token.end }
+            if token.kind != .comma { return 0 - 1 }
+            cursor: token.end
+            expectingParameter: true
+        }
+    }
+    return 0 - 1
+}
+
+function compilerBodyArenaParseTrailingClosure(arena: CompilerBodyArena, leftBrace: RangeLexedToken, limit: Int): CompilerBodyParseResult {
+    let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: leftBrace.start), leftKind: .leftBrace, rightKind: .rightBrace))
+    if maybeRange == nil { return compilerBodyParseFailure(index: leftBrace.start) }
+    let range: CompilerSourceRange(maybeRange ?? CompilerSourceRange(start: leftBrace.end, end: leftBrace.end, next: leftBrace.end))
+    if range.next > limit || compilerBodyArenaTrailingClosureParameterClauseEnd(arena: arena, leftBrace: leftBrace, limit: limit) < 0 { return compilerBodyParseFailure(index: leftBrace.start) }
+    let fallbackIndex: Int(leftBrace.start)
+    let parameterStarts: Buffer<Int>(bufferCreateInt(capacity: 2))
+    let parameterEnds: Buffer<Int>(bufferCreateInt(capacity: 2))
+    state parameterCursor: Int(range.start)
+    state bodyStart: Int(range.start)
+    state hasParameterClause: Bool(false)
+    state parametersValid: Bool(true)
+    state scanningParameters: Bool(true)
+    while scanningParameters && parameterCursor < range.end {
+        let maybeParameter: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: parameterCursor))
+        if maybeParameter == nil {
+            scanningParameters: false
+        } else {
+            let parameter: RangeLexedToken(maybeParameter ?? compilerFallbackTokenAt(index: fallbackIndex))
+            if parameter.text == String("in") {
+                hasParameterClause: true
+                bodyStart: parameter.end
+                scanningParameters: false
+            } else if parameter.kind != .identifier {
+                scanningParameters: false
+            } else {
+                if parameterStarts.append(element: parameter.start) != 0 || parameterEnds.append(element: parameter.end) != 0 {
+                    parametersValid: false
+                    scanningParameters: false
+                } else {
+                    let maybeSeparator: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: parameter.end))
+                    if maybeSeparator == nil {
+                        scanningParameters: false
+                    } else {
+                        let separator: RangeLexedToken(maybeSeparator ?? compilerFallbackTokenAt(index: fallbackIndex))
+                        if separator.text == String("in") {
+                            hasParameterClause: true
+                            bodyStart: separator.end
+                            scanningParameters: false
+                        } else if separator.kind == .comma {
+                            parameterCursor: separator.end
+                        } else {
+                            scanningParameters: false
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if !hasParameterClause {
+        parameterStarts.destroy()
+        parameterEnds.destroy()
+        return compilerBodyParseFailure(index: range.start)
+    }
+    let closureNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindClosure(), ordinal: 0, start: leftBrace.start, end: range.next, firstStart: leftBrace.start, firstEnd: leftBrace.end, secondStart: range.end, secondEnd: range.next, aux: parameterStarts.count))
+    let bodyNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindLexicalRegion(), ordinal: 0, start: bodyStart, end: range.end, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    state valid: Bool(parametersValid && closureNodeID >= 0 && bodyNodeID >= 0)
+    state parameterOrdinal: Int(0)
+    while valid && parameterOrdinal < parameterStarts.count {
+        let parameterNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindIdentifier(), ordinal: parameterOrdinal, start: parameterStarts.element(index: parameterOrdinal), end: parameterEnds.element(index: parameterOrdinal), firstStart: parameterStarts.element(index: parameterOrdinal), firstEnd: parameterEnds.element(index: parameterOrdinal), secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+        if parameterNodeID < 0
+            || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: closureNodeID, childNodeID: parameterNodeID, role: compilerSyntaxRoleClosureParameter(), ordinal: parameterOrdinal) != 0 { valid: false }
+        parameterOrdinal: parameterOrdinal + 1
+    }
+    if valid && compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: closureNodeID, childNodeID: bodyNodeID, role: compilerSyntaxRoleClosureBody(), ordinal: 0) != 0 { valid: false }
+    if valid {
+        let parsedBody: CompilerBodyParseResult(compilerBodyArenaParseRegionInto(arena: arena, regionNodeID: bodyNodeID, start: bodyStart, limit: range.end))
+        if !parsedBody.isValid || parsedBody.nextIndex < range.end { valid: false }
+    }
+    parameterStarts.destroy()
+    parameterEnds.destroy()
+    if !valid { return compilerBodyParseFailure(index: bodyStart) }
+    return compilerBodyParseSuccess(nodeID: closureNodeID, nextIndex: range.next)
+}
+
 function compilerBodyArenaParsePostfix(arena: CompilerBodyArena, start: Int, limit: Int): CompilerBodyParseResult {
     state result: CompilerBodyParseResult(compilerBodyArenaParsePrimary(arena: arena, start: start, limit: limit))
     if !result.isValid { return result }
@@ -519,6 +620,28 @@ function compilerBodyArenaParsePostfix(arena: CompilerBodyArena, start: Int, lim
                 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: indexNodeID, childNodeID: receiverNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0) != 0
                 || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: indexNodeID, childNodeID: indexValue.nodeID, role: compilerSyntaxRoleIndex(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: suffix.start) }
             result: compilerBodyParseSuccess(nodeID: indexNodeID, nextIndex: rightBracket.end)
+        } else if suffix.kind == .leftBrace {
+            state callNodeID: Int(result.nodeID)
+            let trailingCalleeKind: Int(compilerIntTableValue(table: arena.nodes, row: callNodeID, column: 1))
+            if trailingCalleeKind != compilerSyntaxKindApplication() && trailingCalleeKind != compilerSyntaxKindMemberRead() {
+                keepScanning: false
+            } else if compilerBodyArenaTrailingClosureParameterClauseEnd(arena: arena, leftBrace: suffix, limit: limit) < 0 {
+                keepScanning: false
+            } else {
+                if trailingCalleeKind != compilerSyntaxKindApplication() {
+                    let calleeNodeID: Int(result.nodeID)
+                    let calleeStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.nodes, row: calleeNodeID, column: 4)))
+                    callNodeID: compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindApplication(), ordinal: 0, start: calleeStart, end: suffix.start, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0)
+                    if callNodeID < 0
+                        || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: callNodeID, childNodeID: calleeNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: suffix.start) }
+                }
+                if compilerBodyArenaChild(arena: arena, ownerNodeID: callNodeID, role: compilerSyntaxRoleTrailingClosure(), ordinal: 0) >= 0 { return compilerBodyParseFailure(index: suffix.start) }
+                let closure: CompilerBodyParseResult(compilerBodyArenaParseTrailingClosure(arena: arena, leftBrace: suffix, limit: limit))
+                if !closure.isValid
+                    || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: callNodeID, childNodeID: closure.nodeID, role: compilerSyntaxRoleTrailingClosure(), ordinal: 0) != 0
+                    || arena.nodes.values.update(element: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: closure.nextIndex), index: callNodeID * compilerBodyArenaNodeColumnCount() + 5) != 0 { return compilerBodyParseFailure(index: suffix.start) }
+                result: compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: closure.nextIndex)
+            }
         } else {
             keepScanning: false
         }
