@@ -50,6 +50,12 @@ function compilerBodyResolutionEnumCase(): Int { return 14 }
 function compilerBodyResolutionEnum(): Int { return 15 }
 function compilerBodyResolutionArrayLiteral(): Int { return 16 }
 function compilerBodyResolutionArrayCount(): Int { return 17 }
+function compilerBodyResolutionMacroEnvironmentProjection(): Int { return 18 }
+function compilerBodyResolutionMacroSyntaxFilter(): Int { return 19 }
+
+function compilerMacroEnvironmentProjectionTarget(): Int { return 1 }
+function compilerMacroEnvironmentProjectionDiagnostics(): Int { return 2 }
+function compilerMacroEnvironmentProjectionGraph(): Int { return 3 }
 function compilerBodyBuiltinArraySyntaxID(): Int { return 0 - 2 }
 function compilerBodyBuiltinString(): Int { return 1 }
 function compilerBodyBuiltinFloat(): Int { return 2 }
@@ -1231,7 +1237,9 @@ function compilerBodyMIROperationArrayStore(): Int { return 47 }
 function compilerBodyMIROperationStringOwnedCopy(): Int { return 48 }
 function compilerBodyMIROperationStringAppendOwned(): Int { return 49 }
 function compilerBodyMIROperationMemberAddress(): Int { return 50 }
-function compilerBodyMIROperationLast(): Int { return compilerBodyMIROperationMemberAddress() }
+function compilerBodyMIROperationMacroEnvironmentProjection(): Int { return 51 }
+function compilerBodyMIROperationMacroSyntaxFilter(): Int { return 52 }
+function compilerBodyMIROperationLast(): Int { return compilerBodyMIROperationMacroSyntaxFilter() }
 
 function compilerBodyMIROperandColumnCount(): Int { return 4 }
 function compilerBodyMIROperandOperationColumn(): Int { return 0 }

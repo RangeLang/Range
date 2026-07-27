@@ -97,7 +97,7 @@ check_range_native_project_macro() {
     "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "Range-native project macro did not compile"
     [[ ! -s "$error" ]] || fail "Range-native project macro wrote stderr"
-    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=2' "$output" \
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1' "$output" \
         || fail "Range-native project macro did not execute through target capabilities"
     /usr/bin/grep -Fq $'name=integer\tmemberKind=state\ttype=Int' "$output" \
         || fail "Range-native project macro did not expand the integer default"
@@ -123,6 +123,38 @@ check_range_native_project_macro() {
     echo "ProjectDefaults range-native-project: pass"
 }
 
+check_macro_environment() {
+    local fixture="$REPO_ROOT/Testing/Macros/Pass/Environment.range"
+    local output="$WORK_ROOT/macro-environment.out"
+    local error="$WORK_ROOT/macro-environment.err"
+
+    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "single-binding macro environment did not compile"
+    [[ ! -s "$error" ]] || fail "single-binding macro environment wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1\teventCount=1' "$output" \
+        || fail "single-binding macro environment did not execute through one capability handle"
+    /usr/bin/grep -Fq $'readDependencyCount=1' "$output" \
+        || fail "single-binding macro environment did not record its graph read"
+    /usr/bin/grep -Fq $'severity=1\toperation=1\tmessage=environment observed' "$output" \
+        || fail "single-binding macro environment did not emit its diagnostic"
+    echo "Macros single-binding-environment: pass"
+}
+
+check_canonical_target_members() {
+    local fixture="$REPO_ROOT/Testing/Macros/Pass/CanonicalTargetMembers.range"
+    local output="$WORK_ROOT/macro-canonical-target-members.out"
+    local error="$WORK_ROOT/macro-canonical-target-members.err"
+
+    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "canonical target members macro did not compile"
+    [[ ! -s "$error" ]] || fail "canonical target members macro wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1' "$output" \
+        || fail "canonical target members macro did not execute through one environment"
+    /usr/bin/grep -Fq $'name=canonicalTargetMembersWorked\tmemberKind=let\ttype=Int' "$output" \
+        || fail "canonical target members macro did not observe the deferred member collection"
+    echo "Macros canonical-target-members: pass"
+}
+
 check_canonical_member_family() {
     local fixture="$REPO_ROOT/Testing/Members/Pass/CanonicalMemberFamily.range"
     local output="$WORK_ROOT/member-family-canonical.out"
@@ -142,8 +174,15 @@ check_canonical_declaration_envelopes() {
     local error="$WORK_ROOT/declaration-envelope-models.err"
     local relative expectation path name
     local -a model_sources=(
+        RangeCompiler/Sources/Core/Macro/Macro.range
+        RangeCompiler/Sources/Core/Syntax/Identifier.range
+        RangeCompiler/Sources/Core/Syntax/Declarations/Generic/Generic.range
+        RangeCompiler/Sources/Core/Syntax/Declarations/Generic/TypeGeneric.range
+        RangeCompiler/Sources/Core/Syntax/Declarations/Generic/ValueGeneric.range
+        RangeCompiler/Sources/Core/Syntax/Declarations/Type/Construct.range
         RangeCompiler/Sources/Core/Syntax/Declarations/Type/Function.range
         RangeCompiler/Sources/Core/Syntax/Declarations/Type/Enum.range
+        RangeCompiler/Sources/Core/Syntax/Declarations/Type/Extension.range
         RangeCompiler/Sources/Core/Syntax/Declarations/Type/Parameter.range
         RangeCompiler/Sources/Core/Syntax/Declarations/Property/Let.range
         RangeCompiler/Sources/Core/Syntax/Declarations/Property/State.range
@@ -151,6 +190,21 @@ check_canonical_declaration_envelopes() {
         RangeCompiler/Sources/Core/Syntax/Declarations/Property/Derived.range
     )
     local -a expectations=(
+        'Macro.range|macros'
+        'Macro.range|identifier'
+        'Macro.range|target'
+        'Identifier.range|name'
+        'Identifier.range|id'
+        'Identifier.range|parent'
+        'Identifier.range|source'
+        'Generic.range|macros'
+        'Generic.range|identifier'
+        'TypeGeneric.range|macros'
+        'TypeGeneric.range|identifier'
+        'ValueGeneric.range|macros'
+        'ValueGeneric.range|identifier'
+        'Construct.range|macros'
+        'Construct.range|identifier'
         'Function.range|macros'
         'Function.range|identifier'
         'Function.range|parameters'
@@ -158,7 +212,10 @@ check_canonical_declaration_envelopes() {
         'Function.range|body'
         'Enum.range|macros'
         'Enum.range|identifier'
+        'Extension.range|macros'
+        'Extension.range|identifier'
         'Parameter.range|macros'
+        'Parameter.range|identifier'
         'Let.range|macros'
         'Let.range|identifier'
         'Let.range|type'
@@ -196,6 +253,19 @@ check_canonical_declaration_envelopes() {
             | /usr/bin/grep -F "/$path" > /dev/null \
             || fail "Canonical declaration envelope omitted $path let $name"
     done
+    if /usr/bin/grep -F $'graphNominal\t' "$output" \
+        | /usr/bin/grep -F $'keyword=let\tname=identity\t' \
+        | /usr/bin/grep -F 'path=RangeCompiler/Sources/Core/' > /dev/null; then
+        fail "Canonical declaration envelopes retained a parallel identity field"
+    fi
+    /usr/bin/grep -F $'graphNominal\t' "$output" \
+        | /usr/bin/grep -F $'keyword=let\tname=parent\t' \
+        | /usr/bin/grep -F 'path=RangeCompiler/Sources/Core/Syntax/Identifier.range' \
+        > /dev/null \
+        || fail "Canonical Identifier omitted its direct parent relationship"
+    if /usr/bin/grep -Fq 'GraphIdentity' "$bundle" || /usr/bin/grep -Fq 'RangeGraphIdentity' "$bundle"; then
+        fail "Canonical declaration envelopes retained a parallel identity type"
+    fi
     echo "Members declaration-envelopes: pass"
 }
 
@@ -637,6 +707,8 @@ main_root_value() {
     resolve_stage2_compiler 0
     echo "checkpoint root-value:stage2-cache-$STAGE2_CACHE_STATUS: pass"
     echo "checkpoint root-value:stage2-resolved: pass"
+    check_macro_environment
+    check_canonical_target_members
     check_project_defaults
     check_storage_literals
     check_defaulted_generic_optional

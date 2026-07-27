@@ -1,6 +1,6 @@
-open macro inspect(owner: String, requiresBody: Bool): Construct { target, diagnostics in
+open macro inspect(owner: String, requiresBody: Bool): Construct { environment in
     let bodies: [Derived](
-        target.declaration.members.filter(all: Derived) { property in
+        environment.target.declaration.members.filter(all: Derived) { property in
             property.identifier.name == "body"
         }
     )
@@ -12,23 +12,23 @@ open macro inspect(owner: String, requiresBody: Bool): Construct { target, diagn
 
     if requiresBody {
         if bodies.count != 1 {
-            diagnostics.error("@\(owner) requires exactly one derived body.")
+            environment.diagnostics.error("@\(owner) requires exactly one derived body.")
         }
     } else if bodies.count > 1 {
-        diagnostics.error("@\(owner) allows at most one derived body.")
+        environment.diagnostics.error("@\(owner) allows at most one derived body.")
     }
 
     if bodies.count == 1 {
         if componentBodies.count != 1 {
-            diagnostics.error("@\(owner) derived body must be declared @component.")
+            environment.diagnostics.error("@\(owner) derived body must be declared @component.")
         }
     }
 }
 
-open macro component(element: String = "div", text: String = ""): Construct -> Void { target, diagnostics in
+open macro component(element: String = "div", text: String = ""): Construct -> Void { environment in
     @inspect(owner: "component", requiresBody: false)
 }
 
-open macro page(path: String): Construct -> Void { target, diagnostics in
+open macro page(path: String): Construct -> Void { environment in
     @inspect(owner: "page", requiresBody: true)
 }

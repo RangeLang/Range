@@ -1,0 +1,36 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
+@builtin
+construct Array<Element> {}
+
+compilerSourceFile\trole=core\tpath=Core/Macro/CanonicalTargetMembers.range
+open macro member(): Declaration | Member -> Void {}
+
+construct Construct {
+    let declaration: ConstructDeclaration
+}
+
+construct ConstructDeclaration {
+    let members: [@member]
+}
+
+construct Let {}
+construct State {}
+
+macro canonicalTargetMembers(): Construct { environment in
+    let memberCount: Int(environment.target.declaration.members.filter(all: Let).count)
+    if memberCount == 2 {
+        @expand {
+            extension #(environment.target.declaration.self) {
+                let canonicalTargetMembersWorked: Int
+            }
+        }
+    }
+}
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@canonicalTargetMembers
+construct Value {
+    let first: Int
+    state mutable: Int
+    let second: Bool
+}

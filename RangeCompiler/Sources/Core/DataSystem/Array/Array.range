@@ -17,6 +17,8 @@ construct Array<Element> {
         return storage.update(element: element, index: index)
     }
 
+    function filter<T>(all: T): [T]
+
     function destroy(): Int {
         return storage.destroy()
     }

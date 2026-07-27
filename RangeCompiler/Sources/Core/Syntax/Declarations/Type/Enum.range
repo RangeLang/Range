@@ -17,11 +17,15 @@ construct Enum {
     @graph(.declaration)
     @member
     construct Case {
+        let macros: [Macro.Application]
         let identifier: Identifier
         let associatedValues: [AssociatedValue]
     }
 
+    @member
     construct AssociatedValue {
+        let macros: [Macro.Application]
+        let identifier: Identifier?
         let label: String?
         let type: TypeReference
     }

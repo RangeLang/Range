@@ -1,6 +1,6 @@
-closed macro syntax(): Construct { target, diagnostics in
-    target.declaration.expand {
-        closed macro #(target.declaration.identifier)(): #(target.declaration.self) { target, diagnostics, graph in
+closed macro syntax(): Construct { environment in
+    environment.expand {
+        closed macro #(environment.target.declaration.identifier)(): #(environment.target.declaration.self) { environment in
         }
     }
 }

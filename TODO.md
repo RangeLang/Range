@@ -122,9 +122,103 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [ ] Execute typed views such as
       `members.filter(all: Let) { lets in ... }` over those same values without
       copying them into a second representation.
+      - [x] Standardize executable macro bodies on one authored
+        `{ environment in }` binding. `Macro.Environment<Target>` owns the
+        target and diagnostics/graph query views; the compiler records one
+        capability handle and models each view as an explicit environment
+        projection rather than an ordinary local symbol.
+        - [x] Route every direct call on the environment's `target`, `graph`,
+          and `diagnostics` projections through capability resolution,
+          including denied operations, while leaving deeper source-backed
+          syntax paths to ordinary Range member resolution.
+          - Verification: the compiler candidate proves an untaken denied
+            `target` operation is path-sensitive and an executed denied
+            `graph` operation emits `macroCapabilityDenied`.
+      - [x] Declare the Range-authored generic projection surface as
+        `function filter<T>(all: T): [T]` on the single `Array<Element>`
+        primitive.
+      - [x] Execute fluent exact nominal selection over source-backed member
+        views and preserve original order.
+        - Verification: `Testing/Macros/Pass/CanonicalTargetMembers.range`
+          proves that `members.filter(all: Let).count` selects two `let`
+          members while excluding one `state` member.
+      - [ ] Infer a function-owned generic type value from a nominal `all:`
+        argument and carry that specialization through the return type.
+      - [ ] Execute ordinary Range-authored function calls from compile-time
+        macro programs; the current macro interpreter handles scalar MIR and
+        compiler queries but rejects direct calls.
+        - [x] Execute scalar direct calls through recursively built ordinary
+          Range CFG, ownership, and MIR frames and preserve their typed return
+          values in the compile-time value store.
+        - [ ] Execute construct, enum, array, closure, and syntax-valued calls
+          through the same frame path.
+          - [x] Preserve construct returns and member projections across an
+            ordinary Range call, and execute macro-local array
+            literal/count/index operations in the same typed value store.
+          - [ ] Supply compile-time ownership return summaries for
+            Range-authored functions that return tracked arrays.
+          - [ ] Execute enum payloads, closures, and syntax-valued returns.
+      - [ ] Treat `[@member]` as a deferred compile-time collection: collect
+        the complete conforming child set before synthesizing its physical
+        storage.
+        - [x] Intern macro-family member types as deferred `Array` views and
+          execute `environment.target.declaration.members.count` through lazy,
+          source-backed syntax handles in original member order.
+        - [ ] Record the complete observed member set as a macro read
+          dependency and expose each handle through its exact syntax nominal.
+      - [ ] Lower the heterogeneous values into a nominally partitioned
+        multibuffer with one concrete child buffer per conformee, using the
+        maximum conformee population as the shared multibuffer capacity bound.
+      - [ ] Preserve one source-ordered buffer of `(nominal, partitionIndex)`
+        references so partitioned physical storage does not change logical
+        member order or graph identity.
+      - [x] Filter `all: Let`, `all: State`, `all: Binding`,
+        `all: Derived`, and other `@member` nominals by their exact direct
+        syntax nominal, not by the broad `Member` target mask.
+        - The bootstrap lowering recognizes the canonical stored member
+          nominals; generalized authored conformee lookup remains part of the
+          deferred-view specialization work above.
+      - [ ] Return a typed deferred view that preserves order, parent, source,
+        written syntax, graph identity, and macro applications, and record the
+        complete observed member set as a macro read dependency.
     - [ ] Make the direct syntax values the semantic witnesses consumed by
       macros and lowering, leaving integer tables as an internal compact
       backing store rather than a parallel public model.
+      - [x] Give every macro-attachable declaration an ordered
+        `macros: [Macro.Application]` source shape.
+      - [x] Unify authored identifier and semantic graph identity as one
+        `Identifier` carrying its nominal `name`, stable `id`, direct
+        `parent: Identifier?`, and
+        a canonical `source: @syntax?` witness; declarations no longer expose
+        parallel
+        `identity`, `parent`, and `identifier` values.
+        - The owning declaration's existing `type` is the named value's
+          representation (`state count: Int` means nominal `Count` represented
+          by `Int`); the source syntax provides `State`, `Let`, and other
+          metadata without duplicating either fact in `Identifier`.
+      - [ ] Materialize every syntax-facing `Identifier` directly from the
+        compiler's existing stable fingerprint, parent relationship, and
+        canonical syntax node when its source-backed view is projected; do not
+        reconstruct identity from the name or copy source text into a parallel
+        representation.
+        - Lower `parent` as an indirect stable graph handle internally so the
+          recursive language-facing relationship does not imply recursive
+          inline storage.
+      - [ ] Project those ordered macro applications from the source-backed
+        syntax handles and record the complete observed application set as a
+        macro read dependency.
+    - [ ] Restore self-hosted lowercase `@codable` synthesis.
+      - [x] Add the modernized Range-authored `Codable.range` implementation
+        to Core, using canonical `members.filter(all: Let)` instead of the
+        removed Swift-hosted `target.declaration.lets` projection.
+      - [ ] Execute compile-time predicate `map`/`filter`, nested macro calls,
+        and syntax-array splicing in the Range-authored macro interpreter.
+        `target.declaration.members` and exact nominal filtering are proven.
+      - [ ] Restore the Range-authored `Result`, encoder/decoder container,
+        coding error, and JSON surfaces needed by generated implementations.
+      - [ ] Prove field key overrides, exclusion, object-shape rejection, and
+        generated encode/decode bodies through supported fixtures before
+        adding the source to the accepted compiler manifest.
     - [ ] Make authored `keyword + name` declarations the graph's canonical
       nominal sources.
       - [x] Cover macros, constructs, enums, authored functions, members,

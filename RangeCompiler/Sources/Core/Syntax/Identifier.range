@@ -1,7 +1,7 @@
-macro identifierSyntaxName(): Init { target, diagnostics in
-    target.application.replace(with:
-        target.declaration.expression(arguments: [
-            String(target.application.arguments[0].expression)
+macro identifierSyntaxName(): Init { environment in
+    environment.target.application.replace(with:
+        environment.target.declaration.expression(arguments: [
+            String(environment.target.application.arguments[0].expression)
         ])
     )
 }
@@ -10,4 +10,7 @@ macro identifierSyntaxName(): Init { target, diagnostics in
 @identifierSyntaxName
 construct Identifier {
     let name: String
+    let id: String
+    let parent: Identifier?
+    let source: @syntax?
 }

@@ -7,7 +7,7 @@ construct Parameter {
     construct Declaration {
         let macros: [Macro.Application]
         let externalName: String?
-        let localName: String
+        let identifier: Identifier
         let type: TypeReference
         let captureMetadataType: TypeReference?
         let defaultValue: Expression?

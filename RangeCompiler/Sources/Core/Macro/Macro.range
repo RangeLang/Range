@@ -1,5 +1,19 @@
 @syntax
 construct Macro {
+    construct Environment<Target> {
+        let target: Target
+        let parent: @syntax?
+        let children: [@syntax]
+        let ancestors: [@syntax]
+        let siblings: [@syntax]
+        let diagnostics: MacroDiagnostics
+        let graph: RangeGraph
+        let source: ProgramSourceFile
+
+        function expand(_ expansion: () -> [@syntax])
+        function omit()
+    }
+
     construct Target {
         let kind: String
         let name: String
@@ -10,7 +24,7 @@ construct Macro {
 
     @graph(.declaration)
     construct Declaration {
-        let name: String
+        let macros: [Macro.Application]
         let identifier: Identifier
         let packageVisibility: String
         let generics: [Generic]
@@ -26,8 +40,8 @@ construct Macro {
 
     @graph(.application)
     construct Application<Value> {
-        let name: String
         let identifier: Identifier
+        let target: Identifier
         let genericArguments: [TypeReference]
         let argumentClause: String
         let arguments: [Expression]

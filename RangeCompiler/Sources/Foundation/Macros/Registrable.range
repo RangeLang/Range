@@ -1,6 +1,6 @@
-macro registrable(): Construct { target, diagnostics in
+macro registrable(): Construct { environment in
     @expand {
-        extension #(target.declaration.self) {
+        extension #(environment.target.declaration.self) {
             let registrationSeed: Int
             state registrationCount: Int
             function register(delta: Int): Int {

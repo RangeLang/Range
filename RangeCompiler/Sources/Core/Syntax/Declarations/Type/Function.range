@@ -7,8 +7,6 @@ construct Function {
     @field
     @member
     construct Declaration {
-        let identity: GraphIdentity
-        let parent: GraphIdentity?
         let macros: [Macro.Application]
         let identifier: Identifier
         let generics: [Generic]

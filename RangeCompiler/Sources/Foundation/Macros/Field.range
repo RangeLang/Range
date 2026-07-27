@@ -1,2 +1,2 @@
-open macro field(): Construct -> Void { target, diagnostics in
+open macro field(): Construct -> Void { environment in
 }

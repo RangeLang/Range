@@ -7,9 +7,9 @@ construct Construct {
     @field
     @member
     construct Declaration {
+        let macros: [Macro.Application]
         let identifier: Identifier
         let self: NominalTypeReference
-        let macros: [Macro.Application]
         let generics: [Generic]
         let conformances: [NominalTypeReference]
         let members: [@member]

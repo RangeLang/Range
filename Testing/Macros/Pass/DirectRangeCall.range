@@ -1,0 +1,19 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/Macro/DirectCall.range
+function macroIncrement(value: Int): Int {
+    return value + 1
+}
+
+macro directCall(): Construct { environment in
+    let result: Int(macroIncrement(value: 1))
+    if result == 2 {
+        @expand {
+            extension #(environment.target.declaration.self) {
+                let directCallWorked: Int
+            }
+        }
+    }
+}
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@directCall
+construct Value {}

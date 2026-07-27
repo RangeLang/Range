@@ -1477,48 +1477,13 @@ function compilerCoreParseMacroCapabilityHeader(source: String, bodyRange: Compi
         return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderDeclarative(), headerRange: invalidRange, executableBodyRange: bodyRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
     }
     let comma1: RangeLexedToken(comma1Maybe ?? compilerFallbackTokenAt(index: first.end))
+    if comma1.text == String("in") {
+        return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderValid(), headerRange: CompilerSourceRange(start: first.start, end: comma1.end, next: comma1.end), executableBodyRange: CompilerSourceRange(start: comma1.end, end: bodyRange.end, next: bodyRange.end), targetRange: CompilerSourceRange(start: first.start, end: first.end, next: first.end), diagnosticsRange: invalidRange, graphRange: invalidRange)
+    }
     if comma1.kind != .comma {
-        if comma1.text == String("in") {
-            return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: CompilerSourceRange(start: first.start, end: comma1.end, next: comma1.end), executableBodyRange: CompilerSourceRange(start: comma1.end, end: bodyRange.end, next: bodyRange.end), targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
-        }
         return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderDeclarative(), headerRange: invalidRange, executableBodyRange: bodyRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
     }
-    let secondMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: comma1.end))
-    if secondMaybe == nil {
-        return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: invalidRange, executableBodyRange: invalidRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
-    }
-    let second: RangeLexedToken(secondMaybe ?? compilerFallbackTokenAt(index: comma1.end))
-    let comma2Maybe: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: second.end))
-    if (second.kind != .identifier && second.kind != .keyword) || comma2Maybe == nil {
-        return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: invalidRange, executableBodyRange: invalidRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
-    }
-    let comma2: RangeLexedToken(comma2Maybe ?? compilerFallbackTokenAt(index: second.end))
-    if comma2.text == String("in") {
-        if first.text == second.text {
-            return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderDuplicate(), headerRange: CompilerSourceRange(start: first.start, end: comma2.end, next: comma2.end), executableBodyRange: CompilerSourceRange(start: comma2.end, end: bodyRange.end, next: bodyRange.end), targetRange: CompilerSourceRange(start: first.start, end: first.end, next: first.end), diagnosticsRange: CompilerSourceRange(start: second.start, end: second.end, next: second.end), graphRange: invalidRange)
-        }
-        return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderValid(), headerRange: CompilerSourceRange(start: first.start, end: comma2.end, next: comma2.end), executableBodyRange: CompilerSourceRange(start: comma2.end, end: bodyRange.end, next: bodyRange.end), targetRange: CompilerSourceRange(start: first.start, end: first.end, next: first.end), diagnosticsRange: CompilerSourceRange(start: second.start, end: second.end, next: second.end), graphRange: invalidRange)
-    }
-    if comma2.kind != .comma {
-        return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: invalidRange, executableBodyRange: invalidRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
-    }
-    let thirdMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: comma2.end))
-    if thirdMaybe == nil {
-        return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: invalidRange, executableBodyRange: invalidRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
-    }
-    let third: RangeLexedToken(thirdMaybe ?? compilerFallbackTokenAt(index: comma2.end))
-    let inMaybe: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: third.end))
-    if (third.kind != .identifier && third.kind != .keyword) || inMaybe == nil {
-        return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: invalidRange, executableBodyRange: invalidRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
-    }
-    let inToken: RangeLexedToken(inMaybe ?? compilerFallbackTokenAt(index: third.end))
-    if inToken.text != String("in") {
-        return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: invalidRange, executableBodyRange: invalidRange, targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
-    }
-    if first.text == second.text || first.text == third.text || second.text == third.text {
-        return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderDuplicate(), headerRange: CompilerSourceRange(start: first.start, end: inToken.end, next: inToken.end), executableBodyRange: CompilerSourceRange(start: inToken.end, end: bodyRange.end, next: bodyRange.end), targetRange: CompilerSourceRange(start: first.start, end: first.end, next: first.end), diagnosticsRange: CompilerSourceRange(start: second.start, end: second.end, next: second.end), graphRange: CompilerSourceRange(start: third.start, end: third.end, next: third.end))
-    }
-    return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderValid(), headerRange: CompilerSourceRange(start: first.start, end: inToken.end, next: inToken.end), executableBodyRange: CompilerSourceRange(start: inToken.end, end: bodyRange.end, next: bodyRange.end), targetRange: CompilerSourceRange(start: first.start, end: first.end, next: first.end), diagnosticsRange: CompilerSourceRange(start: second.start, end: second.end, next: second.end), graphRange: CompilerSourceRange(start: third.start, end: third.end, next: third.end))
+    return CompilerMacroCapabilityHeader(status: compilerMacroCapabilityHeaderMalformed(), headerRange: CompilerSourceRange(start: first.start, end: comma1.end, next: comma1.end), executableBodyRange: CompilerSourceRange(start: comma1.end, end: bodyRange.end, next: bodyRange.end), targetRange: invalidRange, diagnosticsRange: invalidRange, graphRange: invalidRange)
 }
 
 function compilerCoreParseMacroDeclarationParts(source: String, keyword: RangeLexedToken, visibility: Int, declarationStart: Int): Optional<CompilerMacroDeclarationParts> {

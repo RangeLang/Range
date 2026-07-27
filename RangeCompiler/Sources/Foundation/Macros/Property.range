@@ -1,2 +1,2 @@
-open macro property(): Construct -> Void { target, diagnostics in
+open macro property(): Construct -> Void { environment in
 }

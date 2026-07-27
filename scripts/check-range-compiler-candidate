@@ -3645,8 +3645,8 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/Diagnostic.range' \
-                'macro Signal(): Construct -> Void { target, diagnostics, graph in' \
-                '    return diagnostics.information("checked")' \
+                'macro Signal(): Construct -> Void { environment in' \
+                '    return environment.diagnostics.information("checked")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/DiagnosticUse.range' \
                 '@Signal' \
@@ -3656,11 +3656,11 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/Diagnostics.range' \
-                'macro Signal(): Construct -> Void { target, diagnostics, graph in' \
-                '    return diagnostics.information("checked")' \
+                'macro Signal(): Construct -> Void { environment in' \
+                '    return environment.diagnostics.information("checked")' \
                 '}' \
-                'macro Notice(): Construct -> Void { target, diagnostics, graph in' \
-                '    return diagnostics.warning("noticed")' \
+                'macro Notice(): Construct -> Void { environment in' \
+                '    return environment.diagnostics.warning("noticed")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/DiagnosticsUse.range' \
                 '@Signal' \
@@ -3672,9 +3672,9 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/GraphQuery.range' \
-                'macro Observe(): Construct -> Void { target, diagnostics, graph in' \
-                '    graph.declarationCount("Construct", "Observed")' \
-                '    return diagnostics.information("observed")' \
+                'macro Observe(): Construct -> Void { environment in' \
+                '    environment.graph.declarationCount("Construct", "Observed")' \
+                '    return environment.diagnostics.information("observed")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/GraphQueryUse.range' \
                 '@Observe' \
@@ -3687,9 +3687,9 @@ write_macro_execution_bundle() {
                 'compilerSourceFile\trole=foundation\tpath=Foundation/Unrelated.range' \
                 'construct Unrelated {}' \
                 'compilerSourceFile\trole=core\tpath=Core/GraphQuery.range' \
-                'macro Observe(): Construct -> Void { target, diagnostics, graph in' \
-                '    graph.declarationCount("Construct", "Observed")' \
-                '    return diagnostics.information("observed")' \
+                'macro Observe(): Construct -> Void { environment in' \
+                '    environment.graph.declarationCount("Construct", "Observed")' \
+                '    return environment.diagnostics.information("observed")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/GraphQueryUse.range' \
                 '@Observe' \
@@ -3700,9 +3700,9 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/GraphQueryZero.range' \
-                'macro ObserveMissing(): Construct -> Void { target, diagnostics, graph in' \
-                '    graph.declarationCount("Construct", "Missing")' \
-                '    return diagnostics.information("observed zero")' \
+                'macro ObserveMissing(): Construct -> Void { environment in' \
+                '    environment.graph.declarationCount("Construct", "Missing")' \
+                '    return environment.diagnostics.information("observed zero")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/GraphQueryZeroUse.range' \
                 '@ObserveMissing' \
@@ -3712,11 +3712,11 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQuery.range' \
-                'macro RequireMember(): Construct -> Void { target, diagnostics, graph in' \
-                '    if target.memberCount("required") == 0 {' \
-                '        return diagnostics.error("missing required member")' \
+                'macro RequireMember(): Construct -> Void { environment in' \
+                '    if environment.target.memberCount("required") == 0 {' \
+                '        return environment.diagnostics.error("missing required member")' \
                 '    }' \
-                '    return diagnostics.information("validated")' \
+                '    return environment.diagnostics.information("validated")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryUse.range' \
                 '@RequireMember' \
@@ -3730,11 +3730,11 @@ write_macro_execution_bundle() {
                 'compilerSourceFile\trole=foundation\tpath=Foundation/UnrelatedMemberQuery.range' \
                 'construct Unrelated {}' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQuery.range' \
-                'macro RequireMember(): Construct -> Void { target, diagnostics, graph in' \
-                '    if target.memberCount("required") == 0 {' \
-                '        return diagnostics.error("missing required member")' \
+                'macro RequireMember(): Construct -> Void { environment in' \
+                '    if environment.target.memberCount("required") == 0 {' \
+                '        return environment.diagnostics.error("missing required member")' \
                 '    }' \
-                '    return diagnostics.information("validated")' \
+                '    return environment.diagnostics.information("validated")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryUse.range' \
                 '@RequireMember' \
@@ -3746,11 +3746,11 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQueryMissing.range' \
-                'macro RequireMember(): Construct -> Void { target, diagnostics, graph in' \
-                '    if target.memberCount("required") == 0 {' \
-                '        return diagnostics.error("missing required member")' \
+                'macro RequireMember(): Construct -> Void { environment in' \
+                '    if environment.target.memberCount("required") == 0 {' \
+                '        return environment.diagnostics.error("missing required member")' \
                 '    }' \
-                '    return diagnostics.information("validated")' \
+                '    return environment.diagnostics.information("validated")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryMissingUse.range' \
                 '@RequireMember' \
@@ -3760,11 +3760,11 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQueryPath.range' \
-                'macro RequireMemberPath(): Construct -> Void { target, diagnostics, graph in' \
-                '    if target.memberCount("required") == 0 {' \
-                '        return target.replace()' \
+                'macro RequireMemberPath(): Construct -> Void { environment in' \
+                '    if environment.target.memberCount("required") == 0 {' \
+                '        return environment.target.replace()' \
                 '    }' \
-                '    return diagnostics.information("validated")' \
+                '    return environment.diagnostics.information("validated")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryPathUse.range' \
                 '@RequireMemberPath' \
@@ -3776,9 +3776,9 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQueryInvalid.range' \
-                'macro RequireMemberInvalid(): Construct -> Void { target, diagnostics, graph in' \
-                '    target.memberCount()' \
-                '    return diagnostics.information("unreachable")' \
+                'macro RequireMemberInvalid(): Construct -> Void { environment in' \
+                '    environment.target.memberCount()' \
+                '    return environment.diagnostics.information("unreachable")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryInvalidUse.range' \
                 '@RequireMemberInvalid' \
@@ -3788,9 +3788,9 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQueryInvalidType.range' \
-                'macro RequireMemberInvalidType(): Construct -> Void { target, diagnostics, graph in' \
-                '    target.memberCount(1)' \
-                '    return diagnostics.information("unreachable")' \
+                'macro RequireMemberInvalidType(): Construct -> Void { environment in' \
+                '    environment.target.memberCount(1)' \
+                '    return environment.diagnostics.information("unreachable")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryInvalidTypeUse.range' \
                 '@RequireMemberInvalidType' \
@@ -3800,9 +3800,9 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQueryNonConstruct.range' \
-                'macro RequireMemberNonConstruct(): Function -> Void { target, diagnostics, graph in' \
-                '    target.memberCount("required")' \
-                '    return diagnostics.information("unreachable")' \
+                'macro RequireMemberNonConstruct(): Function -> Void { environment in' \
+                '    environment.target.memberCount("required")' \
+                '    return environment.diagnostics.information("unreachable")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryNonConstructUse.range' \
                 '@RequireMemberNonConstruct' \
@@ -3812,9 +3812,9 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/GraphQueryInvalid.range' \
-                'macro ObserveInvalid(): Construct -> Void { target, diagnostics, graph in' \
-                '    graph.declarationCount("Unknown", "Missing")' \
-                '    return diagnostics.information("unreachable")' \
+                'macro ObserveInvalid(): Construct -> Void { environment in' \
+                '    environment.graph.declarationCount("Unknown", "Missing")' \
+                '    return environment.diagnostics.information("unreachable")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/GraphQueryInvalidUse.range' \
                 '@ObserveInvalid' \
@@ -3824,10 +3824,10 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/Expansion.range' \
-                'macro OmitObserved(): Construct -> Void { target, diagnostics, graph in' \
-                '    graph.declarationCount("Construct", "Observed")' \
-                '    target.omit()' \
-                '    return diagnostics.information("omitted")' \
+                'macro OmitObserved(): Construct -> Void { environment in' \
+                '    environment.graph.declarationCount("Construct", "Observed")' \
+                '    environment.omit()' \
+                '    return environment.diagnostics.information("omitted")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/ExpansionUse.range' \
                 '@OmitObserved' \
@@ -3838,10 +3838,10 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/DuplicateExpansion.range' \
-                'macro OmitTwice(): Construct -> Void { target, diagnostics, graph in' \
-                '    target.omit()' \
-                '    target.omit()' \
-                '    return diagnostics.information("unreachable")' \
+                'macro OmitTwice(): Construct -> Void { environment in' \
+                '    environment.omit()' \
+                '    environment.omit()' \
+                '    return environment.diagnostics.information("unreachable")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/DuplicateExpansionUse.range' \
                 '@OmitTwice' \
@@ -3851,8 +3851,8 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/TargetDenied.range' \
-                'macro ReplaceDenied(): Construct -> Void { target, diagnostics, graph in' \
-                '    return target.replace()' \
+                'macro ReplaceDenied(): Construct -> Void { environment in' \
+                '    return environment.target.replace()' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/TargetDeniedUse.range' \
                 '@ReplaceDenied' \
@@ -3862,8 +3862,8 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/Reject.range' \
-                'macro Reject(): Construct -> Void { target, diagnostics, graph in' \
-                '    return diagnostics.error("rejected")' \
+                'macro Reject(): Construct -> Void { environment in' \
+                '    return environment.diagnostics.error("rejected")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/RejectUse.range' \
                 '@Reject' \
@@ -3873,8 +3873,8 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/Denied.range' \
-                'macro Probe(): Construct -> Void { target, diagnostics, graph in' \
-                '    return graph.macros()' \
+                'macro Probe(): Construct -> Void { environment in' \
+                '    return environment.graph.macros()' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/DeniedUse.range' \
                 '@Probe' \
@@ -3884,14 +3884,14 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/Fuel.range' \
-                'macro Exhaust(): Construct -> Void { target, diagnostics, graph in' > "$output"
+                'macro Exhaust(): Construct -> Void { environment in' > "$output"
             local index=0
             while [[ "$index" -lt 70 ]]; do
-                /usr/bin/printf '    diagnostics.information("step%s")\n' "$index" >> "$output"
+                /usr/bin/printf '    environment.diagnostics.information("step%s")\n' "$index" >> "$output"
                 index=$((index + 1))
             done
             /usr/bin/printf '%b\n' \
-                '    return diagnostics.information("tail")' \
+                '    return environment.diagnostics.information("tail")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/FuelUse.range' \
                 '@Exhaust' \
@@ -3901,8 +3901,8 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MalformedHeader.range' \
-                'macro Broken(): Construct -> Void { target in' \
-                '    return diagnostics.information("bad")' \
+                'macro Broken(): Construct -> Void { target, diagnostics in' \
+                '    return environment.diagnostics.information("bad")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MalformedHeaderUse.range' \
                 '@Broken' \
@@ -3912,8 +3912,8 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/DuplicateHeader.range' \
-                'macro Duplicate(): Construct -> Void { target, target, graph in' \
-                '    return diagnostics.information("bad")' \
+                'macro Duplicate(): Construct -> Void { environment, environment in' \
+                '    return environment.diagnostics.information("bad")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/DuplicateHeaderUse.range' \
                 '@Duplicate' \
@@ -3940,9 +3940,9 @@ write_macro_execution_native_integration_bundle() {
 
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=core\tpath=Core/DiagnosticNative.range' \
-        'macro Signal(): Construct -> Void { target, diagnostics, graph in' \
-        '    graph.declarationCount("Construct", "Target")' \
-        '    return diagnostics.information("checked")' \
+        'macro Signal(): Construct -> Void { environment in' \
+        '    environment.graph.declarationCount("Construct", "Target")' \
+        '    return environment.diagnostics.information("checked")' \
         '}' \
         'compilerSourceFile\trole=project\tpath=Project/DiagnosticNativeUse.range' \
         '@Signal' \
@@ -3959,11 +3959,11 @@ write_macro_execution_native_member_bundle() {
 
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=core\tpath=Core/MemberQueryNative.range' \
-        'macro RequireMember(): Construct -> Void { target, diagnostics, graph in' \
-        '    if target.memberCount("required") == 0 {' \
-        '        return diagnostics.error("missing required member")' \
+        'macro RequireMember(): Construct -> Void { environment in' \
+        '    if environment.target.memberCount("required") == 0 {' \
+        '        return environment.diagnostics.error("missing required member")' \
         '    }' \
-        '    return diagnostics.information("validated")' \
+        '    return environment.diagnostics.information("validated")' \
         '}' \
         'compilerSourceFile\trole=project\tpath=Project/MemberQueryNativeUse.range' \
         '@RequireMember' \
@@ -3991,14 +3991,14 @@ write_macro_expansion_commit_bundle() {
 
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=core\tpath=Core/ExpansionCommit.range' \
-        'macro OmitConstruct(): Construct -> Void { target, diagnostics, graph in' \
-        '    graph.declarationCount("Construct", "Hidden")' \
-        '    target.omit()' \
-        '    return diagnostics.information("omitted construct")' \
+        'macro OmitConstruct(): Construct -> Void { environment in' \
+        '    environment.graph.declarationCount("Construct", "Hidden")' \
+        '    environment.omit()' \
+        '    return environment.diagnostics.information("omitted construct")' \
         '}' \
-        'macro OmitMember(): Member -> Void { target, diagnostics, graph in' \
-        '    target.omit()' \
-        '    return diagnostics.information("omitted member")' \
+        'macro OmitMember(): Member -> Void { environment in' \
+        '    environment.omit()' \
+        '    return environment.diagnostics.information("omitted member")' \
         '}' \
         'compilerSourceFile\trole=project\tpath=Project/ExpansionCommitUse.range' \
         '@OmitConstruct' \
@@ -4029,7 +4029,7 @@ write_macro_generated_function_bundle() {
     if [[ "$order" == reordered ]]; then
         /usr/bin/printf '%b\n' \
             'compilerSourceFile\trole=foundation\tpath=Foundation/UnrelatedGenerated.range' \
-            'macro unrelatedGenerated(): Construct { target, diagnostics in' \
+            'macro unrelatedGenerated(): Construct { environment in' \
             '    @expand {' \
             '        function unrelatedFunction(): Int {' \
             '            return 11' \
@@ -4041,7 +4041,7 @@ write_macro_generated_function_bundle() {
     fi
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=core\tpath=Core/Registrable.range' \
-        'macro registrable(): Construct { target, diagnostics in' \
+        'macro registrable(): Construct { environment in' \
         '    @expand {' \
         '        function globalFunction(input: Int): Int {' \
         '            let adjusted: Int(input + 2)' \
@@ -4049,7 +4049,7 @@ write_macro_generated_function_bundle() {
         '        }' \
         '    }' \
         '    @expand {' \
-        '        extension #(target.declaration.self) {' \
+        '        extension #(environment.target.declaration.self) {' \
         '            function memberFunction(delta: Int): Int {' \
         '                return delta + 3' \
         '            }' \
@@ -4111,7 +4111,7 @@ write_macro_registrable_bundle() {
     if [[ "$order" == reordered ]]; then
         /usr/bin/printf '%b\n' \
             'compilerSourceFile\trole=foundation\tpath=Foundation/UnrelatedRegistrable.range' \
-            'macro unrelatedRegistrable(): Construct { target, diagnostics in' \
+            'macro unrelatedRegistrable(): Construct { environment in' \
             '    @expand {' \
             '        function unrelatedRegistrableFunction(): Int {' \
             '            return 11' \
@@ -4170,7 +4170,7 @@ write_macro_registrable_root_storage_bundle() {
     /usr/bin/printf '%b\n' \
         'compilerMacroSnapshot' \
         'compilerSourceFile\trole=core\tpath=Core/RootStorage.range' \
-        'macro rootStorage(): Construct { target, diagnostics in' \
+        'macro rootStorage(): Construct { environment in' \
         '    @expand {' \
         '        let rootValue: Int' \
         '    }' \
@@ -4189,9 +4189,9 @@ write_macro_registrable_malformed_splice_bundle() {
     /usr/bin/printf '%b\n' \
         'compilerMacroSnapshot' \
         'compilerSourceFile\trole=core\tpath=Core/MalformedMemberSplice.range' \
-        'macro malformedMember(): Construct { target, diagnostics in' \
+        'macro malformedMember(): Construct { environment in' \
         '    @expand {' \
-        '        extension #(target.declaration.bad) {' \
+        '        extension #(environment.target.declaration.bad) {' \
         '            let registrationSeed: Int' \
         '        }' \
         '    }' \
@@ -4338,9 +4338,9 @@ write_macro_generated_function_malformed_extension_bundle() {
     /usr/bin/printf '%b\n' \
         'compilerMacroSnapshot' \
         'compilerSourceFile\trole=core\tpath=Core/MalformedGeneratedExtension.range' \
-        'macro malformed(): Construct { target, diagnostics in' \
+        'macro malformed(): Construct { environment in' \
         '    @expand {' \
-        '        extension #(target.declaration.bad) {' \
+        '        extension #(environment.target.declaration.bad) {' \
         '            function memberFunction(): Int {' \
         '                return 7' \
         '            }' \
@@ -4506,7 +4506,7 @@ audit_macro_execution() {
     run_capture "$executable" "$bundle" "$repeat_output" "$repeat_error"
     require_successful_output "$stage_label repeated macro execution positive" "$repeat_output" "$repeat_error"
     /usr/bin/cmp -s "$output" "$repeat_output" || fail "$stage_label macro execution positive was not deterministic"
-    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=3\teventCount=1\tgraphDeltaNodeCount=0\tgraphDeltaFactCount=0\treadDependencyCount=0' "$output" || fail "$stage_label macro execution positive counts changed"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1\teventCount=1\tgraphDeltaNodeCount=0\tgraphDeltaFactCount=0\treadDependencyCount=0' "$output" || fail "$stage_label macro execution positive counts changed"
     /usr/bin/grep -Fq $'macroInvocation\trow=0\tapplicationRow=0\tdeclarationRow=0\ttargetSyntaxID=' "$output" || fail "$stage_label macro execution omitted invocation provenance"
     /usr/bin/grep -Fq $'macroExecutionEvent\trow=0\tinvocationRow=0\tseverity=1\toperation=1\tmessage=checked' "$output" || fail "$stage_label macro execution omitted information event"
 
@@ -4705,7 +4705,7 @@ audit_macro_execution() {
     write_macro_execution_bundle "$bundle" multiple
     run_capture "$executable" "$bundle" "$output" "$error"
     require_successful_output "$stage_label multiple macro execution" "$output" "$error"
-    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2\tcapabilityHandleCount=6\teventCount=2' "$output" || fail "$stage_label multiple macro execution counts changed"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2\tcapabilityHandleCount=2\teventCount=2' "$output" || fail "$stage_label multiple macro execution counts changed"
     /usr/bin/grep -Fq $'message=checked' "$output" || fail "$stage_label multiple macro execution omitted first arbitrary macro"
     /usr/bin/grep -Fq $'message=noticed' "$output" || fail "$stage_label multiple macro execution omitted second arbitrary macro"
 
@@ -4801,7 +4801,7 @@ audit_macro_execution() {
         [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label macro $kind exited $RUN_STATUS"
         [[ ! -s "$error" ]] || fail "$stage_label macro $kind wrote stderr"
         expected='diagnosticKind=macroCapabilityHeaderMalformed'
-        if [[ "$kind" == duplicate-header ]]; then expected='diagnosticKind=macroCapabilityBindingDuplicate'; fi
+        if [[ "$kind" == duplicate-header ]]; then expected='diagnosticKind=macroCapabilityHeaderMalformed'; fi
         /usr/bin/grep -Fq "$expected" "$output" || fail "$stage_label macro $kind missed diagnostic $expected"
     done
     echo "$stage_label macro execution: pass (shared BodyArena/MIR, diagnostics, deterministic queries/dependencies, transactional typed omission delta, denial, fuel, header validation)"

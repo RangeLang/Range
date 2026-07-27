@@ -1,6 +1,8 @@
 @syntax
 @member
 construct Extension {
+    let macros: [Macro.Application]
+    let identifier: Identifier
     let target: NominalTypeReference
     let conformances: [NominalTypeReference]
     let functions: [Function.Declaration]

@@ -1,0 +1,25 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/Macro/DirectAggregateCall.range
+construct MacroPair {
+    let left: Int
+    let right: Int
+}
+
+function macroPair(value: Int): MacroPair {
+    return MacroPair(left: value, right: value + 1)
+}
+
+macro directAggregateCall(): Construct { environment in
+    let pair: MacroPair(macroPair(value: 4))
+    let values: [Int]([5, 6])
+    if pair.left == 4 && pair.right == 5 && values.count == 2 && values[1] == 6 {
+        @expand {
+            extension #(environment.target.declaration.self) {
+                let directAggregateCallWorked: Int
+            }
+        }
+    }
+}
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@directAggregateCall
+construct Value {}

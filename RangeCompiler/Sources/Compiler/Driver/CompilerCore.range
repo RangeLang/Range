@@ -416,6 +416,22 @@ construct CompilerMacroInvocationOutcome {
     let stepCount: Int
 }
 
+construct CompilerMacroValueStore {
+    let kinds: Buffer<Int>
+    let typeKinds: Buffer<Int>
+    let typeIDs: Buffer<Int>
+    let scalars: Buffer<Int>
+    let firstChildren: Buffer<Int>
+    let childCounts: Buffer<Int>
+    let children: Buffer<Int>
+}
+
+construct CompilerMacroFunctionOutcome {
+    let status: Int
+    let valueID: Int
+    let stepCount: Int
+}
+
 construct CompilerMacroExecutionResult {
     let status: Int
     let diagnosticCode: Int

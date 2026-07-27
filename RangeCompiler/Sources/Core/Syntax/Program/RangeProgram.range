@@ -40,21 +40,21 @@ construct RangeGraphTopology {
 
 @builtin
 construct RangeGraphNode {
-    let identity: RangeGraphIdentity
+    let identifier: Identifier
     let sourcePath: String
     let labels: [String]
 }
 
 @builtin
 construct RangeGraphRelationship {
-    let origin: RangeGraphIdentity
-    let destination: RangeGraphIdentity
+    let origin: Identifier
+    let destination: Identifier
     let kind: String
 }
 
 @builtin
 construct GraphSyntax {
-    let identity: RangeGraphIdentity
+    let identifier: Identifier
     let declarations: [GraphEntry]
     let applications: [GraphEntry]
 }
@@ -66,13 +66,6 @@ enum GraphRole {
 }
 
 @builtin
-construct RangeGraphIdentity {
-    let id: String
-    let kind: String
-    let name: String
-}
-
-@builtin
 construct GraphEntry {
-    let identity: RangeGraphIdentity
+    let identifier: Identifier
 }

@@ -1,2 +1,2 @@
-open macro Statement(): @syntax -> Void { target, diagnostics in
+open macro Statement(): @syntax -> Void { environment in
 }

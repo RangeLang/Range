@@ -148,6 +148,9 @@ function compilerBodyArenaBuildCFGExpressionChildren(arena: CompilerBodyArena, n
     if kind == compilerSyntaxKindApplication() {
         let calleeNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleCallee(), ordinal: 0))
         if calleeNodeID < 0 { return CompilerBodyCFGResult(blockID: currentBlockID, isTerminated: false, isValid: false) }
+        let calleeResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: calleeNodeID))
+        let isMacroSyntaxFilter: Bool(calleeResolutionRow >= 0
+            && compilerIntTableValue(table: arena.resolutions, row: calleeResolutionRow, column: compilerBodyResolutionTargetKindColumn()) == compilerBodyResolutionMacroSyntaxFilter())
         if compilerIntTableValue(table: arena.nodes, row: calleeNodeID, column: 1) == compilerSyntaxKindMemberRead() {
             let receiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: calleeNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
             if receiverNodeID < 0 { return CompilerBodyCFGResult(blockID: currentBlockID, isTerminated: false, isValid: false) }
@@ -155,6 +158,7 @@ function compilerBodyArenaBuildCFGExpressionChildren(arena: CompilerBodyArena, n
             if !receiverResult.isValid { return receiverResult }
             currentBlockID: receiverResult.blockID
         }
+        if isMacroSyntaxFilter { return CompilerBodyCFGResult(blockID: currentBlockID, isTerminated: false, isValid: true) }
         state argumentOrdinal: Int(0)
         let argumentCount: Int(compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID))
         while argumentOrdinal < argumentCount {
@@ -660,7 +664,7 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindEnumCaseValue()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindArrayLiteral()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindIndex())
-            || targetKind < compilerBodyResolutionLocalSymbol() || targetKind > compilerBodyResolutionArrayCount() { return false }
+            || targetKind < compilerBodyResolutionLocalSymbol() || targetKind > compilerBodyResolutionMacroSyntaxFilter() { return false }
         if targetKind == compilerBodyResolutionLocalSymbol() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.symbols)) { return false }
         if targetKind == compilerBodyResolutionFunction() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.functions)) { return false }
         if targetKind == compilerBodyResolutionBuiltin() && targetID != compilerBodyBuiltinString() && targetID != compilerBodyBuiltinFloat() && targetID != compilerBodyBuiltinRuntimeCall() && targetID != compilerBodyBuiltinNil() { return false }
@@ -692,6 +696,17 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
         if targetKind == compilerBodyResolutionArrayLiteral()
             && (targetID != compilerBodyArenaArrayDeclarationSyntaxID(arena: arena) || !compilerBodyArenaTypeIDIsArray(arena: arena, typeID: resolutionTypeID)) { return false }
         if targetKind == compilerBodyResolutionArrayCount() && (targetID != 0 || compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindMemberRead()) { return false }
+        if targetKind == compilerBodyResolutionMacroEnvironmentProjection()
+            && (compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindMemberRead()
+                || targetID < compilerMacroEnvironmentProjectionTarget()
+                || targetID > compilerMacroEnvironmentProjectionGraph()) { return false }
+        if targetKind == compilerBodyResolutionMacroSyntaxFilter()
+            && (compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindMemberRead()
+                || (targetID != compilerSyntaxMemberKindLet()
+                    && targetID != compilerSyntaxMemberKindState()
+                    && targetID != compilerSyntaxMemberKindBinding()
+                    && targetID != compilerSyntaxMemberKindDerived())
+                || !compilerBodyArenaTypeIDIsArray(arena: arena, typeID: resolutionTypeID)) { return false }
         if (targetKind == compilerBodyResolutionLocalSymbol() || targetKind == compilerBodyResolutionFunction() || targetKind == compilerBodyResolutionMember() || targetKind == compilerBodyResolutionConstruct()
             || targetKind == compilerBodyResolutionEnumCase() || targetKind == compilerBodyResolutionEnum() || targetKind == compilerBodyResolutionArrayLiteral())
             && (resolutionTypeID < 0 || resolutionTypeID >= compilerIntTableRowCount(table: arena.typeInstances)) { return false }

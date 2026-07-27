@@ -1691,9 +1691,9 @@ function compilerBodyArenaTypeListContains(values: Buffer<Int>, value: Int): Boo
 }
 
 function compilerBodyArenaTypeIDIsOptional(arena: CompilerBodyArena, typeID: Int): Bool {
-    return typeID >= 0
-        && typeID < compilerIntTableRowCount(table: arena.typeInstances)
-        && compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: typeID) == compilerBodyTypeConstruct()
+    if typeID < 0 || typeID >= compilerIntTableRowCount(table: arena.typeInstances) { return false }
+    let typeKind: Int(compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: typeID))
+    return (typeKind == compilerBodyTypeConstruct() || typeKind == compilerBodyTypeEnum())
         && compilerBodyArenaTypeOuterName(typeName: compilerBodyArenaTypeNameForTypeID(arena: arena, typeID: typeID)) == String("Optional")
 }
 
