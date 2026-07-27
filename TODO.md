@@ -127,6 +127,13 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         target and diagnostics/graph query views; the compiler records one
         capability handle and models each view as an explicit environment
         projection rather than an ordinary local symbol.
+        - [x] Materialize that environment as a graph-backed compile-time
+          value, bind it to the macro frame's real MIR parameter, and resolve
+          `target`, `diagnostics`, and `graph` by projecting children from the
+          passed value instead of consulting the invocation out of band.
+          - Verification: the root environment and canonical-target-members
+            fixtures pass, and the compiler candidate remains a byte-identical
+            Stage 2/Stage 3 fixed point.
         - [x] Route every direct call on the environment's `target`, `graph`,
           and `diagnostics` projections through capability resolution,
           including denied operations, while leaving deeper source-backed
@@ -164,6 +171,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - [x] Intern macro-family member types as deferred `Array` views and
           execute `environment.target.declaration.members.count` through lazy,
           source-backed syntax handles in original member order.
+        - [x] Store the canonical syntax ID in every source-backed syntax
+          handle and resolve compact member-table rows only at the internal
+          filtering boundary.
         - [ ] Record the complete observed member set as a macro read
           dependency and expose each handle through its exact syntax nominal.
       - [ ] Lower the heterogeneous values into a nominally partitioned

@@ -5698,6 +5698,7 @@ function compilerMacroValueKindConstruct(): Int { return 3 }
 function compilerMacroValueKindEnum(): Int { return 4 }
 function compilerMacroValueKindSyntax(): Int { return 5 }
 function compilerMacroValueKindCapability(): Int { return 6 }
+function compilerMacroValueKindEnvironment(): Int { return 7 }
 
 function compilerMacroValueStoreCreate(): CompilerMacroValueStore {
     return CompilerMacroValueStore(
@@ -5785,6 +5786,85 @@ function compilerMacroValueStoreAppendAggregate(
         firstChild: firstChild,
         childCount: children.count
     )
+}
+
+function compilerMacroExecutionCapabilityHandleRow(tables: CompilerSyntaxTables, invocationRow: Int): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.macroCapabilityHandles) {
+        if compilerIntTableValue(table: tables.macroCapabilityHandles, row: row, column: 1) == invocationRow
+            && compilerIntTableValue(table: tables.macroCapabilityHandles, row: row, column: 3) == compilerMacroCapabilityTarget() {
+            return row
+        }
+        row: row + 1
+    }
+    return 0 - 1
+}
+
+function compilerMacroExecutionMaterializeEnvironment(
+    tables: CompilerSyntaxTables,
+    store: CompilerMacroValueStore,
+    invocationRow: Int,
+    targetSyntaxID: Int
+): Int {
+    let handleRow: Int(compilerMacroExecutionCapabilityHandleRow(tables: tables, invocationRow: invocationRow))
+    if handleRow < 0
+        || compilerIntTableValue(table: tables.macroCapabilityHandles, row: handleRow, column: 5) != targetSyntaxID {
+        return 0 - 1
+    }
+    let targetValueID: Int(compilerMacroValueStoreAppend(
+        store: store,
+        kind: compilerMacroValueKindSyntax(),
+        typeKind: compilerBodyTypeMacroTarget(),
+        typeID: 0 - 1,
+        scalar: targetSyntaxID,
+        firstChild: store.children.count,
+        childCount: 0
+    ))
+    let diagnosticsValueID: Int(compilerMacroValueStoreAppend(
+        store: store,
+        kind: compilerMacroValueKindCapability(),
+        typeKind: compilerBodyTypeMacroDiagnostics(),
+        typeID: 0 - 1,
+        scalar: handleRow,
+        firstChild: store.children.count,
+        childCount: 0
+    ))
+    let graphValueID: Int(compilerMacroValueStoreAppend(
+        store: store,
+        kind: compilerMacroValueKindCapability(),
+        typeKind: compilerBodyTypeMacroGraph(),
+        typeID: 0 - 1,
+        scalar: handleRow,
+        firstChild: store.children.count,
+        childCount: 0
+    ))
+    if targetValueID < 0 || diagnosticsValueID < 0 || graphValueID < 0 { return 0 - 1 }
+    let environmentChildren: Buffer<Int>(bufferCreateInt(capacity: 3))
+    state childrenValid: Bool(environmentChildren.append(element: targetValueID) == 0)
+    if childrenValid && environmentChildren.append(element: diagnosticsValueID) != 0 { childrenValid: false }
+    if childrenValid && environmentChildren.append(element: graphValueID) != 0 { childrenValid: false }
+    state environmentValueID: Int(0 - 1)
+    if childrenValid {
+        environmentValueID: compilerMacroValueStoreAppendAggregate(
+            store: store,
+            kind: compilerMacroValueKindEnvironment(),
+            typeKind: compilerBodyTypeMacroTarget(),
+            typeID: 0 - 1,
+            scalar: handleRow,
+            children: environmentChildren
+        )
+    }
+    environmentChildren.destroy()
+    return environmentValueID
+}
+
+function compilerMacroExecutionMemberRowForSyntaxID(tables: CompilerSyntaxTables, syntaxID: Int): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.members) {
+        if compilerIntTableValue(table: tables.members, row: row, column: 0) == syntaxID { return row }
+        row: row + 1
+    }
+    return 0 - 1
 }
 
 function compilerMacroValueStoreScalar(store: CompilerMacroValueStore, valueID: Int): Int {
@@ -6818,7 +6898,10 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
                     || store.kinds.element(index: childStoreValueID) != compilerMacroValueKindSyntax() {
                     filterValid: false
                 } else {
-                    let memberRow: Int(store.scalars.element(index: childStoreValueID))
+                    let memberRow: Int(compilerMacroExecutionMemberRowForSyntaxID(
+                        tables: arena.tables,
+                        syntaxID: store.scalars.element(index: childStoreValueID)
+                    ))
                     if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: arena.tables.members) {
                         filterValid: false
                     } else if compilerIntTableValue(table: arena.tables.members, row: memberRow, column: 12) == filterMemberKind {
@@ -6846,21 +6929,25 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
     } else if operationKind == compilerBodyMIROperationMacroEnvironmentProjection() {
         let projectionResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
         let projection: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationTargetIDColumn()))
-        state projectionKind: Int(compilerMacroValueKindCapability())
-        state projectionScalar: Int(projection)
-        if projection == compilerMacroEnvironmentProjectionTarget() {
-            projectionKind: compilerMacroValueKindSyntax()
-            projectionScalar: targetSyntaxID
+        let environmentReceiverMIRValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
+        state environmentStoreValueID: Int(0 - 1)
+        if environmentReceiverMIRValueID >= 0 && environmentReceiverMIRValueID < evaluationValues.count {
+            environmentStoreValueID: evaluationValues.element(index: environmentReceiverMIRValueID)
         }
-        let projectionStoreValueID: Int(compilerMacroValueStoreAppend(
-            store: store,
-            kind: projectionKind,
-            typeKind: compilerIntTableValue(table: arena.mirValues, row: projectionResultValueID, column: compilerBodyMIRValueTypeColumn()),
-            typeID: compilerIntTableValue(table: arena.mirValues, row: projectionResultValueID, column: compilerBodyMIRValueTypeIDColumn()),
-            scalar: projectionScalar,
-            firstChild: store.children.count,
-            childCount: 0
-        ))
+        state projectionOrdinal: Int(0 - 1)
+        if projection == compilerMacroEnvironmentProjectionTarget() { projectionOrdinal: 0 }
+        if projection == compilerMacroEnvironmentProjectionDiagnostics() { projectionOrdinal: 1 }
+        if projection == compilerMacroEnvironmentProjectionGraph() { projectionOrdinal: 2 }
+        state projectionStoreValueID: Int(0 - 1)
+        if environmentStoreValueID >= 0 && environmentStoreValueID < store.kinds.count
+            && store.kinds.element(index: environmentStoreValueID) == compilerMacroValueKindEnvironment()
+            && projectionOrdinal >= 0 {
+            projectionStoreValueID: compilerMacroValueStoreChild(
+                store: store,
+                valueID: environmentStoreValueID,
+                ordinal: projectionOrdinal
+            )
+        }
         if projectionStoreValueID < 0
             || evaluationValues.update(element: projectionStoreValueID, index: projectionResultValueID) != 0 {
             operationStatus: 0 - compilerMacroDiagnosticBodyInvalid()
@@ -7058,7 +7145,7 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
                                 kind: compilerMacroValueKindSyntax(),
                                 typeKind: compilerBodyTypeMacroTarget(),
                                 typeID: 0 - 1,
-                                scalar: syntaxMemberRow,
+                                scalar: compilerIntTableValue(table: arena.tables.members, row: syntaxMemberRow, column: 0),
                                 firstChild: store.children.count,
                                 childCount: 0
                             ))
@@ -7311,11 +7398,32 @@ function compilerMacroExecutionEvaluateInvocation(tables: CompilerSyntaxTables, 
         evaluationValues.append(element: 0 - 1)
         evaluationValueRow: evaluationValueRow + 1
     }
+    let environmentValueID: Int(compilerMacroExecutionMaterializeEnvironment(
+        tables: tables,
+        store: valueStore,
+        invocationRow: invocationRow,
+        targetSyntaxID: targetSyntaxID
+    ))
+    state environmentParameterBound: Bool(false)
+    evaluationValueRow: 0
+    while evaluationValueRow < compilerIntTableRowCount(table: arena.mirValues) && !environmentParameterBound {
+        if compilerIntTableValue(table: arena.mirValues, row: evaluationValueRow, column: compilerBodyMIRValueKindColumn()) == compilerBodyMIRValueParameter() {
+            if environmentValueID >= 0
+                && evaluationValues.update(element: environmentValueID, index: evaluationValueRow) == 0 {
+                environmentParameterBound: true
+            }
+        }
+        evaluationValueRow: evaluationValueRow + 1
+    }
     state invocationSteps: Int(0)
     state currentBlockID: Int(0)
     state previousBlockID: Int(0 - 1)
-    state pathRunning: Bool(true)
+    state pathRunning: Bool(environmentParameterBound)
     state failureOperationRow: Int(0 - 1)
+    if !environmentParameterBound {
+        status: 0 - 1
+        diagnosticCode: compilerMacroDiagnosticBodyInvalid()
+    }
     while pathRunning && status == 0 {
         state blockValid: Bool(currentBlockID >= 0 && currentBlockID < compilerIntTableRowCount(table: arena.mirBlocks))
         if !blockValid {
