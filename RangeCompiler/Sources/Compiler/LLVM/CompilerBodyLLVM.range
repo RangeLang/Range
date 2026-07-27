@@ -69,12 +69,56 @@ function compilerLLVMIntegerTypeBitWidth(typeName: String): Int {
 
 function compilerBodyLLVMTypeNameForTypeID(arena: CompilerBodyArena, typeID: Int): String {
     let typeKind: Int(compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: typeID))
+    if typeKind == compilerBodyTypeInt() {
+        let typeName: String(compilerBodyArenaTypeNameForTypeID(arena: arena, typeID: typeID))
+        if compilerIntegerTypeIsSigned(typeName: typeName) {
+            return compilerCoreLLVMTypeNameForRangeTypeInProject(tables: arena.tables, typeName: typeName)
+        }
+    }
     if typeKind == compilerBodyTypeConstruct() || typeKind == compilerBodyTypeEnum() {
         let nominalName: String(compilerBodyLLVMNominalTypeNameForTypeID(arena: arena, typeID: typeID))
         if nominalName != String("") { return nominalName }
     }
     if typeKind == compilerBodyTypeUnknown() { return String("") }
     return compilerBodyLLVMTypeName(tables: arena.tables, typeKind: typeKind)
+}
+
+function compilerBodyLLVMGenericEnumTypeNameForTypeID(arena: CompilerBodyArena, typeID: Int, enumSyntaxID: Int): String {
+    if typeID < 0 || enumSyntaxID < 0
+        || compilerSyntaxGenericParameterCountForOwner(tables: arena.tables, ownerSyntaxID: enumSyntaxID) <= 0 { return String("") }
+    let fields: RawBuffer(rawBufferCreate(capacity: 128, stride: 1))
+    if rawBufferAppendText(buffer: fields, text: String("{ i32")) != 0 {
+        rawBufferDestroy(buffer: fields)
+        return String("")
+    }
+    state payloadCount: Int(0)
+    state payloadRow: Int(0)
+    while payloadRow < compilerIntTableRowCount(table: arena.tables.members) {
+        if compilerIntTableValue(table: arena.tables.members, row: payloadRow, column: 12) == compilerSyntaxMemberKindEnumCasePayload()
+            && compilerSyntaxEnumPayloadOwnerSyntaxID(tables: arena.tables, payloadRow: payloadRow) == enumSyntaxID {
+            let storagePolicy: Int(compilerIntTableValue(table: arena.tables.members, row: payloadRow, column: 13))
+            state fieldType: String("")
+            if storagePolicy == compilerSyntaxMemberStorageBinding() || storagePolicy == compilerSyntaxMemberStorageIndirect() {
+                fieldType: String("ptr")
+            } else {
+                let payloadTypeID: Int(compilerBodyArenaEnumPayloadTypeID(arena: arena, enumTypeID: typeID, payloadRow: payloadRow))
+                fieldType: compilerBodyLLVMTypeNameForTypeID(arena: arena, typeID: payloadTypeID)
+            }
+            if fieldType == String("") || rawBufferAppendText(buffer: fields, text: ", \(fieldType)") != 0 {
+                rawBufferDestroy(buffer: fields)
+                return String("")
+            }
+            payloadCount: payloadCount + 1
+        }
+        payloadRow: payloadRow + 1
+    }
+    if payloadCount <= 0 || rawBufferAppendText(buffer: fields, text: String(" }")) != 0 {
+        rawBufferDestroy(buffer: fields)
+        return String("")
+    }
+    let result: String(rawBufferMaterializeText(buffer: fields))
+    rawBufferDestroy(buffer: fields)
+    return result
 }
 
 function compilerBodyLLVMNominalTypeNameForTypeID(arena: CompilerBodyArena, typeID: Int): String {
@@ -88,6 +132,8 @@ function compilerBodyLLVMNominalTypeNameForTypeID(arena: CompilerBodyArena, type
     let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: arena.tables, syntaxID: syntaxID))
     if declarationRow < 0 { return String("") }
     if compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 2) == compilerSyntaxKindEnum() {
+        let specializedTypeName: String(compilerBodyLLVMGenericEnumTypeNameForTypeID(arena: arena, typeID: typeID, enumSyntaxID: syntaxID))
+        if specializedTypeName != String("") { return specializedTypeName }
         return compilerEnumLLVMTypeName(tables: arena.tables, declarationRow: declarationRow)
     }
     return compilerNominalLLVMTypeName(tables: arena.tables, declarationRow: declarationRow)
@@ -120,6 +166,11 @@ function compilerBodyLLVMConstructIdentityFieldCount(arena: CompilerBodyArena, t
 function compilerBodyLLVMValueTypeName(arena: CompilerBodyArena, valueID: Int): String {
     if compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueKindColumn()) == compilerBodyMIRValueReceiverAddress() { return String("ptr") }
     let typeKind: Int(compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueTypeColumn()))
+    let typeID: Int(compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueTypeIDColumn()))
+    if typeKind == compilerBodyTypeInt() && typeID >= 0 {
+        let specializedIntegerType: String(compilerBodyLLVMTypeNameForTypeID(arena: arena, typeID: typeID))
+        if specializedIntegerType != String("") { return specializedIntegerType }
+    }
     let payloadProducerOperationID: Int(compilerBodyMIRValueProducerOperation(arena: arena, valueID: valueID, operationKind: compilerBodyMIROperationEnumPayload()))
     if payloadProducerOperationID >= 0 {
         let payloadRow: Int(compilerIntTableValue(table: arena.mirOperations, row: payloadProducerOperationID, column: compilerBodyMIROperationTargetIDColumn()))
@@ -161,6 +212,10 @@ function compilerBodyLLVMValue(emitter: CompilerBodyLLVMEmitter, valueID: Int): 
             let memberRow: Int(compilerIntTableValue(table: emitter.arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
             if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: emitter.arena.tables.members) { return CompilerLLVMValue(text: String(""), typeName: String("")) }
             return CompilerLLVMValue(text: "\(compilerIntTableValue(table: emitter.arena.tables.members, row: memberRow, column: 3))", typeName: typeName)
+        }
+        if sourceNodeID >= 0 && sourceNodeID < compilerIntTableRowCount(table: emitter.arena.nodes)
+            && compilerIntTableValue(table: emitter.arena.nodes, row: sourceNodeID, column: 1) == compilerSyntaxKindPrefixNegate() {
+            return CompilerLLVMValue(text: "\(compilerMacroExecutionScalarValue(arena: emitter.arena, valueID: valueID))", typeName: typeName)
         }
         return CompilerLLVMValue(text: compilerBodyArenaNodeText(arena: emitter.arena, nodeID: sourceNodeID), typeName: typeName)
     }

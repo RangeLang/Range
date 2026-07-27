@@ -1,0 +1,22 @@
+enum MissingReason {
+    case unavailable
+}
+
+enum Optional<Value, None = Nil> {
+    case exists(value: Value)
+    case none(value: None)
+}
+
+enum Nil {
+    case nil
+}
+
+@main {
+    let selected: Optional<Int, MissingReason>(.none(value: MissingReason(.unavailable)))
+    switch selected {
+    case .exists(let value):
+        return value
+    case .none(let reason):
+        return 7
+    }
+}

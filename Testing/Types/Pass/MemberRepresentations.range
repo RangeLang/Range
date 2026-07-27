@@ -1,6 +1,6 @@
 @builtin(.storage)
 construct ByteStorageView {
-    state bytes: Buffer<Int<8, .unsigned>>
+    state bytes: Buffer<Int<.unsigned, 8>>
 
     derived count: Int {
         bytes.count

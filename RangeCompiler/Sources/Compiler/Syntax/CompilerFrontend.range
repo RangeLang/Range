@@ -1970,20 +1970,30 @@ function compilerTypedSyntaxCaptureGenericParameters(source: String, tables: Com
                             }
                         }
                     } else {
-                        let parameterFingerprint: CompilerFingerprint(compilerTypedFingerprintAppendNamedType(fingerprint: baseFingerprint, tag: 60, ordinal: ordinal, name: token.text, typeName: String("type")))
-                        if compilerSyntaxAppendGenericParameter(tables: tables, ownerSyntaxID: ownerSyntaxID, ownerKind: ownerKind, ordinal: ordinal, fileID: fileID, start: token.start, end: token.end, nameStart: token.start, nameEnd: token.end, kind: compilerSyntaxGenericParameterTypeKind(), fingerprint: parameterFingerprint) != 0 {
+                        let parameterEnd: Int(compilerTypedSyntaxGenericValueParameterEnd(source: source, typeEnd: token.end, genericEnd: genericRange.end))
+                        if parameterEnd < token.end {
                             valid: false
                         } else {
-                            fingerprint: compilerTypedFingerprintAppendNamedType(fingerprint: fingerprint, tag: 60, ordinal: ordinal, name: token.text, typeName: String("type"))
-                            ordinal: ordinal + 1
-                            if following.kind == .comma {
-                                expectingName: true
-                                cursor: following.end
-                            } else if following.kind == .greater && following.start == genericRange.end - 1 {
-                                expectingName: false
-                                cursor: following.end
-                            } else {
+                            let authored: String(stringSubstring(source: source, start: token.start, end: parameterEnd))
+                            let parameterFingerprint: CompilerFingerprint(compilerTypedFingerprintAppendNamedType(fingerprint: baseFingerprint, tag: 60, ordinal: ordinal, name: token.text, typeName: authored))
+                            if compilerSyntaxAppendGenericParameter(tables: tables, ownerSyntaxID: ownerSyntaxID, ownerKind: ownerKind, ordinal: ordinal, fileID: fileID, start: token.start, end: parameterEnd, nameStart: token.start, nameEnd: token.end, kind: compilerSyntaxGenericParameterTypeKind(), fingerprint: parameterFingerprint) != 0 {
                                 valid: false
+                            } else {
+                                fingerprint: compilerTypedFingerprintAppendNamedType(fingerprint: fingerprint, tag: 60, ordinal: ordinal, name: token.text, typeName: authored)
+                                ordinal: ordinal + 1
+                                let maybeSeparator: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: parameterEnd))
+                                if maybeSeparator == nil { valid: false } else {
+                                    let separator: RangeLexedToken(maybeSeparator ?? compilerFallbackTokenAt(index: parameterEnd))
+                                    if separator.kind == .comma {
+                                        expectingName: true
+                                        cursor: separator.end
+                                    } else if separator.kind == .greater && separator.start == genericRange.end - 1 {
+                                        expectingName: false
+                                        cursor: separator.end
+                                    } else {
+                                        valid: false
+                                    }
+                                }
                             }
                         }
                     }
@@ -4370,8 +4380,10 @@ function compilerSyntaxTypeReferencesAreValid(tables: CompilerSyntaxTables): Boo
             let declarationKind: Int(compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 2))
             if declarationKind != compilerSyntaxKindConstruct() && declarationKind != compilerSyntaxKindEnum() { return false }
             let genericArity: Int(compilerSyntaxGenericParameterCountForOwner(tables: tables, ownerSyntaxID: targetID))
-            if kind == compilerSyntaxTypeReferenceNamed() && genericArity != 0 { return false }
-            if (kind == compilerSyntaxTypeReferenceApplication() || kind == compilerSyntaxTypeReferenceArray() || kind == compilerSyntaxTypeReferenceOptional()) && childCount != genericArity { return false }
+            let requiredGenericArity: Int(compilerSyntaxGenericParameterRequiredCountForOwner(tables: tables, ownerSyntaxID: targetID))
+            if kind == compilerSyntaxTypeReferenceNamed() && requiredGenericArity != 0 { return false }
+            if (kind == compilerSyntaxTypeReferenceApplication() || kind == compilerSyntaxTypeReferenceArray() || kind == compilerSyntaxTypeReferenceOptional())
+                && (childCount < requiredGenericArity || childCount > genericArity) { return false }
         }
         if targetKind == compilerSyntaxTypeReferenceTargetBuiltin() {
             let builtinGenericArity: Int(compilerSyntaxBuiltinTypeGenericArity(typeID: targetID))
@@ -4641,6 +4653,56 @@ function compilerSyntaxGenericParameterCountForOwner(tables: CompilerSyntaxTable
         row: row + 1
     }
     return count
+}
+
+function compilerSyntaxGenericParameterRowForOwnerOrdinal(tables: CompilerSyntaxTables, ownerSyntaxID: Int, ordinal: Int): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.genericParameters) {
+        if compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterOwnerColumn()) == ownerSyntaxID
+            && compilerIntTableValue(table: tables.genericParameters, row: row, column: compilerSyntaxGenericParameterOrdinalColumn()) == ordinal { return row }
+        row: row + 1
+    }
+    return 0 - 1
+}
+
+function compilerSyntaxGenericParameterDefaultRange(tables: CompilerSyntaxTables, parameterRow: Int): CompilerSourceRange {
+    let invalid: CompilerSourceRange(start: 0 - 1, end: 0 - 1, next: 0 - 1)
+    if parameterRow < 0 || parameterRow >= compilerIntTableRowCount(table: tables.genericParameters) { return invalid }
+    let fileID: Int(compilerIntTableValue(table: tables.genericParameters, row: parameterRow, column: compilerSyntaxGenericParameterFileColumn()))
+    let nameEnd: Int(compilerIntTableValue(table: tables.genericParameters, row: parameterRow, column: compilerSyntaxGenericParameterNameEndColumn()))
+    let parameterEnd: Int(compilerIntTableValue(table: tables.genericParameters, row: parameterRow, column: compilerSyntaxGenericParameterEndColumn()))
+    let globalNameEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: nameEnd))
+    let globalParameterEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: parameterEnd))
+    if globalNameEnd < 0 || globalParameterEnd <= globalNameEnd { return invalid }
+    let maybeEqual: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: globalNameEnd))
+    if maybeEqual == nil { return invalid }
+    let equal: RangeLexedToken(maybeEqual ?? compilerFallbackTokenAt(index: globalNameEnd))
+    if equal.kind != .equal || equal.end >= globalParameterEnd { return invalid }
+    let maybeDefault: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: equal.end))
+    if maybeDefault == nil { return invalid }
+    let first: RangeLexedToken(maybeDefault ?? compilerFallbackTokenAt(index: equal.end))
+    if first.start < equal.end || first.end > globalParameterEnd { return invalid }
+    let localStart: Int(compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: first.start))
+    if localStart < 0 { return invalid }
+    return CompilerSourceRange(start: localStart, end: parameterEnd, next: parameterEnd)
+}
+
+function compilerSyntaxGenericParameterHasDefault(tables: CompilerSyntaxTables, parameterRow: Int): Bool {
+    let defaultRange: CompilerSourceRange(compilerSyntaxGenericParameterDefaultRange(tables: tables, parameterRow: parameterRow))
+    return defaultRange.start >= 0
+}
+
+function compilerSyntaxGenericParameterRequiredCountForOwner(tables: CompilerSyntaxTables, ownerSyntaxID: Int): Int {
+    let count: Int(compilerSyntaxGenericParameterCountForOwner(tables: tables, ownerSyntaxID: ownerSyntaxID))
+    state required: Int(count)
+    state ordinal: Int(count - 1)
+    while ordinal >= 0 {
+        let parameterRow: Int(compilerSyntaxGenericParameterRowForOwnerOrdinal(tables: tables, ownerSyntaxID: ownerSyntaxID, ordinal: ordinal))
+        if parameterRow < 0 || !compilerSyntaxGenericParameterHasDefault(tables: tables, parameterRow: parameterRow) { return required }
+        required: ordinal
+        ordinal: ordinal - 1
+    }
+    return required
 }
 
 function compilerSyntaxBodyEdgeCount(tables: CompilerSyntaxTables, syntaxID: Int, roleTag: Int, asOwner: Bool): Int {
@@ -5789,7 +5851,15 @@ function compilerMacroExecutionScalarValue(arena: CompilerBodyArena, valueID: In
     if valueID < 0 || valueID >= compilerIntTableRowCount(table: arena.mirValues) { return 0 }
     let sourceNodeID: Int(compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueSourceColumn()))
     if sourceNodeID < 0 || sourceNodeID >= compilerIntTableRowCount(table: arena.nodes) { return 0 }
-    let sourceText: String(compilerBodyArenaNodeText(arena: arena, nodeID: sourceNodeID))
+    state sourceText: String(compilerBodyArenaNodeText(arena: arena, nodeID: sourceNodeID))
+    state sourceIsNegated: Bool(false)
+    if compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) == compilerSyntaxKindPrefixNegate() {
+        let magnitudeNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: sourceNodeID, role: compilerSyntaxRoleOperand(), ordinal: 0))
+        if magnitudeNodeID < 0
+            || compilerIntTableValue(table: arena.nodes, row: magnitudeNodeID, column: 1) != compilerSyntaxKindIntegerLiteral() { return 0 }
+        sourceText: compilerBodyArenaNodeText(arena: arena, nodeID: magnitudeNodeID)
+        sourceIsNegated: true
+    }
     let typeKind: Int(compilerIntTableValue(table: arena.mirValues, row: valueID, column: compilerBodyMIRValueTypeColumn()))
     if typeKind == compilerBodyTypeBool() {
         if sourceText == String("true") { return 1 }
@@ -5798,6 +5868,7 @@ function compilerMacroExecutionScalarValue(arena: CompilerBodyArena, valueID: In
     if typeKind == compilerBodyTypeString() { return compilerDeclarationNameHash(name: compilerCoreStringLiteralContent(text: sourceText)) }
     if typeKind != compilerBodyTypeInt() { return 0 }
     state sign: Int(1)
+    if sourceIsNegated { sign: 0 - 1 }
     state cursor: Int(0)
     if stringLength(value: sourceText) > 0 && stringByteAt(source: sourceText, index: 0) == 45 {
         sign: 0 - 1

@@ -371,6 +371,8 @@ check_storage_literals() {
     local core_error="$WORK_ROOT/storage-core-source-set.err"
     local llvm_output="$WORK_ROOT/storage-literal-invalid.ll"
     local unsigned_llvm="$WORK_ROOT/storage-signedness-first-unsigned-byte.ll"
+    local signed_unary_llvm="$WORK_ROOT/storage-signed-unary-numeric-literal.ll"
+    local reordered_signed_llvm="$WORK_ROOT/storage-reordered-signed-integer-arguments.ll"
     local unsigned_negation_llvm="$WORK_ROOT/storage-unsigned-negation.ll"
     local command_output="$WORK_ROOT/storage-literal-invalid.out"
     local command_error="$WORK_ROOT/storage-literal-invalid.err"
@@ -450,6 +452,26 @@ check_storage_literals() {
         || fail "Storage signedness-first unsigned byte omitted i8 equality"
     validate_llvm "$unsigned_llvm"
     echo "Storage signedness-first unsigned byte: pass"
+    "$STAGE2_EXECUTABLE" emit-llvm \
+        "$REPO_ROOT/Testing/Storage/Pass/SignedUnaryNumericLiteral.range" \
+        "$signed_unary_llvm" \
+        || fail "Storage signed unary numeric literal did not emit LLVM"
+    /usr/bin/grep -Fq 'icmp eq i8 -4, -4' "$signed_unary_llvm" \
+        || fail "Storage signed unary numeric literal omitted its signed i8 value"
+    validate_llvm "$signed_unary_llvm"
+    echo "Storage signed unary numeric literal: pass"
+    if "$STAGE2_EXECUTABLE" emit-llvm \
+        "$REPO_ROOT/Testing/Storage/Fail/ReorderedSignedIntegerArguments.range" \
+        "$reordered_signed_llvm" > "$command_output" 2> "$command_error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] \
+        || fail "Storage reordered signed integer arguments exited $actual_status, expected 65"
+    [[ ! -s "$command_error" && ! -s "$reordered_signed_llvm" ]] \
+        || fail "Storage reordered signed integer arguments emitted an unexpected artifact"
+    echo "Storage ordered generic arguments: pass"
     if "$STAGE2_EXECUTABLE" emit-llvm \
         "$REPO_ROOT/Testing/Storage/Fail/UnsignedUnaryNegation.range" \
         "$unsigned_negation_llvm" > "$command_output" 2> "$command_error"; then
@@ -467,6 +489,45 @@ check_storage_literals() {
         || fail "Storage unsigned unary negation emitted an LLVM artifact"
     echo "Storage unsigned unary negation: pass"
     echo "checkpoint root-value:storage-literals-complete: pass"
+}
+
+check_defaulted_generic_optional() {
+    local fixture relative llvm executable actual_status
+    for relative in \
+        Testing/Generics/Pass/DefaultedGenericEnum.range \
+        Testing/Optionality/Pass/DefaultQuestionMark.range \
+        Testing/Optionality/Pass/ValueBearingAbsence.range \
+        Testing/Optionality/Pass/CustomAbsenceValue.range; do
+        fixture="$REPO_ROOT/$relative"
+        llvm="$WORK_ROOT/$(basename "$fixture" .range).ll"
+        executable="$WORK_ROOT/$(basename "$fixture" .range)"
+        [[ -f "$fixture" ]] || fail "missing generic Optional fixture: $relative"
+        "$STAGE2_EXECUTABLE" emit-llvm "$fixture" "$llvm" \
+            || fail "generic Optional fixture did not emit LLVM: $relative"
+        /usr/bin/grep -Fq 'alloca { i32,' "$llvm" \
+            || fail "generic Optional fixture omitted its specialized enum layout: $relative"
+        validate_llvm "$llvm"
+        link_llvm "$llvm" "$executable"
+        if "$executable"; then actual_status=0; else actual_status=$?; fi
+        [[ "$actual_status" -eq 7 ]] \
+            || fail "generic Optional fixture exited $actual_status, expected 7: $relative"
+        echo "Generic Optional $(basename "$fixture" .range): pass"
+    done
+
+    fixture="$REPO_ROOT/Testing/Generics/Fail/MissingRequiredGenericEnumArgument.range"
+    local rejection="$WORK_ROOT/MissingRequiredGenericEnumArgument.out"
+    local rejection_error="$WORK_ROOT/MissingRequiredGenericEnumArgument.err"
+    if "$STAGE2_EXECUTABLE" "$fixture" > "$rejection" 2> "$rejection_error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 && ! -s "$rejection_error" ]] \
+        || fail "missing required generic argument rejected at the wrong boundary"
+    /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$rejection" \
+        || fail "missing required generic argument omitted its exact rejection"
+    echo "Generic Optional missing-required-argument: pass"
+    echo "checkpoint root-value:generic-optional-complete: pass"
 }
 
 check_boundary_forward_mixed() {
@@ -578,6 +639,7 @@ main_root_value() {
     echo "checkpoint root-value:stage2-resolved: pass"
     check_project_defaults
     check_storage_literals
+    check_defaulted_generic_optional
     if [[ "$controls" -eq 1 ]]; then
         audit_root_values Controls "$STAGE2_EXECUTABLE" "$WORK_ROOT/controls"
         echo "checkpoint root-value:controls-complete: pass"

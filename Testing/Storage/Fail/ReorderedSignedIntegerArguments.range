@@ -1,0 +1,4 @@
+@main {
+    let value: Int<8, .signed>(-4)
+    return 7
+}

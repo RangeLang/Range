@@ -1,0 +1,18 @@
+enum Nil {
+    case nil
+}
+
+enum Optional<Value, None = Nil> {
+    case exists(value: Value)
+    case none(value: None)
+}
+
+@main {
+    let selected: Optional<Int>(.none(value: Nil(.nil)))
+    switch selected {
+    case .exists(let value):
+        return value
+    case .none(let reason):
+        return 7
+    }
+}

@@ -25,4 +25,4 @@ construct Buffer<Element> {
 function bufferCreateInt(capacity: Int): Buffer<Int>
 
 @builtin(.create)
-function bufferCreateUnsigned8(capacity: Int): Buffer<Int<8, .unsigned>>
+function bufferCreateUnsigned8(capacity: Int): Buffer<Int<.unsigned, 8>>

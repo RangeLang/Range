@@ -60,6 +60,14 @@ for ((index = 0; index < compiler_source_count; index += 1)); do
     append_source core "$relative" "$source_path"
 done
 
+for relative in \
+    RangeCompiler/Sources/Core/System/Optional/Nil.range \
+    RangeCompiler/Sources/Core/System/Optional/Optional.range; do
+    source_path="$REPO_ROOT/$relative"
+    [[ -f "$source_path" ]] || compile_project_fail "missing language Core source: $relative"
+    append_source core "$relative" "$source_path"
+done
+
 if [[ -d "$input" ]]; then
     project_root="$(cd "$input" && pwd)"
     project_paths_raw="$WORK_ROOT/project-paths.raw"

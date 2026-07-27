@@ -180,7 +180,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] `scripts/range check-root-value --controls`
   - [x] `scripts/range check-compiler-smoke`
   - [x] `scripts/range check-compiler-candidate`
-  - [ ] `scripts/range check-stage2-compiler`
+  - [x] `scripts/range check-stage2-compiler`
   - [x] `scripts/range compiler progression`
 - [x] Resolve accepted-seed Stage 2 once per compiler-source change.
   - [x] Share one content-addressed resolver between root-value, smoke, and the
@@ -395,3 +395,20 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           points are Range-authored yet.
   - [ ] Delete raw runtime entry points only after no accepted compiler or Core
     path consumes them.
+  - [ ] Make Optional a Range-authored generic enum with a value-bearing
+    absence branch.
+    - [x] Support ordered default type arguments on nominal declarations, so
+      `Optional<Value, None = Nil>` accepts `Optional<Value>`.
+    - [x] Specialize local generic enum case payload types through the enum
+      instance's positional type arguments.
+    - [ ] Carry specialized generic enum layouts across function ABI
+      boundaries.
+    - [x] Define canonical `Nil` and `Optional` Core enums and lower `T?`
+      through the authored `Optional<Value, None = Nil>` declaration.
+    - [ ] Lower bare `nil` and contextual `.nil` through the authored
+      `Optional.none(value: Nil.nil)` case.
+    - [x] Prove explicit custom absence values, the default `Nil` spelling,
+      generic arity rejection, LLVM emission, and the compiler fixed point.
+      - Promoted accepted seed `bootstrap-154b7b1459b9`; its manifest-driven
+        Stage 3 reproduces LLVM hash
+        `154b7b1459b90de1b3d38fb5d8ba28e97810407b0d225ecc77e0e369019dc7a3`.

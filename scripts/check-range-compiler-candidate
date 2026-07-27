@@ -5105,7 +5105,7 @@ audit_buffer_element_layouts() {
     /usr/bin/grep -Fq 'Canonical Buffer integer layouts verified.' "$output" \
         || fail "$stage_label generic Buffer element-layout proof omitted its checkpoint"
     [[ ! -s "$error" ]] || fail "$stage_label generic Buffer element-layout proof wrote stderr"
-    echo "$stage_label generic Buffer: pass (one declaration, Int/i32 and Int<8, .unsigned>/i8 layout-selected append/read/write, return, destruction)"
+    echo "$stage_label generic Buffer: pass (one declaration, Int/i32 and Int<.unsigned, 8>/i8 layout-selected append/read/write, return, destruction)"
 }
 
 audit_member_representations() {

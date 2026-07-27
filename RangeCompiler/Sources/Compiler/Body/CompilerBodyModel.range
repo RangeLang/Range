@@ -1144,7 +1144,8 @@ function compilerBodyMIRValueReceiverAddress(): Int { return 8 }
 function compilerBodyMIRValueLast(): Int { return compilerBodyMIRValueReceiverAddress() }
 
 function compilerBodyMIRNominalTypeID(typeKind: Int, typeID: Int): Int {
-    if typeKind == compilerBodyTypeConstruct() || typeKind == compilerBodyTypeEnum() { return typeID }
+    if typeKind == compilerBodyTypeConstruct() || typeKind == compilerBodyTypeEnum()
+        || (typeKind == compilerBodyTypeInt() && typeID >= 0) { return typeID }
     return 0 - 1
 }
 

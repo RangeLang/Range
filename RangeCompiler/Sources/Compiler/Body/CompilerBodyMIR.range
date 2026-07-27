@@ -1030,6 +1030,30 @@ function compilerBodyMIRCommitScheduledStatement(arena: CompilerBodyArena, state
         let localTypeKind: Int(compilerBodyArenaSymbolTypeKind(arena: arena, symbolID: symbolID))
         let localTypeID: Int(compilerBodyMIRNominalTypeID(typeKind: localTypeKind, typeID: compilerBodyArenaSymbolTypeID(arena: arena, symbolID: symbolID)))
         state localExpressionValueID: Int(expressionValue.valueID)
+        if localTypeKind == compilerBodyTypeInt() && localTypeID >= 0
+            && compilerIntTableValue(table: arena.mirValues, row: expressionValue.valueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeInt() {
+            let specializedTypeName: String(compilerBodyArenaTypeNameForTypeID(arena: arena, typeID: localTypeID))
+            let literalNodeID: Int(compilerIntTableValue(table: arena.mirValues, row: expressionValue.valueID, column: compilerBodyMIRValueSourceColumn()))
+            state isNumericLiteral: Bool(false)
+            if literalNodeID >= 0 && literalNodeID < compilerIntTableRowCount(table: arena.nodes) {
+                let literalKind: Int(compilerIntTableValue(table: arena.nodes, row: literalNodeID, column: 1))
+                if literalKind == compilerSyntaxKindIntegerLiteral() {
+                    isNumericLiteral: true
+                } else if literalKind == compilerSyntaxKindPrefixNegate() {
+                    let magnitudeNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: literalNodeID, role: compilerSyntaxRoleOperand(), ordinal: 0))
+                    if magnitudeNodeID >= 0
+                        && compilerIntTableValue(table: arena.nodes, row: magnitudeNodeID, column: 1) == compilerSyntaxKindIntegerLiteral() {
+                        isNumericLiteral: true
+                    }
+                }
+            }
+            if compilerIntegerTypeIsSigned(typeName: specializedTypeName) && isNumericLiteral {
+                let specializedValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueConstant(), typeKind: compilerBodyTypeInt(), typeID: localTypeID, sourceNodeID: literalNodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: literalNodeID))
+                if specializedValueID < 0
+                    || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: compilerBodyMIROperationConstant(), resultValueID: specializedValueID, sourceNodeID: literalNodeID, firstOperand: compilerIntTableRowCount(table: arena.mirOperands), operandCount: 0, targetKind: compilerBodyMIROperationTargetNone(), targetID: 0 - 1) < 0 { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
+                localExpressionValueID: specializedValueID
+            }
+        }
         if localTypeKind == compilerBodyTypeUnsigned8()
             && compilerIntTableValue(table: arena.mirValues, row: expressionValue.valueID, column: compilerBodyMIRValueTypeColumn()) == compilerBodyTypeInt() {
             let literalNodeID: Int(compilerIntTableValue(table: arena.mirValues, row: expressionValue.valueID, column: compilerBodyMIRValueSourceColumn()))
@@ -1641,7 +1665,7 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
             if operationKind == compilerBodyMIROperationEnumPayload() {
                 let payloadRow: Int(validationTargetID)
                 if payloadRow < 0 || payloadRow >= compilerIntTableRowCount(table: arena.tables.members) { return 300000 + operationRow * 100 + operationKind }
-                let payloadTypeID: Int(compilerBodyArenaEnumPayloadTypeID(arena: arena, payloadRow: payloadRow))
+                let payloadTypeID: Int(compilerBodyArenaEnumPayloadTypeID(arena: arena, enumTypeID: compilerIntTableValue(table: arena.mirValues, row: enumOperandValueID, column: compilerBodyMIRValueTypeIDColumn()), payloadRow: payloadRow))
                 if compilerIntTableValue(table: arena.tables.members, row: payloadRow, column: 12) != compilerSyntaxMemberKindEnumCasePayload()
                     || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: payloadTypeID)
                     || ((compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: payloadTypeID) == compilerBodyTypeConstruct() || compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: payloadTypeID) == compilerBodyTypeEnum())
@@ -1767,16 +1791,16 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
             let localOperandValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
             let localResultTypeKind: Int(compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()))
             let localResultTypeID: Int(compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeIDColumn()))
-            if validationTargetKind != compilerBodyMIROperationTargetSymbol()
-                || validationTargetID < 0 || validationTargetID >= compilerIntTableRowCount(table: arena.symbols)
-                || compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()) != 1
-                || localOperandValueID < 0 || localOperandValueID >= valueCount
-                || compilerIntTableValue(table: arena.mirValues, row: localOperandValueID, column: compilerBodyMIRValueTypeColumn()) != localResultTypeKind
-                || (localResultTypeKind == compilerBodyTypeEnum()
-                    && compilerIntTableValue(table: arena.mirValues, row: localOperandValueID, column: compilerBodyMIRValueTypeIDColumn()) != localResultTypeID)
-                || (localResultTypeKind == compilerBodyTypeConstruct()
-                    && compilerBodyArenaTypeIDHasNativeNominalLayout(arena: arena, typeID: localResultTypeID)
-                    && compilerIntTableValue(table: arena.mirValues, row: localOperandValueID, column: compilerBodyMIRValueTypeIDColumn()) != localResultTypeID) { return 300000 + operationRow * 100 + operationKind }
+            if validationTargetKind != compilerBodyMIROperationTargetSymbol() { return 410000 + operationRow }
+            if validationTargetID < 0 || validationTargetID >= compilerIntTableRowCount(table: arena.symbols) { return 411000 + operationRow }
+            if compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()) != 1 { return 412000 + operationRow }
+            if localOperandValueID < 0 || localOperandValueID >= valueCount { return 413000 + operationRow }
+            if compilerIntTableValue(table: arena.mirValues, row: localOperandValueID, column: compilerBodyMIRValueTypeColumn()) != localResultTypeKind { return 414000 + operationRow }
+            if localResultTypeKind == compilerBodyTypeEnum()
+                && compilerIntTableValue(table: arena.mirValues, row: localOperandValueID, column: compilerBodyMIRValueTypeIDColumn()) != localResultTypeID { return 415000 + operationRow }
+            if localResultTypeKind == compilerBodyTypeConstruct()
+                && compilerBodyArenaTypeIDHasNativeNominalLayout(arena: arena, typeID: localResultTypeID)
+                && compilerIntTableValue(table: arena.mirValues, row: localOperandValueID, column: compilerBodyMIRValueTypeIDColumn()) != localResultTypeID { return 416000 + operationRow }
             let localDeclarationNodeID: Int(compilerIntTableValue(table: arena.symbols, row: validationTargetID, column: compilerBodySymbolDeclarationColumn()))
             let localInitializerNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: localDeclarationNodeID, role: compilerSyntaxRoleInitializer(), ordinal: 0))
             let localResolutionNodeID: Int(compilerBodyArenaInitializerResolutionNode(arena: arena, initializerNodeID: localInitializerNodeID))

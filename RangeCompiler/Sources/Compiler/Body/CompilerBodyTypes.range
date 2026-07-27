@@ -112,10 +112,6 @@ function compilerProjectIntegerBits(typeName: String, fallbackBits: Int): Int {
         let width: Int(compilerCoreParseDecimalInt(value: secondText.substring(start: second.start, end: second.end)))
         if width > 0 { return width }
     }
-    if compilerSemanticStringRangeEqualsText(text: secondText, start: second.start, end: second.end, literal: String(".signed")) {
-        let width: Int(compilerCoreParseDecimalInt(value: firstText.substring(start: first.start, end: first.end)))
-        if width > 0 { return width }
-    }
     return 0 - 1
 }
 
@@ -504,8 +500,7 @@ function compilerTextTargetHasUTF8ByteStorage(tables: CompilerSyntaxTables, targ
             let fileID: Int(compilerIntTableValue(table: tables.members, row: row, column: 1))
             let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: row, column: 6), localEnd: compilerIntTableValue(table: tables.members, row: row, column: 7)))
             let typeName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: row, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: row, column: 9)))
-            if name == String("bytes")
-                && (typeName == String("Buffer<Int<.unsigned, 8>>") || typeName == String("Buffer<Int<8, .unsigned>>")) {
+            if name == String("bytes") && typeName == String("Buffer<Int<.unsigned, 8>>") {
                 matchingStateCount: matchingStateCount + 1
             }
         }
@@ -574,18 +569,38 @@ function compilerTextLiteralFactsResolve(tables: CompilerSyntaxTables): Compiler
     return CompilerTextLiteralFacts(textTargetSyntaxID: storageTargetSyntaxID, semanticElementSyntaxID: semanticElementSyntaxID, encoding: encoding, codeUnitBits: bits, codeUnitSignedness: signedness, reason: compilerTextLiteralReasonNone(), relatedRow: 0 - 1, isValid: true)
 }
 
-function compilerIntegerTypeIsUnsigned8(typeName: String): Bool {
+function compilerIntegerTypeSignedness(typeName: String): Int {
     if compilerBodyArenaTypeOuterName(typeName: typeName) != String("Int")
-        || compilerBodyArenaGenericArgumentCount(typeName: typeName) != 2 { return false }
+        || compilerBodyArenaGenericArgumentCount(typeName: typeName) != 2 { return 0 - 1 }
+    let first: String(compilerBodyArenaGenericArgumentText(typeName: typeName, ordinal: 0))
+    let second: String(compilerBodyArenaGenericArgumentText(typeName: typeName, ordinal: 1))
+    let firstRange: CompilerSourceRange(compilerSemanticTrimStringRange(text: first, start: 0, end: stringLength(value: first)))
+    let secondRange: CompilerSourceRange(compilerSemanticTrimStringRange(text: second, start: 0, end: stringLength(value: second)))
+    if firstRange.start < 0 || secondRange.start < 0 { return 0 - 1 }
+    if compilerSemanticStringRangeEqualsText(text: first, start: firstRange.start, end: firstRange.end, literal: String(".signed"))
+        && compilerCoreParseDecimalInt(value: second.substring(start: secondRange.start, end: secondRange.end)) > 0 {
+        return compilerFormulaSignednessSigned()
+    }
+    if compilerSemanticStringRangeEqualsText(text: first, start: firstRange.start, end: firstRange.end, literal: String(".unsigned"))
+        && compilerCoreParseDecimalInt(value: second.substring(start: secondRange.start, end: secondRange.end)) > 0 {
+        return compilerFormulaSignednessUnsigned()
+    }
+    return 0 - 1
+}
+
+function compilerIntegerTypeIsSigned(typeName: String): Bool {
+    return compilerIntegerTypeSignedness(typeName: typeName) == compilerFormulaSignednessSigned()
+}
+
+function compilerIntegerTypeIsUnsigned8(typeName: String): Bool {
+    if compilerIntegerTypeSignedness(typeName: typeName) != compilerFormulaSignednessUnsigned() { return false }
     let first: String(compilerBodyArenaGenericArgumentText(typeName: typeName, ordinal: 0))
     let second: String(compilerBodyArenaGenericArgumentText(typeName: typeName, ordinal: 1))
     let firstRange: CompilerSourceRange(compilerSemanticTrimStringRange(text: first, start: 0, end: stringLength(value: first)))
     let secondRange: CompilerSourceRange(compilerSemanticTrimStringRange(text: second, start: 0, end: stringLength(value: second)))
     if firstRange.start < 0 || secondRange.start < 0 { return false }
-    return (compilerSemanticStringRangeEqualsText(text: first, start: firstRange.start, end: firstRange.end, literal: String(".unsigned"))
-            && compilerSemanticStringRangeEqualsText(text: second, start: secondRange.start, end: secondRange.end, literal: String("8")))
-        || (compilerSemanticStringRangeEqualsText(text: first, start: firstRange.start, end: firstRange.end, literal: String("8"))
-            && compilerSemanticStringRangeEqualsText(text: second, start: secondRange.start, end: secondRange.end, literal: String(".unsigned")))
+    return compilerSemanticStringRangeEqualsText(text: first, start: firstRange.start, end: firstRange.end, literal: String("8"))
+        || compilerSemanticStringRangeEqualsText(text: second, start: secondRange.start, end: secondRange.end, literal: String("8"))
 }
 
 function compilerFloatTypeBitWidth(typeName: String): Int {
@@ -661,7 +676,7 @@ function compilerBodyArenaTypeKindForName(arena: CompilerBodyArena, typeName: St
             capabilityRow: capabilityRow + 1
         }
     }
-    if typeName == String("Int") { return compilerBodyTypeInt() }
+    if typeName == String("Int") || compilerIntegerTypeIsSigned(typeName: typeName) { return compilerBodyTypeInt() }
     if compilerIntegerTypeIsUnsigned8(typeName: typeName) { return compilerBodyTypeUnsigned8() }
     if typeName == String("Bool") { return compilerBodyTypeBool() }
     if typeName == String("String") { return compilerBodyTypeString() }
@@ -671,8 +686,9 @@ function compilerBodyArenaTypeKindForName(arena: CompilerBodyArena, typeName: St
     if typeName == String("Void") { return compilerBodyTypeVoid() }
     if compilerBodyRuntimeABITypeIsOpaque(tables: arena.tables, typeName: typeName) { return compilerBodyTypeConstruct() }
     let outerName: String(compilerBodyArenaTypeOuterName(typeName: typeName))
-    if outerName == String("Optional") || compilerDeclarationIndexLookup(tables: arena.tables, index: arena.declarationIndex, name: outerName, kindTag: compilerSyntaxKindConstruct()) >= 0 { return compilerBodyTypeConstruct() }
+    if compilerDeclarationIndexLookup(tables: arena.tables, index: arena.declarationIndex, name: outerName, kindTag: compilerSyntaxKindConstruct()) >= 0 { return compilerBodyTypeConstruct() }
     if compilerDeclarationIndexLookup(tables: arena.tables, index: arena.declarationIndex, name: outerName, kindTag: compilerSyntaxKindEnum()) >= 0 { return compilerBodyTypeEnum() }
+    if outerName == String("Optional") { return compilerBodyTypeConstruct() }
     return compilerBodyTypeUnknown()
 }
 
@@ -839,15 +855,21 @@ function compilerBodyArenaTypeKindForSpan(arena: CompilerBodyArena, fileID: Int,
     if compilerSemanticLocalRangeEqualsText(tables: arena.tables, fileID: fileID, start: normalizedRange.start, end: normalizedRange.end, text: String("Void")) { return compilerBodyTypeVoid() }
     let normalizedTypeName: String(compilerTypedSyntaxLocalText(tables: arena.tables, fileID: fileID, localStart: normalizedRange.start, localEnd: normalizedRange.end))
     if compilerIntegerTypeIsUnsigned8(typeName: normalizedTypeName) { return compilerBodyTypeUnsigned8() }
+    if compilerIntegerTypeIsSigned(typeName: normalizedTypeName) { return compilerBodyTypeInt() }
     if compilerFloatTypeIs32(typeName: normalizedTypeName) { return compilerBodyTypeFloat32() }
     if compilerFloatTypeIs64(typeName: normalizedTypeName) { return compilerBodyTypeFloat() }
-    if compilerBodyArenaTypeOuterName(typeName: normalizedTypeName) == String("Optional") { return compilerBodyTypeConstruct() }
+    let outerName: String(compilerBodyArenaTypeOuterName(typeName: normalizedTypeName))
+    if outerName == String("Optional") {
+        let optionalEnumRow: Int(compilerDeclarationIndexLookup(tables: arena.tables, index: arena.declarationIndex, name: outerName, kindTag: compilerSyntaxKindEnum()))
+        if optionalEnumRow >= 0 { return compilerBodyTypeEnum() }
+    }
     let outerRange: CompilerSourceRange(compilerBodyArenaTypeOuterRangeForSpan(arena: arena, fileID: fileID, start: normalizedRange.start, end: normalizedRange.end))
     if outerRange.start < 0 { return compilerBodyTypeUnknown() }
     let declarationSyntaxID: Int(compilerDeclarationIndexLocalRangeSyntaxID(tables: arena.tables, index: arena.declarationIndex, fileID: fileID, start: outerRange.start, end: outerRange.end, kindTag: compilerSyntaxKindConstruct()))
     if declarationSyntaxID >= 0 { return compilerBodyTypeConstruct() }
     let enumSyntaxID: Int(compilerDeclarationIndexLocalRangeSyntaxID(tables: arena.tables, index: arena.declarationIndex, fileID: fileID, start: outerRange.start, end: outerRange.end, kindTag: compilerSyntaxKindEnum()))
     if enumSyntaxID >= 0 { return compilerBodyTypeEnum() }
+    if outerName == String("Optional") { return compilerBodyTypeConstruct() }
     return compilerBodyTypeUnknown()
 }
 
@@ -1029,6 +1051,10 @@ function compilerBodyArenaTypeIDForMemberTypeReference(arena: CompilerBodyArena,
         argumentIDs.destroy()
         return 0 - 1
     }
+    if compilerBodyArenaAppendDefaultTypeArguments(arena: arena, nominalSyntaxID: nominalSyntaxID, argumentIDs: argumentIDs) != 0 {
+        argumentIDs.destroy()
+        return 0 - 1
+    }
     let typeID: Int(compilerBodyArenaTypeInstanceInternStructuralAtSpan(arena: arena, typeKind: typeKind, nominalSyntaxID: nominalSyntaxID, fileID: fileID, start: start, end: end, argumentIDs: argumentIDs))
     argumentIDs.destroy()
     return typeID
@@ -1064,6 +1090,24 @@ function compilerBodyArenaAppendTypeArguments(arena: CompilerBodyArena, typeID: 
     return 0
 }
 
+function compilerBodyArenaAppendDefaultTypeArguments(arena: CompilerBodyArena, nominalSyntaxID: Int, argumentIDs: Buffer<Int>): Int {
+    if nominalSyntaxID < 0 { return 0 }
+    let expectedCount: Int(compilerSyntaxGenericParameterCountForOwner(tables: arena.tables, ownerSyntaxID: nominalSyntaxID))
+    let requiredCount: Int(compilerSyntaxGenericParameterRequiredCountForOwner(tables: arena.tables, ownerSyntaxID: nominalSyntaxID))
+    if argumentIDs.count < requiredCount || argumentIDs.count > expectedCount { return 0 - 1 }
+    state ordinal: Int(argumentIDs.count)
+    while ordinal < expectedCount {
+        let parameterRow: Int(compilerSyntaxGenericParameterRowForOwnerOrdinal(tables: arena.tables, ownerSyntaxID: nominalSyntaxID, ordinal: ordinal))
+        let defaultRange: CompilerSourceRange(compilerSyntaxGenericParameterDefaultRange(tables: arena.tables, parameterRow: parameterRow))
+        if parameterRow < 0 || defaultRange.start < 0 { return 0 - 1 }
+        let fileID: Int(compilerIntTableValue(table: arena.tables.genericParameters, row: parameterRow, column: compilerSyntaxGenericParameterFileColumn()))
+        let defaultTypeID: Int(compilerBodyArenaTypeInstanceIntern(arena: arena, fileID: fileID, start: defaultRange.start, end: defaultRange.end))
+        if defaultTypeID < 0 || argumentIDs.append(element: defaultTypeID) != 0 { return 0 - 1 }
+        ordinal: ordinal + 1
+    }
+    return 0
+}
+
 function compilerBodyArenaTypeInstanceIntern(arena: CompilerBodyArena, fileID: Int, start: Int, end: Int): Int {
     let normalizedRange: CompilerSourceRange(compilerBodyArenaNormalizedTypeRange(arena: arena, fileID: fileID, start: start, end: end))
     if normalizedRange.start < 0 { return 0 - 1 }
@@ -1092,10 +1136,18 @@ function compilerBodyArenaTypeInstanceIntern(arena: CompilerBodyArena, fileID: I
             expectedArgumentCount: compilerSyntaxGenericParameterCountForOwner(tables: arena.tables, ownerSyntaxID: declarationSyntaxID)
         }
     } else if typeKind == compilerBodyTypeEnum() {
-        if outerRange.start < 0 || genericStartGlobal >= 0 { return 0 - 1 }
-        nominalSyntaxID: compilerDeclarationIndexLocalRangeSyntaxID(tables: arena.tables, index: arena.declarationIndex, fileID: fileID, start: outerRange.start, end: outerRange.end, kindTag: compilerSyntaxKindEnum())
+        if outerRange.start < 0 { return 0 - 1 }
+        if isOptional && genericStartGlobal < 0 {
+            let optionalDeclarationRow: Int(compilerDeclarationIndexLookup(tables: arena.tables, index: arena.declarationIndex, name: String("Optional"), kindTag: compilerSyntaxKindEnum()))
+            if optionalDeclarationRow >= 0 {
+                nominalSyntaxID: compilerIntTableValue(table: arena.tables.declarations, row: optionalDeclarationRow, column: 0)
+            }
+        } else {
+            nominalSyntaxID: compilerDeclarationIndexLocalRangeSyntaxID(tables: arena.tables, index: arena.declarationIndex, fileID: fileID, start: outerRange.start, end: outerRange.end, kindTag: compilerSyntaxKindEnum())
+        }
         if nominalSyntaxID < 0 { return 0 - 1 }
-    } else if typeKind == compilerBodyTypeUnsigned8() {
+        expectedArgumentCount: compilerSyntaxGenericParameterCountForOwner(tables: arena.tables, ownerSyntaxID: nominalSyntaxID)
+    } else if typeKind == compilerBodyTypeUnsigned8() || (typeKind == compilerBodyTypeInt() && compilerIntegerTypeIsSigned(typeName: normalizedTypeName)) {
         expectedArgumentCount: 2
     } else if typeKind == compilerBodyTypeFloat32() || compilerFloatTypeIs64(typeName: normalizedTypeName) {
         expectedArgumentCount: 1
@@ -1103,10 +1155,18 @@ function compilerBodyArenaTypeInstanceIntern(arena: CompilerBodyArena, fileID: I
         return 0 - 1
     }
     let actualArgumentCount: Int(compilerBodyArenaTypeArgumentCountForSpan(arena: arena, fileID: fileID, start: normalizedRange.start, end: normalizedRange.end))
-    if actualArgumentCount < 0 || actualArgumentCount != expectedArgumentCount { return 0 - 1 }
+    if actualArgumentCount < 0 || actualArgumentCount > expectedArgumentCount { return 0 - 1 }
+    state requiredArgumentCount: Int(expectedArgumentCount)
+    if nominalSyntaxID >= 0 {
+        requiredArgumentCount: compilerSyntaxGenericParameterRequiredCountForOwner(tables: arena.tables, ownerSyntaxID: nominalSyntaxID)
+    }
+    if actualArgumentCount < requiredArgumentCount { return 0 - 1 }
     let argumentIDs: Buffer<Int>(bufferCreateInt(capacity: actualArgumentCount + 1))
     state argumentOrdinal: Int(0)
-    if typeKind == compilerBodyTypeUnsigned8() || typeKind == compilerBodyTypeFloat32() || compilerFloatTypeIs64(typeName: normalizedTypeName) { argumentOrdinal: actualArgumentCount }
+    if typeKind == compilerBodyTypeUnsigned8()
+        || (typeKind == compilerBodyTypeInt() && compilerIntegerTypeIsSigned(typeName: normalizedTypeName))
+        || typeKind == compilerBodyTypeFloat32()
+        || compilerFloatTypeIs64(typeName: normalizedTypeName) { argumentOrdinal: actualArgumentCount }
     while argumentOrdinal < actualArgumentCount {
         let argumentRange: CompilerSourceRange(compilerBodyArenaTypeArgumentRangeForSpan(arena: arena, fileID: fileID, start: normalizedRange.start, end: normalizedRange.end, ordinal: argumentOrdinal))
         let argumentTypeID: Int(compilerBodyArenaTypeInstanceIntern(arena: arena, fileID: fileID, start: argumentRange.start, end: argumentRange.end))
@@ -1119,6 +1179,11 @@ function compilerBodyArenaTypeInstanceIntern(arena: CompilerBodyArena, fileID: I
             return 0 - 1
         }
         argumentOrdinal: argumentOrdinal + 1
+    }
+    if !(isOptional && typeKind == compilerBodyTypeConstruct())
+        && compilerBodyArenaAppendDefaultTypeArguments(arena: arena, nominalSyntaxID: nominalSyntaxID, argumentIDs: argumentIDs) != 0 {
+        argumentIDs.destroy()
+        return 0 - 1
     }
     let internedArgumentCount: Int(argumentIDs.count)
     let existing: Int(compilerBodyArenaTypeInstanceFind(arena: arena, typeKind: typeKind, nominalSyntaxID: nominalSyntaxID, argumentCount: internedArgumentCount, argumentIDs: argumentIDs))
@@ -2321,10 +2386,11 @@ function compilerBodyArenaEnumPayloadFieldOrdinal(arena: CompilerBodyArena, payl
     return 0 - 1
 }
 
-function compilerBodyArenaEnumPayloadTypeID(arena: CompilerBodyArena, payloadRow: Int): Int {
+function compilerBodyArenaEnumPayloadTypeID(arena: CompilerBodyArena, enumTypeID: Int, payloadRow: Int): Int {
     if payloadRow < 0 || payloadRow >= compilerIntTableRowCount(table: arena.tables.members) { return 0 - 1 }
     if compilerIntTableValue(table: arena.tables.members, row: payloadRow, column: 12) != compilerSyntaxMemberKindEnumCasePayload() { return 0 - 1 }
-    return compilerBodyArenaTypeIDForSpan(arena: arena, fileID: compilerIntTableValue(table: arena.tables.members, row: payloadRow, column: 1), start: compilerIntTableValue(table: arena.tables.members, row: payloadRow, column: 8), end: compilerIntTableValue(table: arena.tables.members, row: payloadRow, column: 9))
+    let ownerSyntaxID: Int(compilerSyntaxEnumPayloadOwnerSyntaxID(tables: arena.tables, payloadRow: payloadRow))
+    return compilerBodyArenaSpecializedTypeIDForSpan(arena: arena, receiverTypeID: enumTypeID, ownerSyntaxID: ownerSyntaxID, fileID: compilerIntTableValue(table: arena.tables.members, row: payloadRow, column: 1), start: compilerIntTableValue(table: arena.tables.members, row: payloadRow, column: 8), end: compilerIntTableValue(table: arena.tables.members, row: payloadRow, column: 9))
 }
 
 function compilerBodyArenaEnumPayloadRowForArgument(arena: CompilerBodyArena, caseMemberRow: Int, argumentNodeID: Int, allowUnlabeled: Bool): Int {
@@ -2368,7 +2434,7 @@ function compilerBodyArenaResolveEnumCaseApplication(arena: CompilerBodyArena, i
         if valueNodeID < 0 || payloadRow < 0 { return 0 - 1 }
         if compilerIntTableValue(table: arena.nodes, row: valueNodeID, column: 10) == compilerBodyEnumPatternBindingAux()
             || compilerBodyArenaResolveExpression(arena: arena, index: index, nodeID: valueNodeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
-        let expectedTypeID: Int(compilerBodyArenaEnumPayloadTypeID(arena: arena, payloadRow: payloadRow))
+        let expectedTypeID: Int(compilerBodyArenaEnumPayloadTypeID(arena: arena, enumTypeID: enumTypeID, payloadRow: payloadRow))
         let expectedTypeKind: Int(compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: expectedTypeID))
         let actualTypeKind: Int(compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID))
         let storagePolicy: Int(compilerIntTableValue(table: arena.tables.members, row: payloadRow, column: 13))
@@ -3147,13 +3213,13 @@ function compilerBodyArenaEnumCaseCount(arena: CompilerBodyArena, enumSyntaxID: 
     return count
 }
 
-function compilerBodyArenaResolveEnumPayloadPatternBinding(arena: CompilerBodyArena, caseMemberRow: Int, argumentNodeID: Int, caseRegionNodeID: Int): Int {
+function compilerBodyArenaResolveEnumPayloadPatternBinding(arena: CompilerBodyArena, enumTypeID: Int, caseMemberRow: Int, argumentNodeID: Int, caseRegionNodeID: Int): Int {
     let bindingNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: argumentNodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0))
     let payloadRow: Int(compilerBodyArenaEnumPayloadRowForArgument(arena: arena, caseMemberRow: caseMemberRow, argumentNodeID: argumentNodeID, allowUnlabeled: true))
     if bindingNodeID < 0 || payloadRow < 0 { return 0 - 1 }
     if compilerIntTableValue(table: arena.nodes, row: bindingNodeID, column: 1) != compilerSyntaxKindIdentifier()
         || compilerIntTableValue(table: arena.nodes, row: bindingNodeID, column: 10) != compilerBodyEnumPatternBindingAux() { return 0 - 1 }
-    let payloadTypeID: Int(compilerBodyArenaEnumPayloadTypeID(arena: arena, payloadRow: payloadRow))
+    let payloadTypeID: Int(compilerBodyArenaEnumPayloadTypeID(arena: arena, enumTypeID: enumTypeID, payloadRow: payloadRow))
     let payloadTypeKind: Int(compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: payloadTypeID))
     let storagePolicy: Int(compilerIntTableValue(table: arena.tables.members, row: payloadRow, column: 13))
     if payloadTypeID < 0 || payloadTypeKind == compilerBodyTypeUnknown()
@@ -3178,7 +3244,7 @@ function compilerBodyArenaResolveAppliedEnumCasePattern(arena: CompilerBodyArena
     while argumentOrdinal < argumentCount {
         let argumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: patternNodeID, role: compilerSyntaxRoleArgument(), ordinal: argumentOrdinal))
         if argumentNodeID < 0
-            || compilerBodyArenaResolveEnumPayloadPatternBinding(arena: arena, caseMemberRow: caseMemberRow, argumentNodeID: argumentNodeID, caseRegionNodeID: caseRegionNodeID) != 0 { return 0 - 1 }
+            || compilerBodyArenaResolveEnumPayloadPatternBinding(arena: arena, enumTypeID: enumTypeID, caseMemberRow: caseMemberRow, argumentNodeID: argumentNodeID, caseRegionNodeID: caseRegionNodeID) != 0 { return 0 - 1 }
         argumentOrdinal: argumentOrdinal + 1
     }
     return caseMemberRow

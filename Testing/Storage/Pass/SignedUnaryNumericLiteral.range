@@ -1,0 +1,7 @@
+@main {
+    let value: Int<.signed, 8>(-4)
+    if value == value {
+        return 7
+    }
+    return 1
+}

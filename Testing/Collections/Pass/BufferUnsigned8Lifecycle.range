@@ -1,8 +1,8 @@
-function makeBytes(): Buffer<Int<8, .unsigned>> {
-    state bytes: Buffer<Int<8, .unsigned>>(capacity: 1)
-    let first: Int<8, .unsigned>(3)
-    let second: Int<8, .unsigned>(7)
-    let third: Int<8, .unsigned>(11)
+function makeBytes(): Buffer<Int<.unsigned, 8>> {
+    state bytes: Buffer<Int<.unsigned, 8>>(capacity: 1)
+    let first: Int<.unsigned, 8>(3)
+    let second: Int<.unsigned, 8>(7)
+    let third: Int<.unsigned, 8>(11)
     bytes.append(element: first)
     bytes.append(element: second)
     bytes.append(element: third)
@@ -10,8 +10,8 @@ function makeBytes(): Buffer<Int<8, .unsigned>> {
 }
 
 @main {
-    state bytes: Buffer<Int<8, .unsigned>>(makeBytes())
-    let expected: Int<8, .unsigned>(13)
+    state bytes: Buffer<Int<.unsigned, 8>>(makeBytes())
+    let expected: Int<.unsigned, 8>(13)
     bytes.update(element: expected, index: 1)
     let valid: Bool(bytes.count == 3 && bytes.element(index: 1) == expected)
     bytes.destroy()
