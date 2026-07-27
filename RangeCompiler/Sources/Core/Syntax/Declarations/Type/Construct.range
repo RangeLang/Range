@@ -1,4 +1,14 @@
-@syntax
+@syntax {
+    declaration:
+        [declaration.macros]
+        construct [declaration.identifier][declaration.generics?]:
+            [declaration.conformances?] {
+                [declaration.members]
+            }
+
+    application:
+        [application.type]([application.arguments])
+}
 construct Construct {
     let declaration: Declaration
     let application: Application
@@ -14,7 +24,7 @@ construct Construct {
         let conformances: [NominalTypeReference]
         let members: [@member]
 
-        function expand(_ expansion: () -> [@syntax])
+        function expand(_ expansion: () -> [@syntax]): RangeGraphDelta
     }
 
     @graph(.application)

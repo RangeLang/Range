@@ -79,7 +79,7 @@ function compilerProjectDefaultsReasonName(reason: Int): String {
     return String("none")
 }
 
-function compilerProjectMacroApplicationName(tables: CompilerSyntaxTables, applicationRow: Int): String {
+function compilerMacroApplicationName(tables: CompilerSyntaxTables, applicationRow: Int): String {
     if applicationRow < 0 || applicationRow >= compilerIntTableRowCount(table: tables.macroApplications) { return String("") }
     let fileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
     return compilerTypedSyntaxLocalText(
@@ -163,23 +163,25 @@ function compilerProjectDefaultsForTarget(tables: CompilerSyntaxTables, projectT
 function compilerProjectDefaultsResolve(tables: CompilerSyntaxTables): CompilerProjectDefaults {
     let pointerBits: Int(compilerBuiltinTargetPointerBits())
     state projectTargetSyntaxID: Int(0 - 1)
-    state projectApplicationCount: Int(0)
-    state applicationRow: Int(0)
-    while applicationRow < compilerIntTableRowCount(table: tables.macroApplications) {
-        if compilerProjectMacroApplicationName(tables: tables, applicationRow: applicationRow) == String("project") {
-            let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12))
-            let targetKind: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 13))
-            if targetSyntaxID >= 0 && targetKind == compilerSyntaxKindConstruct() {
+    state projectResultCount: Int(0)
+    state resultRow: Int(0)
+    while resultRow < compilerIntTableRowCount(table: tables.macroResults) {
+        let resultNominalSyntaxID: Int(compilerIntTableValue(table: tables.macroResults, row: resultRow, column: 7))
+        if resultNominalSyntaxID >= 0
+            && compilerDeclarationNameForSyntaxID(tables: tables, syntaxID: resultNominalSyntaxID) == String("ProjectDefaults") {
+            let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroResults, row: resultRow, column: 4))
+            if targetSyntaxID >= 0
+                && compilerIntTableValue(table: tables.syntaxIndex, row: targetSyntaxID, column: 0) == compilerSyntaxKindConstruct() {
                 projectTargetSyntaxID: targetSyntaxID
-                projectApplicationCount: projectApplicationCount + 1
+                projectResultCount: projectResultCount + 1
             }
         }
-        applicationRow: applicationRow + 1
+        resultRow: resultRow + 1
     }
-    if projectApplicationCount > 1 {
+    if projectResultCount > 1 {
         return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: pointerBits, integerWasOverridden: false, boolWasOverridden: false, reason: compilerProjectDefaultsReasonDuplicateProject(), relatedRow: 0 - 1, isValid: false)
     }
-    if projectApplicationCount == 0 {
+    if projectResultCount == 0 {
         return CompilerProjectDefaults(targetPointerBits: pointerBits, integerBits: 32, integerWasOverridden: false, boolWasOverridden: false, reason: compilerProjectDefaultsReasonNone(), relatedRow: 0 - 1, isValid: true)
     }
     return compilerProjectDefaultsForTarget(tables: tables, projectTargetSyntaxID: projectTargetSyntaxID, pointerBits: pointerBits)
@@ -241,7 +243,7 @@ function compilerStorageApplicationCountForTarget(tables: CompilerSyntaxTables, 
     state count: Int(0)
     state row: Int(0)
     while row < compilerIntTableRowCount(table: tables.macroApplications) {
-        if compilerProjectMacroApplicationName(tables: tables, applicationRow: row) == String("storage")
+        if compilerMacroApplicationName(tables: tables, applicationRow: row) == String("storage")
             && compilerIntTableValue(table: tables.macroApplications, row: row, column: 12) == targetSyntaxID {
             count: count + 1
         }
@@ -331,7 +333,7 @@ function compilerStorageLiteralFactsResolveApplications(tables: CompilerSyntaxTa
     state decimalSeparatorByte: Int(0 - 1)
     state row: Int(0)
     while row < compilerIntTableRowCount(table: tables.macroApplications) {
-        let macroName: String(compilerProjectMacroApplicationName(tables: tables, applicationRow: row))
+        let macroName: String(compilerMacroApplicationName(tables: tables, applicationRow: row))
         if macroName == String("storage") {
             storageApplicationCount: storageApplicationCount + 1
             let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: row, column: 12))
@@ -352,7 +354,7 @@ function compilerStorageLiteralFactsResolveApplications(tables: CompilerSyntaxTa
     }
     row: 0
     while row < compilerIntTableRowCount(table: tables.macroApplications) {
-        if compilerProjectMacroApplicationName(tables: tables, applicationRow: row) == String("literal") {
+        if compilerMacroApplicationName(tables: tables, applicationRow: row) == String("literal") {
             literalApplicationCount: literalApplicationCount + 1
             let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: row, column: 12))
             let targetKind: Int(compilerIntTableValue(table: tables.macroApplications, row: row, column: 13))
@@ -412,12 +414,12 @@ function compilerStorageLiteralFactsResolve(tables: CompilerSyntaxTables): Compi
         }
         if kind == compilerFormulaFactStorage() {
             storageFactCount: storageFactCount + 1
-            if compilerProjectMacroApplicationName(tables: tables, applicationRow: applicationRow) != String("storage") {
+            if compilerMacroApplicationName(tables: tables, applicationRow: applicationRow) != String("storage") {
                 return compilerStorageLiteralInvalid(storageApplicationCount: applicationFacts.storageApplicationCount, literalApplicationCount: applicationFacts.literalApplicationCount, numericTargetSyntaxID: applicationFacts.numericTargetSyntaxID, decimalTargetSyntaxID: applicationFacts.decimalTargetSyntaxID, decimalSeparatorByte: applicationFacts.decimalSeparatorByte, reason: compilerStorageLiteralReasonInvalidCompilerFormulaFact(), relatedRow: row)
             }
         } else if kind == compilerFormulaFactLiteral() {
             literalFactCount: literalFactCount + 1
-            if compilerProjectMacroApplicationName(tables: tables, applicationRow: applicationRow) != String("literal") {
+            if compilerMacroApplicationName(tables: tables, applicationRow: applicationRow) != String("literal") {
                 return compilerStorageLiteralInvalid(storageApplicationCount: applicationFacts.storageApplicationCount, literalApplicationCount: applicationFacts.literalApplicationCount, numericTargetSyntaxID: applicationFacts.numericTargetSyntaxID, decimalTargetSyntaxID: applicationFacts.decimalTargetSyntaxID, decimalSeparatorByte: applicationFacts.decimalSeparatorByte, reason: compilerStorageLiteralReasonInvalidCompilerFormulaFact(), relatedRow: row)
             }
             if category == compilerFormulaLiteralNumeric() { numericFactTarget: targetSyntaxID }
@@ -2854,7 +2856,8 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
                 let constructDeclarationRow: Int(compilerDeclarationIndexLookup(tables: arena.tables, index: index, name: calleeName, kindTag: compilerSyntaxKindConstruct()))
                 if constructDeclarationRow >= 0 {
                     let calledConstructSyntaxID: Int(compilerIntTableValue(table: arena.tables.declarations, row: constructDeclarationRow, column: 0))
-                    if !compilerNominalLLVMLayoutIsSupported(tables: arena.tables, declarationRow: constructDeclarationRow) { return 0 - 1 }
+                    if arena.ownerKind != compilerBodyArenaOwnerMacro()
+                        && !compilerNominalLLVMLayoutIsSupported(tables: arena.tables, declarationRow: constructDeclarationRow) { return 0 - 1 }
                     targetKind: compilerBodyResolutionConstruct()
                     targetID: calledConstructSyntaxID
                     returnTypeKind: compilerBodyTypeConstruct()

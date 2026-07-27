@@ -1,6 +1,8 @@
 compilerMacroSnapshot
 compilerSourceFile\trole=core\tpath=Core/Macro/Project.range
-macro project(): Construct { environment in
+construct ProjectDefaults {}
+
+macro project(): Construct -> ProjectDefaults { environment in
     let integerCount: Int(environment.target.memberCount("integer"))
     let boolCount: Int(environment.target.memberCount("bool"))
     if integerCount == 0 && boolCount == 0 {
@@ -10,21 +12,25 @@ macro project(): Construct { environment in
                 state bool: Bool
             }
         }
+        return ProjectDefaults()
     }
-    if integerCount == 0 {
+    if integerCount == 0 && boolCount != 0 {
         @expand {
             extension #(environment.target.declaration.self) {
                 state integer: Int
             }
         }
+        return ProjectDefaults()
     }
-    if boolCount == 0 {
+    if boolCount == 0 && integerCount != 0 {
         @expand {
             extension #(environment.target.declaration.self) {
                 state bool: Bool
             }
         }
+        return ProjectDefaults()
     }
+    return ProjectDefaults()
 }
 compilerSourceFile\trole=project\tpath=Project.range
 @project

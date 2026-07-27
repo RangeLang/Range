@@ -152,11 +152,6 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
         compilerSyntaxTablesDestroy(tables: tables)
         return macroDiagnosticOutput
     }
-    let projectDefaults: CompilerProjectDefaults(compilerProjectDefaultsResolve(tables: tables))
-    if !projectDefaults.isValid {
-        compilerSyntaxTablesDestroy(tables: tables)
-        return "compilerError\tkind=invalidProjectDefaults\treason=\(compilerProjectDefaultsReasonName(reason: projectDefaults.reason))\trelatedRow=\(projectDefaults.relatedRow)"
-    }
     let executionIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: tables))
     if !executionIndex.isValid {
         compilerDeclarationIndexDestroy(index: executionIndex)
@@ -170,6 +165,13 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
         compilerDeclarationIndexDestroy(index: executionIndex)
         compilerSyntaxTablesDestroy(tables: tables)
         return executionOutput
+    }
+    let projectDefaults: CompilerProjectDefaults(compilerProjectDefaultsResolve(tables: tables))
+    if !projectDefaults.isValid {
+        compilerGraphDeltaDestroy(delta: execution.graphDelta)
+        compilerDeclarationIndexDestroy(index: executionIndex)
+        compilerSyntaxTablesDestroy(tables: tables)
+        return "compilerError\tkind=invalidProjectDefaults\treason=\(compilerProjectDefaultsReasonName(reason: projectDefaults.reason))\trelatedRow=\(projectDefaults.relatedRow)"
     }
     let storageLiteralFacts: CompilerStorageLiteralFacts(compilerStorageLiteralFactsResolve(tables: tables))
     if !storageLiteralFacts.isValid {

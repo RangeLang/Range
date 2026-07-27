@@ -18,8 +18,9 @@ Usage:
   scripts/check-range-compiler-candidate --help
 
 DIR defaults to RangeCompiler/Sources/Compiler. The stage2-plan checkpoint
-resolves the shared immutable Stage 2 artifact, then independently proves that
-Stage 2 can read the canonical candidate build plan and source set.
+resolves the shared immutable development Stage 2 artifact (-O0, no LTO), then
+independently proves that Stage 2 can read the canonical candidate build plan
+and source set. The full candidate path remains optimized with ThinLTO.
 
 The bootstrap bridge mode uses the manifested seed to compile an immutable
 old-syntax Phase1 source bundle, audits that one-shot bridge, and uses it only
@@ -5314,6 +5315,12 @@ main() {
     else
         usage >&2
         exit 64
+    fi
+
+    if [[ "$checkpoint_mode" == stage2-plan ]]; then
+        RANGE_STAGE2_PROFILE="development"
+        COMPILER_OPTIMIZATION="-O0"
+        COMPILER_LTO="-fno-lto"
     fi
 
     [[ -d "$compiler_input" ]] || fail "missing compiler directory: $compiler_input"

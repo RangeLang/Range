@@ -1,0 +1,35 @@
+construct SyntaxTemplate {
+    let written: WrittenSyntax
+    let elements: [Element]
+
+    construct Element {
+        let written: WrittenSyntax
+        let capture: Capture?
+    }
+
+    construct Capture {
+        let member: Identifier
+        let type: TypeReference
+        let cardinality: Cardinality
+    }
+
+    enum Cardinality {
+        case one
+        case optional
+        case many
+    }
+
+    construct Binding {
+        let capture: Capture
+        let values: [@syntax]
+    }
+
+    construct Match {
+        let template: SyntaxTemplate
+        let source: @syntax
+        let bindings: [Binding]
+    }
+
+    function match(source: WrittenSyntax): Parsed<Match>
+    function render(match: Match): WrittenSyntax
+}

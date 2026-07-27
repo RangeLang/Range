@@ -74,6 +74,55 @@ function compilerGraphDeltaAppend(delta: CompilerGraphDelta, table: CompilerIntT
     return graphAppendStatus
 }
 
+function compilerGraphDeltaMergeIdentityTable(delta: CompilerGraphDelta, destination: CompilerIntTable, source: CompilerIntTable): Int {
+    if destination.columnCount != source.columnCount || !compilerIntTableIsComplete(table: source) { return 0 - 1 }
+    let rowBase: Int(compilerIntTableRowCount(table: destination))
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: source) {
+        state column: Int(0)
+        while column < source.columnCount {
+            state value: Int(compilerIntTableValue(table: source, row: row, column: column))
+            if column == 0 { value: value + rowBase }
+            if compilerGraphDeltaAppend(delta: delta, table: destination, value: value) != 0 { return 0 - 1 }
+            column: column + 1
+        }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerGraphDeltaMergeFacts(delta: CompilerGraphDelta, destination: CompilerIntTable, source: CompilerIntTable, nodeBase: Int): Int {
+    if destination.columnCount != source.columnCount || source.columnCount != compilerGraphFactColumnCount()
+        || !compilerIntTableIsComplete(table: source) { return 0 - 1 }
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: source) {
+        state column: Int(0)
+        while column < source.columnCount {
+            state value: Int(compilerIntTableValue(table: source, row: row, column: column))
+            if column == 1 || column == 2 || column == 4 { value: value + nodeBase }
+            if compilerGraphDeltaAppend(delta: delta, table: destination, value: value) != 0 { return 0 - 1 }
+            column: column + 1
+        }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerGraphDeltaMerge(delta: CompilerGraphDelta, source: CompilerGraphDelta): Int {
+    if source.failures.count != 0 || delta.failures.count != 0
+        || compilerIntTableRowCount(table: source.nominals) != 0
+        || compilerIntTableRowCount(table: source.nominalReferences) != 0 { return 0 - 1 }
+    let nodeBase: Int(compilerIntTableRowCount(table: delta.nodes))
+    if compilerGraphDeltaMergeIdentityTable(delta: delta, destination: delta.nodes, source: source.nodes) != 0
+        || compilerGraphDeltaMergeFacts(delta: delta, destination: delta.facts, source: source.facts, nodeBase: nodeBase) != 0
+        || compilerGraphDeltaMergeIdentityTable(delta: delta, destination: delta.generatedFunctions, source: source.generatedFunctions) != 0
+        || compilerGraphDeltaMergeIdentityTable(delta: delta, destination: delta.generatedMembers, source: source.generatedMembers) != 0 {
+        compilerGraphDeltaPoison(delta: delta)
+        return 0 - 1
+    }
+    return 0
+}
+
 function compilerGraphDeltaAppendNode(delta: CompilerGraphDelta, kindTag: Int, syntaxID: Int, declarationSyntaxID: Int, fileID: Int, start: Int, end: Int, facetKind: Int): Int {
     let nodeID: Int(compilerIntTableRowCount(table: delta.nodes))
     if syntaxID < 0 || fileID < 0 || start < 0 || end < start || facetKind <= 0 {

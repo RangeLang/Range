@@ -52,6 +52,39 @@ construct RangeGraphRelationship {
     let kind: String
 }
 
+construct RangeGraphDelta {
+    let origin: Identifier
+    let changes: [Change]
+    let dependencies: [Dependency]
+    let diagnostics: [Diagnostic]
+
+    enum Change {
+        case insert(value: @syntax, parent: Identifier?, ordinal: Int)
+        case replace(target: Identifier, value: @syntax)
+        case remove(target: Identifier)
+        case relate(relationship: RangeGraphRelationship)
+    }
+
+    construct Dependency {
+        let observer: Identifier
+        let observed: Identifier
+        let kind: String
+    }
+
+    construct Diagnostic {
+        let severity: Severity
+        let message: String
+        let source: @syntax?
+    }
+
+    enum Severity {
+        case error
+        case warning
+        case information
+        case hint
+    }
+}
+
 @builtin
 construct GraphSyntax {
     let identifier: Identifier

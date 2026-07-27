@@ -7,6 +7,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/check-range-compiler-candidate"
 source "$SCRIPT_DIR/resolve-range-stage2-compiler"
 
+# Root-value is the tight compiler-development loop. Its Stage 2 artifact is
+# deliberately disposable and fast to link; optimized/LTO artifacts remain the
+# responsibility of smoke, candidate, fixed-point, and promotion gates.
+RANGE_STAGE2_PROFILE="development"
+SEED_COMPILER_OPTIMIZATION="-O2"
+SEED_COMPILER_LTO="-flto=thin"
+COMPILER_OPTIMIZATION="-O0"
+COMPILER_LTO="-fno-lto"
+
 usage() {
     cat <<'USAGE'
 Usage:
@@ -15,8 +24,9 @@ Usage:
   scripts/check-range-root-value --help
 
 DIR defaults to RangeCompiler/Sources/Compiler. The command resolves a
-content-addressed Stage 2 compiler for the current accepted seed, runtime, and
-compiler sources, then validates only RootValue boundary-forward-mixed.
+content-addressed development Stage 2 compiler (-O0, no LTO) for the current
+accepted seed, runtime, and compiler sources, then validates only RootValue
+boundary-forward-mixed.
 The controls mode runs the complete neighboring RootValue positive and negative
 fixture set against the same cached Stage 2 compiler. Both modes first verify
 the focused @project scalar-default and @storage/@literal fixtures against

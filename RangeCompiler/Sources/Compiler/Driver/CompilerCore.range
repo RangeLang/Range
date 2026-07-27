@@ -227,6 +227,7 @@ construct CompilerSyntaxTables {
     let macroCapabilityHandles: CompilerIntTable
     let macroExecutionEvents: CompilerIntTable
     let macroReadDependencies: CompilerIntTable
+    let macroResults: CompilerIntTable
     let compilerFormulaFacts: CompilerIntTable
     let macroExpansionTemplates: CompilerIntTable
     let pendingGeneratedFunctions: CompilerIntTable
@@ -407,6 +408,21 @@ construct CompilerGraphDelta {
     let failures: Buffer<Int>
 }
 
+construct CompilerMacroEvaluationOutcome {
+    let status: Int
+    let diagnosticCode: Int
+    let eventCount: Int
+    let readDependencyCount: Int
+    let mirOperationCount: Int
+    let stepCount: Int
+    let hasResult: Bool
+    let resultKind: Int
+    let resultTypeKind: Int
+    let resultNominalSyntaxID: Int
+    let resultScalar: Int
+    let resultChildCount: Int
+}
+
 construct CompilerMacroInvocationOutcome {
     let status: Int
     let diagnosticCode: Int
@@ -414,6 +430,13 @@ construct CompilerMacroInvocationOutcome {
     let readDependencyCount: Int
     let mirOperationCount: Int
     let stepCount: Int
+    let hasResult: Bool
+    let resultKind: Int
+    let resultTypeKind: Int
+    let resultNominalSyntaxID: Int
+    let resultScalar: Int
+    let resultChildCount: Int
+    let graphDelta: CompilerGraphDelta
 }
 
 construct CompilerMacroValueStore {

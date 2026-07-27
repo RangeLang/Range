@@ -16,6 +16,9 @@
 
 RANGE_STAGE2_CACHE_SCHEMA=2
 RANGE_STAGE2_CACHE_ROOT="${RANGE_STAGE2_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Library/Caches}/Range/stage2-compiler}"
+RANGE_STAGE2_PROFILE="${RANGE_STAGE2_PROFILE:-optimized}"
+SEED_COMPILER_OPTIMIZATION="${SEED_COMPILER_OPTIMIZATION:-$COMPILER_OPTIMIZATION}"
+SEED_COMPILER_LTO="${SEED_COMPILER_LTO:-$COMPILER_LTO}"
 
 range_stage2_write_cache_key_material() {
     local output="$1"
@@ -43,6 +46,7 @@ range_stage2_write_cache_key_material() {
 
     /usr/bin/printf 'schema=%s\n' "$RANGE_STAGE2_CACHE_SCHEMA" > "$output"
     /usr/bin/printf 'pipeline=accepted-seed-stage2\n' >> "$output"
+    /usr/bin/printf 'profile=%s\n' "$RANGE_STAGE2_PROFILE" >> "$output"
     /usr/bin/printf 'targetPlatform=%s\n' "$(manifest_value target.platform)" >> "$output"
     /usr/bin/printf 'targetArchitecture=%s\n' "$(manifest_value target.architecture)" >> "$output"
     /usr/bin/printf 'targetPointerBits=%s\n' "$(manifest_value target.pointerBits)" >> "$output"
@@ -61,7 +65,7 @@ range_stage2_write_cache_key_material() {
     /usr/bin/printf 'environmentSDKROOT=%s\nenvironmentDeploymentTarget=%s\nenvironmentDeveloperDirectory=%s\n' \
         "${SDKROOT:-}" "${MACOSX_DEPLOYMENT_TARGET:-}" "${DEVELOPER_DIR:-}" >> "$output"
     /usr/bin/printf 'seedLinkArgv=%s|%s|-Wno-override-module|-x|ir|seed|-x|c|runtime-set|-o|output\n' \
-        "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" >> "$output"
+        "$SEED_COMPILER_OPTIMIZATION" "$SEED_COMPILER_LTO" >> "$output"
     /usr/bin/printf 'compilerEmitArgv=seed-executable|source-bundle\n' >> "$output"
     /usr/bin/printf 'llvmValidateArgv=-Wno-override-module|-x|ir|-c|stage2-llvm|-o|object\n' >> "$output"
     /usr/bin/printf 'stage2LinkArgv=%s|%s|-Wno-override-module|stage2-llvm|runtime-set|-o|output\n' \
@@ -205,6 +209,7 @@ resolve_stage2_compiler() {
     local build_directory seed seed_executable stage2_llvm stage2_executable
     local lock_directory publish_directory invalid_directory
     local lock_status build_status publish_status
+    local range_stage2_phase_started range_stage2_build_started
 
     [[ "$require_llvm" == "0" || "$require_llvm" == "1" ]] \
         || fail "shared Stage 2 resolver expected require_llvm 0 or 1"
@@ -221,7 +226,7 @@ resolve_stage2_compiler() {
         return 0
     fi
 
-    if [[ "$require_llvm" == "0" ]]; then
+    if [[ "$require_llvm" == "0" && "$RANGE_STAGE2_PROFILE" == "optimized" ]]; then
         range_stage2_write_legacy_cache_key_material "$legacy_key_material"
         legacy_cache_key="$(sha256 "$legacy_key_material")"
         legacy_cache_directory="$RANGE_STAGE2_CACHE_ROOT/$legacy_cache_key"
@@ -270,14 +275,23 @@ resolve_stage2_compiler() {
     seed_executable="$WORK_ROOT/RangeCompilerSeed"
     stage2_llvm="$build_directory/RangeCompiler.ll"
     stage2_executable="$build_directory/RangeCompiler"
+    range_stage2_build_started="$(date +%s)"
     set +e
     (
         set -e
-        clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module \
+        range_stage2_phase_started="$(date +%s)"
+        clang "$SEED_COMPILER_OPTIMIZATION" "$SEED_COMPILER_LTO" -Wno-override-module \
             -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
+        echo "stage2Timing profile=$RANGE_STAGE2_PROFILE phase=seed-link seconds=$(($(date +%s) - range_stage2_phase_started))"
+        range_stage2_phase_started="$(date +%s)"
         emit_candidate_llvm "$seed_executable" "$SOURCE_BUNDLE" "$stage2_llvm" shared-stage2
+        echo "stage2Timing profile=$RANGE_STAGE2_PROFILE phase=llvm-emission seconds=$(($(date +%s) - range_stage2_phase_started))"
+        range_stage2_phase_started="$(date +%s)"
         validate_llvm "$stage2_llvm"
+        echo "stage2Timing profile=$RANGE_STAGE2_PROFILE phase=llvm-validation seconds=$(($(date +%s) - range_stage2_phase_started))"
+        range_stage2_phase_started="$(date +%s)"
         link_llvm "$stage2_llvm" "$stage2_executable"
+        echo "stage2Timing profile=$RANGE_STAGE2_PROFILE phase=stage2-link seconds=$(($(date +%s) - range_stage2_phase_started))"
     )
     build_status=$?
     set -e
@@ -285,6 +299,7 @@ resolve_stage2_compiler() {
         range_stage2_release_cache_lock "$lock_directory"
         fail "shared Stage 2 artifact build failed"
     fi
+    echo "stage2Timing profile=$RANGE_STAGE2_PROFILE phase=total seconds=$(($(date +%s) - range_stage2_build_started))"
 
     if ! publish_directory="$(/usr/bin/mktemp -d "$RANGE_STAGE2_CACHE_ROOT/.stage2-publish.XXXXXX")"; then
         range_stage2_release_cache_lock "$lock_directory"

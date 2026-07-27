@@ -10,8 +10,13 @@ construct Macro {
         let graph: RangeGraph
         let source: ProgramSourceFile
 
-        function expand(_ expansion: () -> [@syntax])
-        function omit()
+        function expand(_ expansion: () -> [@syntax]): RangeGraphDelta
+        function omit(): RangeGraphDelta
+    }
+
+    construct Execution<Value> {
+        let value: Value
+        let delta: RangeGraphDelta
     }
 
     construct Target {

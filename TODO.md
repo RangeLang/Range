@@ -65,6 +65,14 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       `state bool: Bool` declarations.
     - Focused fixtures prove the empty-project expansion and preservation of
       an explicit `state integer: Int<4>` override.
+  - [x] Remove `project` name-based collection from compiler semantics.
+    - Successful macro invocations materialize generic typed result rows with
+      invocation, target, nominal type, scalar, and child-count provenance.
+      The Range-authored macro returns `ProjectDefaults()`, and lowering
+      resolves that value only after ordinary macro execution.
+    - `compilerFormulaExecuteApplication` has no `project` branch; project
+      defaults are selected by the returned `ProjectDefaults` nominal rather
+      than by the attached macro's spelling.
   - [x] Allow `state integer: Int<4>` and full signed-width forms to override
     the project integer default without an `override` keyword.
   - [ ] Route every bare and partially specialized `Int` use through the
@@ -165,6 +173,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           - [ ] Supply compile-time ownership return summaries for
             Range-authored functions that return tracked arrays.
           - [ ] Execute enum payloads, closures, and syntax-valued returns.
+      - [ ] Preserve a compile-time construct result created after a
+        side-effecting conditional branch join.
+        - The `project` macro currently returns `ProjectDefaults()` inside
+          each expansion branch because constructing the same value in the
+          shared continuation is not yet materialized by the macro evaluator.
       - [ ] Treat `[@member]` as a deferred compile-time collection: collect
         the complete conforming child set before synthesizing its physical
         storage.
@@ -194,6 +207,23 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [ ] Make the direct syntax values the semantic witnesses consumed by
       macros and lowering, leaving integer tables as an internal compact
       backing store rather than a parallel public model.
+      - [x] Define the Range-authored bidirectional `SyntaxTemplate` value
+        model with fixed written elements, member-linked captures,
+        one/optional/many cardinality, canonical syntax bindings, matching,
+        and rendering.
+        - `Construct.range` now authors declaration and application templates
+          directly in its `@syntax` body, including ordered macro/member
+          captures and optional generic/conformance groups.
+      - [ ] Execute `@syntax` by matching its raw template body against the
+        annotated construct's members, materializing a canonical value, and
+        using the same template to render values consumed by `@expand`.
+      - [x] Model every macro update as one transactional `RangeGraphDelta`.
+        - The delta carries ordered insert/replace/remove/relationship changes,
+          observed graph dependencies, and diagnostics with the invoking macro
+          application as its origin.
+        - `Macro.Execution<Value>` pairs ordinary Range return-value flow with
+          the graph delta; `expand` and `omit` return deltas instead of being
+          privileged hidden mutations.
       - [x] Give every macro-attachable declaration an ordered
         `macros: [Macro.Application]` source shape.
       - [x] Unify authored identifier and semantic graph identity as one
@@ -298,6 +328,19 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - The final verified shared-cache reuse completed root-value in 3.49
       seconds and smoke in 3.72 seconds with cache key
       `22ef98c2c4267c598b7677af4ff9725b46e831fbe705632aeda60b2f25586660`.
+  - [x] Add a profile-sensitive development Stage 2 for root-value and smoke.
+    - Keep the accepted-seed producer optimized, but validate and link the
+      disposable Stage 2 with `-O0` and no LTO. Candidate, fixed-point, and
+      promotion paths retain `-O2` plus ThinLTO.
+    - Key the profile and both producer/output flag sets into the immutable
+      cache, so development artifacts cannot satisfy optimized gates.
+    - Emit phase timings on cache misses. The first measured development miss
+      spent 18 seconds linking the optimized seed, 593 seconds emitting LLVM,
+      1 second validating LLVM, and 2 seconds linking Stage 2.
+  - [ ] Make compiler LLVM emission incremental or cacheable below the full
+    source-bundle key.
+    - Phase timings show self-emission, not Clang or linking, dominates a
+      compiler-source cache miss; preserve full candidate/fixed-point proofs.
   - [ ] Remove the labeled schema-1 executable-only compatibility lookup after
     the next compiler-source miss publishes the first schema-2 LLVM plus
     executable entry; bound cleanup of quarantined invalid entries then.
@@ -329,6 +372,18 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     code.
   - [ ] Replace the temporary Clang LLVM validation/link provider with a
     versioned, replaceable object/link backend.
+    - [ ] Add a `range backend` boundary that consumes emitted LLVM and
+      produces a target object without routing through the Clang driver.
+      - The current machine has `/usr/bin/ld` but no `llc`, `llvm-as`, or
+        `opt`; `ld` cannot consume LLVM IR, so this requires a shipped LLVM
+        target backend or a Range-owned Mach-O/object writer.
+    - [ ] Invoke the platform linker directly with a deterministic,
+      manifest-recorded SDK/runtime link plan after object production.
+    - [ ] Replace `Core/Package/LinkPlan.range`'s authored `clang` process with
+      that backend plus direct-link plan.
+    - [ ] Remove Clang identity and flags from Stage 2 cache/build-plan keys
+      only after object generation, runtime compilation, validation, and
+      linking have independent versioned owners.
 
 ## Repository Layout
 

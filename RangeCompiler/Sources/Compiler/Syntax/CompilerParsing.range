@@ -553,10 +553,13 @@ function compilerMacroRenderSnapshot(tables: CompilerSyntaxTables): String {
 
 function compilerMacroExecutionSummaryForValidIndex(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex): String {
     let execution: CompilerMacroExecutionResult(compilerMacroExecution(tables: tables, index: index))
+    let defaults: CompilerProjectDefaults(compilerProjectDefaultsResolve(tables: tables))
     let memory: CompilerMemoryGraph(compilerMemoryGraphCreate())
     state output: String("")
     if execution.status != 0 {
         output: compilerMacroRenderExecutionError(tables: tables, result: execution)
+    } else if !defaults.isValid {
+        output: "compilerError\tkind=invalidProjectDefaults\treason=\(compilerProjectDefaultsReasonName(reason: defaults.reason))\trelatedRow=\(defaults.relatedRow)\n"
     } else {
         let storageLiteralFacts: CompilerStorageLiteralFacts(compilerStorageLiteralFactsResolve(tables: tables))
         if !storageLiteralFacts.isValid {
@@ -569,7 +572,7 @@ function compilerMacroExecutionSummaryForValidIndex(tables: CompilerSyntaxTables
         || !compilerMemoryMacroFamilyRepresentationsAreValid(tables: tables, memory: memory) {
                 output: "\(compilerNativeDiagnostic(kind: String("invalidMacroFamilyMemoryGraph")))\(compilerMemoryRenderMacroFamilySnapshot(memory: memory))"
             } else {
-                output: "literalStorage\tvalid=true\tstorageApplicationCount=\(storageLiteralFacts.storageApplicationCount)\tliteralApplicationCount=\(storageLiteralFacts.literalApplicationCount)\tnumericTargetSyntaxID=\(storageLiteralFacts.numericTargetSyntaxID)\tdecimalTargetSyntaxID=\(storageLiteralFacts.decimalTargetSyntaxID)\tdecimalSeparatorByte=\(storageLiteralFacts.decimalSeparatorByte)\ntextLiteralStorage\tvalid=true\ttextTargetSyntaxID=\(textLiteralFacts.textTargetSyntaxID)\tsemanticElementSyntaxID=\(textLiteralFacts.semanticElementSyntaxID)\tencoding=\(textLiteralFacts.encoding)\tcodeUnitBits=\(textLiteralFacts.codeUnitBits)\tcodeUnitSignedness=\(textLiteralFacts.codeUnitSignedness)\n\(compilerMacroRenderExecutionSnapshot(tables: tables, result: execution))\(compilerMacroRenderSnapshot(tables: tables))\(compilerMemoryRenderMacroFamilySnapshot(memory: memory))"
+                output: "projectDefaults\tvalid=true\ttargetPointerBits=\(defaults.targetPointerBits)\tintegerBits=\(defaults.integerBits)\tintegerOverridden=\(defaults.integerWasOverridden)\tboolOverridden=\(defaults.boolWasOverridden)\nliteralStorage\tvalid=true\tstorageApplicationCount=\(storageLiteralFacts.storageApplicationCount)\tliteralApplicationCount=\(storageLiteralFacts.literalApplicationCount)\tnumericTargetSyntaxID=\(storageLiteralFacts.numericTargetSyntaxID)\tdecimalTargetSyntaxID=\(storageLiteralFacts.decimalTargetSyntaxID)\tdecimalSeparatorByte=\(storageLiteralFacts.decimalSeparatorByte)\ntextLiteralStorage\tvalid=true\ttextTargetSyntaxID=\(textLiteralFacts.textTargetSyntaxID)\tsemanticElementSyntaxID=\(textLiteralFacts.semanticElementSyntaxID)\tencoding=\(textLiteralFacts.encoding)\tcodeUnitBits=\(textLiteralFacts.codeUnitBits)\tcodeUnitSignedness=\(textLiteralFacts.codeUnitSignedness)\n\(compilerMacroRenderExecutionSnapshot(tables: tables, result: execution))\(compilerMacroRenderSnapshot(tables: tables))\(compilerMemoryRenderMacroFamilySnapshot(memory: memory))"
             }
         }
     }
@@ -583,21 +586,12 @@ function compilerMacroExecutionSummaryForValidIndex(tables: CompilerSyntaxTables
 }
 
 function compilerMacroSummaryForLinkedTables(tables: CompilerSyntaxTables): String {
-    let defaults: CompilerProjectDefaults(compilerProjectDefaultsResolve(tables: tables))
-    if !defaults.isValid {
-        return "compilerError\tkind=invalidProjectDefaults\treason=\(compilerProjectDefaultsReasonName(reason: defaults.reason))\trelatedRow=\(defaults.relatedRow)\n"
-    }
     let declarationIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: tables))
     state output: String("")
     if !declarationIndex.isValid {
         output: "compilerError\tkind=invalidDeclarationIndex\n"
     } else {
-        let executionOutput: String(compilerMacroExecutionSummaryForValidIndex(tables: tables, index: declarationIndex))
-        if compilerNativeOutputIsError(output: executionOutput) {
-            output: executionOutput
-        } else {
-            output: "projectDefaults\tvalid=true\ttargetPointerBits=\(defaults.targetPointerBits)\tintegerBits=\(defaults.integerBits)\tintegerOverridden=\(defaults.integerWasOverridden)\tboolOverridden=\(defaults.boolWasOverridden)\n\(executionOutput)"
-        }
+        output: compilerMacroExecutionSummaryForValidIndex(tables: tables, index: declarationIndex)
     }
     if compilerDeclarationIndexDestroy(index: declarationIndex) != 0 {
         output: "compilerError\tkind=macroOwnershipFailure\n"
@@ -637,6 +631,12 @@ function compilerNativeSourceSetLLVMTextForValidIndex(source: String, declaratio
         compilerGraphDeltaDestroy(delta: execution.graphDelta)
         compilerDeclarationIndexDestroy(index: executionIndex)
     } else {
+        let defaults: CompilerProjectDefaults(compilerProjectDefaultsResolve(tables: declarationTables))
+        if !defaults.isValid {
+            output: "compilerError\tkind=invalidProjectDefaults\treason=\(compilerProjectDefaultsReasonName(reason: defaults.reason))\trelatedRow=\(defaults.relatedRow)\n"
+            compilerGraphDeltaDestroy(delta: execution.graphDelta)
+            compilerDeclarationIndexDestroy(index: executionIndex)
+        } else {
         let storageLiteralFacts: CompilerStorageLiteralFacts(compilerStorageLiteralFactsResolve(tables: declarationTables))
         if !storageLiteralFacts.isValid {
             output: "compilerError\tkind=invalidLiteralStorage\treason=\(compilerStorageLiteralReasonName(reason: storageLiteralFacts.reason))\trelatedRow=\(storageLiteralFacts.relatedRow)\n"
@@ -669,16 +669,13 @@ function compilerNativeSourceSetLLVMTextForValidIndex(source: String, declaratio
         }
         }
         }
+        }
     }
     if compilerMemoryGraphDestroy(memory: familyMemory) != 0 { return compilerNativeDiagnostic(kind: String("memoryOwnershipFailure")) }
     return output
 }
 
 function compilerNativeSourceSetLLVMTextForLinkedTables(source: String, declarationTables: CompilerSyntaxTables): String {
-    let defaults: CompilerProjectDefaults(compilerProjectDefaultsResolve(tables: declarationTables))
-    if !defaults.isValid {
-        return "compilerError\tkind=invalidProjectDefaults\treason=\(compilerProjectDefaultsReasonName(reason: defaults.reason))\trelatedRow=\(defaults.relatedRow)\n"
-    }
     let executionIndex: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: declarationTables))
     state output: String("")
     if !executionIndex.isValid {

@@ -54,6 +54,7 @@ function compilerSyntaxMacroInvocationColumnCount(): Int { return 35 }
 function compilerSyntaxMacroCapabilityHandleColumnCount(): Int { return 8 }
 function compilerSyntaxMacroExecutionEventColumnCount(): Int { return 12 }
 function compilerSyntaxMacroReadDependencyColumnCount(): Int { return 18 }
+function compilerSyntaxMacroResultColumnCount(): Int { return 10 }
 function compilerFormulaFactColumnCount(): Int { return 10 }
 function compilerSyntaxMacroExpansionTemplateColumnCount(): Int { return 27 }
 
@@ -343,6 +344,7 @@ function compilerSyntaxTablesCreate(source: String): CompilerSyntaxTables {
         macroCapabilityHandles: compilerIntTableCreate(columnCount: compilerSyntaxMacroCapabilityHandleColumnCount(), estimatedRowCount: 384),
         macroExecutionEvents: compilerIntTableCreate(columnCount: compilerSyntaxMacroExecutionEventColumnCount(), estimatedRowCount: 128),
         macroReadDependencies: compilerIntTableCreate(columnCount: compilerSyntaxMacroReadDependencyColumnCount(), estimatedRowCount: 128),
+        macroResults: compilerIntTableCreate(columnCount: compilerSyntaxMacroResultColumnCount(), estimatedRowCount: 128),
         compilerFormulaFacts: compilerIntTableCreate(columnCount: compilerFormulaFactColumnCount(), estimatedRowCount: 32),
         macroExpansionTemplates: compilerIntTableCreate(columnCount: compilerSyntaxMacroExpansionTemplateColumnCount(), estimatedRowCount: 32),
         pendingGeneratedFunctions: compilerIntTableCreate(columnCount: compilerGraphGeneratedFunctionColumnCount(), estimatedRowCount: 32),
@@ -407,6 +409,9 @@ function compilerSyntaxTablesDestroy(tables: CompilerSyntaxTables): Int {
         status: 0 - 1
     }
     if compilerIntTableDestroy(table: tables.macroReadDependencies) != 0 {
+        status: 0 - 1
+    }
+    if compilerIntTableDestroy(table: tables.macroResults) != 0 {
         status: 0 - 1
     }
     if compilerIntTableDestroy(table: tables.compilerFormulaFacts) != 0 {
@@ -503,6 +508,7 @@ function compilerSyntaxTablesIsValid(tables: CompilerSyntaxTables): Bool {
         && compilerIntTableIsComplete(table: tables.macroCapabilityHandles)
         && compilerIntTableIsComplete(table: tables.macroExecutionEvents)
         && compilerIntTableIsComplete(table: tables.macroReadDependencies)
+        && compilerIntTableIsComplete(table: tables.macroResults)
         && compilerIntTableIsComplete(table: tables.compilerFormulaFacts)
         && compilerIntTableIsComplete(table: tables.macroExpansionTemplates)
         && compilerIntTableIsComplete(table: tables.pendingGeneratedFunctions)
@@ -5082,7 +5088,8 @@ function compilerMacroExecutionTablesAreStructurallyValid(tables: CompilerSyntax
     if !compilerIntTableIsComplete(table: tables.macroInvocations)
         || !compilerIntTableIsComplete(table: tables.macroCapabilityHandles)
         || !compilerIntTableIsComplete(table: tables.macroExecutionEvents)
-        || !compilerIntTableIsComplete(table: tables.macroReadDependencies) { return false }
+        || !compilerIntTableIsComplete(table: tables.macroReadDependencies)
+        || !compilerIntTableIsComplete(table: tables.macroResults) { return false }
     state row: Int(0)
     while row < invocationCount {
         if compilerIntTableValue(table: tables.macroInvocations, row: row, column: 0) != row
@@ -5144,6 +5151,28 @@ function compilerMacroExecutionTablesAreStructurallyValid(tables: CompilerSyntax
             || (dependencyTargetIdentityFirst == 0 && dependencyTargetIdentitySecond == 0)
             || (dependencyQueryIdentityFirst == 0 && dependencyQueryIdentitySecond == 0)
             || (dependencyObservationFirst == 0 && dependencyObservationSecond == 0) { return false }
+        row: row + 1
+    }
+    row: 0
+    while row < compilerIntTableRowCount(table: tables.macroResults) {
+        let resultInvocationRow: Int(compilerIntTableValue(table: tables.macroResults, row: row, column: 1))
+        let resultApplicationRow: Int(compilerIntTableValue(table: tables.macroResults, row: row, column: 2))
+        let resultDeclarationRow: Int(compilerIntTableValue(table: tables.macroResults, row: row, column: 3))
+        let resultTargetSyntaxID: Int(compilerIntTableValue(table: tables.macroResults, row: row, column: 4))
+        let resultKind: Int(compilerIntTableValue(table: tables.macroResults, row: row, column: 5))
+        let resultNominalSyntaxID: Int(compilerIntTableValue(table: tables.macroResults, row: row, column: 7))
+        if compilerIntTableValue(table: tables.macroResults, row: row, column: 0) != row
+            || resultInvocationRow < 0 || resultInvocationRow >= invocationCount
+            || resultApplicationRow < 0 || resultApplicationRow >= applicationCount
+            || resultDeclarationRow < 0 || resultDeclarationRow >= declarationCount
+            || resultTargetSyntaxID < 0 || resultTargetSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
+            || resultKind < compilerMacroValueKindScalar() || resultKind > compilerMacroValueKindEnvironment()
+            || resultNominalSyntaxID < 0 - 1 || resultNominalSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
+            || compilerIntTableValue(table: tables.macroResults, row: row, column: 9) < 0
+            || compilerIntTableValue(table: tables.macroInvocations, row: resultInvocationRow, column: 1) != resultApplicationRow
+            || compilerIntTableValue(table: tables.macroInvocations, row: resultInvocationRow, column: 2) != resultDeclarationRow
+            || compilerIntTableValue(table: tables.macroInvocations, row: resultInvocationRow, column: 3) != resultTargetSyntaxID
+            || compilerIntTableValue(table: tables.macroInvocations, row: resultInvocationRow, column: 9) != compilerMacroInvocationSuccess() { return false }
         row: row + 1
     }
     return true
@@ -5531,7 +5560,7 @@ function compilerFormulaFactAppend(tables: CompilerSyntaxTables, kind: Int, invo
 }
 
 function compilerFormulaExecuteApplication(tables: CompilerSyntaxTables, applicationRow: Int, declarationRow: Int): Int {
-    let name: String(compilerProjectMacroApplicationName(tables: tables, applicationRow: applicationRow))
+    let name: String(compilerMacroApplicationName(tables: tables, applicationRow: applicationRow))
     if name != String("storage") && name != String("literal") { return 0 }
     let invocationRow: Int(compilerMacroExecutionAppendInvocation(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow, budget: compilerMacroExecutionBudgetDefault()))
     if invocationRow < 0 { return 0 - 1 }
@@ -5661,6 +5690,32 @@ function compilerMacroExecutionSetInvocation(tables: CompilerSyntaxTables, row: 
         || tables.macroInvocations.values.update(element: pipelineStatus, index: base + 33) != 0
         || tables.macroInvocations.values.update(element: pipelineFailureCode, index: base + 34) != 0 { return 0 - 1 }
     return 0
+}
+
+function compilerMacroExecutionAppendResult(
+    tables: CompilerSyntaxTables,
+    invocationRow: Int,
+    applicationRow: Int,
+    declarationRow: Int,
+    targetSyntaxID: Int,
+    resultKind: Int,
+    resultTypeKind: Int,
+    resultNominalSyntaxID: Int,
+    resultScalar: Int,
+    resultChildCount: Int
+): Int {
+    let row: Int(compilerIntTableRowCount(table: tables.macroResults))
+    if compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: row) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: invocationRow) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: applicationRow) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: declarationRow) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: targetSyntaxID) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: resultKind) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: resultTypeKind) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: resultNominalSyntaxID) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: resultScalar) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: resultChildCount) != 0 { return 0 - 1 }
+    return row
 }
 
 function compilerMacroExecutionAppendEvent(tables: CompilerSyntaxTables, invocationRow: Int, operation: Int, arena: CompilerBodyArena, operationRow: Int, messageValueID: Int, identity: CompilerFingerprint): Int {
@@ -7383,13 +7438,26 @@ function compilerMacroExecutionEvaluateFunction(
     return CompilerMacroFunctionOutcome(status: status, valueID: resultValueID, stepCount: stepCount)
 }
 
-function compilerMacroExecutionEvaluateInvocation(tables: CompilerSyntaxTables, arena: CompilerBodyArena, graphDelta: CompilerGraphDelta, pendingOmissionTargets: Buffer<Int>, applicationRow: Int, declarationRow: Int, invocationRow: Int, bodyStart: Int, bodyEnd: Int): CompilerMacroInvocationOutcome {
+function compilerMacroExecutionEvaluateInvocation(tables: CompilerSyntaxTables, arena: CompilerBodyArena, graphDelta: CompilerGraphDelta, pendingOmissionTargets: Buffer<Int>, applicationRow: Int, declarationRow: Int, invocationRow: Int, bodyStart: Int, bodyEnd: Int): CompilerMacroEvaluationOutcome {
     state status: Int(0)
     state diagnosticCode: Int(0)
     state eventCount: Int(0)
     state readDependencyCount: Int(0)
     state mirOperationCount: Int(0)
     state stepCount: Int(0)
+    state resultStoreValueID: Int(0 - 1)
+    let expansionTypeStart: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 13))
+    let expansionTypeEnd: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 14))
+    state expectsResult: Bool(expansionTypeStart >= 0 && expansionTypeEnd > expansionTypeStart)
+    if expectsResult
+        && compilerTypedSyntaxLocalText(
+            tables: tables,
+            fileID: compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 1),
+            localStart: expansionTypeStart,
+            localEnd: expansionTypeEnd
+        ) == String("Void") {
+        expectsResult: false
+    }
     let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12))
     let valueStore: CompilerMacroValueStore(compilerMacroValueStoreCreate())
     let evaluationValues: Buffer<Int>(bufferCreateInt(capacity: compilerIntTableRowCount(table: arena.mirValues)))
@@ -7537,6 +7605,22 @@ function compilerMacroExecutionEvaluateInvocation(tables: CompilerSyntaxTables, 
                                     diagnosticCode: compilerMacroDiagnosticBodyInvalid()
                                     failureOperationRow: operationRow
                                 } else if operationKind == compilerBodyMIROperationReturn() {
+                                    let returnOperandCount: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()))
+                                    if expectsResult && returnOperandCount == 1 {
+                                        let returnMIRValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
+                                        if returnMIRValueID < 0 || returnMIRValueID >= evaluationValues.count
+                                            || evaluationValues.element(index: returnMIRValueID) < 0 {
+                                            status: 0 - 1
+                                            diagnosticCode: compilerMacroDiagnosticBodyInvalid()
+                                            failureOperationRow: operationRow
+                                        } else {
+                                            resultStoreValueID: evaluationValues.element(index: returnMIRValueID)
+                                        }
+                                    } else if expectsResult {
+                                        status: 0 - 1
+                                        diagnosticCode: compilerMacroDiagnosticBodyInvalid()
+                                        failureOperationRow: operationRow
+                                    }
                                     pathRunning: false
                                 }
                             }
@@ -7587,6 +7671,26 @@ function compilerMacroExecutionEvaluateInvocation(tables: CompilerSyntaxTables, 
             }
         }
     }
+    if status == 0 {
+        state omissionRow: Int(0)
+        while omissionRow < pendingOmissionTargets.count && status == 0 {
+            if compilerMacroGraphDeltaAppendOmission(tables: tables, delta: graphDelta, targetSyntaxID: pendingOmissionTargets.element(index: omissionRow)) != 0 {
+                status: 0 - 1
+                diagnosticCode: compilerMacroDiagnosticGraphDeltaInvalid()
+            }
+            omissionRow: omissionRow + 1
+        }
+        if status == 0 && !compilerMacroGraphDeltaIsValid(tables: tables, delta: graphDelta) {
+            status: 0 - 1
+            if compilerMacroGraphDeltaHasGeneratedMemberCollision(tables: tables, delta: graphDelta) {
+                diagnosticCode: compilerMacroDiagnosticGeneratedMemberCollision()
+            } else if compilerMacroGraphDeltaHasGeneratedFunctionCollision(tables: tables, delta: graphDelta) {
+                diagnosticCode: compilerMacroDiagnosticGeneratedFunctionCollision()
+            } else {
+                diagnosticCode: compilerMacroDiagnosticGraphDeltaInvalid()
+            }
+        }
+    }
     mirOperationCount: mirOperationCount + compilerIntTableRowCount(table: arena.mirOperations)
     if status == 0 {
         let successIdentity: CompilerFingerprint(compilerMacroExecutionInvocationIdentity(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow))
@@ -7606,19 +7710,39 @@ function compilerMacroExecutionEvaluateInvocation(tables: CompilerSyntaxTables, 
         let failureIdentity: CompilerFingerprint(compilerMacroExecutionErrorIdentity(base: compilerMacroExecutionInvocationIdentity(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow), code: diagnosticCode, row: failureOperationRow))
         compilerMacroExecutionSetInvocation(tables: tables, row: invocationRow, status: compilerMacroInvocationFailed(), diagnosticCode: diagnosticCode, diagnosticFileID: failureFileID, diagnosticStart: failureStart, diagnosticEnd: failureEnd, resultIdentity: failureIdentity, mirOperationCount: compilerIntTableRowCount(table: arena.mirOperations), stepCount: 0, pipelineStatus: 0, pipelineFailureCode: 0)
     }
+    state hasResult: Bool(false)
+    state resultKind: Int(0 - 1)
+    state resultTypeKind: Int(compilerBodyTypeUnknown())
+    state resultNominalSyntaxID: Int(0 - 1)
+    state resultScalar: Int(0)
+    state resultChildCount: Int(0)
+    if status == 0 && resultStoreValueID >= 0 && resultStoreValueID < valueStore.kinds.count {
+        hasResult: true
+        resultKind: valueStore.kinds.element(index: resultStoreValueID)
+        resultTypeKind: valueStore.typeKinds.element(index: resultStoreValueID)
+        resultScalar: valueStore.scalars.element(index: resultStoreValueID)
+        resultChildCount: valueStore.childCounts.element(index: resultStoreValueID)
+        let resultTypeID: Int(valueStore.typeIDs.element(index: resultStoreValueID))
+        if resultTypeID >= 0 && resultTypeID < compilerIntTableRowCount(table: arena.typeInstances) {
+            resultNominalSyntaxID: compilerIntTableValue(table: arena.typeInstances, row: resultTypeID, column: compilerBodyTypeInstanceNominalSyntaxColumn())
+        }
+    }
     evaluationValues.destroy()
     compilerMacroValueStoreDestroy(store: valueStore)
-    return CompilerMacroInvocationOutcome(status: status, diagnosticCode: diagnosticCode, eventCount: eventCount, readDependencyCount: readDependencyCount, mirOperationCount: mirOperationCount, stepCount: stepCount)
+    return CompilerMacroEvaluationOutcome(status: status, diagnosticCode: diagnosticCode, eventCount: eventCount, readDependencyCount: readDependencyCount, mirOperationCount: mirOperationCount, stepCount: stepCount, hasResult: hasResult, resultKind: resultKind, resultTypeKind: resultTypeKind, resultNominalSyntaxID: resultNominalSyntaxID, resultScalar: resultScalar, resultChildCount: resultChildCount)
 }
 
-function compilerMacroExecutionRunInvocation(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, graphDelta: CompilerGraphDelta, pendingOmissionTargets: Buffer<Int>, applicationRow: Int, declarationRow: Int, invocationRow: Int, bodyStart: Int, bodyEnd: Int): CompilerMacroInvocationOutcome {
+function compilerMacroExecutionRunInvocation(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, applicationRow: Int, declarationRow: Int, invocationRow: Int, bodyStart: Int, bodyEnd: Int): CompilerMacroInvocationOutcome {
+    let graphDelta: CompilerGraphDelta(compilerGraphDeltaCreate())
+    let pendingOmissionTargets: Buffer<Int>(bufferCreateInt(capacity: 4))
     let declarationFileID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 1))
     let globalBodyStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: declarationFileID, localOffset: bodyStart))
     let globalBodyEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: declarationFileID, localOffset: bodyEnd))
     if compilerCoreFirstNonWhitespaceIndex(source: tables.sourceStore.source, start: globalBodyStart, end: globalBodyEnd) >= globalBodyEnd {
         let noOpIdentity: CompilerFingerprint(compilerMacroExecutionInvocationIdentity(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow))
         compilerMacroExecutionSetInvocation(tables: tables, row: invocationRow, status: compilerMacroInvocationSuccess(), diagnosticCode: 0, diagnosticFileID: 0 - 1, diagnosticStart: 0 - 1, diagnosticEnd: 0 - 1, resultIdentity: noOpIdentity, mirOperationCount: 0, stepCount: 0, pipelineStatus: 0, pipelineFailureCode: 0)
-        return CompilerMacroInvocationOutcome(status: 0, diagnosticCode: 0, eventCount: 0, readDependencyCount: 0, mirOperationCount: 0, stepCount: 0)
+        pendingOmissionTargets.destroy()
+        return CompilerMacroInvocationOutcome(status: 0, diagnosticCode: 0, eventCount: 0, readDependencyCount: 0, mirOperationCount: 0, stepCount: 0, hasResult: false, resultKind: 0 - 1, resultTypeKind: compilerBodyTypeUnknown(), resultNominalSyntaxID: 0 - 1, resultScalar: 0, resultChildCount: 0, graphDelta: graphDelta)
     }
     let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreateMacro(tables: tables, index: index, macroDeclarationRow: declarationRow)))
     let emptyReturnModes: Buffer<Int>(bufferCreateInt(capacity: 0))
@@ -7637,6 +7761,12 @@ function compilerMacroExecutionRunInvocation(tables: CompilerSyntaxTables, index
     state stepCount: Int(0)
     state pipelineStatus: Int(0)
     state pipelineFailureCode: Int(0)
+    state hasResult: Bool(false)
+    state resultKind: Int(0 - 1)
+    state resultTypeKind: Int(compilerBodyTypeUnknown())
+    state resultNominalSyntaxID: Int(0 - 1)
+    state resultScalar: Int(0)
+    state resultChildCount: Int(0)
     if arena.failures.count != 0 {
         pipelineStatus: 1
         let parseFailureOffset: Int(arena.failures.element(index: 0))
@@ -7710,23 +7840,29 @@ function compilerMacroExecutionRunInvocation(tables: CompilerSyntaxTables, index
         compilerMacroExecutionSetInvocation(tables: tables, row: invocationRow, status: compilerMacroInvocationFailed(), diagnosticCode: diagnosticCode, diagnosticFileID: compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 1), diagnosticStart: diagnosticStart, diagnosticEnd: diagnosticEnd, resultIdentity: bodyIdentity, mirOperationCount: compilerIntTableRowCount(table: arena.mirOperations), stepCount: 0, pipelineStatus: pipelineStatus, pipelineFailureCode: pipelineFailureCode)
         mirOperationCount: mirOperationCount + compilerIntTableRowCount(table: arena.mirOperations)
     } else {
-        let evaluationOutcome: CompilerMacroInvocationOutcome(compilerMacroExecutionEvaluateInvocation(tables: tables, arena: arena, graphDelta: graphDelta, pendingOmissionTargets: pendingOmissionTargets, applicationRow: applicationRow, declarationRow: declarationRow, invocationRow: invocationRow, bodyStart: bodyStart, bodyEnd: bodyEnd))
+        let evaluationOutcome: CompilerMacroEvaluationOutcome(compilerMacroExecutionEvaluateInvocation(tables: tables, arena: arena, graphDelta: graphDelta, pendingOmissionTargets: pendingOmissionTargets, applicationRow: applicationRow, declarationRow: declarationRow, invocationRow: invocationRow, bodyStart: bodyStart, bodyEnd: bodyEnd))
         status: evaluationOutcome.status
         diagnosticCode: evaluationOutcome.diagnosticCode
         eventCount: evaluationOutcome.eventCount
         readDependencyCount: evaluationOutcome.readDependencyCount
         mirOperationCount: evaluationOutcome.mirOperationCount
         stepCount: evaluationOutcome.stepCount
+        hasResult: evaluationOutcome.hasResult
+        resultKind: evaluationOutcome.resultKind
+        resultTypeKind: evaluationOutcome.resultTypeKind
+        resultNominalSyntaxID: evaluationOutcome.resultNominalSyntaxID
+        resultScalar: evaluationOutcome.resultScalar
+        resultChildCount: evaluationOutcome.resultChildCount
     }
     compilerBodyArenaDestroy(arena: arena)
     emptyReturnModes.destroy()
     emptyParticipants.destroy()
-    return CompilerMacroInvocationOutcome(status: status, diagnosticCode: diagnosticCode, eventCount: eventCount, readDependencyCount: readDependencyCount, mirOperationCount: mirOperationCount, stepCount: stepCount)
+    pendingOmissionTargets.destroy()
+    return CompilerMacroInvocationOutcome(status: status, diagnosticCode: diagnosticCode, eventCount: eventCount, readDependencyCount: readDependencyCount, mirOperationCount: mirOperationCount, stepCount: stepCount, hasResult: hasResult, resultKind: resultKind, resultTypeKind: resultTypeKind, resultNominalSyntaxID: resultNominalSyntaxID, resultScalar: resultScalar, resultChildCount: resultChildCount, graphDelta: graphDelta)
 }
 
 function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex): CompilerMacroExecutionResult {
     let graphDelta: CompilerGraphDelta(compilerGraphDeltaCreate())
-    let pendingOmissionTargets: Buffer<Int>(bufferCreateInt(capacity: 8))
     state status: Int(0)
     state diagnosticCode: Int(0)
     state invocationCount: Int(0)
@@ -7771,13 +7907,34 @@ function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDec
                         capabilityRow: capabilityRow + 1
                     }
                     if status == 0 {
-                        let invocationOutcome: CompilerMacroInvocationOutcome(compilerMacroExecutionRunInvocation(tables: tables, index: index, graphDelta: graphDelta, pendingOmissionTargets: pendingOmissionTargets, applicationRow: applicationRow, declarationRow: declarationRow, invocationRow: invocationRow, bodyStart: bodyStart, bodyEnd: bodyEnd))
+                        let invocationOutcome: CompilerMacroInvocationOutcome(compilerMacroExecutionRunInvocation(tables: tables, index: index, applicationRow: applicationRow, declarationRow: declarationRow, invocationRow: invocationRow, bodyStart: bodyStart, bodyEnd: bodyEnd))
                         status: invocationOutcome.status
                         diagnosticCode: invocationOutcome.diagnosticCode
                         eventCount: eventCount + invocationOutcome.eventCount
                         readDependencyCount: readDependencyCount + invocationOutcome.readDependencyCount
                         mirOperationCount: mirOperationCount + invocationOutcome.mirOperationCount
                         stepCount: stepCount + invocationOutcome.stepCount
+                        if status == 0 && compilerGraphDeltaMerge(delta: graphDelta, source: invocationOutcome.graphDelta) != 0 {
+                            status: 0 - 1
+                            diagnosticCode: compilerMacroDiagnosticGraphDeltaInvalid()
+                        }
+                        if status == 0 && invocationOutcome.hasResult
+                            && compilerMacroExecutionAppendResult(
+                                tables: tables,
+                                invocationRow: invocationRow,
+                                applicationRow: applicationRow,
+                                declarationRow: declarationRow,
+                                targetSyntaxID: targetSyntaxID,
+                                resultKind: invocationOutcome.resultKind,
+                                resultTypeKind: invocationOutcome.resultTypeKind,
+                                resultNominalSyntaxID: invocationOutcome.resultNominalSyntaxID,
+                                resultScalar: invocationOutcome.resultScalar,
+                                resultChildCount: invocationOutcome.resultChildCount
+                            ) < 0 {
+                            status: 0 - 1
+                            diagnosticCode: compilerMacroDiagnosticBodyInvalid()
+                        }
+                        compilerGraphDeltaDestroy(delta: invocationOutcome.graphDelta)
                     }
                 }
                 }
@@ -7786,15 +7943,7 @@ function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDec
         applicationRow: applicationRow + 1
     }
     if status == 0 {
-        state omissionRow: Int(0)
-        while omissionRow < pendingOmissionTargets.count && status == 0 {
-            if compilerMacroGraphDeltaAppendOmission(tables: tables, delta: graphDelta, targetSyntaxID: pendingOmissionTargets.element(index: omissionRow)) != 0 {
-                status: 0 - 1
-                diagnosticCode: compilerMacroDiagnosticGraphDeltaInvalid()
-            }
-            omissionRow: omissionRow + 1
-        }
-        if status == 0 && !compilerMacroGraphDeltaIsValid(tables: tables, delta: graphDelta) {
+        if !compilerMacroGraphDeltaIsValid(tables: tables, delta: graphDelta) {
             status: 0 - 1
             if compilerMacroGraphDeltaHasGeneratedMemberCollision(tables: tables, delta: graphDelta) {
                 diagnosticCode: compilerMacroDiagnosticGeneratedMemberCollision()
@@ -7806,7 +7955,6 @@ function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDec
             compilerMacroExecutionRecordFinalFailure(tables: tables, code: diagnosticCode)
         }
     }
-    pendingOmissionTargets.destroy()
     return CompilerMacroExecutionResult(status: status, diagnosticCode: diagnosticCode, invocationCount: invocationCount, capabilityHandleCount: handleCount, eventCount: eventCount, readDependencyCount: readDependencyCount, mirOperationCount: mirOperationCount, stepCount: stepCount, graphDelta: graphDelta)
 }
 
