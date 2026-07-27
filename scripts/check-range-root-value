@@ -150,6 +150,51 @@ check_macro_environment() {
     echo "Macros single-binding-environment: pass"
 }
 
+check_macro_result_values() {
+    local recursive_fixture="$REPO_ROOT/Testing/Macros/Pass/RecursiveResultValue.range"
+    local branch_fixture="$REPO_ROOT/Testing/Macros/Pass/BranchJoinReturn.range"
+    local application_fixture="$REPO_ROOT/Testing/Macros/Pass/ApplicationValue.range"
+    local recursive_output="$WORK_ROOT/macro-recursive-result.out"
+    local branch_output="$WORK_ROOT/macro-branch-join-result.out"
+    local application_output="$WORK_ROOT/macro-application-value.out"
+    local error="$WORK_ROOT/macro-result.err"
+
+    "$STAGE2_EXECUTABLE" compile "$recursive_fixture" > "$recursive_output" 2> "$error" \
+        || fail "recursive macro result did not compile"
+    [[ ! -s "$error" ]] || fail "recursive macro result wrote stderr"
+    /usr/bin/grep -Fq $'macroResult\trow=0\tinvocationRow=0\tapplicationRow=0\tkind=3' "$recursive_output" \
+        || fail "recursive macro result omitted its construct root"
+    /usr/bin/grep -Fq $'childCount=2\tparentRow=-1\tordinal=0' "$recursive_output" \
+        || fail "recursive macro result root omitted its ordered children"
+    /usr/bin/grep -Fq $'macroResult\trow=2\tinvocationRow=0\tapplicationRow=0\tkind=3' "$recursive_output" \
+        || fail "recursive macro result omitted its nested construct"
+    /usr/bin/grep -Fq $'childCount=1\tparentRow=0\tordinal=1' "$recursive_output" \
+        || fail "recursive macro result lost its nested construct position"
+    /usr/bin/grep -Fq $'macroResult\trow=3\tinvocationRow=0\tapplicationRow=0\tkind=1' "$recursive_output" \
+        || fail "recursive macro result omitted its nested scalar leaf"
+    /usr/bin/grep -Fq $'childCount=0\tparentRow=2\tordinal=0' "$recursive_output" \
+        || fail "recursive macro result lost its scalar leaf position"
+
+    "$STAGE2_EXECUTABLE" compile "$branch_fixture" > "$branch_output" 2> "$error" \
+        || fail "branch-join macro result did not compile"
+    [[ ! -s "$error" ]] || fail "branch-join macro result wrote stderr"
+    /usr/bin/grep -Fq $'macroGraphGeneratedMember\trow=0\tkind=member' "$branch_output" \
+        || fail "branch-join macro did not preserve its expansion"
+    /usr/bin/grep -Fq $'macroResult\trow=0\tinvocationRow=0\tapplicationRow=0\tkind=3' "$branch_output" \
+        || fail "branch-join macro did not pass its result through the function boundary"
+
+    "$STAGE2_EXECUTABLE" compile "$application_fixture" > "$application_output" 2> "$error" \
+        || fail "Macro.Application.value fixture did not compile"
+    [[ ! -s "$error" ]] || fail "Macro.Application.value fixture wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2' "$application_output" \
+        || fail "Macro.Application.value fixture did not execute both member macros"
+    /usr/bin/grep -Fq $'macroResult\trow=3\tinvocationRow=1\tapplicationRow=1\tkind=1' "$application_output" \
+        || fail "Macro.Application.value did not feed the first macro result into the second"
+    /usr/bin/grep -Fq $'scalar=7\tchildCount=0\tparentRow=2\tordinal=0' "$application_output" \
+        || fail "Macro.Application.value changed the persisted generic payload"
+    echo "Macros recursive-and-branch-join-results: pass"
+}
+
 check_canonical_target_members() {
     local fixture="$REPO_ROOT/Testing/Macros/Pass/CanonicalTargetMembers.range"
     local output="$WORK_ROOT/macro-canonical-target-members.out"
@@ -718,6 +763,7 @@ main_root_value() {
     echo "checkpoint root-value:stage2-cache-$STAGE2_CACHE_STATUS: pass"
     echo "checkpoint root-value:stage2-resolved: pass"
     check_macro_environment
+    check_macro_result_values
     check_canonical_target_members
     check_project_defaults
     check_storage_literals

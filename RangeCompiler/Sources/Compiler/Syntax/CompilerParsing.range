@@ -529,6 +529,11 @@ function compilerMacroRenderExecutionSnapshot(tables: CompilerSyntaxTables, resu
         row: row + 1
     }
     row: 0
+    while row < compilerIntTableRowCount(table: tables.macroResults) {
+        output: "\(output)macroResult\trow=\(row)\tinvocationRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 1))\tapplicationRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 2))\tkind=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 5))\ttypeKind=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 6))\tnominalSyntaxID=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 7))\tscalar=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 8))\tchildCount=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 9))\tparentRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 10))\tordinal=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 11))\n"
+        row: row + 1
+    }
+    row: 0
     while row < compilerIntTableRowCount(table: tables.compilerFormulaFacts) {
         output: "\(output)compilerFormulaFact\trow=\(row)\tkind=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 1))\tinvocationRow=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 2))\tapplicationRow=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 3))\ttargetSyntaxID=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 4))\tcategory=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 5))\tsemanticElementSyntaxID=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 6))\tencoding=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 7))\tbits=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 8))\tsignedness=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 9))\n"
         row: row + 1

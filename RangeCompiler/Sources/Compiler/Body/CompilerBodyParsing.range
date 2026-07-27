@@ -910,13 +910,6 @@ function compilerBodyArenaAppendExpandStatement(arena: CompilerBodyArena, statem
     let applicationNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindApplication(), ordinal: 0, start: statementStart, end: expansion.next, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
     if calleeNodeID < 0 || applicationNodeID < 0
         || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: applicationNodeID, childNodeID: calleeNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: statementStart) }
-    let trailingStart: Int(compilerCoreFirstNonWhitespaceIndex(source: arena.tables.sourceStore.source, start: expansion.next, end: limit))
-    if trailingStart >= limit {
-        let returnNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindReturn(), ordinal: 0, start: statementStart, end: expansion.next, firstStart: nameStart, firstEnd: nameEnd, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
-        if returnNodeID < 0
-            || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: returnNodeID, childNodeID: applicationNodeID, role: compilerSyntaxRoleReturnValue(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: statementStart) }
-        return compilerBodyParseSuccess(nodeID: returnNodeID, nextIndex: expansion.next)
-    }
     return compilerBodyParseSuccess(nodeID: applicationNodeID, nextIndex: expansion.next)
 }
 

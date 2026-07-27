@@ -167,7 +167,8 @@ function compilerProjectDefaultsResolve(tables: CompilerSyntaxTables): CompilerP
     state resultRow: Int(0)
     while resultRow < compilerIntTableRowCount(table: tables.macroResults) {
         let resultNominalSyntaxID: Int(compilerIntTableValue(table: tables.macroResults, row: resultRow, column: 7))
-        if resultNominalSyntaxID >= 0
+        if compilerIntTableValue(table: tables.macroResults, row: resultRow, column: 10) < 0
+            && resultNominalSyntaxID >= 0
             && compilerDeclarationNameForSyntaxID(tables: tables, syntaxID: resultNominalSyntaxID) == String("ProjectDefaults") {
             let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroResults, row: resultRow, column: 4))
             if targetSyntaxID >= 0

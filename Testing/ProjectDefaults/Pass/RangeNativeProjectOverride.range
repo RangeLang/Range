@@ -12,7 +12,6 @@ macro project(): Construct -> ProjectDefaults { environment in
                 state bool: Bool
             }
         }
-        return ProjectDefaults()
     }
     if integerCount == 0 && boolCount != 0 {
         @expand {
@@ -20,7 +19,6 @@ macro project(): Construct -> ProjectDefaults { environment in
                 state integer: Int
             }
         }
-        return ProjectDefaults()
     }
     if boolCount == 0 && integerCount != 0 {
         @expand {
@@ -28,7 +26,6 @@ macro project(): Construct -> ProjectDefaults { environment in
                 state bool: Bool
             }
         }
-        return ProjectDefaults()
     }
     return ProjectDefaults()
 }

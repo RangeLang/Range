@@ -1,0 +1,56 @@
+compilerMacroSnapshot
+construct WrittenSyntax {}
+construct TypeReference {}
+construct Expression {}
+
+construct Identifier {
+    let name: String
+    let id: String
+    let parent: Identifier?
+    let source: WrittenSyntax?
+}
+
+construct Macro {
+    construct Declaration {}
+}
+
+construct MacroApplication {
+    let identifier: Identifier
+    let target: Identifier
+    let genericArguments: [TypeReference]
+    let argumentClause: String
+    let arguments: [Expression]
+    let rawBody: WrittenSyntax
+    let declaration: WrittenSyntax?
+    let packageVisibility: String
+    let valueType: TypeReference
+    let value: Metadata
+}
+
+construct Member {
+    let macros: [MacroApplication]
+}
+
+construct Metadata {
+    let number: Int
+}
+
+construct Observation {
+    let number: Int
+}
+
+macro metadata(): Member -> Metadata { environment in
+    return Metadata(number: 7)
+}
+
+macro observeMetadata(): Member -> Observation { environment in
+    let application: MacroApplication(environment.target.macros[0])
+    let metadata: Metadata(application.value)
+    return Observation(number: metadata.number)
+}
+
+construct ApplicationValueTarget {
+    @metadata
+    @observeMetadata
+    let value: Int
+}

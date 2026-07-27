@@ -1,0 +1,19 @@
+compilerMacroSnapshot
+construct ResultLeaf {
+    let flag: Bool
+}
+
+construct ResultTree {
+    let count: Int
+    let leaf: ResultLeaf
+}
+
+macro resultTree(): Construct -> ResultTree { environment in
+    return ResultTree(
+        count: 4,
+        leaf: ResultLeaf(flag: true)
+    )
+}
+
+@resultTree
+construct ResultTarget {}

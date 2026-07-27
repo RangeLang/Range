@@ -44,7 +44,7 @@ construct Macro {
     }
 
     @graph(.application)
-    construct Application<Value> {
+    construct Application<Value = Nil> {
         let identifier: Identifier
         let target: Identifier
         let genericArguments: [TypeReference]

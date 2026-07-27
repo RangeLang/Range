@@ -173,11 +173,14 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           - [ ] Supply compile-time ownership return summaries for
             Range-authored functions that return tracked arrays.
           - [ ] Execute enum payloads, closures, and syntax-valued returns.
-      - [ ] Preserve a compile-time construct result created after a
+      - [x] Preserve a compile-time construct result created after a
         side-effecting conditional branch join.
-        - The `project` macro currently returns `ProjectDefaults()` inside
-          each expansion branch because constructing the same value in the
-          shared continuation is not yet materialized by the macro evaluator.
+        - `@expand` is an ordinary delta-producing statement instead of an
+          implicit return at the end of every nested block; the authored
+          function-boundary `return` now carries the result through the shared
+          continuation.
+        - `Testing/Macros/Pass/BranchJoinReturn.range` and the Range-authored
+          `project` macro prove the shared return after conditional expansion.
       - [ ] Treat `[@member]` as a deferred compile-time collection: collect
         the complete conforming child set before synthesizing its physical
         storage.
@@ -247,6 +250,18 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - [ ] Project those ordered macro applications from the source-backed
         syntax handles and record the complete observed application set as a
         macro read dependency.
+        - [x] Materialize ordered `Macro.Application` values from a
+          source-backed member and reconstruct each application's recursively
+          persisted generic `value`.
+          - Macro results retain every construct/array/enum child with a
+            stable parent row and child ordinal instead of flattening the
+            result to a root descriptor and child count.
+          - `Testing/Macros/Pass/ApplicationValue.range` proves one member
+            macro consumes another's `Metadata(number: 7)` result through
+            `Macro.Application.value`.
+        - [ ] Record the complete observed application set as a read
+          dependency and materialize the remaining identifier/source fields
+          from their canonical graph values rather than placeholders.
     - [ ] Restore self-hosted lowercase `@codable` synthesis.
       - [x] Add the modernized Range-authored `Codable.range` implementation
         to Core, using canonical `members.filter(all: Let)` instead of the
@@ -254,6 +269,13 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - [ ] Execute compile-time predicate `map`/`filter`, nested macro calls,
         and syntax-array splicing in the Range-authored macro interpreter.
         `target.declaration.members` and exact nominal filtering are proven.
+        - The canonical Core source bundle now links `@syntax`,
+          `@syntax?`, `[@syntax]`, and qualified nested names such as
+          `Macro.Application`; `Application<Value>` defaults to `Nil`.
+        - The first current execution blocker is the predicate trailing
+          closure at `Codable.range:110` in
+          `.filter { property in ... }`. Implement closure parse/CFG/MIR and
+          compile-time invocation before nested `map` and syntax splicing.
       - [ ] Restore the Range-authored `Result`, encoder/decoder container,
         coding error, and JSON surfaces needed by generated implementations.
       - [ ] Prove field key overrides, exclusion, object-shape rejection, and
