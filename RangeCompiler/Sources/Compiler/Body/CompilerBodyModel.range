@@ -20,6 +20,7 @@ function compilerBodySymbolLet(): Int { return 2 }
 function compilerBodySymbolState(): Int { return 3 }
 function compilerBodySymbolReceiver(): Int { return 4 }
 function compilerBodySymbolEnumPayloadBinding(): Int { return 5 }
+function compilerBodySymbolClosureParameter(): Int { return 6 }
 function compilerBodyEnumPatternBindingAux(): Int { return 1 }
 function compilerBodySymbolOwnsLocalStorage(kind: Int): Bool {
     return kind == compilerBodySymbolLet() || kind == compilerBodySymbolState()
@@ -52,6 +53,9 @@ function compilerBodyResolutionArrayLiteral(): Int { return 16 }
 function compilerBodyResolutionArrayCount(): Int { return 17 }
 function compilerBodyResolutionMacroEnvironmentProjection(): Int { return 18 }
 function compilerBodyResolutionMacroSyntaxFilter(): Int { return 19 }
+function compilerBodyResolutionMacroCollectionTransform(): Int { return 20 }
+function compilerBodyCollectionTransformFilter(): Int { return 1 }
+function compilerBodyCollectionTransformMap(): Int { return 2 }
 
 function compilerMacroEnvironmentProjectionTarget(): Int { return 1 }
 function compilerMacroEnvironmentProjectionDiagnostics(): Int { return 2 }
@@ -545,14 +549,14 @@ function compilerBodyArenaOwnerIsParticipant(arena: CompilerBodyArena, plan: Com
 
 function compilerBodyArenaOwnerReturnMode(arena: CompilerBodyArena, plan: CompilerModuleABIPlan): Int {
     if compilerBodyArenaIsEntry(arena: arena) { return compilerFunctionReturnABIDirect() }
-    if arena.ownerKind == compilerBodyArenaOwnerMacro() { return compilerFunctionReturnABIDirect() }
+    if arena.ownerKind == compilerBodyArenaOwnerMacro() || arena.ownerKind == compilerBodyArenaOwnerClosure() { return compilerFunctionReturnABIDirect() }
     if arena.ownerKind != compilerBodyArenaOwnerFunction() { return compilerFunctionReturnABINone() }
     return compilerModuleABIPlanReturnMode(plan: plan, tables: arena.tables, index: arena.declarationIndex, functionRow: arena.ownerFunctionRow)
 }
 
 function compilerBodyArenaOwnerAuxID(arena: CompilerBodyArena): Int {
     if compilerBodyArenaIsEntry(arena: arena) { return arena.ownerDeclarationSyntaxID }
-    if arena.ownerKind == compilerBodyArenaOwnerMacro() { return arena.ownerDeclarationSyntaxID }
+    if arena.ownerKind == compilerBodyArenaOwnerMacro() || arena.ownerKind == compilerBodyArenaOwnerClosure() { return arena.ownerDeclarationSyntaxID }
     return arena.ownerFunctionRow
 }
 
@@ -1239,7 +1243,9 @@ function compilerBodyMIROperationStringAppendOwned(): Int { return 49 }
 function compilerBodyMIROperationMemberAddress(): Int { return 50 }
 function compilerBodyMIROperationMacroEnvironmentProjection(): Int { return 51 }
 function compilerBodyMIROperationMacroSyntaxFilter(): Int { return 52 }
-function compilerBodyMIROperationLast(): Int { return compilerBodyMIROperationMacroSyntaxFilter() }
+function compilerBodyMIROperationMacroCollectionFilter(): Int { return 53 }
+function compilerBodyMIROperationMacroCollectionMap(): Int { return 54 }
+function compilerBodyMIROperationLast(): Int { return compilerBodyMIROperationMacroCollectionMap() }
 
 function compilerBodyMIROperandColumnCount(): Int { return 4 }
 function compilerBodyMIROperandOperationColumn(): Int { return 0 }

@@ -61,7 +61,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     `targetPointerBits()` directly instead of its accepted-seed 64-bit value.
   - [x] Define lowercase `project` in Range and execute its real macro body.
     - The macro records exact `integer` and `bool` member reads, then uses
-      `@expand` to add only the missing `state integer: Int` and
+      `environment.expand` to add only the missing `state integer: Int` and
       `state bool: Bool` declarations.
     - Focused fixtures prove the empty-project expansion and preservation of
       an explicit `state integer: Int<4>` override.
@@ -135,6 +135,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         target and diagnostics/graph query views; the compiler records one
         capability handle and models each view as an explicit environment
         projection rather than an ordinary local symbol.
+        - [x] Make `environment.expand { ... }` the only tracked authored
+          expansion boundary and lower it through the environment's expansion
+          authority into the existing transactional graph-delta operation.
+          - Core Project, Core Codable, Foundation macros, and focused fixtures
+            no longer use the compiler-special `@expand` spelling.
         - [x] Materialize that environment as a graph-backed compile-time
           value, bind it to the macro frame's real MIR parameter, and resolve
           `target`, `diagnostics`, and `graph` by projecting children from the
@@ -157,6 +162,27 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - Verification: `Testing/Macros/Pass/CanonicalTargetMembers.range`
           proves that `members.filter(all: Let).count` selects two `let`
           members while excluding one `state` member.
+      - [x] Execute source-backed `filter` and `map` closures over exact
+        nominal views, with `map` returning each closure result as a typed
+        collection element.
+        - Verification: `Testing/Macros/Pass/CollectionClosureExecution.range`
+          proves chained source-backed collection transforms;
+          `Testing/Macros/Pass/ApplicationValue.range` separately proves
+          recursively persisted macro-application result values.
+      - [x] Persist member macro results before declaration-level macros query
+        `Macro.Application.value`.
+        - The current two-pass scheduler preserves source order within member
+          and non-member applications. Replace it with dependency-driven delta
+          scheduling once graph observations can trigger selective reruns.
+      - [x] Materialize Bool, String, and optional String macro arguments and
+        defaults through the generic macro-value boundary.
+        - Canonical parameter defaults use typed value syntax:
+          `key: String?(nil)` and `exclude: Bool(false)`.
+        - `Testing/Macros/Pass/TypedParameterDefaults.range` keeps this proof
+          independent from Codable now that construct-attached Codable does
+          not require per-field discovery.
+        - Legacy `= value` recognition remains temporarily bootstrap-compatible,
+          but canonical Core, Framework, and test macro sources no longer use it.
       - [ ] Infer a function-owned generic type value from a nominal `all:`
         argument and carry that specialization through the return type.
       - [ ] Execute ordinary Range-authored function calls from compile-time
@@ -175,7 +201,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           - [ ] Execute enum payloads, closures, and syntax-valued returns.
       - [x] Preserve a compile-time construct result created after a
         side-effecting conditional branch join.
-        - `@expand` is an ordinary delta-producing statement instead of an
+        - `environment.expand` is an ordinary delta-producing capability call instead of an
           implicit return at the end of every nested block; the authored
           function-boundary `return` now carries the result through the shared
           continuation.
@@ -219,7 +245,16 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           captures and optional generic/conformance groups.
       - [ ] Execute `@syntax` by matching its raw template body against the
         annotated construct's members, materializing a canonical value, and
-        using the same template to render values consumed by `@expand`.
+        using the same template to render values consumed by
+        `environment.expand`.
+        - [ ] Compile each declaration's Range-authored `@syntax` witness into
+          one source-query plan whose captures retain member identity, type,
+          and one/optional/many cardinality.
+        - [ ] Route source-backed macro projections through that plan and
+          reject missing, duplicated, mistyped, or out-of-order captures
+          before materializing a Range value.
+          - The parser's integer tables remain compact query indexes; they are
+            not an independently authored declaration-shape model.
       - [x] Model every macro update as one transactional `RangeGraphDelta`.
         - The delta carries ordered insert/replace/remove/relationship changes,
           observed graph dependencies, and diagnostics with the invoking macro
@@ -266,6 +301,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - [x] Add the modernized Range-authored `Codable.range` implementation
         to Core, using canonical `members.filter(all: Let)` instead of the
         removed Swift-hosted `target.declaration.lets` projection.
+        - `@codable` attaches only to the construct and automatically treats
+          its stored `let` members as the coding surface; it does not discover
+          or execute a second `@codable` application on every property.
       - [ ] Execute compile-time predicate `map`/`filter`, nested macro calls,
         and syntax-array splicing in the Range-authored macro interpreter.
         `target.declaration.members` and exact nominal filtering are proven.
@@ -277,14 +315,16 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           - `Codable.range:110` now crosses the former postfix parse boundary;
             closure typing, capture materialization, CFG/MIR, and compile-time
             invocation remain independently verifiable steps.
-        - [ ] Type closure parameters and captures, lower closure CFG/MIR, and
+        - [x] Type closure parameters and captures, lower closure CFG/MIR, and
           invoke predicate `filter`/`map` closures at compile time before
           nested macro calls and syntax splicing.
       - [ ] Restore the Range-authored `Result`, encoder/decoder container,
         coding error, and JSON surfaces needed by generated implementations.
-      - [ ] Prove field key overrides, exclusion, object-shape rejection, and
-        generated encode/decode bodies through supported fixtures before
-        adding the source to the accepted compiler manifest.
+      - [ ] Prove construct-attached automatic fields and generated
+        encode/decode bodies through supported fixtures before adding the
+        source to the accepted compiler manifest.
+        - Treat field key overrides and exclusion as separate future coding
+          policy features rather than requirements for baseline `@codable`.
     - [ ] Make authored `keyword + name` declarations the graph's canonical
       nominal sources.
       - [x] Cover macros, constructs, enums, authored functions, members,

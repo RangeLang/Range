@@ -811,6 +811,16 @@ function compilerIntTableAppend(table: CompilerIntTable, value: Int): Int {
     return table.values.append(element: value)
 }
 
+function compilerIntTableClone(table: CompilerIntTable): CompilerIntTable {
+    let clone: CompilerIntTable(compilerIntTableCreate(columnCount: table.columnCount, estimatedRowCount: compilerIntTableRowCount(table: table)))
+    state index: Int(0)
+    while index < table.values.count {
+        clone.values.append(element: table.values.element(index: index))
+        index: index + 1
+    }
+    return clone
+}
+
 function compilerIntTableRowCount(table: CompilerIntTable): Int {
     if table.columnCount <= 0 {
         return 0

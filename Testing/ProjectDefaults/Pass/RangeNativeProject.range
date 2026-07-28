@@ -6,7 +6,7 @@ macro project(): Construct -> ProjectDefaults { environment in
     let integerCount: Int(environment.target.memberCount("integer"))
     let boolCount: Int(environment.target.memberCount("bool"))
     if integerCount == 0 && boolCount == 0 {
-        @expand {
+        environment.expand {
             extension #(environment.target.declaration.self) {
                 state integer: Int
                 state bool: Bool
@@ -14,14 +14,14 @@ macro project(): Construct -> ProjectDefaults { environment in
         }
     }
     if integerCount == 0 && boolCount != 0 {
-        @expand {
+        environment.expand {
             extension #(environment.target.declaration.self) {
                 state integer: Int
             }
         }
     }
     if boolCount == 0 && integerCount != 0 {
-        @expand {
+        environment.expand {
             extension #(environment.target.declaration.self) {
                 state bool: Bool
             }

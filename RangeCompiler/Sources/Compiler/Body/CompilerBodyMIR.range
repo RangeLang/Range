@@ -318,6 +318,34 @@ function compilerBodyMIRBuildNativeEnumTagValue(arena: CompilerBodyArena, source
     return CompilerBodyMIRValueResult(valueID: tagValueID, isValid: true)
 }
 
+function compilerBodyMIRCollectionCaptureSymbols(arena: CompilerBodyArena, closureNodeID: Int): Buffer<Int> {
+    let captures: Buffer<Int>(bufferCreateInt(capacity: 4))
+    let bodyRegionNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: closureNodeID, role: compilerSyntaxRoleClosureBody(), ordinal: 0))
+    state resolutionRow: Int(0)
+    while resolutionRow < compilerIntTableRowCount(table: arena.resolutions) {
+        let sourceNodeID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionSourceColumn()))
+        let targetKind: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()))
+        let symbolID: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetIDColumn()))
+        if targetKind == compilerBodyResolutionLocalSymbol()
+            && compilerBodyArenaEnclosingClosure(arena: arena, nodeID: sourceNodeID) == closureNodeID
+            && symbolID >= 0 && symbolID < compilerIntTableRowCount(table: arena.symbols)
+            && compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolKindColumn()) != compilerBodySymbolClosureParameter() {
+            let declarationNodeID: Int(compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolDeclarationColumn()))
+            if !compilerBodyArenaRegionContainsNode(arena: arena, regionNodeID: bodyRegionNodeID, nodeID: declarationNodeID) {
+                state alreadyCaptured: Bool(false)
+                state captureOrdinal: Int(0)
+                while captureOrdinal < captures.count {
+                    if captures.element(index: captureOrdinal) == symbolID { alreadyCaptured: true }
+                    captureOrdinal: captureOrdinal + 1
+                }
+                if !alreadyCaptured { captures.append(element: symbolID) }
+            }
+        }
+        resolutionRow: resolutionRow + 1
+    }
+    return captures
+}
+
 function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, blockID: Int): CompilerBodyMIRValueResult {
     let scheduledValueID: Int(compilerBodyMIRExpressionValue(arena: arena, nodeID: nodeID, action: compilerBodyCFGScheduleEvaluateNode()))
     if scheduledValueID >= 0 { return CompilerBodyMIRValueResult(valueID: scheduledValueID, isValid: true) }
@@ -511,6 +539,41 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
                 return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
             }
             return CompilerBodyMIRValueResult(valueID: filterValueID, isValid: true)
+        }
+        if resolutionTargetKind == compilerBodyResolutionMacroCollectionTransform() {
+            let transformReceiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: calleeNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
+            let closureNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleTrailingClosure(), ordinal: 0))
+            let transformReceiverValue: CompilerBodyMIRValueResult(compilerBodyMIRBuildExpression(arena: arena, nodeID: transformReceiverNodeID, blockID: blockID))
+            let transformValueID: Int(compilerBodyMIRAppendValue(
+                arena: arena,
+                kind: compilerBodyMIRValueCall(),
+                typeKind: compilerIntTableValue(table: arena.resolutions, row: callResolutionRow, column: compilerBodyResolutionTypeKindColumn()),
+                typeID: compilerIntTableValue(table: arena.resolutions, row: callResolutionRow, column: compilerBodyResolutionTypeIDColumn()),
+                sourceNodeID: nodeID,
+                provenanceKind: compilerBodyMemorySubjectNode(),
+                provenanceID: nodeID
+            ))
+            let captures: Buffer<Int>(compilerBodyMIRCollectionCaptureSymbols(arena: arena, closureNodeID: closureNodeID))
+            let transformOperationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
+            let transformFirstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
+            state transformValid: Bool(transformReceiverNodeID >= 0 && closureNodeID >= 0 && transformReceiverValue.isValid && transformValueID >= 0)
+            if transformValid && compilerBodyMIRAppendOperand(arena: arena, operationID: transformOperationID, ordinal: 0, valueID: transformReceiverValue.valueID, role: compilerBodyMIROperandArgument()) != 0 { transformValid: false }
+            state captureOrdinal: Int(0)
+            while transformValid && captureOrdinal < captures.count {
+                let captureValueID: Int(compilerBodyMIRValueForSymbolAtBlock(arena: arena, symbolID: captures.element(index: captureOrdinal), blockID: blockID))
+                if captureValueID < 0
+                    || compilerBodyMIRAppendOperand(arena: arena, operationID: transformOperationID, ordinal: captureOrdinal + 1, valueID: captureValueID, role: compilerBodyMIROperandArgument()) != 0 { transformValid: false }
+                captureOrdinal: captureOrdinal + 1
+            }
+            state transformOperationKind: Int(compilerBodyMIROperationMacroCollectionFilter())
+            if targetID == compilerBodyCollectionTransformMap() { transformOperationKind: compilerBodyMIROperationMacroCollectionMap() }
+            if !transformValid
+                || compilerBodyMIRAppendOperation(arena: arena, blockID: blockID, kind: transformOperationKind, resultValueID: transformValueID, sourceNodeID: nodeID, firstOperand: transformFirstOperand, operandCount: captures.count + 1, targetKind: compilerBodyMIROperationTargetNone(), targetID: closureNodeID) != transformOperationID {
+                captures.destroy()
+                return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
+            }
+            captures.destroy()
+            return CompilerBodyMIRValueResult(valueID: transformValueID, isValid: true)
         }
         if resolutionTargetKind == compilerBodyResolutionBuiltin()
             && targetID == compilerBodyBuiltinFloat() {
@@ -1455,7 +1518,7 @@ function compilerBodyMIRBuildWithScheduleIndex(arena: CompilerBodyArena, schedul
     state symbolRow: Int(0)
     while symbolRow < compilerIntTableRowCount(table: arena.symbols) {
         let symbolKind: Int(compilerIntTableValue(table: arena.symbols, row: symbolRow, column: compilerBodySymbolKindColumn()))
-        if symbolKind == compilerBodySymbolParameter() || symbolKind == compilerBodySymbolReceiver() {
+        if symbolKind == compilerBodySymbolParameter() || symbolKind == compilerBodySymbolReceiver() || symbolKind == compilerBodySymbolClosureParameter() {
             let parameterTypeKind: Int(compilerBodyArenaSymbolTypeKind(arena: arena, symbolID: symbolRow))
             let parameterTypeID: Int(compilerBodyArenaSymbolTypeID(arena: arena, symbolID: symbolRow))
             let parameterValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueParameter(), typeKind: parameterTypeKind, typeID: parameterTypeID, sourceNodeID: compilerIntTableValue(table: arena.symbols, row: symbolRow, column: compilerBodySymbolDeclarationColumn()), provenanceKind: compilerBodyMemorySubjectSymbol(), provenanceID: symbolRow))
@@ -1716,6 +1779,18 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                 || filterReceiverValueID < 0 || filterReceiverValueID >= valueCount
                 || compilerIntTableValue(table: arena.mirValues, row: filterReceiverValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeConstruct()
                 || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeConstruct() { return 320800 + operationRow }
+        }
+        if operationKind == compilerBodyMIROperationMacroCollectionFilter()
+            || operationKind == compilerBodyMIROperationMacroCollectionMap() {
+            let transformOperandCount: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()))
+            let transformReceiverValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
+            if validationTargetKind != compilerBodyMIROperationTargetNone()
+                || validationTargetID < 0 || validationTargetID >= compilerIntTableRowCount(table: arena.nodes)
+                || compilerIntTableValue(table: arena.nodes, row: validationTargetID, column: 1) != compilerSyntaxKindClosure()
+                || transformOperandCount < 1
+                || transformReceiverValueID < 0 || transformReceiverValueID >= valueCount
+                || compilerIntTableValue(table: arena.mirValues, row: transformReceiverValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeConstruct()
+                || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeConstruct() { return 320900 + operationRow }
         }
         if operationKind == compilerBodyMIROperationConstruct() {
             let constructResultTypeID: Int(compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeIDColumn()))

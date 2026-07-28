@@ -1,0 +1,61 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
+@builtin
+construct Array<Element> {}
+
+compilerSourceFile\trole=core\tpath=Core/Macro/CodableConstructCollection.range
+open macro member(): Declaration | Member -> Void {}
+open macro syntax(): Declaration -> Void {}
+
+construct Identifier {
+    let name: String
+}
+
+construct Construct {
+    let declaration: ConstructDeclaration
+}
+
+construct ConstructDeclaration {
+    let members: [@member]
+}
+
+@syntax
+construct Let {
+    let identifier: Identifier
+}
+
+macro codable(): Construct { environment in
+    let properties: [Let](
+        environment.target.declaration.members.filter(all: Let)
+    )
+
+    if properties.count == 2 {
+        environment.expand {
+            extension #(environment.target.declaration.self) {
+                function encode(to encoder: Encoder): Int {
+                    #(properties.map { property in
+                        encode(#(property.identifier))
+                    })
+                    return 0
+                }
+
+                function decode(from decoder: Decoder): Int {
+                    #(properties.map { property in
+                        decode(#(property.identifier))
+                    })
+                    return 0
+                }
+            }
+        }
+    }
+}
+
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@codable
+construct Value {
+    let included: Int
+
+    let enabled: Bool
+
+    state ignored: Int
+}

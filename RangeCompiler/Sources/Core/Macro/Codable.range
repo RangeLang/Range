@@ -1,149 +1,39 @@
-enum CodingShape {
-    case object
-    case array
-    case singleValue
-}
-
-construct CodingBehavior {
-    let key: String?
-    let exclude: Bool
-}
-
-macro codable<T>(_ key: String? = nil, exclude: Bool = false): @field -> CodingBehavior { environment in
-    return CodingBehavior(key: key, exclude: exclude)
-}
-
-macro codableEncodeProperty(
-    container: KeyedEncodingContainer,
-    value: Identifier,
-    key: String
-) -> Switch {
-    switch container.encode(#(value), forKey: key) {
-    case .success:
-        break
-    case .failure(let error):
-        return .failure(cause: error)
-    }
-}
-
-macro codableEncodeBody(
-    container: KeyedEncodingContainer,
-    properties: [Let]
-) -> [Switch] {
-    #(properties.map { property in
-        let applications: [Macro.Application](
-            property.macros.filter { application in
-                application.identifier.name == "codable"
-            }
-        )
-        let behaviors: [CodingBehavior](
-            applications.map { application in
-                application.value
-            }
-        )
-        let keys: [String](
-            behaviors.map { behavior in
-                behavior.key ?? property.identifier.name
-            }
-        )
-        let key: String(keys.first(default: property.identifier.name))
-
-        @codableEncodeProperty(
-            container: container,
-            value: property.identifier,
-            key: key
-        )
-    })
-}
-
-macro codableDecodeProperty(
-    container: KeyedDecodingContainer,
-    type: TypeReference,
-    value: Identifier,
-    key: String
-) -> Switch {
-    switch container.decode(#(type).self, forKey: key) {
-    case .success(let #(value)):
-        self.#(value): #(value)
-    case .failure(let error):
-        return .failure(cause: error)
-    }
-}
-
-macro codableDecodeBody(
-    container: KeyedDecodingContainer,
-    properties: [Let]
-) -> [Switch] {
-    #(properties.map { property in
-        let applications: [Macro.Application](
-            property.macros.filter { application in
-                application.identifier.name == "codable"
-            }
-        )
-        let behaviors: [CodingBehavior](
-            applications.map { application in
-                application.value
-            }
-        )
-        let keys: [String](
-            behaviors.map { behavior in
-                behavior.key ?? property.identifier.name
-            }
-        )
-        let key: String(keys.first(default: property.identifier.name))
-
-        @codableDecodeProperty(
-            container: container,
-            type: property.type,
-            value: property.identifier,
-            key: key
-        )
-    })
-}
-
-macro codable(shape: CodingShape = .object): Construct { environment in
-    if shape != .object {
-        environment.diagnostics.error("@codable currently supports object coding only.")
-    }
-
+macro codable(): Construct { environment in
     let properties: [Let](
-        environment.target.declaration.members.filter(all: Let).filter { property in
-            let applications: [Macro.Application](
-                property.macros.filter { application in
-                    application.identifier.name == "codable"
-                }
-            )
-            let behaviors: [CodingBehavior](
-                applications.map { application in
-                    application.value
-                }
-            )
-            let excluded: [CodingBehavior](
-                behaviors.filter { behavior in
-                    behavior.exclude
-                }
-            )
-            return excluded.count == 0
-        }
+        environment.target.declaration.members.filter(all: Let)
     )
 
     environment.expand {
         extension #(environment.target.declaration.self) {
             function encode(to encoder: Encoder): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer(encoder.keyedContainer())
-                @codableEncodeBody(
-                    container: container,
-                    properties: properties
-                )
+                #(properties.map { property in
+                    switch container.encode(
+                        #(property.identifier),
+                        forKey: property.identifier.name
+                    ) {
+                    case .success:
+                        break
+                    case .failure(let error):
+                        return .failure(cause: error)
+                    }
+                })
                 return .success(result: Void())
             }
 
             function decode(from decoder: Decoder): Result<Self, DecodingError> {
                 let container: KeyedDecodingContainer(decoder.keyedContainer())
-                @codableDecodeBody(
-                    container: container,
-                    properties: properties
-                )
+                #(properties.map { property in
+                    switch container.decode(
+                        #(property.type).self,
+                        forKey: property.identifier.name
+                    ) {
+                    case .success(let #(property.identifier)):
+                        self.#(property.identifier): #(property.identifier)
+                    case .failure(let error):
+                        return .failure(cause: error)
+                    }
+                })
                 return .success(result: self)
             }
         }

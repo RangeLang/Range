@@ -210,6 +210,57 @@ check_canonical_target_members() {
     echo "Macros canonical-target-members: pass"
 }
 
+check_collection_closure_execution() {
+    local fixture="$REPO_ROOT/Testing/Macros/Pass/CollectionClosureExecution.range"
+    local output="$WORK_ROOT/macro-collection-closure-execution.out"
+    local error="$WORK_ROOT/macro-collection-closure-execution.err"
+
+    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "typed collection closure execution did not compile"
+    [[ ! -s "$error" ]] || fail "typed collection closure execution wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1' "$output" \
+        || fail "typed collection closures did not execute through the macro environment"
+    /usr/bin/grep -Fq $'name=collectionClosureExecutionWorked\tmemberKind=let\ttype=Int' "$output" \
+        || fail "typed filter and map closures did not preserve their source-backed values"
+    echo "Macros typed-collection-closure-execution: pass"
+}
+
+check_codable_construct_collection() {
+    local fixture="$REPO_ROOT/Testing/Macros/Pass/CodableConstructCollection.range"
+    local output="$WORK_ROOT/macro-codable-construct-collection.out"
+    local error="$WORK_ROOT/macro-codable-construct-collection.err"
+
+    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "construct-attached Codable collection did not compile"
+    [[ ! -s "$error" ]] || fail "construct-attached Codable collection wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1' "$output" \
+        || fail "construct-attached Codable did not execute through one macro environment"
+    /usr/bin/grep -Eq $'macroGraphGeneratedFunction\trow=0\tkind=function\townerSyntaxID=[0-9]+\tplacement=1.*\tname=encode\treturnType=Int' "$output" \
+        || fail "construct-attached Codable did not generate encode"
+    /usr/bin/grep -Eq $'macroGraphGeneratedFunction\trow=1\tkind=function\townerSyntaxID=[0-9]+\tplacement=1.*\tname=decode\treturnType=Int' "$output" \
+        || fail "construct-attached Codable did not generate decode"
+    local generated_function_count
+    generated_function_count="$(/usr/bin/grep -F -c 'macroGraphGeneratedFunction' "$output" || true)"
+    [[ "$generated_function_count" -eq 2 ]] \
+        || fail "construct-attached Codable generated $generated_function_count functions, expected exactly encode and decode"
+    echo "Macros Codable-construct-collection: pass"
+}
+
+check_typed_parameter_defaults() {
+    local fixture="$REPO_ROOT/Testing/Macros/Pass/TypedParameterDefaults.range"
+    local output="$WORK_ROOT/macro-typed-parameter-defaults.out"
+    local error="$WORK_ROOT/macro-typed-parameter-defaults.err"
+
+    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "typed macro parameter defaults did not compile"
+    [[ ! -s "$error" ]] || fail "typed macro parameter defaults wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=3\tcapabilityHandleCount=3' "$output" \
+        || fail "typed macro parameter defaults did not execute through ordinary macro values"
+    /usr/bin/grep -Fq $'name=typedParameterDefaultsWorked\tmemberKind=let\ttype=Int' "$output" \
+        || fail "typed macro parameter defaults did not preserve optional String and Bool values"
+    echo "Macros typed-parameter-defaults: pass"
+}
+
 check_canonical_member_family() {
     local fixture="$REPO_ROOT/Testing/Members/Pass/CanonicalMemberFamily.range"
     local output="$WORK_ROOT/member-family-canonical.out"
@@ -765,6 +816,9 @@ main_root_value() {
     check_macro_environment
     check_macro_result_values
     check_canonical_target_members
+    check_collection_closure_execution
+    check_codable_construct_collection
+    check_typed_parameter_defaults
     check_project_defaults
     check_storage_literals
     check_defaulted_generic_optional

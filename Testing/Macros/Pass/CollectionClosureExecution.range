@@ -1,0 +1,56 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
+@builtin
+construct Array<Element> {}
+
+compilerSourceFile\trole=core\tpath=Core/Macro/CollectionClosureExecution.range
+open macro member(): Declaration | Member -> Void {}
+open macro syntax(): Declaration -> Void {}
+
+construct Identifier {
+    let name: String
+}
+
+construct Construct {
+    let declaration: ConstructDeclaration
+}
+
+construct ConstructDeclaration {
+    let members: [@member]
+}
+
+@syntax
+construct Let {
+    let identifier: Identifier
+}
+
+macro collectionClosureExecution(): Construct { environment in
+    let expected: String("first")
+    let lets: [Let](
+        environment.target.declaration.members.filter(all: Let)
+    )
+    let selected: [Let](
+        lets.filter { property in
+            return property.identifier.name == expected
+        }
+    )
+    let names: [String](
+        selected.map { property in
+            return property.identifier.name
+        }
+    )
+    if names.count == 1 {
+        environment.expand {
+            extension #(environment.target.declaration.self) {
+                let collectionClosureExecutionWorked: Int
+            }
+        }
+    }
+}
+
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@collectionClosureExecution
+construct Value {
+    let first: Int
+    let second: Bool
+}

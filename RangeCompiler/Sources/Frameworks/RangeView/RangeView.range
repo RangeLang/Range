@@ -25,7 +25,7 @@ open macro inspect(owner: String, requiresBody: Bool): Construct { environment i
     }
 }
 
-open macro component(element: String = "div", text: String = ""): Construct -> Void { environment in
+open macro component(element: String("div"), text: String("")): Construct -> Void { environment in
     @inspect(owner: "component", requiresBody: false)
 }
 

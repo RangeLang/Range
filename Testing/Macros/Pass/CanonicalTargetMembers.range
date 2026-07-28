@@ -20,7 +20,7 @@ construct State {}
 macro canonicalTargetMembers(): Construct { environment in
     let memberCount: Int(environment.target.declaration.members.filter(all: Let).count)
     if memberCount == 2 {
-        @expand {
+        environment.expand {
             extension #(environment.target.declaration.self) {
                 let canonicalTargetMembersWorked: Int
             }

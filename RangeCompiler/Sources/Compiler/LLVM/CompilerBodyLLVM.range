@@ -1877,6 +1877,10 @@ function compilerBodyArenaIsValid(arena: CompilerBodyArena): Bool {
             || arena.fileID != compilerIntTableValue(table: arena.tables.macroDeclarations, row: arena.ownerDeclarationSyntaxID, column: 1)
             || arena.bodyStart != compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.tables.macroDeclarations, row: arena.ownerDeclarationSyntaxID, column: 27))
             || arena.bodyEnd != compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: compilerIntTableValue(table: arena.tables.macroDeclarations, row: arena.ownerDeclarationSyntaxID, column: 28)) { return false }
+    } else if arena.ownerKind == compilerBodyArenaOwnerClosure() {
+        if arena.ownerFunctionRow != 0 - 1
+            || arena.ownerDeclarationSyntaxID < 0
+            || arena.fileID != compilerSourceStoreFileIDAtGlobalOffset(store: arena.tables.sourceStore, globalOffset: arena.ownerDeclarationSyntaxID) { return false }
     } else { return false }
     if arena.bodyStart < 0
         || arena.bodyEnd <= arena.bodyStart

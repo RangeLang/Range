@@ -1,0 +1,99 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
+@builtin
+construct Array<Element> {}
+
+compilerSourceFile\trole=core\tpath=Core/Macro/TypedParameterDefaults.range
+open macro member(): Declaration | Member -> Void {}
+open macro syntax(): Declaration -> Void {}
+
+construct Identifier {
+    let name: String
+}
+
+construct TypeReference {}
+construct Expression {}
+construct WrittenSyntax {}
+
+construct Macro {
+    construct Declaration {}
+
+    construct Application {
+        let identifier: Identifier
+        let target: Identifier
+        let genericArguments: [TypeReference]
+        let argumentClause: String
+        let arguments: [Expression]
+        let rawBody: WrittenSyntax
+        let declaration: WrittenSyntax
+        let packageVisibility: String
+        let valueType: TypeReference
+        let value: Metadata
+    }
+}
+
+construct Construct {
+    let declaration: ConstructDeclaration
+}
+
+construct ConstructDeclaration {
+    let members: [@member]
+}
+
+construct Metadata {
+    let key: String?
+    let enabled: Bool
+}
+
+@syntax
+construct Let {
+    let macros: [Macro.Application]
+}
+
+macro metadata(_ key: String?(nil), enabled: Bool(false)): Let -> Metadata { environment in
+    return Metadata(key: key, enabled: enabled)
+}
+
+macro inspectMetadata(): Construct { environment in
+    let lets: [Let](
+        environment.target.declaration.members.filter(all: Let)
+    )
+    let enabledProperties: [Let](
+        lets.filter { property in
+            let applications: [Macro.Application](
+                property.macros.filter { application in
+                    return application.identifier.name == "metadata"
+                }
+            )
+            let values: [Metadata](
+                applications.map { application in
+                    return application.value
+                }
+            )
+            let enabled: [Metadata](
+                values.filter { value in
+                    return value.enabled
+                }
+            )
+            return enabled.count == 1
+        }
+    )
+
+    if enabledProperties.count == 1 {
+        environment.expand {
+            extension #(environment.target.declaration.self) {
+                let typedParameterDefaultsWorked: Int
+            }
+        }
+    }
+}
+
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@inspectMetadata
+construct Value {
+    @metadata
+    let disabled: Int
+
+    @metadata("custom", enabled: true)
+    let enabled: Bool
+}

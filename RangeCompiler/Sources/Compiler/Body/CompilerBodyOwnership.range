@@ -27,7 +27,7 @@ function compilerBodyMemoryBuildValuePhase(arena: CompilerBodyArena): Int {
     while symbolRow < compilerIntTableRowCount(table: arena.symbols) {
         let symbolKind: Int(compilerIntTableValue(table: arena.symbols, row: symbolRow, column: compilerBodySymbolKindColumn()))
         state symbolFactKind: Int(compilerBodyMemoryFactOwnedImmutableValue())
-        if symbolKind == compilerBodySymbolParameter() || symbolKind == compilerBodySymbolReceiver() || symbolKind == compilerBodySymbolEnumPayloadBinding() { symbolFactKind: compilerBodyMemoryFactBorrowedParameterValue() }
+        if symbolKind == compilerBodySymbolParameter() || symbolKind == compilerBodySymbolReceiver() || symbolKind == compilerBodySymbolEnumPayloadBinding() || symbolKind == compilerBodySymbolClosureParameter() { symbolFactKind: compilerBodyMemoryFactBorrowedParameterValue() }
         if symbolKind == compilerBodySymbolState() { symbolFactKind: compilerBodyMemoryFactOwnedMutableValue() }
         let symbolTypeKind: Int(compilerBodyArenaSymbolTypeKind(arena: arena, symbolID: symbolRow))
         if compilerBodyMemoryAppendFact(arena: arena, phase: phase, kind: symbolFactKind, sourceNodeID: compilerIntTableValue(table: arena.symbols, row: symbolRow, column: compilerBodySymbolDeclarationColumn()), subjectKind: compilerBodyMemorySubjectSymbol(), subjectID: symbolRow, auxID: symbolTypeKind) < 0 { return 0 - 1 }
@@ -1944,7 +1944,7 @@ function compilerBodyArenaBuildOwnedPathTables(arena: CompilerBodyArena): Int {
     while symbolRow < compilerIntTableRowCount(table: arena.symbols) {
         let symbolTypeID: Int(compilerBodyArenaSymbolTypeID(arena: arena, symbolID: symbolRow))
         let symbolKind: Int(compilerIntTableValue(table: arena.symbols, row: symbolRow, column: compilerBodySymbolKindColumn()))
-        let symbolIsMacroParameter: Bool(arena.ownerKind == compilerBodyArenaOwnerMacro() && symbolKind == compilerBodySymbolParameter())
+        let symbolIsMacroParameter: Bool((arena.ownerKind == compilerBodyArenaOwnerMacro() && symbolKind == compilerBodySymbolParameter()) || symbolKind == compilerBodySymbolClosureParameter())
         if !symbolIsMacroParameter {
             let symbolIsOpaqueStorage: Bool(compilerBodyArenaTypeIDHasOpaqueStorageRepresentation(arena: arena, typeID: symbolTypeID))
             if symbolIsOpaqueStorage
@@ -1968,7 +1968,14 @@ function compilerBodyArenaBuildOwnedPathTables(arena: CompilerBodyArena): Int {
                     initializerNodeID >= 0
                         && compilerBodyArenaValueIsNonOwningStringView(arena: arena, valueNodeID: initializerNodeID)
                 )
-                if symbolIsBorrowedAggregate || (initializerNodeID >= 0 && !initializerIsNonOwningStringView) {
+                let initializerIsSyntaxQueryProjection: Bool(
+                    initializerNodeID >= 0
+                        && compilerBodyArenaValueIsDerivedSyntaxQueryProjection(arena: arena, valueNodeID: initializerNodeID)
+                )
+                if symbolIsBorrowedAggregate
+                    || (initializerNodeID >= 0
+                        && !initializerIsNonOwningStringView
+                        && !initializerIsSyntaxQueryProjection) {
                     let rootPolicy: Int(compilerBodyOwnedPathPolicyForBorrowed(borrowed: symbolIsBorrowedAggregate))
                     let rootPathID: Int(compilerBodyOwnedPathAppend(paths: arena.ownedPaths, rootKind: compilerBodyOwnedPathRootSymbol(), rootID: symbolRow, parentPathID: 0 - 1, memberRow: 0 - 1, typeID: symbolTypeID, policy: rootPolicy))
                     if rootPathID < 0 { return 0 - 1 }
@@ -1980,6 +1987,7 @@ function compilerBodyArenaBuildOwnedPathTables(arena: CompilerBodyArena): Int {
                 let initializerNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: declarationNodeID, role: compilerSyntaxRoleInitializer(), ordinal: 0))
                 if initializerNodeID >= 0
                     && (!compilerBodyArenaValueIsNonOwningStringView(arena: arena, valueNodeID: initializerNodeID)
+                        && !compilerBodyArenaValueIsDerivedSyntaxQueryProjection(arena: arena, valueNodeID: initializerNodeID)
                         || symbolKind == compilerBodySymbolState()) {
                     if compilerBodyOwnedPathAppend(paths: arena.ownedPaths, rootKind: compilerBodyOwnedPathRootSymbol(), rootID: symbolRow, parentPathID: 0 - 1, memberRow: 0 - 1, typeID: symbolTypeID, policy: compilerBodyOwnedPathPolicyOwned()) < 0 { return 0 - 1 }
                 }
@@ -2154,8 +2162,63 @@ function compilerBodyArenaValueIsNonOwningStringView(arena: CompilerBodyArena, v
             || compilerBodyArenaValueIsEphemeralString(arena: arena, valueNodeID: valueNodeID))
 }
 
+function compilerBodyArenaValueIsSyntaxQueryProjection(arena: CompilerBodyArena, valueNodeID: Int): Bool {
+    if arena.ownerKind != compilerBodyArenaOwnerClosure()
+        || valueNodeID < 0 || valueNodeID >= compilerIntTableRowCount(table: arena.nodes) { return false }
+    state rootNodeID: Int(valueNodeID)
+    state step: Int(0)
+    let maximumSteps: Int(compilerIntTableRowCount(table: arena.nodes) + 1)
+    while step < maximumSteps
+        && compilerIntTableValue(table: arena.nodes, row: rootNodeID, column: 1) == compilerSyntaxKindMemberRead() {
+        rootNodeID: compilerBodyArenaChild(arena: arena, ownerNodeID: rootNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0)
+        if rootNodeID < 0 || rootNodeID >= compilerIntTableRowCount(table: arena.nodes) { return false }
+        step: step + 1
+    }
+    if step == 0 || step >= maximumSteps { return false }
+    let symbolID: Int(compilerBodyArenaValueLocalSymbolID(arena: arena, valueNodeID: rootNodeID))
+    return symbolID >= 0
+        && symbolID < compilerIntTableRowCount(table: arena.symbols)
+        && compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolKindColumn()) == compilerBodySymbolClosureParameter()
+}
+
+function compilerBodyArenaSyntaxQueryDerivedSource(arena: CompilerBodyArena, valueNodeID: Int): Int {
+    if valueNodeID < 0 || valueNodeID >= compilerIntTableRowCount(table: arena.nodes) { return 0 - 1 }
+    let valueKind: Int(compilerIntTableValue(table: arena.nodes, row: valueNodeID, column: 1))
+    if valueKind == compilerSyntaxKindApplication() {
+        let calleeNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: valueNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0))
+        if calleeNodeID < 0 { return 0 - 1 }
+        let resolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: calleeNodeID))
+        if resolutionRow < 0 { return 0 - 1 }
+        let targetKind: Int(compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()))
+        if targetKind != compilerBodyResolutionMacroSyntaxFilter()
+            && targetKind != compilerBodyResolutionMacroCollectionTransform() { return 0 - 1 }
+        return compilerBodyArenaChild(arena: arena, ownerNodeID: calleeNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0)
+    }
+    if valueKind != compilerSyntaxKindIdentifier() { return 0 - 1 }
+    let symbolID: Int(compilerBodyArenaValueLocalSymbolID(arena: arena, valueNodeID: valueNodeID))
+    if symbolID < 0 || symbolID >= compilerIntTableRowCount(table: arena.symbols)
+        || compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolKindColumn()) != compilerBodySymbolLet() { return 0 - 1 }
+    let declarationNodeID: Int(compilerIntTableValue(table: arena.symbols, row: symbolID, column: compilerBodySymbolDeclarationColumn()))
+    return compilerBodyArenaChild(arena: arena, ownerNodeID: declarationNodeID, role: compilerSyntaxRoleInitializer(), ordinal: 0)
+}
+
+function compilerBodyArenaValueIsDerivedSyntaxQueryProjection(arena: CompilerBodyArena, valueNodeID: Int): Bool {
+    state sourceNodeID: Int(valueNodeID)
+    state step: Int(0)
+    let maximumSteps: Int(compilerIntTableRowCount(table: arena.nodes) + 1)
+    while step < maximumSteps {
+        if compilerBodyArenaValueIsSyntaxQueryProjection(arena: arena, valueNodeID: sourceNodeID) { return true }
+        let nextSourceNodeID: Int(compilerBodyArenaSyntaxQueryDerivedSource(arena: arena, valueNodeID: sourceNodeID))
+        if nextSourceNodeID < 0 || nextSourceNodeID == sourceNodeID { return false }
+        sourceNodeID: nextSourceNodeID
+        step: step + 1
+    }
+    return false
+}
+
 function compilerBodyArenaValueHasNoTrackedFunctionReturn(arena: CompilerBodyArena, valueNodeID: Int, returnSummaries: CompilerIntTable): Bool {
     if valueNodeID < 0 || valueNodeID >= compilerIntTableRowCount(table: arena.nodes) { return false }
+    if compilerBodyArenaValueIsSyntaxQueryProjection(arena: arena, valueNodeID: valueNodeID) { return true }
     let localSymbolID: Int(compilerBodyArenaValueLocalSymbolID(arena: arena, valueNodeID: valueNodeID))
     if localSymbolID >= 0 {
         if compilerIntTableValue(table: arena.symbols, row: localSymbolID, column: compilerBodySymbolKindColumn()) == compilerBodySymbolState() { return false }

@@ -4,7 +4,7 @@ construct JoinedResult {}
 macro joined(): Construct -> JoinedResult { environment in
     let memberCount: Int(environment.target.memberCount("generated"))
     if memberCount == 0 {
-        @expand {
+        environment.expand {
             extension #(environment.target.declaration.self) {
                 state generated: Int
             }
