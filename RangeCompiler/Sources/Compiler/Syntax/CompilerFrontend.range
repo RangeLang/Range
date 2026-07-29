@@ -7,8 +7,11 @@ function compilerSyntaxDeclarationColumnCount(): Int {
 }
 
 function compilerSyntaxMemberColumnCount(): Int {
-    return 16
+    return 18
 }
+
+function compilerSyntaxMemberValueStartColumn(): Int { return 16 }
+function compilerSyntaxMemberValueEndColumn(): Int { return 17 }
 
 function compilerSyntaxFunctionColumnCount(): Int {
     return 13
@@ -1777,11 +1780,13 @@ function compilerSyntaxAppendDeclaration(tables: CompilerSyntaxTables, syntaxID:
     return compilerSyntaxTableAppend(tables: tables, table: tables.declarations, value: builtinPolicy)
 }
 
-function compilerSyntaxAppendMemberWithStorage(tables: CompilerSyntaxTables, syntaxID: Int, fileID: Int, parentSyntaxID: Int, ordinal: Int, memberStart: Int, memberEnd: Int, nameStart: Int, nameEnd: Int, typeStart: Int, typeEnd: Int, fingerprint: CompilerFingerprint, memberKind: Int, storagePolicy: Int): Int {
+function compilerSyntaxAppendMemberWithStorage(tables: CompilerSyntaxTables, syntaxID: Int, fileID: Int, parentSyntaxID: Int, ordinal: Int, memberStart: Int, memberEnd: Int, nameStart: Int, nameEnd: Int, typeStart: Int, typeEnd: Int, valueStart: Int, valueEnd: Int, fingerprint: CompilerFingerprint, memberKind: Int, storagePolicy: Int): Int {
     if !compilerSyntaxMemberRangesAreValid(tables: tables, fileID: fileID, memberStart: memberStart, memberEnd: memberEnd, nameStart: nameStart, nameEnd: nameEnd, typeStart: typeStart, typeEnd: typeEnd) {
         compilerSyntaxTablesPoison(tables: tables)
         return 0 - 1
     }
+    if (valueStart < 0 || valueEnd < 0) && (valueStart != 0 - 1 || valueEnd != 0 - 1) { return 0 - 1 }
+    if valueStart >= 0 && (valueStart < typeStart || valueEnd <= valueStart || valueEnd > memberEnd) { return 0 - 1 }
     if compilerSyntaxTableAppend(tables: tables, table: tables.members, value: syntaxID) != 0 { return 0 - 1 }
     if compilerSyntaxTableAppend(tables: tables, table: tables.members, value: fileID) != 0 { return 0 - 1 }
     if compilerSyntaxTableAppend(tables: tables, table: tables.members, value: parentSyntaxID) != 0 { return 0 - 1 }
@@ -1797,11 +1802,20 @@ function compilerSyntaxAppendMemberWithStorage(tables: CompilerSyntaxTables, syn
     if compilerSyntaxTableAppend(tables: tables, table: tables.members, value: memberKind) != 0 { return 0 - 1 }
     if compilerSyntaxTableAppend(tables: tables, table: tables.members, value: storagePolicy) != 0 { return 0 - 1 }
     if compilerSyntaxTableAppend(tables: tables, table: tables.members, value: compilerSyntaxTypeTargetNone()) != 0 { return 0 - 1 }
-    return compilerSyntaxTableAppend(tables: tables, table: tables.members, value: 0 - 1)
+    if compilerSyntaxTableAppend(tables: tables, table: tables.members, value: 0 - 1) != 0 { return 0 - 1 }
+    state valueStartLocal: Int(0 - 1)
+    state valueEndLocal: Int(0 - 1)
+    if valueStart >= 0 {
+        valueStartLocal: compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: valueStart)
+        valueEndLocal: compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: valueEnd)
+        if valueStartLocal < 0 || valueEndLocal <= valueStartLocal { return 0 - 1 }
+    }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.members, value: valueStartLocal) != 0 { return 0 - 1 }
+    return compilerSyntaxTableAppend(tables: tables, table: tables.members, value: valueEndLocal)
 }
 
-function compilerSyntaxAppendMember(tables: CompilerSyntaxTables, syntaxID: Int, fileID: Int, parentSyntaxID: Int, ordinal: Int, memberStart: Int, memberEnd: Int, nameStart: Int, nameEnd: Int, typeStart: Int, typeEnd: Int, fingerprint: CompilerFingerprint, memberKind: Int): Int {
-    return compilerSyntaxAppendMemberWithStorage(tables: tables, syntaxID: syntaxID, fileID: fileID, parentSyntaxID: parentSyntaxID, ordinal: ordinal, memberStart: memberStart, memberEnd: memberEnd, nameStart: nameStart, nameEnd: nameEnd, typeStart: typeStart, typeEnd: typeEnd, fingerprint: fingerprint, memberKind: memberKind, storagePolicy: compilerSyntaxMemberStorageNone())
+function compilerSyntaxAppendMember(tables: CompilerSyntaxTables, syntaxID: Int, fileID: Int, parentSyntaxID: Int, ordinal: Int, memberStart: Int, memberEnd: Int, nameStart: Int, nameEnd: Int, typeStart: Int, typeEnd: Int, valueStart: Int, valueEnd: Int, fingerprint: CompilerFingerprint, memberKind: Int): Int {
+    return compilerSyntaxAppendMemberWithStorage(tables: tables, syntaxID: syntaxID, fileID: fileID, parentSyntaxID: parentSyntaxID, ordinal: ordinal, memberStart: memberStart, memberEnd: memberEnd, nameStart: nameStart, nameEnd: nameEnd, typeStart: typeStart, typeEnd: typeEnd, valueStart: valueStart, valueEnd: valueEnd, fingerprint: fingerprint, memberKind: memberKind, storagePolicy: compilerSyntaxMemberStorageNone())
 }
 
 function compilerSyntaxAppendFunction(tables: CompilerSyntaxTables, syntaxID: Int, fileID: Int, firstParameterRow: Int, parameterCount: Int, parameterStart: Int, parameterEnd: Int, returnTypeStart: Int, returnTypeEnd: Int, bodyStart: Int, bodyEnd: Int, signature: CompilerFingerprint, isDerived: Bool): Int {
@@ -3555,7 +3569,7 @@ function compilerTypedSyntaxAppendEnumCasePayload(tables: CompilerSyntaxTables, 
     let payloadRow: Int(compilerIntTableRowCount(table: tables.members))
     let payloadSyntaxID: Int(compilerSyntaxAllocate(tables: tables, kindTag: compilerSyntaxKindMember(), facetRow: payloadRow))
     if payloadSyntaxID < 0
-        || compilerSyntaxAppendMemberWithStorage(tables: tables, syntaxID: payloadSyntaxID, fileID: fileID, parentSyntaxID: caseSyntaxID, ordinal: payloadOrdinal, memberStart: firstStart, memberEnd: step.typeReference.end, nameStart: step.nameToken.start, nameEnd: step.nameToken.end, typeStart: step.typeReference.start, typeEnd: step.typeReference.end, fingerprint: payloadFingerprint, memberKind: compilerSyntaxMemberKindEnumCasePayload(), storagePolicy: storagePolicy) != 0 {
+        || compilerSyntaxAppendMemberWithStorage(tables: tables, syntaxID: payloadSyntaxID, fileID: fileID, parentSyntaxID: caseSyntaxID, ordinal: payloadOrdinal, memberStart: firstStart, memberEnd: step.typeReference.end, nameStart: step.nameToken.start, nameEnd: step.nameToken.end, typeStart: step.typeReference.start, typeEnd: step.typeReference.end, valueStart: 0 - 1, valueEnd: 0 - 1, fingerprint: payloadFingerprint, memberKind: compilerSyntaxMemberKindEnumCasePayload(), storagePolicy: storagePolicy) != 0 {
         return CompilerEnumPayloadAppendStep(nextIndex: step.nextIndex, fingerprint: fingerprint, isValid: false)
     }
     return CompilerEnumPayloadAppendStep(nextIndex: step.nextIndex, fingerprint: payloadFingerprint, isValid: true)
@@ -3676,7 +3690,7 @@ function compilerTypedSyntaxCaptureEnumCases(source: String, tables: CompilerSyn
         let memberRow: Int(compilerIntTableRowCount(table: tables.members))
         let memberSyntaxID: Int(compilerSyntaxAllocate(tables: tables, kindTag: compilerSyntaxKindMember(), facetRow: memberRow))
         if memberSyntaxID < 0
-            || compilerSyntaxAppendMember(tables: tables, syntaxID: memberSyntaxID, fileID: fileID, parentSyntaxID: parentSyntaxID, ordinal: caseOrdinal, memberStart: caseToken.start, memberEnd: caseEnd, nameStart: nameToken.start, nameEnd: nameToken.end, typeStart: nameToken.end, typeEnd: nameToken.end, fingerprint: caseFingerprint, memberKind: compilerSyntaxMemberKindEnumCase()) != 0 {
+            || compilerSyntaxAppendMember(tables: tables, syntaxID: memberSyntaxID, fileID: fileID, parentSyntaxID: parentSyntaxID, ordinal: caseOrdinal, memberStart: caseToken.start, memberEnd: caseEnd, nameStart: nameToken.start, nameEnd: nameToken.end, typeStart: nameToken.end, typeEnd: nameToken.end, valueStart: 0 - 1, valueEnd: 0 - 1, fingerprint: caseFingerprint, memberKind: compilerSyntaxMemberKindEnumCase()) != 0 {
             compilerSyntaxTablesPoison(tables: tables)
             return CompilerTypedMemberCapture(count: caseOrdinal, fingerprint: declarationFingerprint)
         }
@@ -3853,17 +3867,31 @@ function compilerTypedSyntaxCaptureMembers(source: String, tables: CompilerSynta
             compilerSyntaxTablesPoison(tables: tables)
             return CompilerTypedMemberCapture(count: memberOrdinal, fingerprint: declarationFingerprint)
         }
-        if !compilerSyntaxMemberRangesAreValid(tables: tables, fileID: fileID, memberStart: token.start, memberEnd: step.typeReference.end, nameStart: step.nameToken.start, nameEnd: step.nameToken.end, typeStart: step.typeReference.start, typeEnd: step.typeReference.end) {
+        state memberEnd: Int(step.typeReference.end)
+        state valueStart: Int(0 - 1)
+        state valueEnd: Int(0 - 1)
+        if (step.kindTag == compilerSyntaxMemberKindLet() || step.kindTag == compilerSyntaxMemberKindState())
+            && step.nextIndex > step.typeReference.end {
+            memberEnd: step.nextIndex
+            valueStart: step.typeReference.start
+            valueEnd: step.nextIndex
+        }
+        if !compilerSyntaxMemberRangesAreValid(tables: tables, fileID: fileID, memberStart: token.start, memberEnd: memberEnd, nameStart: step.nameToken.start, nameEnd: step.nameToken.end, typeStart: step.typeReference.start, typeEnd: step.typeReference.end) {
             compilerSyntaxTablesPoison(tables: tables)
             return CompilerTypedMemberCapture(count: memberOrdinal, fingerprint: declarationFingerprint)
         }
 
         let memberFingerprintBase: CompilerFingerprint(compilerTypedFingerprintAppendNamedType(fingerprint: baseFingerprint, tag: 10, ordinal: memberOrdinal, name: step.nameToken.text, typeName: step.typeReference.text))
-        let memberFingerprint: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: memberFingerprintBase, value: step.kindTag))
-        declarationFingerprint: compilerFingerprintAppendInt(fingerprint: compilerTypedFingerprintAppendNamedType(fingerprint: declarationFingerprint, tag: 10, ordinal: memberOrdinal, name: step.nameToken.text, typeName: step.typeReference.text), value: step.kindTag)
+        state memberFingerprint: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: memberFingerprintBase, value: step.kindTag))
+        state nextDeclarationFingerprint: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: compilerTypedFingerprintAppendNamedType(fingerprint: declarationFingerprint, tag: 10, ordinal: memberOrdinal, name: step.nameToken.text, typeName: step.typeReference.text), value: step.kindTag))
+        if valueStart >= 0 {
+            memberFingerprint: compilerFingerprintAppendRange(fingerprint: memberFingerprint, tag: 11, source: source, start: valueStart, end: valueEnd)
+            nextDeclarationFingerprint: compilerFingerprintAppendRange(fingerprint: nextDeclarationFingerprint, tag: 11, source: source, start: valueStart, end: valueEnd)
+        }
+        declarationFingerprint: nextDeclarationFingerprint
         let memberRow: Int(compilerIntTableRowCount(table: tables.members))
         let memberSyntaxID: Int(compilerSyntaxAllocate(tables: tables, kindTag: compilerSyntaxKindMember(), facetRow: memberRow))
-        if compilerSyntaxAppendMember(tables: tables, syntaxID: memberSyntaxID, fileID: fileID, parentSyntaxID: parentSyntaxID, ordinal: memberOrdinal, memberStart: token.start, memberEnd: step.typeReference.end, nameStart: step.nameToken.start, nameEnd: step.nameToken.end, typeStart: step.typeReference.start, typeEnd: step.typeReference.end, fingerprint: memberFingerprint, memberKind: step.kindTag) != 0 {
+        if compilerSyntaxAppendMember(tables: tables, syntaxID: memberSyntaxID, fileID: fileID, parentSyntaxID: parentSyntaxID, ordinal: memberOrdinal, memberStart: token.start, memberEnd: memberEnd, nameStart: step.nameToken.start, nameEnd: step.nameToken.end, typeStart: step.typeReference.start, typeEnd: step.typeReference.end, valueStart: valueStart, valueEnd: valueEnd, fingerprint: memberFingerprint, memberKind: step.kindTag) != 0 {
             compilerSyntaxTablesPoison(tables: tables)
             return CompilerTypedMemberCapture(count: memberOrdinal, fingerprint: declarationFingerprint)
         }
@@ -4166,6 +4194,9 @@ function compilerSyntaxMembersAreValid(tables: CompilerSyntaxTables): Bool {
         let storagePolicy: Int(compilerIntTableValue(table: tables.members, row: row, column: 13))
         let typeTargetKind: Int(compilerIntTableValue(table: tables.members, row: row, column: 14))
         let typeTargetID: Int(compilerIntTableValue(table: tables.members, row: row, column: 15))
+        let valueStart: Int(compilerIntTableValue(table: tables.members, row: row, column: compilerSyntaxMemberValueStartColumn()))
+        let valueEnd: Int(compilerIntTableValue(table: tables.members, row: row, column: compilerSyntaxMemberValueEndColumn()))
+        let hasValue: Bool(valueStart >= 0 || valueEnd >= 0)
         if syntaxID < 0 || syntaxID >= syntaxCount || fileID < 0 || fileID >= fileCount || parentSyntaxID < 0 || parentSyntaxID >= syntaxCount
             || (memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState() && memberKind != compilerSyntaxMemberKindBinding() && memberKind != compilerSyntaxMemberKindEnumCase() && memberKind != compilerSyntaxMemberKindEnumCasePayload() && memberKind != compilerSyntaxMemberKindDerived()) {
             return false
@@ -4190,6 +4221,11 @@ function compilerSyntaxMembersAreValid(tables: CompilerSyntaxTables): Bool {
             || (!compilerSyntaxMemberHasTypeReference(tables: tables, memberRow: row) && (typeTargetKind != compilerSyntaxTypeTargetNone() || typeTargetID != 0 - 1))
             || (memberKind == compilerSyntaxMemberKindEnumCasePayload() && compilerIntTableValue(table: tables.members, row: row, column: 9) <= compilerIntTableValue(table: tables.members, row: row, column: 8))
             || (memberKind == compilerSyntaxMemberKindEnumCase() && compilerIntTableValue(table: tables.members, row: row, column: 9) != compilerIntTableValue(table: tables.members, row: row, column: 8))
+            || (hasValue && (memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState()))
+            || (hasValue && (valueStart < compilerIntTableValue(table: tables.members, row: row, column: 8)
+                || valueEnd <= valueStart
+                || valueEnd > compilerIntTableValue(table: tables.members, row: row, column: 5)))
+            || (!hasValue && (valueStart != 0 - 1 || valueEnd != 0 - 1))
             || ordinal != compilerSyntaxPriorChildCount(table: tables.members, row: row, parentColumn: 2, parentSyntaxID: parentSyntaxID) {
             return false
         }
@@ -6594,11 +6630,44 @@ function compilerMacroExecutionMaterializeSyntaxIdentifier(
     return identifierValueID
 }
 
+function compilerMacroExecutionMaterializeSyntaxValue(
+    tables: CompilerSyntaxTables,
+    store: CompilerMacroValueStore,
+    sourceSyntaxID: Int,
+    fileID: Int,
+    valueStart: Int,
+    valueEnd: Int
+): Int {
+    if fileID < 0 || valueStart < 0 || valueEnd <= valueStart { return 0 - 1 }
+    let fileValueID: Int(compilerMacroValueStoreAppendScalar(store: store, typeKind: compilerBodyTypeInt(), typeID: 0 - 1, scalar: fileID))
+    let startValueID: Int(compilerMacroValueStoreAppendScalar(store: store, typeKind: compilerBodyTypeInt(), typeID: 0 - 1, scalar: valueStart))
+    let endValueID: Int(compilerMacroValueStoreAppendScalar(store: store, typeKind: compilerBodyTypeInt(), typeID: 0 - 1, scalar: valueEnd))
+    let children: Buffer<Int>(bufferCreateInt(capacity: 3))
+    state valid: Bool(fileValueID >= 0 && startValueID >= 0 && endValueID >= 0)
+    if valid && children.append(element: fileValueID) != 0 { valid: false }
+    if valid && children.append(element: startValueID) != 0 { valid: false }
+    if valid && children.append(element: endValueID) != 0 { valid: false }
+    state syntaxValueID: Int(0 - 1)
+    if valid {
+        syntaxValueID: compilerMacroValueStoreAppendAggregate(
+            store: store,
+            kind: compilerMacroValueKindSyntax(),
+            typeKind: compilerBodyTypeMacroTarget(),
+            typeID: 0 - 1,
+            scalar: sourceSyntaxID,
+            children: children
+        )
+    }
+    children.destroy()
+    return syntaxValueID
+}
+
 function compilerMacroExecutionQuerySyntaxCapture(
     tables: CompilerSyntaxTables,
     store: CompilerMacroValueStore,
     sourceSyntaxID: Int,
     captureMemberRow: Int,
+    resultTypeKind: Int,
     resultTypeID: Int
 ): Int {
     if captureMemberRow < 0 || captureMemberRow >= compilerIntTableRowCount(table: tables.members) { return 0 - 1 }
@@ -6618,6 +6687,44 @@ function compilerMacroExecutionQuerySyntaxCapture(
             syntaxID: sourceSyntaxID,
             typeID: resultTypeID
         )
+    }
+    if captureName == String("value") {
+        let sourceMemberRow: Int(compilerMacroExecutionMemberRowForSyntaxID(tables: tables, syntaxID: sourceSyntaxID))
+        if sourceMemberRow < 0 { return 0 - 1 }
+        let sourceMemberKind: Int(compilerIntTableValue(table: tables.members, row: sourceMemberRow, column: 12))
+        if sourceMemberKind != compilerSyntaxMemberKindLet() && sourceMemberKind != compilerSyntaxMemberKindState() { return 0 - 1 }
+        let valueStart: Int(compilerIntTableValue(table: tables.members, row: sourceMemberRow, column: compilerSyntaxMemberValueStartColumn()))
+        let valueEnd: Int(compilerIntTableValue(table: tables.members, row: sourceMemberRow, column: compilerSyntaxMemberValueEndColumn()))
+        let optionalChildren: Buffer<Int>(bufferCreateInt(capacity: 1))
+        state optionalScalar: Int(0)
+        state valid: Bool(valueStart == 0 - 1 && valueEnd == 0 - 1)
+        if valueStart >= 0 && valueEnd > valueStart {
+            let syntaxValueID: Int(compilerMacroExecutionMaterializeSyntaxValue(
+                tables: tables,
+                store: store,
+                sourceSyntaxID: sourceSyntaxID,
+                fileID: compilerIntTableValue(table: tables.members, row: sourceMemberRow, column: 1),
+                valueStart: valueStart,
+                valueEnd: valueEnd
+            ))
+            if syntaxValueID >= 0 && optionalChildren.append(element: syntaxValueID) == 0 {
+                optionalScalar: 1
+                valid: true
+            }
+        }
+        state optionalValueID: Int(0 - 1)
+        if valid {
+            optionalValueID: compilerMacroValueStoreAppendAggregate(
+                store: store,
+                kind: compilerMacroValueKindEnum(),
+                typeKind: resultTypeKind,
+                typeID: resultTypeID,
+                scalar: optionalScalar,
+                children: optionalChildren
+            )
+        }
+        optionalChildren.destroy()
+        return optionalValueID
     }
     return 0 - 1
 }
@@ -7608,7 +7715,7 @@ function compilerGraphDeltaCommitGeneratedMember(tables: CompilerSyntaxTables, r
         || ownerSyntaxID < 0
         || syntaxID < 0
         || tables.failures.count != 0
-        || compilerSyntaxAppendMember(tables: tables, syntaxID: syntaxID, fileID: fileID, parentSyntaxID: ownerSyntaxID, ordinal: ordinal, memberStart: memberStartGlobal, memberEnd: memberEndGlobal, nameStart: nameStartGlobal, nameEnd: nameEndGlobal, typeStart: typeStartGlobal, typeEnd: typeEndGlobal, fingerprint: memberFingerprint, memberKind: memberKind) != 0
+        || compilerSyntaxAppendMember(tables: tables, syntaxID: syntaxID, fileID: fileID, parentSyntaxID: ownerSyntaxID, ordinal: ordinal, memberStart: memberStartGlobal, memberEnd: memberEndGlobal, nameStart: nameStartGlobal, nameEnd: nameEndGlobal, typeStart: typeStartGlobal, typeEnd: typeEndGlobal, valueStart: 0 - 1, valueEnd: 0 - 1, fingerprint: memberFingerprint, memberKind: memberKind) != 0
         || compilerSyntaxLinkMemberTypeTargetAtRow(tables: tables, memberRow: memberRow) != 0 {
         compilerSyntaxTablesPoison(tables: tables)
         return 0 - 1
@@ -8505,6 +8612,7 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
                     store: store,
                     sourceSyntaxID: store.scalars.element(index: projectionReceiverStoreValueID),
                     captureMemberRow: projectedMemberRow,
+                    resultTypeKind: compilerIntTableValue(table: arena.mirValues, row: projectionResultValueID, column: compilerBodyMIRValueTypeColumn()),
                     resultTypeID: compilerIntTableValue(table: arena.mirValues, row: projectionResultValueID, column: compilerBodyMIRValueTypeIDColumn())
                 )
                 if projectionStoreValueID >= 0 { projectedSyntaxValue: true }

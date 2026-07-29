@@ -91,9 +91,15 @@ function compilerTypedSyntaxRenderSnapshot(tables: CompilerSyntaxTables): String
         let memberStoragePolicy: Int(compilerIntTableValue(table: tables.members, row: row, column: 13))
         let memberTypeTargetKind: Int(compilerIntTableValue(table: tables.members, row: row, column: 14))
         let memberTypeTargetID: Int(compilerIntTableValue(table: tables.members, row: row, column: 15))
+        let memberValueStart: Int(compilerIntTableValue(table: tables.members, row: row, column: compilerSyntaxMemberValueStartColumn()))
+        let memberValueEnd: Int(compilerIntTableValue(table: tables.members, row: row, column: compilerSyntaxMemberValueEndColumn()))
         let memberName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: memberFileID, localStart: memberNameStart, localEnd: memberNameEnd))
         let memberTypeName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: memberFileID, localStart: memberTypeStart, localEnd: memberTypeEnd))
-        rawBufferAppendText(buffer: outputBuffer, text: "member\(tab)row=\(row)\(tab)syntaxID=\(memberSyntaxID)\(tab)fileID=\(memberFileID)\(tab)parentSyntaxID=\(parentSyntaxID)\(tab)ordinal=\(memberOrdinal)\(tab)start=\(memberStart)\(tab)end=\(memberEnd)\(tab)name=\(memberName)\(tab)nameStart=\(memberNameStart)\(tab)nameEnd=\(memberNameEnd)\(tab)type=\(memberTypeName)\(tab)typeStart=\(memberTypeStart)\(tab)typeEnd=\(memberTypeEnd)\(tab)kind=\(compilerSyntaxMemberKindName(kindTag: memberKind))\(tab)storage=\(compilerSyntaxMemberStorageName(storagePolicy: memberStoragePolicy))\(tab)typeTargetKind=\(compilerSyntaxTypeTargetKindName(kind: memberTypeTargetKind))\(tab)typeTargetID=\(memberTypeTargetID)\(tab)fingerprint=\(memberFingerprintFirst):\(memberFingerprintSecond)\(newline)")
+        state memberValue: String("")
+        if memberValueStart >= 0 && memberValueEnd > memberValueStart {
+            memberValue: compilerTypedSyntaxLocalText(tables: tables, fileID: memberFileID, localStart: memberValueStart, localEnd: memberValueEnd)
+        }
+        rawBufferAppendText(buffer: outputBuffer, text: "member\(tab)row=\(row)\(tab)syntaxID=\(memberSyntaxID)\(tab)fileID=\(memberFileID)\(tab)parentSyntaxID=\(parentSyntaxID)\(tab)ordinal=\(memberOrdinal)\(tab)start=\(memberStart)\(tab)end=\(memberEnd)\(tab)name=\(memberName)\(tab)nameStart=\(memberNameStart)\(tab)nameEnd=\(memberNameEnd)\(tab)type=\(memberTypeName)\(tab)typeStart=\(memberTypeStart)\(tab)typeEnd=\(memberTypeEnd)\(tab)value=\(memberValue)\(tab)valueStart=\(memberValueStart)\(tab)valueEnd=\(memberValueEnd)\(tab)kind=\(compilerSyntaxMemberKindName(kindTag: memberKind))\(tab)storage=\(compilerSyntaxMemberStorageName(storagePolicy: memberStoragePolicy))\(tab)typeTargetKind=\(compilerSyntaxTypeTargetKindName(kind: memberTypeTargetKind))\(tab)typeTargetID=\(memberTypeTargetID)\(tab)fingerprint=\(memberFingerprintFirst):\(memberFingerprintSecond)\(newline)")
         row: row + 1
     }
 

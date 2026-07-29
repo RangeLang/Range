@@ -37,6 +37,21 @@ describe("SvelteKit routes", () => {
     const html = await response.text();
 
     expect(response.status).toBe(200);
+    expect(html).toContain(
+      "<title>Range — A Graph-Backed Programming Language</title>",
+    );
+    expect(html).toContain(
+      'name="description" content="A love letter to electrons, logic and abstraction."',
+    );
+    expect(html).toContain(
+      'property="og:title" content="Range — A Graph-Backed Programming Language"',
+    );
+    expect(html).toContain(
+      'name="twitter:title" content="Range — A Graph-Backed Programming Language"',
+    );
+    expect(html).not.toContain(
+      "Native benchmark results for Range, C, C++, Rust, Go, and Swift",
+    );
     expect(html).toContain("a love letter to electrons, logic and abstraction");
     expect(html).toContain("<range-spline-nav");
     expect(html).toContain("<range-scale");

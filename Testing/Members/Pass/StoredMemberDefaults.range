@@ -1,0 +1,6 @@
+compilerTypedSyntaxSnapshot
+construct StoredMemberDefaults {
+    let count: Int(3)
+    state enabled: Bool(true)
+    let name: String
+}

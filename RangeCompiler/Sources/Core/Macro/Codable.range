@@ -21,7 +21,7 @@ macro codable(): Construct { environment in
             function decode(from decoder: Decoder): Result<Self, DecodingError> {
                 let container: KeyedDecodingContainer(decoder.keyedContainer())
                 #fields.map { property in
-                    switch container.decode(#property.type.self, forKey: property.identifier.name) {
+                    switch container.decode(#property.type.self, forKey: property.identifier.name, default: #property.value) {
                     case .success(#property.identifier):
                         self.#property.identifier: #property.identifier
                     case .failure(error):

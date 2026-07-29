@@ -9,6 +9,10 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     deployment instructions for the standalone SvelteKit website.
   - [x] Add Caddy automatic HTTPS, private Docker-network proxying, persistent
     certificate storage, and configurable domain/port deployment settings.
+    - [x] Harden production containers with dropped capabilities, read-only
+      filesystems, no-new-privileges, and bounded local log rotation.
+    - [x] Replace benchmark-only default metadata with a language-level SEO
+      title and description across search and social previews.
     - [x] Register each legacy site-shell custom element with its own
       constructor so production route navigation stays console-clean.
   - [x] Remove the redundant Benchmarks and Strings Go Fast link cards from
@@ -659,6 +663,12 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           non-stored `@field` members.
         - `members.filter(all: @stored)` resolves the declared macro family and
           selects members through their annotated syntax nominal.
+      - [x] Preserve written stored-member defaults through Codable synthesis.
+        - [x] Capture `let` and `state` initializer syntax in the canonical
+          member graph and include it in declaration fingerprints.
+        - [x] Materialize `property.value: Expression?` as an exact
+          source-backed macro value and pass it to generated decode calls.
+        - Field key overrides and transient/exclusion policy remain deferred.
       - [x] Represent a macro boundary result as one enum value.
         - `CompilerMacroResult` is either `.value(...)` or `.noValue`; evaluation
           and invocation outcomes no longer transport a boolean plus parallel
