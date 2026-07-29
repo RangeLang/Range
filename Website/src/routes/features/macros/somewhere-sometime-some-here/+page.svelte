@@ -67,8 +67,7 @@
   </section>
 
   <blockquote>
-    Somewhere gives the macro a place. Sometime gives it a phase. Some place
-    gives it a boundary.
+    Somewhere gives the macro a place. Sometime gives it a phase. Some place gives it a boundary.
   </blockquote>
 
   <section>
