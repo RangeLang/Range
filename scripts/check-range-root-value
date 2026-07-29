@@ -458,6 +458,38 @@ check_typed_parameter_defaults() {
     echo "Macros typed-parameter-defaults: pass"
 }
 
+check_graph_capabilities() {
+    local pass_fixture="$REPO_ROOT/Testing/Macros/Pass/GraphCapabilities.range"
+    local output="$WORK_ROOT/graph-capabilities.out"
+    local error="$WORK_ROOT/graph-capabilities.err"
+    local actual_status relative expected
+
+    "$STAGE2_EXECUTABLE" compile "$pass_fixture" > "$output" 2> "$error" \
+        || fail "graph capabilities did not compile"
+    [[ ! -s "$error" ]] || fail "graph capabilities wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2' "$output" \
+        || fail "graph capabilities did not execute both syntax-bearing and syntaxless families"
+
+    for relative in \
+        Testing/Macros/Fail/GraphMissingDeclaration.range \
+        Testing/Macros/Fail/GraphMissingApplication.range; do
+        expected=graphApplicationCapabilityMissing
+        if [[ "$relative" == *MissingDeclaration.range ]]; then
+            expected=graphDeclarationCapabilityMissing
+        fi
+        if "$STAGE2_EXECUTABLE" compile "$REPO_ROOT/$relative" > "$output" 2> "$error"; then
+            actual_status=0
+        else
+            actual_status=$?
+        fi
+        [[ "$actual_status" -eq 65 ]] || fail "$relative exited $actual_status instead of 65"
+        [[ ! -s "$error" ]] || fail "$relative wrote stderr"
+        /usr/bin/grep -Fq "diagnosticKind=$expected" "$output" \
+            || fail "$relative omitted $expected"
+    done
+    echo "Macros graph-capabilities: pass"
+}
+
 check_canonical_member_family() {
     local fixture="$REPO_ROOT/Testing/Members/Pass/CanonicalMemberFamily.range"
     local output="$WORK_ROOT/member-family-canonical.out"
@@ -477,6 +509,8 @@ check_canonical_declaration_envelopes() {
     local error="$WORK_ROOT/declaration-envelope-models.err"
     local relative expectation path name
     local -a model_sources=(
+        RangeCompiler/Sources/Core/Macro/Graph.range
+        RangeCompiler/Sources/Core/Macro/Syntax.range
         RangeCompiler/Sources/Core/Macro/Macro.range
         RangeCompiler/Sources/Core/Syntax/Identifier.range
         RangeCompiler/Sources/Core/Syntax/Declarations/Generic/Generic.range
@@ -1023,6 +1057,7 @@ main_root_value() {
     check_inline_core_codable
     check_codable_composite_atomic_rollback
     check_typed_parameter_defaults
+    check_graph_capabilities
     check_project_defaults
     check_storage_literals
     check_defaulted_generic_optional

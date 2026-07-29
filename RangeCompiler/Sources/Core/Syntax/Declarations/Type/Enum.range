@@ -1,20 +1,17 @@
-@syntax
+@graph(.declaration)
 construct Enum {
-    let declaration: Declaration
-
-    @graph(.declaration)
+    @syntax
     @member
     construct Declaration {
         let macros: [Macro.Application]
         let identifier: Identifier
-        let self: NominalTypeReference
         let generics: [Generic]
         let cases: [Case]
 
         function expand(_ expansion: () -> [@syntax]): RangeGraphDelta
     }
 
-    @graph(.declaration)
+    @syntax
     @member
     construct Case {
         let macros: [Macro.Application]

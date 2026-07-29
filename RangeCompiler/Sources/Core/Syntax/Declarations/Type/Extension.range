@@ -3,8 +3,7 @@
 construct Extension {
     let macros: [Macro.Application]
     let identifier: Identifier
-    let target: NominalTypeReference
-    let conformances: [NominalTypeReference]
+    let target: TypeReference
     let functions: [Function.Declaration]
     let constructs: [Construct.Declaration]
 }

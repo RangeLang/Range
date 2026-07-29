@@ -1,9 +1,6 @@
-@syntax
+@graph(.declaration, .application)
 construct Parameter {
-    let declaration: Declaration
-    let application: Application
-
-    @graph(.declaration)
+    @syntax
     construct Declaration {
         let macros: [Macro.Application]
         let externalName: String?
@@ -13,7 +10,7 @@ construct Parameter {
         let defaultValue: Expression?
     }
 
-    @graph(.application)
+    @syntax
     construct Application {
         let label: String?
         let type: TypeReference

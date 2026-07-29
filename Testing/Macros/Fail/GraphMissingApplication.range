@@ -1,0 +1,15 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/Macro/Graph.range
+enum GraphRole {
+    case declaration
+    case application
+}
+open macro syntax(): Declaration -> Void {}
+macro graph(
+    _ role: GraphRole,
+    _ additionalRole: GraphRole?(nil)
+): Construct -> Void {}
+
+compilerSourceFile\trole=project\tpath=Project/SyntaxFamily.range
+@graph(.application)
+construct SyntaxFamily {}

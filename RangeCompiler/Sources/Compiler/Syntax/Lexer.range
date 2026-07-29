@@ -627,9 +627,6 @@ function isRangeDeclarationKeyword(value: String): Bool {
 }
 
 function isRangeTypeDeclarationKeyword(value: String): Bool {
-    if value == String("protocol") {
-        return true
-    }
     if value == String("construct") {
         return true
     }

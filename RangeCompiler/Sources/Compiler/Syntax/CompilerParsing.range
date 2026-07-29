@@ -205,6 +205,9 @@ function compilerMacroDiagnosticName(code: Int): String {
     if code == compilerMacroDiagnosticGraphDeltaInvalid() { return String("macroGraphDeltaInvalid") }
     if code == compilerMacroDiagnosticGeneratedFunctionCollision() { return String("generatedFunctionCollision") }
     if code == compilerMacroDiagnosticGeneratedMemberCollision() { return String("generatedMemberCollision") }
+    if code == compilerMacroDiagnosticGraphCapabilitiesInvalid() { return String("graphCapabilitiesInvalid") }
+    if code == compilerMacroDiagnosticGraphDeclarationMissing() { return String("graphDeclarationCapabilityMissing") }
+    if code == compilerMacroDiagnosticGraphApplicationMissing() { return String("graphApplicationCapabilityMissing") }
     return String("invalidMacroDiagnostic")
 }
 

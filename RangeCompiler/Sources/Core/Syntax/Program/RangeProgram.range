@@ -84,21 +84,3 @@ construct RangeGraphDelta {
         case hint
     }
 }
-
-@builtin
-construct GraphSyntax {
-    let identifier: Identifier
-    let declarations: [GraphEntry]
-    let applications: [GraphEntry]
-}
-
-@builtin
-enum GraphRole {
-    case declaration
-    case application
-}
-
-@builtin
-construct GraphEntry {
-    let identifier: Identifier
-}

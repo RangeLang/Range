@@ -1,33 +1,25 @@
-@syntax {
-    declaration:
-        [declaration.macros]
-        construct [declaration.identifier][declaration.generics?]:
-            [declaration.conformances?] {
-                [declaration.members]
-            }
-
-    application:
-        [application.type]([application.arguments])
-}
+@graph(.declaration, .application)
 construct Construct {
-    let declaration: Declaration
-    let application: Application
-
-    @graph(.declaration)
+    @syntax {
+        [macros]
+        construct [identifier][generics?] {
+            [members]
+        }
+    }
     @field
     @member
     construct Declaration {
         let macros: [Macro.Application]
         let identifier: Identifier
-        let self: NominalTypeReference
         let generics: [Generic]
-        let conformances: [NominalTypeReference]
         let members: [@member]
 
         function expand(_ expansion: () -> [@syntax]): RangeGraphDelta
     }
 
-    @graph(.application)
+    @syntax {
+        [type]([arguments])
+    }
     construct Application {
         let type: TypeReference
         let arguments: [Parameter.Application]

@@ -104,6 +104,9 @@ function compilerMacroDiagnosticGraphQueryInvalid(): Int { return 14 }
 function compilerMacroDiagnosticGraphDeltaInvalid(): Int { return 15 }
 function compilerMacroDiagnosticGeneratedFunctionCollision(): Int { return 16 }
 function compilerMacroDiagnosticGeneratedMemberCollision(): Int { return 17 }
+function compilerMacroDiagnosticGraphCapabilitiesInvalid(): Int { return 18 }
+function compilerMacroDiagnosticGraphDeclarationMissing(): Int { return 19 }
+function compilerMacroDiagnosticGraphApplicationMissing(): Int { return 20 }
 
 function compilerMacroSeverityInformation(): Int { return 1 }
 function compilerMacroSeverityWarning(): Int { return 2 }
@@ -6015,15 +6018,122 @@ function compilerFormulaFactAppend(tables: CompilerSyntaxTables, kind: Int, invo
     return compilerSyntaxTableAppend(tables: tables, table: tables.compilerFormulaFacts, value: signedness)
 }
 
+function compilerFormulaGraphCapabilityMask(argument: String): Int {
+    state cursor: Int(0)
+    state mask: Int(0)
+    state scanning: Bool(true)
+    while scanning {
+        let maybeDot: Optional<RangeLexedToken>(lexNextRangeToken(source: argument, start: cursor))
+        if maybeDot == nil {
+            scanning: false
+        } else {
+            let dot: RangeLexedToken(maybeDot ?? compilerFallbackTokenAt(index: cursor))
+            if dot.kind != .dot { return 0 - 1 }
+            let maybeRole: Optional<RangeLexedToken>(lexNextRangeToken(source: argument, start: dot.end))
+            if maybeRole == nil { return 0 - 1 }
+            let role: RangeLexedToken(maybeRole ?? compilerFallbackTokenAt(index: dot.end))
+            state roleBit: Int(0)
+            if role.text == String("declaration") {
+                roleBit: 1
+            } else if role.text == String("application") {
+                roleBit: 2
+            } else {
+                return 0 - 1
+            }
+            if (roleBit == 1 && (mask == 1 || mask == 3))
+                || (roleBit == 2 && (mask == 2 || mask == 3)) { return 0 - 1 }
+            mask: mask + roleBit
+            let maybeSeparator: Optional<RangeLexedToken>(lexNextRangeToken(source: argument, start: role.end))
+            if maybeSeparator == nil {
+                scanning: false
+            } else {
+                let separator: RangeLexedToken(maybeSeparator ?? compilerFallbackTokenAt(index: role.end))
+                if separator.kind != .comma { return 0 - 1 }
+                cursor: separator.end
+            }
+        }
+    }
+    if mask == 0 { return 0 - 1 }
+    return mask
+}
+
+function compilerFormulaGraphNestedConstructSyntaxID(tables: CompilerSyntaxTables, parentSyntaxID: Int, name: String): Int {
+    state match: Int(0 - 1)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.declarations) {
+        if compilerIntTableValue(table: tables.declarations, row: row, column: 2) == compilerSyntaxKindConstruct()
+            && compilerIntTableValue(table: tables.declarations, row: row, column: 3) == parentSyntaxID {
+            let fileID: Int(compilerIntTableValue(table: tables.declarations, row: row, column: 1))
+            let nestedName: String(compilerTypedSyntaxLocalText(
+                tables: tables,
+                fileID: fileID,
+                localStart: compilerIntTableValue(table: tables.declarations, row: row, column: 7),
+                localEnd: compilerIntTableValue(table: tables.declarations, row: row, column: 8)
+            ))
+            if nestedName == name {
+                if match >= 0 { return 0 - 2 }
+                match: compilerIntTableValue(table: tables.declarations, row: row, column: 0)
+            }
+        }
+        row: row + 1
+    }
+    return match
+}
+
 function compilerFormulaExecuteApplication(tables: CompilerSyntaxTables, applicationRow: Int, declarationRow: Int): Int {
     let name: String(compilerMacroApplicationName(tables: tables, applicationRow: applicationRow))
-    if name != String("storage") && name != String("literal") { return 0 }
+    if name != String("storage") && name != String("literal") && name != String("graph") { return 0 }
     let invocationRow: Int(compilerMacroExecutionAppendInvocation(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow, budget: compilerMacroExecutionBudgetDefault()))
     if invocationRow < 0 { return 0 - 1 }
     let identity: CompilerFingerprint(compilerMacroExecutionInvocationIdentity(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow))
-    if compilerMacroExecutionSetInvocation(tables: tables, row: invocationRow, status: compilerMacroInvocationSuccess(), diagnosticCode: 0, diagnosticFileID: 0 - 1, diagnosticStart: 0 - 1, diagnosticEnd: 0 - 1, resultIdentity: identity, mirOperationCount: 0, stepCount: 1, pipelineStatus: 0, pipelineFailureCode: 0) != 0 { return 0 - 1 }
     let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12))
     let argument: String(compilerMacroApplicationArgumentText(tables: tables, applicationRow: applicationRow))
+    if name == String("graph") {
+        let capabilityMask: Int(compilerFormulaGraphCapabilityMask(argument: argument))
+        state diagnosticCode: Int(0)
+        state declarationSyntaxID: Int(0 - 1)
+        state applicationSyntaxID: Int(0 - 1)
+        if capabilityMask < 0 {
+            diagnosticCode: compilerMacroDiagnosticGraphCapabilitiesInvalid()
+        } else if targetSyntaxID < 0
+            || targetSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
+            || compilerIntTableValue(table: tables.syntaxIndex, row: targetSyntaxID, column: 0) != compilerSyntaxKindConstruct() {
+            diagnosticCode: compilerMacroDiagnosticGraphCapabilitiesInvalid()
+        } else {
+            if capabilityMask == 1 || capabilityMask == 3 {
+                declarationSyntaxID: compilerFormulaGraphNestedConstructSyntaxID(tables: tables, parentSyntaxID: targetSyntaxID, name: String("Declaration"))
+                if declarationSyntaxID < 0 {
+                    diagnosticCode: compilerMacroDiagnosticGraphDeclarationMissing()
+                }
+            }
+            if diagnosticCode == 0 && (capabilityMask == 2 || capabilityMask == 3) {
+                applicationSyntaxID: compilerFormulaGraphNestedConstructSyntaxID(tables: tables, parentSyntaxID: targetSyntaxID, name: String("Application"))
+                if applicationSyntaxID < 0 {
+                    diagnosticCode: compilerMacroDiagnosticGraphApplicationMissing()
+                }
+            }
+        }
+        let applicationFileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
+        state status: Int(compilerMacroInvocationSuccess())
+        if diagnosticCode != 0 { status: compilerMacroInvocationFailed() }
+        if compilerMacroExecutionSetInvocation(
+            tables: tables,
+            row: invocationRow,
+            status: status,
+            diagnosticCode: diagnosticCode,
+            diagnosticFileID: applicationFileID,
+            diagnosticStart: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 2),
+            diagnosticEnd: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 3),
+            resultIdentity: identity,
+            mirOperationCount: 0,
+            stepCount: 1,
+            pipelineStatus: 0,
+            pipelineFailureCode: diagnosticCode
+        ) != 0 { return 0 - 1 }
+        if diagnosticCode != 0 { return 0 - 1 }
+        return 1
+    }
+    if compilerMacroExecutionSetInvocation(tables: tables, row: invocationRow, status: compilerMacroInvocationSuccess(), diagnosticCode: 0, diagnosticFileID: 0 - 1, diagnosticStart: 0 - 1, diagnosticEnd: 0 - 1, resultIdentity: identity, mirOperationCount: 0, stepCount: 1, pipelineStatus: 0, pipelineFailureCode: 0) != 0 { return 0 - 1 }
     state kind: Int(compilerFormulaFactStorage())
     state category: Int(compilerFormulaStorageInferred())
     state semanticElementSyntaxID: Int(0 - 1)

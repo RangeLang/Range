@@ -1,9 +1,6 @@
-@syntax
+@graph(.declaration, .application)
 construct Function {
-    let declaration: Declaration
-    let call: Call
-
-    @graph(.declaration)
+    @syntax
     @field
     @member
     construct Declaration {
@@ -15,8 +12,8 @@ construct Function {
         let body: Block
     }
 
-    @graph(.application)
-    construct Call {
+    @syntax
+    construct Application {
         let identifier: Identifier
         let arguments: [Parameter.Application]
 

@@ -93,6 +93,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       attributes, violet macro splices, and differentiated punctuation.
     - [x] Generate named light and dark Codability variants and point the Range
       Zed extension at the renamed theme artifact.
+    - [x] Parse current `{ environment in` macro bodies before applying syntax
+      captures, so keyword and string highlighting does not depend on
+      Tree-sitter error recovery.
 
 ## RangeStore
 
@@ -503,13 +506,52 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [ ] Make the direct syntax values the semantic witnesses consumed by
       macros and lowering, leaving integer tables as an internal compact
       backing store rather than a parallel public model.
+      - [ ] Flatten syntax nominal families so their nested declaration and
+        application constructs are the graph values, not simultaneous fields
+        of an artificial outer instance.
+        - [x] Define an inline declaration as a declaration nested directly in
+          another declaration body: it inherits the parent graph identity,
+          remains addressable by its qualified name, and adds no
+          instance-storage edge to the enclosing value.
+        - [x] Remove the parallel `declaration` and `application` fields from
+          `Construct`; `Construct.Declaration` and `Construct.Application` are
+          now its direct nested value representations.
+        - [x] Define `graph` once on each outer syntax family with explicit
+          declaration/application roles, require the matching nested
+          constructs, and let each nested representation own its `@syntax`.
+          - A syntax template remains an independent attached value. It does
+            not copy its parent's name, and `graph` does not absorb or require
+            the template; attachment identity can connect them when needed.
+          - `@syntax { ... }` is the universal language-level builder surface:
+            fixed Range syntax and captures belong directly to the represented
+            value and can be reused outside graph declaration/application
+            roles.
+          - [ ] Move the bootstrap nested-role validation from
+            `compilerFormulaExecuteApplication` into the Range-authored
+            `graph` body once macro targets expose direct nested declarations,
+            then delete the name-based compiler bridge.
+        - [x] Remove the remaining parallel declaration/application fields
+          from `Function`, `Parameter`, and `Enum`; normalize function calls as
+          `Function.Application`.
+        - [x] Delete the unused `GraphSyntax`/`GraphEntry` container model;
+          graph roles now live only as capabilities attached to syntax
+          families.
+        - [x] Remove nominal-reference, protocol, and conformance storage from
+          syntax declarations; declaration and application capabilities are
+          expressed by attached macros instead of inherited nominal contracts.
+          - [ ] Promote the source removal through the accepted bootstrap seed
+            after compiler progression reaches the corresponding checkpoint;
+            do not hand-edit the generated LLVM snapshot.
+        - [ ] Materialize construct macro targets directly as
+          `Construct.Declaration` and remove the compatibility
+          `environment.target.declaration` projection.
       - [x] Define the Range-authored bidirectional `SyntaxTemplate` value
         model with fixed written elements, member-linked captures,
         one/optional/many cardinality, canonical syntax bindings, matching,
         and rendering.
         - `Construct.range` now authors declaration and application templates
           directly in its `@syntax` body, including ordered macro/member
-          captures and optional generic/conformance groups.
+          captures and optional generic groups.
       - [ ] Execute `@syntax` by matching its raw template body against the
         annotated construct's members, materializing a canonical value, and
         using the same template to render values consumed by
@@ -1079,8 +1121,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
             original owner path.
           - [ ] Add a separate dynamic-dispatch matrix for C function pointers,
             C++ virtual calls, Rust trait objects, Swift protocols, Go
-            interfaces, and Range once callable protocol values have a real
-            runtime surface; do not mix dispatch cost into allocation results.
+            interfaces, and Range once callable macro-attached capabilities
+            have a real runtime surface; do not mix dispatch cost into
+            allocation results.
           - [x] Run and publish a stable multi-sample Constructs evaluation
             before choosing another chunk size or claiming a speedup.
       - [ ] Move length, indexing, comparison, slicing, concatenation, and

@@ -1,6 +1,6 @@
 @syntax
 construct MemberTypeReference {
-    let base: NominalTypeReference
+    let base: TypeReference
     let name: String
 
     function replace(with replacement: TypeReference): TypeReference

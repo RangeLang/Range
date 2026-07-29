@@ -1,4 +1,4 @@
-@syntax
+@graph(.declaration, .application)
 construct Macro {
     construct Environment<Target> {
         let target: Target
@@ -27,7 +27,7 @@ construct Macro {
         let written: WrittenSyntax
     }
 
-    @graph(.declaration)
+    @syntax
     construct Declaration {
         let macros: [Macro.Application]
         let identifier: Identifier
@@ -43,7 +43,7 @@ construct Macro {
         let syntaxBody: String
     }
 
-    @graph(.application)
+    @syntax
     construct Application<Value = Nil> {
         let identifier: Identifier
         let target: Identifier

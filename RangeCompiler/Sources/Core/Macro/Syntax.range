@@ -1,0 +1,1 @@
+open macro syntax(): Declaration -> Void {}
