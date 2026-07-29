@@ -1,5 +1,4 @@
 compilerMacroSnapshot
-construct WrittenSyntax {}
 construct TypeReference {}
 construct Expression {}
 
@@ -7,7 +6,7 @@ construct Identifier {
     let name: String
     let id: String
     let parent: Identifier?
-    let source: WrittenSyntax?
+    let source: @syntax?
 }
 
 construct Macro {
@@ -20,8 +19,7 @@ construct MacroApplication {
     let genericArguments: [TypeReference]
     let argumentClause: String
     let arguments: [Expression]
-    let rawBody: WrittenSyntax
-    let declaration: WrittenSyntax?
+    let declaration: Macro.Declaration?
     let packageVisibility: String
     let valueType: TypeReference
     let value: Metadata

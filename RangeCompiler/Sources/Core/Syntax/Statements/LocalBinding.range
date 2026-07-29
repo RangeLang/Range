@@ -4,5 +4,5 @@ construct LocalBinding {
     let mutable: Bool
     let identifier: Identifier
     let type: TypeReference
-    let expression: WrittenSyntax
+    let expression: Expression
 }

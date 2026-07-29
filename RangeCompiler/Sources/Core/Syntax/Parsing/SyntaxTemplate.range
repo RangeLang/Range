@@ -1,11 +1,6 @@
 construct SyntaxTemplate {
-    let written: WrittenSyntax
-    let elements: [Element]
-
-    construct Element {
-        let written: WrittenSyntax
-        let capture: Capture?
-    }
+    let closure: () -> [@syntax]
+    let captures: [Capture]
 
     construct Capture {
         let member: Identifier
@@ -30,6 +25,6 @@ construct SyntaxTemplate {
         let bindings: [Binding]
     }
 
-    function match(source: WrittenSyntax): Parsed<Match>
-    function render(match: Match): WrittenSyntax
+    function match(source: @syntax): Parsed<Match>
+    function render(match: Match): @syntax
 }

@@ -1,7 +1,6 @@
 @stored
 @syntax($macros state $identifier: $value)
 @property
-@field
 @member
 construct State<Value> {
     let macros: [Macro.Application]

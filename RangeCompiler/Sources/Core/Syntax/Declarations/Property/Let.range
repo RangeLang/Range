@@ -1,7 +1,6 @@
 @stored
 @syntax($macros let $identifier: $value)
 @property
-@field
 @member
 construct Let<Value> {
   let macros: [Macro.Application]

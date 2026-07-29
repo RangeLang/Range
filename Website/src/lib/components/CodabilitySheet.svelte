@@ -108,9 +108,12 @@
   }
 
   const macroMarker = "macro codable(): Construct";
-  const declarationSource = sourceFrom(codableSource, macroMarker);
+  const declarationSource = sourceFrom(codableSource, macroMarker).replace(
+    /environment\.expand(?=\s*\{)/g,
+    "#environment",
+  );
   const extensionMarker = "extension #environment.target.Declaration.identifier {";
-  const expansionSection = sourceBlock(declarationSource, "environment.expand");
+  const expansionSection = sourceBlock(declarationSource, "#environment");
   const macroDeclarationSection = "macro codable(): Construct { environment in";
   const macroSection = sourceBlock(declarationSource, macroDeclarationSection);
   const extensionSection = sourceBlock(declarationSource, extensionMarker);
@@ -194,12 +197,12 @@ construct User {
     },
     {
       id: "expansion",
-      token: "environment.expand",
+      token: "#environment",
       title: "Normal Range code",
       phase: "macro evaluation",
       result: "generated syntax artifact",
       description:
-        "Everything inside the expand block is normal type-checked code.",
+        "Everything inside the #environment block is normal type-checked code.",
       kind: "section",
       step: 3,
       scopeToken: expansionSection,

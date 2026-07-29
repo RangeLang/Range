@@ -1,6 +1,5 @@
 @syntax
 @property
-@field
 @member
 construct Derived<T> {
     let macros: [Macro.Application]

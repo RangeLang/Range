@@ -24,7 +24,6 @@ construct Macro {
         let name: String
         let type: TypeReference?
         let elements: [Target]
-        let written: WrittenSyntax
     }
 
     @syntax
@@ -37,10 +36,7 @@ construct Macro {
         let target: String
         let targetSyntax: Target?
         let expansionType: TypeReference?
-        let writtenBody: WrittenSyntax
         let parsedBody: Parsed<Block>
-        let body: String
-        let syntaxBody: String
     }
 
     @syntax
@@ -50,7 +46,6 @@ construct Macro {
         let genericArguments: [TypeReference]
         let argumentClause: String
         let arguments: [Expression]
-        let rawBody: WrittenSyntax
         let declaration: Declaration?
         let packageVisibility: String
         let valueType: TypeReference

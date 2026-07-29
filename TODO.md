@@ -53,6 +53,15 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] Replace stale `let declaration: ConstructDeclaration` macro snapshots
     with the direct nested `Construct.Declaration` representation consumed by
     the uppercase projection.
+  - [x] Remove the redundant `@field` marker, its unused Foundation macro, and
+    its compiler target alias; declaration bodies already expose `[@member]`,
+    while `@property` and `@stored` describe the meaningful subsets.
+    - The development Stage 2 rebuilt one artifact and reused 2,655, completed
+      in 324 seconds, and passed every affected macro/Codable fixture before
+      reaching the unchanged graph-capability `macroMissingTarget` boundary.
+  - [x] Remove declaration-owned `replace` methods from
+    `Construct.Application` and `Function.Application`; syntax values describe
+    applications rather than owning graph mutation.
   - The focused rerun now passes canonical target members, typed collection
     closures, inline mapped syntax, stored defaults, the actual Core Codable
     surface, composite rollback, and typed parameter defaults. Root-value next
@@ -654,16 +663,33 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           representation type, and lowercase compatibility projection is
           rejected.
       - [x] Define the Range-authored bidirectional `SyntaxTemplate` value
-        model with fixed written elements, member-linked captures,
+        model with a first-class syntax closure, member-linked captures,
         one/optional/many cardinality, canonical syntax bindings, matching,
         and rendering.
         - `Construct.range` now authors declaration and application templates
           directly in its `@syntax` body, including ordered macro/member
           captures and optional generic groups.
-      - [ ] Execute `@syntax` by matching its raw template body against the
-        annotated construct's members, materializing a canonical value, and
-        using the same template to render values consumed by
+      - [x] Remove the parallel `WrittenSyntax`, `WrittenExpression`, and
+        macro `rawBody` text representations; typed syntax values and the
+        syntax macro closure are the language model, while source offsets
+        remain compiler-internal diagnostic/query indexes.
+      - [x] Represent every enum case as the same generic
+        `Case<Value> { identifier, value? }` shape; an enum declaration
+        collects `Case<Payload>` values, and one payload packages the fixed
+        ordered set of associated fields.
+        - Runtime enum tags and payload layout remain lowering details; the
+          syntax model does not expose a second `associatedValues` shape.
+        - [ ] Materialize compile-time enum results through this case shape:
+          resolve the case identifier, package zero or more MIR operands as
+          the optional payload value, and preserve that value through generic
+          macro result persistence and projection.
+      - [ ] Execute `@syntax` by matching its captured template closure
+        against the annotated construct's members, materializing a canonical
+        value, and using the same template to render values consumed by
         `environment.expand`.
+        - [x] Delete the obsolete Foundation `syntax` implementation that
+          expanded a second macro through lowercase target projections; the
+          replacement must consume the first-class closure directly.
         - [ ] Compile each declaration's Range-authored `@syntax` witness into
           one source-query plan whose captures retain member identity, type,
           and one/optional/many cardinality.
@@ -837,7 +863,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           remain a separate implementation slice.
       - [x] Make stored-member discovery a Range-authored macro relationship.
         - `Let` and `State` carry `@stored`; `Binding` and `Derived` remain
-          non-stored `@field` members.
+          non-stored `@property` members.
         - `members.filter(all: @stored)` resolves the declared macro family and
           selects members through their annotated syntax nominal.
       - [ ] Make property constructs the canonical authored syntax IR.

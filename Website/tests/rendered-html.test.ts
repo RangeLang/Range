@@ -97,6 +97,8 @@ describe("SvelteKit routes", () => {
     expect(html).toContain("Codability Under 100");
     expect(html).toContain("01 · metaprogramming");
     expect(html).toContain("Core/Macro/Codable.range");
+    expect(html).toContain("#environment");
+    expect(html).not.toContain("environment.expand");
     expect(html).not.toContain("declaration → graph query → expansion");
     expect(html).toContain('aria-label="Code inspection"');
     expect(html.match(/data-step="[1-7]"/g)).toHaveLength(7);
@@ -117,6 +119,18 @@ describe("SvelteKit routes", () => {
     expect(html).toContain('class="rangeSource language-range');
     expect(html).toContain("The declarative half");
     expect(html).toContain("The imperative half");
+    expect(html).not.toContain("environment.expand");
+    expect(html).toContain("The macro’s target is also its access type.");
+    expect(html).toContain('aria-label="Complete Equatable synthesis"');
+    expect(html).not.toContain('aria-label="Query through the Construct access type"');
+    expect(html).not.toContain('aria-label="Emit an Equatable implementation"');
+    expect(html).toContain("#properties");
+    expect(html).toContain("The macro performs the complete synthesis.");
+    expect(html).toContain("An empty");
+    expect(html).toContain(">Case iterable</h2>");
+    expect(html).toContain('aria-label="A modern CaseIterable derivation"');
+    expect(html).toContain("@caseIterable requires cases without associated values");
+    expect(html).toContain("the macro receives typed enum syntax");
   });
 
   test("renders the environment essay", async () => {
@@ -139,6 +153,7 @@ describe("SvelteKit routes", () => {
       "Somewhere gives the macro a place. Sometime gives it a phase. Some place gives it a boundary.",
     );
     expect(html).toContain("Not expand. Environment.");
+    expect(html).not.toContain("environment.expand");
   });
 
   test("renders and filters the benchmark hierarchy", async () => {
@@ -575,7 +590,7 @@ test("keeps the concrete codability application example", async () => {
   );
   expect(sheet).toContain("token: extensionMarker");
   expect(sheet).toContain(
-    '"Everything inside the expand block is normal type-checked code."',
+    '"Everything inside the #environment block is normal type-checked code."',
   );
   expect(sheet).toContain('accent: "#environment.target.Declaration.identifier"');
   expect(sheet).toContain(
@@ -614,7 +629,7 @@ test("keeps the concrete codability application example", async () => {
     "`Codability chapter ${chapter.step} no longer matches Codable.range`",
   );
   expect(sheet).toContain(
-    'const expansionSection = sourceBlock(declarationSource, "environment.expand")',
+    'const expansionSection = sourceBlock(declarationSource, "#environment")',
   );
   expect(sheet).toContain("scopeToken: expansionSection");
   expect(sheet).toContain("scopeToken: macroSection");

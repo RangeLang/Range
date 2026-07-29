@@ -13,7 +13,6 @@ construct Identifier {
 
 construct TypeReference {}
 construct Expression {}
-construct WrittenSyntax {}
 
 construct Macro {
     construct Declaration {}
@@ -24,8 +23,7 @@ construct Macro {
         let genericArguments: [TypeReference]
         let argumentClause: String
         let arguments: [Expression]
-        let rawBody: WrittenSyntax
-        let declaration: WrittenSyntax
+        let declaration: Declaration?
         let packageVisibility: String
         let valueType: TypeReference
         let value: Metadata

@@ -6,7 +6,6 @@ construct Construct {
             [members]
         }
     }
-    @field
     @member
     construct Declaration {
         let macros: [Macro.Application]
@@ -21,7 +20,5 @@ construct Construct {
     construct Application {
         let type: TypeReference
         let arguments: [Parameter.Application]
-
-        function replace(with replacement: Expression): Expression
     }
 }

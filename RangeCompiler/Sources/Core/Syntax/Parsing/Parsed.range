@@ -1,6 +1,5 @@
 @syntax
 construct Parsed<Value> {
-    let written: WrittenSyntax
     let value: Value?
     let diagnostics: [String]
 }

@@ -2107,7 +2107,7 @@ function compilerMacroTargetAtomMask(text: String): Int {
     if text == String("Construct") || text == String("@construct") { return 1 }
     if text == String("Enum") { return 16 }
     if text == String("Function") { return 2 }
-    if text == String("Member") || text == String("Let") || text == String("State") || text == String("Binding") || text == String("Derived") || text == String("@field") { return 4 }
+    if text == String("Member") || text == String("Let") || text == String("State") || text == String("Binding") || text == String("Derived") { return 4 }
     if text == String("Parameter") { return 8 }
     if text == String("Declaration") { return 19 }
     if text == String("Syntax") || text == String("@syntax") || text == String("@block") { return 31 }
@@ -6828,7 +6828,6 @@ function compilerMacroExecutionMaterializeApplication(
     let genericArgumentsValueID: Int(compilerMacroValueStoreAppendAggregate(store: store, kind: compilerMacroValueKindArray(), typeKind: compilerBodyTypeConstruct(), typeID: 0 - 1, scalar: applicationRow, children: emptyChildren))
     let argumentClauseValueID: Int(compilerMacroExecutionAppendPlaceholderValue(store: store))
     let argumentsValueID: Int(compilerMacroValueStoreAppendAggregate(store: store, kind: compilerMacroValueKindArray(), typeKind: compilerBodyTypeConstruct(), typeID: 0 - 1, scalar: applicationRow, children: emptyChildren))
-    let rawBodyValueID: Int(compilerMacroExecutionAppendPlaceholderValue(store: store))
     let declarationValueID: Int(compilerMacroExecutionAppendPlaceholderValue(store: store))
     let visibilityValueID: Int(compilerMacroExecutionAppendPlaceholderValue(store: store))
     let valueTypeValueID: Int(compilerMacroExecutionAppendPlaceholderValue(store: store))
@@ -6838,16 +6837,15 @@ function compilerMacroExecutionMaterializeApplication(
         resultValueID: compilerMacroExecutionMaterializePersistedResult(tables: tables, store: store, resultRow: rootResultRow)
     }
     emptyChildren.destroy()
-    let children: Buffer<Int>(bufferCreateInt(capacity: 10))
+    let children: Buffer<Int>(bufferCreateInt(capacity: 9))
     state valid: Bool(identifierValueID >= 0 && targetValueID >= 0 && genericArgumentsValueID >= 0
-        && argumentClauseValueID >= 0 && argumentsValueID >= 0 && rawBodyValueID >= 0
+        && argumentClauseValueID >= 0 && argumentsValueID >= 0
         && declarationValueID >= 0 && visibilityValueID >= 0 && valueTypeValueID >= 0 && resultValueID >= 0)
     if valid && children.append(element: identifierValueID) != 0 { valid: false }
     if valid && children.append(element: targetValueID) != 0 { valid: false }
     if valid && children.append(element: genericArgumentsValueID) != 0 { valid: false }
     if valid && children.append(element: argumentClauseValueID) != 0 { valid: false }
     if valid && children.append(element: argumentsValueID) != 0 { valid: false }
-    if valid && children.append(element: rawBodyValueID) != 0 { valid: false }
     if valid && children.append(element: declarationValueID) != 0 { valid: false }
     if valid && children.append(element: visibilityValueID) != 0 { valid: false }
     if valid && children.append(element: valueTypeValueID) != 0 { valid: false }

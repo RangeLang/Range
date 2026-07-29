@@ -26,7 +26,7 @@
     environment.target.Declaration.members.filter(all: Let)
 )
 
-environment.expand {
+#environment {
     extension #environment.target.Declaration.identifier {
         #collection.map { item in
             let #item.identifier: #item.value

@@ -11,6 +11,54 @@
         }
     }
 }`;
+
+  const equatableSynthesis = `macro equatable(): Construct { environment in
+    let properties: [@stored](
+        environment.target.Declaration.members.filter(all: @stored)
+    )
+
+    #environment {
+        extension #environment.target.Declaration.identifier {
+            function equals(_ other: Self): Bool {
+                #properties.map { property in
+                    if self.#property.identifier != other.#property.identifier {
+                        return false
+                    }
+                }
+                return true
+            }
+        }
+    }
+}`;
+
+  const caseIterable = `macro caseIterable(): Enum { environment in
+    let cases: [Enum.Case](
+        environment.target.Declaration.cases
+    )
+    let payloadCases: [Enum.Case](
+        cases.filter { item in
+            return item.associatedValues.count != 0
+        }
+    )
+
+    if payloadCases.count != 0 {
+        environment.diagnostics.error(
+            "@caseIterable requires cases without associated values"
+        )
+    }
+
+    #environment {
+        extension #environment.target.Declaration.identifier {
+            function allCases(): [Self] {
+                return [
+                    #cases.map { item in
+                        .#item.identifier,
+                    }
+                ]
+            }
+        }
+    }
+}`;
 </script>
 
 <EssayPage
@@ -55,11 +103,44 @@
       The <code>map</code> is compile-time execution: ordinary control and data
       flow used to produce declarative code.
     </p>
+    <p>
+      The macro’s target is also its access type. A macro targeting a
+      <code>Construct</code> receives the typed declaration and members of that
+      construct; a macro targeting another kind of syntax receives the surface
+      appropriate to that code. The type says what written code may be queried.
+    </p>
     <ul>
-      <li>Query the graph and the current system.</li>
+      <li>Query the code exposed by the macro’s access type.</li>
       <li>Filter, map, branch, and validate with ordinary Range.</li>
       <li>Emit declarations in the same syntax programmers use everywhere else.</li>
     </ul>
+
+    <CodeBlock source={equatableSynthesis} syntax="range" label="Complete Equatable synthesis" />
+
+    <p>
+      The macro performs the complete synthesis. It queries the stored
+      properties, emits an <code>equals</code> function into the target, and
+      generates one short-circuiting comparison per property. An empty
+      construct naturally reaches <code>return true</code>.
+    </p>
+  </section>
+
+  <section>
+    <h2>Case iterable</h2>
+    <p>
+      An <code>Enum</code> access type exposes its cases and each case’s
+      associated values. A modern <code>@caseIterable</code> macro can validate
+      that every case is payload-free, then project those written cases into
+      one generated collection.
+    </p>
+
+    <CodeBlock source={caseIterable} syntax="range" label="A modern CaseIterable derivation" />
+
+    <p>
+      This is also a forward-looking derivation example. The important part is
+      that the macro receives typed enum syntax, not an unrestricted view of the
+      whole program.
+    </p>
   </section>
 
   <blockquote>

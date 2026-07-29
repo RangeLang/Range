@@ -1,6 +1,0 @@
-closed macro syntax(): Construct { environment in
-    environment.expand {
-        closed macro #environment.target.declaration.identifier(): #environment.target.declaration.self { environment in
-        }
-    }
-}

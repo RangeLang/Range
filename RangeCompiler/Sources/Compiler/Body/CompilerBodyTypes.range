@@ -1924,7 +1924,7 @@ function compilerBodyArenaSymbolTypeID(arena: CompilerBodyArena, symbolID: Int):
         if resolutionRow < 0 { return 0 - 1 }
         return compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTypeIDColumn())
     }
-    if compilerBodyArenaSymbolIsCapturedMacroParameter(arena: arena, symbolID: symbolID) { return compilerBodyArenaNominalTypeID(arena: arena, name: String("WrittenExpression")) }
+    if compilerBodyArenaSymbolIsCapturedMacroParameter(arena: arena, symbolID: symbolID) { return compilerBodyArenaNominalTypeID(arena: arena, name: String("Expression")) }
     let arrayInitializerNodeID: Int(compilerBodyArenaSymbolArrayInitializer(arena: arena, symbolID: symbolID))
     if arrayInitializerNodeID >= 0 { return compilerBodyArenaExpressionTypeID(arena: arena, nodeID: arrayInitializerNodeID) }
     let ownerSyntaxID: Int(compilerBodyArenaReceiverConstructSyntaxID(arena: arena))
