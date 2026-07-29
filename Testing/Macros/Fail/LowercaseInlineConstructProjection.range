@@ -1,0 +1,17 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/Macro/LowercaseInlineConstructProjection.range
+construct Identifier {}
+
+construct Construct {
+    construct Declaration {
+        let identifier: Identifier
+    }
+}
+
+macro lowercaseInlineConstructProjection(): Construct { environment in
+    environment.target.declaration.identifier
+}
+
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@lowercaseInlineConstructProjection
+construct Value {}

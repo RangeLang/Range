@@ -109,23 +109,23 @@
 
   const macroMarker = "macro codable(): Construct";
   const declarationSource = sourceFrom(codableSource, macroMarker);
-  const extensionMarker = "extension #environment.target.declaration.self {";
+  const extensionMarker = "extension #environment.target.Declaration.identifier {";
   const expansionSection = sourceBlock(declarationSource, "environment.expand");
   const macroDeclarationSection = "macro codable(): Construct { environment in";
   const macroSection = sourceBlock(declarationSource, macroDeclarationSection);
   const extensionSection = sourceBlock(declarationSource, extensionMarker);
   const fieldQuerySection = `    let fields: [@stored](
-        environment.target.declaration.members.filter(all: @stored)
+        environment.target.Declaration.members.filter(all: @stored)
     )`;
   const encodeFunctionSection =
-    `            function encode(to encoder: Encoder): Result<Void, EncodingError> {
-                let container: KeyedEncodingContainer(encoder.keyedContainer())`;
+    `            function encode<Format>(to encoder: Encoder<Format>): Result<Void, EncodingError> {
+                let container: KeyedEncodingContainer<Format>(encoder.keyedContainer())`;
   const encodeFunctionScope = sourceBlock(
     declarationSource,
-    "function encode(to encoder: Encoder): Result<Void, EncodingError> {",
+    "function encode<Format>(to encoder: Encoder<Format>): Result<Void, EncodingError> {",
   );
   const encodeMapSection = `#fields.map { property in
-                    switch container.encode(#property.identifier, forKey: property.identifier.name) {
+                    switch container.encode(self.#property.identifier, forKey: #property.identifier.name) {
                     case .success:
                         break
                     case .failure(error):
@@ -134,7 +134,7 @@
                 }`;
   const decodeFunctionSection = sourceBlock(
     declarationSource,
-    "function decode(from decoder: Decoder): Result<Self, DecodingError> {",
+    "function decode<Format>(from decoder: Decoder<Format>): Result<Self, DecodingError> {",
   );
   const userExample = `@codable
 construct User {
@@ -188,7 +188,7 @@ construct User {
       phase: "macro evaluation",
       result: "ordered source-backed fields and state",
       description:
-        "Construct members are values in the compile-time graph, so macros can perform type-level set operations over their declarations. Here `filter(all:)` selects the fields that participate in storage, using `@stored` as its criterion.",
+        "Collect the stored properties from the target and filter them. `Declaration.members` exposes the target’s declared members, and `filter(all: @stored)` retains both `let` and `state` properties through their shared storage capability.",
       kind: "section",
       step: 2,
     },
@@ -210,9 +210,9 @@ construct User {
       title: "Code splicing",
       phase: "inside expansion",
       result: "an extension of the target construct",
-      accent: "#environment.target.declaration.self",
+      accent: "#environment.target.Declaration.identifier",
       accentDescription:
-        "extension expects a nominal value, and environment is supplying it. The # prefix splices that macro-time value into the generated extension, so the result is valid Range code.",
+        "`Declaration.identifier` is the target construct’s canonical declared name. The # prefix splices that compile-time identifier into the generated extension.",
       kind: "section",
       step: 4,
       scopeToken: extensionSection,
@@ -222,7 +222,7 @@ construct User {
       token: encodeFunctionSection,
       title: "Ordinary Range code, continued",
       description:
-        "An ordinary Range function named `encode` takes an `Encoder`, the coding representation for a specific target, opens that target’s keyed container, and returns `Result<Void, EncodingError>`.",
+        "The generated `encode<Format>` function keeps the encoder and keyed container on the same coding format, then returns `Result<Void, EncodingError>`.",
       kind: "section",
       step: 5,
       scopeToken: encodeFunctionScope,
@@ -232,7 +232,7 @@ construct User {
       token: encodeMapSection,
       title: "Synthesizing each field",
       description:
-        "Here we map the stored fields directly inside `encode`.",
+        "For every stored property, the macro splices `self.#property.identifier` as the value and its declared identifier name as the coding key.",
       kind: "section",
       step: 6,
       scopeToken: encodeMapSection,
@@ -269,7 +269,7 @@ construct User {
       token: decodeFunctionSection,
       title: "Decoding the construct",
       description:
-        "The matching `decode` function opens the keyed container, maps the same stored fields, returns on the first `DecodingError`, and produces `self` when every field succeeds.",
+        "The matching `decode<Format>` function decodes each stored property by its declared type and key, preserves `#property.value` as the default, assigns successful values to `self`, and returns the completed construct.",
       kind: "section",
       step: 7,
       scopeToken: decodeFunctionSection,
@@ -293,6 +293,14 @@ construct User {
       index = source.indexOf(token, index + token.length);
     }
     return -1;
+  }
+
+  for (const chapter of chapters) {
+    if (tokenIndex(declarationSource, chapter.token, 0) === -1) {
+      throw new Error(
+        `Codability chapter ${chapter.step} no longer matches Codable.range`,
+      );
+    }
   }
 
   function highlightInspectableLines(source: string) {
@@ -699,7 +707,7 @@ construct User {
               <li>{line}</li>
             {/each}
           </ol>
-          <pre class="language-range"><code class:chapterFiltered={hasChapterSelection}>{#each highlightedLines as line}{#if line.inspectionID}<span
+          <pre class="rangeSource language-range"><code class:chapterFiltered={hasChapterSelection}>{#each highlightedLines as line}{#if line.inspectionID}<span
                 class="codeLine"
                 class:chapterActive={activeInspectionID === line.inspectionID}
               data-inspection-id={line.inspectionID}
@@ -1090,8 +1098,13 @@ construct User {
   }
 
   :global(.codePreviewCard .codeLine) {
+    position: relative;
     display: block;
     min-height: 1.8em;
+  }
+
+  :global(.codePreviewCard .chapterStart.inspectSection) {
+    position: static;
   }
 
   :global(.codePreviewCard .lineCodeContent) {
@@ -1100,12 +1113,12 @@ construct User {
   }
 
   :global(.codePreviewCard .chapterFiltered .lineCodeContent) {
-    opacity: 0.14;
+    opacity: 0.24;
   }
 
   :global(.codePreviewCard .chapterFiltered .chapterContext) {
-    opacity: 0.34;
-    filter: blur(0.3px);
+    opacity: 0.48;
+    filter: blur(0);
   }
 
   :global(.codePreviewCard .chapterFiltered .chapterActive .lineCodeContent) {
@@ -1115,7 +1128,7 @@ construct User {
   :global(.codePreviewCard .chapterBadge) {
     position: absolute;
     top: 50%;
-    left: -2.1em;
+    left: -2.25em;
     transform: translateY(-50%);
     display: inline-grid;
     width: 1.45em;
@@ -1129,69 +1142,6 @@ construct User {
     font-weight: 700;
     line-height: 1;
     opacity: 1;
-  }
-
-  :global(.codePreviewCard .token.keyword) {
-    color: oklch(0.56 0.2 var(--range-hue));
-    font-weight: 700;
-  }
-
-  :global(.codePreviewCard .token.macro) {
-    color: oklch(0.63 0.19 315);
-  }
-
-  :global(.codePreviewCard .token.splice) {
-    color: oklch(0.62 0.18 290);
-    font-weight: 600;
-  }
-
-  :global(.codePreviewCard .token.function),
-  :global(.codePreviewCard .token.method) {
-    color: #000000d9;
-    font-weight: 400;
-  }
-
-  :global(.codePreviewCard .token.property) {
-    color: oklch(0.51 0.11 190);
-  }
-
-  :global(.codePreviewCard .token.type),
-  :global(.codePreviewCard .token.type-declaration) {
-    color: oklch(0.55 0.16 190);
-  }
-
-  :global(.codePreviewCard .token.function-declaration),
-  :global(.codePreviewCard .token.macro-declaration) {
-    color: #000000d9;
-    font-weight: 400;
-  }
-
-  :global(.codePreviewCard .token.variable),
-  :global(.codePreviewCard .token.variable-declaration),
-  :global(.codePreviewCard .token.parameter) {
-    color: #000000d9;
-  }
-
-  :global(.codePreviewCard .token.string) {
-    color: #000000d9;
-    font-weight: 400;
-  }
-
-  :global(.codePreviewCard .token.number) {
-    color: #1c00cf;
-  }
-
-  :global(.codePreviewCard .token.comment) {
-    color: #5d6c79;
-    font-style: italic;
-  }
-
-  :global(.codePreviewCard .token.punctuation) {
-    color: #8a8f98;
-  }
-
-  :global(.codePreviewCard .token.brace) {
-    color: #565d66;
   }
 
   .codeInspector {

@@ -7,12 +7,13 @@ compilerSourceFile\trole=core\tpath=Core/Macro/CanonicalTargetMembers.range
 open macro member(): Declaration | Member -> Void {}
 open macro stored(): Construct -> Void {}
 
-construct Construct {
-    let declaration: ConstructDeclaration
-}
+construct Identifier {}
 
-construct ConstructDeclaration {
-    let members: [@member]
+construct Construct {
+    construct Declaration {
+        let identifier: Identifier
+        let members: [@member]
+    }
 }
 
 @stored
@@ -24,10 +25,10 @@ construct State {}
 construct Binding {}
 
 macro canonicalTargetMembers(): Construct { environment in
-    let memberCount: Int(environment.target.declaration.members.filter(all: @stored).count)
+    let memberCount: Int(environment.target.Declaration.members.filter(all: @stored).count)
     if memberCount == 3 {
         environment.expand {
-            extension #environment.target.declaration.self {
+            extension #environment.target.Declaration.identifier {
                 let canonicalTargetMembersWorked: Int
             }
         }

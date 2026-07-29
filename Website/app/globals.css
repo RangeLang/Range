@@ -1231,39 +1231,80 @@ range-spline-nav a:focus-visible {
   line-height: 1.5;
 }
 
-.codeBlock {
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: oklch(0.97 0.006 255);
-}
-
-.codeBlock > header {
-  padding: 8px 11px;
-  border-bottom: 1px solid var(--line);
-  color: var(--muted);
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 10px;
-}
-
-.codeBlockBody {
-  max-height: 430px;
-  overflow: auto;
-}
-
-.codeBlockBody pre {
+.rangeSource {
   min-width: max-content;
   margin: 0;
-  padding: 12px;
+  color: #000000d9;
   font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-size: 11px;
-  line-height: 1.58;
-  tab-size: 2;
+  white-space: pre;
 }
 
-.codeBlockBody code > span {
-  display: block;
+.rangeSource code {
+  font: inherit;
+  white-space: inherit;
+}
+
+.language-range .token.keyword {
+  color: oklch(0.56 0.2 var(--range-hue));
+  font-weight: 700;
+}
+
+.language-range .token.macro {
+  color: oklch(0.63 0.19 315);
+}
+
+.language-range .token.splice {
+  color: oklch(0.62 0.18 290);
+  font-weight: 600;
+}
+
+.language-range .token.function,
+.language-range .token.method {
+  color: #000000d9;
+  font-weight: 400;
+}
+
+.language-range .token.property {
+  color: oklch(0.51 0.11 190);
+}
+
+.language-range .token.type,
+.language-range .token.type-declaration {
+  color: oklch(0.55 0.16 190);
+}
+
+.language-range .token.function-declaration,
+.language-range .token.macro-declaration {
+  color: #000000d9;
+  font-weight: 400;
+}
+
+.language-range .token.variable,
+.language-range .token.variable-declaration,
+.language-range .token.parameter {
+  color: #000000d9;
+}
+
+.language-range .token.string {
+  color: #000000d9;
+  font-weight: 400;
+}
+
+.language-range .token.number {
+  color: #1c00cf;
+}
+
+.language-range .token.comment {
+  color: #5d6c79;
+  font-style: italic;
+}
+
+.language-range .token.punctuation {
+  color: #8a8f98;
+}
+
+.language-range .token.brace {
+  color: #565d66;
 }
 
 .benchmarkCategory {

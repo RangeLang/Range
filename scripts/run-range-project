@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+
+run_project_fail() {
+    echo "range: $*" >&2
+    exit 1
+}
+
+input="${1:-}"
+[[ -n "$input" ]] || run_project_fail "expected a Range program or project directory"
+shift
+if [[ "${1:-}" == "--" ]]; then
+    shift
+fi
+
+if [[ ! -e "$input" && "$input" != *.range && -f "$input.range" ]]; then
+    input="$input.range"
+fi
+
+WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-run.XXXXXX")"
+trap '/bin/rm -rf "$WORK_ROOT"' EXIT
+
+llvm_path="$WORK_ROOT/Program.ll"
+executable_path="$WORK_ROOT/Program"
+
+"$REPO_ROOT/scripts/compile-range-project" "$input" > "$llvm_path"
+
+runtime_inputs=()
+runtime_source_count="$(/usr/bin/plutil -extract runtimeSources raw -o - "$MANIFEST")"
+for ((index = 0; index < runtime_source_count; index += 1)); do
+    runtime_relative_path="$(/usr/bin/plutil -extract "runtimeSources.$index.path" raw -o - "$MANIFEST")"
+    runtime_path="$REPO_ROOT/$runtime_relative_path"
+    [[ -f "$runtime_path" ]] || run_project_fail "missing runtime input: $runtime_relative_path"
+    runtime_inputs+=("$runtime_path")
+done
+
+clang -O0 -fno-lto -Wno-override-module \
+    "$llvm_path" "${runtime_inputs[@]}" -o "$executable_path"
+
+program_exit=0
+"$executable_path" "$@" || program_exit=$?
+exit "$program_exit"

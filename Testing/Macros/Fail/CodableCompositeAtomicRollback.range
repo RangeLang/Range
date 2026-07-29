@@ -43,11 +43,11 @@ macro invalidDecodeBody(properties: [Let]) -> Int { environment in
 
 macro codable(): Construct { environment in
     let properties: [Let](
-        environment.target.declaration.members.filter(all: Let)
+        environment.target.Declaration.members.filter(all: Let)
     )
 
     environment.expand {
-        extension #environment.target.declaration.self {
+        extension #environment.target.Declaration.identifier {
             function encode(to encoder: Encoder): Int {
                 @validEncodeBody(properties: #properties)
                 return 0

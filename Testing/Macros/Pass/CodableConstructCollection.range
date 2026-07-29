@@ -54,12 +54,12 @@ macro codableDecodeBody(properties: [@stored]) -> Int { environment in
 
 macro codable(): Construct { environment in
     let properties: [@stored](
-        environment.target.declaration.members.filter(all: @stored)
+        environment.target.Declaration.members.filter(all: @stored)
     )
 
     if properties.count == 2 {
         environment.expand {
-            extension #environment.target.declaration.self {
+            extension #environment.target.Declaration.identifier {
                 function encode(to encoder: Encoder): Int {
                     @codableEncodeBody(properties: #properties)
                     return 0

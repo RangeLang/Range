@@ -1,1 +1,0 @@
-macro storage(_ representation: Foreign<ASCII>(.inferred)): Construct -> Void {}

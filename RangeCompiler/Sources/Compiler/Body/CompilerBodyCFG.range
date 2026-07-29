@@ -675,7 +675,7 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindEnumCaseValue()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindArrayLiteral()
                 && compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindIndex())
-            || targetKind < compilerBodyResolutionLocalSymbol() || targetKind > compilerBodyResolutionMacroCollectionTransform() { return false }
+            || targetKind < compilerBodyResolutionLocalSymbol() || targetKind > compilerBodyResolutionInlineConstructProjection() { return false }
         if targetKind == compilerBodyResolutionLocalSymbol() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.symbols)) { return false }
         if targetKind == compilerBodyResolutionFunction() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.functions)) { return false }
         if targetKind == compilerBodyResolutionBuiltin() && targetID != compilerBodyBuiltinString() && targetID != compilerBodyBuiltinFloat() && targetID != compilerBodyBuiltinRuntimeCall() && targetID != compilerBodyBuiltinNil() { return false }
@@ -719,8 +719,13 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
                     && targetID != compilerSyntaxMemberKindBinding()
                     && targetID != compilerSyntaxMemberKindDerived())
                 || !compilerBodyArenaTypeIDIsArray(arena: arena, typeID: resolutionTypeID)) { return false }
+        if targetKind == compilerBodyResolutionInlineConstructProjection()
+            && (compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindMemberRead()
+                || targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.syntaxIndex)
+                || compilerIntTableValue(table: arena.tables.syntaxIndex, row: targetID, column: 0) != compilerSyntaxKindConstruct()) { return false }
         if (targetKind == compilerBodyResolutionLocalSymbol() || targetKind == compilerBodyResolutionFunction() || targetKind == compilerBodyResolutionMember() || targetKind == compilerBodyResolutionConstruct()
-            || targetKind == compilerBodyResolutionEnumCase() || targetKind == compilerBodyResolutionEnum() || targetKind == compilerBodyResolutionArrayLiteral())
+            || targetKind == compilerBodyResolutionEnumCase() || targetKind == compilerBodyResolutionEnum() || targetKind == compilerBodyResolutionArrayLiteral()
+            || targetKind == compilerBodyResolutionInlineConstructProjection())
             && (resolutionTypeID < 0 || resolutionTypeID >= compilerIntTableRowCount(table: arena.typeInstances)) { return false }
         if targetKind == compilerBodyResolutionOperator() && targetID == compilerSyntaxKindOptionalCoalescing()
             && (resolutionTypeID < 0 || resolutionTypeID >= compilerIntTableRowCount(table: arena.typeInstances)) { return false }

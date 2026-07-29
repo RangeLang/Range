@@ -9,7 +9,7 @@ macro genericBoundaryMaterialization(): Construct { environment in
     let enabled: Bool(true)
 
     environment.expand {
-        extension #environment.target.declaration.self {
+        extension #environment.target.Declaration.identifier {
             function generatedCount(): Int {
                 return #values.count
             }

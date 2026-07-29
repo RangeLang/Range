@@ -2,12 +2,13 @@
   import { onMount } from "svelte";
 
   let {
-    variant = "codability",
+    palette = 0,
   }: {
-    variant?: "codability" | "string";
+    palette?: number;
   } = $props();
 
   let canvas: HTMLCanvasElement;
+  let paletteHue = $derived((22 + palette * 137.507764) % 360);
 
   const vertexSource = `
     attribute vec2 a_position;
@@ -22,7 +23,7 @@
 
     uniform vec2 u_resolution;
     uniform float u_time;
-    uniform float u_variant;
+    uniform float u_palette;
 
     float hash(vec2 point) {
       point = fract(point * vec2(123.34, 456.21));
@@ -95,15 +96,25 @@
       vec2 field = vec2(uv.x * aspect, uv.y);
       float time = u_time;
 
-      float cloudScale = mix(0.8, 0.6, u_variant);
-      vec2 flowDirection = mix(
-        vec2(0.052, -0.026),
-        vec2(-0.034, 0.045),
-        u_variant
-      );
+      float palettePhase = fract(u_palette * 0.61803398875);
+      float paletteAngle = palettePhase * 6.28318530718;
+      float cloudScale = mix(0.58, 0.84, palettePhase);
+      vec2 flowDirection = vec2(
+        cos(paletteAngle),
+        sin(paletteAngle)
+      ) * 0.052;
+      vec2 paletteOrigin = vec2(
+        hash(vec2(u_palette + 1.7, 4.1)),
+        hash(vec2(8.3, u_palette + 2.9))
+      ) * 18.0;
       vec2 largeFlow = flowDirection * time;
       vec2 cloudField =
-        field * cloudScale + mix(vec2(0.0), vec2(10.7, 4.3), u_variant);
+        field * cloudScale + paletteOrigin;
+      float warpStrength = mix(
+        0.74,
+        1.22,
+        hash(vec2(u_palette + 5.3, 9.7))
+      );
       float horizontalWarp = fbm(
         cloudField * 0.72 - largeFlow * 0.36 + vec2(3.1, 8.2)
       );
@@ -114,15 +125,15 @@
       float hills = fbm(
         cloudField
           + largeFlow
-          + cloudWarp * mix(1.2, 0.76, u_variant)
+          + cloudWarp * warpStrength
       );
       float folding = fbm(
-        cloudField * mix(1.5, 1.08, u_variant)
+        cloudField * mix(1.08, 1.5, palettePhase)
           - largeFlow * 0.5
           + vec2(hills * 1.3, -hills * 0.8)
       );
       float fineClouds = fbm(
-        cloudField * mix(3.1, 2.45, u_variant)
+        cloudField * mix(2.45, 3.1, palettePhase)
           + largeFlow * 0.18
           + cloudWarp * 0.32
           + vec2(17.2, -9.4)
@@ -137,14 +148,19 @@
       float ridge = 1.0 - abs(fineClouds * 2.0 - 1.0);
       ridge = smoothstep(0.58, 0.94, ridge) * (0.35 + folding * 0.65);
 
-      float coolHue = mix(188.0, 286.0, mapped);
-      float warmHue = mix(76.0, 154.0, mapped);
-      float hue = mix(coolHue, warmHue, u_variant);
+      float baseHue = 22.0 + u_palette * 137.507764;
+      float hue = baseHue + mix(-38.0, 54.0, mapped) + ridge * 12.0;
       float lightness = mix(0.61, 0.89, mapped) + ridge * 0.025;
       float chroma =
         mix(0.175, 0.235, 0.28 + mapped * 0.72)
         + ridge * 0.012;
       vec3 color = oklch(lightness, chroma, hue);
+      vec3 ridgeColor = oklch(
+        min(lightness + 0.035, 0.94),
+        chroma * 0.82,
+        baseHue + 156.0
+      );
+      color = mix(color, ridgeColor, ridge * 0.13);
 
       color = (color - 0.5) * 1.075 + 0.5;
 
@@ -216,7 +232,7 @@
     const positionLocation = context.getAttribLocation(program, "a_position");
     const resolutionLocation = context.getUniformLocation(program, "u_resolution");
     const timeLocation = context.getUniformLocation(program, "u_time");
-    const variantLocation = context.getUniformLocation(program, "u_variant");
+    const paletteLocation = context.getUniformLocation(program, "u_palette");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0;
     let start = performance.now();
@@ -240,7 +256,7 @@
       context.vertexAttribPointer(positionLocation, 2, context.FLOAT, false, 0, 0);
       context.uniform2f(resolutionLocation, canvas.width, canvas.height);
       context.uniform1f(timeLocation, reducedMotion.matches ? 0 : (now - start) / 1000);
-      context.uniform1f(variantLocation, variant === "string" ? 1 : 0);
+      context.uniform1f(paletteLocation, palette);
       context.drawArrays(context.TRIANGLES, 0, 6);
 
       if (!reducedMotion.matches) {
@@ -272,13 +288,19 @@
   });
 </script>
 
-<canvas class="postShader" aria-hidden="true" bind:this={canvas}></canvas>
+<canvas
+  class="postShader"
+  aria-hidden="true"
+  data-palette={palette}
+  style={`--palette-hue: ${paletteHue}`}
+  bind:this={canvas}
+></canvas>
 
 <style>
   .postShader {
     width: 100%;
     height: 100%;
     display: block;
-    background: oklch(0.8 0.16 210);
+    background: oklch(0.8 0.16 var(--palette-hue));
   }
 </style>

@@ -3,7 +3,21 @@ enum GraphRole {
     case application
 }
 
+@shared
 macro graph(
     _ role: GraphRole,
-    _ additionalRole: GraphRole?(nil)
-): Construct -> Void {}
+    _ additionalRole: GraphRole?
+): Construct -> Void { environment in
+    environment.graph.addNode(role: role, additionalRole: additionalRole)
+}
+
+enum Sharing {
+    case shared
+    case private
+}
+
+macro shared(): Macro { environment in
+    environment.expand {
+        return Sharing.shared
+    }
+}

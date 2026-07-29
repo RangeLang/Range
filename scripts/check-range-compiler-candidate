@@ -4057,7 +4057,7 @@ write_macro_generated_function_bundle() {
         '        }' \
         '    }' \
         '    environment.expand {' \
-        '        extension #environment.target.declaration.self {' \
+        '        extension #environment.target.Declaration.identifier {' \
         '            function memberFunction(delta: Int): Int {' \
         '                return delta + 3' \
         '            }' \
@@ -4203,7 +4203,7 @@ write_macro_registrable_malformed_splice_bundle() {
         'compilerSourceFile\trole=core\tpath=Core/MalformedMemberSplice.range' \
         'macro malformedMember(): Construct { environment in' \
         '    environment.expand {' \
-        '        extension #(environment.target.declaration.bad) {' \
+        '        extension #(environment.target.Declaration.bad) {' \
         '            let registrationSeed: Int' \
         '        }' \
         '    }' \
@@ -4356,7 +4356,7 @@ write_macro_generated_function_malformed_extension_bundle() {
         'compilerSourceFile\trole=core\tpath=Core/MalformedGeneratedExtension.range' \
         'macro malformed(): Construct { environment in' \
         '    environment.expand {' \
-        '        extension #(environment.target.declaration.bad) {' \
+        '        extension #(environment.target.Declaration.bad) {' \
         '            function memberFunction(): Int {' \
         '                return 7' \
         '            }' \

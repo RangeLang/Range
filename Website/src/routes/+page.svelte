@@ -30,8 +30,24 @@
         <span>Notes from the language</span>
       </header>
       <div class="latestPostStrip">
+        <a class="latestPost" href="/features/macros/50-declarative-50-imperative">
+          <PostNoiseShader palette={0} />
+          <span class="postCopy">
+            <small>Language design</small>
+            <strong>50% Declarative, 50% Imperative</strong>
+            <span>Describe the world. Use a macro for the funky parts.</span>
+          </span>
+        </a>
+        <a class="latestPost" href="/features/macros/somewhere-sometime-some-here">
+          <PostNoiseShader palette={1} />
+          <span class="postCopy">
+            <small>Metaprogramming</small>
+            <strong>Somewhere, Sometime, Some-here</strong>
+            <span>Environment as place, phase, and local context.</span>
+          </span>
+        </a>
         <a class="latestPost" href="/features/macros/codability-under-100">
-          <PostNoiseShader variant="codability" />
+          <PostNoiseShader palette={2} />
           <span class="postCopy">
             <small>Metaprogramming</small>
             <strong>Codability under 100</strong>
@@ -39,7 +55,7 @@
           </span>
         </a>
         <a class="latestPost" href="/optimizations/general/strings-go-fast">
-          <PostNoiseShader variant="string" />
+          <PostNoiseShader palette={3} />
           <span class="postCopy">
             <small>Compiler update</small>
             <strong>Strings Go Fast</strong>

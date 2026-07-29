@@ -20,11 +20,11 @@ construct Let {}
 
 macro inlineMappedSyntax(): Construct { environment in
     let fields: [Let](
-        environment.target.declaration.members.filter(all: Let)
+        environment.target.Declaration.members.filter(all: Let)
     )
 
     environment.expand {
-        extension #environment.target.declaration.self {
+        extension #environment.target.Declaration.identifier {
             function mappedValue(): Int {
                 #fields.map { property in
                     return #property.value

@@ -10,6 +10,7 @@ usage() {
 Usage:
   range version
   range compile <FILE-OR-DIR>
+  range run <PROGRAM-OR-DIR> [-- ARGS...]
   range compiler next
   range compiler next --cached-only
   range compiler progression
@@ -20,12 +21,16 @@ Usage:
   range check-compiler-smoke [DIR]
   range check-compiler-candidate [DIR]
   range check-document-store
+  range check-gpu-canvas
   range check-seed-integrity
   range check-stage2-compiler
 
 The supported native surface is the self-hosted compiler kernel and its proof
 commands. Broader language commands return only after their implementations are
 Range-owned and covered by the native proof boundary.
+
+The run command infers the .range extension when an extensionless program path
+names an existing .range file.
 USAGE
 }
 
@@ -49,6 +54,10 @@ case "$command" in
     compile)
         if [[ $# -ne 1 ]]; then usage; exit 1; fi
         "$REPO_ROOT/scripts/compile-range-project" "$1"
+        ;;
+    run)
+        if [[ $# -lt 1 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/run-range-project" "$@"
         ;;
     compiler)
         compiler_command="${1:-}"
@@ -104,6 +113,10 @@ case "$command" in
     check-document-store)
         if [[ $# -ne 0 ]]; then usage; exit 1; fi
         "$REPO_ROOT/scripts/check-range-document-store"
+        ;;
+    check-gpu-canvas)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/check-range-gpu-canvas"
         ;;
     check-stage2-compiler)
         if [[ $# -ne 0 ]]; then usage; exit 1; fi

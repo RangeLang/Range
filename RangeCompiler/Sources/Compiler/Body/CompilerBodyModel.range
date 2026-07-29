@@ -54,6 +54,7 @@ function compilerBodyResolutionArrayCount(): Int { return 17 }
 function compilerBodyResolutionMacroEnvironmentProjection(): Int { return 18 }
 function compilerBodyResolutionMacroSyntaxFilter(): Int { return 19 }
 function compilerBodyResolutionMacroCollectionTransform(): Int { return 20 }
+function compilerBodyResolutionInlineConstructProjection(): Int { return 21 }
 function compilerBodyMacroSyntaxFilterFamilyBase(): Int { return 1024 }
 function compilerBodyCollectionTransformFilter(): Int { return 1 }
 function compilerBodyCollectionTransformMap(): Int { return 2 }
@@ -61,6 +62,7 @@ function compilerBodyCollectionTransformMap(): Int { return 2 }
 function compilerMacroEnvironmentProjectionTarget(): Int { return 1 }
 function compilerMacroEnvironmentProjectionDiagnostics(): Int { return 2 }
 function compilerMacroEnvironmentProjectionGraph(): Int { return 3 }
+function compilerMacroEnvironmentProjectionInlineBase(): Int { return 1024 }
 function compilerBodyBuiltinArraySyntaxID(): Int { return 0 - 2 }
 function compilerBodyBuiltinString(): Int { return 1 }
 function compilerBodyBuiltinFloat(): Int { return 2 }

@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+APP_ROOT="$REPO_ROOT/GPUCanvas.range"
+APP_RUN_ROOT="$REPO_ROOT/GPUCanvas"
+BUILD_ROOT="$REPO_ROOT/.build/GPUCanvas"
+LLVM_PATH="$BUILD_ROOT/GPUCanvas.ll"
+EXECUTABLE_PATH="$BUILD_ROOT/GPUCanvas"
+HTML_PATH="$BUILD_ROOT/index.html"
+JAVASCRIPT_PATH="$BUILD_ROOT/GPUCanvas.mjs"
+RUN_HTML_PATH="$BUILD_ROOT/run-index.html"
+
+/bin/mkdir -p "$BUILD_ROOT"
+
+"$REPO_ROOT/scripts/range" compile "$APP_ROOT" > "$LLVM_PATH"
+
+/usr/bin/grep -Fq 'define i32 @writeGPUCanvas' "$LLVM_PATH" \
+    || {
+        echo "GPUCanvas: macro did not lower writeGPUCanvas into LLVM" >&2
+        exit 1
+    }
+/usr/bin/grep -Fq 'call i32 @gpuCanvasHost' "$LLVM_PATH" \
+    || {
+        echo "GPUCanvas: macro-generated function did not lower the GPU host call" >&2
+        exit 1
+    }
+/usr/bin/grep -Fq 'call i32 @writeFile' "$LLVM_PATH" \
+    || {
+        echo "GPUCanvas: generated function did not lower the HTML artifact write" >&2
+        exit 1
+    }
+
+clang -O0 -fno-lto -Wno-override-module \
+    "$LLVM_PATH" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerHost.c" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeRawBuffer.c" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerMetrics.c" \
+    -o "$EXECUTABLE_PATH"
+
+"$EXECUTABLE_PATH" "$HTML_PATH"
+
+for marker in \
+    'navigator.gpu.requestAdapter()' \
+    '@vertex fn vertex' \
+    '@fragment fn fragment' \
+    'pass.draw(3)'; do
+    /usr/bin/grep -Fq "$marker" "$HTML_PATH" \
+        || {
+            echo "GPUCanvas: generated HTML omitted $marker" >&2
+            exit 1
+        }
+done
+
+/usr/bin/awk '
+    /<script type='\''module'\''>/ { inside = 1; next }
+    /<\/script>/ { inside = 0 }
+    inside { print }
+' "$HTML_PATH" > "$JAVASCRIPT_PATH"
+node --check "$JAVASCRIPT_PATH"
+
+"$REPO_ROOT/scripts/range" run "$APP_RUN_ROOT" -- "$RUN_HTML_PATH"
+/usr/bin/cmp -s "$HTML_PATH" "$RUN_HTML_PATH" \
+    || {
+        echo "GPUCanvas: range run produced a different WebGPU artifact" >&2
+        exit 1
+    }
+
+echo "GPUCanvas: pass (macro-expanded function, LLVM link/run, extension-inferred range run, JavaScript parse, WebGPU/WGSL artifact at $HTML_PATH)"

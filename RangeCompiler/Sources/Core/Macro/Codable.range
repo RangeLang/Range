@@ -1,10 +1,10 @@
 macro codable(): Construct { environment in
     let fields: [@stored](
-        environment.target.declaration.members.filter(all: @stored)
+        environment.target.Declaration.members.filter(all: @stored)
     )
 
     environment.expand {
-        extension #environment.target.declaration.self {
+        extension #environment.target.Declaration.identifier {
             function encode<Format>(to encoder: Encoder<Format>): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer<Format>(encoder.keyedContainer())
                 #fields.map { property in

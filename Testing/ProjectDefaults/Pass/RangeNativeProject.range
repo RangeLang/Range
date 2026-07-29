@@ -1,33 +1,13 @@
 compilerMacroSnapshot
 compilerSourceFile\trole=core\tpath=Core/Macro/Project.range
-construct ProjectDefaults {}
-
-macro project(): Construct -> ProjectDefaults { environment in
-    let integerCount: Int(environment.target.memberCount("integer"))
-    let boolCount: Int(environment.target.memberCount("bool"))
-    if integerCount == 0 && boolCount == 0 {
-        environment.expand {
-            extension #environment.target.declaration.self {
-                state integer: Int
-                state bool: Bool
+macro project(): Construct { environment in
+    #environment {
+        construct ProjectDefaults {
+            #environment.system.defaults.map { default in
+                let #default.identifier: #default.value
             }
         }
     }
-    if integerCount == 0 && boolCount != 0 {
-        environment.expand {
-            extension #environment.target.declaration.self {
-                state integer: Int
-            }
-        }
-    }
-    if boolCount == 0 && integerCount != 0 {
-        environment.expand {
-            extension #environment.target.declaration.self {
-                state bool: Bool
-            }
-        }
-    }
-    return ProjectDefaults()
 }
 compilerSourceFile\trole=project\tpath=Project.range
 @project

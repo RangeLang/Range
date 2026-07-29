@@ -56,7 +56,7 @@ macro metadata(_ key: String?(nil), enabled: Bool(false)): Let -> Metadata { env
 
 macro inspectMetadata(): Construct { environment in
     let lets: [Let](
-        environment.target.declaration.members.filter(all: Let)
+        environment.target.Declaration.members.filter(all: Let)
     )
     let enabledProperties: [Let](
         lets.filter { property in
@@ -81,7 +81,7 @@ macro inspectMetadata(): Construct { environment in
 
     if enabledProperties.count == 1 {
         environment.expand {
-            extension #environment.target.declaration.self {
+            extension #environment.target.Declaration.identifier {
                 let typedParameterDefaultsWorked: Int
             }
         }

@@ -1,6 +1,6 @@
 macro identifierSyntaxName(): Init { environment in
     environment.target.application.replace(with:
-        environment.target.declaration.expression(arguments: [
+        environment.target.Declaration.expression(arguments: [
             String(environment.target.application.arguments[0].expression)
         ])
     )

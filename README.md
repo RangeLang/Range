@@ -109,12 +109,20 @@ Range peak memory: **5.3 GB** · peers: **1.8–4.2 MB**.
 ## Use Range
 
 ```sh
+scripts/range compile Testing/Basics/Pass/ReturnInteger.range
+range run GPUCanvas
 scripts/range compiler next
 scripts/range compiler progression
 scripts/range check-stage2-compiler
 ```
 
-The supported implementation is the Range-authored self-hosted compiler kernel. It emits native LLVM and must reproduce byte-identical LLVM and linked compiler executables before a compiler change is accepted. Ordinary project compilation is intentionally absent until its source loading, macro materialization, lowering, and runtime behavior are Range-owned and proven. See the [speed benchmark](Benchmarks/Speed/README.md) for performance comparisons.
+The supported implementation is the Range-authored self-hosted compiler kernel.
+It emits native LLVM and must reproduce byte-identical LLVM and linked compiler
+executables before a compiler change is accepted. The ordinary file/directory
+wrapper bundles canonical Core sources through the accepted compiler;
+`range run` additionally links the manifest-declared runtime inputs and
+executes `@main`. See the [speed benchmark](Benchmarks/Speed/README.md) for
+performance comparisons.
 
 ## License
 

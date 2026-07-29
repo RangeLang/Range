@@ -3,8 +3,77 @@
 Priority and dependency order live in [MILESTONES.md](MILESTONES.md). This file
 owns the actionable checkboxes for the active and deliberately deferred work.
 
+## 2026-07-29 Inline Representation Handoff
+
+- [x] Migrate Core macro paths and focused fixtures from
+  `environment.target.declaration...` to
+  `environment.target.Declaration...`; expansion target splices now use
+  `#environment.target.Declaration.identifier`.
+- [ ] Finish the general uppercase inline-construct projection without
+  regressing bounded Stage 2 production.
+  - The current draft adds resolution kind
+    `compilerBodyResolutionInlineConstructProjection`, resolves a directly
+    nested construct by parent syntax ID and name, interns its construct type,
+    and reuses the macro-environment MIR projection with an encoded nested
+    syntax ID.
+  - Runtime materialization preserves the same source syntax handle while
+    changing its nominal type to the selected nested representation.
+  - `Testing/Macros/Fail/LowercaseInlineConstructProjection.range` and the
+    updated canonical-target fixture are wired into
+    `check-range-root-value`, but neither proof has completed.
+- [ ] Restore a bounded native producer run before continuing semantics work.
+  - The first attempt failed quickly with
+    `representationSensitiveABICapabilityBlocked` for
+    `compilerBodyMIRBuildExpression` at capability stage `1780729`.
+  - Extracting the full projection helper then failed with the same diagnostic
+    for `compilerBodyArenaResolveInlineConstructProjection` at stage
+    `1780096`.
+  - Reusing the existing MIR environment projection removed those new
+    aggregate-return helpers, but subsequent producer runs stayed at full CPU
+    for several minutes and were manually interrupted. A cross-layer call
+    from body resolution to the frontend graph helper was removed; the latest
+    local body lookup draft was interrupted at the user's request and remains
+    unverified.
+  - Run `scripts/range check-build-plan`, then
+    `scripts/range check-root-value`; do not infer later-gate success from the
+    build-plan result.
+- [ ] Complete generated project configuration as a value/artifact.
+  - The current `Project.range` emits a `ProjectDefaults` construct from
+    `#environment.system.defaults`; it no longer returns
+    `-> ProjectDefaults`.
+  - Compiler lowering still recognizes only persisted macro-result nominals,
+    and root expansion currently records arbitrary root constructs as opaque
+    artifacts rather than committing them into the declaration graph.
+  - `check_range_native_project_macro` still asserts the older synthesized
+    `state integer` / `state bool` extension and read-dependency behavior; it
+    must be rewritten only after the generated construct has a supported
+    compiler data path.
+- [ ] Execute the shared Range-authored graph body directly.
+  - `Graph.range` now authors
+    `environment.graph.addNode(role:additionalRole:)`, uses implicit `nil` for
+    the optional second role, and includes the shared/private value model.
+  - The bootstrap `compilerFormulaExecuteApplication` graph-name bridge still
+    performs role validation; `addNode` is not yet a supported ordinary graph
+    capability operation.
+- [x] Delete `RangeCompiler/Sources/Core/Macro/Storage.range` and remove the
+  root-value script's direct attempt to concatenate that deleted file.
+  - Storage descriptor fixtures still declare their own focused legacy macro,
+    and `Int.range` still carries `@storage`; decide that remaining semantic
+    migration separately rather than treating file deletion as proof that the
+    storage formula path is gone.
+- [ ] Reconcile concurrent workspace edits before the next patch.
+  - The worktree also contains unrelated README, Website, GPU canvas, example,
+    and script changes. Preserve them and inspect overlapping compiler/Core
+    files before editing.
+  - Last completed validation in this run was `scripts/range
+    check-build-plan`; it passed before the latest overlapping edits.
+    `scripts/range check-root-value` has not passed.
+
 ## Website
 
+  - [x] Publish separate “50% Declarative, 50% Imperative” and “Somewhere,
+    Sometime, Some-here” essays with dedicated routes, homepage entries, and
+    rendered-route assertions.
   - [x] Add a production Docker image, Compose service, health endpoint, and
     deployment instructions for the standalone SvelteKit website.
   - [x] Add Caddy automatic HTTPS, private Docker-network proxying, persistent
@@ -30,6 +99,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     homepage entry point.
     - [x] Present the newest writing in a responsive homepage strip of
       animated OKLCH shader cards, led by `Codability under 100`.
+      - [x] Generate a distinct shader palette for every post from an unbounded
+        golden-angle OKLCH seed instead of reusing named color variants.
   - [x] Modulate the continuous Cardinality hum’s low-pass cutoff from homepage
     scroll proximity without changing its pitch, rhythm, or volume.
   - [x] Add a homepage codability sheet sourced from the Range-authored macro.
@@ -58,8 +129,14 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       compressed output bus.
   - [x] Use Range's editor-owned light syntax palette and semantic token roles
     for keywords, types, declarations, functions, macros, members, and values.
+    - [x] Share one reusable `RangeCode` renderer across plain source blocks,
+      and share its Range syntax theme with the interactive Codable walkthrough.
+      - Preserve authored whitespace and indentation; syntax token spans must
+        remain inline rather than becoming accidental line boxes.
     - [x] Keep inspectable macro nodes flat and non-interactive, and navigate
-      the five explanations explicitly through a trailing numbered chapter rail.
+      the seven explanations explicitly through a trailing numbered chapter rail.
+      - [x] Re-anchor all seven chapters to the current generic Codable source
+        and align their numbered markers in one indentation-independent gutter.
     - [x] Rebalance the preview away from a single purple identifier bucket:
       reserve the luminous Range blue for keywords, then use project teals,
       property/declaration blue, vivid salad-green callables, amethyst-lilac macro
@@ -171,9 +248,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           line rather than its smaller internal text box.
         - [x] Include the query passage's shared leading indent inside its
           multiline inspection token so its opening and closing lines align.
-        - [x] Align the query passage's `2` badge beside its indented `let`
-          line, matching the `3` and `4` chapter badges.
-      - [x] Show step 4's complete `#environment.target.declaration.self`
+        - [x] Align every chapter badge in one source gutter independent of
+          the annotated line's authored indentation.
+      - [x] Show step 4's complete `#environment.target.Declaration.identifier`
         mention in the inspector accent and explain `#` as interpolation from
         a macro-time value into code that executes later.
       - [x] Keep the generated `encode` function inline in the target extension
@@ -182,10 +259,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         them, and remove Phase/Produces metadata from every inspector.
         - [x] Separate the concepts cleanly: chapter 3 owns ordinary validated
           Range code inside `environment.expand`, while chapter 4 owns only the
-          highlighted `#environment.target.declaration.self` splice.
-          - [x] Explain that `extension` expects a nominal value and the
-            environment supplies one, making the spliced extension valid Range
-            code.
+          highlighted `#environment.target.Declaration.identifier` splice.
+          - [x] Explain that `extension` receives the target's canonical
+            declaration identifier as a spliced compile-time value.
       - [x] Give those passages a concentrated glyph drop shadow without an
         overlay, broad blur, or underline; keep single-token mentions
         underline-only.
@@ -330,19 +406,20 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] After seed promotion, make the resolver hook call
     `targetPointerBits()` directly instead of its accepted-seed 64-bit value.
   - [x] Define lowercase `project` in Range and execute its real macro body.
-    - The macro records exact `integer` and `bool` member reads, then uses
-      `environment.expand` to add only the missing `state integer: Int` and
-      `state bool: Bool` declarations.
-    - Focused fixtures prove the empty-project expansion and preservation of
-      an explicit `state integer: Int<4>` override.
-  - [x] Remove `project` name-based collection from compiler semantics.
-    - Successful macro invocations materialize generic typed result rows with
-      invocation, target, nominal type, scalar, and child-count provenance.
-      The Range-authored macro returns `ProjectDefaults()`, and lowering
-      resolves that value only after ordinary macro execution.
-    - `compilerFormulaExecuteApplication` has no `project` branch; project
-      defaults are selected by the returned `ProjectDefaults` nominal rather
-      than by the attached macro's spelling.
+    - The authored macro uses `#environment { ... }` as its contextual
+      expansion boundary and maps `environment.system.defaults` into generated
+      `let` members of one canonical `ProjectDefaults` construct.
+    - [ ] Make `#environment { ... }` the executable contextual expansion
+      boundary, then migrate the remaining authored macros from
+      `environment.expand { ... }`.
+    - [ ] Materialize the `system.defaults` environment projection and prove
+      generated defaults plus preservation of explicit project overrides.
+  - [ ] Resolve emitted `ProjectDefaults` artifacts as compiler configuration
+    data.
+    - The Range macro now emits the canonical construct and the bootstrap
+      bridge preserves target overrides, but lowering still keys its fallback
+      lookup from the `project` application until opaque root construct
+      artifacts are committed into the declaration graph.
   - [x] Allow `state integer: Int<4>` and full signed-width forms to override
     the project integer default without an `override` keyword.
   - [ ] Route every bare and partially specialized `Int` use through the
@@ -368,6 +445,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] Execute lowercase `@storage` and `@literal` applications as compiler
     formula invocations and consume their emitted facts for descriptor
     validation.
+  - [x] Delete the shared Core `Macro/Storage.range` declaration; focused
+    legacy descriptor fixtures remain self-contained while physical
+    representation moves into generated configuration data.
   - [x] Define and validate text literal facts as semantic `Character`
     elements encoded as UTF-8 with unsigned 8-bit physical code units.
     - [x] Prove the exact text descriptor, missing text storage, and invalid
@@ -379,9 +459,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     `signedness` and `bits`, including unary minus only for signed storage.
   - [ ] Replace the native integer literal and LLVM lowering branches with
     macro-produced representation facts.
-  - [ ] Add the Range-authored `Signedness`, `Int`, `storage`, and `literal`
-    sources to the bootstrap manifest after the parser-capable seed is
-    reproducibly promoted.
+  - [ ] Add the Range-authored `Signedness`, `Int`, and `literal` sources to
+    the bootstrap manifest after the parser-capable seed is reproducibly
+    promoted.
   - [ ] Expose compiler declarations through one canonical typed meta-model.
     - [x] Define lowercase `member` for `Declaration | Member` and annotate the
       direct `Let`, `State`, `Binding`, `Derived`, nested `Construct`,
@@ -394,9 +474,13 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       model.
       - [x] Carry leading macro applications on function, enum, and parameter
         declarations alongside their authored identifiers and callable shape.
-      - [x] Keep `let`, `state`, `binding`, and `derived` as stored declaration
-        variants with macro applications, identifier, type, and value/body
-        storage instead of inventing a callable parameter list.
+      - [x] Keep `let` and `state` as value-generic stored variants with macro
+        applications, identifier, and value; keep `binding` and `derived` with
+        their direct type and accessor/body storage instead of inventing a
+        callable parameter list.
+      - [x] Align the canonical declaration-envelope proof with value-generic
+        `Let<Value>` and `State<Value>` by checking their direct `value`
+        witness without expecting a parallel `type` field.
     - [ ] Execute typed views such as
       `members.filter(all: Let) { lets in ... }` over those same values without
       copying them into a second representation.
@@ -481,7 +565,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         the complete conforming child set before synthesizing its physical
         storage.
         - [x] Intern macro-family member types as deferred `Array` views and
-          execute `environment.target.declaration.members.count` through lazy,
+          execute `environment.target.Declaration.members.count` through lazy,
           source-backed syntax handles in original member order.
         - [x] Store the canonical syntax ID in every source-backed syntax
           handle and resolve compact member-table rows only at the internal
@@ -527,9 +611,10 @@ owns the actionable checkboxes for the active and deliberately deferred work.
             value and can be reused outside graph declaration/application
             roles.
           - [ ] Move the bootstrap nested-role validation from
-            `compilerFormulaExecuteApplication` into the Range-authored
-            `graph` body once macro targets expose direct nested declarations,
-            then delete the name-based compiler bridge.
+            `compilerFormulaExecuteApplication` into execution of the
+            Range-authored shared `graph` body, which now authors
+            `environment.graph.addNode(role:additionalRole:)`; then delete
+            the name-based compiler bridge.
         - [x] Remove the remaining parallel declaration/application fields
           from `Function`, `Parameter`, and `Enum`; normalize function calls as
           `Function.Application`.
@@ -542,9 +627,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           - [ ] Promote the source removal through the accepted bootstrap seed
             after compiler progression reaches the corresponding checkpoint;
             do not hand-edit the generated LLVM snapshot.
-        - [ ] Materialize construct macro targets directly as
-          `Construct.Declaration` and remove the compatibility
-          `environment.target.declaration` projection.
+        - [x] Materialize construct macro targets through path-addressable
+          inline representations such as `Construct.Declaration`; uppercase
+          projections preserve the attached syntax value under the nested
+          representation type, and lowercase compatibility projection is
+          rejected.
       - [x] Define the Range-authored bidirectional `SyntaxTemplate` value
         model with fixed written elements, member-linked captures,
         one/optional/many cardinality, canonical syntax bindings, matching,
@@ -643,7 +730,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           - [x] Remove the seed-compatible `#(...)` spelling and reject it
             structurally. Compile-time values use only prefix mentions such
             as `#properties.map` and
-            `#environment.target.declaration.self`; no braced splice program
+            `#environment.target.Declaration.identifier`; no braced splice program
             form exists.
         - [x] Materialize macro applications retained inside generated
           function bodies as child applications of the parent expansion.
@@ -1154,3 +1241,18 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - Promoted accepted seed `bootstrap-154b7b1459b9`; its manifest-driven
         Stage 3 reproduces LLVM hash
         `154b7b1459b90de1b3d38fb5d8ba28e97810407b0d225ecc77e0e369019dc7a3`.
+
+## GPU Drawing
+
+- [ ] Prove the first macro-lowered GPU drawing application.
+  - [x] Lower a construct-attached Range macro into an ordinary generated
+    function that writes a self-contained WebGPU/WGSL application.
+  - [x] Add the general `scripts/range run <FILE-OR-DIR>` implementation,
+    expose it as `range run`, and make `range run GPUCanvas` generate and
+    launch its drawing with no application arguments.
+  - [x] Compile, link, and run the generated function, then validate the
+    generated JavaScript and WebGPU/WGSL artifact markers.
+  - [ ] Verify in a browser that the application obtains a WebGPU adapter and
+    presents the triangle.
+- [ ] Add a native typed GPU/runtime consumer only after its shader values,
+  resource ownership, effects, and Graph 0 scheduling boundary are explicit.

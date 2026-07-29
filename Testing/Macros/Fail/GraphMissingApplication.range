@@ -5,10 +5,13 @@ enum GraphRole {
     case application
 }
 open macro syntax(): Declaration -> Void {}
+@shared
 macro graph(
     _ role: GraphRole,
-    _ additionalRole: GraphRole?(nil)
-): Construct -> Void {}
+    _ additionalRole: GraphRole?
+): Construct -> Void { environment in
+    environment.graph.addNode(role: role, additionalRole: additionalRole)
+}
 
 compilerSourceFile\trole=project\tpath=Project/SyntaxFamily.range
 @graph(.application)

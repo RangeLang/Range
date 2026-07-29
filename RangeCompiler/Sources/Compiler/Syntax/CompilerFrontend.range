@@ -2539,18 +2539,18 @@ function compilerMacroExpansionTargetSplice(source: String, start: Int): Optiona
     let maybeDeclaration: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeDeclaration == nil { return nil }
     let declaration: RangeLexedToken(maybeDeclaration ?? compilerFallbackToken(cursor: cursor))
-    if declaration.kind != .identifier || declaration.text != String("declaration") { return nil }
+    if declaration.kind != .identifier || declaration.text != String("Declaration") { return nil }
     cursor: compilerCursorAdvance(cursor: cursor, token: declaration)
     let maybeDot3: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeDot3 == nil { return nil }
     let dot3: RangeLexedToken(maybeDot3 ?? compilerFallbackToken(cursor: cursor))
     if dot3.kind != .dot { return nil }
     cursor: compilerCursorAdvance(cursor: cursor, token: dot3)
-    let maybeSelf: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
-    if maybeSelf == nil { return nil }
-    let selfToken: RangeLexedToken(maybeSelf ?? compilerFallbackToken(cursor: cursor))
-    if selfToken.kind != .identifier || selfToken.text != String("self") { return nil }
-    return CompilerSourceRange(start: hash.start, end: selfToken.end, next: selfToken.end)
+    let maybeIdentifier: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeIdentifier == nil { return nil }
+    let identifier: RangeLexedToken(maybeIdentifier ?? compilerFallbackToken(cursor: cursor))
+    if identifier.kind != .identifier || identifier.text != String("identifier") { return nil }
+    return CompilerSourceRange(start: hash.start, end: identifier.end, next: identifier.end)
 }
 
 function compilerMacroExpansionSyntaxSplice(source: String, start: Int): Optional<CompilerSourceRange> {
@@ -8738,7 +8738,19 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
         if projection == compilerMacroEnvironmentProjectionDiagnostics() { projectionOrdinal: 1 }
         if projection == compilerMacroEnvironmentProjectionGraph() { projectionOrdinal: 2 }
         state projectionStoreValueID: Int(0 - 1)
-        if environmentStoreValueID >= 0 && environmentStoreValueID < store.kinds.count
+        if projection >= compilerMacroEnvironmentProjectionInlineBase()
+            && environmentStoreValueID >= 0 && environmentStoreValueID < store.kinds.count
+            && store.kinds.element(index: environmentStoreValueID) == compilerMacroValueKindSyntax() {
+            projectionStoreValueID: compilerMacroValueStoreAppend(
+                store: store,
+                kind: compilerMacroValueKindSyntax(),
+                typeKind: compilerIntTableValue(table: arena.mirValues, row: projectionResultValueID, column: compilerBodyMIRValueTypeColumn()),
+                typeID: compilerIntTableValue(table: arena.mirValues, row: projectionResultValueID, column: compilerBodyMIRValueTypeIDColumn()),
+                scalar: store.scalars.element(index: environmentStoreValueID),
+                firstChild: store.children.count,
+                childCount: 0
+            )
+        } else if environmentStoreValueID >= 0 && environmentStoreValueID < store.kinds.count
             && store.kinds.element(index: environmentStoreValueID) == compilerMacroValueKindEnvironment()
             && projectionOrdinal >= 0 {
             projectionStoreValueID: compilerMacroValueStoreChild(
@@ -8926,18 +8938,7 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
                     localEnd: compilerIntTableValue(table: arena.tables.members, row: projectedMemberRow, column: 7)
                 ))
                 let sourceSyntaxID: Int(store.scalars.element(index: projectionReceiverStoreValueID))
-                if !projectedSyntaxValue && (projectedMemberName == String("declaration") || projectedMemberName == String("self")) {
-                    projectionStoreValueID: compilerMacroValueStoreAppend(
-                        store: store,
-                        kind: compilerMacroValueKindSyntax(),
-                        typeKind: compilerIntTableValue(table: arena.mirValues, row: projectionResultValueID, column: compilerBodyMIRValueTypeColumn()),
-                        typeID: compilerIntTableValue(table: arena.mirValues, row: projectionResultValueID, column: compilerBodyMIRValueTypeIDColumn()),
-                        scalar: sourceSyntaxID,
-                        firstChild: store.children.count,
-                        childCount: 0
-                    )
-                    projectedSyntaxValue: true
-                } else if !projectedSyntaxValue && projectedMemberName == String("members") {
+                if !projectedSyntaxValue && projectedMemberName == String("members") {
                     let syntaxMembers: Buffer<Int>(bufferCreateInt(capacity: 8))
                     state syntaxMembersValid: Bool(true)
                     state syntaxMemberRow: Int(0)
@@ -9594,6 +9595,19 @@ function compilerMacroExecutionParameterValueText(
             }
         }
     }
+    if valueText == String("") {
+        let parameterType: String(compilerTypedSyntaxLocalText(
+            tables: tables,
+            fileID: declarationFileID,
+            localStart: compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 7),
+            localEnd: compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 8)
+        ))
+        let parameterTypeLength: Int(stringLength(value: parameterType))
+        if parameterTypeLength > 0
+            && parameterType.substring(start: parameterTypeLength - 1, end: parameterTypeLength) == String("?") {
+            valueText: String("nil")
+        }
+    }
     return valueText
 }
 
@@ -9640,6 +9654,21 @@ function compilerMacroExecutionParameterValue(
             typeID: typeID,
             scalar: compilerDeclarationNameHash(name: compilerCoreStringLiteralContent(text: valueText))
         )
+    }
+    let parameterTypeLength: Int(stringLength(value: parameterType))
+    if valueText == String("nil") && parameterTypeLength > 0
+        && parameterType.substring(start: parameterTypeLength - 1, end: parameterTypeLength) == String("?") {
+        let noChildren: Buffer<Int>(bufferCreateInt(capacity: 0))
+        let optionalValueID: Int(compilerMacroValueStoreAppendAggregate(
+            store: store,
+            kind: compilerMacroValueKindEnum(),
+            typeKind: typeKind,
+            typeID: typeID,
+            scalar: 0,
+            children: noChildren
+        ))
+        noChildren.destroy()
+        return optionalValueID
     }
     if parameterType == String("String?") {
         let optionalChildren: Buffer<Int>(bufferCreateInt(capacity: 1))

@@ -230,8 +230,10 @@ check_macro_parenthesized_boundary_rejection() {
 
 check_canonical_target_members() {
     local fixture="$REPO_ROOT/Testing/Macros/Pass/CanonicalTargetMembers.range"
+    local lowercase_fixture="$REPO_ROOT/Testing/Macros/Fail/LowercaseInlineConstructProjection.range"
     local output="$WORK_ROOT/macro-canonical-target-members.out"
     local error="$WORK_ROOT/macro-canonical-target-members.err"
+    local actual_status
 
     "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "canonical target members macro did not compile"
@@ -240,6 +242,15 @@ check_canonical_target_members() {
         || fail "canonical target members macro did not execute through one environment"
     /usr/bin/grep -Fq $'name=canonicalTargetMembersWorked\tmemberKind=let\ttype=Int' "$output" \
         || fail "canonical target members macro did not observe the deferred member collection"
+    if "$STAGE2_EXECUTABLE" compile "$lowercase_fixture" > "$output" 2> "$error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] || fail "lowercase inline construct projection exited $actual_status instead of 65"
+    [[ ! -s "$error" ]] || fail "lowercase inline construct projection wrote stderr"
+    /usr/bin/grep -Fq $'diagnosticKind=bodyInvalid' "$output" \
+        || fail "lowercase inline construct projection did not fail macro body validation"
     echo "Macros canonical-target-members: pass"
 }
 
@@ -555,11 +566,9 @@ check_canonical_declaration_envelopes() {
         'Parameter.range|identifier'
         'Let.range|macros'
         'Let.range|identifier'
-        'Let.range|type'
         'Let.range|value'
         'State.range|macros'
         'State.range|identifier'
-        'State.range|type'
         'State.range|value'
         'Binding.range|macros'
         'Binding.range|identifier'
@@ -786,8 +795,6 @@ check_storage_literals() {
     local actual_status
 
     /usr/bin/printf '%s\n' 'compilerMacroSnapshot' > "$core_bundle"
-    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/Macro/Storage.range' >> "$core_bundle"
-    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Storage.range" >> "$core_bundle"
     /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/Macro/Literal.range' >> "$core_bundle"
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Literal.range" >> "$core_bundle"
     /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Number/Signedness.range' >> "$core_bundle"

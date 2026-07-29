@@ -66,9 +66,18 @@ describe("SvelteKit routes", () => {
     expect(html).not.toContain("Spiral track");
     expect(html).not.toContain("Codability lives in the language.");
     expect(html).toContain('href="/features/macros/codability-under-100"');
+    expect(html).toContain('href="/features/macros/50-declarative-50-imperative"');
+    expect(html).toContain('href="/features/macros/somewhere-sometime-some-here"');
     expect(html).toContain("Latest posts");
+    expect(html).toContain("50% Declarative, 50% Imperative");
+    expect(html).toContain("Somewhere, Sometime, Some-here");
     expect(html).toContain("Codability under 100");
     expect(html).toContain('class="postShader');
+    const postPalettes = html.match(/data-palette="[0-3]"/g) ?? [];
+    expect(postPalettes).toHaveLength(4);
+    expect(new Set(postPalettes).size).toBe(4);
+    expect(html).not.toContain('variant="codability"');
+    expect(html).not.toContain('variant="string"');
     expect(html).not.toContain("source() →");
     expect(html).not.toContain("Program melody");
     expect(html).toContain('href="/benchmarks"');
@@ -90,9 +99,38 @@ describe("SvelteKit routes", () => {
     expect(html).toContain("Core/Macro/Codable.range");
     expect(html).not.toContain("declaration → graph query → expansion");
     expect(html).toContain('aria-label="Code inspection"');
-    expect(html).toContain('data-step="3"');
-    expect(html).toContain('data-step="4"');
+    expect(html.match(/data-step="[1-7]"/g)).toHaveLength(7);
+    expect(
+      new Set(html.match(/data-inspection-id="[^"]+"/g) ?? []).size,
+    ).toBe(7);
     expect(html).toContain('class="codabilityStage');
+  });
+
+  test("renders the declarative and imperative essay", async () => {
+    const response = await render("/features/macros/50-declarative-50-imperative");
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain("<title>50% Declarative, 50% Imperative · Range</title>");
+    expect(html).toContain(">50% Declarative, 50% Imperative</h1>");
+    expect(html).toContain('aria-label="Core/Macro/Project.range"');
+    expect(html).toContain('class="rangeSource language-range');
+    expect(html).toContain("The declarative half");
+    expect(html).toContain("The imperative half");
+  });
+
+  test("renders the environment essay", async () => {
+    const response = await render("/features/macros/somewhere-sometime-some-here");
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain("<title>Somewhere, Sometime, Some-here · Range</title>");
+    expect(html).toContain(">Somewhere, Sometime, Some-here</h1>");
+    expect(html).toContain('class="rangeSource language-range');
+    expect(html).toContain(
+      "Somewhere gives the macro a place. Sometime gives it a phase. Some place gives it a boundary.",
+    );
+    expect(html).toContain("Not expand. Environment.");
   });
 
   test("renders and filters the benchmark hierarchy", async () => {
@@ -383,17 +421,17 @@ test("uses Range-native semantic syntax roles", async () => {
   const { highlightRange } = await import("../src/lib/benchmarks");
   const highlighted = highlightRange(`macro codable(): Construct { environment in
     let fields: [@stored](
-      environment.target.declaration.members.filter(all: @stored)
+      environment.target.Declaration.members.filter(all: @stored)
     )
-    function encode(to encoder: Encoder): Result<Void, EncodingError> {
-      let container: KeyedEncodingContainer(encoder.keyedContainer())
-      #properties.map { property in
-        switch container.encode(#property.identifier, forKey: property.identifier.name) {
+    function encode<Format>(to encoder: Encoder<Format>): Result<Void, EncodingError> {
+      let container: KeyedEncodingContainer<Format>(encoder.keyedContainer())
+      #fields.map { property in
+        switch container.encode(self.#property.identifier, forKey: #property.identifier.name) {
         case .success:
           break
         }
       }
-      extension #environment.target.declaration.self {}
+      extension #environment.target.Declaration.identifier {}
       return .success(result: Void())
     }
   }`);
@@ -404,14 +442,38 @@ test("uses Range-native semantic syntax roles", async () => {
   expect(highlighted.match(/<span class="token type">@stored<\/span>/g)).toHaveLength(2);
   expect(highlighted).toContain('<span class="token function-declaration">encode</span>');
   expect(highlighted).toContain('<span class="token method">keyedContainer</span>');
-  expect(highlighted).toContain('<span class="token splice">#properties</span>');
+  expect(highlighted).toContain('<span class="token splice">#fields</span>');
   expect(highlighted).toContain(
-    '<span class="token property">self</span>',
+    '<span class="token keyword">self</span>',
   );
   expect(highlighted).toContain('<span class="token splice">#property</span>');
   expect(highlighted).toContain('<span class="token keyword">switch</span>');
   expect(highlighted).toContain('<span class="token parameter">container</span>');
   expect(highlighted).toContain('<span class="token brace">{</span>');
+});
+
+test("reuses one whitespace-safe Range source renderer", async () => {
+  const [codeBlock, rangeCode, globals] = await Promise.all([
+    readFile(
+      new URL("../src/lib/components/CodeBlock.svelte", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/lib/components/RangeCode.svelte", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  expect(codeBlock).toContain('import RangeCode from "./RangeCode.svelte"');
+  expect(codeBlock).toContain("<RangeCode {source} {syntax} />");
+  expect(codeBlock).not.toContain("highlightRange");
+  expect(rangeCode).toContain('import { escapeHtml, highlightRange } from "$lib/benchmarks"');
+  expect(rangeCode).toContain('class={`rangeSource language-${syntax}`}');
+  expect(globals).toContain(".rangeSource {\n  min-width: max-content;");
+  expect(globals).toContain(".rangeSource code {\n  font: inherit;");
+  expect(globals).toContain(".language-range .token.keyword {");
+  expect(globals).not.toContain(".codeBlockBody code > span");
 });
 
 test("keeps the concrete codability application example", async () => {
@@ -454,10 +516,10 @@ test("keeps the concrete codability application example", async () => {
   expect(codable.match(/switch container\.encode/g)).toHaveLength(1);
   expect(codable.match(/switch container\.decode/g)).toHaveLength(1);
   expect(codable).toContain(
-    "switch container.encode(#property.identifier, forKey: property.identifier.name)",
+    "switch container.encode(self.#property.identifier, forKey: #property.identifier.name)",
   );
   expect(codable).toContain(
-    "switch container.decode(#property.type.self, forKey: property.identifier.name)",
+    "switch container.decode(#property.type.self, forKey: #property.identifier.name, default: #property.value)",
   );
   expect(sheet).not.toContain("previewFooter");
   expect(sheet).not.toContain("declaration → graph query → expansion");
@@ -494,22 +556,22 @@ test("keeps the concrete codability application example", async () => {
     "const fieldQuerySection = `    let fields: [@stored](",
   );
   expect(sheet).toContain(
-    '"Construct members are values in the compile-time graph, so macros can perform type-level set operations over their declarations. Here `filter(all:)` selects the fields that participate in storage, using `@stored` as its criterion."',
+    '"Collect the stored properties from the target and filter them. `Declaration.members` exposes the target’s declared members, and `filter(all: @stored)` retains both `let` and `state` properties through their shared storage capability."',
   );
   expect(sheet).toContain("let fields: [@stored](");
   expect(sheet).toContain("members.filter(all: @stored)");
   expect(sheet).toContain('title: "Normal Range code"');
   expect(sheet).toContain('title: "Code splicing"');
   expect(sheet).toContain(
-    'const extensionMarker = "extension #environment.target.declaration.self {"',
+    'const extensionMarker = "extension #environment.target.Declaration.identifier {"',
   );
   expect(sheet).toContain("token: extensionMarker");
   expect(sheet).toContain(
     '"Everything inside the expand block is normal type-checked code."',
   );
-  expect(sheet).toContain('accent: "#environment.target.declaration.self"');
+  expect(sheet).toContain('accent: "#environment.target.Declaration.identifier"');
   expect(sheet).toContain(
-    '"extension expects a nominal value, and environment is supplying it. The # prefix splices that macro-time value into the generated extension, so the result is valid Range code."',
+    '"`Declaration.identifier` is the target construct’s canonical declared name. The # prefix splices that compile-time identifier into the generated extension."',
   );
   expect(sheet).toContain(
     '<code class="inspectionAccent">{activeInspection.accent}</code>',
@@ -530,16 +592,19 @@ test("keeps the concrete codability application example", async () => {
   expect(sheet).toContain("step: 7");
   expect(sheet).toContain('title: "Ordinary Range code, continued"');
   expect(sheet).toContain(
-    '"An ordinary Range function named `encode` takes an `Encoder`, the coding representation for a specific target, opens that target’s keyed container, and returns `Result<Void, EncodingError>`."',
+    '"The generated `encode<Format>` function keeps the encoder and keyed container on the same coding format, then returns `Result<Void, EncodingError>`."',
   );
   expect(sheet).not.toContain(
     "The body is small, so we can keep it here instead of making another macro.",
   );
   expect(sheet).toContain('title: "Decoding the construct"');
   expect(sheet).toContain(
-    '"The matching `decode` function opens the keyed container, maps the same stored fields, returns on the first `DecodingError`, and produces `self` when every field succeeds."',
+    '"The matching `decode<Format>` function decodes each stored property by its declared type and key, preserves `#property.value` as the default, assigns successful values to `self`, and returns the completed construct."',
   );
   expect(sheet).toContain("highlightInspectableLines(activePane.source)");
+  expect(sheet).toContain(
+    "`Codability chapter ${chapter.step} no longer matches Codable.range`",
+  );
   expect(sheet).toContain(
     'const expansionSection = sourceBlock(declarationSource, "environment.expand")',
   );
@@ -559,7 +624,7 @@ test("keeps the concrete codability application example", async () => {
   );
   expect(sheet).toContain('title: "Synthesizing each field"');
   expect(sheet).toContain(
-    '"Here we map the stored fields directly inside `encode`."',
+    '"For every stored property, the macro splices `self.#property.identifier` as the value and its declared identifier name as the coding key."',
   );
   expect(sheet).toContain("scopeToken: decodeFunctionSection");
   expect(sheet).toContain(
@@ -593,10 +658,10 @@ test("keeps the concrete codability application example", async () => {
     "class:chapterActive={activeInspectionID === line.inspectionID}",
   );
   expect(sheet).toContain(
-    ".chapterFiltered .lineCodeContent) {\n    opacity: 0.14;",
+    ".chapterFiltered .lineCodeContent) {\n    opacity: 0.24;",
   );
   expect(sheet).toContain(
-    ".chapterFiltered .chapterContext) {\n    opacity: 0.34;\n    filter: blur(0.3px);",
+    ".chapterFiltered .chapterContext) {\n    opacity: 0.48;\n    filter: blur(0);",
   );
   expect(sheet).toContain(
     ".chapterFiltered .chapterActive .lineCodeContent) {\n    opacity: 1;",
@@ -610,12 +675,18 @@ test("keeps the concrete codability application example", async () => {
   expect(sheet).not.toContain("line.slice(sharedWhitespace.length)");
   expect(sheet).toContain("cursor: pointer;");
   expect(sheet).toContain(".inspectSection) {\n    position: relative;");
+  expect(sheet).toContain(
+    ".chapterStart.inspectSection) {\n    position: static;",
+  );
+  expect(sheet).toContain(
+    ".codeLine) {\n    position: relative;\n    display: block;",
+  );
   expect(sheet).toContain("text-decoration: none;");
   expect(sheet).toContain(".chapterBadge)");
   expect(sheet).toContain("position: absolute;");
   expect(sheet).toContain("top: 50%;");
   expect(sheet).toContain("transform: translateY(-50%);");
-  expect(sheet).toContain("left: -2.1em;");
+  expect(sheet).toContain("left: -2.25em;");
   expect(sheet).not.toContain("margin-right: 0.65em;");
   expect(sheet).toContain("background: var(--range);");
   expect(sheet).toContain("color: white;");
@@ -650,31 +721,32 @@ test("keeps the concrete codability application example", async () => {
   expect(sheet).toContain("background: #fff;");
   expect(sheet).toContain("oklch(0.994 0.004 300)");
   expect(sheet).not.toContain("color: #9b2393;");
-  expect(sheet).toContain(
-    ".token.keyword) {\n    color: oklch(0.56 0.2 var(--range-hue));",
+  expect(sheet).toContain('class="rangeSource language-range"');
+  expect(globals).toContain(
+    ".language-range .token.keyword {\n  color: oklch(0.56 0.2 var(--range-hue));",
   );
   expect(globals).toContain("--range-hue: 252;");
   expect(globals).toContain("--range: oklch(0.65 0.2 var(--range-hue));");
-  expect(sheet).toContain("color: oklch(0.63 0.19 315);");
-  expect(sheet).toContain(
-    ".token.splice) {\n    color: oklch(0.62 0.18 290);\n    font-weight: 600;",
+  expect(globals).toContain("color: oklch(0.63 0.19 315);");
+  expect(globals).toContain(
+    ".language-range .token.splice {\n  color: oklch(0.62 0.18 290);\n  font-weight: 600;",
   );
   expect(sheet).not.toContain("color: #3f8128;");
-  expect(sheet).toContain(
-    ".token.method) {\n    color: #000000d9;\n    font-weight: 400;",
+  expect(globals).toContain(
+    ".language-range .token.method {\n  color: #000000d9;\n  font-weight: 400;",
   );
-  expect(sheet).toContain("color: oklch(0.55 0.16 190);");
-  expect(sheet).toContain(
-    ".token.property) {\n    color: oklch(0.51 0.11 190);",
+  expect(globals).toContain("color: oklch(0.55 0.16 190);");
+  expect(globals).toContain(
+    ".language-range .token.property {\n  color: oklch(0.51 0.11 190);",
   );
-  expect(sheet).toContain(".token.function-declaration),");
-  expect(sheet).toContain(".token.macro-declaration) {");
-  expect(sheet).toContain("color: #000000d9;");
-  expect(sheet).toContain(".token.type),");
-  expect(sheet).toContain(".token.type-declaration) {");
-  expect(sheet).toContain("color: #8a8f98;");
-  expect(sheet).toContain("color: #565d66;");
-  expect(sheet).toContain("font-weight: 400;");
+  expect(globals).toContain(".language-range .token.function-declaration,");
+  expect(globals).toContain(".language-range .token.macro-declaration {");
+  expect(globals).toContain("color: #000000d9;");
+  expect(globals).toContain(".language-range .token.type,");
+  expect(globals).toContain(".language-range .token.type-declaration {");
+  expect(globals).toContain("color: #8a8f98;");
+  expect(globals).toContain("color: #565d66;");
+  expect(globals).toContain("font-weight: 400;");
   expect(sheet).toContain("text-decoration: none;");
   expect(sheet).not.toContain("onpointerover={inspectFromEvent}");
   expect(sheet).toContain("overflow-y: hidden;");
@@ -709,7 +781,7 @@ test("keeps the concrete codability application example", async () => {
   expect(codable).toContain("let fields: [@stored](");
   expect(codable).toContain("members.filter(all: @stored)");
   expect(codable).toContain(
-    "function encode(to encoder: Encoder): Result<Void, EncodingError> {",
+    "function encode<Format>(to encoder: Encoder<Format>): Result<Void, EncodingError> {",
   );
   expect(codable).not.toContain("#(");
 });

@@ -1,6 +1,6 @@
 macro stored<Value>(): Construct { environment in
     let fields: [Let](
-        environment.target.declaration.members.filter(all: Let)
+        environment.target.Declaration.members.filter(all: Let)
     )
     let identifiers: [Let<Identifier>](
         fields

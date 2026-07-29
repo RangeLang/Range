@@ -1,0 +1,35 @@
+macro gpuCanvas(): Construct { environment in
+    environment.expand {
+        function writeGPUCanvas(path: String): Int {
+            return gpuCanvasHost(path: path, vertexCount: 3)
+        }
+    }
+}
+
+function gpuCanvasHost(path: String, vertexCount: Int): Int {
+    return writeFile(
+        path: path,
+        text: String("<!doctype html>\n<meta charset='utf-8'>\n<meta name='viewport' content='width=device-width,initial-scale=1'>\n<title>Range GPU Canvas</title>\n<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07111f}canvas{display:block;width:100%;height:100%}#status{position:fixed;left:18px;bottom:16px;color:#a9c7e8;font:13px ui-monospace,monospace;letter-spacing:.04em}</style>\n<canvas aria-label='A triangle drawn by WebGPU'></canvas><div id='status'>Range macro → WGSL → WebGPU</div>\n<script type='module'>\nconst canvas=document.querySelector('canvas');\nconst status=document.querySelector('#status');\nif(!navigator.gpu){status.textContent='WebGPU is unavailable in this browser';throw new Error('WebGPU unavailable')}\nconst adapter=await navigator.gpu.requestAdapter();\nif(!adapter){status.textContent='No WebGPU adapter found';throw new Error('No WebGPU adapter')}\nconst device=await adapter.requestDevice();\nconst context=canvas.getContext('webgpu');\nconst format=navigator.gpu.getPreferredCanvasFormat();\nconst shader=device.createShaderModule({code:`\nstruct VertexOutput { @builtin(position) position: vec4f, @location(0) color: vec3f }\n@vertex fn vertex(@builtin(vertex_index) index:u32)->VertexOutput {\n  var positions=array(vec2f(0.0,-0.72),vec2f(-0.72,0.62),vec2f(0.72,0.62));\n  var colors=array(vec3f(0.15,0.75,1.0),vec3f(0.48,0.35,1.0),vec3f(0.1,1.0,0.72));\n  var output:VertexOutput;\n  output.position=vec4f(positions[index],0.0,1.0);\n  output.color=colors[index];\n  return output;\n}\n@fragment fn fragment(input:VertexOutput)->@location(0) vec4f {\n  return vec4f(input.color,1.0);\n}`});\nconst pipeline=device.createRenderPipeline({layout:'auto',vertex:{module:shader},fragment:{module:shader,targets:[{format}]},primitive:{topology:'triangle-list'}});\nfunction draw(){\n  const scale=devicePixelRatio;\n  canvas.width=Math.max(1,Math.floor(innerWidth*scale));\n  canvas.height=Math.max(1,Math.floor(innerHeight*scale));\n  context.configure({device,format,alphaMode:'opaque'});\n  const encoder=device.createCommandEncoder();\n  const pass=encoder.beginRenderPass({colorAttachments:[{view:context.getCurrentTexture().createView(),clearValue:{r:0.027,g:0.067,b:0.122,a:1},loadOp:'clear',storeOp:'store'}]});\n  pass.setPipeline(pipeline);\n  pass.draw(\(vertexCount));\n  pass.end();\n  device.queue.submit([encoder.finish()]);\n}\naddEventListener('resize',draw);\ndraw();\n</script>\n")
+    )
+}
+
+@gpuCanvas
+construct Triangle {}
+
+@main {
+    if commandLineArgumentCount() == 0 {
+        let outputPath: String("/tmp/RangeGPUCanvas.html")
+        let writeStatus: Int(writeGPUCanvas(path: outputPath))
+        if writeStatus != 0 {
+            return writeStatus
+        }
+        let launchPlan: ProcessPlan(processPlan(executable: String("/usr/bin/open")))
+        let openCanvasPlan: ProcessPlan(processPlanAppendingArgument(plan: launchPlan, argument: outputPath))
+        return processPlanRun(plan: openCanvasPlan)
+    }
+    if commandLineArgumentCount() == 1 {
+        return writeGPUCanvas(path: commandLineArgument(index: 0))
+    }
+    print(value: String("usage: GPUCanvas [output.html]"))
+    return 64
+}
