@@ -1,4 +1,4 @@
-@Statement
+@statement
 @syntax
 construct Expression {
     let type: TypeReference?

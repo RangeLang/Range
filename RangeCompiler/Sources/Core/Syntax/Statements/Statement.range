@@ -1,2 +1,2 @@
-open macro Statement(): @syntax -> Void { environment in
+open macro statement(): @syntax -> Void { environment in
 }

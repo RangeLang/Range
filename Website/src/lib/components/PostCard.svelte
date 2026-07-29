@@ -47,7 +47,7 @@
   }
 
   .socialPost .postCopy {
-    padding: 180px 72px 64px;
+    padding: 180px 72px 116px;
     gap: 14px;
     background: radial-gradient(
       ellipse 94% 128% at 50% 118%,

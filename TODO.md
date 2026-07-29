@@ -679,6 +679,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - [x] Remove redundant authored `replace(with:)` members from syntax
           value declarations; replacement is supplied by the macro
           environment rather than declared independently by each shape.
+        - [x] Model generic `Assignment<Value>` as a name-directed write with
+          an `Identifier` and replacement `Value`, rather than an expression
+          container around either role.
+        - [x] Normalize the statement capability macro and every Core
+          application to lowercase `@statement`.
       - [x] Remove the separate `Generic`, `TypeGeneric`, and `ValueGeneric`
         syntax declarations; construct, enum, function, and macro generic
         clauses now collect ordinary `Parameter.Declaration` bindings.

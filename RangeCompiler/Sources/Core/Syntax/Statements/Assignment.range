@@ -1,6 +1,6 @@
-@Statement
 @syntax
-construct Assignment {
-    let target: Expression
-    let expression: Expression
+@statement
+construct Assignment<Value> {
+    let identifier: Identifier
+    let value: Value
 }
