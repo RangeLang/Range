@@ -1,0 +1,30 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
+@builtin
+construct Array<Element> {}
+
+compilerSourceFile\trole=core\tpath=Core/Macro/GenericBoundaryMaterialization.range
+macro genericBoundaryMaterialization(): Construct { environment in
+    let values: [Int]([3, 4])
+    let enabled: Bool(true)
+
+    environment.expand {
+        extension #environment.target.declaration.self {
+            function generatedCount(): Int {
+                return #values.count
+            }
+
+            function generatedValues(): [Int] {
+                return #values
+            }
+
+            function generatedEnabled(): Bool {
+                return #enabled
+            }
+        }
+    }
+}
+
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@genericBoundaryMaterialization
+construct Value {}

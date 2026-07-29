@@ -161,6 +161,15 @@ function compilerBodyArenaBuildCFGExpressionChildren(arena: CompilerBodyArena, n
             currentBlockID: receiverResult.blockID
         }
         if isMacroSyntaxFilter || isMacroCollectionTransform { return CompilerBodyCFGResult(blockID: currentBlockID, isTerminated: false, isValid: true) }
+        state interpolationOrdinal: Int(0)
+        state interpolationNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleExpansionValue(), ordinal: interpolationOrdinal))
+        while interpolationNodeID >= 0 {
+            let interpolationResult: CompilerBodyCFGResult(compilerBodyArenaBuildCFGExpression(arena: arena, nodeID: interpolationNodeID, entryBlockID: currentBlockID))
+            if !interpolationResult.isValid { return interpolationResult }
+            currentBlockID: interpolationResult.blockID
+            interpolationOrdinal: interpolationOrdinal + 1
+            interpolationNodeID: compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleExpansionValue(), ordinal: interpolationOrdinal)
+        }
         state argumentOrdinal: Int(0)
         let argumentCount: Int(compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID))
         while argumentOrdinal < argumentCount {

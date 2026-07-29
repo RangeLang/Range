@@ -2839,6 +2839,13 @@ function compilerBodyArenaResolveCapabilityExpression(arena: CompilerBodyArena, 
         if compilerIntTableValue(table: arena.nodes, row: calleeNodeID, column: 1) == compilerSyntaxKindIdentifier()
             && compilerBodyArenaNodeText(arena: arena, nodeID: calleeNodeID) == String("expand") {
             if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 0 { return 0 - 1 }
+            state boundaryOrdinal: Int(0)
+            state boundaryNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleExpansionValue(), ordinal: boundaryOrdinal))
+            while boundaryNodeID >= 0 {
+                if compilerBodyArenaResolveExpression(arena: arena, index: index, nodeID: boundaryNodeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
+                boundaryOrdinal: boundaryOrdinal + 1
+                boundaryNodeID: compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleExpansionValue(), ordinal: boundaryOrdinal)
+            }
             state targetCapabilityFound: Bool(false)
             state capabilityRow: Int(0)
             while capabilityRow < compilerIntTableRowCount(table: arena.tables.macroCapabilities) {

@@ -594,8 +594,15 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         let callTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: callResolutionRow, column: compilerBodyResolutionTypeIDColumn()))
         let callValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueCall(), typeKind: callTypeKind, typeID: compilerBodyMIRNominalTypeID(typeKind: callTypeKind, typeID: callTypeID), sourceNodeID: nodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: nodeID))
         let argumentCount: Int(compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID))
+        let expansionOperation: Bool(resolutionTargetKind == compilerBodyResolutionMacroTargetOperation() && targetID == compilerMacroTargetOperationExpand())
+        state interpolationCount: Int(0)
+        if expansionOperation {
+            while compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleExpansionValue(), ordinal: interpolationCount) >= 0 {
+                interpolationCount: interpolationCount + 1
+            }
+        }
         let ordinaryMemberFunctionCall: Bool(resolutionTargetKind == compilerBodyResolutionFunction() && compilerIntTableValue(table: arena.nodes, row: calleeNodeID, column: 1) == compilerSyntaxKindMemberRead())
-        state callOperandCount: Int(argumentCount)
+        state callOperandCount: Int(argumentCount + interpolationCount)
         if ordinaryMemberFunctionCall
             || resolutionTargetKind == compilerBodyResolutionMemberRuntimeBuiltin()
             || resolutionTargetKind == compilerBodyResolutionMacroCapability()
@@ -656,6 +663,16 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
                 return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
             }
             ordinal: ordinal + 1
+        }
+        state interpolationOrdinal: Int(0)
+        while interpolationOrdinal < interpolationCount {
+            let interpolationNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleExpansionValue(), ordinal: interpolationOrdinal))
+            let interpolationValue: CompilerBodyMIRValueResult(compilerBodyMIRBuildExpression(arena: arena, nodeID: interpolationNodeID, blockID: blockID))
+            if !interpolationValue.isValid || argumentValues.append(element: interpolationValue.valueID) != 0 {
+                argumentValues.destroy()
+                return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false)
+            }
+            interpolationOrdinal: interpolationOrdinal + 1
         }
         let callOperationID: Int(compilerIntTableRowCount(table: arena.mirOperations))
         let callFirstOperand: Int(compilerIntTableRowCount(table: arena.mirOperands))
@@ -1723,8 +1740,7 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                         || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeVoid()
                         || compilerIntTableValue(table: arena.mirValues, row: macroReceiverValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeMacroTarget() { return 320300 + operationRow }
                 } else if validationTargetID == compilerMacroTargetOperationExpand() {
-                    if macroOperandCount != 0
-                        || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeVoid() { return 320300 + operationRow }
+                    if compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeVoid() { return 320300 + operationRow }
                 } else { return 320300 + operationRow }
             } else if operationKind == compilerBodyMIROperationMacroGraphQuery() {
                 let queryKindValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 1))

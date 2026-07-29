@@ -564,6 +564,13 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - [ ] Execute compile-time predicate `map`/`filter`, nested macro calls,
         and syntax-array splicing in the Range-authored macro interpreter.
         `target.declaration.members` and exact nominal filtering are proven.
+        - [x] Materialize every supported compile-time value referenced by a
+          top-level `#expression` through the typed macro CFG/MIR boundary.
+          - [x] Persist and compose scalar, array, optional, and source-backed
+            syntax value trees without a Codable-specific splice path.
+          - [ ] Treat a mapped closure body in syntax position as a
+            source-backed syntax value so `#fields.map { ... }` can compose
+            heterogeneous generated statements through the same boundary.
         - The canonical Core source bundle now links `@syntax`,
           `@syntax?`, `[@syntax]`, and qualified nested names such as
           `Macro.Application`; `Application<Value>` defaults to `Nil`.
@@ -578,10 +585,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - [x] Add macro-time `#value.member` prefix chains at expansion
           boundaries without introducing an `@splice` macro or special
           collection operation.
-          - The compiler still accepts the seed-compatible parenthesized
-            spelling, but Core Codable and focused fixtures use canonical
-            prefix mentions such as `#properties.map` and
-            `#environment.target.declaration.self`.
+          - [x] Remove the seed-compatible `#(...)` spelling and reject it
+            structurally. Compile-time values use only prefix mentions such
+            as `#properties.map` and
+            `#environment.target.declaration.self`; no braced splice program
+            form exists.
         - [x] Materialize macro applications retained inside generated
           function bodies as child applications of the parent expansion.
           - The construct-attached Codable proof records one parent and two
@@ -821,8 +829,16 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           focused validation pass.
         - `per-function-artifacts-v1` requires a bundle on every source-key
           miss; missing or malformed artifact state is a hard failure.
-      - [ ] Persist the prerequisite syntax/graph/ABI/effect facts and store
-        unchanged LLVM fragments as immutable chunks.
+      - [ ] Persist a stable `[@syntax]` artifact graph and store unchanged
+        LLVM fragments as immutable chunks.
+        - Fingerprint each syntax value independently, including blocks,
+          functions, local and stored bindings, macro applications,
+          constructs, and enumerations. Key its phase artifacts by the syntax
+          fingerprint, compiler/seed/toolchain identity, and the fingerprints
+          of dependencies actually observed by that phase.
+        - Invalidate the changed syntax values plus their reverse dependency
+          closure. Functions remain LLVM-fragment owners, but are no longer
+          the only reusable compiler unit.
         - The exact-hit run still reparses/replans the complete compiler and
           reconstructs an approximately 8.3 MB artifact/module String.
           Dense instance indexing and unchecked string slices preserved the

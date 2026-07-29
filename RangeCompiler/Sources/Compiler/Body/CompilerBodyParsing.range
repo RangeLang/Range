@@ -1023,6 +1023,13 @@ function compilerBodyArenaParsedPostfixIsApplication(arena: CompilerBodyArena, n
     return compilerIntTableValue(table: arena.nodes, row: nodeID, column: 1) == compilerSyntaxKindApplication()
 }
 
+function compilerBodyExpansionBoundary(source: String, start: Int, isExtensionTarget: Bool): Optional<CompilerSourceRange> {
+    if isExtensionTarget {
+        return compilerMacroExpansionTargetSplice(source: source, start: start)
+    }
+    return compilerMacroExpansionSyntaxSplice(source: source, start: start)
+}
+
 function compilerBodyArenaParseAssignmentStatement(arena: CompilerBodyArena, start: Int, limit: Int, ordinal: Int): CompilerBodyParseResult {
     let target: CompilerBodyParseResult(compilerBodyArenaParsePostfix(arena: arena, start: start, limit: limit))
     if !target.isValid { return target }
@@ -1052,6 +1059,43 @@ function compilerBodyArenaAppendExpandStatement(arena: CompilerBodyArena, statem
     let applicationNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindApplication(), ordinal: 0, start: statementStart, end: expansion.next, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
     if calleeNodeID < 0 || applicationNodeID < 0
         || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: applicationNodeID, childNodeID: calleeNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: statementStart) }
+    state cursor: Int(expansion.start)
+    state boundaryOrdinal: Int(0)
+    state previousWasExtension: Bool(false)
+    while cursor < expansion.end {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
+        if maybeToken == nil { return compilerBodyParseFailure(index: cursor) }
+        let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: cursor))
+        if token.start >= expansion.end {
+            cursor: expansion.end
+        } else if token.kind == .macroAttribute {
+            let application: CompilerMacroApplicationParseResult(compilerCoreParseMacroApplicationParts(source: arena.tables.sourceStore.source, macroToken: token))
+            if !application.isValid { return compilerBodyParseFailure(index: token.start) }
+            let parts: CompilerMacroApplicationParts(compilerCoreOwnedMacroApplicationPartsCopy(parts: application.parts))
+            if parts.nextIndex > expansion.end { return compilerBodyParseFailure(index: token.start) }
+            previousWasExtension: false
+            cursor: parts.nextIndex
+        } else if token.kind == .hash {
+            let maybeBoundary: Optional<CompilerSourceRange>(compilerBodyExpansionBoundary(source: arena.tables.sourceStore.source, start: token.start, isExtensionTarget: previousWasExtension))
+            if maybeBoundary == nil { return compilerBodyParseFailure(index: token.start) }
+            let boundary: CompilerSourceRange(maybeBoundary ?? CompilerSourceRange(start: token.start, end: token.end, next: token.end))
+            if boundary.end > expansion.end { return compilerBodyParseFailure(index: boundary.end) }
+            if !previousWasExtension {
+                let value: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: token.end, limit: boundary.end, minimumPrecedence: 0))
+                if !value.isValid || value.nextIndex != boundary.end
+                    || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: applicationNodeID, childNodeID: value.nodeID, role: compilerSyntaxRoleExpansionValue(), ordinal: boundaryOrdinal) != 0 {
+                    return compilerBodyParseFailure(index: token.start)
+                }
+                boundaryOrdinal: boundaryOrdinal + 1
+            }
+            previousWasExtension: false
+            cursor: boundary.next
+        } else {
+            previousWasExtension: false
+            if token.kind == .keyword && token.text == String("extension") { previousWasExtension: true }
+            cursor: token.end
+        }
+    }
     return compilerBodyParseSuccess(nodeID: applicationNodeID, nextIndex: expansion.next)
 }
 

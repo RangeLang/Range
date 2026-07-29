@@ -1,0 +1,17 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/Macro/ParenthesizedBoundaryValue.range
+macro parenthesizedBoundaryValue(): Construct { environment in
+    let enabled: Bool(true)
+
+    environment.expand {
+        extension #environment.target.declaration.self {
+            function generatedEnabled(): Bool {
+                return #(enabled)
+            }
+        }
+    }
+}
+
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@parenthesizedBoundaryValue
+construct Value {}
