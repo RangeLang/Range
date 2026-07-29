@@ -725,6 +725,15 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - [x] Delete the orphaned authored `Background` statement; concurrency
           will use an explicit execution model rather than this obsolete body
           wrapper.
+        - [x] Delete the orphaned authored `For` statement and stop reserving
+          `for`; collection traversal states intent through operations such as
+          `map`, `filter`, `each`, and `reduce`, while `while` remains the
+          explicit general control form.
+          - [x] Reject the removed `for element in elements` spelling at its
+            exact identifier-led entry-body syntax boundary.
+          - [ ] Complete ordinary runtime collection operations through the
+            existing closure, generic specialization, and ownership work;
+            compile-time macro transforms do not prove the runtime surface.
         - [x] Generalize `Return<Value>` over its carried value; an absent
           return value defaults the generic payload to `Nil`.
       - [x] Remove the separate `Generic`, `TypeGeneric`, and `ValueGeneric`

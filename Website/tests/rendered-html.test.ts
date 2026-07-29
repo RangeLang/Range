@@ -538,6 +538,7 @@ test("uses Range-native semantic syntax roles", async () => {
   expect(highlighted).toContain('<span class="token keyword">switch</span>');
   expect(highlighted).toContain('<span class="token parameter">container</span>');
   expect(highlighted).toContain('<span class="token brace">{</span>');
+  expect(highlightRange("for")).toBe('<span class="token variable">for</span>');
 });
 
 test("reuses one whitespace-safe Range source renderer", async () => {

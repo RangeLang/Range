@@ -579,9 +579,6 @@ function isRangeFlowKeyword(value: String): Bool {
     if value == String("extension") {
         return true
     }
-    if value == String("for") {
-        return true
-    }
     if value == String("in") {
         return true
     }

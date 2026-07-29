@@ -1,7 +1,0 @@
-@statement
-@syntax
-construct For {
-    let pattern: Expression
-    let sequence: Expression
-    let body: Block
-}

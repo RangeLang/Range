@@ -84,7 +84,7 @@ export function benchmarkFromLeaf(subcategory: string, leaf: any): Benchmark {
 const rangeKeywords = new Set([
   "background", "binding", "break", "builder", "capture", "case", "closed",
   "construct", "continue", "core", "default", "derived", "else", "enum",
-  "extension", "for", "function", "get", "if", "in", "infix", "init", "let",
+  "extension", "function", "get", "if", "in", "infix", "init", "let",
   "macro", "main", "marker", "namespace", "nil", "on", "open", "operator",
   "package", "postfix", "precedencegroup", "prefix", "protocol", "return",
   "self", "set", "state", "switch", "var", "while",

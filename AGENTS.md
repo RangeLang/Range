@@ -40,6 +40,19 @@
 - A passing gate proves only that gate and its prerequisites. Do not report it
   as proof that later gates ran or passed.
 
+## Collection Iteration
+
+- Range has no `for` statement. Do not introduce one or reserve `for` as a
+  control-flow keyword.
+- Collection traversal should state its intent through operations such as
+  `map`, `filter`, `each`, and `reduce`, as each operation is implemented and
+  proven.
+- `while` remains the explicit control-flow form for condition-driven
+  iteration, mutation, and irregular short-circuiting.
+- Do not infer runtime collection support from the compile-time macro
+  collection transforms; each surface needs its own focused fixture and
+  supported proof command.
+
 ## Deferred Unified Generic Parameters Review
 
 Do not change generic syntax or semantics as part of the current Buffer work.

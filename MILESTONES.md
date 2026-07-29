@@ -212,6 +212,9 @@ Outcome:
 - Core language fixtures cover constructs, enums, generics, collections,
   macros, ownership, control flow, functions, and errors as one supported
   surface.
+- Collection traversal uses intent-bearing operations such as `map`, `filter`,
+  `each`, and `reduce`; Range has no `for` statement, and `while` remains the
+  explicit condition-driven control form.
 - Array, Set, Dictionary, Sequence, and Collection share canonical Buffer-based
   storage and capability rules rather than special compiler cases.
 - Diagnostics include stable source paths and spans instead of

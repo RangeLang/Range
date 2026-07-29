@@ -133,6 +133,33 @@ check_range_native_project_macro() {
     echo "ProjectDefaults range-native-project: pass"
 }
 
+check_removed_for_statement_rejected() {
+    local fixture="$REPO_ROOT/Testing/ControlFlow/Fail/RemovedForStatement.range"
+    local output="$WORK_ROOT/control-flow-removed-for.out"
+    local error="$WORK_ROOT/control-flow-removed-for.err"
+    local actual_status
+
+    if "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+
+    [[ "$actual_status" -eq 65 ]] \
+        || fail "removed for statement exited $actual_status instead of 65"
+    [[ ! -s "$error" ]] \
+        || fail "removed for statement rejection wrote stderr"
+    /usr/bin/grep -Fqx \
+        $'compilerError\tkind=invalidEntryReachability\tstage=1043' \
+        "$output" \
+        || fail "removed for statement did not fail at the exact entry-body syntax boundary"
+    if /usr/bin/grep -Fq 'define ' "$output"; then
+        fail "removed for statement emitted LLVM"
+    fi
+
+    echo "ControlFlow removed-for-statement-rejected: pass"
+}
+
 check_macro_environment() {
     local fixture="$REPO_ROOT/Testing/Macros/Pass/Environment.range"
     local output="$WORK_ROOT/macro-environment.out"
@@ -1098,6 +1125,7 @@ main_root_value() {
     resolve_stage2_compiler 0
     echo "checkpoint root-value:stage2-cache-$STAGE2_CACHE_STATUS: pass"
     echo "checkpoint root-value:stage2-resolved: pass"
+    check_removed_for_statement_rejected
     check_macro_environment
     check_non_generic_stored_assignment
     check_legacy_macro_modifiers_rejected
