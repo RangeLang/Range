@@ -1,7 +1,7 @@
-# Human-editable Xcode-style palette for Range.
+# Human-editable Codability palette for Range.
 #
-# This file is intentionally human-editable. The importer can refresh Xcode-
-# derived color/font fields while preserving Range support metadata.
+# This file is intentionally human-editable. Its supported semantic roles match
+# the syntax treatment used by the website's Codability code preview.
 #
 # Style field notes:
 # - XcodeSyntax is the source plist key in Xcode's .xccolortheme files.
@@ -29,7 +29,7 @@
   Dark: "#FFFFFFD9"
   Light: "#000000D9"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
   Notes: "Default unclassified source text."
@@ -41,11 +41,11 @@
   Supported: true
   ZedNative: true
   Needs: []
-  Dark: "#6C7986FF"
+  Dark: "#8D9AA6FF"
   Light: "#5D6C79FF"
   FontSize: 12
-  FontWeight: "medium"
-  FontStyle: "normal"
+  FontWeight: "normal"
+  FontStyle: "italic"
   TextDecoration:
   Notes: "Line comments."
 
@@ -107,10 +107,10 @@
   Supported: true
   ZedNative: true
   Needs: []
-  Dark: "#FC6A5DFF"
-  Light: "#C41A16FF"
+  Dark: "#FFFFFFD9"
+  Light: "#000000D9"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
   Notes: "String delimiters and contents."
@@ -139,10 +139,10 @@
   Supported: true
   ZedNative: true
   Needs: []
-  Dark: "#D0BF69FF"
+  Dark: "#9D8CFFFF"
   Light: "#1C00CFFF"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
   Notes: "Integer and float literals."
@@ -239,8 +239,8 @@
   Supported: true
   ZedNative: true
   Needs: []
-  Dark: "#FC5FA3FF"
-  Light: "#9B2393FF"
+  Dark: "#55A8FFFF"
+  Light: "#0073E4FF"
   FontSize: 12
   FontWeight: "bold"
   FontStyle: "normal"
@@ -289,10 +289,10 @@
   Needs:
     - attribute-tokenization
     - semantic-token-mapping
-  Dark: "#BF8555FF"
-  Light: "#815F03FF"
+  Dark: "#E392FFFF"
+  Light: "#B35ED6FF"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
   Notes: "'@main' is currently keyword-colored; future attributes can be distinct."
@@ -304,10 +304,10 @@
   Supported: true
   ZedNative: true
   Needs: []
-  Dark: "#5DD8FFFF"
-  Light: "#0B4F79FF"
+  Dark: "#70D9D1FF"
+  Light: "#008C86FF"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
   Notes: "Construct, protocol, enum, and similar declaration names."
@@ -321,10 +321,10 @@
   Needs:
     - declaration-category-policy
     - semantic-token-mapping
-  Dark: "#41A1C0FF"
-  Light: "#0F68A0FF"
+  Dark: "#FFFFFFD9"
+  Light: "#000000D9"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
   Notes: "Generic declaration bucket; not currently emitted directly."
@@ -460,10 +460,10 @@
   Supported: true
   ZedNative: true
   Needs: []
-  Dark: "#A167E6FF"
-  Light: "#6C36A9FF"
+  Dark: "#FFFFFFD9"
+  Light: "#000000D9"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
   Notes: "Free function declarations and calls."
@@ -475,10 +475,10 @@
   Supported: true
   ZedNative: true
   Needs: []
-  Dark: "#A167E6FF"
-  Light: "#6C36A9FF"
+  Dark: "#FFFFFFD9"
+  Light: "#000000D9"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
   Notes: "Member calls."
@@ -507,10 +507,10 @@
   Supported: true
   ZedNative: true
   Needs: []
-  Dark: "#D0A8FFFF"
-  Light: "#3900A0FF"
+  Dark: "#70D9D1FF"
+  Light: "#008C86FF"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
   Notes: "Type references."
@@ -522,10 +522,10 @@
   Supported: true
   ZedNative: true
   Needs: []
-  Dark: "#A167E6FF"
-  Light: "#6C36A9FF"
+  Dark: "#62C5BEFF"
+  Light: "#007974FF"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
   Notes: "Properties and member accesses."
@@ -537,10 +537,10 @@
   Supported: true
   ZedNative: true
   Needs: []
-  Dark: "#A167E6FF"
-  Light: "#6C36A9FF"
+  Dark: "#FFFFFFD9"
+  Light: "#000000D9"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
   Notes: "Local variable declarations and uses."
@@ -552,10 +552,10 @@
   Supported: true
   ZedNative: true
   Needs: []
-  Dark: "#A167E6FF"
-  Light: "#6C36A9FF"
+  Dark: "#FFFFFFD9"
+  Light: "#000000D9"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
   Notes: "Parameters."
@@ -582,10 +582,10 @@
   Supported: true
   ZedNative: false
   Needs: []
-  Dark: "#A167E6FF"
-  Light: "#6C36A9FF"
+  Dark: "#FFFFFFD9"
+  Light: "#000000D9"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
   Notes: "Macro declaration names."
@@ -597,13 +597,43 @@
   Supported: true
   ZedNative: false
   Needs: []
-  Dark: "#A167E6FF"
-  Light: "#6C36A9FF"
+  Dark: "#B6A0FFFF"
+  Light: "#886DE9FF"
   FontSize: 12
-  FontWeight: "medium"
+  FontWeight: "semibold"
   FontStyle: "normal"
   TextDecoration:
   Notes: "Macro application sigils and names."
+
+- Name: "Punctuation"
+  XcodeCategory: "Punctuation"
+  XcodeSyntax:
+  ZedStyle: "punctuation"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#8B949EFF"
+  Light: "#8A8F98FF"
+  FontSize: 12
+  FontWeight: "normal"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Soft structural punctuation matching the Codability preview."
+
+- Name: "Braces"
+  XcodeCategory: "Braces"
+  XcodeSyntax:
+  ZedStyle: "punctuation.bracket"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#A7B0BAFF"
+  Light: "#565D66FF"
+  FontSize: 12
+  FontWeight: "normal"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Darker structural braces matching the Codability preview."
 
 - Name: "Heading"
   XcodeCategory: "Heading"

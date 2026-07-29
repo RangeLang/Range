@@ -1,14 +1,13 @@
-@syntax
+@stored
+@syntax($macros let $identifier: $value)
 @property
 @field
-@stored
 @member
-construct Let<T> {
+construct Let<Value> {
   let macros: [Macro.Application]
   let identifier: Identifier
-  let type: TypeReference
-  let value: Expression?
+  let value: Value
 
-  function initializer(transform: (T) -> T)
-  function getter(transform: (T) -> T)
+  function initializer(transform: (Value) -> Value)
+  function getter(transform: (Value) -> Value)
 }

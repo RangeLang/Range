@@ -84,6 +84,16 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [x] Hide the code viewport’s horizontal scrollbar chrome while retaining
       its horizontal scrolling behavior.
 
+## Editor
+
+  - [x] Replace the generated Zed Xcode-style syntax theme with the website
+    Codability palette.
+    - [x] Keep neutral functions, declarations, variables, and strings while
+      carrying across Range-blue keywords, cyan types and properties, magenta
+      attributes, violet macro splices, and differentiated punctuation.
+    - [x] Generate named light and dark Codability variants and point the Range
+      Zed extension at the renamed theme artifact.
+
 ## RangeStore
 
   - [x] Implement a first Range-authored durable document store.
@@ -680,6 +690,20 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           non-stored `@field` members.
         - `members.filter(all: @stored)` resolves the declared macro family and
           selects members through their annotated syntax nominal.
+      - [ ] Make property constructs the canonical authored syntax IR.
+        - [x] Express `Let<Value>` and `State<Value>` directly as attached
+          macro applications, an identifier, and one value-producing
+          initialization edge.
+        - [x] Author `@stored` as a generic structural validator requiring one
+          `identifier: Identifier` field and one `value: Value` field.
+          - `Array.filter(named:)` is the authored identifier-query surface;
+            compiler execution remains part of the template-engine slice.
+        - [ ] Teach `@syntax` `$field` templates to parse, validate, and render
+          the same construct representation, including plural macro
+          applications.
+        - [ ] Route boundary-value splicing through the destination template
+          instead of compiler-owned `identifier`, `type`, and `value`
+          projection cases.
       - [x] Preserve written stored-member defaults through Codable synthesis.
         - [x] Capture `let` and `state` initializer syntax in the canonical
           member graph and include it in declaration fingerprints.

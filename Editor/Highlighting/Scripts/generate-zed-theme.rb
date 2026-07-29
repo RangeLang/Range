@@ -7,14 +7,14 @@ require "optparse"
 require "yaml"
 
 ROOT = File.expand_path("../../..", __dir__)
-DEFAULT_PALETTE = File.join(ROOT, "Editor/Highlighting/xcode-style-palette.yaml")
+DEFAULT_PALETTE = File.join(ROOT, "Editor/Highlighting/codability-palette.yaml")
 DEFAULT_SEMANTIC_RULES = File.join(ROOT, "Editor/Highlighting/semantic_token_rules.zed.json")
 DEFAULT_BASE_THEME = File.join(ROOT, "Editor/Highlighting/zed-one-base.json")
-DEFAULT_OUTPUT = File.expand_path("../RangeZed/themes/range-xcode.json", ROOT)
+DEFAULT_OUTPUT = File.expand_path("../RangeZed/themes/range-codability.json", ROOT)
 
 THEME_NAMES = {
-  "dark" => "Range Xcode Dark",
-  "light" => "Range Xcode Light"
+  "dark" => "Range Codability Dark",
+  "light" => "Range Codability Light"
 }.freeze
 
 FONT_WEIGHTS = {
@@ -126,7 +126,7 @@ end
 
 theme = {
   "$schema" => "https://zed.dev/schema/themes/v0.2.0.json",
-  "name" => "Range Xcode",
+  "name" => "Range Codability",
   "author" => "Range Team",
   "themes" => themes
 }

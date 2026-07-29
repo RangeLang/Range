@@ -1,15 +1,14 @@
-@syntax
+@stored
+@syntax($macros state $identifier: $value)
 @property
 @field
-@stored
 @member
-construct State<T> {
+construct State<Value> {
     let macros: [Macro.Application]
     let identifier: Identifier
-    let type: TypeReference
-    let value: Expression?
+    let value: Value
 
-    function initializer(transform: (T) -> T)
-    function getter(transform: (T) -> T)
-    function setter(transform: (T) -> T)
+    function initializer(transform: (Value) -> Value)
+    function getter(transform: (Value) -> Value)
+    function setter(transform: (Value) -> Value)
 }

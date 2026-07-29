@@ -7,7 +7,6 @@ require "open3"
 require "yaml"
 
 ROOT = File.expand_path("../../..", __dir__)
-DEFAULT_PALETTE = File.join(ROOT, "Editor/Highlighting/xcode-style-palette.yaml")
 DEFAULT_DARK_THEME = File.expand_path("~/Library/Developer/Xcode/UserData/FontAndColorThemes/Default (Dark).xccolortheme")
 DEFAULT_LIGHT_THEME = File.expand_path("~/Library/Developer/Xcode/UserData/FontAndColorThemes/Default (Light).xccolortheme")
 
@@ -89,7 +88,7 @@ HEADER = <<~YAML
 YAML
 
 options = {
-  palette: DEFAULT_PALETTE,
+  palette: nil,
   dark: DEFAULT_DARK_THEME,
   light: DEFAULT_LIGHT_THEME
 }
@@ -100,6 +99,8 @@ OptionParser.new do |parser|
   parser.on("--dark PATH", "Dark .xccolortheme file") { |path| options[:dark] = path }
   parser.on("--light PATH", "Light .xccolortheme file") { |path| options[:light] = path }
 end.parse!
+
+abort("--palette is required; do not overwrite codability-palette.yaml with Xcode values") unless options[:palette]
 
 def load_plist(path)
   stdout, stderr, status = Open3.capture3("plutil", "-convert", "json", "-o", "-", path)
