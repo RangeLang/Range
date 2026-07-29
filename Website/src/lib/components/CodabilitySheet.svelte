@@ -1097,9 +1097,6 @@ construct User {
   :global(.codePreviewCard .lineCodeContent) {
     opacity: 1;
     filter: blur(0);
-    transition:
-      opacity 180ms ease-out,
-      filter 180ms ease-out;
   }
 
   :global(.codePreviewCard .chapterFiltered .lineCodeContent) {

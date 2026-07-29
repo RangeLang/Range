@@ -714,6 +714,19 @@ test("keeps the concrete codability application example", async () => {
   expect(codable).not.toContain("#(");
 });
 
+test("switches story chapters without fading code lines", async () => {
+  const sheet = await readFile(
+    new URL("../src/lib/components/CodabilitySheet.svelte", import.meta.url),
+    "utf8",
+  );
+
+  expect(sheet).toContain(
+    ".chapterFiltered .chapterActive .lineCodeContent) {\n    opacity: 1;",
+  );
+  expect(sheet).not.toContain("opacity 180ms ease-out");
+  expect(sheet).not.toContain("filter 180ms ease-out");
+});
+
 test("holds a symmetric plateau around the codability focus stage", async () => {
   const {
     codabilityFocusProgress,
