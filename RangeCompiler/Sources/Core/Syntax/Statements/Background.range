@@ -1,5 +1,0 @@
-@statement
-@syntax
-construct Background {
-    let body: Block
-}

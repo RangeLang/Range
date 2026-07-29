@@ -99,6 +99,24 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     check-build-plan`; it passed before the latest overlapping edits.
     `scripts/range check-root-value` has not passed.
 
+## Concurrency
+
+- [ ] Add the first structured-concurrency compiler checkpoint without
+  restoring the obsolete `background` statement.
+  - [x] Delete the orphaned authored `Background` syntax declaration; it had
+    no compiler consumer or focused fixture.
+  - [ ] Outline and execute one noncapturing closure as an ordinary runtime
+    callable, independent of the existing collection-transform and macro
+    closure paths.
+  - [ ] Represent an explicitly joined `Task<Value>` over that callable;
+    settle the authored start/join syntax only after the callable proof.
+  - [ ] Prove two independent tasks execute and join deterministically in a
+    focused `Testing/Concurrency/Pass/` fixture.
+  - [ ] Reject mutable captures at the task boundary until ownership transfer
+    and isolation are modeled and proven.
+  - Existing `runProcessBatch` support is bounded host-process parallelism,
+    not proof of in-language task or shared-memory concurrency.
+
 ## Website
 
   - [x] Publish separate “50% Declarative, 50% Imperative” and “Somewhere,
@@ -684,6 +702,13 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           container around either role.
         - [x] Normalize the statement capability macro and every Core
           application to lowercase `@statement`.
+        - [x] Delete the authored `ExpressionStatement` wrapper; a value
+          carrying `@statement` is already a statement.
+        - [x] Delete the orphaned authored `Background` statement; concurrency
+          will use an explicit execution model rather than this obsolete body
+          wrapper.
+        - [x] Generalize `Return<Value>` over its carried value; an absent
+          return value defaults the generic payload to `Nil`.
       - [x] Remove the separate `Generic`, `TypeGeneric`, and `ValueGeneric`
         syntax declarations; construct, enum, function, and macro generic
         clauses now collect ordinary `Parameter.Declaration` bindings.

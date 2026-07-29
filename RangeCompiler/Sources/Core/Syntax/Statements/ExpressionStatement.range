@@ -1,5 +1,0 @@
-@statement
-@syntax
-construct ExpressionStatement {
-    let expression: Expression
-}
