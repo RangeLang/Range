@@ -1,6 +1,6 @@
 compilerMacroSnapshot
 compilerSourceFile\trole=core\tpath=Core/Macro/Member.range
-open macro member(): Declaration | Member -> Void {}
+macro member(): Declaration | Member -> Void {}
 compilerSourceFile\trole=project\tpath=Project/Model.range
 construct Model {
     @member

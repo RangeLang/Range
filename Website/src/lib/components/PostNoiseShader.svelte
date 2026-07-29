@@ -1,12 +1,18 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import {
+    measurePostContrast,
+    type PostContrastPalette,
+  } from "$lib/post-contrast";
 
   let {
     palette = 0,
     still = false,
+    oncontrast,
   }: {
     palette?: number;
     still?: boolean;
+    oncontrast?: (palette: PostContrastPalette) => void;
   } = $props();
 
   let canvas: HTMLCanvasElement;
@@ -236,8 +242,13 @@
     const timeLocation = context.getUniformLocation(program, "u_time");
     const paletteLocation = context.getUniformLocation(program, "u_palette");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sampleFramebuffer = context.createFramebuffer();
+    const sampleTexture = context.createTexture();
     let frame = 0;
     let start = performance.now();
+    let lastMeasurement = -Infinity;
+    let sampleWidth = 0;
+    let sampleHeight = 0;
 
     const resize = () => {
       const density = Math.min(window.devicePixelRatio || 1, 2);
@@ -249,20 +260,101 @@
       }
     };
 
-    const render = (now: number) => {
-      resize();
-      context.viewport(0, 0, canvas.width, canvas.height);
+    const draw = (
+      width: number,
+      height: number,
+      time: number,
+      framebuffer: WebGLFramebuffer | null,
+    ) => {
+      context.bindFramebuffer(context.FRAMEBUFFER, framebuffer);
+      context.viewport(0, 0, width, height);
       context.useProgram(program);
       context.bindBuffer(context.ARRAY_BUFFER, positionBuffer);
       context.enableVertexAttribArray(positionLocation);
       context.vertexAttribPointer(positionLocation, 2, context.FLOAT, false, 0, 0);
-      context.uniform2f(resolutionLocation, canvas.width, canvas.height);
-      context.uniform1f(
-        timeLocation,
-        still || reducedMotion.matches ? 0 : (now - start) / 1000,
-      );
+      context.uniform2f(resolutionLocation, width, height);
+      context.uniform1f(timeLocation, time);
       context.uniform1f(paletteLocation, palette);
       context.drawArrays(context.TRIANGLES, 0, 6);
+    };
+
+    const measureContrast = (time: number) => {
+      if (!sampleFramebuffer || !sampleTexture) return;
+      const nextWidth = 32;
+      const nextHeight = Math.max(
+        8,
+        Math.min(32, Math.round(nextWidth * (canvas.height / canvas.width))),
+      );
+
+      if (sampleWidth !== nextWidth || sampleHeight !== nextHeight) {
+        sampleWidth = nextWidth;
+        sampleHeight = nextHeight;
+        context.bindTexture(context.TEXTURE_2D, sampleTexture);
+        context.texParameteri(
+          context.TEXTURE_2D,
+          context.TEXTURE_MIN_FILTER,
+          context.NEAREST,
+        );
+        context.texParameteri(
+          context.TEXTURE_2D,
+          context.TEXTURE_MAG_FILTER,
+          context.NEAREST,
+        );
+        context.texParameteri(
+          context.TEXTURE_2D,
+          context.TEXTURE_WRAP_S,
+          context.CLAMP_TO_EDGE,
+        );
+        context.texParameteri(
+          context.TEXTURE_2D,
+          context.TEXTURE_WRAP_T,
+          context.CLAMP_TO_EDGE,
+        );
+        context.texImage2D(
+          context.TEXTURE_2D,
+          0,
+          context.RGBA,
+          sampleWidth,
+          sampleHeight,
+          0,
+          context.RGBA,
+          context.UNSIGNED_BYTE,
+          null,
+        );
+        context.bindFramebuffer(context.FRAMEBUFFER, sampleFramebuffer);
+        context.framebufferTexture2D(
+          context.FRAMEBUFFER,
+          context.COLOR_ATTACHMENT0,
+          context.TEXTURE_2D,
+          sampleTexture,
+          0,
+        );
+      }
+
+      draw(sampleWidth, sampleHeight, time, sampleFramebuffer);
+      const pixels = new Uint8Array(sampleWidth * sampleHeight * 4);
+      context.readPixels(
+        0,
+        0,
+        sampleWidth,
+        sampleHeight,
+        context.RGBA,
+        context.UNSIGNED_BYTE,
+        pixels,
+      );
+      oncontrast?.(measurePostContrast(pixels, sampleWidth, sampleHeight));
+    };
+
+    const render = (now: number) => {
+      resize();
+      const time = still || reducedMotion.matches ? 0 : (now - start) / 1000;
+      draw(canvas.width, canvas.height, time, null);
+
+      if (now - lastMeasurement >= 125) {
+        measureContrast(time);
+        lastMeasurement = now;
+        context.bindFramebuffer(context.FRAMEBUFFER, null);
+      }
       canvas.dataset.rendered = "true";
 
       if (!still && !reducedMotion.matches) {
@@ -286,6 +378,8 @@
       if (frame) window.cancelAnimationFrame(frame);
       observer.disconnect();
       reducedMotion.removeEventListener("change", restart);
+      context.deleteFramebuffer(sampleFramebuffer);
+      context.deleteTexture(sampleTexture);
       context.deleteBuffer(positionBuffer);
       context.deleteProgram(program);
       context.deleteShader(vertexShader);

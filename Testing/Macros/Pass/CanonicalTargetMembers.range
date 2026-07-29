@@ -4,8 +4,8 @@ compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
 construct Array<Element> {}
 
 compilerSourceFile\trole=core\tpath=Core/Macro/CanonicalTargetMembers.range
-open macro member(): Declaration | Member -> Void {}
-open macro stored(): Construct -> Void {}
+macro member(): Declaration | Member -> Void {}
+macro stored(): Construct -> Void {}
 
 construct Identifier {}
 
@@ -27,7 +27,7 @@ construct Binding {}
 macro canonicalTargetMembers(): Construct { environment in
     let memberCount: Int(environment.target.Declaration.members.filter(all: @stored).count)
     if memberCount == 3 {
-        environment.expand {
+        #environment {
             extension #environment.target.Declaration.identifier {
                 let canonicalTargetMembersWorked: Int
             }

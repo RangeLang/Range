@@ -3,7 +3,7 @@ compilerSourceFile\trole=core\tpath=Core/Macro/ParenthesizedBoundaryValue.range
 macro parenthesizedBoundaryValue(): Construct { environment in
     let enabled: Bool(true)
 
-    environment.expand {
+    #environment {
         extension #environment.target.Declaration.identifier {
             function generatedEnabled(): Bool {
                 return #(enabled)

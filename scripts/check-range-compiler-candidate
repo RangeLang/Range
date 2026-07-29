@@ -4038,7 +4038,7 @@ write_macro_generated_function_bundle() {
         /usr/bin/printf '%b\n' \
             'compilerSourceFile\trole=foundation\tpath=Foundation/UnrelatedGenerated.range' \
             'macro unrelatedGenerated(): Construct { environment in' \
-            '    environment.expand {' \
+            '    #environment {' \
             '        function unrelatedFunction(): Int {' \
             '            return 11' \
             '        }' \
@@ -4050,13 +4050,13 @@ write_macro_generated_function_bundle() {
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=core\tpath=Core/Registrable.range' \
         'macro registrable(): Construct { environment in' \
-        '    environment.expand {' \
+        '    #environment {' \
         '        function globalFunction(input: Int): Int {' \
         '            let adjusted: Int(input + 2)' \
         '            return adjusted + 1' \
         '        }' \
         '    }' \
-        '    environment.expand {' \
+        '    #environment {' \
         '        extension #environment.target.Declaration.identifier {' \
         '            function memberFunction(delta: Int): Int {' \
         '                return delta + 3' \
@@ -4120,7 +4120,7 @@ write_macro_registrable_bundle() {
         /usr/bin/printf '%b\n' \
             'compilerSourceFile\trole=foundation\tpath=Foundation/UnrelatedRegistrable.range' \
             'macro unrelatedRegistrable(): Construct { environment in' \
-            '    environment.expand {' \
+            '    #environment {' \
             '        function unrelatedRegistrableFunction(): Int {' \
             '            return 11' \
             '        }' \
@@ -4183,7 +4183,7 @@ write_macro_registrable_root_storage_bundle() {
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=core\tpath=Core/RootStorage.range' \
         'macro rootStorage(): Construct { environment in' \
-        '    environment.expand {' \
+        '    #environment {' \
         '        let rootValue: Int' \
         '    }' \
         '}' \
@@ -4202,7 +4202,7 @@ write_macro_registrable_malformed_splice_bundle() {
         'compilerMacroSnapshot' \
         'compilerSourceFile\trole=core\tpath=Core/MalformedMemberSplice.range' \
         'macro malformedMember(): Construct { environment in' \
-        '    environment.expand {' \
+        '    #environment {' \
         '        extension #(environment.target.Declaration.bad) {' \
         '            let registrationSeed: Int' \
         '        }' \
@@ -4355,7 +4355,7 @@ write_macro_generated_function_malformed_extension_bundle() {
         'compilerMacroSnapshot' \
         'compilerSourceFile\trole=core\tpath=Core/MalformedGeneratedExtension.range' \
         'macro malformed(): Construct { environment in' \
-        '    environment.expand {' \
+        '    #environment {' \
         '        extension #(environment.target.Declaration.bad) {' \
         '            function memberFunction(): Int {' \
         '                return 7' \
@@ -4395,7 +4395,7 @@ audit_macro_generated_function() {
     /usr/bin/cmp -s "$snapshot_output" "$snapshot_repeat" || fail "$stage_label generated function snapshot was not deterministic"
     local generated_function_count
     generated_function_count="$(/usr/bin/grep -F 'macroGraphGeneratedFunction' "$snapshot_output" | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
-    [[ "$generated_function_count" -eq 2 ]] || fail "$stage_label each environment.expand block did not emit exactly one generated function set"
+    [[ "$generated_function_count" -eq 2 ]] || fail "$stage_label each #environment block did not emit exactly one generated function set"
     /usr/bin/grep -Fq $'macroGraphGeneratedFunction\trow=0\tkind=function\townerSyntaxID=-1\tplacement=0\tlexicalParentOrdinal=-1\tparentFingerprint=0:0\tname=globalFunction\treturnType=Int\tmacroDeclarationRow=' "$snapshot_output" || fail "$stage_label root generated function was not module-level"
     /usr/bin/grep -E -q $'macroGraphGeneratedFunction\trow=1\tkind=function\townerSyntaxID=[0-9]+\tplacement=1\tlexicalParentOrdinal=[0-9]+\tparentFingerprint=[0-9]+:[0-9]+\tname=memberFunction\treturnType=Int\tmacroDeclarationRow=' "$snapshot_output" || fail "$stage_label extension generated function was not target-owned"
     /usr/bin/grep -F 'macroGraphGeneratedFunction' "$snapshot_output" \

@@ -20,13 +20,6 @@ export type Benchmark = {
 export const data: any = benchmarkData;
 export const githubUrl = "https://github.com/georgetchelidze/Range/tree/development";
 
-export const baselineBenchmarks: Benchmark[] = [
-  { name: "Loops", scale: "20m iterations", axisMax: 80, results: [["C++", 61.3], ["C", 61.4], ["Rust", 61.9], ["Swift", 62.5], ["Range", 66.3], ["Go", 79.6]] },
-  { name: "Noise", scale: "50m samples", axisMax: 90, results: [["C", 70.5], ["C++", 70.9], ["Go", 78.9], ["Range", 82.4], ["Rust", 82.9], ["Swift", 82.9]] },
-  { name: "Function Calls", scale: "20m iterations", axisMax: 80, results: [["Go", 64.2], ["C++", 67.4], ["C", 67.5], ["Rust", 67.9], ["Swift", 68.5], ["Range", 72.3]] },
-  { name: "Strings", scale: "100k appends", axisMax: 500, results: [["C++", 3.6], ["Rust", 3.6], ["Go", 4.3], ["C", 4.4], ["Swift", 4.8], ["Range", 491.2]], note: "Range peak memory: 5.3 GB · peers: 1.8–4.2 MB" },
-];
-
 export const improvedStringsBenchmark: Benchmark = {
   name: "Strings",
   scale: "100k appends",

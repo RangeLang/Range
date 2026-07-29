@@ -4,9 +4,9 @@ compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
 construct Array<Element> {}
 
 compilerSourceFile\trole=core\tpath=Core/Macro/CodableConstructCollection.range
-open macro member(): Declaration | Member -> Void {}
-open macro syntax(): Declaration -> Void {}
-open macro stored(): Construct -> Void {}
+macro member(): Declaration | Member -> Void {}
+macro syntax(): Declaration -> Void {}
+macro stored(): Construct -> Void {}
 
 construct Identifier {
     let name: String
@@ -35,7 +35,7 @@ construct Binding {}
 
 macro codableEncodeBody(properties: [@stored]) -> Int { environment in
     if properties.count == 2 {
-        environment.expand {
+        #environment {
             let encodedProperties: Int(2)
         }
     }
@@ -44,7 +44,7 @@ macro codableEncodeBody(properties: [@stored]) -> Int { environment in
 
 macro codableDecodeBody(properties: [@stored]) -> Int { environment in
     if properties.count == 2 {
-        environment.expand {
+        #environment {
             let decodedProperties: Int(2)
         }
     }
@@ -57,7 +57,7 @@ macro codable(): Construct { environment in
     )
 
     if properties.count == 2 {
-        environment.expand {
+        #environment {
             extension #environment.target.Declaration.identifier {
                 function encode(to encoder: Encoder): Int {
                     @codableEncodeBody(properties: #properties)

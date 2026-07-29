@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Post } from "$lib/posts";
+  import type { PostContrastPalette } from "$lib/post-contrast";
   import PostNoiseShader from "$lib/components/PostNoiseShader.svelte";
 
   let {
@@ -11,6 +12,12 @@
     still?: boolean;
     social?: boolean;
   } = $props();
+
+  let contrast = $state<PostContrastPalette>();
+
+  const applyContrast = (measured: PostContrastPalette) => {
+    contrast = measured;
+  };
 </script>
 
 <a
@@ -18,8 +25,11 @@
   class:socialPost={social}
   href={post.href}
   aria-label={post.cardTitle}
+  data-foreground-contrast={contrast?.contrast.toFixed(2)}
+  data-measured-background={contrast?.background}
+  style={`--post-foreground: ${contrast?.foreground ?? "oklch(0.18 0.04 245)"}; --post-foreground-muted: ${contrast?.mutedForeground ?? "oklch(0.38 0.025 245)"}`}
 >
-  <PostNoiseShader palette={post.palette} {still} />
+  <PostNoiseShader palette={post.palette} {still} oncontrast={applyContrast} />
   <span class="postCopy">
     <small>{post.category}</small>
     <strong>{post.cardTitle}</strong>
@@ -36,7 +46,7 @@
     overflow: hidden;
     isolation: isolate;
     background: var(--paper);
-    color: var(--ink);
+    color: var(--post-foreground);
     text-decoration: none;
   }
 

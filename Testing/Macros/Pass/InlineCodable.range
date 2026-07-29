@@ -4,9 +4,9 @@ compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
 construct Array<Element> {}
 
 compilerSourceFile\trole=core\tpath=Core/Macro/InlineCodableSurface.range
-open macro member(): Declaration | Member -> Void {}
-open macro syntax(): Declaration -> Void {}
-open macro stored(): Construct -> Void {}
+macro member(): Declaration | Member -> Void {}
+macro syntax(): Declaration -> Void {}
+macro stored(): Construct -> Void {}
 
 construct Identifier {
     let name: String

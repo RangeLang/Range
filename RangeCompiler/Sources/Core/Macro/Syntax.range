@@ -1,1 +1,1 @@
-open macro syntax(): Declaration -> Void {}
+macro syntax(): Declaration -> Void {}

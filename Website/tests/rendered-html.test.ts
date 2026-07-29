@@ -180,6 +180,11 @@ describe("SvelteKit routes", () => {
     expect(html).toContain("4 of 15 leaves run");
     expect(html).toContain("Range passed 4");
     expect(html).not.toContain("Depth 20 and 21");
+    expect(html).not.toContain("Compiler status");
+    expect(html).not.toContain("4 of 6 tests emitted and passed");
+    expect(html).not.toContain("<range-status-list");
+    expect(html).not.toContain("Initial benchmark");
+    expect(html).not.toContain('id="baseline-');
     expect(html).toContain('href="/benchmarks/history"');
   });
 
@@ -223,6 +228,9 @@ describe("SvelteKit routes", () => {
     expect(html).toContain("Measurements");
     expect(html).toContain("Peak memory");
     expect(html).toContain("Run procedure");
+    expect(html).toContain('class="procedureBranch"');
+    expect(html).toContain('class="procedureTrunk"');
+    expect(html).not.toContain('class="procedureConnector"');
     expect(html).toContain('class="token keyword">state</span>');
   });
 

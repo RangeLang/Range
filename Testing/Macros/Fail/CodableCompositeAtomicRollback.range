@@ -3,8 +3,8 @@ compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
 construct Array<Element> {}
 
 compilerSourceFile\trole=core\tpath=Core/Macro/CodableCompositeAtomicRollback.range
-open macro member(): Declaration | Member -> Void {}
-open macro syntax(): Declaration -> Void {}
+macro member(): Declaration | Member -> Void {}
+macro syntax(): Declaration -> Void {}
 
 construct Identifier {
     let name: String
@@ -24,7 +24,7 @@ construct Let {
 
 macro validEncodeBody(properties: [Let]) -> Int { environment in
     if properties.count == 2 {
-        environment.expand {
+        #environment {
             let encodedProperties: Int(2)
         }
     }
@@ -33,7 +33,7 @@ macro validEncodeBody(properties: [Let]) -> Int { environment in
 
 macro invalidDecodeBody(properties: [Let]) -> Int { environment in
     if properties.count == 2 {
-        environment.expand {
+        #environment {
             break
         }
     }
@@ -45,7 +45,7 @@ macro codable(): Construct { environment in
         environment.target.Declaration.members.filter(all: Let)
     )
 
-    environment.expand {
+    #environment {
         extension #environment.target.Declaration.identifier {
             function encode(to encoder: Encoder): Int {
                 @validEncodeBody(properties: #properties)

@@ -49,7 +49,6 @@ range-update-page,
 range-benchmark-chart,
 range-code-block,
 range-procedure-graph,
-range-status-list,
 range-site-footer {
   display: block;
 }
@@ -537,7 +536,7 @@ range-spline-nav a:focus-visible {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--paper);
-  color: var(--ink);
+  color: var(--post-foreground, var(--ink));
   text-decoration: none;
 }
 
@@ -570,28 +569,30 @@ range-spline-nav a:focus-visible {
 }
 
 .postCopy small {
-  color: oklch(0.28 0.025 250);
+  color: var(--post-foreground, oklch(0.28 0.025 250));
   font-family: var(--font-geist-mono), monospace;
   font-size: 9px;
   font-variant-ligatures: none;
   font-weight: 650;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  transition: color 160ms linear;
 }
 
 .postCopy strong {
-  color: oklch(0.26 0.025 240);
+  color: var(--post-foreground, oklch(0.26 0.025 240));
   font-size: clamp(20px, 2.4vw, 30px);
   font-weight: 520;
   letter-spacing: -0.045em;
   line-height: 1.05;
-  mix-blend-mode: multiply;
+  transition: color 160ms linear;
 }
 
 .postCopy > span {
-  color: oklch(0.46 0.01 240);
+  color: var(--post-foreground, oklch(0.26 0.025 240));
   font-size: 12px;
   line-height: 1.45;
+  transition: color 160ms linear;
 }
 
 .primaryAction {
@@ -901,16 +902,6 @@ range-spline-nav a:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-.statusLabel {
-  margin: 0 0 12px;
-  color: var(--range);
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .benchmarkProject {
   padding-bottom: 40px;
   border-bottom: 1px solid var(--line);
@@ -1022,15 +1013,15 @@ range-spline-nav a:focus-visible {
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-columns: minmax(126px, 0.9fr) 34px minmax(218px, 1.55fr) 34px minmax(132px, 0.95fr) 34px minmax(132px, 0.95fr) 34px minmax(132px, 0.95fr);
-  align-items: center;
-  min-height: 208px;
-  padding: 22px;
+  justify-items: center;
+  gap: 30px;
+  min-height: 0;
+  padding: 30px 24px;
   overflow: hidden;
   border-radius: 10px;
   background:
-    radial-gradient(circle at 42% 50%, color-mix(in oklch, var(--range), transparent 85%) 0, transparent 29%),
-    linear-gradient(135deg, color-mix(in oklch, var(--range), var(--paper) 96%), var(--paper) 62%);
+    radial-gradient(circle at 50% 32%, color-mix(in oklch, var(--range), transparent 91%) 0, transparent 38%),
+    linear-gradient(180deg, color-mix(in oklch, var(--range), var(--paper) 97%), var(--paper) 72%);
 }
 
 .procedureGraph::before {
@@ -1046,38 +1037,30 @@ range-spline-nav a:focus-visible {
 }
 
 .procedureNode,
-.procedureBuilds {
+.procedureBranch li {
   position: relative;
   min-width: 0;
   border: 1px solid color-mix(in oklch, var(--line), var(--range) 16%);
-  border-radius: 10px;
-  background: color-mix(in oklch, var(--paper), transparent 8%);
-  box-shadow: 0 12px 30px color-mix(in oklch, var(--range), transparent 94%);
-  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  border-radius: 8px;
+  background: var(--paper);
 }
 
 .procedureNode {
   display: grid;
-  gap: 5px;
-  padding: 15px;
-}
-
-.procedureNode:hover,
-.procedureBuilds:hover {
-  border-color: color-mix(in oklch, var(--range), var(--line) 34%);
-  box-shadow: 0 16px 36px color-mix(in oklch, var(--range), transparent 88%);
-  transform: translateY(-2px);
+  width: min(220px, 100%);
+  gap: 4px;
+  padding: 13px 15px;
 }
 
 .procedureNode strong,
-.procedureBuilds strong {
+.procedureBranch strong {
   font-size: 13px;
   font-weight: 550;
   letter-spacing: -0.015em;
 }
 
 .procedureNode small,
-.procedureBuilds li span,
+.procedureBranch li span,
 .procedureIndex {
   color: var(--muted);
   font-family: var(--font-geist-mono), monospace;
@@ -1091,82 +1074,107 @@ range-spline-nav a:focus-visible {
   text-transform: uppercase;
 }
 
-.procedureConnector {
-  position: relative;
-  height: 1px;
-  background: color-mix(in oklch, var(--line), var(--range) 22%);
-}
-
-.procedureConnector::after {
+.procedureSource::after {
   position: absolute;
-  top: -2px;
-  right: -1px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--range);
-  box-shadow: 0 0 12px color-mix(in oklch, var(--range), transparent 20%);
+  top: 100%;
+  left: 50%;
+  width: 1px;
+  height: 31px;
+  background: color-mix(in oklch, var(--line), var(--range) 24%);
   content: "";
 }
 
-.procedureConnector span {
-  position: absolute;
-  top: -1px;
-  left: 10%;
-  width: 38%;
-  height: 3px;
-  border-radius: 999px;
-  background: color-mix(in oklch, var(--range), transparent 30%);
+.procedureBranch {
+  position: relative;
+  width: min(760px, 100%);
+  text-align: center;
 }
 
-.procedureBuilds {
-  padding: 12px;
-}
-
-.procedureBuilds > .procedureIndex {
+.procedureBranch > .procedureIndex {
   display: block;
-  margin: 0 0 9px 3px;
+  margin-bottom: 21px;
 }
 
-.procedureBuilds ul {
+.procedureBranch ul {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.procedureBuilds li {
+.procedureBranch ul::before {
+  position: absolute;
+  top: -11px;
+  right: calc((100% / 12) - 1px);
+  left: calc((100% / 12) - 1px);
+  height: 1px;
+  background: color-mix(in oklch, var(--line), var(--range) 24%);
+  content: "";
+}
+
+.procedureBranch ul::after {
+  position: absolute;
+  top: -21px;
+  left: 50%;
+  width: 1px;
+  height: 10px;
+  background: color-mix(in oklch, var(--line), var(--range) 24%);
+  content: "";
+}
+
+.procedureBranch li {
+  position: relative;
   display: grid;
   gap: 2px;
   min-width: 0;
-  padding: 8px 9px;
-  border-radius: 7px;
-  background: color-mix(in oklch, var(--range), var(--paper) 94%);
+  padding: 9px 10px;
+  text-align: left;
 }
 
-.procedureBuilds li:last-child {
+.procedureBranch li::before {
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  width: 1px;
+  height: 10px;
+  background: color-mix(in oklch, var(--line), var(--range) 24%);
+  content: "";
+}
+
+.procedureBranch li:last-child {
+  border-color: color-mix(in oklch, var(--range), var(--line) 42%);
   background: color-mix(in oklch, var(--range), var(--paper) 87%);
 }
 
-.procedureSamples {
-  display: flex;
-  gap: 4px;
-  margin-top: 5px;
+.procedureBranch::after {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  width: 1px;
+  height: 30px;
+  background: color-mix(in oklch, var(--line), var(--range) 24%);
+  content: "";
 }
 
-.procedureSamples i {
+.procedureTrunk {
+  position: relative;
   display: grid;
-  width: 15px;
-  height: 15px;
-  place-items: center;
-  border-radius: 50%;
-  background: color-mix(in oklch, var(--range), var(--paper) 84%);
-  color: var(--range);
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 8px;
-  font-style: normal;
+  justify-items: center;
+  gap: 28px;
+  width: 100%;
+}
+
+.procedureTrunk::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: color-mix(in oklch, var(--line), var(--range) 24%);
+  content: "";
 }
 
 .procedureResult {
@@ -1370,10 +1378,6 @@ range-spline-nav a:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-.benchmarkSection {
-  margin-top: 72px;
-}
-
 .chartGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1392,8 +1396,7 @@ range-spline-nav a:focus-visible {
   margin-bottom: 18px;
 }
 
-.chartHeader h2,
-.status h2 {
+.chartHeader h2 {
   margin: 0;
   font-size: 20px;
   font-weight: 500;
@@ -1527,41 +1530,6 @@ range-spline-nav a:focus-visible {
   display: grid;
   gap: 12px;
   margin-top: 12px;
-}
-
-.status {
-  display: grid;
-  gap: 28px;
-  margin-top: 72px;
-  padding: 32px 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-
-.statusList {
-  display: grid;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.statusList li {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  align-items: center;
-  column-gap: 7px;
-}
-
-.statusIcon {
-  display: block;
-  width: 16px;
-  height: 16px;
-  color: var(--error);
-}
-
-.statusList strong {
-  font-weight: 500;
 }
 
 .benchmarkDetailHeader {
@@ -1914,32 +1882,22 @@ footer {
   }
 
   .procedureGraph {
-    grid-template-columns: 1fr;
-    gap: 0;
-    padding: 16px;
+    gap: 26px;
+    padding: 24px 14px;
   }
 
-  .procedureConnector {
-    justify-self: center;
-    width: 1px;
-    height: 24px;
+  .procedureBranch ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .procedureConnector::after {
-    top: auto;
-    right: -2px;
-    bottom: -1px;
+  .procedureBranch ul::before,
+  .procedureBranch li::before {
+    display: none;
   }
 
-  .procedureConnector span {
-    top: 10%;
-    left: -1px;
-    width: 3px;
-    height: 38%;
-  }
-
-  .procedureBuilds ul {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .procedureBranch::after {
+    bottom: -26px;
+    height: 26px;
   }
 
   main {
@@ -1988,11 +1946,6 @@ footer {
     flex: 0 0 auto;
   }
 
-  .status {
-    gap: 24px;
-    margin-top: 52px;
-  }
-
   .improvementPlot {
     width: 100%;
   }
@@ -2005,8 +1958,7 @@ footer {
   .contextSection,
   .improvementSection,
   .scalingSection,
-  .updatesSection,
-  .benchmarkSection {
+  .updatesSection {
     margin-top: 52px;
   }
 

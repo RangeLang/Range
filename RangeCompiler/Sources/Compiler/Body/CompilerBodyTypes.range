@@ -2788,7 +2788,7 @@ function compilerBodyArenaExpressionUsesMacroCapability(arena: CompilerBodyArena
     if expressionKind == compilerSyntaxKindApplication() {
         let calleeNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleCallee(), ordinal: 0))
         if calleeNodeID >= 0 && compilerIntTableValue(table: arena.nodes, row: calleeNodeID, column: 1) == compilerSyntaxKindIdentifier()
-            && compilerBodyArenaNodeText(arena: arena, nodeID: calleeNodeID) == String("expand") { return true }
+            && compilerBodyArenaNodeText(arena: arena, nodeID: calleeNodeID) == String("#environment") { return true }
     }
     let rootNodeID: Int(compilerBodyArenaMacroCapabilityRootNode(arena: arena, nodeID: nodeID))
     if rootNodeID < 0 { return false }
@@ -2822,7 +2822,6 @@ function compilerBodyArenaExpressionUsesMacroCapability(arena: CompilerBodyArena
         || operationName == String("graph")
         || operationName == String("omit")
         || operationName == String("memberCount")
-        || operationName == String("expand")
         || compilerMacroDiagnosticsOperationForName(name: operationName) > 0
         || compilerMacroGraphOperationForName(name: operationName) > 0
 }
@@ -2905,7 +2904,7 @@ function compilerBodyArenaResolveCapabilityExpression(arena: CompilerBodyArena, 
         let calleeNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleCallee(), ordinal: 0))
         if calleeNodeID < 0 { return 0 - 1 }
         if compilerIntTableValue(table: arena.nodes, row: calleeNodeID, column: 1) == compilerSyntaxKindIdentifier()
-            && compilerBodyArenaNodeText(arena: arena, nodeID: calleeNodeID) == String("expand") {
+            && compilerBodyArenaNodeText(arena: arena, nodeID: calleeNodeID) == String("#environment") {
             if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 0 { return 0 - 1 }
             state boundaryOrdinal: Int(0)
             state boundaryNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: nodeID, role: compilerSyntaxRoleExpansionValue(), ordinal: boundaryOrdinal))

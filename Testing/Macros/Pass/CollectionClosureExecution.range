@@ -4,8 +4,8 @@ compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
 construct Array<Element> {}
 
 compilerSourceFile\trole=core\tpath=Core/Macro/CollectionClosureExecution.range
-open macro member(): Declaration | Member -> Void {}
-open macro syntax(): Declaration -> Void {}
+macro member(): Declaration | Member -> Void {}
+macro syntax(): Declaration -> Void {}
 
 construct Identifier {
     let name: String
@@ -39,7 +39,7 @@ macro collectionClosureExecution(): Construct { environment in
         }
     )
     if names.count == 1 {
-        environment.expand {
+        #environment {
             extension #environment.target.Declaration.identifier {
                 let collectionClosureExecutionWorked: Int
             }

@@ -62,6 +62,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] Remove declaration-owned `replace` methods from
     `Construct.Application` and `Function.Application`; syntax values describe
     applications rather than owning graph mutation.
+  - [x] Make `#environment { ... }` the canonical macro expansion boundary,
+    remove `Macro.Environment.expand`, migrate authored macros and fixtures,
+    and reject the legacy callable spelling.
   - The focused rerun now passes canonical target members, typed collection
     closures, inline mapped syntax, stored defaults, the actual Core Codable
     surface, composite rollback, and typed parameter defaults. Root-value next
@@ -119,6 +122,12 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 
 ## Website
 
+  - [x] Render the benchmark run procedure as a minimal top-down tree, with
+    generated source branching into six optimized builds before the shared
+    run, validation, and median-result trunk.
+  - [x] Remove the stale static compiler-status block from the benchmarks page.
+  - [x] Remove the initial static benchmark so feature charts come only from
+    the latest generated benchmark artifact.
   - [x] Publish separate “50% Declarative, 50% Imperative” and “Somewhere,
     Sometime, Some-here” essays with dedicated routes, homepage entries, and
     rendered-route assertions.
@@ -149,6 +158,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       animated OKLCH shader cards, led by `Codability under 100`.
       - [x] Generate a distinct shader palette for every post from an unbounded
         golden-angle OKLCH seed instead of reusing named color variants.
+      - [x] Measure each animated shader card in real time and derive a
+        complementary text palette that maintains at least 4.5:1 contrast in
+        the composited copy region.
   - [x] Modulate the continuous Cardinality hum’s low-pass cutoff from homepage
     scroll proximity without changing its pitch, rhythm, or volume.
   - [x] Add a homepage codability sheet sourced from the Range-authored macro.
@@ -264,7 +276,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
             - [x] Keep every numbered chapter badge fully opaque while its
               surrounding source line is dimmed.
             - [x] Give nested lines a secondary context opacity when a parent
-              block chapter such as `environment.expand` is selected.
+              block chapter such as `#environment` is selected.
             - [x] Apply the same brace-delimited context treatment to the macro
               declaration, extension, and property-helper chapters.
               - [x] Keep the two-line chapter 5 `encode` function setup fully
@@ -306,7 +318,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - [x] Lead with inspector explanations, place accented syntax beneath
         them, and remove Phase/Produces metadata from every inspector.
         - [x] Separate the concepts cleanly: chapter 3 owns ordinary validated
-          Range code inside `environment.expand`, while chapter 4 owns only the
+          Range code inside `#environment`, while chapter 4 owns only the
           highlighted `#environment.target.Declaration.identifier` splice.
           - [x] Explain that `extension` receives the target's canonical
             declaration identifier as a spliced compile-time value.
@@ -459,7 +471,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       `let` members of one canonical `ProjectDefaults` construct.
     - [ ] Make `#environment { ... }` the executable contextual expansion
       boundary, then migrate the remaining authored macros from
-      `environment.expand { ... }`.
+      `#environment { ... }`.
     - [ ] Materialize the `system.defaults` environment projection and prove
       generated defaults plus preservation of explicit project overrides.
   - [ ] Resolve emitted `ProjectDefaults` artifacts as compiler configuration
@@ -537,7 +549,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         target and diagnostics/graph query views; the compiler records one
         capability handle and models each view as an explicit environment
         projection rather than an ordinary local symbol.
-        - [x] Make `environment.expand { ... }` the only tracked authored
+        - [x] Make `#environment { ... }` the only tracked authored
           expansion boundary and lower it through the environment's expansion
           authority into the existing transactional graph-delta operation.
           - Core Project, Core Codable, Foundation macros, and focused fixtures
@@ -603,7 +615,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           - [ ] Execute enum payloads, closures, and syntax-valued returns.
       - [x] Preserve a compile-time construct result created after a
         side-effecting conditional branch join.
-        - `environment.expand` is an ordinary delta-producing capability call instead of an
+        - `#environment` is an ordinary delta-producing capability boundary instead of an
           implicit return at the end of every nested block; the authored
           function-boundary `return` now carries the result through the shared
           continuation.
@@ -697,9 +709,15 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - [x] Remove redundant authored `replace(with:)` members from syntax
           value declarations; replacement is supplied by the macro
           environment rather than declared independently by each shape.
-        - [x] Model generic `Assignment<Value>` as a name-directed write with
-          an `Identifier` and replacement `Value`, rather than an expression
-          container around either role.
+        - [x] Model non-generic `Assignment` as the canonical `@stored`
+          key/value pair: `identifier` is key slot 0 and the `@stored`-typed
+          `value` is slot 1.
+          - [x] Author its captured form directly as
+            `@syntax { $identifier: $value }`.
+          - [ ] Enforce the shared `identifier + @stored value` key/value shape for every
+            `@stored` construct through canonical member metadata; `stored`
+            is now a non-generic structural role rather than an unexecuted generic
+            validator body.
         - [x] Normalize the statement capability macro and every Core
           application to lowercase `@statement`.
         - [x] Delete the authored `ExpressionStatement` wrapper; a value
@@ -712,6 +730,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - [x] Remove the separate `Generic`, `TypeGeneric`, and `ValueGeneric`
         syntax declarations; construct, enum, function, and macro generic
         clauses now collect ordinary `Parameter.Declaration` bindings.
+        - [x] Remove authored `open macro` and `closed macro` modifiers for
+          now; every declaration uses the single `macro` spelling and the
+          legacy forms are rejected.
         - A bare parameter is an unconstrained compile-time value binding, an
           optional type constrains that value, and an optional default is any
           syntax value; a type is one possible compile-time value.
@@ -740,7 +761,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - [ ] Execute `@syntax` by matching its captured template closure
         against the annotated construct's members, materializing a canonical
         value, and using the same template to render values consumed by
-        `environment.expand`.
+        `#environment`.
         - [x] Delete the obsolete Foundation `syntax` implementation that
           expanded a second macro through lowercase target projections; the
           replacement must consume the first-class closure directly.
@@ -836,7 +857,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - [x] Materialize macro applications retained inside generated
           function bodies as child applications of the parent expansion.
           - The construct-attached Codable proof records one parent and two
-            child invocations. Each helper now executes `environment.expand`
+            child invocations. Each helper now executes `#environment`
             and produces a source-backed syntax artifact instead of remaining
             unexecuted template text.
           - [x] Make `Block` the canonical ordered body syntax relationship
@@ -880,7 +901,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
               attributes while inheriting the parent construct as their
               `Macro.Environment.target`.
           - [x] Execute ready children in dependency order, recursively
-            flatten their `environment.expand` artifact values, and join them
+            flatten their `#environment` artifact values, and join them
             into the parent's uncommitted graph delta.
             - [x] Execute ready scalar-result children in source order and
               persist their recursively materialized return values.

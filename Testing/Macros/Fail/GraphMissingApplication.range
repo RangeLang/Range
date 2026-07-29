@@ -4,7 +4,7 @@ enum GraphRole {
     case declaration
     case application
 }
-open macro syntax(): Declaration -> Void {}
+macro syntax(): Declaration -> Void {}
 @shared
 macro graph(
     _ role: GraphRole,

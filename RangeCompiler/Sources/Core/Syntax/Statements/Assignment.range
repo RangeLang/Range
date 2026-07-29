@@ -1,6 +1,9 @@
-@syntax
+@stored
+@syntax {
+    $identifier: $value
+}
 @statement
-construct Assignment<Value> {
+construct Assignment {
     let identifier: Identifier
-    let value: Value
+    let value: @stored
 }

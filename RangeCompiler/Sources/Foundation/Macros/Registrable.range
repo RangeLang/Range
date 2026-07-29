@@ -1,5 +1,5 @@
 macro registrable(): Construct { environment in
-    environment.expand {
+    #environment {
         extension #environment.target.declaration.self {
             let registrationSeed: Int
             state registrationCount: Int

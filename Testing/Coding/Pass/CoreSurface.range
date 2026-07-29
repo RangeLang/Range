@@ -9,7 +9,7 @@ enum Result<Value, Failure> {
 }
 
 compilerSourceFile\trole=core\tpath=Core/Coding/Encoding.range
-open macro encoding(): Construct -> Void {}
+macro encoding(): Construct -> Void {}
 
 compilerSourceFile\trole=core\tpath=Core/Coding/CodingError.range
 construct CodingPath {

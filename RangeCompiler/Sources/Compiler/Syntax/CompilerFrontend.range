@@ -178,8 +178,6 @@ function compilerSyntaxKindFunction(): Int {
 }
 
 function compilerSyntaxMacroVisibilityDefault(): Int { return 0 }
-function compilerSyntaxMacroVisibilityOpen(): Int { return 1 }
-function compilerSyntaxMacroVisibilityClosed(): Int { return 2 }
 
 function compilerMacroEdgeAppliesTo(): Int { return 1 }
 function compilerMacroEdgeResolvedBy(): Int { return 2 }
@@ -2314,7 +2312,7 @@ function compilerMacroDiagnosticAppend(tables: CompilerSyntaxTables, code: Int, 
 }
 
 function compilerSyntaxAppendMacroDeclaration(tables: CompilerSyntaxTables, fileID: Int, visibility: Int, ordinal: Int, authoredStart: Int, authoredEnd: Int, nameStart: Int, nameEnd: Int, genericStart: Int, genericEnd: Int, parameterStart: Int, parameterEnd: Int, targetStart: Int, targetEnd: Int, expansionStart: Int, expansionEnd: Int, bodyStart: Int, bodyEnd: Int, acceptedTargetKind: Int, firstParameterRow: Int, parameterCount: Int, capabilityHeaderStart: Int, capabilityHeaderEnd: Int, executableBodyStart: Int, executableBodyEnd: Int, capabilitySetID: Int, capabilityFingerprint: CompilerFingerprint, identity: CompilerFingerprint): Int {
-    if visibility < compilerSyntaxMacroVisibilityDefault() || visibility > compilerSyntaxMacroVisibilityClosed()
+    if visibility != compilerSyntaxMacroVisibilityDefault()
         || !compilerSyntaxDeclarationRangesAreValid(tables: tables, fileID: fileID, declarationStart: authoredStart, declarationEnd: authoredEnd, nameStart: nameStart, nameEnd: nameEnd, bodyStart: bodyStart, bodyEnd: bodyEnd)
         || !compilerSyntaxOptionalGlobalRangeIsValid(tables: tables, fileID: fileID, start: genericStart, end: genericEnd)
         || !compilerSyntaxGlobalRangeIsValid(tables: tables, fileID: fileID, start: parameterStart, end: parameterEnd)
@@ -2725,23 +2723,18 @@ function compilerMacroExpansionDeclarationBody(source: String, start: Int, limit
     return nil
 }
 
-function compilerMacroTargetDeclarationExpansion(source: String, start: Int): Optional<CompilerSourceRange> {
+function compilerMacroEnvironmentExpansion(source: String, start: Int): Optional<CompilerSourceRange> {
     state cursor: CompilerTokenCursor(source: $source, index: start)
+    let maybeHash: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeHash == nil { return nil }
+    let hash: RangeLexedToken(maybeHash ?? compilerFallbackTokenAt(index: cursor.index))
+    if hash.kind != .hash { return nil }
+    cursor: compilerCursorAdvance(cursor: cursor, token: hash)
     let maybeEnvironment: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeEnvironment == nil { return nil }
     let environment: RangeLexedToken(maybeEnvironment ?? compilerFallbackTokenAt(index: cursor.index))
-    if environment.kind != .identifier { return nil }
+    if environment.kind != .identifier || environment.text != String("environment") { return nil }
     cursor: compilerCursorAdvance(cursor: cursor, token: environment)
-    let maybeDot1: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
-    if maybeDot1 == nil { return nil }
-    let dot1: RangeLexedToken(maybeDot1 ?? compilerFallbackTokenAt(index: cursor.index))
-    if dot1.kind != .dot { return nil }
-    cursor: compilerCursorAdvance(cursor: cursor, token: dot1)
-    let maybeExpand: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
-    if maybeExpand == nil { return nil }
-    let expand: RangeLexedToken(maybeExpand ?? compilerFallbackTokenAt(index: cursor.index))
-    if expand.kind != .identifier || expand.text != String("expand") { return nil }
-    cursor: compilerCursorAdvance(cursor: cursor, token: expand)
     let maybeBrace: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
     if maybeBrace == nil { return nil }
     let brace: RangeLexedToken(maybeBrace ?? compilerFallbackTokenAt(index: cursor.index))
@@ -2838,7 +2831,7 @@ function compilerTypedSyntaxCaptureMacroExpansionTemplates(source: String, table
         if token.start >= end { return captured }
         state hasExpansion: Bool(false)
         state expansion: CompilerSourceRange(start: token.end, end: token.end, next: token.end)
-        let maybeExpansion: Optional<CompilerSourceRange>(compilerMacroTargetDeclarationExpansion(source: source, start: token.start))
+        let maybeExpansion: Optional<CompilerSourceRange>(compilerMacroEnvironmentExpansion(source: source, start: token.start))
         if maybeExpansion != nil {
             expansion: maybeExpansion ?? expansion
             hasExpansion: true
@@ -2884,24 +2877,14 @@ function compilerTypedSyntaxCaptureMacroExpansionTemplates(source: String, table
                     templateOrdinal: extensionCapture.nextTemplateOrdinal
                     captured: captured + extensionCapture.captured
                     functionCursor: extensionBody.next
-                } else if functionToken.text == String("macro") || functionToken.text == String("open") || functionToken.text == String("closed") {
-                    state macroKeywordStart: Int(functionToken.start)
-                    state macroKeywordEnd: Int(functionToken.end)
-                    state macroKeywordText: String(functionToken.text)
-                    if functionToken.text == String("open") || functionToken.text == String("closed") {
-                        let maybeMacroKeyword: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: functionToken.end))
-                        if maybeMacroKeyword == nil { return 0 - 1 }
-                        let parsedMacroKeyword: RangeLexedToken(maybeMacroKeyword ?? compilerFallbackTokenAt(index: functionToken.end))
-                        macroKeywordStart: parsedMacroKeyword.start
-                        macroKeywordEnd: parsedMacroKeyword.end
-                        macroKeywordText: String(parsedMacroKeyword.text)
-                    }
-                    if macroKeywordText != String("macro") { return 0 - 1 }
-                    let maybeBody: Optional<CompilerSourceRange>(compilerMacroExpansionDeclarationBody(source: source, start: macroKeywordEnd, limit: expansion.end))
+                } else if functionToken.text == String("open") || functionToken.text == String("closed") {
+                    return 0 - 1
+                } else if functionToken.text == String("macro") {
+                    let maybeBody: Optional<CompilerSourceRange>(compilerMacroExpansionDeclarationBody(source: source, start: functionToken.end, limit: expansion.end))
                     if maybeBody == nil { return 0 - 1 }
-                    let body: CompilerSourceRange(maybeBody ?? CompilerSourceRange(start: macroKeywordEnd, end: macroKeywordEnd, next: macroKeywordEnd))
+                    let body: CompilerSourceRange(maybeBody ?? CompilerSourceRange(start: functionToken.end, end: functionToken.end, next: functionToken.end))
                     let invalidFingerprint: CompilerFingerprint(first: 0, second: 0)
-                    if compilerSyntaxAppendOpaqueMacroExpansionTemplate(tables: tables, macroDeclarationRow: macroDeclarationRow, fileID: fileID, expansionStart: token.start, expansionEnd: expansion.next, declarationStart: functionToken.start, declarationEnd: body.next, nameStart: macroKeywordStart, nameEnd: macroKeywordEnd, bodyStart: body.start, bodyEnd: body.end, ordinal: templateOrdinal, placement: compilerMacroExpansionTemplatePlacementRoot(), lexicalParent: 0 - 1, lexicalParentOrdinal: 0 - 1, targetSpliceStart: 0 - 1, targetSpliceEnd: 0 - 1, targetSpliceFingerprint: invalidFingerprint) < 0 { return 0 - 1 }
+                    if compilerSyntaxAppendOpaqueMacroExpansionTemplate(tables: tables, macroDeclarationRow: macroDeclarationRow, fileID: fileID, expansionStart: token.start, expansionEnd: expansion.next, declarationStart: functionToken.start, declarationEnd: body.next, nameStart: functionToken.start, nameEnd: functionToken.end, bodyStart: body.start, bodyEnd: body.end, ordinal: templateOrdinal, placement: compilerMacroExpansionTemplatePlacementRoot(), lexicalParent: 0 - 1, lexicalParentOrdinal: 0 - 1, targetSpliceStart: 0 - 1, targetSpliceEnd: 0 - 1, targetSpliceFingerprint: invalidFingerprint) < 0 { return 0 - 1 }
                     templateOrdinal: templateOrdinal + 1
                     captured: captured + 1
                     functionCursor: body.next
@@ -3452,16 +3435,13 @@ function compilerTypedSyntaxCaptureMacroGenericParameters(source: String, tables
 }
 
 function compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(source: String, tables: CompilerSyntaxTables, declarationOrdinal: Int, token: RangeLexedToken, captureBodies: Bool, builtinPolicy: Int, fileEnd: Int): CompilerTypedDeclarationCaptureStep {
-    if token.kind == .keyword && (token.text == String("open") || token.text == String("closed")) {
-        let cursor: CompilerTokenCursor(source: $source, index: token.end)
-        let maybeMacro: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if token.text == String("open") || token.text == String("closed") {
+        let maybeMacro: Optional<RangeLexedToken>(lexNextRangeToken(source: source, start: token.end))
         if maybeMacro != nil {
-            let macroToken: RangeLexedToken(maybeMacro ?? compilerFallbackToken(cursor: cursor))
-            if macroToken.kind == .keyword && macroToken.text == String("macro") {
-                state visibility: Int(compilerSyntaxMacroVisibilityDefault())
-                if token.text == String("open") { visibility: compilerSyntaxMacroVisibilityOpen() }
-                if token.text == String("closed") { visibility: compilerSyntaxMacroVisibilityClosed() }
-                return compilerTypedSyntaxCaptureMacroWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, visibility: visibility, declarationStart: token.start, keyword: macroToken)
+            let macroToken: RangeLexedToken(maybeMacro ?? compilerFallbackTokenAt(index: token.end))
+            if macroToken.text == String("macro") {
+                compilerSyntaxTablesPoison(tables: tables)
+                return CompilerTypedDeclarationCaptureStep(captured: false, nextIndex: macroToken.end)
             }
         }
     }
@@ -5265,7 +5245,7 @@ function compilerMacroDeclarationsAreStructurallyValid(tables: CompilerSyntaxTab
             if compilerIntTableValue(table: tables.macroDeclarations, row: priorRow, column: 1) == fileID { expectedOrdinal: expectedOrdinal + 1 }
             priorRow: priorRow + 1
         }
-        if fileID < 0 || fileID >= fileCount || visibility < 0 || visibility > compilerSyntaxMacroVisibilityClosed() || ordinal != expectedOrdinal || acceptedTargetKind < 0
+        if fileID < 0 || fileID >= fileCount || visibility != compilerSyntaxMacroVisibilityDefault() || ordinal != expectedOrdinal || acceptedTargetKind < 0
             || firstParameterRow < 0 || parameterCountForRow < 0 || firstParameterRow + parameterCountForRow > parameterCount { return false }
         if !compilerMacroLocalRangeIsValid(tables: tables, fileID: fileID, start: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 2), end: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 3), optional: false)
             || !compilerMacroLocalRangeIsValid(tables: tables, fileID: fileID, start: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 4), end: compilerIntTableValue(table: tables.macroDeclarations, row: row, column: 5), optional: false)

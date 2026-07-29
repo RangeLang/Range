@@ -1,5 +1,5 @@
 macro gpuCanvas(): Construct { environment in
-    environment.expand {
+    #environment {
         function writeGPUCanvas(path: String): Int {
             return gpuCanvasHost(path: path, vertexCount: 3)
         }

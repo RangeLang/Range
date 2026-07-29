@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { baselineBenchmarks, benchmarkFromLeaf, data, slug } from "$lib/benchmarks";
+  import { benchmarkFromLeaf, data } from "$lib/benchmarks";
   import Chart from "$lib/components/Chart.svelte";
   import Footer from "$lib/components/Footer.svelte";
   import Procedure from "$lib/components/Procedure.svelte";
@@ -26,8 +26,6 @@
       </details>
       <div class="benchmarkRunStatus" aria-label="Current benchmark run status"><span>{data.summary.runLeafCount} of {data.summary.leafCount} leaves run</span><span>Range passed {data.summary.rangePassed}</span><span>Not emitted {data.summary.rangeNotEmitted}</span><span>Failed {data.summary.rangeFailed}</span></div>
     </section>
-    <section class="benchmarkSection" aria-labelledby="baseline-title"><div class="sectionHeader"><h2 id="baseline-title">Initial benchmark</h2><p class="dateLabel">July 18, 2026</p></div><div class="chartGrid">{#each baselineBenchmarks as benchmark}<Chart {benchmark} id={`baseline-${slug(benchmark.name)}`} />{/each}</div></section>
-    <range-status-list><section class="status" aria-labelledby="range-status-title"><div class="statusHeader"><p class="statusLabel">Compiler status</p><h2 id="range-status-title">4 of 6 tests emitted and passed</h2></div><ul class="statusList" aria-label="Tests not emitted in this pass"><li><span class="statusIcon" aria-hidden="true">×</span><span><strong>Collections</strong> · resolution stage 2</span></li><li><span class="statusIcon" aria-hidden="true">×</span><span><strong>Constructs</strong> · constructor-argument parse reachability</span></li></ul></section></range-status-list>
     <section class="updatesSection" aria-labelledby="updates-title"><div class="sectionHeader"><h2 id="updates-title">Updates</h2></div><a class="updateLink" href="/optimizations/general/strings-go-fast"><span><strong>Strings Go Fast</strong><small>100k appends · 491.2 ms → 4.1 ms</small></span><time datetime="2026-07-18">July 18, 2026</time></a></section>
     <Footer />
   </main>

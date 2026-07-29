@@ -17,7 +17,7 @@ enum Sharing {
 }
 
 macro shared(): Macro { environment in
-    environment.expand {
+    #environment {
         return Sharing.shared
     }
 }

@@ -1,0 +1,12 @@
+compilerTypedSyntaxSnapshot
+macro syntax(): Declaration -> Void {}
+macro stored(): Construct -> Void {}
+
+construct Identifier {}
+
+@stored
+@syntax
+construct Assignment {
+    let identifier: Identifier
+    let value: @stored
+}

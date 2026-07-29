@@ -4,8 +4,8 @@ compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
 construct Array<Element> {}
 
 compilerSourceFile\trole=core\tpath=Core/Macro/InlineMappedSyntax.range
-open macro member(): Declaration | Member -> Void {}
-open macro syntax(): Declaration -> Void {}
+macro member(): Declaration | Member -> Void {}
+macro syntax(): Declaration -> Void {}
 
 construct Identifier {}
 
@@ -24,7 +24,7 @@ macro inlineMappedSyntax(): Construct { environment in
         environment.target.Declaration.members.filter(all: Let)
     )
 
-    environment.expand {
+    #environment {
         extension #environment.target.Declaration.identifier {
             function mappedValue(): Int {
                 #fields.map { property in

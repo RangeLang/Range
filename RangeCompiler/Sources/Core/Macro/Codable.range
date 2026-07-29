@@ -3,7 +3,7 @@ macro codable(): Construct { environment in
         environment.target.Declaration.members.filter(all: @stored)
     )
 
-    environment.expand {
+    #environment {
         extension #environment.target.Declaration.identifier {
             function encode<Format>(to encoder: Encoder<Format>): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer<Format>(encoder.keyedContainer())

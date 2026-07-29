@@ -150,6 +150,62 @@ check_macro_environment() {
     echo "Macros single-binding-environment: pass"
 }
 
+check_non_generic_stored_assignment() {
+    local fixture="$REPO_ROOT/Testing/Macros/Pass/NonGenericStoredAssignment.range"
+    local output="$WORK_ROOT/macro-non-generic-stored-assignment.out"
+    local error="$WORK_ROOT/macro-non-generic-stored-assignment.err"
+
+    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "non-generic stored Assignment did not compile"
+    [[ ! -s "$error" ]] || fail "non-generic stored Assignment wrote stderr"
+    /usr/bin/grep -Fq $'typedSyntax\tvalid=true\tidentityScope=pathStable,pathlessSnapshotLocal\tfileCount=1\tsyntaxCount=4\tdeclarationCount=2\tmemberCount=2\tfunctionCount=0\tparameterCount=0\tgenericParameterCount=0' "$output" \
+        || fail "non-generic stored Assignment did not preserve its two-member declaration shape"
+    /usr/bin/grep -Eq $'member\\trow=0\\t.*parentSyntaxID=1\\tordinal=0\\t.*name=identifier\\t.*type=Identifier\\t' "$output" \
+        || fail "non-generic stored Assignment did not place identifier in key slot 0"
+    /usr/bin/grep -Eq $'member\\trow=1\\t.*parentSyntaxID=1\\tordinal=1\\t.*name=value\\t.*type=@stored\\t' "$output" \
+        || fail "non-generic stored Assignment did not place its @stored value in slot 1"
+    echo "Macros non-generic-stored-assignment: pass"
+}
+
+check_legacy_macro_modifiers_rejected() {
+    local output="$WORK_ROOT/macro-legacy-modifier.out"
+    local error="$WORK_ROOT/macro-legacy-modifier.err"
+    local actual_status
+
+    for modifier in Open Closed; do
+        if "$STAGE2_EXECUTABLE" compile "$REPO_ROOT/Testing/Macros/Fail/Legacy${modifier}MacroModifier.range" > "$output" 2> "$error"; then
+            actual_status=0
+        else
+            actual_status=$?
+        fi
+        [[ "$actual_status" -eq 65 ]] \
+            || fail "legacy ${modifier,,} macro modifier exited $actual_status instead of 65"
+        [[ ! -s "$error" ]] || fail "legacy ${modifier,,} macro modifier wrote stderr"
+        /usr/bin/grep -Fq $'compilerError\tkind=invalidTypedDeclarations' "$output" \
+            || fail "legacy ${modifier,,} macro modifier did not fail typed declaration validation"
+    done
+    echo "Macros legacy-open-closed-modifiers-rejected: pass"
+}
+
+check_legacy_environment_expand_rejected() {
+    local fixture="$REPO_ROOT/Testing/Macros/Fail/LegacyEnvironmentExpand.range"
+    local output="$WORK_ROOT/macro-legacy-environment-expand.out"
+    local error="$WORK_ROOT/macro-legacy-environment-expand.err"
+    local actual_status
+
+    if "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] \
+        || fail "legacy environment.expand exited $actual_status instead of 65"
+    [[ ! -s "$error" ]] || fail "legacy environment.expand rejection wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=macroExecution\tdiagnosticKind=macroExecutionBodyInvalid' "$output" \
+        || fail "legacy environment.expand did not fail macro body validation"
+    echo "Macros legacy-environment-expand-rejected: pass"
+}
+
 check_macro_result_values() {
     local recursive_fixture="$REPO_ROOT/Testing/Macros/Pass/RecursiveResultValue.range"
     local branch_fixture="$REPO_ROOT/Testing/Macros/Pass/BranchJoinReturn.range"
@@ -1043,6 +1099,9 @@ main_root_value() {
     echo "checkpoint root-value:stage2-cache-$STAGE2_CACHE_STATUS: pass"
     echo "checkpoint root-value:stage2-resolved: pass"
     check_macro_environment
+    check_non_generic_stored_assignment
+    check_legacy_macro_modifiers_rejected
+    check_legacy_environment_expand_rejected
     check_macro_result_values
     check_macro_generic_boundary_materialization
     check_macro_parenthesized_boundary_rejection

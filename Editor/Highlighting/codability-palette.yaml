@@ -312,6 +312,22 @@
   TextDecoration:
   Notes: "Construct, protocol, enum, and similar declaration names."
 
+- Name: "Generic Parameters"
+  XcodeCategory: "Generic Parameters"
+  XcodeSyntax: "xcode.syntax.identifier.typeparameter"
+  ZedStyle: "type.parameter"
+  Supported: "partial"
+  ZedNative: true
+  Needs:
+    - complete-generic-reference-semantic-tokens
+  Dark: "#B2A4FFFF"
+  Light: "#5947D6FF"
+  FontSize: 12
+  FontWeight: "normal"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Generic parameter declarations and resolved references."
+
 - Name: "Other Declarations"
   XcodeCategory: "Other Declarations"
   XcodeSyntax: "xcode.syntax.declaration.other"

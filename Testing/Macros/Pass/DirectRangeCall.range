@@ -7,7 +7,7 @@ function macroIncrement(value: Int): Int {
 macro directCall(): Construct { environment in
     let result: Int(macroIncrement(value: 1))
     if result == 2 {
-        environment.expand {
+        #environment {
             extension #environment.target.Declaration.identifier {
                 let directCallWorked: Int
             }

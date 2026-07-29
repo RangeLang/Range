@@ -1121,27 +1121,22 @@ function compilerBodyArenaAppendExpandStatement(arena: CompilerBodyArena, statem
     return compilerBodyParseSuccess(nodeID: applicationNodeID, nextIndex: expansion.next)
 }
 
-function compilerBodyArenaParseEnvironmentExpandStatement(arena: CompilerBodyArena, environment: RangeLexedToken, limit: Int): CompilerBodyParseResult {
-    state cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: environment.end)
+function compilerBodyArenaParseEnvironmentExpansionStatement(arena: CompilerBodyArena, hash: RangeLexedToken, limit: Int): CompilerBodyParseResult {
+    state cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: hash.end)
     let fallbackIndex: Int(cursor.index)
-    let maybeDot: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
-    if maybeDot == nil { return compilerBodyParseFailure(index: environment.end) }
-    let dot: RangeLexedToken(maybeDot ?? compilerFallbackTokenAt(index: fallbackIndex))
-    if dot.kind != .dot { return compilerBodyParseFailure(index: environment.end) }
-    cursor: compilerCursorAdvance(cursor: cursor, token: dot)
-    let maybeExpand: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
-    if maybeExpand == nil { return compilerBodyParseFailure(index: dot.end) }
-    let expand: RangeLexedToken(maybeExpand ?? compilerFallbackTokenAt(index: fallbackIndex))
-    if expand.kind != .identifier || expand.text != String("expand") { return compilerBodyParseFailure(index: expand.start) }
-    cursor: compilerCursorAdvance(cursor: cursor, token: expand)
+    let maybeEnvironment: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeEnvironment == nil { return compilerBodyParseFailure(index: hash.end) }
+    let environment: RangeLexedToken(maybeEnvironment ?? compilerFallbackTokenAt(index: fallbackIndex))
+    if environment.kind != .identifier || environment.text != String("environment") { return compilerBodyParseFailure(index: environment.start) }
+    cursor: compilerCursorAdvance(cursor: cursor, token: environment)
     let maybeBrace: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
-    if maybeBrace == nil { return compilerBodyParseFailure(index: expand.end) }
+    if maybeBrace == nil { return compilerBodyParseFailure(index: environment.end) }
     let brace: RangeLexedToken(maybeBrace ?? compilerFallbackTokenAt(index: fallbackIndex))
     if brace.kind != .leftBrace { return compilerBodyParseFailure(index: brace.start) }
     let maybeExpansion: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: brace.start), leftKind: .leftBrace, rightKind: .rightBrace))
     if maybeExpansion == nil { return compilerBodyParseFailure(index: brace.start) }
     let expansion: CompilerSourceRange(maybeExpansion ?? CompilerSourceRange(start: brace.end, end: brace.end, next: brace.end))
-    return compilerBodyArenaAppendExpandStatement(arena: arena, statementStart: environment.start, nameStart: expand.start, nameEnd: expand.end, expansion: expansion, limit: limit)
+    return compilerBodyArenaAppendExpandStatement(arena: arena, statementStart: hash.start, nameStart: hash.start, nameEnd: environment.end, expansion: expansion, limit: limit)
 }
 
 function compilerBodyArenaParseSetStatement(arena: CompilerBodyArena, keyword: RangeLexedToken, limit: Int, ordinal: Int): CompilerBodyParseResult {
@@ -1160,9 +1155,9 @@ function compilerBodyArenaParseStatement(arena: CompilerBodyArena, start: Int, l
     let maybeKeyword: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: start))
     if maybeKeyword == nil { return compilerBodyParseFailure(index: start) }
     let keyword: RangeLexedToken(maybeKeyword ?? RangeLexedToken(kind: .eof, start: start, end: start, text: String("")))
-    if arena.ownerKind == compilerBodyArenaOwnerMacro() && keyword.kind == .identifier
-        && compilerMacroTargetDeclarationExpansion(source: arena.tables.sourceStore.source, start: keyword.start) != nil {
-        return compilerBodyArenaParseEnvironmentExpandStatement(arena: arena, environment: keyword, limit: limit)
+    if arena.ownerKind == compilerBodyArenaOwnerMacro() && keyword.kind == .hash
+        && compilerMacroEnvironmentExpansion(source: arena.tables.sourceStore.source, start: keyword.start) != nil {
+        return compilerBodyArenaParseEnvironmentExpansionStatement(arena: arena, hash: keyword, limit: limit)
     }
     if keyword.text == String("set") { return compilerBodyArenaParseSetStatement(arena: arena, keyword: keyword, limit: limit, ordinal: ordinal) }
     let statementKind: Int(compilerBodyArenaStatementKind(token: keyword))

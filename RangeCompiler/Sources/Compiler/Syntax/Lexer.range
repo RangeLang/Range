@@ -633,12 +633,6 @@ function isRangeTypeDeclarationKeyword(value: String): Bool {
     if value == String("macro") {
         return true
     }
-    if value == String("open") {
-        return true
-    }
-    if value == String("closed") {
-        return true
-    }
     if value == String("function") {
         return true
     }

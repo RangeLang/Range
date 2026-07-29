@@ -30,6 +30,10 @@
     "style": ["type", "type.range"]
   },
   {
+    "token_type": "typeParameter",
+    "style": ["type.parameter"]
+  },
+  {
     "token_type": "function",
     "token_modifiers": ["declaration"],
     "style": ["declaration", "function.range.declaration"]

@@ -1,0 +1,4 @@
+compilerMacroSnapshot
+closed macro legacyClosed(): Construct -> Void {}
+
+construct Construct {}
