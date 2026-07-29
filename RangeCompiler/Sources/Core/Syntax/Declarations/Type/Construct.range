@@ -13,8 +13,6 @@ construct Construct {
         let identifier: Identifier
         let generics: [Generic]
         let members: [@member]
-
-        function expand(_ expansion: () -> [@syntax]): RangeGraphDelta
     }
 
     @syntax {

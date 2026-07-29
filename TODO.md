@@ -21,7 +21,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - `Testing/Macros/Fail/LowercaseInlineConstructProjection.range` and the
     updated canonical-target fixture are wired into
     `check-range-root-value`, but neither proof has completed.
-- [ ] Restore a bounded native producer run before continuing semantics work.
+- [x] Restore a bounded native producer run before continuing semantics work.
   - The first attempt failed quickly with
     `representationSensitiveABICapabilityBlocked` for
     `compilerBodyMIRBuildExpression` at capability stage `1780729`.
@@ -37,6 +37,27 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - Run `scripts/range check-build-plan`, then
     `scripts/range check-root-value`; do not infer later-gate success from the
     build-plan result.
+  - The uninterrupted recovery run completed the development Stage 2 producer
+    in 583 seconds (`llvm-emission=580`, `llvm-validation=2`,
+    `stage2-link=1`; 17 artifacts reused and 2,639 rebuilt).
+  - `check-root-value` then reached the inline-projection proofs: the uppercase
+    canonical-target fixture passed, and the lowercase fixture correctly
+    exited 65 with empty stderr and
+    `diagnosticKind=macroExecutionBodyInvalid`.
+  - [x] Correct the harness's stale `diagnosticKind=bodyInvalid` expectation to
+    the canonical `macroExecutionBodyInvalid` spelling, then rerun
+    `scripts/range check-root-value`.
+  - [x] Keep expansion authority on `Macro.Environment` by removing
+    `expand` from `Construct.Declaration` and `Enum.Declaration`, then delete
+    the unused `SyntaxExpandable` wrapper.
+  - [x] Replace stale `let declaration: ConstructDeclaration` macro snapshots
+    with the direct nested `Construct.Declaration` representation consumed by
+    the uppercase projection.
+  - The focused rerun now passes canonical target members, typed collection
+    closures, inline mapped syntax, stored defaults, the actual Core Codable
+    surface, composite rollback, and typed parameter defaults. Root-value next
+    stops in the separate graph-capability draft with
+    `macroMissingTarget`; do not fold that graph work into this cleanup.
 - [ ] Complete generated project configuration as a value/artifact.
   - The current `Project.range` emits a `ProjectDefaults` construct from
     `#environment.system.defaults`; it no longer returns

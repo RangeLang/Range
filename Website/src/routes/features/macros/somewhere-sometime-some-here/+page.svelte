@@ -9,6 +9,30 @@
         }
     }
 }`;
+
+  const staticEnvironment = `#environment {
+    construct ProjectDefaults {}
+}`;
+
+  const projectedEnvironment = `#environment {
+    construct ProjectDefaults {
+        #environment.system.defaults.map { default in
+            let #default.identifier: #default.value
+        }
+    }
+}`;
+
+  const filteredCollection = `let collection: [Let](
+    environment.target.Declaration.members.filter(all: Let)
+)
+
+environment.expand {
+    extension #environment.target.Declaration.identifier {
+        #collection.map { item in
+            let #item.identifier: #item.value
+        }
+    }
+}`;
 </script>
 
 <EssayPage
@@ -54,10 +78,14 @@
       The <code>#</code> makes that crossing visible. A value known now becomes
       part of code that exists next.
     </p>
+
+    <CodeBlock source={staticEnvironment} syntax="range" label="Static declaration" />
+    <CodeBlock source={projectedEnvironment} syntax="range" label="Compile-time projection" />
+    <CodeBlock source={filteredCollection} syntax="range" label="Filter, then map" />
   </section>
 
   <section>
-    <h2>Some-here</h2>
+    <h2>Place</h2>
     <p>
       “Here” should be smaller than “everywhere.” The environment gives a macro
       local authority and makes its observations explicit. That lets the graph

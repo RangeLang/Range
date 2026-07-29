@@ -33,11 +33,10 @@ construct Macro {
 }
 
 construct Construct {
-    let declaration: ConstructDeclaration
-}
-
-construct ConstructDeclaration {
-    let members: [@member]
+    construct Declaration {
+        let identifier: Identifier
+        let members: [@member]
+    }
 }
 
 construct Metadata {

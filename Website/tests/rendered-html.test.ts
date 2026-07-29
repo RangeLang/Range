@@ -127,6 +127,14 @@ describe("SvelteKit routes", () => {
     expect(html).toContain("<title>Somewhere, Sometime, Some-here · Range</title>");
     expect(html).toContain(">Somewhere, Sometime, Some-here</h1>");
     expect(html).toContain('class="rangeSource language-range');
+    expect(html).toContain(">Place</h2>");
+    expect(html).not.toContain(">Some-here</h2>");
+    expect(html).toContain('aria-label="Static declaration"');
+    expect(html).toContain('aria-label="Compile-time projection"');
+    expect(html).toContain('aria-label="Filter, then map"');
+    expect(html).toContain('<span class="token property">defaults</span>');
+    expect(html).toContain('<span class="token method">filter</span>');
+    expect(html).toContain('<span class="token splice">#collection</span>');
     expect(html).toContain(
       "Somewhere gives the macro a place. Sometime gives it a phase. Some place gives it a boundary.",
     );

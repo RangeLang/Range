@@ -1,3 +1,0 @@
-construct SyntaxExpandable<Target> {
-    function expand(_ expansion: () -> [@syntax]): RangeGraphDelta
-}

@@ -7,12 +7,13 @@ compilerSourceFile\trole=core\tpath=Core/Macro/InlineMappedSyntax.range
 open macro member(): Declaration | Member -> Void {}
 open macro syntax(): Declaration -> Void {}
 
-construct Construct {
-    let declaration: ConstructDeclaration
-}
+construct Identifier {}
 
-construct ConstructDeclaration {
-    let members: [@member]
+construct Construct {
+    construct Declaration {
+        let identifier: Identifier
+        let members: [@member]
+    }
 }
 
 @syntax

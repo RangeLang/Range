@@ -7,8 +7,6 @@ construct Enum {
         let identifier: Identifier
         let generics: [Generic]
         let cases: [Case]
-
-        function expand(_ expansion: () -> [@syntax]): RangeGraphDelta
     }
 
     @syntax

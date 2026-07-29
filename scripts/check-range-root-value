@@ -249,7 +249,7 @@ check_canonical_target_members() {
     fi
     [[ "$actual_status" -eq 65 ]] || fail "lowercase inline construct projection exited $actual_status instead of 65"
     [[ ! -s "$error" ]] || fail "lowercase inline construct projection wrote stderr"
-    /usr/bin/grep -Fq $'diagnosticKind=bodyInvalid' "$output" \
+    /usr/bin/grep -Fq $'diagnosticKind=macroExecutionBodyInvalid' "$output" \
         || fail "lowercase inline construct projection did not fail macro body validation"
     echo "Macros canonical-target-members: pass"
 }
