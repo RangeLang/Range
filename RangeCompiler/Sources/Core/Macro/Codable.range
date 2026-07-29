@@ -5,10 +5,10 @@ macro codable(): Construct { environment in
 
     environment.expand {
         extension #environment.target.declaration.self {
-            function encode(to encoder: Encoder): Result<Void, EncodingError> {
-                let container: KeyedEncodingContainer(encoder.keyedContainer())
+            function encode<Format>(to encoder: Encoder<Format>): Result<Void, EncodingError> {
+                let container: KeyedEncodingContainer<Format>(encoder.keyedContainer())
                 #fields.map { property in
-                    switch container.encode(#property.identifier, forKey: property.identifier.name) {
+                    switch container.encode(self.#property.identifier, forKey: property.identifier.name) {
                     case .success:
                         break
                     case .failure(error):
@@ -18,8 +18,8 @@ macro codable(): Construct { environment in
                 return .success(result: Void())
             }
 
-            function decode(from decoder: Decoder): Result<Self, DecodingError> {
-                let container: KeyedDecodingContainer(decoder.keyedContainer())
+            function decode<Format>(from decoder: Decoder<Format>): Result<Self, DecodingError> {
+                let container: KeyedDecodingContainer<Format>(decoder.keyedContainer())
                 #fields.map { property in
                     switch container.decode(#property.type.self, forKey: property.identifier.name, default: #property.value) {
                     case .success(#property.identifier):

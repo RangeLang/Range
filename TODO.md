@@ -656,8 +656,14 @@ owns the actionable checkboxes for the active and deliberately deferred work.
                 every syntax/type/body buffer if a later mutation fails.
             - A child diagnostic rejects the whole parent transaction; no
               partially generated `encode` or `decode` declaration survives.
-      - [ ] Restore the Range-authored `Result`, encoder/decoder container,
+      - [x] Restore the Range-authored `Result`, encoder/decoder container,
         coding error, and JSON surfaces needed by generated implementations.
+        - `Encoder<Format>`, `Decoder<Format>`, and their keyed containers are
+          transport-neutral ordinary Range constructs.
+        - `JSON` is an ordinary `@encoding` format with a recursive authored
+          value model; the compiler does not discover or special-case it.
+        - Runtime JSON parsing/rendering and concrete keyed-container behavior
+          remain a separate implementation slice.
       - [x] Make stored-member discovery a Range-authored macro relationship.
         - `Let` and `State` carry `@stored`; `Binding` and `Derived` remain
           non-stored `@field` members.

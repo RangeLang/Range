@@ -265,6 +265,44 @@ check_stored_member_defaults() {
     echo "Macros stored-member-defaults: pass"
 }
 
+check_coding_core_surface() {
+    local fixture="$REPO_ROOT/Testing/Coding/Pass/CoreSurface.range"
+    local output="$WORK_ROOT/coding-core-surface.out"
+    local error="$WORK_ROOT/coding-core-surface.err"
+    local source_file
+
+    for source_file in \
+        RangeCompiler/Sources/Core/System/Result/Result.range \
+        RangeCompiler/Sources/Core/Coding/Encoding.range \
+        RangeCompiler/Sources/Core/Coding/CodingError.range \
+        RangeCompiler/Sources/Core/Coding/Encoder.range \
+        RangeCompiler/Sources/Core/Coding/Decoder.range \
+        RangeCompiler/Sources/Core/Coding/JSON.range; do
+        [[ -f "$REPO_ROOT/$source_file" ]] || fail "missing Range-authored coding source: $source_file"
+    done
+
+    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "Range-authored coding core surface did not compile"
+    [[ ! -s "$error" ]] || fail "Range-authored coding core surface wrote stderr"
+    /usr/bin/grep -Fq $'typedSyntax\tvalid=true' "$output" \
+        || fail "Range-authored coding core surface did not produce valid typed syntax"
+    for source_file in Result Encoder KeyedEncodingContainer Decoder KeyedDecodingContainer JSON JSONValue JSONMember; do
+        /usr/bin/grep -Fq $'name='"$source_file"$'\tnameStart=' "$output" \
+            || fail "Range-authored coding core surface omitted $source_file"
+    done
+    /usr/bin/grep -Fq $'name=encode\tnameStart=' "$output" \
+        && /usr/bin/grep -Fq $'name=decode\tnameStart=' "$output" \
+        || fail "Range-authored keyed containers omitted encode or decode"
+    [[ "$(/usr/bin/grep -F -c $'storage=indirect\t' "$output" || true)" -eq 2 ]] \
+        || fail "Range-authored JSON did not preserve two recursive indirect collections"
+    /usr/bin/grep -Fq 'function encode<Format>(to encoder: Encoder<Format>)' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
+        && /usr/bin/grep -Fq 'container.encode(self.#property.identifier' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
+        && /usr/bin/grep -Fq 'function decode<Format>(from decoder: Decoder<Format>)' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
+        && /usr/bin/grep -Fq 'default: #property.value' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
+        || fail "Range-authored Codable is not wired to the generic coding surface"
+    echo "Coding Range-authored-core-surface: pass"
+}
+
 check_codable_construct_collection() {
     local fixture="$REPO_ROOT/Testing/Macros/Pass/CodableConstructCollection.range"
     local output="$WORK_ROOT/macro-codable-construct-collection.out"
@@ -903,6 +941,7 @@ main_root_value() {
     check_canonical_target_members
     check_collection_closure_execution
     check_stored_member_defaults
+    check_coding_core_surface
     check_codable_construct_collection
     check_codable_composite_atomic_rollback
     check_typed_parameter_defaults

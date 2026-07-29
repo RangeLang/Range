@@ -1,0 +1,13 @@
+construct CodingPath {
+    let components: [String]
+}
+
+construct EncodingError {
+    let message: String
+    let path: CodingPath
+}
+
+construct DecodingError {
+    let message: String
+    let path: CodingPath
+}

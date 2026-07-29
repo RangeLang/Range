@@ -1,0 +1,15 @@
+construct Decoder<Format> {
+    let format: Format
+
+    function keyedContainer(): KeyedDecodingContainer<Format>
+}
+
+construct KeyedDecodingContainer<Format> {
+    let format: Format
+
+    function decode<Value>(
+        _ type: Value,
+        forKey key: String,
+        default defaultValue: Value?
+    ): Result<Value, DecodingError>
+}

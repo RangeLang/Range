@@ -1,0 +1,80 @@
+compilerTypedSyntaxSnapshot
+compilerSourceFile\trole=core\tpath=Core/Syntax/Construct.range
+construct Construct {}
+
+compilerSourceFile\trole=core\tpath=Core/System/Result/Result.range
+enum Result<Value, Failure> {
+    case success(result: Value)
+    case failure(cause: Failure)
+}
+
+compilerSourceFile\trole=core\tpath=Core/Coding/Encoding.range
+open macro encoding(): Construct -> Void {}
+
+compilerSourceFile\trole=core\tpath=Core/Coding/CodingError.range
+construct CodingPath {
+    let components: [String]
+}
+
+construct EncodingError {
+    let message: String
+    let path: CodingPath
+}
+
+construct DecodingError {
+    let message: String
+    let path: CodingPath
+}
+
+compilerSourceFile\trole=core\tpath=Core/Coding/Encoder.range
+construct Encoder<Format> {
+    state format: Format
+
+    function keyedContainer(): KeyedEncodingContainer<Format>
+}
+
+construct KeyedEncodingContainer<Format> {
+    state format: Format
+
+    function encode<Value>(
+        _ value: Value,
+        forKey key: String
+    ): Result<Void, EncodingError>
+}
+
+compilerSourceFile\trole=core\tpath=Core/Coding/Decoder.range
+construct Decoder<Format> {
+    let format: Format
+
+    function keyedContainer(): KeyedDecodingContainer<Format>
+}
+
+construct KeyedDecodingContainer<Format> {
+    let format: Format
+
+    function decode<Value>(
+        _ type: Value,
+        forKey key: String,
+        default defaultValue: Value?
+    ): Result<Value, DecodingError>
+}
+
+compilerSourceFile\trole=core\tpath=Core/Coding/JSON.range
+@encoding
+construct JSON {
+    state root: JSONValue
+}
+
+enum JSONValue {
+    case null
+    case boolean(value: Bool)
+    case number(value: String)
+    case string(value: String)
+    case array(indirect elements: [JSONValue])
+    case object(indirect members: [JSONMember])
+}
+
+construct JSONMember {
+    let name: String
+    let value: JSONValue
+}
