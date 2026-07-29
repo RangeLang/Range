@@ -26,3 +26,6 @@ function bufferCreateInt(capacity: Int): Buffer<Int>
 
 @builtin(.create)
 function bufferCreateUnsigned8(capacity: Int): Buffer<Int<.unsigned, 8>>
+
+@builtin(.write)
+function bufferTruncateInt(buffer: Buffer<Int>, count: Int): Int

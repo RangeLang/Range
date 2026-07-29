@@ -5,48 +5,240 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 
 ## Website
 
+  - [x] Move the codability walkthrough from the homepage into a dedicated
+    `/features/macros/codability-under-100` long-form article, with a concise
+    homepage entry point.
+    - [x] Present the newest writing in a responsive homepage strip of
+      animated OKLCH shader cards, led by `Codability under 100`.
+  - [x] Modulate the continuous Cardinality hum’s low-pass cutoff from homepage
+    scroll proximity without changing its pitch, rhythm, or volume.
+  - [x] Add a homepage codability sheet sourced from the Range-authored macro.
+    - [x] Tighten the Declaration/Usage picker padding and control height.
+    - [x] Reduce the inspector track to the smallest bounded height that still
+      accommodates the longest chapter description.
+  - [x] Move the String optimization article to
+    `/optimizations/general/strings-go-fast` and title it “Strings Go Fast.”
+  - [x] Use Range's editor-owned light syntax palette and semantic token roles
+    for keywords, types, declarations, functions, macros, members, and values.
+    - [x] Keep inspectable macro nodes flat and non-interactive, and navigate
+      the five explanations explicitly through a trailing numbered chapter rail.
+    - [x] Rebalance the preview away from a single purple identifier bucket:
+      reserve the luminous Range blue for keywords, then use project teals,
+      property/declaration blue, vivid salad-green callables, amethyst-lilac macro
+      applications, and neutral local values.
+    - [x] Keep string literals black and light, with soft-gray punctuation and
+      darker structural curly braces.
+    - [x] Color nominal type names and macro declaration names with the same
+      project blue used for properties.
+  - [x] Show a concrete `User` Usage example, the exact codable Declaration,
+    and one focused Field helper from
+    `RangeCompiler/Sources/Core/Macro/Codable.range`.
+    - [x] Make enum payload patterns bind bare identifiers, so focused helpers
+      use `case .failure(error)` and reject the redundant `let` spelling.
+    - [x] Show an immutable `let` and a `state` member in the usage example,
+      with both entering the unified `@stored` coding surface.
+  - [x] Explain the collect → map → expand mechanism without presenting the
+    deferred complete encoder/decoder runtime surface as finished.
+  - [x] Present canonical macro expressions in a prominent full-width code
+    workspace with explicit numbered chapter inspection.
+    - [x] Route the code viewport’s vertical progression through the parent
+      page scroll so the full-screen stage never competes with a nested Y scroller.
+
+## RangeStore
+
+  - [x] Implement a first Range-authored durable document store.
+    - [x] Persist an atomic append-only metadata revision log with immutable
+      per-revision document body sidecars.
+    - [x] Support stable integer IDs, latest-revision lookup, updates,
+      tombstone deletion, restoration, and bodies containing delimiters/newlines.
+    - [x] Prove compile, link, persistence, reopening, and body round-trip with
+      `scripts/range check-document-store`.
+  - [ ] Add a stateful store handle once owned dynamic-string aggregate returns
+    are admitted by the accepted compiler proof boundary.
+  - [ ] Layer typed collection schemas, indexes and query predicates over the
+    revision core before adding auth, realtime subscriptions, or an HTTP API.
+      - [x] Treat the macro declaration/context line and stored-field graph query
+        as inspectable semantic passages instead of isolated keyword nodes.
+      - [x] Frame chapter 1 as declaring a construct-attached macro, the basic
+        shape for drafting behavioral relationships.
+        - [x] Name the usage inspector action “Attaching a macro.”
+        - [x] Describe the resulting `User` construct as carrying `@codable`
+          behavior.
+        - [x] Explain the standard declaration pattern as naming the macro,
+          choosing its target, and gaining access to the surroundings.
+          - [x] Collapse the repeated chapter 1 prose into one concise lead-in
+            and three short bullets.
+      - [x] Number declaration, graph query, expansion, and the first
+        code-splicing passage as steps `1 → 2 → 3 → 4`.
+        - [x] Inline the encode/decode field maps in the main macro and use the
+          ordinary `encode` function declaration and keyed-container setup as
+          step `5`.
+          - [x] Preserve the complete encode-side `#fields.map` synthesis
+            closure as step `6`.
+        - [x] Make every numbered badge and its complete code passage select
+          the corresponding inspector chapter.
+          - [x] Hide the chapter rail and chevrons while the Usage pane is
+            selected.
+        - [x] Dim every non-selected code segment while a chapter is active and
+          let a second click clear the chapter to restore full highlighting.
+          - [x] Fade complete source lines rather than partial syntax fragments
+            so each chapter reads as one coherent focused passage.
+            - [x] Keep every numbered chapter badge fully opaque while its
+              surrounding source line is dimmed.
+            - [x] Give nested lines a secondary context opacity when a parent
+              block chapter such as `environment.expand` is selected.
+            - [x] Apply the same brace-delimited context treatment to the macro
+              declaration, extension, and property-helper chapters.
+              - [x] Keep the two-line chapter 5 `encode` function setup fully
+                highlighted as one ordinary Range code unit.
+                - [x] Retain the rest of the `encode` function as softer
+                  nested context through its closing brace.
+                - [x] State the function’s `Result<Void, EncodingError>`
+                  return contract in the chapter 5 description.
+            - [x] Recede nested block context to a lower-lightness `34%`
+              layer with a restrained `0.3px` blur.
+            - [x] Treat chapter 7 as one complete closure and keep its entire
+              property-helper macro fully highlighted.
+              - [x] Include both encode and decode property-helper macros in
+                the chapter 7 highlighted synthesis unit.
+          - [x] Remove the inspector from layout when chapter selection is
+            cleared so the source expands across the complete workspace.
+          - [x] Keep the codability interaction in one permanent vertical
+            hierarchy: breadcrumb and picker, full-width code, then a
+            horizontal chapter description.
+        - [x] Add the failure-aware encode helper as step `6` to show that a
+          macro can encapsulate one piece of control flow or logic.
+        - [x] Position step badges outside multiline source flow so continuation
+          lines retain their authored indentation.
+        - [x] Preserve absolute authored indentation for every continuation line
+          inside clickable multiline chapter controls.
+        - [x] Convert authored four-space levels to semantic tabs and size each
+          tab from the code viewport width with compact bounds.
+        - [x] Center each scaled step badge vertically against its first code
+          line rather than its smaller internal text box.
+        - [x] Include the query passage's shared leading indent inside its
+          multiline inspection token so its opening and closing lines align.
+        - [x] Align the query passage's `2` badge beside its indented `let`
+          line, matching the `3` and `4` chapter badges.
+      - [x] Show step 4's complete `#environment.target.declaration.self`
+        mention in the inspector accent and explain `#` as interpolation from
+        a macro-time value into code that executes later.
+      - [x] Keep the generated `encode` function inline in the target extension
+        and use one `[@stored]` query for immutable fields and state.
+      - [x] Lead with inspector explanations, place accented syntax beneath
+        them, and remove Phase/Produces metadata from every inspector.
+        - [x] Separate the concepts cleanly: chapter 3 owns ordinary validated
+          Range code inside `environment.expand`, while chapter 4 owns only the
+          highlighted `#environment.target.declaration.self` splice.
+          - [x] Explain that `extension` expects a nominal value and the
+            environment supplies one, making the spliced extension valid Range
+            code.
+      - [x] Give those passages a concentrated glyph drop shadow without an
+        overlay, broad blur, or underline; keep single-token mentions
+        underline-only.
+      - [x] Derive nominal-type and member-access syntax roles from the primary
+        OKLCH hue, stepping chroma down from the solid keyword accent.
+      - [x] Give `@` macro mentions and `#` code splices distinct amethyst and
+        violet hues as the two special compile-time syntax roles.
+        - [x] Give `#` splice roots semibold weight so their compile-time
+          boundary remains legible beside the derivative blue member chain.
+      - [x] Classify `@stored` as a plural nominal selector rather than a macro
+        application, matching the nominal-type color used by `Construct`.
+      - [x] Render declared function and macro names in normal black while
+        retaining semantic color for macro applications, properties, types,
+        and keywords.
+      - [x] Render function and method references in normal black as well,
+        removing the remaining green callable-name role.
+      - [x] Keep nominal types stronger than member access while preserving the
+        exact primary accent hue across the full semantic chain.
+        - [x] Deepen both derivative blue tiers and classify dotted `.self` as
+          member access so only actual keywords use the solid accent.
+    - [x] Keep the inspector focused on its explanation and metadata without
+      repeating the active expression in a separate token pill.
+    - [x] Remove the inspector eyebrow row and interaction-hint copy.
+    - [x] Remove the redundant Range-authored-source eyebrow from the preview
+      header and let the active filename stand alone.
+    - [x] Keep the code canvas and line-number gutter on a pure white
+      background.
+      - [x] Use near-white, trace-chroma OKLCH shell surfaces so the display
+        stays subtly luminous without reading as a colored panel.
+  - [x] Turn the workspace into a scroll-linked focus stage that expands to
+    the full viewport across a stable center band.
+    - Keyboard focus within the workspace also holds the fullscreen state;
+      reduced-motion users receive the full display without interpolation.
+    - [x] Hold a `60vh` fullscreen plateau around vertical-center alignment,
+      then ease symmetrically through the entry and exit falloffs.
+    - [x] Keep the code surface at a fixed scale and map its internal scroll
+      exclusively across the centered plateau.
+    - [x] Keep the code viewport scroll-locked while the page enters the stage,
+      then enable its own scrolling only at the centered fullscreen state.
+    - [x] Drive the focus stage through explicit entering, focused, and exiting
+      states with hysteresis, using direct frame-synced transforms.
+    - [x] Keep interaction focus from forcing visual progress to fullscreen;
+      it may only hold an already-focused stage inside a bounded geometry band.
+    - [x] Keep the inspector body at one stable full width and height across
+      every pane and chapter variant.
+    - [x] Replace the landscape inspector's content-sized `auto` row with one
+      stable viewport-relative track so chapter switches cannot move the split.
 - [x] Position the homepage 0-to-1 measure on a zero-safe logarithmic scale.
   - [x] Use those non-linear positions for canvas marks and verify the rendered
     endpoint alignment.
-  - [x] Replace the detached pointer pinch with direct dragging of the authored
-    `0` endpoint.
-    - [x] Pull nearby marks by logical value with a compact falloff, keep every
-      dash the same length, and spring the zero endpoint home on release.
+  - [x] Let mouse hover move the logarithmic spacing origin through the scale,
+    using the authored `0` position as its resting state.
+    - [x] Distort mark positions without changing dash length or adding a
+      separate pinch control.
+    - [x] Ease into hover focus and ease back toward `0` when hover is lost,
+      without overshoot or backlash.
+    - [x] Synthesize subtly varied bristle-and-tone clicks through Web Audio
+      as the pointer hovers and moves across the scale, without requiring a
+      press.
 - [x] Add an interactive concentric nucleus graph to the Svelte homepage.
   - [x] Render one shared source nucleus with persistent concept branches.
+  - [x] Center the concept picker above the graph, remove its selected fill,
+    and omit the per-concept explanatory sentence.
   - [x] Add an explicit `Shape(1, 2, 4)` branch and expand the radial
     canvas to use the available content width.
   - [x] Verify Svelte diagnostics, production build, server rendering, and
     concept-picker interaction.
-  - [x] Play one short low sine note every `1.8s + (1.8s / 3)`, or 2.4
-    seconds.
+  - [x] Map the Range `0 → 1 → 2 → 4` progression into loop timing, treating
+    zero as the silent origin and multiplying audible values by `0.6s`.
     - [x] Advance Shape → Ownership → Capability on the same boundary that
-      triggers each note.
-    - [x] Leave silence between the short note and the next interval.
-    - [x] Keep one fixed A2 note in an audible low register with enough gain
-      for laptop speakers, independent of the active concept.
-    - [x] Send the note through a strong five-second stereo reverb tail that
-      overlaps and layers beneath multiple 2.4-second pulses.
-      - [x] Mix the output at 90% wet reverb and 10% direct dry tone.
-      - [x] Filter the wet return through a rumble cut and a resonant low-pass
-        that moves one scale step above the base pulse: A2 → B2.
-      - [x] Use a smooth exponential tail and restrained resonance so
-        overlapping sine-bass pulses do not pump or rumble.
+      triggers each note, using the authored six-step loop
+      Shape → Ownership → Capability → Shape → Ownership → Shape.
+    - [x] Keep the authored timing in the visual concept changes and quiet air
+      swells without restarting the underlying voice on each step.
+    - [x] Hold one persistent, gently detuned A2 voice in an audible low
+      register, with a very slow breath that does not share the loop period.
+      - [x] Raise the persistent voice and direct presence enough for the hum
+        to remain audible on laptop speakers without sharpening its tone.
+    - [x] Send the continuous voice through a strong five-second stereo reverb
+      tail so it reads as one source heard from afar.
+      - [x] Keep a quiet direct tone beneath a diffuse reverb return.
+      - [x] Filter the wet return through a rumble cut and a broad low-pass
+        without emphasizing an individual bass frequency.
+      - [x] Use a smooth tail and low-Q filtering so overlapping sine-bass
+        pulses do not pump or ring.
   - [x] Place every branch node on a shared concentric numeric scale where the
     `8 → 16` ring interval is twice `4 → 8`, which is twice `2 → 4`.
-  - [x] Add a toggleable synchronized spiral track through the existing
-    `4 → 8 → 16` nodes.
-    - [x] Follow an expanding value-derived spiral and advance a rising
-      B2 → D3 → E3 sine phrase once per 2.4-second clock step.
+    - [x] Keep the concentric marks unlabelled and preserve node values only as
+      semantic/audio metadata, without visible numeric annotations.
+  - [x] Keep a permanently visible synchronized spiral track through the
+    existing `4 → 8 → 16` nodes without a redundant toggle control.
+    - [x] Follow the expanding value-derived spiral with quiet, overlapping
+      near-unison air around A2 instead of a rising melodic phrase.
+    - [x] Expand the spiral dash lengths and gaps with the same local base-2
+      magnitude rule used by the radial connectors.
   - [x] Render straight radial connectors from value-aware dash segments whose
     lengths and gaps expand with the local base-2 logarithmic magnitude.
-  - [x] Keep numeric labels on the top SVG layer with a glyph-shaped paper
-    knockout so rings and connector marks cannot overlap their text.
-  - [x] Highlight the active branch line, concept label, and numeric labels
-    directly in a darker, higher-chroma playback accent while leaving every
-    inactive branch muted.
-    - [x] Restart its OKLCH color envelope on every interval boundary and
-      match the animation duration to the 2.4-second playback clock.
+  - [x] Replace the visible numeric node labels with restrained value dots,
+    using a thin paper knockout so rings and connector marks stay distinct.
+  - [x] Highlight the active branch line, concept label, and value dots directly
+    in a darker, higher-chroma playback accent while leaving every inactive
+    branch muted.
+    - [x] Snap the active color directly at each concept boundary without a
+      tween or pulsing color envelope.
+    - [x] Animate the spiral at one constant linear speed, independent of the
+      authored concept and audio-window durations.
     - [x] Keep that rhythmic envelope within a brighter playback range while
       retaining its chromatic contrast.
     - [x] Alternate two distinct OKLCH rhythm contours instead of repeating
@@ -318,8 +510,98 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - [x] Type closure parameters and captures, lower closure CFG/MIR, and
           invoke predicate `filter`/`map` closures at compile time before
           nested macro calls and syntax splicing.
+        - [x] Add macro-time `#value.member` prefix chains at expansion
+          boundaries without introducing an `@splice` macro or special
+          collection operation.
+          - The compiler still accepts the seed-compatible parenthesized
+            spelling, but Core Codable and focused fixtures use canonical
+            prefix mentions such as `#properties.map` and
+            `#environment.target.declaration.self`.
+        - [x] Materialize macro applications retained inside generated
+          function bodies as child applications of the parent expansion.
+          - The construct-attached Codable proof records one parent and two
+            child invocations. Each helper now executes `environment.expand`
+            and produces a source-backed syntax artifact instead of remaining
+            unexecuted template text.
+          - [x] Make `Block` the canonical ordered body syntax relationship
+            before composing generated bodies.
+            - [x] Define the Range-authored surface as
+              `Block.syntax: [@syntax]`; do not use physical lines or a
+              statement-only parallel hierarchy as the semantic container.
+            - [x] Capture every authored/generated function and entry body as
+              one `body` edge to a `Block`, with the block owning its ordered
+              syntax children and nested control-flow bodies using the same
+              block kind.
+              - The typed-body replay now requires two `block` nodes and two
+                role-31 `body` edges; RootValue validates, links, and executes
+                the resulting compiler output.
+            - [x] Preserve authored source spans and generated
+              macro-application provenance independently from containment.
+              - Expansion templates retain their parent macro declaration and
+                application while each fragment retains its own file-local
+                span, parent fragment, and source ordinal.
+          - [x] Replace the generated function body's single contiguous
+            source range with an ordered expansion-artifact fragment list.
+            - A fragment is either authored template syntax, a `#` boundary
+              value with its observed dependency, or a child macro result;
+              `map` remains an ordinary producer of ordered fragment values.
+            - `Testing/Macros/Pass/CodableConstructCollection.range` proves
+              two generated functions as eight ordered fragments: four
+              authored ranges, two child macro applications, and two nested
+              `#properties` boundaries.
+          - [x] Persist each boundary value referenced by a generated
+            artifact under its parent invocation and lexical binding identity.
+            - `#properties` must materialize the actual source-backed `[Let]`
+              value after the parent evaluator returns; it must not be
+              reconstructed from the spelling `properties`.
+            - The Codable fixture now retains two recursive three-row values:
+              one `[Let]` root and two source-backed syntax children for each
+              helper call.
+          - [x] Register each retained macro application with parent
+            invocation, fragment ordinal, inherited target/expansion
+            authority, and explicit boundary arguments.
+            - Expansion-only macros resolve as nested calls rather than fake
+              attributes while inheriting the parent construct as their
+              `Macro.Environment.target`.
+          - [x] Execute ready children in dependency order, recursively
+            flatten their `environment.expand` artifact values, and join them
+            into the parent's uncommitted graph delta.
+            - [x] Execute ready scalar-result children in source order and
+              persist their recursively materialized return values.
+              - `CodableConstructCollection.range` now proves three
+                invocations and two helper results of `2`.
+            - [x] Treat child syntax artifacts as replacement fragments and
+              merge nested expansion graph deltas before commit.
+              - The source store appends immutable generated files through
+                in-place String storage growth, avoiding unsupported stored
+                String reassignment in the accepted seed.
+              - `CodableConstructCollection.range` proves two opaque child
+                artifacts replace the helper calls before the generated
+                encode/decode functions are parsed and committed.
+          - [x] Reparse and validate only the completed composite function
+            body, then commit the parent and all child artifacts atomically.
+            - [x] Reparse the completed generated source and reject malformed
+              composite declaration ranges before graph-delta commit.
+            - [x] Stage all completed bodies before mutating syntax tables so
+              a later body failure cannot leave an earlier generated function
+              committed inside the discarded compilation transaction.
+              - Malformed child syntax is rejected at the completed
+                graph-delta boundary before any generated function is exposed;
+                commit-time table snapshots and `bufferTruncateInt` restore
+                every syntax/type/body buffer if a later mutation fails.
+            - A child diagnostic rejects the whole parent transaction; no
+              partially generated `encode` or `decode` declaration survives.
       - [ ] Restore the Range-authored `Result`, encoder/decoder container,
         coding error, and JSON surfaces needed by generated implementations.
+      - [x] Make stored-member discovery a Range-authored macro relationship.
+        - `Let` and `State` carry `@stored`; `Binding` and `Derived` remain
+          non-stored `@field` members.
+        - `members.filter(all: @stored)` resolves the declared macro family and
+          selects members through their annotated syntax nominal.
+      - [x] Represent a macro boundary result as one enum value.
+        - `CompilerMacroResult` is either `.value(...)` or `.noValue`; evaluation
+          and invocation outcomes no longer transport a boolean plus parallel
+          result fields.
       - [ ] Prove construct-attached automatic fields and generated
         encode/decode bodies through supported fixtures before adding the
         source to the accepted compiler manifest.
@@ -407,11 +689,40 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     source-bundle key.
     - Phase timings show self-emission, not Clang or linking, dominates a
       compiler-source cache miss; preserve full candidate/fixed-point proofs.
+    - The `@stored` selector proof measured 916 seconds emitting LLVM, 2
+      seconds validating it, and 2 seconds linking Stage 2. The identical
+      follow-up root-value run reused the immutable artifact and completed in
+      about 4 seconds.
+    - [x] Add a validated rolling development producer and skip the duplicate
+      ownership/effect reconstruction only for marked development source sets.
+      - Root-value publishes a development compiler as a future producer only
+        after all focused proofs pass. Optimized candidate, fixed-point, and
+        promotion gates continue from the accepted seed and retain the full
+        independent effect-validation pass.
+      - The producer identity is part of the immutable cache key; the normal
+        source snapshot remains unchanged and the marker exists only in the
+        disposable emission bundle.
+    - [x] Measure a marker-aware cache miss and record the new phase timings.
+      - The strict bootstrap miss emitted LLVM in 777 seconds. The validated
+        marker-aware forced miss emitted LLVM in 650 seconds, validated in 1
+        second, linked in 2 seconds, and passed the focused RootValue suite.
+        This proves the duplicate effects pass was removed but is only a 16%
+        improvement; do not describe it as the feedback-loop fix.
+    - [ ] Cache immutable LLVM fragments per specialized function and reuse
+      unchanged fragments across compiler-source misses.
+      - Key each fragment by the function body, generic specialization, and
+        referenced ABI/layout/effect dependencies. Invalidate only the changed
+        function and its graph dependents.
+      - The marker-aware sample is dominated by
+        `compilerBodyLLVMEmit` and
+        `compilerBodyLLVMEmitterRenderCFGDepthFirst`, including repeated
+        nominal-declaration and syntax-row resolution while rebuilding the
+        complete LLVM text.
   - [ ] Remove the labeled schema-1 executable-only compatibility lookup after
     the next compiler-source miss publishes the first schema-2 LLVM plus
     executable entry; bound cleanup of quarantined invalid entries then.
-  - [ ] Consider per-function compiler-output caching only after artifact-level
-    reuse proves insufficient.
+  - [x] Confirm artifact-level reuse is insufficient for compiler-source
+    misses; pursue the per-function fragment task above.
 - [ ] Promote the latest accepted seed as the runnable `range` compiler.
   - [ ] Make `range compile <folder>` discover the project, Core, Foundation,
     framework, and generated source graph and compile it with the immutable

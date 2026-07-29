@@ -10,7 +10,7 @@ function makeStep(value: Int): CompilerStep {
 
 function readStep(step: CompilerStep): Int {
     switch step {
-    case .value(let value):
+    case .value(value):
         return value
     case .end:
         return 0

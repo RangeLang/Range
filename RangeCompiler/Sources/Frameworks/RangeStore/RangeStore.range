@@ -1,0 +1,158 @@
+construct StoredDocument {
+    let found: Bool
+    let id: Int
+    let revision: Int
+    let bodyLength: Int
+}
+
+function documentStorePut(path: String, id: Int, body: String): Int {
+    return documentStoreCommit(path: path, id: id, deleted: 0, body: body)
+}
+
+function documentStoreRemove(path: String, id: Int): Int {
+    if id < 0 {
+        return 0 - 22
+    }
+    state log: String(readFile(path: path))
+    let revision: Int(documentStoreNextRevision(source: log))
+    let record: String("\(id):\(revision):1:0\n")
+    if log.append(text: record) != 0 { return 0 - 12 }
+    let status: Int(writeFile(path: path, text: log))
+    if status != 0 {
+        return 0 - status
+    }
+    return revision
+}
+
+function documentStoreGet(source: String, id: Int): StoredDocument {
+    state cursor: Int(0)
+    state found: Bool(false)
+    state revision: Int(0)
+    state selectedBodyLength: Int(0)
+
+    while cursor < source.count {
+        let idEnd: Int(documentStoreFindByte(source: source, start: cursor, byte: 58))
+        if idEnd < 0 {
+            return StoredDocument(found: false, id: id, revision: 0, bodyLength: 0)
+        }
+        let revisionStart: Int(idEnd + 1)
+        let revisionEnd: Int(documentStoreFindByte(source: source, start: revisionStart, byte: 58))
+        if revisionEnd < 0 {
+            return StoredDocument(found: false, id: id, revision: 0, bodyLength: 0)
+        }
+        let deletedStart: Int(revisionEnd + 1)
+        let deletedEnd: Int(documentStoreFindByte(source: source, start: deletedStart, byte: 58))
+        if deletedEnd < 0 {
+            return StoredDocument(found: false, id: id, revision: 0, bodyLength: 0)
+        }
+        let lengthStart: Int(deletedEnd + 1)
+        let lengthEnd: Int(documentStoreFindByte(source: source, start: lengthStart, byte: 10))
+        if lengthEnd < 0 {
+            return StoredDocument(found: false, id: id, revision: 0, bodyLength: 0)
+        }
+
+        let recordID: Int(documentStoreReadNatural(source: source, start: cursor, end: idEnd))
+        let recordRevision: Int(documentStoreReadNatural(source: source, start: revisionStart, end: revisionEnd))
+        let deleted: Int(documentStoreReadNatural(source: source, start: deletedStart, end: deletedEnd))
+        let bodyLength: Int(documentStoreReadNatural(source: source, start: lengthStart, end: lengthEnd))
+        if recordID < 0 || recordRevision < 0 || deleted < 0 || bodyLength < 0 {
+            return StoredDocument(found: false, id: id, revision: 0, bodyLength: 0)
+        }
+
+        if recordID == id {
+            revision: recordRevision
+            if deleted == 0 {
+                found: true
+                selectedBodyLength: bodyLength
+            } else {
+                found: false
+                selectedBodyLength: 0
+            }
+        }
+        cursor: lengthEnd + 1
+    }
+
+    return StoredDocument(
+        found: found,
+        id: id,
+        revision: revision,
+        bodyLength: selectedBodyLength)
+}
+
+function documentStoreCommit(path: String, id: Int, deleted: Int, body: String): Int {
+    if id < 0 {
+        return 0 - 22
+    }
+    state log: String(readFile(path: path))
+    let revision: Int(documentStoreNextRevision(source: log))
+    if deleted == 0 {
+        let bodyPath: String("\(path).document.\(id).\(revision)")
+        let bodyStatus: Int(writeFile(path: bodyPath, text: body))
+        if bodyStatus != 0 {
+            return 0 - bodyStatus
+        }
+    }
+    let record: String("\(id):\(revision):\(deleted):\(body.count)\n")
+    if log.append(text: record) != 0 { return 0 - 12 }
+    let status: Int(writeFile(path: path, text: log))
+    if status != 0 {
+        return 0 - status
+    }
+    return revision
+}
+
+function documentStoreNextRevision(source: String): Int {
+    state cursor: Int(0)
+    state nextRevision: Int(1)
+
+    while cursor < source.count {
+        let idEnd: Int(documentStoreFindByte(source: source, start: cursor, byte: 58))
+        if idEnd < 0 { return nextRevision }
+        let revisionStart: Int(idEnd + 1)
+        let revisionEnd: Int(documentStoreFindByte(source: source, start: revisionStart, byte: 58))
+        if revisionEnd < 0 { return nextRevision }
+        let deletedStart: Int(revisionEnd + 1)
+        let deletedEnd: Int(documentStoreFindByte(source: source, start: deletedStart, byte: 58))
+        if deletedEnd < 0 { return nextRevision }
+        let lengthStart: Int(deletedEnd + 1)
+        let lengthEnd: Int(documentStoreFindByte(source: source, start: lengthStart, byte: 10))
+        if lengthEnd < 0 { return nextRevision }
+
+        let revision: Int(documentStoreReadNatural(
+            source: source,
+            start: revisionStart,
+            end: revisionEnd))
+        let bodyLength: Int(documentStoreReadNatural(
+            source: source,
+            start: lengthStart,
+            end: lengthEnd))
+        if revision < 0 || bodyLength < 0 { return nextRevision }
+        if revision >= nextRevision { nextRevision: revision + 1 }
+
+        cursor: lengthEnd + 1
+    }
+
+    return nextRevision
+}
+
+function documentStoreFindByte(source: String, start: Int, byte: Int): Int {
+    state index: Int(start)
+    while index < source.count {
+        if source.byte(index: index) == byte { return index }
+        index: index + 1
+    }
+    return 0 - 1
+}
+
+function documentStoreReadNatural(source: String, start: Int, end: Int): Int {
+    if start >= end { return 0 - 1 }
+    state index: Int(start)
+    state value: Int(0)
+    while index < end {
+        let digit: Int(source.byte(index: index) - 48)
+        if digit < 0 || digit > 9 { return 0 - 1 }
+        value: value * 10 + digit
+        index: index + 1
+    }
+    return value
+}

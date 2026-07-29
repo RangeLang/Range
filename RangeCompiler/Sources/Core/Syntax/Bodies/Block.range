@@ -1,11 +1,6 @@
 @syntax
 construct Block {
-    let declaration: Declaration
-    let statements: [@Statement]
-
-    construct Declaration {
-        let statements: [@Statement]
-    }
+    let syntax: [@syntax]
 
     function replace(with replacement: Block): Block
 }

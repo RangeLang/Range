@@ -921,7 +921,7 @@ audit_storage_switches() {
     done
 
     local negative_kind negative_source negative_output negative_error
-    for negative_kind in nonstorage mismatch enum-missing enum-duplicate enum-unknown; do
+    for negative_kind in nonstorage mismatch enum-missing enum-duplicate enum-unknown enum-let-binding; do
         negative_source="$SWITCH_NONSTORAGE_SOURCE"
         if [[ "$negative_kind" == mismatch ]]; then
             negative_source="$SWITCH_MISMATCH_SOURCE"
@@ -931,13 +931,19 @@ audit_storage_switches() {
             negative_source="$SWITCH_ENUM_DUPLICATE_SOURCE"
         elif [[ "$negative_kind" == enum-unknown ]]; then
             negative_source="$SWITCH_ENUM_UNKNOWN_SOURCE"
+        elif [[ "$negative_kind" == enum-let-binding ]]; then
+            negative_source="$SWITCH_ENUM_LET_BINDING_SOURCE"
         fi
         negative_output="$WORK_ROOT/$stage_label.switch.$negative_kind.out"
         negative_error="$WORK_ROOT/$stage_label.switch.$negative_kind.err"
         run_capture "$executable" "$negative_source" "$negative_output" "$negative_error"
         [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label $negative_kind switch rejection exited $RUN_STATUS"
         [[ ! -s "$negative_error" ]] || fail "$stage_label $negative_kind switch rejection wrote stderr"
-        /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$negative_output" \
+        local expected_stage=2
+        if [[ "$negative_kind" == enum-let-binding ]]; then
+            expected_stage=1152
+        fi
+        /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage='"$expected_stage" "$negative_output" \
             || fail "$stage_label $negative_kind switch rejection missed the semantic diagnostic"
         if /usr/bin/grep -Fq 'define ' "$negative_output"; then
             fail "$stage_label $negative_kind switch rejection emitted LLVM"
@@ -1244,16 +1250,17 @@ audit_body_syntax_split() {
     require_successful_output "$stage_label repeated typed body syntax" "$typed_second" "$typed_second_error"
     /usr/bin/cmp -s "$typed_first" "$typed_second" || fail "$stage_label typed body syntax was not deterministic"
 
-    /usr/bin/grep -Fq $'bodyNodeCount=13\tbodyEdgeCount=12' "$typed_first" \
+    /usr/bin/grep -Fq $'bodyNodeCount=15\tbodyEdgeCount=14' "$typed_first" \
         || fail "$stage_label typed body syntax changed its canonical node/edge counts"
-    /usr/bin/grep -Fq $'typedTable\tname=bodyNode\tversion=1\tcolumns=11\trows=13' "$typed_first" \
+    /usr/bin/grep -Fq $'typedTable\tname=bodyNode\tversion=1\tcolumns=11\trows=15' "$typed_first" \
         || fail "$stage_label typed body syntax omitted its canonical body-node table"
-    /usr/bin/grep -Fq $'typedTable\tname=bodyEdge\tversion=1\tcolumns=4\trows=12' "$typed_first" \
+    /usr/bin/grep -Fq $'typedTable\tname=bodyEdge\tversion=1\tcolumns=4\trows=14' "$typed_first" \
         || fail "$stage_label typed body syntax omitted its canonical body-edge table"
 
     local specification kind expected actual
     for specification in \
         entry:1 \
+        block:2 \
         local:1 \
         return:2 \
         identifier:4 \
@@ -1269,7 +1276,7 @@ audit_body_syntax_split() {
             || fail "$stage_label typed body syntax emitted $actual $kind nodes; expected $expected"
     done
 
-    for specification in 1:3 2:1 3:2 4:1 5:1 6:1 8:1 9:1 12:1; do
+    for specification in 1:3 2:1 3:2 4:1 5:1 6:1 8:1 9:1 12:1 31:2; do
         kind="${specification%%:*}"
         expected="${specification#*:}"
         actual="$(body_syntax_typed_edge_role_count "$typed_first" "$kind")"
@@ -4031,7 +4038,7 @@ write_macro_generated_function_bundle() {
         /usr/bin/printf '%b\n' \
             'compilerSourceFile\trole=foundation\tpath=Foundation/UnrelatedGenerated.range' \
             'macro unrelatedGenerated(): Construct { environment in' \
-            '    @expand {' \
+            '    environment.expand {' \
             '        function unrelatedFunction(): Int {' \
             '            return 11' \
             '        }' \
@@ -4043,13 +4050,13 @@ write_macro_generated_function_bundle() {
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=core\tpath=Core/Registrable.range' \
         'macro registrable(): Construct { environment in' \
-        '    @expand {' \
+        '    environment.expand {' \
         '        function globalFunction(input: Int): Int {' \
         '            let adjusted: Int(input + 2)' \
         '            return adjusted + 1' \
         '        }' \
         '    }' \
-        '    @expand {' \
+        '    environment.expand {' \
         '        extension #(environment.target.declaration.self) {' \
         '            function memberFunction(delta: Int): Int {' \
         '                return delta + 3' \
@@ -4113,7 +4120,7 @@ write_macro_registrable_bundle() {
         /usr/bin/printf '%b\n' \
             'compilerSourceFile\trole=foundation\tpath=Foundation/UnrelatedRegistrable.range' \
             'macro unrelatedRegistrable(): Construct { environment in' \
-            '    @expand {' \
+            '    environment.expand {' \
             '        function unrelatedRegistrableFunction(): Int {' \
             '            return 11' \
             '        }' \
@@ -4168,11 +4175,15 @@ write_macro_registrable_bundle() {
 
 write_macro_registrable_root_storage_bundle() {
     local output="$1"
+    local header="${2-compilerMacroSnapshot}"
+    : > "$output"
+    if [[ -n "$header" ]]; then
+        /usr/bin/printf '%s\n' "$header" > "$output"
+    fi
     /usr/bin/printf '%b\n' \
-        'compilerMacroSnapshot' \
         'compilerSourceFile\trole=core\tpath=Core/RootStorage.range' \
         'macro rootStorage(): Construct { environment in' \
-        '    @expand {' \
+        '    environment.expand {' \
         '        let rootValue: Int' \
         '    }' \
         '}' \
@@ -4182,7 +4193,7 @@ write_macro_registrable_root_storage_bundle() {
         '' \
         '@main {' \
         '    return 0' \
-        '}' > "$output"
+        '}' >> "$output"
 }
 
 write_macro_registrable_malformed_splice_bundle() {
@@ -4191,7 +4202,7 @@ write_macro_registrable_malformed_splice_bundle() {
         'compilerMacroSnapshot' \
         'compilerSourceFile\trole=core\tpath=Core/MalformedMemberSplice.range' \
         'macro malformedMember(): Construct { environment in' \
-        '    @expand {' \
+        '    environment.expand {' \
         '        extension #(environment.target.declaration.bad) {' \
         '            let registrationSeed: Int' \
         '        }' \
@@ -4294,7 +4305,11 @@ audit_macro_registrable() {
     negative_error="$WORK_ROOT/$stage_label.macro.registrable.root-storage.err"
     write_macro_registrable_root_storage_bundle "$negative_bundle"
     run_capture "$executable" "$negative_bundle" "$negative_output" "$negative_error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label root generated storage exited $RUN_STATUS"
+    [[ "$RUN_STATUS" -eq 0 ]] || fail "$stage_label root storage artifact snapshot exited $RUN_STATUS"
+    /usr/bin/grep -Fq 'macroExpansionArtifact' "$negative_output" || fail "$stage_label root storage snapshot did not retain its syntax artifact"
+    write_macro_registrable_root_storage_bundle "$negative_bundle" ""
+    run_capture "$executable" "$negative_bundle" "$negative_output" "$negative_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label unconsumed root storage artifact exited $RUN_STATUS"
     [[ ! -s "$negative_error" ]] || fail "$stage_label root generated storage wrote stderr"
     if /usr/bin/grep -Fq 'define ' "$negative_output" || /usr/bin/grep -Fq 'call ' "$negative_output"; then
         fail "$stage_label root generated storage emitted LLVM before rejection"
@@ -4340,7 +4355,7 @@ write_macro_generated_function_malformed_extension_bundle() {
         'compilerMacroSnapshot' \
         'compilerSourceFile\trole=core\tpath=Core/MalformedGeneratedExtension.range' \
         'macro malformed(): Construct { environment in' \
-        '    @expand {' \
+        '    environment.expand {' \
         '        extension #(environment.target.declaration.bad) {' \
         '            function memberFunction(): Int {' \
         '                return 7' \
@@ -4380,7 +4395,7 @@ audit_macro_generated_function() {
     /usr/bin/cmp -s "$snapshot_output" "$snapshot_repeat" || fail "$stage_label generated function snapshot was not deterministic"
     local generated_function_count
     generated_function_count="$(/usr/bin/grep -F 'macroGraphGeneratedFunction' "$snapshot_output" | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
-    [[ "$generated_function_count" -eq 2 ]] || fail "$stage_label each @expand block did not emit exactly one generated function set"
+    [[ "$generated_function_count" -eq 2 ]] || fail "$stage_label each environment.expand block did not emit exactly one generated function set"
     /usr/bin/grep -Fq $'macroGraphGeneratedFunction\trow=0\tkind=function\townerSyntaxID=-1\tplacement=0\tlexicalParentOrdinal=-1\tparentFingerprint=0:0\tname=globalFunction\treturnType=Int\tmacroDeclarationRow=' "$snapshot_output" || fail "$stage_label root generated function was not module-level"
     /usr/bin/grep -E -q $'macroGraphGeneratedFunction\trow=1\tkind=function\townerSyntaxID=[0-9]+\tplacement=1\tlexicalParentOrdinal=[0-9]+\tparentFingerprint=[0-9]+:[0-9]+\tname=memberFunction\treturnType=Int\tmacroDeclarationRow=' "$snapshot_output" || fail "$stage_label extension generated function was not target-owned"
     /usr/bin/grep -F 'macroGraphGeneratedFunction' "$snapshot_output" \
@@ -5417,6 +5432,7 @@ main() {
     SWITCH_MEMBER_SOURCE="$REPO_ROOT/Testing/ControlFlow/Pass/ReturnMemberIntegerSwitch.range"
     SWITCH_ENUM_SOURCE="$REPO_ROOT/Testing/Enums/Pass/ReturnEnumSwitch.range"
     SWITCH_ENUM_FUNCTION_SOURCE="$REPO_ROOT/Testing/Enums/Pass/ReturnEnumFunctionSwitch.range"
+    SWITCH_ENUM_LET_BINDING_SOURCE="$REPO_ROOT/Testing/Enums/Fail/LegacyLetPayloadBinding.range"
     ARRAY_INDEX_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ReturnArrayIndex.range"
     ARRAY_COUNT_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ReturnArrayCount.range"
     ARRAY_ENUM_PAYLOAD_SOURCE="$REPO_ROOT/Testing/Collections/Pass/ReturnEnumArrayPayload.range"

@@ -386,7 +386,7 @@ function compilerBodyArenaParsePrimary(arena: CompilerBodyArena, start: Int, lim
         kind: compilerSyntaxKindStringLiteral()
     }
     if (token.kind == .identifier || token.kind == .keyword) && (token.text == String("true") || token.text == String("false")) { kind: compilerSyntaxKindBoolLiteral() }
-    if kind < 0 && (token.kind == .identifier || token.kind == .keyword) { kind: compilerSyntaxKindIdentifier() }
+    if kind < 0 && (token.kind == .identifier || token.kind == .keyword || token.kind == .macroAttribute) { kind: compilerSyntaxKindIdentifier() }
     if kind < 0 { return compilerBodyParseFailure(index: start) }
     let primaryNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: kind, ordinal: 0, start: token.start, end: token.end, firstStart: token.start, firstEnd: token.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
     return compilerBodyParseSuccess(nodeID: primaryNodeID, nextIndex: token.end)
@@ -458,18 +458,14 @@ function compilerBodyArenaParseSwitchPatternArguments(arena: CompilerBodyArena, 
                 }
             }
         }
-        if bindingToken.kind != .keyword || bindingToken.text != String("let") { return compilerBodyParseFailure(index: bindingToken.start) }
-        let maybeName: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: bindingToken.end))
-        if maybeName == nil { return compilerBodyParseFailure(index: bindingToken.end) }
-        let name: RangeLexedToken(maybeName ?? compilerFallbackTokenAt(index: fallbackIndex))
-        if name.kind != .identifier { return compilerBodyParseFailure(index: name.start) }
-        let bindingNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindIdentifier(), ordinal: ordinal, start: bindingToken.start, end: name.end, firstStart: name.start, firstEnd: name.end, secondStart: bindingToken.start, secondEnd: bindingToken.end, aux: compilerBodyEnumPatternBindingAux()))
-        let argumentNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindArgument(), ordinal: ordinal, start: token.start, end: name.end, firstStart: labelStart, firstEnd: labelEnd, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+        if bindingToken.kind != .identifier { return compilerBodyParseFailure(index: bindingToken.start) }
+        let bindingNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindIdentifier(), ordinal: ordinal, start: bindingToken.start, end: bindingToken.end, firstStart: bindingToken.start, firstEnd: bindingToken.end, secondStart: 0 - 1, secondEnd: 0 - 1, aux: compilerBodyEnumPatternBindingAux()))
+        let argumentNodeID: Int(compilerBodyArenaAppendNode(arena: arena, kind: compilerSyntaxKindArgument(), ordinal: ordinal, start: token.start, end: bindingToken.end, firstStart: labelStart, firstEnd: labelEnd, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
         if bindingNodeID < 0 || argumentNodeID < 0
             || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: callNodeID, childNodeID: argumentNodeID, role: compilerSyntaxRoleArgument(), ordinal: ordinal) != 0
             || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: argumentNodeID, childNodeID: bindingNodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: cursor) }
-        let maybeSeparator: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: name.end))
-        if maybeSeparator == nil { return compilerBodyParseFailure(index: name.end) }
+        let maybeSeparator: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: bindingToken.end))
+        if maybeSeparator == nil { return compilerBodyParseFailure(index: bindingToken.end) }
         let separator: RangeLexedToken(maybeSeparator ?? compilerFallbackTokenAt(index: fallbackIndex))
         if separator.kind == .rightParen { return compilerBodyParseSuccess(nodeID: callNodeID, nextIndex: separator.end) }
         if separator.kind != .comma { return compilerBodyParseFailure(index: separator.start) }

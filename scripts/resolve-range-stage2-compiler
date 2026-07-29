@@ -19,6 +19,62 @@ RANGE_STAGE2_CACHE_ROOT="${RANGE_STAGE2_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Libra
 RANGE_STAGE2_PROFILE="${RANGE_STAGE2_PROFILE:-optimized}"
 SEED_COMPILER_OPTIMIZATION="${SEED_COMPILER_OPTIMIZATION:-$COMPILER_OPTIMIZATION}"
 SEED_COMPILER_LTO="${SEED_COMPILER_LTO:-$COMPILER_LTO}"
+RANGE_STAGE2_VALIDATED_DEVELOPMENT_PRODUCER="$RANGE_STAGE2_CACHE_ROOT/ValidatedDevelopmentProducer.txt"
+RANGE_STAGE2_PRODUCER_KIND="accepted-seed"
+RANGE_STAGE2_PRODUCER_PATH=""
+
+range_stage2_select_producer() {
+    local seed_relative validated_key validated_capability validated_directory
+
+    seed_relative="$(manifest_value seed.path)"
+    RANGE_STAGE2_PRODUCER_KIND="accepted-seed"
+    RANGE_STAGE2_PRODUCER_PATH="$REPO_ROOT/$seed_relative"
+    if [[ "$RANGE_STAGE2_PROFILE" != "development"
+        || ! -f "$RANGE_STAGE2_VALIDATED_DEVELOPMENT_PRODUCER" ]]; then
+        return 0
+    fi
+    validated_key="$(/usr/bin/sed -n '1p' "$RANGE_STAGE2_VALIDATED_DEVELOPMENT_PRODUCER" 2>/dev/null || true)"
+    validated_capability="$(/usr/bin/sed -n '2p' "$RANGE_STAGE2_VALIDATED_DEVELOPMENT_PRODUCER" 2>/dev/null || true)"
+    [[ "$validated_key" =~ ^[0-9a-f]{64}$ ]] || return 0
+    [[ "$validated_capability" == "developmentEffectValidation=single-pass-v1" ]] || return 0
+    validated_directory="$RANGE_STAGE2_CACHE_ROOT/$validated_key"
+    if range_stage2_validated_producer_is_valid "$validated_directory" "$validated_key"; then
+        RANGE_STAGE2_PRODUCER_KIND="validated-development"
+        RANGE_STAGE2_PRODUCER_PATH="$validated_directory/RangeCompilerProducer"
+    fi
+}
+
+range_stage2_mark_development_producer_validated() {
+    local temporary producer temporary_producer producer_metadata
+    local saved_optimization saved_lto
+
+    [[ "$RANGE_STAGE2_PROFILE" == "development" ]] || return 0
+    [[ -n "${STAGE2_CACHE_KEY:-}" && -n "${STAGE2_CACHE_DIRECTORY:-}" ]] || return 1
+    range_stage2_cache_entry_is_valid "$STAGE2_CACHE_DIRECTORY" "$STAGE2_CACHE_KEY" || return 1
+    producer="$STAGE2_CACHE_DIRECTORY/RangeCompilerProducer"
+    producer_metadata="$STAGE2_CACHE_DIRECTORY/ProducerMetadata.txt"
+    if ! range_stage2_validated_producer_is_valid "$STAGE2_CACHE_DIRECTORY" "$STAGE2_CACHE_KEY"; then
+        temporary_producer="$WORK_ROOT/RangeCompilerProducer"
+        saved_optimization="$COMPILER_OPTIMIZATION"
+        saved_lto="$COMPILER_LTO"
+        COMPILER_OPTIMIZATION="-O2"
+        COMPILER_LTO="-flto=thin"
+        link_llvm "$STAGE2_LLVM" "$temporary_producer" || {
+            COMPILER_OPTIMIZATION="$saved_optimization"
+            COMPILER_LTO="$saved_lto"
+            return 1
+        }
+        COMPILER_OPTIMIZATION="$saved_optimization"
+        COMPILER_LTO="$saved_lto"
+        /bin/mv "$temporary_producer" "$producer"
+        /usr/bin/printf 'sourceCacheKey=%s\ncapability=single-pass-v1\nexecutableHash=%s\nexecutableBytes=%s\n' \
+            "$STAGE2_CACHE_KEY" "$(sha256 "$producer")" "$(bytes "$producer")" > "$producer_metadata"
+    fi
+    /bin/mkdir -p "$RANGE_STAGE2_CACHE_ROOT"
+    temporary="$RANGE_STAGE2_VALIDATED_DEVELOPMENT_PRODUCER.$$"
+    /usr/bin/printf '%s\ndevelopmentEffectValidation=single-pass-v1\n' "$STAGE2_CACHE_KEY" > "$temporary"
+    /bin/mv "$temporary" "$RANGE_STAGE2_VALIDATED_DEVELOPMENT_PRODUCER"
+}
 
 range_stage2_write_cache_key_material() {
     local output="$1"
@@ -67,6 +123,9 @@ range_stage2_write_cache_key_material() {
     /usr/bin/printf 'seedLinkArgv=%s|%s|-Wno-override-module|-x|ir|seed|-x|c|runtime-set|-o|output\n' \
         "$SEED_COMPILER_OPTIMIZATION" "$SEED_COMPILER_LTO" >> "$output"
     /usr/bin/printf 'compilerEmitArgv=seed-executable|source-bundle\n' >> "$output"
+    /usr/bin/printf 'compilerEmitProducerKind=%s\ncompilerEmitProducerHash=%s\ncompilerEmitProducerBytes=%s\n' \
+        "$RANGE_STAGE2_PRODUCER_KIND" \
+        "$(sha256 "$RANGE_STAGE2_PRODUCER_PATH")" "$(bytes "$RANGE_STAGE2_PRODUCER_PATH")" >> "$output"
     /usr/bin/printf 'llvmValidateArgv=-Wno-override-module|-x|ir|-c|stage2-llvm|-o|object\n' >> "$output"
     /usr/bin/printf 'stage2LinkArgv=%s|%s|-Wno-override-module|stage2-llvm|runtime-set|-o|output\n' \
         "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" >> "$output"
@@ -142,6 +201,24 @@ range_stage2_cache_entry_is_valid() {
     [[ "$(bytes "$executable")" == "$expected_executable_bytes" ]] || return 1
 }
 
+range_stage2_validated_producer_is_valid() {
+    local directory="$1"
+    local expected_key="$2"
+    local producer="$directory/RangeCompilerProducer"
+    local metadata="$directory/ProducerMetadata.txt"
+    local expected_hash expected_bytes
+
+    range_stage2_cache_entry_is_valid "$directory" "$expected_key" || return 1
+    [[ -x "$producer" && -f "$metadata" ]] || return 1
+    /usr/bin/grep -Fxq "sourceCacheKey=$expected_key" "$metadata" || return 1
+    /usr/bin/grep -Fxq 'capability=single-pass-v1' "$metadata" || return 1
+    expected_hash="$(/usr/bin/awk -F= '$1 == "executableHash" { print $2 }' "$metadata")"
+    expected_bytes="$(/usr/bin/awk -F= '$1 == "executableBytes" { print $2 }' "$metadata")"
+    [[ -n "$expected_hash" && -n "$expected_bytes" ]] || return 1
+    [[ "$(sha256 "$producer")" == "$expected_hash" ]] || return 1
+    [[ "$(bytes "$producer")" == "$expected_bytes" ]] || return 1
+}
+
 range_stage2_legacy_cache_entry_is_valid() {
     local directory="$1"
     local expected_key="$2"
@@ -206,7 +283,7 @@ resolve_stage2_compiler() {
     local legacy_key_material="$WORK_ROOT/stage2-cache-key.legacy"
     local cache_key cache_directory
     local legacy_cache_key legacy_cache_directory
-    local build_directory seed seed_executable stage2_llvm stage2_executable
+    local build_directory seed seed_executable stage2_source_bundle stage2_llvm stage2_executable
     local lock_directory publish_directory invalid_directory
     local lock_status build_status publish_status
     local range_stage2_phase_started range_stage2_build_started
@@ -214,6 +291,7 @@ resolve_stage2_compiler() {
     [[ "$require_llvm" == "0" || "$require_llvm" == "1" ]] \
         || fail "shared Stage 2 resolver expected require_llvm 0 or 1"
 
+    range_stage2_select_producer
     range_stage2_write_cache_key_material "$key_material"
     cache_key="$(sha256 "$key_material")"
     cache_directory="$RANGE_STAGE2_CACHE_ROOT/$cache_key"
@@ -273,18 +351,31 @@ resolve_stage2_compiler() {
     fi
     seed="$REPO_ROOT/$(manifest_value seed.path)"
     seed_executable="$WORK_ROOT/RangeCompilerSeed"
+    stage2_source_bundle="$SOURCE_BUNDLE"
     stage2_llvm="$build_directory/RangeCompiler.ll"
     stage2_executable="$build_directory/RangeCompiler"
+    if [[ "$RANGE_STAGE2_PROFILE" == "development" ]]; then
+        stage2_source_bundle="$build_directory/RangeCompilerDevelopmentSourceSet.range"
+        {
+            /usr/bin/head -n 1 "$SOURCE_BUNDLE"
+            /usr/bin/printf '%s\n' '// range-development-compiler'
+            /usr/bin/tail -n +2 "$SOURCE_BUNDLE"
+        } > "$stage2_source_bundle"
+    fi
     range_stage2_build_started="$(date +%s)"
     set +e
     (
         set -e
         range_stage2_phase_started="$(date +%s)"
-        clang "$SEED_COMPILER_OPTIMIZATION" "$SEED_COMPILER_LTO" -Wno-override-module \
-            -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
+        if [[ "$RANGE_STAGE2_PRODUCER_KIND" == "validated-development" ]]; then
+            seed_executable="$RANGE_STAGE2_PRODUCER_PATH"
+        else
+            clang "$SEED_COMPILER_OPTIMIZATION" "$SEED_COMPILER_LTO" -Wno-override-module \
+                -x ir "$seed" -x c "${RUNTIME_INPUTS[@]}" -o "$seed_executable"
+        fi
         echo "stage2Timing profile=$RANGE_STAGE2_PROFILE phase=seed-link seconds=$(($(date +%s) - range_stage2_phase_started))"
         range_stage2_phase_started="$(date +%s)"
-        emit_candidate_llvm "$seed_executable" "$SOURCE_BUNDLE" "$stage2_llvm" shared-stage2
+        emit_candidate_llvm "$seed_executable" "$stage2_source_bundle" "$stage2_llvm" shared-stage2
         echo "stage2Timing profile=$RANGE_STAGE2_PROFILE phase=llvm-emission seconds=$(($(date +%s) - range_stage2_phase_started))"
         range_stage2_phase_started="$(date +%s)"
         validate_llvm "$stage2_llvm"

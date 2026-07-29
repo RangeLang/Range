@@ -41,7 +41,7 @@ macro collectionClosureExecution(): Construct { environment in
     )
     if names.count == 1 {
         environment.expand {
-            extension #(environment.target.declaration.self) {
+            extension #environment.target.declaration.self {
                 let collectionClosureExecutionWorked: Int
             }
         }

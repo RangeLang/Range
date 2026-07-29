@@ -9,11 +9,11 @@ enum List {
     switch list {
     case .end:
         return 1
-    case .next(let value):
+    case .next(value):
         switch value {
         case .end:
             return 7
-        case .next(let ignored):
+        case .next(ignored):
             return 2
         }
     }

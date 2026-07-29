@@ -2469,7 +2469,8 @@ function compilerCoreRenderLLVMRuntimeDeclarations(records: String, renderedFunc
     }
     let dynamicConstructDeclarations: String(compilerCoreRenderLLVMDynamicConstructDeclarations(records: records, renderedFunctions: renderedFunctions))
     let metricsDeclarations: String(compilerCoreLLVMRuntimeMetricsDeclarations(records: records, renderedFunctions: renderedFunctions))
-    return "\(trapDeclaration)\(baseDeclarations)\(dynamicConstructDeclarations)\(metricsDeclarations)\n"
+    let transactionDeclarations: String("declare i32 @bufferTruncateInt(ptr, i32)\n")
+    return "\(trapDeclaration)\(baseDeclarations)\(transactionDeclarations)\(dynamicConstructDeclarations)\(metricsDeclarations)\n"
 }
 
 function compilerCoreRenderLLVMDynamicConstructDeclarations(records: String, renderedFunctions: String): String {

@@ -1,0 +1,14 @@
+enum Result {
+    case success(value: Int)
+    case failure
+}
+
+@main {
+    let result: Result(.success(value: 7))
+    switch result {
+    case .success(let value):
+        return value
+    case .failure:
+        return 0
+    }
+}

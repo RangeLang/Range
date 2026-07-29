@@ -230,11 +230,31 @@ construct CompilerSyntaxTables {
     let macroResults: CompilerIntTable
     let compilerFormulaFacts: CompilerIntTable
     let macroExpansionTemplates: CompilerIntTable
+    let macroExpansionFragments: CompilerIntTable
+    let macroExpansionBindings: CompilerIntTable
+    let macroChildApplications: CompilerIntTable
+    let macroExpansionArtifacts: CompilerIntTable
     let pendingGeneratedFunctions: CompilerIntTable
     let pendingGeneratedMembers: CompilerIntTable
     let bodyNodes: CompilerIntTable
     let bodyEdges: CompilerIntTable
     let failures: Buffer<Int>
+}
+
+construct CompilerGeneratedCommitSnapshot {
+    let syntaxValueCount: Int
+    let declarationValueCount: Int
+    let memberValueCount: Int
+    let functionValueCount: Int
+    let functionOwnerCount: Int
+    let parameterValueCount: Int
+    let genericParameterValueCount: Int
+    let typeReferenceValueCount: Int
+    let bodyNodeValueCount: Int
+    let bodyEdgeValueCount: Int
+    let pendingFunctionValueCount: Int
+    let pendingMemberValueCount: Int
+    let failureCount: Int
 }
 
 construct CompilerMacroIndex {
@@ -408,6 +428,11 @@ construct CompilerGraphDelta {
     let failures: Buffer<Int>
 }
 
+enum CompilerMacroResult {
+    case value(kind: Int, typeKind: Int, nominalSyntaxID: Int, scalar: Int, childCount: Int)
+    case noValue
+}
+
 construct CompilerMacroEvaluationOutcome {
     let status: Int
     let diagnosticCode: Int
@@ -415,12 +440,7 @@ construct CompilerMacroEvaluationOutcome {
     let readDependencyCount: Int
     let mirOperationCount: Int
     let stepCount: Int
-    let hasResult: Bool
-    let resultKind: Int
-    let resultTypeKind: Int
-    let resultNominalSyntaxID: Int
-    let resultScalar: Int
-    let resultChildCount: Int
+    let result: CompilerMacroResult
 }
 
 construct CompilerMacroInvocationOutcome {
@@ -430,12 +450,7 @@ construct CompilerMacroInvocationOutcome {
     let readDependencyCount: Int
     let mirOperationCount: Int
     let stepCount: Int
-    let hasResult: Bool
-    let resultKind: Int
-    let resultTypeKind: Int
-    let resultNominalSyntaxID: Int
-    let resultScalar: Int
-    let resultChildCount: Int
+    let result: CompilerMacroResult
     let graphDelta: CompilerGraphDelta
 }
 

@@ -7,7 +7,7 @@ enum MutableNumberToken {
     state tokens: [MutableNumberToken]([.value(value: 4), .eof])
     tokens[1]: .value(value: 7)
     switch tokens[1] {
-    case .value(let number):
+    case .value(number):
         return number
     case .eof:
         return 0

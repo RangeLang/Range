@@ -81,7 +81,7 @@ macro inspectMetadata(): Construct { environment in
 
     if enabledProperties.count == 1 {
         environment.expand {
-            extension #(environment.target.declaration.self) {
+            extension #environment.target.declaration.self {
                 let typedParameterDefaultsWorked: Int
             }
         }

@@ -35,6 +35,42 @@ export function logarithmicScalePosition(value, {
   return Math.log1p(value * intervalCount) / Math.log1p(intervalCount);
 }
 
+export function logarithmicScalePositionAround(value, {
+  center = 0,
+  divisionBase = 3,
+  divisionLevels = 3,
+} = {}) {
+  assertFiniteNumber(value, "value");
+  assertFiniteNumber(center, "center");
+  if (value < 0 || value > 1) throw new RangeError("value must be within [0, 1]");
+  if (center < 0 || center > 1) throw new RangeError("center must be within [0, 1]");
+
+  if (center === 0) {
+    return logarithmicScalePosition(value, { divisionBase, divisionLevels });
+  }
+  if (center === 1) {
+    return 1 - logarithmicScalePosition(1 - value, {
+      divisionBase,
+      divisionLevels,
+    });
+  }
+  if (value === center) return center;
+
+  if (value < center) {
+    const distance = (center - value) / center;
+    return center - center * logarithmicScalePosition(distance, {
+      divisionBase,
+      divisionLevels,
+    });
+  }
+
+  const distance = (value - center) / (1 - center);
+  return center + (1 - center) * logarithmicScalePosition(distance, {
+    divisionBase,
+    divisionLevels,
+  });
+}
+
 export function dragZeroWithFalloff(position, {
   value = position,
   drag = 0,
@@ -307,14 +343,17 @@ export function createRangeMarks(config = {}) {
     divisionBase: config.divisionBase,
     divisionLevels: config.divisionLevels,
   });
+  const center = Number.isFinite(config.focusPosition)
+    ? Math.min(1, Math.max(0, config.focusPosition))
+    : 0;
 
   return logicalMarks.map((mark) => ({
     ...mark,
     anchored: mark.position === 0 || mark.position === 1,
-    position: dragZeroWithFalloff(mark.position, {
-      value: mark.value,
-      drag: config.zeroDrag,
-      falloff: config.zeroDragFalloff,
+    position: logarithmicScalePositionAround(mark.value, {
+      center,
+      divisionBase: config.divisionBase,
+      divisionLevels: config.divisionLevels,
     }),
     width: 1,
   }));

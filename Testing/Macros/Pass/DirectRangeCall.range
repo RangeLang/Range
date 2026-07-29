@@ -8,7 +8,7 @@ macro directCall(): Construct { environment in
     let result: Int(macroIncrement(value: 1))
     if result == 2 {
         environment.expand {
-            extension #(environment.target.declaration.self) {
+            extension #environment.target.declaration.self {
                 let directCallWorked: Int
             }
         }

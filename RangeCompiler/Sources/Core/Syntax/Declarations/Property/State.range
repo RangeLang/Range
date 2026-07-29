@@ -1,6 +1,7 @@
 @syntax
 @property
 @field
+@stored
 @member
 construct State<T> {
     let macros: [Macro.Application]

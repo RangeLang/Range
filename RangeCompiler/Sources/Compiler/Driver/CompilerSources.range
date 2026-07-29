@@ -123,6 +123,29 @@ function compilerSourceStoreFileCount(store: CompilerSourceStore): Int {
     return compilerIntTableRowCount(table: store.files)
 }
 
+function compilerSourceStoreAppendGeneratedFile(store: CompilerSourceStore, path: String, content: String): Int {
+    if !store.isValid || stringLength(value: path) == 0 { return 0 - 1 }
+    let oldLength: Int(stringLength(value: store.source))
+    let pathStart: Int(oldLength + 1)
+    let pathEnd: Int(pathStart + stringLength(value: path))
+    let contentStart: Int(pathEnd + 1)
+    let contentEnd: Int(contentStart + stringLength(value: content))
+    let buffer: RawBuffer(rawBufferCreate(capacity: contentEnd - oldLength, stride: 1))
+    if rawBufferAppendText(buffer: buffer, text: compilerCoreNewlineCharacter()) != 0
+        || rawBufferAppendText(buffer: buffer, text: path) != 0
+        || rawBufferAppendText(buffer: buffer, text: compilerCoreNewlineCharacter()) != 0
+        || rawBufferAppendText(buffer: buffer, text: content) != 0 {
+        rawBufferDestroy(buffer: buffer)
+        return 0 - 1
+    }
+    let suffix: String(compilerCoreRawBufferMaterializeAndDestroy(buffer: buffer))
+    if stringAppendStorage(destination: store.source, text: suffix) != 0
+        || compilerSourceFileTableAppend(files: store.files, role: compilerSourceRoleGenerated(), pathStart: pathStart, pathEnd: pathEnd, contentStart: contentStart, contentEnd: contentEnd) != 0 {
+        return 0 - 1
+    }
+    return compilerSourceStoreFileCount(store: store) - 1
+}
+
 function compilerSourceStoreFileRole(store: CompilerSourceStore, fileID: Int): Int {
     return compilerIntTableValue(table: store.files, row: fileID, column: 0)
 }
@@ -396,4 +419,3 @@ function compilerSourceNextMarkerCandidateFromCandidate(source: String, marker: 
     }
     return compilerSourceNextMarkerCandidateFromCandidate(source: source, marker: marker, candidate: stringIndexOf(source: source, needle: marker, start: candidate + 1))
 }
-

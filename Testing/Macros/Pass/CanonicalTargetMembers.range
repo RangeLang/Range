@@ -5,6 +5,7 @@ construct Array<Element> {}
 
 compilerSourceFile\trole=core\tpath=Core/Macro/CanonicalTargetMembers.range
 open macro member(): Declaration | Member -> Void {}
+open macro stored(): Construct -> Void {}
 
 construct Construct {
     let declaration: ConstructDeclaration
@@ -14,14 +15,19 @@ construct ConstructDeclaration {
     let members: [@member]
 }
 
+@stored
 construct Let {}
+
+@stored
 construct State {}
 
+construct Binding {}
+
 macro canonicalTargetMembers(): Construct { environment in
-    let memberCount: Int(environment.target.declaration.members.filter(all: Let).count)
-    if memberCount == 2 {
+    let memberCount: Int(environment.target.declaration.members.filter(all: @stored).count)
+    if memberCount == 3 {
         environment.expand {
-            extension #(environment.target.declaration.self) {
+            extension #environment.target.declaration.self {
                 let canonicalTargetMembersWorked: Int
             }
         }
@@ -32,5 +38,6 @@ compilerSourceFile\trole=project\tpath=Project/Value.range
 construct Value {
     let first: Int
     state mutable: Int
+    binding excluded: Int
     let second: Bool
 }

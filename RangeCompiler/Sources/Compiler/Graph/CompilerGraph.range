@@ -832,7 +832,7 @@ function compilerPlotterBuild(tables: CompilerSyntaxTables, delta: CompilerGraph
     state plotSubjectSyntaxID: Int(0)
     while plotSubjectSyntaxID < plotSyntaxCount {
         state plotRoleTag: Int(compilerSyntaxRoleStatement())
-        while plotRoleTag <= compilerSyntaxRoleIndex() {
+        while plotRoleTag <= compilerSyntaxRoleBody() {
             if plotRoleTag == compilerGraphRoleMember() {
                 if compilerPlotterAppendMemberFacts(tables: tables, delta: delta, subjectSyntaxID: plotSubjectSyntaxID) != 0 { return 0 - 1 }
             } else if plotRoleTag == compilerGraphRoleParameter() {

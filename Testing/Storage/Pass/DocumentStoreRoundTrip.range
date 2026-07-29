@@ -1,0 +1,77 @@
+@main {
+    if commandLineArgumentCount() != 1 { return 64 }
+    let path: String(commandLineArgument(index: 0))
+
+    let first: Int(documentStorePut(path: path, id: 7, body: String("first")))
+    if first != 1 { return 1 }
+
+    let second: Int(documentStorePut(path: path, id: 7, body: String("second:\nvalue")))
+    if second != 2 { return 2 }
+
+    let other: Int(documentStorePut(path: path, id: 9, body: String("other")))
+    if other != 3 { return 3 }
+
+    if !documentStoreFixtureMatches(
+        path: path,
+        id: 7,
+        found: true,
+        revision: 2,
+        body: String("second:\nvalue")) { return 4 }
+
+    let deleted: Int(documentStoreRemove(path: path, id: 7))
+    if deleted != 4 { return 5 }
+
+    if !documentStoreFixtureMatches(
+        path: path,
+        id: 7,
+        found: false,
+        revision: 4,
+        body: String("")) { return 6 }
+
+    if !documentStoreFixtureMatches(
+        path: path,
+        id: 9,
+        found: true,
+        revision: 3,
+        body: String("other")) { return 7 }
+    if !documentStoreFixtureMatches(
+        path: path,
+        id: 7,
+        found: false,
+        revision: 4,
+        body: String("")) { return 8 }
+
+    let restored: Int(documentStorePut(path: path, id: 7, body: String("restored")))
+    if restored != 5 { return 9 }
+
+    if !documentStoreFixtureMatches(
+        path: path,
+        id: 7,
+        found: true,
+        revision: 5,
+        body: String("restored")) { return 10 }
+
+    return 0
+}
+
+function documentStoreFixtureMatches(
+    path: String,
+    id: Int,
+    found: Bool,
+    revision: Int,
+    body: String
+): Bool {
+    state snapshot: String(readFile(path: path))
+    let document: StoredDocument(documentStoreGet(source: snapshot, id: id))
+    state storedBody: String("")
+    if document.found {
+        storedBody: readFile(path: "\(path).document.\(document.id).\(document.revision)")
+    }
+    let matches: Bool(
+        document.found == found
+        && document.revision == revision
+        && storedBody == body)
+    storedBody.destroy()
+    snapshot.destroy()
+    return matches
+}

@@ -89,8 +89,53 @@ export function benchmarkFromLeaf(subcategory: string, leaf: any): Benchmark {
 }
 
 const rangeKeywords = new Set([
-  "binding", "break", "case", "closed", "construct", "continue", "default", "derived", "else", "enum", "extension", "for", "function", "get", "if", "in", "infix", "init", "let", "macro", "open", "operator", "postfix", "precedencegroup", "prefix", "protocol", "return", "set", "state", "switch", "while",
+  "background", "binding", "break", "builder", "capture", "case", "closed",
+  "construct", "continue", "core", "default", "derived", "else", "enum",
+  "extension", "for", "function", "get", "if", "in", "infix", "init", "let",
+  "macro", "main", "marker", "namespace", "nil", "on", "open", "operator",
+  "package", "postfix", "precedencegroup", "prefix", "protocol", "return",
+  "self", "set", "state", "switch", "var", "while",
 ]);
+
+const rangeTypeDeclarationKeywords = new Set([
+  "construct", "enum", "namespace", "protocol",
+]);
+
+const rangeBindingKeywords = new Set([
+  "binding", "let", "state", "var",
+]);
+
+function rangeSemanticTokenType(
+  token: string,
+  previous: string,
+  next: string,
+) {
+  if (token.startsWith("//")) return "comment";
+  if (token.startsWith('"')) return "string";
+  if (token === "@stored") return "type";
+  if (token.startsWith("@")) return "macro";
+  if (token.startsWith("#")) return "splice";
+  if (/^\d/.test(token)) return "number";
+  if (/^[{}]$/.test(token)) return "brace";
+  if (/^[{}[\]();,.:<>]$/.test(token)) return "punctuation";
+  if (!/^[A-Za-z_]/.test(token)) return "";
+
+  if (previous === "." && next === "(") return "method";
+  if (previous === ".") return "property";
+  if (rangeKeywords.has(token)) return "keyword";
+  if (previous === "macro" || previous === "marker") {
+    return "macro-declaration";
+  }
+  if (rangeTypeDeclarationKeywords.has(previous)) {
+    return "type-declaration";
+  }
+  if (/^[A-Z]/.test(token)) return "type";
+  if (previous === "function") return "function-declaration";
+  if (next === "(") return "function";
+  if (next === ":") return "parameter";
+  if (rangeBindingKeywords.has(previous)) return "variable-declaration";
+  return "variable";
+}
 
 export function escapeHtml(value: unknown): string {
   return String(value)
@@ -102,21 +147,17 @@ export function escapeHtml(value: unknown): string {
 }
 
 export function highlightRange(source: string): string {
-  const pattern = /(@[A-Za-z_]\w*|\/\/.*$|"(?:\\.|[^"\\])*"|\b[A-Za-z_]\w*\b|\b\d(?:_?\d)*(?:\.\d(?:_?\d)*)?\b|[{}[\]();,.])/gm;
+  const pattern = /([@#][A-Za-z_]\w*|\/\/.*$|"(?:\\.|[^"\\])*"|\b[A-Za-z_]\w*\b|\b\d(?:_?\d)*(?:\.\d(?:_?\d)*)?\b|[{}[\]();,.:<>])/gm;
+  const matches = Array.from(source.matchAll(pattern));
   let output = "";
   let cursor = 0;
-  for (const match of source.matchAll(pattern)) {
+  for (const [matchIndex, match] of matches.entries()) {
     const token = match[0];
     const index = match.index ?? 0;
     output += escapeHtml(source.slice(cursor, index));
-    let type = "";
-    if (token.startsWith("//")) type = "comment";
-    else if (token.startsWith('"')) type = "string";
-    else if (token.startsWith("@")) type = "atrule";
-    else if (rangeKeywords.has(token)) type = "keyword";
-    else if (/^[A-Z]/.test(token)) type = "class-name";
-    else if (/^\d/.test(token)) type = "number";
-    else if (/^[{}[\]();,.]$/.test(token)) type = "punctuation";
+    const previous = matches[matchIndex - 1]?.[0] ?? "";
+    const next = matches[matchIndex + 1]?.[0] ?? "";
+    const type = rangeSemanticTokenType(token, previous, next);
     output += type ? `<span class="token ${type}">${escapeHtml(token)}</span>` : escapeHtml(token);
     cursor = index + token.length;
   }

@@ -14,9 +14,9 @@ enum Nil {
 @main {
     let selected: Optional<Int, MissingReason>(.none(value: MissingReason(.unavailable)))
     switch selected {
-    case .exists(let value):
+    case .exists(value):
         return value
-    case .none(let reason):
+    case .none(reason):
         return 7
     }
 }

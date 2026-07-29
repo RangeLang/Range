@@ -1,4 +1,4 @@
-import { createRangeMarks } from "./range-scale-math.js?profile=zero-drag-v1";
+import { createRangeMarks } from "./range-scale-math.js?profile=hover-log-origin-v1";
 
 const defaults = {
   endpointGap: 8,
@@ -7,8 +7,6 @@ const defaults = {
   divisionLevels: 3,
   markLength: 5,
   markThickness: 0.25,
-  zeroDragFalloff: 0.38,
-  zeroDragLimit: 0.42,
 };
 
 function finiteAttribute(element, name, fallback) {
@@ -24,65 +22,69 @@ class RangeScale extends HTMLElement {
     "division-levels",
     "mark-length",
     "mark-thickness",
-    "zero-drag-falloff",
-    "zero-drag-limit",
   ];
 
-  #activeZeroDrag = 0;
+  #audioContext;
+  #bristleBuffer;
   #canvas;
+  #clickIndex = 0;
   #context;
   #colorProbe;
-  #didDrag = false;
-  #dragStartPosition = 0;
-  #dragStartY = 0;
-  #isPointerActive = false;
+  #focusPosition = 0;
+  #focusTarget = 0;
+  #focusVelocity = 0;
+  #hasHoverSample = false;
+  #hoverDistance = 0;
+  #isHovered = false;
+  #lastHoverY = 0;
   #lastMotionTime = 0;
   #motionFrame;
-  #motionTarget = 0;
-  #motionVelocity = 0;
-  #pointerId;
   #resizeObserver;
-  #zero;
 
-  #handlePointerDown = (event) => {
-    if (event.button !== 0 || !this.#zero) return;
-    event.preventDefault();
-    event.stopPropagation();
-    this.#pointerId = event.pointerId;
-    this.#dragStartY = event.clientY;
-    this.#dragStartPosition = this.#activeZeroDrag;
-    this.#didDrag = false;
-    this.#isPointerActive = true;
-    this.#motionVelocity = 0;
-    this.#zero.setPointerCapture(event.pointerId);
+  #handlePointerEnter = (event) => {
+    this.#hasHoverSample = true;
+    this.#hoverDistance = 0;
+    this.#lastHoverY = event.clientY;
+    this.#focusVelocity = 0;
+    void this.#primeAudio();
   };
 
   #handlePointerMove = (event) => {
-    if (event.pointerId !== this.#pointerId) return;
-    event.preventDefault();
-    const height = Math.max(1, this.getBoundingClientRect().height);
-    const distance = event.clientY - this.#dragStartY;
-    if (Math.abs(distance) > 2) this.#didDrag = true;
-    this.#motionTarget = Math.min(
-      this.#config().zeroDragLimit,
-      Math.max(0, this.#dragStartPosition + distance / height),
+    const bounds = this.getBoundingClientRect();
+    if (bounds.height <= 0) return;
+    this.#isHovered = true;
+    this.#focusTarget = Math.min(
+      1,
+      Math.max(0, (event.clientY - bounds.top) / bounds.height),
     );
     this.#startMotion();
+
+    void this.#primeAudio();
+    if (!this.#hasHoverSample) {
+      this.#hasHoverSample = true;
+      this.#lastHoverY = event.clientY;
+      return;
+    }
+    const delta = event.clientY - this.#lastHoverY;
+    this.#lastHoverY = event.clientY;
+    this.#hoverDistance += Math.abs(delta);
+    const clickCount = Math.min(4, Math.floor(this.#hoverDistance / 4.5));
+    if (clickCount === 0) return;
+    this.#hoverDistance %= 4.5;
+    const direction = Math.sign(delta);
+    const intensity = Math.min(1, 0.45 + Math.abs(delta) / 18);
+    for (let index = 0; index < clickCount; index += 1) {
+      this.#playClick(direction, intensity, index * 0.005);
+    }
   };
 
-  #handlePointerEnd = (event) => {
-    if (event.pointerId !== this.#pointerId) return;
-    this.#pointerId = undefined;
-    this.#isPointerActive = false;
-    this.#motionTarget = 0;
+  #handlePointerLeave = () => {
+    this.#isHovered = false;
+    this.#focusTarget = 0;
+    this.#focusVelocity = 0;
+    this.#hasHoverSample = false;
+    this.#hoverDistance = 0;
     this.#startMotion();
-  };
-
-  #handleZeroClick = (event) => {
-    if (!this.#didDrag) return;
-    event.preventDefault();
-    event.stopPropagation();
-    this.#didDrag = false;
   };
 
   constructor() {
@@ -91,57 +93,39 @@ class RangeScale extends HTMLElement {
   }
 
   connectedCallback() {
-    this.#activeZeroDrag = 0;
-    this.#motionTarget = 0;
-    this.#bindZero();
+    this.#focusPosition = 0;
+    this.#focusTarget = 0;
+    this.#focusVelocity = 0;
     this.#align();
     this.#render();
+    this.addEventListener("pointerenter", this.#handlePointerEnter);
+    this.addEventListener("pointermove", this.#handlePointerMove);
+    this.addEventListener("pointerleave", this.#handlePointerLeave);
     this.#resizeObserver = new ResizeObserver(() => this.#align());
     const sequence = this.parentElement;
+    const zero = sequence?.querySelector("[data-scale-zero]");
     const end = sequence?.querySelector("[data-scale-end]");
     if (sequence) this.#resizeObserver.observe(sequence);
-    if (this.#zero) this.#resizeObserver.observe(this.#zero);
+    if (zero) this.#resizeObserver.observe(zero);
     if (end) this.#resizeObserver.observe(end);
     document.fonts.ready.then(() => this.#align());
   }
 
   disconnectedCallback() {
-    this.#unbindZero();
+    this.removeEventListener("pointerenter", this.#handlePointerEnter);
+    this.removeEventListener("pointermove", this.#handlePointerMove);
+    this.removeEventListener("pointerleave", this.#handlePointerLeave);
     this.#cancelMotion();
+    void this.#audioContext?.close();
+    this.#audioContext = undefined;
+    this.#bristleBuffer = undefined;
     this.#resizeObserver?.disconnect();
   }
 
   attributeChangedCallback() {
     if (!this.isConnected) return;
-    this.#activeZeroDrag = 0;
-    this.#motionTarget = 0;
-    this.#motionVelocity = 0;
     this.#render();
     this.#align();
-  }
-
-  #bindZero() {
-    this.#unbindZero();
-    this.#zero = this.parentElement?.querySelector("[data-scale-zero]");
-    if (!this.#zero) return;
-    this.#zero.addEventListener("pointerdown", this.#handlePointerDown);
-    this.#zero.addEventListener("pointermove", this.#handlePointerMove);
-    this.#zero.addEventListener("pointerup", this.#handlePointerEnd);
-    this.#zero.addEventListener("pointercancel", this.#handlePointerEnd);
-    this.#zero.addEventListener("lostpointercapture", this.#handlePointerEnd);
-    this.#zero.addEventListener("click", this.#handleZeroClick, true);
-  }
-
-  #unbindZero() {
-    if (!this.#zero) return;
-    this.#zero.removeEventListener("pointerdown", this.#handlePointerDown);
-    this.#zero.removeEventListener("pointermove", this.#handlePointerMove);
-    this.#zero.removeEventListener("pointerup", this.#handlePointerEnd);
-    this.#zero.removeEventListener("pointercancel", this.#handlePointerEnd);
-    this.#zero.removeEventListener("lostpointercapture", this.#handlePointerEnd);
-    this.#zero.removeEventListener("click", this.#handleZeroClick, true);
-    this.#zero.style.removeProperty("--range-zero-drag-y");
-    this.#zero = undefined;
   }
 
   #config() {
@@ -152,16 +136,17 @@ class RangeScale extends HTMLElement {
       divisionLevels: Math.min(6, Math.max(1, Math.round(finiteAttribute(this, "division-levels", defaults.divisionLevels)))),
       markLength: Math.max(1, finiteAttribute(this, "mark-length", defaults.markLength)),
       markThickness: Math.max(0.1, finiteAttribute(this, "mark-thickness", defaults.markThickness)),
-      zeroDragFalloff: Math.min(1, Math.max(0.000001, finiteAttribute(this, "zero-drag-falloff", defaults.zeroDragFalloff))),
-      zeroDragLimit: Math.min(0.8, Math.max(0, finiteAttribute(this, "zero-drag-limit", defaults.zeroDragLimit))),
     };
   }
 
   #render() {
     const config = this.#config();
-    const marks = createRangeMarks({ ...config, zeroDrag: this.#activeZeroDrag });
+    const marks = createRangeMarks({
+      ...config,
+      focusPosition: this.#focusPosition,
+    });
     if (!this.#canvas) {
-      this.shadowRoot.innerHTML = `<style>:host{display:block;position:absolute;width:48px;pointer-events:none;transform:translateX(-50%)}canvas{display:block;width:100%;height:100%}.colorProbe{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}</style><canvas role="presentation"></canvas><span class="colorProbe" aria-hidden="true"></span>`;
+      this.shadowRoot.innerHTML = `<style>:host{display:block;position:absolute;width:48px;pointer-events:auto;cursor:ns-resize;transform:translateX(-50%)}canvas{display:block;width:100%;height:100%}.colorProbe{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}</style><canvas role="presentation"></canvas><span class="colorProbe" aria-hidden="true"></span>`;
       this.#canvas = this.shadowRoot.querySelector("canvas");
       this.#context = this.#canvas?.getContext("2d");
       this.#colorProbe = this.shadowRoot.querySelector(".colorProbe");
@@ -195,22 +180,75 @@ class RangeScale extends HTMLElement {
       const y = mark.position * (deviceHeight - markHeight);
       this.#context.fillRect(x, y, markWidth, markHeight);
     }
-
-    this.#applyZeroTransform();
   }
 
-  #applyZeroTransform() {
-    if (!this.#zero) return;
-    const height = Math.max(1, this.getBoundingClientRect().height);
-    this.#zero.style.setProperty(
-      "--range-zero-drag-y",
-      `${this.#activeZeroDrag * height}px`,
+  async #primeAudio() {
+    const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextConstructor) return;
+    if (!this.#audioContext) {
+      this.#audioContext = new AudioContextConstructor();
+      const frameCount = Math.ceil(this.#audioContext.sampleRate * 0.026);
+      this.#bristleBuffer = this.#audioContext.createBuffer(
+        1,
+        frameCount,
+        this.#audioContext.sampleRate,
+      );
+      const channel = this.#bristleBuffer.getChannelData(0);
+      for (let index = 0; index < channel.length; index += 1) {
+        const envelope = 1 - index / channel.length;
+        channel[index] = (Math.random() * 2 - 1) * envelope;
+      }
+    }
+    if (this.#audioContext.state === "suspended") {
+      await this.#audioContext.resume();
+    }
+  }
+
+  #playClick(direction, intensity, delay = 0) {
+    const audio = this.#audioContext;
+    if (!audio || audio.state !== "running" || !this.#bristleBuffer) return;
+
+    const clickIndex = this.#clickIndex;
+    this.#clickIndex += 1;
+    const variation = (((clickIndex * 7) % 11) - 5) / 5;
+    const time = audio.currentTime + delay;
+    const duration = 0.018 + (variation + 1) * 0.0015;
+
+    const bristle = audio.createBufferSource();
+    const filter = audio.createBiquadFilter();
+    const bristleGain = audio.createGain();
+    bristle.buffer = this.#bristleBuffer;
+    bristle.playbackRate.value = 1 + variation * 0.055;
+    filter.type = "bandpass";
+    filter.frequency.value = 2_150 + variation * 260 + direction * 80;
+    filter.Q.value = 0.85 + intensity * 0.25;
+    bristleGain.gain.setValueAtTime(0.024 + intensity * 0.012, time);
+    bristleGain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+    bristle.connect(filter);
+    filter.connect(bristleGain);
+    bristleGain.connect(audio.destination);
+    bristle.start(time, (clickIndex * 0.0019) % 0.008, duration);
+    bristle.stop(time + duration);
+
+    const tone = audio.createOscillator();
+    const toneGain = audio.createGain();
+    tone.type = "triangle";
+    tone.frequency.setValueAtTime(
+      1_080 + variation * 95 + direction * 32,
+      time,
     );
+    toneGain.gain.setValueAtTime(0.006 + intensity * 0.004, time);
+    toneGain.gain.exponentialRampToValueAtTime(0.0001, time + duration * 0.72);
+    tone.connect(toneGain);
+    toneGain.connect(audio.destination);
+    tone.start(time);
+    tone.stop(time + duration);
   }
 
   #startMotion() {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      this.#activeZeroDrag = this.#motionTarget;
+      this.#focusPosition = this.#focusTarget;
+      this.#focusVelocity = 0;
       this.#render();
       return;
     }
@@ -226,25 +264,29 @@ class RangeScale extends HTMLElement {
   }
 
   #animateMotion(time) {
-    const target = this.#motionTarget;
-    const current = this.#activeZeroDrag;
-    const elapsed = this.#lastMotionTime === 0 ? 1 / 60 : (time - this.#lastMotionTime) / 1000;
+    const elapsed = this.#lastMotionTime === 0
+      ? 1 / 60
+      : (time - this.#lastMotionTime) / 1000;
     const deltaTime = Math.min(1 / 30, Math.max(1 / 240, elapsed));
     this.#lastMotionTime = time;
 
-    const spring = this.#isPointerActive ? 280 : 190;
-    const damping = this.#isPointerActive ? 34 : 18;
-    const acceleration = spring * (target - current) - damping * this.#motionVelocity;
-    this.#motionVelocity += acceleration * deltaTime;
-    this.#activeZeroDrag = Math.min(
-      this.#config().zeroDragLimit,
-      Math.max(0, current + this.#motionVelocity * deltaTime),
+    const spring = this.#isHovered ? 240 : 200;
+    const damping = this.#isHovered ? 36 : 32;
+    const acceleration = spring * (this.#focusTarget - this.#focusPosition)
+      - damping * this.#focusVelocity;
+    this.#focusVelocity += acceleration * deltaTime;
+    this.#focusPosition = Math.min(
+      1,
+      Math.max(0, this.#focusPosition + this.#focusVelocity * deltaTime),
     );
     this.#render();
 
-    if (Math.abs(target - this.#activeZeroDrag) < 0.0001 && Math.abs(this.#motionVelocity) < 0.0001) {
-      this.#activeZeroDrag = target;
-      this.#motionVelocity = 0;
+    if (
+      Math.abs(this.#focusTarget - this.#focusPosition) < 0.0001
+      && Math.abs(this.#focusVelocity) < 0.0001
+    ) {
+      this.#focusPosition = this.#focusTarget;
+      this.#focusVelocity = 0;
       this.#motionFrame = undefined;
       this.#render();
       return;
@@ -255,7 +297,7 @@ class RangeScale extends HTMLElement {
 
   #align() {
     const sequence = this.parentElement;
-    const zero = this.#zero ?? sequence?.querySelector("[data-scale-zero]");
+    const zero = sequence?.querySelector("[data-scale-zero]");
     const end = sequence?.querySelector("[data-scale-end]");
     if (!sequence || !zero || !end) return;
 
@@ -263,16 +305,13 @@ class RangeScale extends HTMLElement {
     const sequenceRect = sequence.getBoundingClientRect();
     const zeroRect = zero.getBoundingClientRect();
     const endRect = end.getBoundingClientRect();
-    const currentHeight = Math.max(1, this.getBoundingClientRect().height);
-    const dragPixels = this.#activeZeroDrag * currentHeight;
     const startX = zeroRect.left + zeroRect.width / 2 - sequenceRect.left;
-    const startY = zeroRect.bottom - dragPixels - sequenceRect.top + config.endpointGap;
+    const startY = zeroRect.bottom - sequenceRect.top + config.endpointGap;
     const endY = endRect.top - sequenceRect.top - config.endpointGapEnd;
 
     this.style.left = `${startX}px`;
     this.style.top = `${startY}px`;
     this.style.height = `${Math.max(1, endY - startY)}px`;
-    this.#applyZeroTransform();
   }
 }
 

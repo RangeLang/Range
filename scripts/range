@@ -19,6 +19,7 @@ Usage:
   range check-root-value [DIR]
   range check-compiler-smoke [DIR]
   range check-compiler-candidate [DIR]
+  range check-document-store
   range check-seed-integrity
   range check-stage2-compiler
 
@@ -99,6 +100,10 @@ case "$command" in
         if [[ $# -gt 1 ]]; then usage; exit 1; fi
         compiler_dir="${1:-$REPO_ROOT/RangeCompiler/Sources/Compiler}"
         "$REPO_ROOT/scripts/check-range-compiler-candidate" "$compiler_dir"
+        ;;
+    check-document-store)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/check-range-document-store"
         ;;
     check-stage2-compiler)
         if [[ $# -ne 0 ]]; then usage; exit 1; fi

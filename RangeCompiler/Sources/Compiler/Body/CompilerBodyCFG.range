@@ -704,7 +704,8 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
                 || targetID > compilerMacroEnvironmentProjectionGraph()) { return false }
         if targetKind == compilerBodyResolutionMacroSyntaxFilter()
             && (compilerIntTableValue(table: arena.nodes, row: sourceNodeID, column: 1) != compilerSyntaxKindMemberRead()
-                || (targetID != compilerSyntaxMemberKindLet()
+                || ((targetID < compilerBodyMacroSyntaxFilterFamilyBase())
+                    && targetID != compilerSyntaxMemberKindLet()
                     && targetID != compilerSyntaxMemberKindState()
                     && targetID != compilerSyntaxMemberKindBinding()
                     && targetID != compilerSyntaxMemberKindDerived())

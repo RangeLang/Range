@@ -27,7 +27,8 @@
   --muted: oklch(0.58 0.015 255);
   --line: oklch(0.9 0.012 255);
   --peer: oklch(0.72 0.23 65);
-  --range: oklch(0.65 0.2 252);
+  --range-hue: 252;
+  --range: oklch(0.65 0.2 var(--range-hue));
   --fastest-bar: oklch(0.76 0.19 145);
   --yellow-bar: oklch(0.84 0.18 100);
   --warning-bar: oklch(0.76 0.2 65);
@@ -372,6 +373,7 @@ html.range-route-performance.range-route-backward::view-transition-old(range-per
     animation-duration: 1ms;
     animation-delay: 0ms;
   }
+
 }
 
 .landingIndex {
@@ -388,12 +390,7 @@ html.range-route-performance.range-route-backward::view-transition-old(range-per
 
 .landingNav [data-scale-zero] {
   font-size: 14.6px;
-  cursor: ns-resize;
-  touch-action: none;
-  transform: translateY(var(--range-zero-drag-y, 0px));
-  user-select: none;
   view-transition-name: range-zero-index;
-  will-change: transform;
 }
 
 range-spline-nav {
@@ -495,6 +492,105 @@ range-spline-nav a:focus-visible {
   font-size: 13px;
   font-weight: 500;
   text-decoration: none;
+}
+
+.latestPosts {
+  padding: 64px 0 72px;
+  border-bottom: 1px solid var(--line);
+}
+
+.latestPostsHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.latestPostsHeader h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 520;
+  letter-spacing: -0.035em;
+}
+
+.latestPostsHeader span {
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+}
+
+.latestPostStrip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.latestPost {
+  position: relative;
+  min-width: 0;
+  height: clamp(280px, 29vw, 360px);
+  display: block;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.latestPost:hover,
+.latestPost:focus-visible {
+  border-color: color-mix(in oklch, var(--range), var(--line) 40%);
+  outline: none;
+}
+
+.latestPost > .postShader {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.postCopy {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 1;
+  display: grid;
+  align-content: end;
+  gap: 6px;
+  padding: 72px 24px 24px;
+  background: radial-gradient(
+    ellipse 92% 118% at 50% 118%,
+    oklch(1 0 0 / 0.52),
+    oklch(1 0 0 / 0.18) 54%,
+    transparent 78%
+  );
+}
+
+.postCopy small {
+  color: oklch(0.42 0.02 240);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  font-variant-ligatures: none;
+  font-weight: 520;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.postCopy strong {
+  color: oklch(0.26 0.025 240);
+  font-size: clamp(20px, 2.4vw, 30px);
+  font-weight: 520;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+  mix-blend-mode: multiply;
+}
+
+.postCopy > span {
+  color: oklch(0.46 0.01 240);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .primaryAction {
@@ -1582,6 +1678,20 @@ footer {
 
   .landingLinks {
     grid-template-columns: 1fr;
+  }
+
+  .latestPostStrip {
+    grid-auto-columns: minmax(280px, 86vw);
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+  }
+
+  .latestPost {
+    scroll-snap-align: start;
   }
 
   .landingHero {

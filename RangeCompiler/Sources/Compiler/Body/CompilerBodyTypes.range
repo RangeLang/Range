@@ -2264,6 +2264,26 @@ function compilerBodyArenaCallLabelsMatchMemberRuntimeBuiltin(arena: CompilerBod
     return true
 }
 
+function compilerBodyArenaMacroSelectorDeclarationRow(arena: CompilerBodyArena, name: String): Int {
+    state match: Int(0 - 1)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: arena.tables.macroDeclarations) {
+        let fileID: Int(compilerIntTableValue(table: arena.tables.macroDeclarations, row: row, column: 1))
+        let candidate: String(compilerTypedSyntaxLocalText(
+            tables: arena.tables,
+            fileID: fileID,
+            localStart: compilerIntTableValue(table: arena.tables.macroDeclarations, row: row, column: 4),
+            localEnd: compilerIntTableValue(table: arena.tables.macroDeclarations, row: row, column: 5)
+        ))
+        if candidate == name {
+            if match >= 0 { return 0 - 1 }
+            match: row
+        }
+        row: row + 1
+    }
+    return match
+}
+
 function compilerBodyArenaMacroSyntaxFilterKind(arena: CompilerBodyArena, index: CompilerDeclarationIndex, applicationNodeID: Int, calleeNodeID: Int): Int {
     if compilerBodyArenaNodeText(arena: arena, nodeID: calleeNodeID) != String("filter")
         || compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: applicationNodeID) != 1 { return 0 - 1 }
@@ -2276,31 +2296,52 @@ function compilerBodyArenaMacroSyntaxFilterKind(arena: CompilerBodyArena, index:
         || compilerTypedSyntaxLocalText(tables: arena.tables, fileID: arena.fileID, localStart: labelStart, localEnd: labelEnd) != String("all")
         || compilerIntTableValue(table: arena.nodes, row: valueNodeID, column: 1) != compilerSyntaxKindIdentifier() { return 0 - 1 }
     let nominalName: String(compilerBodyArenaNodeText(arena: arena, nodeID: valueNodeID))
-    if compilerDeclarationIndexLookup(tables: arena.tables, index: index, name: nominalName, kindTag: compilerSyntaxKindConstruct()) < 0 { return 0 - 1 }
-    if nominalName == String("Let") { return compilerSyntaxMemberKindLet() }
-    if nominalName == String("State") { return compilerSyntaxMemberKindState() }
-    if nominalName == String("Binding") { return compilerSyntaxMemberKindBinding() }
-    if nominalName == String("Derived") { return compilerSyntaxMemberKindDerived() }
+    if stringLength(value: nominalName) > 1 && nominalName.substring(start: 0, end: 1) == String("@") {
+        let macroDeclarationRow: Int(compilerBodyArenaMacroSelectorDeclarationRow(
+            arena: arena,
+            name: nominalName.substring(start: 1, end: stringLength(value: nominalName))
+        ))
+        if macroDeclarationRow >= 0 {
+            return compilerBodyMacroSyntaxFilterFamilyBase() + macroDeclarationRow
+        }
+        return 0 - 1
+    }
+    if compilerDeclarationIndexLookup(tables: arena.tables, index: index, name: nominalName, kindTag: compilerSyntaxKindConstruct()) >= 0 {
+        if nominalName == String("Let") { return compilerSyntaxMemberKindLet() }
+        if nominalName == String("State") { return compilerSyntaxMemberKindState() }
+        if nominalName == String("Binding") { return compilerSyntaxMemberKindBinding() }
+        if nominalName == String("Derived") { return compilerSyntaxMemberKindDerived() }
+    }
     return 0 - 1
 }
 
 function compilerBodyArenaMacroSyntaxFilterResultTypeID(arena: CompilerBodyArena, index: CompilerDeclarationIndex, applicationNodeID: Int, calleeNodeID: Int): Int {
-    if compilerBodyArenaMacroSyntaxFilterKind(arena: arena, index: index, applicationNodeID: applicationNodeID, calleeNodeID: calleeNodeID) < 0 { return 0 - 1 }
+    let selector: Int(compilerBodyArenaMacroSyntaxFilterKind(arena: arena, index: index, applicationNodeID: applicationNodeID, calleeNodeID: calleeNodeID))
+    if selector < 0 { return 0 - 1 }
     let argumentNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: applicationNodeID, role: compilerSyntaxRoleArgument(), ordinal: 0))
     let valueNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: argumentNodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0))
     if valueNodeID < 0 { return 0 - 1 }
-    let declarationRow: Int(compilerDeclarationIndexLookup(
-        tables: arena.tables,
-        index: index,
-        name: compilerBodyArenaNodeText(arena: arena, nodeID: valueNodeID),
-        kindTag: compilerSyntaxKindConstruct()
-    ))
-    if declarationRow < 0 { return 0 - 1 }
     let noArguments: Buffer<Int>(bufferCreateInt(capacity: 0))
+    state elementTypeKind: Int(compilerBodyTypeMacroTarget())
+    state elementNominalSyntaxID: Int(0 - 1)
+    if selector < compilerBodyMacroSyntaxFilterFamilyBase() {
+        let declarationRow: Int(compilerDeclarationIndexLookup(
+            tables: arena.tables,
+            index: index,
+            name: compilerBodyArenaNodeText(arena: arena, nodeID: valueNodeID),
+            kindTag: compilerSyntaxKindConstruct()
+        ))
+        if declarationRow < 0 {
+            noArguments.destroy()
+            return 0 - 1
+        }
+        elementTypeKind: compilerBodyTypeConstruct()
+        elementNominalSyntaxID: compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 0)
+    }
     let elementTypeID: Int(compilerBodyArenaTypeInstanceInternStructuralAtSpan(
         arena: arena,
-        typeKind: compilerBodyTypeConstruct(),
-        nominalSyntaxID: compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 0),
+        typeKind: elementTypeKind,
+        nominalSyntaxID: elementNominalSyntaxID,
         fileID: arena.fileID,
         start: compilerIntTableValue(table: arena.nodes, row: valueNodeID, column: 6),
         end: compilerIntTableValue(table: arena.nodes, row: valueNodeID, column: 7),

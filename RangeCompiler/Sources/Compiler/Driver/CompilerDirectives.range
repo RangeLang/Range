@@ -46,6 +46,14 @@ function compilerSourceRequestsNativeSourceSetLLVMText(source: String): Bool {
     return hasRangePrefix(source: source, start: 0, prefix: String("compilerNativeSourceSetLLVMText"))
 }
 
+function compilerSourceRequestsDevelopmentCompiler(source: String): Bool {
+    return hasRangePrefix(
+        source: source,
+        start: 0,
+        prefix: String("compilerNativeSourceSetLLVMText\n// range-development-compiler\n")
+    )
+}
+
 function compilerSourceRequestsSourceSetLLVMText(source: String): Bool {
     return hasRangePrefix(source: source, start: 0, prefix: String("compilerSourceSetLLVMText"))
 }

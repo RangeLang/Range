@@ -14,7 +14,7 @@ macro directAggregateCall(): Construct { environment in
     let values: [Int]([5, 6])
     if pair.left == 4 && pair.right == 5 && values.count == 2 && values[1] == 6 {
         environment.expand {
-            extension #(environment.target.declaration.self) {
+            extension #environment.target.declaration.self {
                 let directAggregateCallWorked: Int
             }
         }

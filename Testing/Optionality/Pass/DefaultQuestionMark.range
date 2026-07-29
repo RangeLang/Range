@@ -10,9 +10,9 @@ enum Optional<Value, None = Nil> {
 @main {
     let selected: Int?(.exists(value: 7))
     switch selected {
-    case .exists(let value):
+    case .exists(value):
         return value
-    case .none(let reason):
+    case .none(reason):
         return 0
     }
 }

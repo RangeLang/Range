@@ -6,6 +6,7 @@ construct Array<Element> {}
 compilerSourceFile\trole=core\tpath=Core/Macro/CodableConstructCollection.range
 open macro member(): Declaration | Member -> Void {}
 open macro syntax(): Declaration -> Void {}
+open macro stored(): Construct -> Void {}
 
 construct Identifier {
     let name: String
@@ -20,29 +21,52 @@ construct ConstructDeclaration {
 }
 
 @syntax
+@stored
 construct Let {
     let identifier: Identifier
 }
 
+@syntax
+@stored
+construct State {
+    let identifier: Identifier
+}
+
+construct Binding {}
+
+macro codableEncodeBody(properties: [@stored]) -> Int { environment in
+    if properties.count == 2 {
+        environment.expand {
+            let encodedProperties: Int(2)
+        }
+    }
+    return properties.count
+}
+
+macro codableDecodeBody(properties: [@stored]) -> Int { environment in
+    if properties.count == 2 {
+        environment.expand {
+            let decodedProperties: Int(2)
+        }
+    }
+    return properties.count
+}
+
 macro codable(): Construct { environment in
-    let properties: [Let](
-        environment.target.declaration.members.filter(all: Let)
+    let properties: [@stored](
+        environment.target.declaration.members.filter(all: @stored)
     )
 
     if properties.count == 2 {
         environment.expand {
-            extension #(environment.target.declaration.self) {
+            extension #environment.target.declaration.self {
                 function encode(to encoder: Encoder): Int {
-                    #(properties.map { property in
-                        encode(#(property.identifier))
-                    })
+                    @codableEncodeBody(properties: #properties)
                     return 0
                 }
 
                 function decode(from decoder: Decoder): Int {
-                    #(properties.map { property in
-                        decode(#(property.identifier))
-                    })
+                    @codableDecodeBody(properties: #properties)
                     return 0
                 }
             }
@@ -55,7 +79,7 @@ compilerSourceFile\trole=project\tpath=Project/Value.range
 construct Value {
     let included: Int
 
-    let enabled: Bool
+    state enabled: Bool
 
-    state ignored: Int
+    binding ignored: Int
 }

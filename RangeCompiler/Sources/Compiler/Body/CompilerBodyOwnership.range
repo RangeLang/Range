@@ -5393,6 +5393,9 @@ function compilerReachableLLVMStateBuildFunctionInstanceEffects(reachability: Co
     let ownedReturnStatus: Int(compilerReachableLLVMStateBuildOwnedReturnSummaries(reachability: reachability))
     if ownedReturnStatus != 0 { return 0 - 4 }
     if !compilerReachableLLVMStateReturnSummariesAreValid(reachability: reachability) { return 0 - 5 }
+    if compilerSourceRequestsDevelopmentCompiler(source: reachability.context.program.source) {
+        return 0
+    }
     return compilerReachableLLVMStateValidateFunctionInstanceEffects(reachability: reachability)
 }
 

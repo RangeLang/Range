@@ -54,6 +54,7 @@ function compilerBodyResolutionArrayCount(): Int { return 17 }
 function compilerBodyResolutionMacroEnvironmentProjection(): Int { return 18 }
 function compilerBodyResolutionMacroSyntaxFilter(): Int { return 19 }
 function compilerBodyResolutionMacroCollectionTransform(): Int { return 20 }
+function compilerBodyMacroSyntaxFilterFamilyBase(): Int { return 1024 }
 function compilerBodyCollectionTransformFilter(): Int { return 1 }
 function compilerBodyCollectionTransformMap(): Int { return 2 }
 
@@ -111,7 +112,8 @@ function compilerBodyRuntimeBuiltinBufferCreateUnsigned8(): Int { return 42 }
 function compilerBodyRuntimeBuiltinStringAppendStorage(): Int { return 43 }
 function compilerBodyRuntimeBuiltinStringDestroy(): Int { return 44 }
 function compilerBodyRuntimeBuiltinTargetPointerBits(): Int { return 45 }
-function compilerBodyRuntimeBuiltinCount(): Int { return 45 }
+function compilerBodyRuntimeBuiltinBufferTruncateInt(): Int { return 46 }
+function compilerBodyRuntimeBuiltinCount(): Int { return 46 }
 
 function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("stringTransientRegionMark") { return compilerBodyRuntimeBuiltinStringTransientRegionMark() }
@@ -159,6 +161,7 @@ function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("stringAppendStorage") { return compilerBodyRuntimeBuiltinStringAppendStorage() }
     if name == String("stringDestroy") { return compilerBodyRuntimeBuiltinStringDestroy() }
     if name == String("targetPointerBits") { return compilerBodyRuntimeBuiltinTargetPointerBits() }
+    if name == String("bufferTruncateInt") { return compilerBodyRuntimeBuiltinBufferTruncateInt() }
     return compilerBodyRuntimeBuiltinNone()
 }
 
@@ -208,6 +211,7 @@ function compilerBodyRuntimeBuiltinName(id: Int): String {
     if id == compilerBodyRuntimeBuiltinStringAppendStorage() { return String("stringAppendStorage") }
     if id == compilerBodyRuntimeBuiltinStringDestroy() { return String("stringDestroy") }
     if id == compilerBodyRuntimeBuiltinTargetPointerBits() { return String("targetPointerBits") }
+    if id == compilerBodyRuntimeBuiltinBufferTruncateInt() { return String("bufferTruncateInt") }
     return String("")
 }
 
@@ -310,6 +314,7 @@ function compilerBodyRuntimeBuiltinParameterType(id: Int, ordinal: Int): String 
         || id == compilerBodyRuntimeBuiltinRawBufferAppendRandomBytes()
         || id == compilerBodyRuntimeBuiltinRawBufferLoadInt()
         || id == compilerBodyRuntimeBuiltinRawBufferStoreInt()
+        || id == compilerBodyRuntimeBuiltinBufferTruncateInt()
         || id == compilerBodyRuntimeBuiltinRawBufferAppendTextInt() {
         if ordinal == 0 { return String("ptr") }
         return String("i32")

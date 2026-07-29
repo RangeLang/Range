@@ -1,27 +1,27 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, onMount } from "svelte";
+  import {
+    rangePlaybackOrder,
+    rangePlaybackStep,
+  } from "$lib/range-rhythm";
 
   type ConceptID = "shape" | "ownership" | "capability";
 
   type Concept = {
-    description: string;
     path: number[];
     labels: Record<number, string>;
   };
 
   const concepts: Record<ConceptID, Concept> = {
     shape: {
-      description: "An explicit shape steps through graph values.",
       path: [1, 2, 4],
       labels: { 1: "source", 2: "step", 4: "result" },
     },
     ownership: {
-      description: "Ownership follows value paths into derived effects.",
       path: [1, 2, 8],
       labels: { 1: "value", 2: "transfer", 8: "effect paths" },
     },
     capability: {
-      description: "Requirements expand into a transitive capability closure.",
       path: [1, 4, 16],
       labels: { 1: "root", 4: "requirement", 16: "closure" },
     },
@@ -39,28 +39,27 @@
     { name: "C4", frequency: 261.63 },
   ];
   const intervalNote = { name: "A2", frequency: 110 };
-  const intervalResonance = { name: "B2", frequency: 123.47 };
   const spiralSteps = [
-    { conceptID: "shape", value: 4, note: { name: "B2", frequency: 123.47 } },
-    { conceptID: "ownership", value: 8, note: { name: "D3", frequency: 146.83 } },
-    { conceptID: "capability", value: 16, note: { name: "E3", frequency: 164.81 } },
+    { conceptID: "shape", value: 4, detuneCents: -5 },
+    { conceptID: "ownership", value: 8, detuneCents: 0 },
+    { conceptID: "capability", value: 16, detuneCents: 4 },
   ] as const;
   let selectedID = $state<ConceptID>("shape");
   let looping = $state(false);
-  let spiralTrackEnabled = $state(true);
   let spiralActiveIndex = $state(-1);
-  let spiralStepIndex = 0;
-  let selected = $derived(concepts[selectedID]);
-  let rhythmPulse = $state(0);
-  const rhythmDuration = 1.8 + 1.8 / 3;
+  let playbackStepIndex = 0;
   let audioContext: AudioContext | undefined;
   let reverbInput: GainNode | undefined;
-  let reverbResonance: BiquadFilterNode | undefined;
+  let distantVoiceGain: GainNode | undefined;
+  let distantVoiceFilter: BiquadFilterNode | undefined;
+  let sectionElement: HTMLElement;
+  let scrollFilterPosition = 0;
   let activeOscillators: OscillatorNode[] = [];
   let loopTimer: number | undefined;
 
   const center = 382;
   const centerY = 320;
+  const spiralFlowDurationSeconds = 2.4;
   const innerRingRadius = 64;
   const outerRadius = 290;
   const circularScaleValues = [2, 4, 8, 16];
@@ -109,12 +108,73 @@
     };
   }
 
-  function spiralPathData() {
-    return Array.from({ length: 65 }, (_, index) => {
-      const point = spiralPoint(index / 64);
-      return `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`;
-    }).join(" ");
+  function spiralDashSegments() {
+    const sampleCount = 256;
+    const samples: Array<{
+      x: number;
+      y: number;
+      distance: number;
+    }> = [];
+    let previous = spiralPoint(0);
+    let totalLength = 0;
+    samples.push({ ...previous, distance: 0 });
+
+    for (let index = 1; index <= sampleCount; index += 1) {
+      const point = spiralPoint(index / sampleCount);
+      totalLength += Math.hypot(point.x - previous.x, point.y - previous.y);
+      samples.push({ ...point, distance: totalLength });
+      previous = point;
+    }
+
+    function pointAtDistance(distance: number) {
+      const boundedDistance = Math.min(totalLength, Math.max(0, distance));
+      let upperIndex = 1;
+      while (
+        upperIndex < samples.length - 1 &&
+        samples[upperIndex].distance < boundedDistance
+      ) {
+        upperIndex += 1;
+      }
+      const lower = samples[upperIndex - 1];
+      const upper = samples[upperIndex];
+      const span = upper.distance - lower.distance;
+      const mix = span === 0 ? 0 : (boundedDistance - lower.distance) / span;
+      return {
+        x: lower.x + (upper.x - lower.x) * mix,
+        y: lower.y + (upper.y - lower.y) * mix,
+      };
+    }
+
+    const segments: Array<{
+      path: string;
+      delaySeconds: number;
+    }> = [];
+    let cursor = 0;
+
+    while (cursor < totalLength) {
+      const start = pointAtDistance(cursor);
+      const radius = Math.hypot(start.x - center, start.y - centerY);
+      const logarithmicMagnitude = Math.log2(valueAtRadius(radius));
+      const dashLength = 2.4 + logarithmicMagnitude * 1.7;
+      const gapLength = 2.8 + logarithmicMagnitude * 1.25;
+      const dashEnd = Math.min(totalLength, cursor + dashLength);
+      const path = Array.from({ length: 5 }, (_, index) => {
+        const distance = cursor + (dashEnd - cursor) * (index / 4);
+        const point = pointAtDistance(distance);
+        return `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`;
+      }).join(" ");
+      const progress = cursor / totalLength;
+      segments.push({
+        path,
+        delaySeconds: -(1 - progress) * spiralFlowDurationSeconds,
+      });
+      cursor = dashEnd + gapLength;
+    }
+
+    return segments;
   }
+
+  const spiralDashes = spiralDashSegments();
 
   function valueAtRadius(radius: number) {
     if (radius <= innerRingRadius) return 1 + radius / innerRingRadius;
@@ -191,16 +251,15 @@
     rumbleCut.frequency.value = 58;
     rumbleCut.Q.value = 0.7;
     resonance.type = "lowpass";
-    resonance.frequency.value = intervalResonance.frequency;
-    resonance.Q.value = 2.6;
-    wet.gain.value = 0.9;
+    resonance.frequency.value = 420;
+    resonance.Q.value = 0.65;
+    wet.gain.value = 0.62;
     input.connect(convolver);
     convolver.connect(rumbleCut);
     rumbleCut.connect(resonance);
     resonance.connect(wet);
     wet.connect(audioContext.destination);
     reverbInput = input;
-    reverbResonance = resonance;
     return input;
   }
 
@@ -215,101 +274,167 @@
       }
     });
     activeOscillators = [];
-    rhythmPulse = 0;
-    spiralStepIndex = 0;
+    distantVoiceGain = undefined;
+    distantVoiceFilter = undefined;
+    playbackStepIndex = 0;
     spiralActiveIndex = -1;
     looping = false;
   }
 
-  function playTone(
-    frequency: number,
+  function scrollFilterFrequency(position: number) {
+    const minimum = 190;
+    const maximum = 760;
+    return minimum + (maximum - minimum) * position;
+  }
+
+  function updateScrollFilter() {
+    if (!sectionElement || typeof window === "undefined") return;
+    const bounds = sectionElement.getBoundingClientRect();
+    const viewportCenter = window.innerHeight / 2;
+    const sectionCenter = bounds.top + bounds.height / 2;
+    const reach = window.innerHeight * 0.92 + bounds.height * 0.12;
+    const proximity = Math.max(
+      0,
+      Math.min(1, 1 - Math.abs(sectionCenter - viewportCenter) / reach),
+    );
+    scrollFilterPosition = proximity * proximity * (3 - 2 * proximity);
+
+    if (!audioContext || !distantVoiceFilter) return;
+    const now = audioContext.currentTime;
+    distantVoiceFilter.frequency.cancelScheduledValues(now);
+    distantVoiceFilter.frequency.setTargetAtTime(
+      scrollFilterFrequency(scrollFilterPosition),
+      now,
+      0.08,
+    );
+  }
+
+  function murmurVelocityEnvelope(
     duration: number,
     peakGain: number,
-    resonanceFrequency: number,
+    bodyGain: number,
   ) {
+    const sampleCount = Math.max(128, Math.ceil(duration * 144));
+    const envelope = new Float32Array(sampleCount);
+    const floor = 0.0001;
+    const accentEnd = 0.38;
+    const bodyEnd = 0.52;
+    const ease = (progress: number) => (1 - Math.cos(Math.PI * progress)) / 2;
+
+    for (let index = 0; index < sampleCount; index += 1) {
+      const progress = index / (sampleCount - 1);
+      if (progress <= accentEnd) {
+        envelope[index] = floor
+          + (peakGain - floor) * ease(progress / accentEnd);
+      } else if (progress <= bodyEnd) {
+        envelope[index] = peakGain
+          + (bodyGain - peakGain)
+          * ease((progress - accentEnd) / (bodyEnd - accentEnd));
+      } else {
+        envelope[index] = bodyGain
+          + (floor - bodyGain)
+          * ease((progress - bodyEnd) / (1 - bodyEnd));
+      }
+    }
+
+    return envelope;
+  }
+
+  function startDistantVoice() {
+    if (!audioContext || distantVoiceGain) return;
+    const startAt = audioContext.currentTime + 0.03;
+    const voiceGain = audioContext.createGain();
+    const voiceFilter = audioContext.createBiquadFilter();
+    const direct = audioContext.createGain();
+    const fundamental = audioContext.createOscillator();
+    const fundamentalGain = audioContext.createGain();
+    const haze = audioContext.createOscillator();
+    const hazeGain = audioContext.createGain();
+    const breath = audioContext.createOscillator();
+    const breathDepth = audioContext.createGain();
+
+    voiceGain.gain.setValueAtTime(0.09, startAt);
+    voiceFilter.type = "lowpass";
+    voiceFilter.frequency.value = scrollFilterFrequency(scrollFilterPosition);
+    voiceFilter.Q.value = 0.28;
+    direct.gain.value = 0.14;
+
+    fundamental.type = "sine";
+    fundamental.frequency.value = intervalNote.frequency - 0.22;
+    fundamentalGain.gain.value = 0.78;
+    haze.type = "triangle";
+    haze.frequency.value = intervalNote.frequency + 0.31;
+    hazeGain.gain.value = 0.09;
+
+    breath.type = "sine";
+    breath.frequency.value = 0.037;
+    breathDepth.gain.value = 0.0038;
+    breath.connect(breathDepth);
+    breathDepth.connect(voiceGain.gain);
+
+    fundamental.connect(fundamentalGain);
+    fundamentalGain.connect(voiceFilter);
+    haze.connect(hazeGain);
+    hazeGain.connect(voiceFilter);
+    voiceFilter.connect(voiceGain);
+    voiceGain.connect(direct);
+    direct.connect(audioContext.destination);
+    const reverb = getReverbInput();
+    if (reverb) voiceGain.connect(reverb);
+
+    fundamental.start(startAt);
+    haze.start(startAt);
+    breath.start(startAt);
+    activeOscillators.push(fundamental, haze, breath);
+    distantVoiceGain = voiceGain;
+    distantVoiceFilter = voiceFilter;
+  }
+
+  function playIntervalNote() {
+    if (!looping) return;
+    const currentStep = rangePlaybackStep(playbackStepIndex);
+    const stepDuration = currentStep.windowSeconds;
+    const noteDuration = currentStep.noteSeconds;
+    const spiralStepIndex = conceptIDs.indexOf(currentStep.conceptID);
+    const spiralStep = spiralSteps[spiralStepIndex];
+    selectedID = currentStep.conceptID;
+
+    playSpiralTone(
+      spiralStep.detuneCents,
+      Math.max(noteDuration + 1.6, stepDuration * 1.8),
+    );
+    spiralActiveIndex = spiralStepIndex;
+    playbackStepIndex = (playbackStepIndex + 1) % rangePlaybackOrder.length;
+    loopTimer = window.setTimeout(() => {
+      if (!looping) return;
+      playIntervalNote();
+    }, stepDuration * 1000);
+  }
+
+  function playSpiralTone(detuneCents: number, duration: number) {
     if (!looping || !audioContext) return;
-    const startAt = audioContext.currentTime + 0.04;
+    const startAt = audioContext.currentTime + Math.min(0.16, duration * 0.04);
     const noteEnd = startAt + duration;
     const oscillator = audioContext.createOscillator();
     const gain = audioContext.createGain();
 
     oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(frequency, startAt);
-    gain.gain.setValueAtTime(0.0001, startAt);
-    gain.gain.exponentialRampToValueAtTime(peakGain, startAt + 0.085);
-    gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
-
-    oscillator.connect(gain);
-    const dry = audioContext.createGain();
-    dry.gain.value = 0.1;
-    gain.connect(dry);
-    dry.connect(audioContext.destination);
-    const reverb = getReverbInput();
-    if (reverb) {
-      gain.connect(reverb);
-      reverbResonance?.frequency.cancelScheduledValues(startAt);
-      reverbResonance?.frequency.setTargetAtTime(
-        resonanceFrequency,
-        startAt,
-        0.12,
-      );
-    }
-    oscillator.start(startAt);
-    oscillator.stop(noteEnd + 0.02);
-    activeOscillators.push(oscillator);
-    oscillator.onended = () => {
-      activeOscillators = activeOscillators.filter((active) => active !== oscillator);
-    };
-  }
-
-  function playIntervalNote() {
-    if (!looping) return;
-    playTone(
-      intervalNote.frequency,
-      1.1,
-      0.4,
-      intervalResonance.frequency,
+    oscillator.frequency.setValueAtTime(intervalNote.frequency, startAt);
+    oscillator.detune.setValueAtTime(detuneCents, startAt);
+    gain.gain.setValueCurveAtTime(
+      murmurVelocityEnvelope(duration, 0.006, 0.0048),
+      startAt,
+      duration,
     );
-    if (spiralTrackEnabled) {
-      const spiralStep = spiralSteps[spiralStepIndex];
-      playSpiralTone(spiralStep.note.frequency);
-      spiralActiveIndex = spiralStepIndex;
-      spiralStepIndex = (spiralStepIndex + 1) % spiralSteps.length;
-    }
-    rhythmPulse += 1;
-    loopTimer = window.setTimeout(() => {
-      if (!looping) return;
-      const currentConceptIndex = conceptIDs.indexOf(selectedID);
-      selectedID = conceptIDs[(currentConceptIndex + 1) % conceptIDs.length];
-      playIntervalNote();
-    }, rhythmDuration * 1000);
-  }
-
-  function playSpiralTone(frequency: number) {
-    if (!looping || !audioContext) return;
-    const startAt = audioContext.currentTime + 0.12;
-    const noteEnd = startAt + 0.72;
-    const oscillator = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(frequency, startAt);
-    gain.gain.setValueAtTime(0.0001, startAt);
-    gain.gain.exponentialRampToValueAtTime(0.09, startAt + 0.13);
-    gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
     oscillator.connect(gain);
-    gain.connect(audioContext.destination);
+    const reverb = getReverbInput();
+    if (reverb) gain.connect(reverb);
     oscillator.start(startAt);
     oscillator.stop(noteEnd + 0.02);
     activeOscillators.push(oscillator);
     oscillator.onended = () => {
       activeOscillators = activeOscillators.filter((active) => active !== oscillator);
     };
-  }
-
-  function toggleSpiralTrack() {
-    spiralTrackEnabled = !spiralTrackEnabled;
-    if (!spiralTrackEnabled) spiralActiveIndex = -1;
   }
 
   async function startPlayback() {
@@ -318,6 +443,7 @@
     audioContext ??= new AudioContext();
     if (audioContext.state === "suspended") await audioContext.resume();
     looping = true;
+    startDistantVoice();
     playIntervalNote();
   }
 
@@ -326,16 +452,36 @@
     selectedID = conceptID;
   }
 
+  onMount(() => {
+    let frame = 0;
+    const scheduleFilterUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        updateScrollFilter();
+      });
+    };
+
+    updateScrollFilter();
+    window.addEventListener("scroll", scheduleFilterUpdate, { passive: true });
+    window.addEventListener("resize", scheduleFilterUpdate);
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", scheduleFilterUpdate);
+      window.removeEventListener("resize", scheduleFilterUpdate);
+    };
+  });
+
   onDestroy(() => {
     stopPlayback();
     void audioContext?.close();
     reverbInput = undefined;
-    reverbResonance = undefined;
   });
 
 </script>
 
-<section class="rangeSection" aria-labelledby="range-title">
+<section class="rangeSection" aria-labelledby="range-title" bind:this={sectionElement}>
   <header class="rangeHeader">
     <h2 id="range-title">Cardinality</h2>
     <p>
@@ -343,34 +489,20 @@
     </p>
   </header>
 
-  <div class="conceptPicker" role="group" aria-label="Range concept">
-    {#each conceptIDs as conceptID}
-      <button
-        type="button"
-        aria-pressed={selectedID === conceptID}
-        onclick={() => selectConcept(conceptID)}
-      >
-        {conceptID[0].toUpperCase() + conceptID.slice(1)}
-      </button>
-    {/each}
-  </div>
-
-  <div class="selectedState">
-    <span>{selected.description}</span>
+  <div class="graphControls">
+    <div class="conceptPicker" role="group" aria-label="Range concept">
+      {#each conceptIDs as conceptID}
+        <button
+          type="button"
+          aria-pressed={selectedID === conceptID}
+          onclick={() => selectConcept(conceptID)}
+        >
+          {conceptID[0].toUpperCase() + conceptID.slice(1)}
+        </button>
+      {/each}
+    </div>
     <div class="pathPlayback">
       <div class="playbackControls" role="group" aria-label="Interval note playback">
-        <button
-          class="playbackControl spiralTrackControl"
-          class:enabled={spiralTrackEnabled}
-          type="button"
-          aria-label="Spiral track"
-          aria-pressed={spiralTrackEnabled}
-          onclick={toggleSpiralTrack}
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M12.8 7.9c0 2.7-2.2 4.8-4.9 4.8S3.2 10.6 3.2 8s2.1-4.3 4.5-4.3c2.2 0 3.7 1.5 3.7 3.4 0 1.7-1.3 2.8-2.8 2.8-1.3 0-2.2-.8-2.2-1.9 0-.9.7-1.5 1.5-1.5"></path>
-          </svg>
-        </button>
         <button
           class="playbackControl"
           type="button"
@@ -402,24 +534,25 @@
     class="rangeGraph nucleusGraph"
     viewBox="0 0 764 640"
     role="img"
-    aria-label="A shared source nucleus with Shape 1, 2, 4, Ownership, and Capability branching outward across a concentric numeric scale. Only the sounding concept is accented."
+    aria-label="A shared source nucleus with Shape, Ownership, and Capability branching outward across a concentric value scale. Small dots mark each value and only the sounding concept is accented."
   >
     <g class="circularScale" aria-hidden="true">
       {#each circularScaleValues as value}
         {@const radius = numericRadius(value)}
         <circle cx={center} cy={centerY} r={radius}></circle>
-        <text x={center + 7} y={centerY - radius + 4}>×{value}</text>
       {/each}
     </g>
 
-    <path
-      class="valueSpiral"
-      class:enabled={spiralTrackEnabled}
-      class:playing={spiralTrackEnabled && looping}
-      d={spiralPathData()}
-      aria-hidden="true"
-      style={`--rhythm-duration: ${rhythmDuration}s`}
-    ></path>
+    <g class="valueSpiral" aria-hidden="true">
+      {#each spiralDashes as dash}
+        <path
+          class="spiralDash"
+          class:playing={looping}
+          d={dash.path}
+          style={`--spiral-duration: ${spiralFlowDurationSeconds}s; --spiral-delay: ${dash.delaySeconds}s`}
+        ></path>
+      {/each}
+    </g>
 
     {#each conceptIDs as conceptID}
       {@const concept = concepts[conceptID]}
@@ -429,10 +562,7 @@
       <g
         class="conceptBranch"
         class:active={branchActive}
-        class:rhythmA={branchActive && rhythmPulse % 2 === 0}
-        class:rhythmB={branchActive && rhythmPulse % 2 === 1}
         data-concept-branch={conceptID}
-        style={`--rhythm-duration: ${rhythmDuration}s`}
       >
         <g class="branchTrack" aria-hidden="true">
           {#each dashSegments as segment}
@@ -444,14 +574,13 @@
           {@const point = branchPoint(conceptID, concept, value)}
           <g
             class="numberNode"
-            class:spiralStepActive={spiralTrackEnabled &&
-              looping &&
+            class:spiralStepActive={looping &&
               spiralSteps[spiralActiveIndex]?.conceptID === conceptID &&
               spiralSteps[spiralActiveIndex]?.value === value}
             transform={`translate(${point.x} ${point.y})`}
           >
             <title>{conceptID} {value} · {noteForValue(concept, value).name}</title>
-            <text>{value}</text>
+            <circle class="valueDot" r="2.8"></circle>
           </g>
         {/each}
 
@@ -463,14 +592,11 @@
 
     <g
       class:activeSource={looping}
-      class:rhythmA={looping && rhythmPulse % 2 === 0}
-      class:rhythmB={looping && rhythmPulse % 2 === 1}
       class="sourceNucleus"
-      style={`--rhythm-duration: ${rhythmDuration}s`}
     >
       <g class="numberNode sourceNumber" transform={`translate(${center} ${centerY})`}>
         <title>1 · shared source</title>
-        <text>1</text>
+        <circle class="valueDot" r="3"></circle>
       </g>
       <text class="sourceLabel" x={center - 21} y={centerY + 4}>source</text>
     </g>
@@ -516,7 +642,7 @@
     max-width: 100%;
     display: flex;
     gap: 4px;
-    margin-bottom: 22px;
+    margin: 0 auto;
     overflow: hidden;
   }
 
@@ -524,15 +650,13 @@
     min-height: 38px;
     padding: 0 14px;
     border: 0;
-    border-radius: 8px;
-    background: var(--paper);
+    background: transparent;
     color: var(--muted);
     font: 500 12px var(--font-geist-mono);
     cursor: pointer;
   }
 
   .conceptPicker button[aria-pressed="true"] {
-    background: var(--range-accent);
     color: var(--range-accent-ink);
     font-weight: 700;
   }
@@ -544,19 +668,21 @@
     outline-offset: -2px;
   }
 
-  .selectedState {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-    color: var(--muted);
+  .graphControls {
+    position: relative;
+    min-height: 38px;
+    margin-bottom: 22px;
   }
 
   .pathPlayback {
+    position: absolute;
+    top: 50%;
+    right: 0;
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
+    transform: translateY(-50%);
   }
 
   .playbackControls {
@@ -583,23 +709,6 @@
     fill: currentColor;
   }
 
-  .spiralTrackControl {
-    background: color-mix(in oklch, var(--range-accent) 42%, var(--paper));
-  }
-
-  .spiralTrackControl.enabled {
-    background: var(--range-accent-ink);
-    color: var(--paper);
-  }
-
-  .spiralTrackControl path {
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 1.5;
-  }
-
   .playbackControl:disabled {
     background: color-mix(in oklch, var(--range-accent) 28%, var(--paper));
     color: color-mix(in oklch, var(--range-accent-ink) 42%, var(--paper));
@@ -624,56 +733,36 @@
 
   .valueSpiral {
     fill: none;
-    opacity: 0.3;
-    stroke: oklch(0.78 0.025 236);
-    stroke-dasharray: 2 7;
-    stroke-linecap: round;
-    stroke-width: 1;
-    transition:
-      opacity 220ms ease,
-      stroke 220ms ease;
   }
 
-  .valueSpiral.enabled {
+  .spiralDash {
     opacity: 0.62;
     stroke: var(--range-accent);
+    stroke-linecap: round;
+    stroke-width: 1;
   }
 
-  .valueSpiral.playing {
-    animation: spiral-flow var(--rhythm-duration) linear infinite;
+  .spiralDash.playing {
+    animation: spiral-flow var(--spiral-duration) linear infinite;
+    animation-delay: var(--spiral-delay);
     stroke: var(--range-playing-accent);
   }
 
-  .sourceNucleus,
-  .conceptBranch {
-    transition: color 220ms ease;
-  }
-
-  .numberNode text {
+  .valueDot {
     fill: oklch(0.53 0.025 236);
-    font-family: var(--font-geist-mono);
-    font-size: 12px;
-    font-weight: 700;
-    dominant-baseline: middle;
-    paint-order: stroke fill;
     stroke: var(--paper);
-    stroke-linejoin: round;
-    stroke-width: 7px;
-    text-anchor: middle;
-    transition:
-      fill 220ms ease,
-      filter 220ms ease;
+    stroke-width: 2px;
   }
 
-  .sourceNucleus.activeSource .numberNode text,
-  .conceptBranch.active .numberNode text,
-  .numberNode.spiralStepActive text {
+  .sourceNucleus.activeSource .valueDot,
+  .conceptBranch.active .valueDot,
+  .numberNode.spiralStepActive .valueDot {
     fill: currentColor;
   }
 
-  .numberNode.spiralStepActive text {
+  .numberNode.spiralStepActive .valueDot {
     color: var(--range-playing-accent);
-    font-weight: 800;
+    filter: drop-shadow(0 0 3px color-mix(in oklch, currentColor 38%, transparent));
   }
 
   .sourceNucleus text,
@@ -697,7 +786,6 @@
     stroke: oklch(0.88 0.012 236);
     stroke-linecap: round;
     stroke-width: 1.2;
-    transition: stroke 220ms ease;
   }
 
   .conceptBranch.active .branchTrack {
@@ -709,55 +797,18 @@
     color: var(--range-playing-accent);
   }
 
-  .sourceNucleus.activeSource.rhythmA,
-  .conceptBranch.active.rhythmA {
-    animation: rhythm-color-a var(--rhythm-duration) linear both;
-  }
-
-  .sourceNucleus.activeSource.rhythmB,
-  .conceptBranch.active.rhythmB {
-    animation: rhythm-color-b var(--rhythm-duration) linear both;
-  }
-
-  @keyframes rhythm-color-a {
-    0% {
-      color: oklch(0.56 0.19 236);
-    }
-    18% {
-      color: oklch(0.72 0.16 236);
-    }
-    58% {
-      color: oklch(0.63 0.14 236);
-    }
-    82% {
-      color: oklch(0.69 0.16 236);
-    }
-    100% {
-      color: oklch(0.59 0.17 236);
-    }
-  }
-
   @keyframes spiral-flow {
-    to {
-      stroke-dashoffset: -18;
-    }
-  }
-
-  @keyframes rhythm-color-b {
-    0% {
-      color: oklch(0.61 0.13 236);
-    }
-    12% {
-      color: oklch(0.68 0.18 236);
-    }
-    38% {
-      color: oklch(0.57 0.2 236);
-    }
-    72% {
-      color: oklch(0.71 0.14 236);
-    }
+    0%,
     100% {
-      color: oklch(0.62 0.18 236);
+      opacity: 0.48;
+    }
+
+    20% {
+      opacity: 0.9;
+    }
+
+    44% {
+      opacity: 0.48;
     }
   }
 
@@ -767,15 +818,8 @@
     stroke-width: 1;
   }
 
-  .circularScale text {
-    fill: color-mix(in oklch, var(--muted) 68%, var(--paper));
-    font-family: var(--font-geist-mono);
-    font-size: 9px;
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    .sourceNucleus.activeSource,
-    .conceptBranch.active {
+    .valueSpiral.playing {
       animation: none;
     }
   }
@@ -792,25 +836,20 @@
     }
 
     .conceptPicker {
-      width: 100%;
+      width: fit-content;
+      max-width: 100%;
       overflow-x: auto;
     }
 
     .conceptPicker button {
       flex: 1 0 auto;
     }
-  }
-
-  @media (max-width: 520px) {
-    .selectedState {
-      align-items: flex-start;
-      flex-direction: column;
-      gap: 10px;
-    }
 
     .pathPlayback {
-      flex-wrap: wrap;
-      justify-content: flex-start;
+      position: static;
+      justify-content: center;
+      margin-top: 12px;
+      transform: none;
     }
   }
 </style>

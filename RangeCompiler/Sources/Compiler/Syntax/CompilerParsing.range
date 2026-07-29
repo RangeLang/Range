@@ -482,6 +482,55 @@ function compilerMacroRenderGraphDelta(tables: CompilerSyntaxTables, delta: Comp
     return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
 }
 
+function compilerMacroExpansionFragmentKindName(kind: Int): String {
+    if kind == compilerMacroExpansionFragmentAuthored() { return String("authored") }
+    if kind == compilerMacroExpansionFragmentBoundary() { return String("boundary") }
+    if kind == compilerMacroExpansionFragmentChildMacro() { return String("childMacro") }
+    return String("unknown")
+}
+
+function compilerMacroRenderExpansionFragments(tables: CompilerSyntaxTables): String {
+    let outputBuffer: RawBuffer(rawBufferCreate(capacity: 512, stride: 1))
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.macroExpansionFragments) {
+        let kind: Int(compilerIntTableValue(table: tables.macroExpansionFragments, row: row, column: 4))
+        let fileID: Int(compilerIntTableValue(table: tables.macroExpansionFragments, row: row, column: 5))
+        let nameStart: Int(compilerIntTableValue(table: tables.macroExpansionFragments, row: row, column: 8))
+        let nameEnd: Int(compilerIntTableValue(table: tables.macroExpansionFragments, row: row, column: 9))
+        state name: String("")
+        if kind != compilerMacroExpansionFragmentAuthored() {
+            name: compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: nameStart, localEnd: nameEnd)
+        }
+        rawBufferAppendText(buffer: outputBuffer, text: "macroExpansionFragment\(tab)row=\(row)\(tab)templateRow=\(compilerIntTableValue(table: tables.macroExpansionFragments, row: row, column: 1))\(tab)parentFragmentRow=\(compilerIntTableValue(table: tables.macroExpansionFragments, row: row, column: 2))\(tab)ordinal=\(compilerIntTableValue(table: tables.macroExpansionFragments, row: row, column: 3))\(tab)kind=\(compilerMacroExpansionFragmentKindName(kind: kind))\(tab)fileID=\(fileID)\(tab)start=\(compilerIntTableValue(table: tables.macroExpansionFragments, row: row, column: 6))\(tab)end=\(compilerIntTableValue(table: tables.macroExpansionFragments, row: row, column: 7))\(tab)name=\(name)\(newline)")
+        row: row + 1
+    }
+    return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
+}
+
+function compilerMacroRenderExpansionExecution(tables: CompilerSyntaxTables): String {
+    let outputBuffer: RawBuffer(rawBufferCreate(capacity: 512, stride: 1))
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.macroChildApplications) {
+        rawBufferAppendText(buffer: outputBuffer, text: "macroChildApplication\(tab)row=\(row)\(tab)applicationRow=\(compilerIntTableValue(table: tables.macroChildApplications, row: row, column: 1))\(tab)parentInvocationRow=\(compilerIntTableValue(table: tables.macroChildApplications, row: row, column: 2))\(tab)templateRow=\(compilerIntTableValue(table: tables.macroChildApplications, row: row, column: 3))\(tab)fragmentRow=\(compilerIntTableValue(table: tables.macroChildApplications, row: row, column: 4))\(tab)targetSyntaxID=\(compilerIntTableValue(table: tables.macroChildApplications, row: row, column: 5))\(tab)ordinal=\(compilerIntTableValue(table: tables.macroChildApplications, row: row, column: 6))\(newline)")
+        row: row + 1
+    }
+    row: 0
+    while row < compilerIntTableRowCount(table: tables.macroExpansionArtifacts) {
+        rawBufferAppendText(buffer: outputBuffer, text: "macroExpansionArtifact\(tab)row=\(row)\(tab)invocationRow=\(compilerIntTableValue(table: tables.macroExpansionArtifacts, row: row, column: 1))\(tab)applicationRow=\(compilerIntTableValue(table: tables.macroExpansionArtifacts, row: row, column: 2))\(tab)templateRow=\(compilerIntTableValue(table: tables.macroExpansionArtifacts, row: row, column: 3))\(tab)fileID=\(compilerIntTableValue(table: tables.macroExpansionArtifacts, row: row, column: 4))\(tab)start=\(compilerIntTableValue(table: tables.macroExpansionArtifacts, row: row, column: 5))\(tab)end=\(compilerIntTableValue(table: tables.macroExpansionArtifacts, row: row, column: 6))\(tab)ordinal=\(compilerIntTableValue(table: tables.macroExpansionArtifacts, row: row, column: 7))\(newline)")
+        row: row + 1
+    }
+    row: 0
+    while row < compilerIntTableRowCount(table: tables.macroExpansionBindings) {
+        rawBufferAppendText(buffer: outputBuffer, text: "macroExpansionBinding\(tab)row=\(row)\(tab)parentInvocationRow=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 1))\(tab)childApplicationRow=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 2))\(tab)templateRow=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 3))\(tab)fragmentRow=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 4))\(tab)symbolID=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 5))\(tab)kind=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 6))\(tab)typeKind=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 7))\(tab)scalar=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 9))\(tab)childCount=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 10))\(tab)parentRow=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 11))\(tab)ordinal=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 12))\(tab)nameHash=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 14))\(newline)")
+        row: row + 1
+    }
+    return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
+}
+
 function compilerMacroRenderExecutionError(tables: CompilerSyntaxTables, result: CompilerMacroExecutionResult): String {
     state invocationRow: Int(0 - 1)
     state foundInvocation: Bool(false)
@@ -522,7 +571,7 @@ function compilerMacroRenderExecutionSnapshot(tables: CompilerSyntaxTables, resu
     let digest: CompilerFingerprint(compilerMacroExecutionDigest(tables: tables))
     let dependencyDigest: CompilerFingerprint(compilerMacroReadDependencyDigest(tables: tables))
     let graphDeltaDigest: CompilerFingerprint(compilerMacroGraphDeltaDigest(delta: result.graphDelta))
-    state output: String("macroExecution\tvalid=true\tinvocationCount=\(compilerIntTableRowCount(table: tables.macroInvocations))\tcapabilityHandleCount=\(compilerIntTableRowCount(table: tables.macroCapabilityHandles))\teventCount=\(compilerIntTableRowCount(table: tables.macroExecutionEvents))\tgraphDeltaNodeCount=\(compilerIntTableRowCount(table: result.graphDelta.nodes))\tgraphDeltaFactCount=\(compilerIntTableRowCount(table: result.graphDelta.facts))\treadDependencyCount=\(result.readDependencyCount)\treadDependencyDigest=\(dependencyDigest.first):\(dependencyDigest.second)\tgraphDeltaDigest=\(graphDeltaDigest.first):\(graphDeltaDigest.second)\texecutionDigest=\(digest.first):\(digest.second)\n")
+    state output: String("macroExecution\tvalid=true\tinvocationCount=\(compilerIntTableRowCount(table: tables.macroInvocations))\tcapabilityHandleCount=\(compilerIntTableRowCount(table: tables.macroCapabilityHandles))\teventCount=\(compilerIntTableRowCount(table: tables.macroExecutionEvents))\tgraphDeltaNodeCount=\(compilerIntTableRowCount(table: result.graphDelta.nodes))\tgraphDeltaFactCount=\(compilerIntTableRowCount(table: result.graphDelta.facts))\treadDependencyCount=\(result.readDependencyCount)\texpansionFragmentCount=\(compilerIntTableRowCount(table: tables.macroExpansionFragments))\tchildApplicationCount=\(compilerIntTableRowCount(table: tables.macroChildApplications))\texpansionBindingCount=\(compilerIntTableRowCount(table: tables.macroExpansionBindings))\treadDependencyDigest=\(dependencyDigest.first):\(dependencyDigest.second)\tgraphDeltaDigest=\(graphDeltaDigest.first):\(graphDeltaDigest.second)\texecutionDigest=\(digest.first):\(digest.second)\n")
     state row: Int(0)
     while row < compilerIntTableRowCount(table: tables.macroInvocations) {
         output: "\(output)macroInvocation\trow=\(row)\tapplicationRow=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 1))\tdeclarationRow=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 2))\ttargetSyntaxID=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 3))\tphase=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 5))\tordinal=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 6))\tstatus=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 9))\tbudget=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 8))\tmirOperationCount=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 27))\tstepCount=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 28))\tapplicationIdentity=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 29)):\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 30))\tdeclarationIdentity=\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 31)):\(compilerIntTableValue(table: tables.macroInvocations, row: row, column: 32))\n"
@@ -540,6 +589,8 @@ function compilerMacroRenderExecutionSnapshot(tables: CompilerSyntaxTables, resu
     }
     output: "\(output)\(compilerMacroRenderExecutionEvents(tables: tables))"
     output: "\(output)\(compilerMacroRenderReadDependencies(tables: tables))"
+    output: "\(output)\(compilerMacroRenderExpansionFragments(tables: tables))"
+    output: "\(output)\(compilerMacroRenderExpansionExecution(tables: tables))"
     output: "\(output)\(compilerMacroRenderGraphDelta(tables: tables, delta: result.graphDelta))"
     return output
 }
@@ -654,9 +705,13 @@ function compilerNativeSourceSetLLVMTextForValidIndex(source: String, declaratio
             compilerGraphDeltaDestroy(delta: execution.graphDelta)
             compilerDeclarationIndexDestroy(index: executionIndex)
         } else {
-        if compilerGraphDeltaCommitGeneratedDeclarations(tables: declarationTables, delta: execution.graphDelta) != 0 {
+        let generatedCommitStatus: Int(compilerGraphDeltaCommitGeneratedDeclarations(tables: declarationTables, delta: execution.graphDelta))
+        if generatedCommitStatus != 0 {
             compilerMacroRecordGeneratedFunctionCommitDiagnostic(tables: declarationTables, delta: execution.graphDelta)
             output: compilerMacroRenderDiagnostics(tables: declarationTables)
+            if generatedCommitStatus == 0 - 2 {
+                output: "\(output)macroGeneratedCommit\tatomicRollback=true\tpendingFunctionCount=\(compilerIntTableRowCount(table: declarationTables.pendingGeneratedFunctions))\tpendingMemberCount=\(compilerIntTableRowCount(table: declarationTables.pendingGeneratedMembers))\n"
+            }
             compilerGraphDeltaDestroy(delta: execution.graphDelta)
             compilerDeclarationIndexDestroy(index: executionIndex)
         } else {

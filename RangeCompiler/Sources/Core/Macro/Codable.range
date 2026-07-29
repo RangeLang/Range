@@ -1,39 +1,59 @@
+macro codableEncodeProperty(
+    container: KeyedEncodingContainer,
+    value: Identifier,
+    key: String
+) -> Switch {
+    switch container.encode(#value, forKey: key) {
+    case .success:
+        break
+    case .failure(error):
+        return .failure(cause: error)
+    }
+}
+
+macro codableDecodeProperty(
+    container: KeyedDecodingContainer,
+    type: TypeReference,
+    value: Identifier,
+    key: String
+) -> Switch {
+    switch container.decode(#type.self, forKey: key) {
+    case .success(#value):
+        self.#value: #value
+    case .failure(error):
+        return .failure(cause: error)
+    }
+}
+
 macro codable(): Construct { environment in
-    let properties: [Let](
-        environment.target.declaration.members.filter(all: Let)
+    let fields: [@stored](
+        environment.target.declaration.members.filter(all: @stored)
     )
 
     environment.expand {
-        extension #(environment.target.declaration.self) {
+        extension #environment.target.declaration.self {
             function encode(to encoder: Encoder): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer(encoder.keyedContainer())
-                #(properties.map { property in
-                    switch container.encode(
-                        #(property.identifier),
-                        forKey: property.identifier.name
-                    ) {
-                    case .success:
-                        break
-                    case .failure(let error):
-                        return .failure(cause: error)
-                    }
-                })
+                #fields.map { property in
+                    @codableEncodeProperty(
+                        container: container,
+                        value: property.identifier,
+                        key: property.identifier.name
+                    )
+                }
                 return .success(result: Void())
             }
 
             function decode(from decoder: Decoder): Result<Self, DecodingError> {
                 let container: KeyedDecodingContainer(decoder.keyedContainer())
-                #(properties.map { property in
-                    switch container.decode(
-                        #(property.type).self,
-                        forKey: property.identifier.name
-                    ) {
-                    case .success(let #(property.identifier)):
-                        self.#(property.identifier): #(property.identifier)
-                    case .failure(let error):
-                        return .failure(cause: error)
-                    }
-                })
+                #fields.map { property in
+                    @codableDecodeProperty(
+                        container: container,
+                        type: property.type,
+                        value: property.identifier,
+                        key: property.identifier.name
+                    )
+                }
                 return .success(result: self)
             }
         }

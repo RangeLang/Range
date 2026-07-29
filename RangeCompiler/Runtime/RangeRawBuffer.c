@@ -261,6 +261,16 @@ int32_t rawBufferCount(void *opaqueBuffer) {
     return (int32_t)buffer->count;
 }
 
+int32_t bufferTruncateInt(void *opaqueBuffer, int32_t requestedCount) {
+    RangeRawBuffer *buffer = opaqueBuffer;
+    if (!buffer || buffer->stride != sizeof(int32_t)
+        || requestedCount < 0 || (size_t)requestedCount > buffer->count) {
+        return -1;
+    }
+    buffer->count = (size_t)requestedCount;
+    return 0;
+}
+
 int32_t rawBufferLoadInt(void *opaqueBuffer, int32_t index) {
     RangeRawBuffer *buffer = opaqueBuffer;
     if (!buffer || buffer->stride != sizeof(int32_t)
