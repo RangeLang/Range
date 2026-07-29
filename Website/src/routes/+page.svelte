@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { data, githubUrl } from "$lib/benchmarks";
+  import { githubUrl } from "$lib/benchmarks";
   import RangeNucleus from "$lib/components/RangeNucleus.svelte";
   import GithubIcon from "$lib/components/GithubIcon.svelte";
   import PostNoiseShader from "$lib/components/PostNoiseShader.svelte";
@@ -49,9 +49,5 @@
       </div>
     </section>
     <RangeNucleus />
-    <section class="landingLinks" aria-label="Range links">
-      <a href="/benchmarks"><span><strong>Benchmarks</strong><small>{data.summary.runLeafCount} generated comparisons</small></span><span>View</span></a>
-      <a href="/optimizations/general/strings-go-fast"><span><strong>Strings Go Fast</strong><small>100k appends · 491.2 ms → 4.1 ms</small></span><span>View</span></a>
-    </section>
   </main>
 </range-home-page>

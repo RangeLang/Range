@@ -30,3 +30,43 @@ The repository benchmark runner at `../Benchmarks/Speed/run.py` writes the
 versioned website input to `public/benchmarks.json`. The website test suite
 validates that artifact against
 `../Benchmarks/Speed/benchmark-results.schema.json`.
+
+## Docker deployment
+
+The production image uses Bun 1.3.14 for both the build and the runtime. It
+runs as the unprivileged `bun` user and exposes the SvelteKit server on port
+`3000`. Run Compose from this `Website/` directory inside the Range checkout:
+the build context includes the website and its canonical
+`RangeCompiler/Sources/Core/Macro/Codable.range` presentation source plus the
+current `Benchmarks/Speed/results/latest.json` measurement artifact.
+
+On the server:
+
+```sh
+cp .env.example .env
+# Set SITE_ADDRESS in .env to the site's public HTTPS URL.
+docker compose build --pull
+docker compose up -d
+docker compose ps
+curl --fail https://your-domain.example/health
+```
+
+Caddy owns host ports `80` and `443`, obtains and renews the site's TLS
+certificate, enables HTTP/3, and proxies to the website over the private
+Compose network. Before starting the stack, point the domain's `A` record
+(and `AAAA` record when used) at the server and allow inbound TCP `80`/`443`
+and UDP `443`.
+
+For a local HTTP check, leave `SITE_ADDRESS=http://localhost` and request
+`http://localhost/health`.
+
+To deploy a later revision:
+
+```sh
+git pull --ff-only
+docker compose up -d --build
+docker compose logs --tail=100 website caddy
+```
+
+`GET /health` is the container and external readiness endpoint. A healthy
+response is `{"status":"ok"}`.

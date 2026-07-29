@@ -1,30 +1,3 @@
-macro codableEncodeProperty(
-    container: KeyedEncodingContainer,
-    value: Identifier,
-    key: String
-) -> Switch {
-    switch container.encode(#value, forKey: key) {
-    case .success:
-        break
-    case .failure(error):
-        return .failure(cause: error)
-    }
-}
-
-macro codableDecodeProperty(
-    container: KeyedDecodingContainer,
-    type: TypeReference,
-    value: Identifier,
-    key: String
-) -> Switch {
-    switch container.decode(#type.self, forKey: key) {
-    case .success(#value):
-        self.#value: #value
-    case .failure(error):
-        return .failure(cause: error)
-    }
-}
-
 macro codable(): Construct { environment in
     let fields: [@stored](
         environment.target.declaration.members.filter(all: @stored)
@@ -35,11 +8,12 @@ macro codable(): Construct { environment in
             function encode(to encoder: Encoder): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer(encoder.keyedContainer())
                 #fields.map { property in
-                    @codableEncodeProperty(
-                        container: container,
-                        value: property.identifier,
-                        key: property.identifier.name
-                    )
+                    switch container.encode(#property.identifier, forKey: property.identifier.name) {
+                    case .success:
+                        break
+                    case .failure(error):
+                        return .failure(cause: error)
+                    }
                 }
                 return .success(result: Void())
             }
@@ -47,12 +21,12 @@ macro codable(): Construct { environment in
             function decode(from decoder: Decoder): Result<Self, DecodingError> {
                 let container: KeyedDecodingContainer(decoder.keyedContainer())
                 #fields.map { property in
-                    @codableDecodeProperty(
-                        container: container,
-                        type: property.type,
-                        value: property.identifier,
-                        key: property.identifier.name
-                    )
+                    switch container.decode(#property.type.self, forKey: property.identifier.name) {
+                    case .success(#property.identifier):
+                        self.#property.identifier: #property.identifier
+                    case .failure(error):
+                        return .failure(cause: error)
+                    }
                 }
                 return .success(result: self)
             }

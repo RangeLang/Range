@@ -67,3 +67,37 @@ export function codabilityPlateauScrollProgress({
     ),
   );
 }
+
+export function codabilityChapterIndex(
+  plateauProgress: number,
+  chapterCount: number,
+) {
+  if (chapterCount <= 0) return -1;
+  const boundedProgress = Math.max(0, Math.min(1, plateauProgress));
+  return Math.min(
+    chapterCount - 1,
+    Math.floor(boundedProgress * chapterCount),
+  );
+}
+
+export function shouldSynchronizeCodabilityChapter({
+  manualChapterIndex,
+  selectionScrollY,
+  currentScrollY,
+  elapsedMilliseconds,
+  releaseDistance = 6,
+  releaseDelay = 320,
+}: {
+  manualChapterIndex: number | null;
+  selectionScrollY: number;
+  currentScrollY: number;
+  elapsedMilliseconds: number;
+  releaseDistance?: number;
+  releaseDelay?: number;
+}) {
+  if (manualChapterIndex === null) return true;
+  return (
+    elapsedMilliseconds >= releaseDelay &&
+    Math.abs(currentScrollY - selectionScrollY) > releaseDistance
+  );
+}

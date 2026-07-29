@@ -729,6 +729,13 @@ construct CompilerLLVMHelperAudit {
     let details: String
 }
 
+construct CompilerFunctionArtifactCache {
+    let artifacts: CompilerIntTable
+    let rowsByInstance: Buffer<Int>
+    let text: String
+    let isValid: Bool
+}
+
 construct CompilerReachableLLVMState {
     binding context: CompilerLLVMLoweringContext
     let selection: CompilerFunctionSelection
@@ -753,6 +760,10 @@ construct CompilerReachableLLVMState {
     let abiReturnModes: Buffer<Int>
     let abiParticipants: Buffer<Int>
     let abiSensitiveFunctions: Buffer<Int>
+    let priorFunctionArtifacts: CompilerFunctionArtifactCache
+    let functionArtifacts: CompilerIntTable
+    let functionArtifactEdges: Buffer<Int>
+    let functionArtifactText: RawBuffer
     let functionsBuffer: RawBuffer
     let globalsBuffer: RawBuffer
     let counters: Buffer<Int>

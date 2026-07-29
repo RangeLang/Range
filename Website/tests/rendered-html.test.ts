@@ -58,6 +58,8 @@ describe("SvelteKit routes", () => {
     expect(html).not.toContain("Program melody");
     expect(html).toContain('href="/benchmarks"');
     expect(html).toContain('href="/optimizations/general/strings-go-fast"');
+    expect(html).not.toContain('class="landingLinks"');
+    expect(html).not.toContain("generated comparisons</small>");
     expect(html).not.toContain("Benchmark suite");
   });
 
@@ -89,6 +91,38 @@ describe("SvelteKit routes", () => {
     expect(html).toContain("4 of 15 leaves run");
     expect(html).toContain("Range passed 4");
     expect(html).not.toContain("Depth 20 and 21");
+    expect(html).toContain('href="/benchmarks/history"');
+  });
+
+  test("renders dated cross-language scaling observations", async () => {
+    const response = await render("/benchmarks/history");
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain("<title>Performance Over Time · Range</title>");
+    expect(html).toContain("Performance over time");
+    expect(html).toContain("Scaling observations");
+    expect(html).toContain("Observed Jul 18, 2026");
+    expect(html).toContain("String append operations · log scale");
+    expect(html).toContain("runtime · milliseconds · log scale");
+    expect(html).toContain(">100k</text>");
+    expect(html).toContain(">1m</text>");
+    expect(html).toContain(">5m</text>");
+    expect(html).toContain(">10m</text>");
+    expect(html).toContain("Language lines");
+    expect(html).toContain("Range</span>");
+    expect(html).toContain("Swift</span>");
+    expect(html).toContain('style="--series-color:var(--range);"');
+    expect(html).not.toContain("Initial");
+    expect(html).not.toContain("Lowering");
+    expect(html).not.toContain("Scale sweep");
+    expect(html).toContain("<range-performance-history");
+    expect(html).toContain("historyScalingGraph");
+    expect(html).toContain("historyLanguageLine");
+    expect(html).toContain("historyAccessibleTable");
+    expect(html).toContain("Range: 50.1 ms at");
+    expect(html).not.toContain("awaiting observation");
+    expect(html).not.toContain('class="historyMatrix"');
   });
 
   test("renders an individual benchmark", async () => {
@@ -157,8 +191,59 @@ test("uses Svelte components and Bun without the legacy renderer", async () => {
   expect(scale).toContain("Math.max(0, this.#focusPosition");
   expect(scale).toContain("new AudioContextConstructor()");
   expect(scale).toContain('filter.type = "bandpass";');
-  expect(scale).toContain("this.#hoverDistance / 4.5");
-  expect(scale).not.toContain('addEventListener("pointerdown"');
+  expect(scale).toContain("this.#hoverDistance / 3.2");
+  expect(scale).toContain("createDynamicsCompressor()");
+  expect(scale).toContain("this.#clickCompressor.ratio.value = 8;");
+  expect(scale).toContain("this.#clickOutput.gain.value = 1.15;");
+  expect(scale).toContain("const audioReady = this.#primeAudio();");
+  expect(scale).toContain("await audioReady;");
+  expect(scale).toContain("audioRequestIndex !== this.#audioRequestIndex");
+  expect(scale).toContain("const pointerSpeed = Math.abs(delta) / elapsed;");
+  expect(scale).toContain("const transientLevel = 1 - fastMovement * 0.55;");
+  expect(scale).toContain("const minimumClickInterval = 0.06 + intervalVariation;");
+  expect(scale).toContain("if (audio.currentTime < this.#nextClickTime) return;");
+  expect(scale).toContain("bristleGain.gain.linearRampToValueAtTime(");
+  expect(scale).toContain('this.addEventListener("pointerdown", this.#handlePointerDown);');
+  expect(scale).toContain("this.#clickCompressor.threshold.value = -12;");
+  expect(scale).toContain("const peakGain = (0.11 + intensity * 0.035)");
+  expect(scale).not.toContain("createOscillator()");
+  expect(scale).toContain("const speedAttenuation = Math.min(0.32");
+  expect(scale).not.toContain("index * 0.005");
+  expect(scale).not.toContain('tone.type = "triangle";');
+});
+
+test("humanizes the benchmark heading with learned timing and synthesized keys", async () => {
+  const [typedText, app] = await Promise.all([
+    readFile(new URL("../public/range-typed-text.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/app.html", import.meta.url), "utf8"),
+  ]);
+
+  expect(app).toContain("range-typed-text.js?version=87");
+  expect(typedText).toContain("const learnedTimingWeights");
+  expect(typedText).toContain("const commonDigraphs = new Set");
+  expect(typedText).toContain("const keyboardProfiles = new Map");
+  expect(typedText).toContain("learnedTimingWeights.alternateHand");
+  expect(typedText).toContain("learnedTimingWeights.sameFinger");
+  expect(typedText).toContain("learnedTimingWeights.keyTravel");
+  expect(typedText).toContain("this.#burstMomentum = this.#burstMomentum * 0.72");
+  expect(typedText).toContain("playSynthesizedKey(");
+  expect(typedText).toContain('transientFilter.type = "bandpass";');
+  expect(typedText).toContain('body.type = "sine";');
+  expect(typedText).toContain("context.createDynamicsCompressor()");
+  expect(typedText).toContain('smoothingFilter.type = "lowpass";');
+  expect(typedText).toContain("compressor.ratio.value = 8;");
+  expect(typedText).toContain("outputGain.gain.value = 1;");
+  expect(typedText).toContain("context.createStereoPanner?.()");
+  expect(typedText).toContain("this.#pendingArticulation");
+  expect(typedText).toContain("const nextStroke = this.#learnedStroke(");
+  expect(typedText).toContain("this.#pendingArticulation = nextStroke.articulation;");
+  expect(typedText).toContain("commonDigraph ? 0.84 : 1");
+  expect(typedText).toContain("typingAudioUnlocked");
+  expect(typedText).toContain('addEventListener("pointerdown", unlockTypingAudio');
+  expect(typedText).toContain("prefers-reduced-motion: reduce");
+  expect(typedText).not.toContain(
+    "setTimeout(() => typeCharacter(index + 1), interval)",
+  );
 });
 
 test("keeps the scale math deterministic", async () => {
@@ -228,6 +313,10 @@ test("keeps cardinality audio continuous beneath its visual rhythm", async () =>
   expect(nucleus).toContain("breath.frequency.value = 0.037;");
   expect(nucleus).toContain("voiceGain.gain.setValueAtTime(0.09, startAt);");
   expect(nucleus).toContain("direct.gain.value = 0.14;");
+  expect(nucleus).toContain("function getAudioMasterInput()");
+  expect(nucleus).toContain("audioMasterInput.gain.value = 1.8;");
+  expect(nucleus).toContain("audioMasterCompressor.ratio.value = 12;");
+  expect(nucleus).toContain("audioMasterOutput.gain.value = 1;");
   expect(nucleus).toContain("function scrollFilterFrequency(position: number)");
   expect(nucleus).toContain("const minimum = 190;");
   expect(nucleus).toContain("const maximum = 760;");
@@ -248,24 +337,20 @@ test("snaps concept color while the spiral moves at one constant speed", async (
     "utf8",
   );
 
-  expect(nucleus).toContain("const spiralFlowDurationSeconds = 2.4;");
-  expect(nucleus).toContain("--spiral-duration: ${spiralFlowDurationSeconds}s");
-  expect(nucleus).toContain("function spiralDashSegments()");
-  expect(nucleus).toContain("const spiralDashes = spiralDashSegments();");
-  expect(nucleus).toContain("--spiral-delay: ${dash.delaySeconds}s");
+  expect(nucleus).toContain("const spiralFlowDurationSeconds = 16;");
+  expect(nucleus).toContain("const spiralDashCount = 30;");
+  expect(nucleus).toContain("const spiralDashStartLength = 3.2;");
+  expect(nucleus).toContain("const spiralDashEndLength = 12;");
   expect(nucleus).toContain(
-    "const dashLength = 2.4 + logarithmicMagnitude * 1.7",
+    "(spiralDashEndLength - spiralDashStartLength) * dashProgress",
   );
-  expect(nucleus).toContain(
-    "const gapLength = 2.8 + logarithmicMagnitude * 1.25",
-  );
-  expect(nucleus).toContain(
-    "delaySeconds: -(1 - progress) * spiralFlowDurationSeconds",
-  );
-  expect(nucleus).toContain(
-    "animation: spiral-flow var(--spiral-duration) linear infinite;",
-  );
-  expect(nucleus).toContain("animation-delay: var(--spiral-delay);");
+  expect(nucleus).toContain("<animateMotion");
+  expect(nucleus).toContain("{#if looping}");
+  expect(nucleus).toContain('href="#value-spiral-motion-path"');
+  expect(nucleus).toContain('values="0;0.62;0.62;0"');
+  expect(nucleus).toContain('keyTimes="0;0.06;0.94;1"');
+  expect(nucleus).toContain("const restingSpiralPattern");
+  expect(nucleus).toContain("class=\"spiralRestingTrack\"");
   expect(nucleus).not.toContain("stroke-dashoffset");
   expect(nucleus).not.toContain("spiralTrackEnabled");
   expect(nucleus).not.toContain("toggleSpiralTrack");
@@ -288,7 +373,10 @@ test("uses Range-native semantic syntax roles", async () => {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
       let container: KeyedEncodingContainer(encoder.keyedContainer())
       #properties.map { property in
-        @codableEncodeProperty(container: container, value: #value)
+        switch container.encode(#property.identifier, forKey: property.identifier.name) {
+        case .success:
+          break
+        }
       }
       extension #environment.target.declaration.self {}
       return .success(result: Void())
@@ -305,7 +393,8 @@ test("uses Range-native semantic syntax roles", async () => {
   expect(highlighted).toContain(
     '<span class="token property">self</span>',
   );
-  expect(highlighted).toContain('<span class="token macro">@codableEncodeProperty</span>');
+  expect(highlighted).toContain('<span class="token splice">#property</span>');
+  expect(highlighted).toContain('<span class="token keyword">switch</span>');
   expect(highlighted).toContain('<span class="token parameter">container</span>');
   expect(highlighted).toContain('<span class="token brace">{</span>');
 });
@@ -338,11 +427,23 @@ test("keeps the concrete codability application example", async () => {
   expect(sheet).not.toContain('label: "Apply"');
   expect(sheet).not.toContain('label: "Fields"');
   expect(sheet).toContain("const declarationSource = sourceFrom(codableSource, macroMarker)");
-  expect(sheet).toContain("const synthesisSource = sourceBetween(codableSource, fieldMarker, macroMarker)");
-  expect(sheet).toContain('source: `${declarationSource}\\n\\n${synthesisSource}`');
+  expect(sheet).toContain("source: declarationSource");
+  expect(sheet).not.toContain("synthesisSource");
   expect(codable).not.toContain("macro codableEncodeBody(");
   expect(codable).not.toContain("macro codableDecodeBody(");
+  expect(codable).not.toContain("macro codableEncodeProperty(");
+  expect(codable).not.toContain("macro codableDecodeProperty(");
+  expect(codable).not.toContain("@codableEncodeProperty");
+  expect(codable).not.toContain("@codableDecodeProperty");
   expect(codable.match(/#fields\.map/g)).toHaveLength(2);
+  expect(codable.match(/switch container\.encode/g)).toHaveLength(1);
+  expect(codable.match(/switch container\.decode/g)).toHaveLength(1);
+  expect(codable).toContain(
+    "switch container.encode(#property.identifier, forKey: property.identifier.name)",
+  );
+  expect(codable).toContain(
+    "switch container.decode(#property.type.self, forKey: property.identifier.name)",
+  );
   expect(sheet).not.toContain("previewFooter");
   expect(sheet).not.toContain("declaration → graph query → expansion");
   expect(sheet).toContain('state message: String("Working on Range!")');
@@ -389,7 +490,7 @@ test("keeps the concrete codability application example", async () => {
   );
   expect(sheet).toContain("token: extensionMarker");
   expect(sheet).toContain(
-    '"Everything inside the expand block is normal Range code. It is type-checked and evaluated as far as possible so the generated declarations are valid before they join the graph."',
+    '"Everything inside the expand block is normal type-checked code."',
   );
   expect(sheet).toContain('accent: "#environment.target.declaration.self"');
   expect(sheet).toContain(
@@ -419,9 +520,9 @@ test("keeps the concrete codability application example", async () => {
   expect(sheet).not.toContain(
     "The body is small, so we can keep it here instead of making another macro.",
   );
-  expect(sheet).toContain('title: "Encapsulating control flow"');
+  expect(sheet).toContain('title: "Decoding the construct"');
   expect(sheet).toContain(
-    '"Here one macro holds a complete `switch`. Macros can encapsulate individual control flow or small pieces of logic, not only whole declarations."',
+    '"The matching `decode` function opens the keyed container, maps the same stored fields, returns on the first `DecodingError`, and produces `self` when every field succeeds."',
   );
   expect(sheet).toContain("highlightInspectableLines(activePane.source)");
   expect(sheet).toContain(
@@ -445,9 +546,9 @@ test("keeps the concrete codability application example", async () => {
   expect(sheet).toContain(
     '"Here we map the stored fields directly inside `encode`."',
   );
-  expect(sheet).toContain("scopeToken: synthesisSource");
+  expect(sheet).toContain("scopeToken: decodeFunctionSection");
   expect(sheet).toContain(
-    'id: "encode-property",\n      token: synthesisSource',
+    'id: "decode-body",\n      token: decodeFunctionSection',
   );
   expect(sheet).toContain("line.scopeIDs.includes(activeInspectionID)");
   expect(sheet).toContain("class:chapterContext={isChapterContext(line)}");
@@ -456,10 +557,17 @@ test("keeps the concrete codability application example", async () => {
     'class="chapterBadge" data-step={line.step} aria-hidden="true"',
   );
   expect(sheet).toContain("onclick={() => selectCodeChapter(line.inspectionID!)}");
-  expect(sheet).toContain("const shouldClear = activeID === \"macro\"");
-  expect(sheet).toContain("activeInspectionID = shouldClear ? null : chapter.id");
-  expect(sheet).toContain('{#if activeID === "macro"}');
+  expect(sheet).not.toContain("const shouldClear");
+  expect(sheet).toContain("storyMode = true;");
+  expect(sheet).toContain("activeInspectionID = chapter.id;");
+  expect(sheet).toContain('{#if activeID === "macro" && storyMode}');
   expect(sheet).toContain('class="chapterNav"');
+  expect(sheet).toContain('class="storyModeToggle"');
+  expect(sheet).toContain('aria-label="Story mode"');
+  expect(sheet).toContain("aria-pressed={storyMode}");
+  expect(sheet).toContain("onclick={() => setStoryMode(!storyMode)}");
+  expect(sheet).toContain("let storyMode = $state(true);");
+  expect(sheet).toContain("activeInspectionID = null;");
   expect(sheet).toContain(
     "class:inspectionVisible={activeInspection !== undefined}",
   );
@@ -558,6 +666,24 @@ test("keeps the concrete codability application example", async () => {
   expect(sheet).toContain(
     "codeViewportElement.scrollTop = codeScrollDistance * stageScrollProgress;",
   );
+  expect(sheet).toContain("function centerChapterInViewport(");
+  expect(sheet).toContain(
+    '`[data-inspection-id="${inspectionID}"]`',
+  );
+  expect(sheet).toContain("centerChapterInViewport(activeInspectionID);");
+  expect(sheet).toContain("data-inspection-id={line.inspectionID}");
+  expect(sheet).toContain(
+    'if (storyMode && activeID === "macro" && activeInspectionID)',
+  );
+  expect(sheet).toContain(
+    "const nextScrollChapterIndex = codabilityChapterIndex(",
+  );
+  expect(sheet).toContain(
+    "nextScrollChapterIndex !== scrollChapterIndex",
+  );
+  expect(sheet).toContain(
+    "activeInspectionID = chapters[nextScrollChapterIndex]?.id ?? null;",
+  );
   expect(sheet).not.toContain("filter: blur(3px);");
   expect(sheet).not.toContain("opacity: 0.4;");
   expect(codable.match(/#fields\.map/g)).toHaveLength(2);
@@ -576,8 +702,10 @@ test("keeps the concrete codability application example", async () => {
 test("holds a symmetric plateau around the codability focus stage", async () => {
   const {
     codabilityFocusProgress,
+    codabilityChapterIndex,
     codabilityPlateauScrollProgress,
     nextCodabilityFocusState,
+    shouldSynchronizeCodabilityChapter,
   } = await import(
     "../src/lib/codability-focus"
   );
@@ -642,6 +770,39 @@ test("holds a symmetric plateau around the codability focus stage", async () => 
     stageHeight,
     viewportHeight,
   })).toBe(1);
+
+  expect(codabilityChapterIndex(0, 7)).toBe(0);
+  expect(codabilityChapterIndex(1 / 7 - 0.0001, 7)).toBe(0);
+  expect(codabilityChapterIndex(1 / 7, 7)).toBe(1);
+  expect(codabilityChapterIndex(3.5 / 7, 7)).toBe(3);
+  expect(codabilityChapterIndex(6 / 7, 7)).toBe(6);
+  expect(codabilityChapterIndex(1, 7)).toBe(6);
+  expect(codabilityChapterIndex(0.5, 0)).toBe(-1);
+
+  expect(shouldSynchronizeCodabilityChapter({
+    manualChapterIndex: 4,
+    selectionScrollY: 800,
+    currentScrollY: 800,
+    elapsedMilliseconds: 1_000,
+  })).toBe(false);
+  expect(shouldSynchronizeCodabilityChapter({
+    manualChapterIndex: 4,
+    selectionScrollY: 800,
+    currentScrollY: 820,
+    elapsedMilliseconds: 120,
+  })).toBe(false);
+  expect(shouldSynchronizeCodabilityChapter({
+    manualChapterIndex: 4,
+    selectionScrollY: 800,
+    currentScrollY: 820,
+    elapsedMilliseconds: 500,
+  })).toBe(true);
+  expect(shouldSynchronizeCodabilityChapter({
+    manualChapterIndex: null,
+    selectionScrollY: 800,
+    currentScrollY: 800,
+    elapsedMilliseconds: 0,
+  })).toBe(true);
 
   expect(nextCodabilityFocusState({
     state: "entering",

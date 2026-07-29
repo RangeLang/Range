@@ -44,6 +44,7 @@ range-site-shell,
 range-home-page,
 range-benchmarks-page,
 range-benchmark-page,
+range-performance-history,
 range-update-page,
 range-benchmark-chart,
 range-code-block,
@@ -603,49 +604,6 @@ range-spline-nav a:focus-visible {
   color: var(--ink);
 }
 
-.landingLinks {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  padding: 56px 0;
-}
-
-.landingLinks > a {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  min-height: 126px;
-  padding: 22px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.landingLinks > a:hover,
-.landingLinks > a:focus-visible {
-  border-color: var(--range);
-  outline: none;
-}
-
-.landingLinks > a > span:first-child {
-  display: grid;
-  gap: 7px;
-}
-
-.landingLinks strong {
-  font-size: 20px;
-  font-weight: 500;
-}
-
-.landingLinks small,
-.landingLinks > a > span:last-child {
-  color: var(--muted);
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 11px;
-}
-
 .updatePageHeader {
   display: grid;
   gap: 36px;
@@ -693,6 +651,246 @@ range-spline-nav a:focus-visible {
   font-size: 24px;
   font-weight: 500;
   letter-spacing: -0.03em;
+}
+
+.benchmarkHeaderMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+}
+
+.benchmarkHeaderMeta > a {
+  color: var(--range);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.benchmarkHeaderMeta > a:hover,
+.benchmarkHeaderMeta > a:focus-visible {
+  color: var(--ink);
+  outline: none;
+}
+
+.performanceHistoryPage {
+  width: min(1480px, calc(100% - 48px));
+}
+
+.performanceHistoryHeader {
+  display: grid;
+  gap: 76px;
+  padding-bottom: 58px;
+}
+
+.performanceHistoryHeader > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.7fr);
+  gap: 18px 54px;
+  align-items: end;
+}
+
+.performanceHistoryHeader p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--range);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.performanceHistoryHeader h1 {
+  margin: 0;
+  font-size: clamp(48px, 7vw, 104px);
+  font-weight: 500;
+  letter-spacing: -0.07em;
+  line-height: 0.88;
+}
+
+.performanceHistoryHeader > div > span {
+  max-width: 500px;
+  color: var(--muted);
+  font-size: clamp(15px, 1.5vw, 19px);
+  letter-spacing: -0.02em;
+  line-height: 1.45;
+}
+
+.historyGraphSection {
+  border-top: 1px solid var(--line);
+}
+
+.historyGraphMeta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.historyGraphMeta > div {
+  display: grid;
+  gap: 5px;
+}
+
+.historyGraphMeta span {
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.historyGraphMeta time,
+.historyGraphMeta p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.historyGraphMeta p {
+  max-width: 520px;
+  line-height: 1.55;
+  text-align: right;
+}
+
+.historyLanguageLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  padding: 18px 0 0;
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+}
+
+.historyLanguageLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.historyLanguageLegend span.rangeSeries {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.historyLanguageLegend i {
+  width: 18px;
+  height: 2px;
+  background: var(--series-color);
+}
+
+.historyGraphViewport {
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: thin;
+}
+
+.historyGraph {
+  position: relative;
+  min-width: 620px;
+  height: clamp(450px, 54vw, 680px);
+  margin: 48px 24px 76px 72px;
+}
+
+.historyYAxisTitle,
+.historyXAxisTitle {
+  position: absolute;
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.historyYAxisTitle {
+  top: 50%;
+  left: -62px;
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+
+.historyXAxisTitle {
+  right: 3.2%;
+  bottom: -32px;
+}
+
+.historyLineChart {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.historyRuntimeGrid,
+.historyOperationGrid {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.historyOperationGrid {
+  stroke: color-mix(in oklch, var(--line), transparent 30%);
+}
+
+.historyRuntimeTick,
+.historyOperationTick {
+  fill: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+}
+
+.historyLanguageLine {
+  fill: none;
+  stroke: var(--series-color);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+  opacity: 0.72;
+  vector-effect: non-scaling-stroke;
+}
+
+.historyLanguageLine.rangeSeries {
+  stroke-width: 2.7;
+  opacity: 1;
+}
+
+.historyLanguagePoint {
+  fill: var(--paper);
+  stroke: var(--series-color);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.historyLanguagePoint.rangeSeries {
+  fill: var(--range);
+  stroke: var(--paper);
+  stroke-width: 2;
+}
+
+.historyAccessibleTable {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  margin: -1px;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.historyLegend {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 0 0;
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+}
+
+.historyLegend p {
+  margin: 0 0 0 auto;
+  text-align: right;
 }
 
 .dateLabel {
@@ -1633,6 +1831,47 @@ footer {
 }
 
 @media (max-width: 760px) {
+  .performanceHistoryPage {
+    width: calc(100% - 28px);
+  }
+
+  .performanceHistoryHeader {
+    gap: 48px;
+  }
+
+  .performanceHistoryHeader > div {
+    grid-template-columns: 1fr;
+  }
+
+  .performanceHistoryHeader p {
+    grid-column: auto;
+  }
+
+  .historyGraphMeta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .historyGraphMeta p {
+    text-align: left;
+  }
+
+  .historyGraph {
+    margin-top: 72px;
+  }
+
+  .historyLegend {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .historyLegend p {
+    width: 100%;
+    margin-left: 0;
+    text-align: left;
+  }
+
   .procedureGraph {
     grid-template-columns: 1fr;
     gap: 0;
@@ -1673,10 +1912,6 @@ footer {
   }
 
   .runCommands {
-    grid-template-columns: 1fr;
-  }
-
-  .landingLinks {
     grid-template-columns: 1fr;
   }
 

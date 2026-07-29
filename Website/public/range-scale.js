@@ -25,9 +25,12 @@ class RangeScale extends HTMLElement {
   ];
 
   #audioContext;
+  #audioRequestIndex = 0;
   #bristleBuffer;
   #canvas;
+  #clickCompressor;
   #clickIndex = 0;
+  #clickOutput;
   #context;
   #colorProbe;
   #focusPosition = 0;
@@ -36,20 +39,24 @@ class RangeScale extends HTMLElement {
   #hasHoverSample = false;
   #hoverDistance = 0;
   #isHovered = false;
+  #lastHoverTime = 0;
   #lastHoverY = 0;
   #lastMotionTime = 0;
   #motionFrame;
+  #nextClickTime = 0;
   #resizeObserver;
 
   #handlePointerEnter = (event) => {
     this.#hasHoverSample = true;
     this.#hoverDistance = 0;
+    this.#lastHoverTime = event.timeStamp;
     this.#lastHoverY = event.clientY;
     this.#focusVelocity = 0;
+    this.#nextClickTime = 0;
     void this.#primeAudio();
   };
 
-  #handlePointerMove = (event) => {
+  #handlePointerMove = async (event) => {
     const bounds = this.getBoundingClientRect();
     if (bounds.height <= 0) return;
     this.#isHovered = true;
@@ -59,23 +66,40 @@ class RangeScale extends HTMLElement {
     );
     this.#startMotion();
 
-    void this.#primeAudio();
+    const audioReady = this.#primeAudio();
     if (!this.#hasHoverSample) {
       this.#hasHoverSample = true;
       this.#lastHoverY = event.clientY;
+      await audioReady;
       return;
     }
     const delta = event.clientY - this.#lastHoverY;
+    const elapsed = Math.max(8, event.timeStamp - this.#lastHoverTime);
+    const pointerSpeed = Math.abs(delta) / elapsed;
+    this.#lastHoverTime = event.timeStamp;
     this.#lastHoverY = event.clientY;
+    const fastMovement = Math.min(
+      1,
+      Math.max(0, (pointerSpeed - 0.18) / 0.62),
+    );
+    const transientLevel = 1 - fastMovement * 0.55;
     this.#hoverDistance += Math.abs(delta);
-    const clickCount = Math.min(4, Math.floor(this.#hoverDistance / 4.5));
+    const clickCount = Math.min(6, Math.floor(this.#hoverDistance / 3.2));
     if (clickCount === 0) return;
-    this.#hoverDistance %= 4.5;
+    this.#hoverDistance %= 3.2;
     const direction = Math.sign(delta);
-    const intensity = Math.min(1, 0.45 + Math.abs(delta) / 18);
-    for (let index = 0; index < clickCount; index += 1) {
-      this.#playClick(direction, intensity, index * 0.005);
-    }
+    const speedAttenuation = Math.min(0.32, Math.abs(delta) / 120);
+    const intensity = Math.max(0.26, 0.58 - speedAttenuation);
+    const audioRequestIndex = ++this.#audioRequestIndex;
+    await audioReady;
+    if (audioRequestIndex !== this.#audioRequestIndex) return;
+    this.#playClick(direction, intensity, transientLevel);
+  };
+
+  #handlePointerDown = async () => {
+    await this.#primeAudio();
+    this.#nextClickTime = 0;
+    this.#playClick(1, 0.58, 1);
   };
 
   #handlePointerLeave = () => {
@@ -84,6 +108,8 @@ class RangeScale extends HTMLElement {
     this.#focusVelocity = 0;
     this.#hasHoverSample = false;
     this.#hoverDistance = 0;
+    this.#audioRequestIndex += 1;
+    this.#nextClickTime = 0;
     this.#startMotion();
   };
 
@@ -100,6 +126,7 @@ class RangeScale extends HTMLElement {
     this.#render();
     this.addEventListener("pointerenter", this.#handlePointerEnter);
     this.addEventListener("pointermove", this.#handlePointerMove);
+    this.addEventListener("pointerdown", this.#handlePointerDown);
     this.addEventListener("pointerleave", this.#handlePointerLeave);
     this.#resizeObserver = new ResizeObserver(() => this.#align());
     const sequence = this.parentElement;
@@ -114,11 +141,15 @@ class RangeScale extends HTMLElement {
   disconnectedCallback() {
     this.removeEventListener("pointerenter", this.#handlePointerEnter);
     this.removeEventListener("pointermove", this.#handlePointerMove);
+    this.removeEventListener("pointerdown", this.#handlePointerDown);
     this.removeEventListener("pointerleave", this.#handlePointerLeave);
     this.#cancelMotion();
     void this.#audioContext?.close();
     this.#audioContext = undefined;
     this.#bristleBuffer = undefined;
+    this.#clickCompressor = undefined;
+    this.#clickOutput = undefined;
+    this.#nextClickTime = 0;
     this.#resizeObserver?.disconnect();
   }
 
@@ -187,7 +218,17 @@ class RangeScale extends HTMLElement {
     if (!AudioContextConstructor) return;
     if (!this.#audioContext) {
       this.#audioContext = new AudioContextConstructor();
-      const frameCount = Math.ceil(this.#audioContext.sampleRate * 0.026);
+      this.#clickCompressor = this.#audioContext.createDynamicsCompressor();
+      this.#clickCompressor.threshold.value = -12;
+      this.#clickCompressor.knee.value = 2;
+      this.#clickCompressor.ratio.value = 8;
+      this.#clickCompressor.attack.value = 0.0005;
+      this.#clickCompressor.release.value = 0.03;
+      this.#clickOutput = this.#audioContext.createGain();
+      this.#clickOutput.gain.value = 1.15;
+      this.#clickCompressor.connect(this.#clickOutput);
+      this.#clickOutput.connect(this.#audioContext.destination);
+      const frameCount = Math.ceil(this.#audioContext.sampleRate * 0.008);
       this.#bristleBuffer = this.#audioContext.createBuffer(
         1,
         frameCount,
@@ -195,7 +236,7 @@ class RangeScale extends HTMLElement {
       );
       const channel = this.#bristleBuffer.getChannelData(0);
       for (let index = 0; index < channel.length; index += 1) {
-        const envelope = 1 - index / channel.length;
+        const envelope = Math.pow(1 - index / channel.length, 4);
         channel[index] = (Math.random() * 2 - 1) * envelope;
       }
     }
@@ -204,45 +245,52 @@ class RangeScale extends HTMLElement {
     }
   }
 
-  #playClick(direction, intensity, delay = 0) {
+  #playClick(direction, intensity, transientLevel) {
     const audio = this.#audioContext;
-    if (!audio || audio.state !== "running" || !this.#bristleBuffer) return;
+    if (
+      !audio
+      || audio.state !== "running"
+      || !this.#bristleBuffer
+      || !this.#clickCompressor
+    ) return;
 
     const clickIndex = this.#clickIndex;
+    const intervalVariation = ((((clickIndex * 5) % 7) - 3) * 0.004);
+    const minimumClickInterval = 0.06 + intervalVariation;
+    if (audio.currentTime < this.#nextClickTime) return;
+    const time = audio.currentTime;
+    this.#nextClickTime = time + minimumClickInterval;
     this.#clickIndex += 1;
     const variation = (((clickIndex * 7) % 11) - 5) / 5;
-    const time = audio.currentTime + delay;
-    const duration = 0.018 + (variation + 1) * 0.0015;
+    const duration = 0.0062 + (variation + 1) * 0.0007;
 
     const bristle = audio.createBufferSource();
     const filter = audio.createBiquadFilter();
     const bristleGain = audio.createGain();
     bristle.buffer = this.#bristleBuffer;
-    bristle.playbackRate.value = 1 + variation * 0.055;
+    bristle.playbackRate.value = 1 + variation * 0.05;
     filter.type = "bandpass";
-    filter.frequency.value = 2_150 + variation * 260 + direction * 80;
-    filter.Q.value = 0.85 + intensity * 0.25;
-    bristleGain.gain.setValueAtTime(0.024 + intensity * 0.012, time);
-    bristleGain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+    filter.frequency.value = 3_200 + variation * 420 + direction * 70;
+    filter.Q.value = 0.7;
+    const peakGain = (0.11 + intensity * 0.035) * transientLevel;
+    bristleGain.gain.setValueAtTime(0.0001, time);
+    bristleGain.gain.linearRampToValueAtTime(
+      peakGain,
+      time + 0.00035,
+    );
+    bristleGain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      time + duration,
+    );
     bristle.connect(filter);
     filter.connect(bristleGain);
-    bristleGain.connect(audio.destination);
-    bristle.start(time, (clickIndex * 0.0019) % 0.008, duration);
-    bristle.stop(time + duration);
-
-    const tone = audio.createOscillator();
-    const toneGain = audio.createGain();
-    tone.type = "triangle";
-    tone.frequency.setValueAtTime(
-      1_080 + variation * 95 + direction * 32,
+    bristleGain.connect(this.#clickCompressor);
+    bristle.start(
       time,
+      (clickIndex * 0.0007) % 0.003,
+      duration,
     );
-    toneGain.gain.setValueAtTime(0.006 + intensity * 0.004, time);
-    toneGain.gain.exponentialRampToValueAtTime(0.0001, time + duration * 0.72);
-    tone.connect(toneGain);
-    toneGain.connect(audio.destination);
-    tone.start(time);
-    tone.stop(time + duration);
+    bristle.stop(time + duration);
   }
 
   #startMotion() {

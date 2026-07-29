@@ -230,7 +230,12 @@ function compilerBodyLLVMValue(emitter: CompilerBodyLLVMEmitter, valueID: Int): 
     if kind == compilerBodyLLVMValueReceiverPointer() { return CompilerLLVMValue(text: String("%self"), typeName: String("ptr")) }
     if kind == compilerBodyLLVMValueStoragePointer() { return CompilerLLVMValue(text: "%storage\(aux)", typeName: String("ptr")) }
     if kind == compilerBodyLLVMValueTemporary() { return CompilerLLVMValue(text: "%r\(number)", typeName: typeName) }
-    if kind == compilerBodyLLVMValueGlobalString() { return CompilerLLVMValue(text: "@.str.\(number)", typeName: String("ptr")) }
+    if kind == compilerBodyLLVMValueGlobalString() {
+        return CompilerLLVMValue(
+            text: "@.str.\(compilerBodyLLVMGlobalIdentifier(arena: emitter.arena, temporary: number))",
+            typeName: String("ptr")
+        )
+    }
     if kind == compilerBodyLLVMValueAlias() { return compilerBodyLLVMValue(emitter: emitter, valueID: aux) }
     return CompilerLLVMValue(text: String(""), typeName: String(""))
 }
@@ -1429,7 +1434,7 @@ function compilerBodyLLVMEmitterProcessOperation(emitter: CompilerBodyLLVMEmitte
         state memberGetterName: String("rangeConstructGetPtr")
         if memberTypeName == String("i32") { memberGetterName: String("rangeConstructGetInt") }
         if memberTypeName == String("i1") { memberGetterName: String("rangeConstructGetBool") }
-        let memberArguments: String("ptr \(memberReceiverValue.text), ptr getelementptr inbounds ([\(emittedMemberByteCount) x i8], ptr @.str.\(memberGlobalTemporary), i32 0, i32 0)")
+        let memberArguments: String("ptr \(memberReceiverValue.text), ptr getelementptr inbounds ([\(emittedMemberByteCount) x i8], ptr @.str.\(compilerBodyLLVMGlobalIdentifier(arena: emitter.arena, temporary: memberGlobalTemporary)), i32 0, i32 0)")
         let memberInstruction: CompilerLLVMInstruction(result: "%r\(memberCallTemporary)", operation: String("call"), typeName: memberTypeName, left: memberGetterName, right: memberArguments)
         return compilerBodyLLVMEmitterAppendInstruction(emitter: emitter, instruction: memberInstruction)
     }
@@ -1680,11 +1685,19 @@ function compilerBodyLLVMEmitterRenderGlobals(emitter: CompilerBodyLLVMEmitter):
         if descriptorKind == compilerBodyLLVMGlobalDescriptorStringLiteral() { descriptorContent: compilerCoreStringLiteralContent(text: descriptorText) }
         if descriptorKind == compilerBodyLLVMGlobalDescriptorStringSegment() { descriptorContent: compilerCoreDecodeStringLiteralContent(content: descriptorText) }
         let renderedText: String(compilerCoreLLVMGlobalStringRenderedText(text: compilerCoreStatementRecordEncodeValue(value: descriptorContent)))
-        rawBufferAppendText(buffer: output, text: "@.str.bytes.\(temporary) = private unnamed_addr constant [\(byteCount) x i8] c\"\(renderedText)\\00\"\n")
-        rawBufferAppendText(buffer: output, text: "@.str.\(temporary) = private global { i64, i64, i64, i64, ptr, i64 } { i64 5927104652607903047, i64 \(byteCount - 1), i64 \(byteCount - 1), i64 1, ptr getelementptr inbounds ([\(byteCount) x i8], ptr @.str.bytes.\(temporary), i32 0, i32 0), i64 -1 }\n")
+        let globalIdentifier: String(compilerBodyLLVMGlobalIdentifier(arena: emitter.arena, temporary: temporary))
+        rawBufferAppendText(buffer: output, text: "@.str.bytes.\(globalIdentifier) = private unnamed_addr constant [\(byteCount) x i8] c\"\(renderedText)\\00\"\n")
+        rawBufferAppendText(buffer: output, text: "@.str.\(globalIdentifier) = private global { i64, i64, i64, i64, ptr, i64 } { i64 5927104652607903047, i64 \(byteCount - 1), i64 \(byteCount - 1), i64 1, ptr getelementptr inbounds ([\(byteCount) x i8], ptr @.str.bytes.\(globalIdentifier), i32 0, i32 0), i64 -1 }\n")
         row: row + 1
     }
     return compilerCoreRawBufferMaterializeAndDestroy(buffer: output)
+}
+
+function compilerBodyLLVMGlobalIdentifier(arena: CompilerBodyArena, temporary: Int): String {
+    if arena.ownerFunctionInstanceID >= 0 {
+        return "\(arena.ownerFunctionInstanceID).\(temporary)"
+    }
+    return "entry.\(temporary)"
 }
 
 function compilerBodyLLVMEmit(arena: CompilerBodyArena, initialTemporary: Int, initialBranch: Int, abiPlan: CompilerModuleABIPlan, typeKeys: CompilerIntTable, typeKeyArguments: CompilerIntTable, functionInstances: CompilerIntTable, functionInstanceSignatures: CompilerIntTable, functionInstanceSignatureParameters: CompilerIntTable): CompilerBodyLLVMEmissionResult {

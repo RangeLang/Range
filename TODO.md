@@ -5,6 +5,22 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 
 ## Website
 
+  - [x] Add a production Docker image, Compose service, health endpoint, and
+    deployment instructions for the standalone SvelteKit website.
+  - [x] Add Caddy automatic HTTPS, private Docker-network proxying, persistent
+    certificate storage, and configurable domain/port deployment settings.
+    - [x] Register each legacy site-shell custom element with its own
+      constructor so production route navigation stays console-clean.
+  - [x] Remove the redundant Benchmarks and Strings Go Fast link cards from
+    the homepage while retaining their primary navigation and post links.
+  - [x] Add a `/benchmarks/history` performance-observation landing page.
+    - [x] Plot `100k → 1m → 5m → 10m` operations on X and logarithmic runtime
+      milliseconds on Y, with one scaling line per measured language.
+    - [x] Treat each benchmark date as one sustained scaling snapshot so future
+      observations append comparable charts without mixing old implementation
+      checkpoints into the current result.
+    - [x] Give both axes explicit visible and accessible labels and provide the
+      complete cross-language values in a screen-reader table.
   - [x] Move the codability walkthrough from the homepage into a dedicated
     `/features/macros/codability-under-100` long-form article, with a concise
     homepage entry point.
@@ -16,8 +32,26 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [x] Tighten the Declaration/Usage picker padding and control height.
     - [x] Reduce the inspector track to the smallest bounded height that still
       accommodates the longest chapter description.
+    - [x] Advance the seven declaration chapters from seven equal slices of
+      the centered scroll plateau.
+    - [x] Inline the small encode and decode property switches into their
+      respective field-map bodies and remove the standalone helper macros.
+    - [x] Add an explicit Story mode that applies chapter focus, advances in
+      equal plateau slices, and centers each highlighted code block; keep the
+      non-Story overview unfiltered with continuous parent-driven code scroll.
+      - [x] Hold a manually selected Story chapter through focus and resize
+        frames, returning ownership to the plateau only after a subsequent
+        deliberate page-scroll movement.
+    - [x] Use the complete generated `decode` function as chapter seven,
+      including its field map, inline result handling, assignments, and return.
   - [x] Move the String optimization article to
     `/optimizations/general/strings-go-fast` and title it “Strings Go Fast.”
+  - [x] Humanize the benchmark heading’s keyboard effect with a deterministic
+    learned-style keystroke timing model and subtle gesture-unlocked Web Audio
+    key transients.
+    - [x] Phase each synthesized key to the digraph transition that produced
+      it, soften fast pairs, and smooth overlapping clicks through a filtered
+      compressed output bus.
   - [x] Use Range's editor-owned light syntax palette and semantic token roles
     for keywords, types, declarations, functions, macros, members, and values.
     - [x] Keep inspectable macro nodes flat and non-interactive, and navigate
@@ -43,6 +77,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     workspace with explicit numbered chapter inspection.
     - [x] Route the code viewport’s vertical progression through the parent
       page scroll so the full-screen stage never competes with a nested Y scroller.
+    - [x] Hide the code viewport’s horizontal scrollbar chrome while retaining
+      its horizontal scrolling behavior.
 
 ## RangeStore
 
@@ -178,6 +214,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       it may only hold an already-focused stage inside a bounded geometry band.
     - [x] Keep the inspector body at one stable full width and height across
       every pane and chapter variant.
+      - [x] Pin every inspector title to the same top-aligned title track,
+        independent of description length or title wrapping.
     - [x] Replace the landscape inspector's content-sized `auto` row with one
       stable viewport-relative track so chapter switches cannot move the split.
 - [x] Position the homepage 0-to-1 measure on a zero-safe logarithmic scale.
@@ -189,9 +227,29 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       separate pinch control.
     - [x] Ease into hover focus and ease back toward `0` when hover is lost,
       without overshoot or backlash.
-    - [x] Synthesize subtly varied bristle-and-tone clicks through Web Audio
-      as the pointer hovers and moves across the scale, without requiring a
-      press.
+    - [x] Synthesize subtly varied, fine-toothed soft-metal detents through Web
+      Audio as the pointer hovers and moves across the scale, without requiring
+      a press or introducing a broad card-like noise tail.
+      - [x] Rate-limit fast pointer passes and route every detent through one
+        conservative compressor/output bus so overlapping ticks cannot peak.
+        - [x] Attenuate ticks as pointer speed rises, cap the train below 39 Hz,
+          and keep less than one tick interval of scheduling backlog.
+      - [x] Master the scale detents, learned typing clicks, and Cardinality
+        sound through protected unity-gain outputs so the operating system owns
+        the final listening volume without quiet site-level attenuation.
+        - [x] Raise the fine-toothed waveform itself to an audible level and
+          wait for its audio context to resume before emitting the first click.
+        - [x] Collapse stale audio-start requests and cap fast movement below
+          19 Hz so resuming audio cannot release a clustered click burst.
+        - [x] Fade the entire detent waveform toward silence as pointer speed
+          rises, clearing accumulated distance so fast passes cannot sound like
+          a repeating electrical pulse.
+        - [x] Replace coherent oscillator partials with one short band-limited
+          noise tooth, a sub-millisecond gain envelope, varied cooldowns, and
+          immediate-only triggering so fast input cannot create a pitched buzz.
+        - [x] Make the noise tooth reliably audible by unlocking its private
+          AudioContext on scale press, playing one confirmation tooth, and
+          replacing the over-aggressive compressor with a safety envelope.
 - [x] Add an interactive concentric nucleus graph to the Svelte homepage.
   - [x] Render one shared source nucleus with persistent concept branches.
   - [x] Center the concept picker above the graph, remove its selected fill,
@@ -226,8 +284,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     existing `4 → 8 → 16` nodes without a redundant toggle control.
     - [x] Follow the expanding value-derived spiral with quiet, overlapping
       near-unison air around A2 instead of a rising melodic phrase.
-    - [x] Expand the spiral dash lengths and gaps with the same local base-2
-      magnitude rule used by the radial connectors.
+    - [x] Move the dash geometry continuously outward, growing its length and
+      physical spacing with radius while hiding each endpoint recycle.
+    - [x] Run the outward flow only during playback at a lazy 16-second cycle,
+      growing from fine Shape-side marks into long Capability-side dashes and
+      falling back to a static progressive spiral when stopped.
   - [x] Render straight radial connectors from value-aware dash segments whose
     lengths and gaps expand with the local base-2 logarithmic magnitude.
   - [x] Replace the visible numeric node labels with restrained value dots,
@@ -718,6 +779,45 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         `compilerBodyLLVMEmitterRenderCFGDepthFirst`, including repeated
         nominal-declaration and syntax-row resolution while rebuilding the
         complete LLVM text.
+      - [x] Make function artifacts the only module-assembly input.
+        - Reset SSA temporary numbering per function instance and namespace
+          emitted String globals by function-instance identity, removing
+          emission-order coupling between otherwise independent fragments.
+        - Record each specialized function's body/specialization identity,
+          dependency fingerprint, function/global text ranges, runtime
+          requirements, and emitted call-edge range in the canonical artifact
+          table. Assemble the module only by consuming that table; do not
+          append lowered functions directly to the module buffers.
+      - [x] Persist the canonical artifact table/text bundle beside the
+        validated development producer.
+        - Exact matches are keyed by body/specialization identity, ABI/effect
+          dependencies, and outgoing-edge fingerprints. The bundle is
+          capability-scoped, loaded before lowering, and atomically replaced
+          only after the completed LLVM module validates.
+        - A one-function capacity delta reused 2,631 artifacts, rebuilt exactly
+          1, validated LLVM in 2 seconds, and linked in 1 second. Total compiler
+          emission still took 326 seconds, so artifact correctness is proven
+          but the feedback loop is not yet fast.
+      - [x] Pin development producers explicitly and remove the legacy
+        `single-pass-v1` producer fallback.
+        - Normal successful development gates no longer advance the producer.
+          `RANGE_STAGE2_ADVANCE_DEVELOPMENT_PRODUCER=1` is required after a
+          focused validation pass.
+        - `per-function-artifacts-v1` requires a bundle on every source-key
+          miss; missing or malformed artifact state is a hard failure.
+      - [ ] Persist the prerequisite syntax/graph/ABI/effect facts and store
+        unchanged LLVM fragments as immutable chunks.
+        - The exact-hit run still reparses/replans the complete compiler and
+          reconstructs an approximately 8.3 MB artifact/module String.
+          Dense instance indexing and unchecked string slices preserved the
+          2,631/1 reuse boundary but did not reduce the 326-second emission
+          time.
+        - Rebuild only changed source facts and their reverse dependency
+          closure; assemble unchanged fragment files without reserializing
+          their contents through interpreted Range loops.
+      - [ ] Delete the whole-bundle development emission path after delta
+        persistence proves unchanged, body-only, ABI, layout, and transitive
+        caller invalidation controls.
   - [ ] Remove the labeled schema-1 executable-only compatibility lookup after
     the next compiler-source miss publishes the first schema-2 LLVM plus
     executable entry; bound cleanup of quarantined invalid entries then.

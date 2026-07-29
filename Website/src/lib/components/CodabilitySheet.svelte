@@ -2,9 +2,11 @@
   import { onMount } from "svelte";
   import { highlightRange } from "$lib/benchmarks";
   import {
+    codabilityChapterIndex,
     codabilityFocusProgress,
     codabilityPlateauScrollProgress,
     nextCodabilityFocusState,
+    shouldSynchronizeCodabilityChapter,
     type CodabilityFocusState,
   } from "$lib/codability-focus";
   import codableSource from "../../../../RangeCompiler/Sources/Core/Macro/Codable.range?raw";
@@ -22,8 +24,7 @@
     | "property-map"
     | "value-mention"
     | "type-mention"
-    | "encode-property"
-    | "decode-property";
+    | "decode-body";
 
   type Inspection = {
     id: InspectionID;
@@ -107,15 +108,7 @@
   }
 
   const macroMarker = "macro codable(): Construct";
-  const fieldMarker = "macro codableEncodeProperty(";
-  const decodePropertyMarker = "macro codableDecodeProperty(";
   const declarationSource = sourceFrom(codableSource, macroMarker);
-  const synthesisSource = sourceBetween(codableSource, fieldMarker, macroMarker);
-  const encodePropertySection = sourceBetween(
-    codableSource,
-    fieldMarker,
-    decodePropertyMarker,
-  );
   const extensionMarker = "extension #environment.target.declaration.self {";
   const expansionSection = sourceBlock(declarationSource, "environment.expand");
   const macroDeclarationSection = "macro codable(): Construct { environment in";
@@ -132,12 +125,17 @@
     "function encode(to encoder: Encoder): Result<Void, EncodingError> {",
   );
   const encodeMapSection = `#fields.map { property in
-                    @codableEncodeProperty(
-                        container: container,
-                        value: property.identifier,
-                        key: property.identifier.name
-                    )
+                    switch container.encode(#property.identifier, forKey: property.identifier.name) {
+                    case .success:
+                        break
+                    case .failure(error):
+                        return .failure(cause: error)
+                    }
                 }`;
+  const decodeFunctionSection = sourceBlock(
+    declarationSource,
+    "function decode(from decoder: Decoder): Result<Self, DecodingError> {",
+  );
   const userExample = `@codable
 construct User {
     let name: String("George")
@@ -148,7 +146,7 @@ construct User {
       id: "macro",
       label: "Declaration",
       file: "Core/Macro/Codable.range",
-      source: `${declarationSource}\n\n${synthesisSource}`,
+      source: declarationSource,
     },
     {
       id: "usage",
@@ -201,7 +199,7 @@ construct User {
       phase: "macro evaluation",
       result: "generated syntax artifact",
       description:
-        "Everything inside the expand block is normal Range code. It is type-checked and evaluated as far as possible so the generated declarations are valid before they join the graph.",
+        "Everything inside the expand block is normal type-checked code.",
       kind: "section",
       step: 3,
       scopeToken: expansionSection,
@@ -250,7 +248,7 @@ construct User {
     },
     {
       id: "value-mention",
-      token: "#value",
+      token: "#property.identifier",
       title: "Identifier mention",
       phase: "inside expansion",
       result: "a generated field reference",
@@ -259,7 +257,7 @@ construct User {
     },
     {
       id: "type-mention",
-      token: "#type.self",
+      token: "#property.type.self",
       title: "Type mention",
       phase: "inside expansion",
       result: "a generated type expression",
@@ -267,23 +265,14 @@ construct User {
         "Mentions the field’s compile-time TypeReference and projects its type-level self value for decoding.",
     },
     {
-      id: "encode-property",
-      token: synthesisSource,
-      title: "Encapsulating control flow",
+      id: "decode-body",
+      token: decodeFunctionSection,
+      title: "Decoding the construct",
       description:
-        "Here one macro holds a complete `switch`. Macros can encapsulate individual control flow or small pieces of logic, not only whole declarations.",
+        "The matching `decode` function opens the keyed container, maps the same stored fields, returns on the first `DecodingError`, and produces `self` when every field succeeds.",
       kind: "section",
       step: 7,
-      scopeToken: synthesisSource,
-    },
-    {
-      id: "decode-property",
-      token: "@codableDecodeProperty",
-      title: "Nested decode expansion",
-      phase: "child macro",
-      result: "one keyed decode switch",
-      description:
-        "Invokes the property helper with the field type, identifier, and source name, producing decode and assignment syntax.",
+      scopeToken: decodeFunctionSection,
     },
   ];
   const inspectionByID = new Map(inspections.map((inspection) => [inspection.id, inspection]));
@@ -366,6 +355,12 @@ construct User {
   let codeViewportElement: HTMLDivElement;
   let interactionFocused = false;
   let focusState: CodabilityFocusState = "entering";
+  let scrollChapterIndex = -1;
+  let manualChapterIndex: number | null = null;
+  let manualSelectionScrollY = 0;
+  let manualSelectionTimestamp = 0;
+  let latestStageScrollProgress = 0;
+  let storyMode = $state(true);
   let stageFocused = $state(false);
   let activePane = $derived(panes.find((pane) => pane.id === activeID) ?? panes[0]);
   let activeInspection = $derived(
@@ -374,19 +369,40 @@ construct User {
   let activeChapterIndex = $derived(
     chapters.findIndex((chapter) => chapter.id === activeInspectionID),
   );
-  let hasChapterSelection = $derived(activeChapterIndex >= 0);
+  let hasChapterSelection = $derived(storyMode && activeChapterIndex >= 0);
   let highlightedLines = $derived(highlightInspectableLines(activePane.source));
   let lineNumbers = $derived(activePane.source.split("\n").map((_, index) => index + 1));
 
   function selectPane(paneID: PaneID) {
+    manualChapterIndex = null;
     activeID = paneID;
-    activeInspectionID = paneDefaults[paneID];
+    if (paneID === "macro") {
+      if (storyMode) {
+        scrollChapterIndex = codabilityChapterIndex(
+          latestStageScrollProgress,
+          chapters.length,
+        );
+        activeInspectionID =
+          chapters[scrollChapterIndex]?.id ?? paneDefaults[paneID];
+      } else {
+        activeInspectionID = null;
+      }
+    } else {
+      activeInspectionID = paneDefaults[paneID];
+    }
   }
 
   function selectChapter(chapter: (typeof chapters)[number]) {
-    const shouldClear = activeID === "macro" && activeInspectionID === chapter.id;
+    storyMode = true;
     activeID = "macro";
-    activeInspectionID = shouldClear ? null : chapter.id;
+    activeInspectionID = chapter.id;
+    scrollChapterIndex = chapters.indexOf(chapter);
+    manualChapterIndex = scrollChapterIndex;
+    manualSelectionScrollY =
+      typeof window === "undefined" ? 0 : window.scrollY;
+    manualSelectionTimestamp =
+      typeof performance === "undefined" ? 0 : performance.now();
+    centerChapterInViewport(chapter.id);
   }
 
   function selectCodeChapter(inspectionID: InspectionID) {
@@ -408,6 +424,50 @@ construct User {
     selectChapter(chapters[nextIndex]);
   }
 
+  function setStoryMode(enabled: boolean) {
+    manualChapterIndex = null;
+    storyMode = enabled;
+    if (activeID !== "macro") return;
+    if (enabled) {
+      scrollChapterIndex = codabilityChapterIndex(
+        latestStageScrollProgress,
+        chapters.length,
+      );
+      activeInspectionID =
+        chapters[scrollChapterIndex]?.id ?? paneDefaults.macro;
+    } else {
+      scrollChapterIndex = -1;
+      activeInspectionID = null;
+    }
+    updateStageFocus();
+  }
+
+  function centerChapterInViewport(inspectionID: InspectionID) {
+    if (!codeViewportElement) return;
+    const lines = Array.from(
+      codeViewportElement.querySelectorAll<HTMLElement>(
+        `[data-inspection-id="${inspectionID}"]`,
+      ),
+    );
+    if (lines.length === 0) return;
+    const viewportBounds = codeViewportElement.getBoundingClientRect();
+    const firstBounds = lines[0].getBoundingClientRect();
+    const lastBounds = lines.at(-1)?.getBoundingClientRect() ?? firstBounds;
+    const highlightedCenter = (firstBounds.top + lastBounds.bottom) / 2;
+    const viewportCenter = viewportBounds.top + viewportBounds.height / 2;
+    const maximumScroll = Math.max(
+      0,
+      codeViewportElement.scrollHeight - codeViewportElement.clientHeight,
+    );
+    codeViewportElement.scrollTop = Math.max(
+      0,
+      Math.min(
+        maximumScroll,
+        codeViewportElement.scrollTop + highlightedCenter - viewportCenter,
+      ),
+    );
+  }
+
   function setInteractionFocus(focused: boolean) {
     interactionFocused = focused;
     updateStageFocus();
@@ -419,7 +479,7 @@ construct User {
     setInteractionFocus(false);
   }
 
-  function updateStageFocus() {
+  function updateStageFocus(synchronizeStoryChapter = false) {
     if (!stageElement || !previewElement || typeof window === "undefined") return;
     const stageBounds = stageElement.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
@@ -449,34 +509,69 @@ construct User {
       stageHeight: stageBounds.height,
       viewportHeight,
     });
-    const codeScrollDistance = Math.max(
-      0,
-      codeViewportElement.scrollHeight - codeViewportElement.clientHeight,
+    latestStageScrollProgress = stageScrollProgress;
+    const nextScrollChapterIndex = codabilityChapterIndex(
+      stageScrollProgress,
+      chapters.length,
     );
-    codeViewportElement.scrollTop = codeScrollDistance * stageScrollProgress;
+    const canSynchronizeStoryChapter =
+      synchronizeStoryChapter &&
+      shouldSynchronizeCodabilityChapter({
+        manualChapterIndex,
+        selectionScrollY: manualSelectionScrollY,
+        currentScrollY: window.scrollY,
+        elapsedMilliseconds:
+          (typeof performance === "undefined" ? 0 : performance.now()) -
+          manualSelectionTimestamp,
+      });
+    if (
+      storyMode &&
+      activeID === "macro" &&
+      canSynchronizeStoryChapter &&
+      nextScrollChapterIndex !== scrollChapterIndex
+    ) {
+      manualChapterIndex = null;
+      scrollChapterIndex = nextScrollChapterIndex;
+      activeInspectionID = chapters[nextScrollChapterIndex]?.id ?? null;
+    }
+    if (storyMode && activeID === "macro" && activeInspectionID) {
+      centerChapterInViewport(activeInspectionID);
+    } else {
+      const codeScrollDistance = Math.max(
+        0,
+        codeViewportElement.scrollHeight - codeViewportElement.clientHeight,
+      );
+      codeViewportElement.scrollTop = codeScrollDistance * stageScrollProgress;
+    }
   }
 
   onMount(() => {
     let frame = 0;
-    const scheduleUpdate = () => {
+    let pendingStorySynchronization = false;
+    const scheduleUpdate = (synchronizeStoryChapter = false) => {
+      pendingStorySynchronization ||= synchronizeStoryChapter;
       if (frame) return;
       frame = window.requestAnimationFrame(() => {
         frame = 0;
-        updateStageFocus();
+        const shouldSynchronize = pendingStorySynchronization;
+        pendingStorySynchronization = false;
+        updateStageFocus(shouldSynchronize);
       });
     };
+    const scheduleScrollUpdate = () => scheduleUpdate(true);
+    const scheduleGeometryUpdate = () => scheduleUpdate(false);
 
-    updateStageFocus();
-    window.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("resize", scheduleUpdate);
-    const viewportObserver = new ResizeObserver(scheduleUpdate);
+    updateStageFocus(true);
+    window.addEventListener("scroll", scheduleScrollUpdate, { passive: true });
+    window.addEventListener("resize", scheduleGeometryUpdate);
+    const viewportObserver = new ResizeObserver(scheduleGeometryUpdate);
     viewportObserver.observe(codeViewportElement);
 
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
       viewportObserver.disconnect();
-      window.removeEventListener("scroll", scheduleUpdate);
-      window.removeEventListener("resize", scheduleUpdate);
+      window.removeEventListener("scroll", scheduleScrollUpdate);
+      window.removeEventListener("resize", scheduleGeometryUpdate);
     };
   });
 </script>
@@ -524,22 +619,35 @@ construct User {
         </div>
       </div>
 
-      <div class="previewTabs" role="tablist" aria-label="Codability source view">
-        {#each panes as pane}
+      <div class="previewControls">
+        {#if activeID === "macro"}
           <button
+            class="storyModeToggle"
             type="button"
-            role="tab"
-            aria-selected={activeID === pane.id}
-            aria-controls="codability-source"
-            onclick={() => selectPane(pane.id)}
+            aria-label="Story mode"
+            aria-pressed={storyMode}
+            onclick={() => setStoryMode(!storyMode)}
           >
-            {pane.label}
+            Story
           </button>
-        {/each}
+        {/if}
+        <div class="previewTabs" role="tablist" aria-label="Codability source view">
+          {#each panes as pane}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeID === pane.id}
+              aria-controls="codability-source"
+              onclick={() => selectPane(pane.id)}
+            >
+              {pane.label}
+            </button>
+          {/each}
+        </div>
       </div>
     </header>
 
-    {#if activeID === "macro"}
+    {#if activeID === "macro" && storyMode}
       <nav class="chapterNav" aria-label="Codability chapters">
         <button
           type="button"
@@ -594,6 +702,7 @@ construct User {
           <pre class="language-range"><code class:chapterFiltered={hasChapterSelection}>{#each highlightedLines as line}{#if line.inspectionID}<span
                 class="codeLine"
                 class:chapterActive={activeInspectionID === line.inspectionID}
+              data-inspection-id={line.inspectionID}
               >{@html line.leadingHTML ?? ""}<button
                   type="button"
                   class="inspectToken inspectSection"
@@ -833,6 +942,39 @@ construct User {
     white-space: nowrap;
   }
 
+  .previewControls {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .storyModeToggle,
+  .previewTabs {
+    font-family: var(--font-geist-mono), monospace;
+  }
+
+  .storyModeToggle {
+    min-height: 31px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 11px;
+  }
+
+  .storyModeToggle[aria-pressed="true"] {
+    color: var(--range);
+    font-weight: 600;
+  }
+
+  .storyModeToggle:focus-visible {
+    outline: 2px solid var(--range);
+    outline-offset: 2px;
+  }
+
   .previewTabs {
     display: inline-flex;
     flex: 0 0 auto;
@@ -851,7 +993,7 @@ construct User {
     background: transparent;
     color: var(--muted);
     cursor: pointer;
-    font-family: var(--font-geist-mono), monospace;
+    font-family: inherit;
     font-size: 11px;
   }
 
@@ -872,8 +1014,12 @@ construct User {
     min-height: 0;
     overflow: hidden;
     background: #fff;
-    scrollbar-color: color-mix(in oklch, var(--range), transparent 60%) transparent;
-    scrollbar-width: thin;
+    scrollbar-width: none;
+  }
+
+  .codeViewport::-webkit-scrollbar {
+    width: 0;
+    height: 0;
   }
 
   .codePreviewCard.stageFocused .codeViewport {
@@ -1126,7 +1272,7 @@ construct User {
     box-sizing: border-box;
     display: grid;
     grid-template-columns: minmax(220px, 0.38fr) minmax(0, 1fr);
-    align-content: center;
+    align-content: start;
     column-gap: clamp(28px, 4vw, 64px);
     padding: clamp(20px, 2.5vw, 34px) clamp(24px, 4vw, 72px);
   }
@@ -1138,6 +1284,7 @@ construct User {
     font-weight: 520;
     letter-spacing: -0.035em;
     line-height: 1.1;
+    align-self: start;
   }
 
   .inspectorBody p {

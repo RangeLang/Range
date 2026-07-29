@@ -49,6 +49,9 @@
   let spiralActiveIndex = $state(-1);
   let playbackStepIndex = 0;
   let audioContext: AudioContext | undefined;
+  let audioMasterInput: GainNode | undefined;
+  let audioMasterCompressor: DynamicsCompressorNode | undefined;
+  let audioMasterOutput: GainNode | undefined;
   let reverbInput: GainNode | undefined;
   let distantVoiceGain: GainNode | undefined;
   let distantVoiceFilter: BiquadFilterNode | undefined;
@@ -59,7 +62,10 @@
 
   const center = 382;
   const centerY = 320;
-  const spiralFlowDurationSeconds = 2.4;
+  const spiralFlowDurationSeconds = 16;
+  const spiralDashCount = 30;
+  const spiralDashStartLength = 3.2;
+  const spiralDashEndLength = 12;
   const innerRingRadius = 64;
   const outerRadius = 290;
   const circularScaleValues = [2, 4, 8, 16];
@@ -108,73 +114,43 @@
     };
   }
 
-  function spiralDashSegments() {
-    const sampleCount = 256;
-    const samples: Array<{
-      x: number;
-      y: number;
-      distance: number;
-    }> = [];
+  function spiralPathData() {
+    const sampleCount = 96;
+    return Array.from({ length: sampleCount + 1 }, (_, index) => {
+      const point = spiralPoint(index / sampleCount);
+      return `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`;
+    }).join(" ");
+  }
+
+  function spiralRestingDashPattern() {
+    const sampleCount = 128;
     let previous = spiralPoint(0);
-    let totalLength = 0;
-    samples.push({ ...previous, distance: 0 });
+    let length = 0;
 
     for (let index = 1; index <= sampleCount; index += 1) {
       const point = spiralPoint(index / sampleCount);
-      totalLength += Math.hypot(point.x - previous.x, point.y - previous.y);
-      samples.push({ ...point, distance: totalLength });
+      length += Math.hypot(point.x - previous.x, point.y - previous.y);
       previous = point;
     }
 
-    function pointAtDistance(distance: number) {
-      const boundedDistance = Math.min(totalLength, Math.max(0, distance));
-      let upperIndex = 1;
-      while (
-        upperIndex < samples.length - 1 &&
-        samples[upperIndex].distance < boundedDistance
-      ) {
-        upperIndex += 1;
-      }
-      const lower = samples[upperIndex - 1];
-      const upper = samples[upperIndex];
-      const span = upper.distance - lower.distance;
-      const mix = span === 0 ? 0 : (boundedDistance - lower.distance) / span;
-      return {
-        x: lower.x + (upper.x - lower.x) * mix,
-        y: lower.y + (upper.y - lower.y) * mix,
-      };
-    }
-
-    const segments: Array<{
-      path: string;
-      delaySeconds: number;
-    }> = [];
+    const pattern: number[] = [];
     let cursor = 0;
-
-    while (cursor < totalLength) {
-      const start = pointAtDistance(cursor);
-      const radius = Math.hypot(start.x - center, start.y - centerY);
-      const logarithmicMagnitude = Math.log2(valueAtRadius(radius));
-      const dashLength = 2.4 + logarithmicMagnitude * 1.7;
+    while (cursor < length) {
+      const logarithmicMagnitude = Math.log2(
+        4 * Math.pow(4, cursor / length),
+      );
+      const dashProgress = (logarithmicMagnitude - Math.log2(4)) / 2;
+      const dashLength =
+        spiralDashStartLength +
+        (spiralDashEndLength - spiralDashStartLength) * dashProgress;
       const gapLength = 2.8 + logarithmicMagnitude * 1.25;
-      const dashEnd = Math.min(totalLength, cursor + dashLength);
-      const path = Array.from({ length: 5 }, (_, index) => {
-        const distance = cursor + (dashEnd - cursor) * (index / 4);
-        const point = pointAtDistance(distance);
-        return `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`;
-      }).join(" ");
-      const progress = cursor / totalLength;
-      segments.push({
-        path,
-        delaySeconds: -(1 - progress) * spiralFlowDurationSeconds,
-      });
-      cursor = dashEnd + gapLength;
+      pattern.push(dashLength, gapLength);
+      cursor += dashLength + gapLength;
     }
-
-    return segments;
+    return pattern.join(" ");
   }
 
-  const spiralDashes = spiralDashSegments();
+  const restingSpiralPattern = spiralRestingDashPattern();
 
   function valueAtRadius(radius: number) {
     if (radius <= innerRingRadius) return 1 + radius / innerRingRadius;
@@ -219,6 +195,26 @@
     return scale[Math.round(position * (scale.length - 1))];
   }
 
+  function getAudioMasterInput() {
+    if (!audioContext) return;
+    if (audioMasterInput) return audioMasterInput;
+
+    audioMasterInput = audioContext.createGain();
+    audioMasterCompressor = audioContext.createDynamicsCompressor();
+    audioMasterOutput = audioContext.createGain();
+    audioMasterInput.gain.value = 1.8;
+    audioMasterCompressor.threshold.value = -28;
+    audioMasterCompressor.knee.value = 8;
+    audioMasterCompressor.ratio.value = 12;
+    audioMasterCompressor.attack.value = 0.003;
+    audioMasterCompressor.release.value = 0.12;
+    audioMasterOutput.gain.value = 1;
+    audioMasterInput.connect(audioMasterCompressor);
+    audioMasterCompressor.connect(audioMasterOutput);
+    audioMasterOutput.connect(audioContext.destination);
+    return audioMasterInput;
+  }
+
   function getReverbInput() {
     if (!audioContext) return;
     if (reverbInput) return reverbInput;
@@ -258,7 +254,8 @@
     convolver.connect(rumbleCut);
     rumbleCut.connect(resonance);
     resonance.connect(wet);
-    wet.connect(audioContext.destination);
+    const master = getAudioMasterInput();
+    if (master) wet.connect(master);
     reverbInput = input;
     return input;
   }
@@ -378,7 +375,8 @@
     hazeGain.connect(voiceFilter);
     voiceFilter.connect(voiceGain);
     voiceGain.connect(direct);
-    direct.connect(audioContext.destination);
+    const master = getAudioMasterInput();
+    if (master) direct.connect(master);
     const reverb = getReverbInput();
     if (reverb) voiceGain.connect(reverb);
 
@@ -476,6 +474,9 @@
   onDestroy(() => {
     stopPlayback();
     void audioContext?.close();
+    audioMasterInput = undefined;
+    audioMasterCompressor = undefined;
+    audioMasterOutput = undefined;
     reverbInput = undefined;
   });
 
@@ -543,15 +544,61 @@
       {/each}
     </g>
 
-    <g class="valueSpiral" aria-hidden="true">
-      {#each spiralDashes as dash}
+    <g class="valueSpiral" class:playing={looping} aria-hidden="true">
+      <path
+        id="value-spiral-motion-path"
+        class="spiralMotionPath"
+        d={spiralPathData()}
+      ></path>
+      {#if looping}
+        {#each Array.from({ length: spiralDashCount }) as _, index}
+          {@const delay = -(index / spiralDashCount) * spiralFlowDurationSeconds}
+          <line
+            class="spiralDash"
+            x1={-spiralDashStartLength / 2}
+            x2={spiralDashStartLength / 2}
+            y1="0"
+            y2="0"
+          >
+            <animateMotion
+              dur={`${spiralFlowDurationSeconds}s`}
+              begin={`${delay}s`}
+              repeatCount="indefinite"
+              rotate="auto"
+            >
+              <mpath href="#value-spiral-motion-path"></mpath>
+            </animateMotion>
+            <animate
+              attributeName="x1"
+              values={`${-spiralDashStartLength / 2};${-spiralDashEndLength / 2}`}
+              dur={`${spiralFlowDurationSeconds}s`}
+              begin={`${delay}s`}
+              repeatCount="indefinite"
+            ></animate>
+            <animate
+              attributeName="x2"
+              values={`${spiralDashStartLength / 2};${spiralDashEndLength / 2}`}
+              dur={`${spiralFlowDurationSeconds}s`}
+              begin={`${delay}s`}
+              repeatCount="indefinite"
+            ></animate>
+            <animate
+              attributeName="opacity"
+              values="0;0.62;0.62;0"
+              keyTimes="0;0.06;0.94;1"
+              dur={`${spiralFlowDurationSeconds}s`}
+              begin={`${delay}s`}
+              repeatCount="indefinite"
+            ></animate>
+          </line>
+        {/each}
+      {:else}
         <path
-          class="spiralDash"
-          class:playing={looping}
-          d={dash.path}
-          style={`--spiral-duration: ${spiralFlowDurationSeconds}s; --spiral-delay: ${dash.delaySeconds}s`}
+          class="spiralRestingTrack"
+          d={spiralPathData()}
+          style={`--spiral-resting-pattern: ${restingSpiralPattern}`}
         ></path>
-      {/each}
+      {/if}
     </g>
 
     {#each conceptIDs as conceptID}
@@ -735,6 +782,20 @@
     fill: none;
   }
 
+  .spiralMotionPath {
+    fill: none;
+    stroke: none;
+  }
+
+  .spiralRestingTrack {
+    fill: none;
+    opacity: 0.62;
+    stroke: var(--range-accent);
+    stroke-dasharray: var(--spiral-resting-pattern);
+    stroke-linecap: round;
+    stroke-width: 1;
+  }
+
   .spiralDash {
     opacity: 0.62;
     stroke: var(--range-accent);
@@ -742,9 +803,7 @@
     stroke-width: 1;
   }
 
-  .spiralDash.playing {
-    animation: spiral-flow var(--spiral-duration) linear infinite;
-    animation-delay: var(--spiral-delay);
+  .valueSpiral.playing .spiralDash {
     stroke: var(--range-playing-accent);
   }
 
@@ -795,21 +854,6 @@
   .sourceNucleus.activeSource,
   .conceptBranch.active {
     color: var(--range-playing-accent);
-  }
-
-  @keyframes spiral-flow {
-    0%,
-    100% {
-      opacity: 0.48;
-    }
-
-    20% {
-      opacity: 0.9;
-    }
-
-    44% {
-      opacity: 0.48;
-    }
   }
 
   .circularScale circle {

@@ -1,0 +1,184 @@
+function compilerFunctionArtifactDirectivePath(source: String, name: String): String {
+    let marker: String("\n// \(name) ")
+    let markerStart: Int(stringIndexOf(source: source, needle: marker, start: 0))
+    if markerStart < 0 { return String("") }
+    let valueStart: Int(markerStart + stringLength(value: marker))
+    state valueEnd: Int(stringIndexOf(source: source, needle: String("\n"), start: valueStart))
+    if valueEnd < 0 { valueEnd: stringLength(value: source) }
+    if valueEnd <= valueStart { return String("") }
+    return source.substring(start: valueStart, end: valueEnd)
+}
+
+function compilerFunctionArtifactCacheEmpty(valid: Bool): CompilerFunctionArtifactCache {
+    return CompilerFunctionArtifactCache(
+        artifacts: compilerIntTableCreate(columnCount: compilerFunctionArtifactColumnCount(), estimatedRowCount: 16),
+        rowsByInstance: bufferCreateInt(capacity: 16),
+        text: String(""),
+        isValid: valid
+    )
+}
+
+function compilerFunctionArtifactCacheAppendRecord(artifacts: CompilerIntTable, rowsByInstance: Buffer<Int>, record: String, functionStart: Int, globalsStart: Int): Int {
+    let functionTextLength: String(compilerCoreRecordField(record: record, prefix: String("functionLength=")))
+    let globalsTextLength: String(compilerCoreRecordField(record: record, prefix: String("globalsLength=")))
+    if compilerCoreRecordField(record: record, prefix: String("function=")) == String("")
+        || compilerCoreRecordField(record: record, prefix: String("instance=")) == String("")
+        || compilerCoreRecordField(record: record, prefix: String("identityFirst=")) == String("")
+        || compilerCoreRecordField(record: record, prefix: String("identitySecond=")) == String("")
+        || compilerCoreRecordField(record: record, prefix: String("dependencyFirst=")) == String("")
+        || compilerCoreRecordField(record: record, prefix: String("dependencySecond=")) == String("")
+        || functionTextLength == String("")
+        || globalsTextLength == String("")
+        || compilerCoreRecordField(record: record, prefix: String("runtimeRequirements=")) == String("")
+        || compilerCoreRecordField(record: record, prefix: String("nextTemporary=")) == String("")
+        || compilerCoreRecordField(record: record, prefix: String("edgeFingerprintFirst=")) == String("")
+        || compilerCoreRecordField(record: record, prefix: String("edgeFingerprintSecond=")) == String("") { return 0 - 1 }
+    let functionLength: Int(compilerCoreParseDecimalInt(value: functionTextLength))
+    let globalsLength: Int(compilerCoreParseDecimalInt(value: globalsTextLength))
+    let instanceID: Int(compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("instance="))))
+    if functionLength < 0 || globalsLength < 0 { return 0 - 1 }
+    while rowsByInstance.count <= instanceID {
+        if rowsByInstance.append(element: 0 - 1) != 0 { return 0 - 1 }
+    }
+    if rowsByInstance.element(index: instanceID) >= 0
+        || rowsByInstance.update(element: compilerIntTableRowCount(table: artifacts), index: instanceID) != 0 { return 0 - 1 }
+    if compilerIntTableAppend(table: artifacts, value: compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("function=")))) != 0
+        || compilerIntTableAppend(table: artifacts, value: instanceID) != 0
+        || compilerIntTableAppend(table: artifacts, value: compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("identityFirst=")))) != 0
+        || compilerIntTableAppend(table: artifacts, value: compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("identitySecond=")))) != 0
+        || compilerIntTableAppend(table: artifacts, value: compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("dependencyFirst=")))) != 0
+        || compilerIntTableAppend(table: artifacts, value: compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("dependencySecond=")))) != 0
+        || compilerIntTableAppend(table: artifacts, value: functionStart) != 0
+        || compilerIntTableAppend(table: artifacts, value: functionLength) != 0
+        || compilerIntTableAppend(table: artifacts, value: globalsStart) != 0
+        || compilerIntTableAppend(table: artifacts, value: globalsLength) != 0
+        || compilerIntTableAppend(table: artifacts, value: compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("runtimeRequirements=")))) != 0
+        || compilerIntTableAppend(table: artifacts, value: compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("nextTemporary=")))) != 0
+        || compilerIntTableAppend(table: artifacts, value: 0) != 0
+        || compilerIntTableAppend(table: artifacts, value: 0) != 0
+        || compilerIntTableAppend(table: artifacts, value: compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("edgeFingerprintFirst=")))) != 0
+        || compilerIntTableAppend(table: artifacts, value: compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("edgeFingerprintSecond=")))) != 0
+        || compilerIntTableAppend(table: artifacts, value: 1) != 0 { return 0 - 1 }
+    return 0
+}
+
+function compilerFunctionArtifactCacheParseInto(text: String, artifacts: CompilerIntTable, rowsByInstance: Buffer<Int>): Bool {
+    let header: String("rangeFunctionArtifacts|version=1\n")
+    if stringLength(value: text) == 0 { return true }
+    if !stringHasPrefix(source: text, start: 0, prefix: header) { return false }
+    state cursor: Int(stringLength(value: header))
+    state valid: Bool(true)
+    while valid && cursor < stringLength(value: text) {
+        let lineEnd: Int(stringIndexOf(source: text, needle: String("\n"), start: cursor))
+        if lineEnd < cursor {
+            valid: false
+        } else {
+            let record: String(text.substring(start: cursor, end: lineEnd))
+            if !stringHasPrefix(source: record, start: 0, prefix: String("artifact|")) {
+                valid: false
+            } else {
+                let functionLength: Int(compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("functionLength="))))
+                let globalsLength: Int(compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("globalsLength="))))
+                let functionStart: Int(lineEnd + 1)
+                let globalsStart: Int(functionStart + functionLength)
+                let nextRecord: Int(globalsStart + globalsLength)
+                if functionLength < 0 || globalsLength < 0 || nextRecord >= stringLength(value: text)
+                    || text.substring(start: nextRecord, end: nextRecord + 1) != String("\n")
+                    || compilerFunctionArtifactCacheAppendRecord(
+                        artifacts: artifacts,
+                        rowsByInstance: rowsByInstance,
+                        record: record,
+                        functionStart: functionStart,
+                        globalsStart: globalsStart
+                    ) != 0 {
+                    valid: false
+                } else {
+                    cursor: nextRecord + 1
+                }
+            }
+        }
+    }
+    return valid && compilerIntTableIsComplete(table: artifacts)
+}
+
+function compilerFunctionArtifactCacheLoad(source: String): CompilerFunctionArtifactCache {
+    let path: String(compilerFunctionArtifactDirectivePath(source: source, name: String("range-function-artifact-input")))
+    if path == String("") { return compilerFunctionArtifactCacheEmpty(valid: true) }
+    let text: String(readFile(path: path))
+    let artifacts: CompilerIntTable(compilerIntTableCreate(columnCount: compilerFunctionArtifactColumnCount(), estimatedRowCount: 1029))
+    let rowsByInstance: Buffer<Int>(bufferCreateInt(capacity: 4096))
+    let isValid: Bool(compilerFunctionArtifactCacheParseInto(text: text, artifacts: artifacts, rowsByInstance: rowsByInstance))
+    return CompilerFunctionArtifactCache(artifacts: artifacts, rowsByInstance: rowsByInstance, text: text, isValid: isValid)
+}
+
+function compilerFunctionArtifactCacheFind(cache: CompilerFunctionArtifactCache, functionRow: Int, instanceID: Int, identity: CompilerFingerprint, dependencies: CompilerFingerprint, edges: CompilerFingerprint): Int {
+    if !cache.isValid || instanceID < 0 || instanceID >= cache.rowsByInstance.count { return 0 - 1 }
+    let row: Int(cache.rowsByInstance.element(index: instanceID))
+    if row >= 0 && row < compilerIntTableRowCount(table: cache.artifacts)
+        && compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactFunctionColumn()) == functionRow
+        && compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactInstanceColumn()) == instanceID
+        && compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactIdentityFirstColumn()) == identity.first
+        && compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactIdentitySecondColumn()) == identity.second
+        && compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactDependencyFirstColumn()) == dependencies.first
+        && compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactDependencySecondColumn()) == dependencies.second
+        && compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactEdgeFingerprintFirstColumn()) == edges.first
+        && compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactEdgeFingerprintSecondColumn()) == edges.second { return row }
+    return 0 - 1
+}
+
+function compilerFunctionArtifactEmptySelected(): CompilerTypedLLVMHelpers {
+    return CompilerTypedLLVMHelpers(
+        helpers: CompilerLLVMHelperFunctions(renderedFunctions: String(""), instructionRecords: String(""), nextTemporary: 0),
+        renderedGlobals: String(""),
+        runtimeRequirements: 0,
+        telemetry: compilerBodyTelemetryEmpty()
+    )
+}
+
+function compilerFunctionArtifactCacheSelected(cache: CompilerFunctionArtifactCache, row: Int): CompilerTypedLLVMHelpers {
+    let functionStart: Int(compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactFunctionStartColumn()))
+    let functionLength: Int(compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactFunctionLengthColumn()))
+    let globalsStart: Int(compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactGlobalsStartColumn()))
+    let globalsLength: Int(compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactGlobalsLengthColumn()))
+    return CompilerTypedLLVMHelpers(
+        helpers: CompilerLLVMHelperFunctions(
+            renderedFunctions: stringSliceUnchecked(source: cache.text, start: functionStart, end: functionStart + functionLength),
+            instructionRecords: String(""),
+            nextTemporary: compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactNextTemporaryColumn())
+        ),
+        renderedGlobals: stringSliceUnchecked(source: cache.text, start: globalsStart, end: globalsStart + globalsLength),
+        runtimeRequirements: compilerIntTableValue(table: cache.artifacts, row: row, column: compilerFunctionArtifactRuntimeRequirementsColumn()),
+        telemetry: CompilerBodyTelemetry(supportedCount: 1, typedParseAttempts: 1, typedParseSuccesses: 1, legacyParses: 0, arenaCreates: 0, arenaDestroys: 0, recordBytes: 0, committedFailures: 0)
+    )
+}
+
+function compilerReachableLLVMStateSerializeFunctionArtifacts(reachability: CompilerReachableLLVMState): String {
+    let text: String(rawBufferMaterializeText(buffer: reachability.functionArtifactText))
+    let output: RawBuffer(rawBufferCreate(capacity: stringLength(value: text) + 65536, stride: 1))
+    rawBufferAppendText(buffer: output, text: String("rangeFunctionArtifacts|version=1\n"))
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: reachability.functionArtifacts) {
+        let functionStart: Int(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactFunctionStartColumn()))
+        let functionLength: Int(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactFunctionLengthColumn()))
+        let globalsStart: Int(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactGlobalsStartColumn()))
+        let globalsLength: Int(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactGlobalsLengthColumn()))
+        rawBufferAppendText(buffer: output, text: "artifact|function=\(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactFunctionColumn()))|instance=\(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactInstanceColumn()))|identityFirst=\(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactIdentityFirstColumn()))|identitySecond=\(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactIdentitySecondColumn()))|dependencyFirst=\(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactDependencyFirstColumn()))|dependencySecond=\(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactDependencySecondColumn()))|functionLength=\(functionLength)|globalsLength=\(globalsLength)|runtimeRequirements=\(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactRuntimeRequirementsColumn()))|nextTemporary=\(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactNextTemporaryColumn()))|edgeFingerprintFirst=\(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactEdgeFingerprintFirstColumn()))|edgeFingerprintSecond=\(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactEdgeFingerprintSecondColumn()))|reused=\(compilerIntTableValue(table: reachability.functionArtifacts, row: row, column: compilerFunctionArtifactReuseColumn()))\n")
+        rawBufferAppendText(buffer: output, text: stringSliceUnchecked(source: text, start: functionStart, end: functionStart + functionLength))
+        rawBufferAppendText(buffer: output, text: stringSliceUnchecked(source: text, start: globalsStart, end: globalsStart + globalsLength))
+        rawBufferAppendText(buffer: output, text: String("\n"))
+        row: row + 1
+    }
+    return compilerCoreRawBufferMaterializeAndDestroy(buffer: output)
+}
+
+function compilerReachableLLVMStateWriteFunctionArtifacts(reachability: CompilerReachableLLVMState): Int {
+    let path: String(compilerFunctionArtifactDirectivePath(source: reachability.context.program.source, name: String("range-function-artifact-output")))
+    if path == String("") { return 0 }
+    return writeFile(path: path, text: compilerReachableLLVMStateSerializeFunctionArtifacts(reachability: reachability))
+}
+
+function compilerFunctionArtifactCacheDestroy(cache: CompilerFunctionArtifactCache): Int {
+    state status: Int(compilerIntTableDestroy(table: cache.artifacts))
+    if cache.rowsByInstance.destroy() != 0 { status: 0 - 1 }
+    return status
+}

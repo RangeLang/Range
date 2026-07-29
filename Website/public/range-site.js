@@ -10,8 +10,8 @@ const componentNames = [
   "range-site-footer",
 ];
 
-class RangeElement extends HTMLElement {}
-
 for (const name of componentNames) {
-  if (!customElements.get(name)) customElements.define(name, RangeElement);
+  if (!customElements.get(name)) {
+    customElements.define(name, class extends HTMLElement {});
+  }
 }
