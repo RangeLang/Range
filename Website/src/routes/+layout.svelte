@@ -1,8 +1,18 @@
 <script lang="ts">
+  import { page } from "$app/state";
+  import { postForPath, postImageUrl } from "$lib/posts";
   import "../../app/globals.css";
 
   const siteTitle = "Range — A Graph-Backed Programming Language";
   const siteDescription = "A love letter to electrons, logic and abstraction.";
+  const defaultImage = "https://rangelang.org/og-v3.png";
+  let activePost = $derived(postForPath(page.url.pathname));
+  let socialImage = $derived(activePost ? postImageUrl(activePost) : defaultImage);
+  let socialImageAlt = $derived(
+    activePost
+      ? `${activePost.cardTitle} — ${activePost.cardDescription}`
+      : "Range programming language",
+  );
 
   let { children } = $props();
 </script>
@@ -13,11 +23,15 @@
   <meta property="og:title" content={siteTitle} />
   <meta property="og:description" content={siteDescription} />
   <meta property="og:type" content="website" />
-  <meta property="og:image" content="https://rangelang.org/og-v3.png" />
-  <meta property="og:image:alt" content="Range programming language" />
+  <meta property="og:image" content={socialImage} />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content={socialImageAlt} />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content={siteTitle} />
   <meta name="twitter:description" content={siteDescription} />
+  <meta name="twitter:image" content={socialImage} />
+  <meta name="twitter:image:alt" content={socialImageAlt} />
 </svelte:head>
 
 <range-site-shell>{@render children()}</range-site-shell>

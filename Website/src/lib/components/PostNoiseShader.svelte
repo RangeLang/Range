@@ -3,8 +3,10 @@
 
   let {
     palette = 0,
+    still = false,
   }: {
     palette?: number;
+    still?: boolean;
   } = $props();
 
   let canvas: HTMLCanvasElement;
@@ -255,11 +257,15 @@
       context.enableVertexAttribArray(positionLocation);
       context.vertexAttribPointer(positionLocation, 2, context.FLOAT, false, 0, 0);
       context.uniform2f(resolutionLocation, canvas.width, canvas.height);
-      context.uniform1f(timeLocation, reducedMotion.matches ? 0 : (now - start) / 1000);
+      context.uniform1f(
+        timeLocation,
+        still || reducedMotion.matches ? 0 : (now - start) / 1000,
+      );
       context.uniform1f(paletteLocation, palette);
       context.drawArrays(context.TRIANGLES, 0, 6);
+      canvas.dataset.rendered = "true";
 
-      if (!reducedMotion.matches) {
+      if (!still && !reducedMotion.matches) {
         frame = window.requestAnimationFrame(render);
       }
     };

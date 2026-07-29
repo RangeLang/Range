@@ -1,6 +1,4 @@
 @syntax
 construct ArrayTypeReference {
     let element: TypeReference
-
-    function replace(with replacement: TypeReference): TypeReference
 }

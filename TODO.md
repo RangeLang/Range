@@ -676,6 +676,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         macro `rawBody` text representations; typed syntax values and the
         syntax macro closure are the language model, while source offsets
         remain compiler-internal diagnostic/query indexes.
+        - [x] Remove redundant authored `replace(with:)` members from syntax
+          value declarations; replacement is supplied by the macro
+          environment rather than declared independently by each shape.
       - [x] Remove the separate `Generic`, `TypeGeneric`, and `ValueGeneric`
         syntax declarations; construct, enum, function, and macro generic
         clauses now collect ordinary `Parameter.Declaration` bindings.
@@ -685,17 +688,21 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - [ ] Collapse the compiler's separate type/value generic parameter
           kinds onto this authored parameter model while preserving
           specialization identity, labels, defaults, and graph requirements.
-      - [x] Represent every enum case as the same generic
-        `Case<Value> { identifier, value? }` shape; an enum declaration
-        collects `Case<Payload>` values, and one payload packages the fixed
-        ordered set of associated fields.
+      - [x] Represent every enum case as the same
+        `Case { identifier, value? }` shape; an enum declaration collects
+        those cases directly without a nested payload wrapper.
+        - [x] Mark `Enum.Case` as stored syntax, a property, and an enum
+          member; its inline storage is the case identifier plus optional
+          syntax value.
         - [x] Delete the parallel top-level `EnumCaseExpression`; `Enum.Case`
-          is the nested inline syntax/storage value for both declaration and
-          selection.
-        - [x] Author the written enum declaration, case, payload, and payload
-          field forms directly in their nested `@syntax { ... }` closures.
+          is the nested inline syntax/storage value for a declared option,
+          while an application selects it by identifier.
+        - [x] Add `Enum.Application { identifier, selectedCase? }` as the
+          application graph role, rendered as
+          `$identifier.$selectedCase`.
         - Runtime enum tags and payload layout remain lowering details; the
-          syntax model does not expose a second `associatedValues` shape.
+          syntax model does not expose `associatedValues` or `Payload`
+          shapes.
         - [ ] Materialize compile-time enum results through this case shape:
           resolve the case identifier, package zero or more MIR operands as
           the optional payload value, and preserve that value through generic

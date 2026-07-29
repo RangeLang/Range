@@ -2,6 +2,4 @@
 construct ArrayExpression {
     let type: TypeReference?
     let elements: [Expression]
-
-    function replace(with replacement: Expression): Expression
 }

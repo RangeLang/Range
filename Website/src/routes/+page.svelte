@@ -2,7 +2,8 @@
   import { githubUrl } from "$lib/benchmarks";
   import RangeNucleus from "$lib/components/RangeNucleus.svelte";
   import GithubIcon from "$lib/components/GithubIcon.svelte";
-  import PostNoiseShader from "$lib/components/PostNoiseShader.svelte";
+  import PostCard from "$lib/components/PostCard.svelte";
+  import { posts } from "$lib/posts";
 </script>
 
 <range-home-page>
@@ -30,38 +31,9 @@
         <span>Notes from the language</span>
       </header>
       <div class="latestPostStrip">
-        <a class="latestPost" href="/features/macros/50-declarative-50-imperative">
-          <PostNoiseShader palette={0} />
-          <span class="postCopy">
-            <small>Language design</small>
-            <strong>50% Declarative, 50% Imperative</strong>
-            <span>Describe the world. Use a macro for the funky parts.</span>
-          </span>
-        </a>
-        <a class="latestPost" href="/features/macros/somewhere-sometime-some-here">
-          <PostNoiseShader palette={1} />
-          <span class="postCopy">
-            <small>Metaprogramming</small>
-            <strong>Somewhere, Sometime, Some-here</strong>
-            <span>Environment as place, phase, and local context.</span>
-          </span>
-        </a>
-        <a class="latestPost" href="/features/macros/codability-under-100">
-          <PostNoiseShader palette={2} />
-          <span class="postCopy">
-            <small>Metaprogramming</small>
-            <strong>Codability under 100</strong>
-            <span>One Range-authored macro, explained line by line.</span>
-          </span>
-        </a>
-        <a class="latestPost" href="/optimizations/general/strings-go-fast">
-          <PostNoiseShader palette={3} />
-          <span class="postCopy">
-            <small>Compiler update</small>
-            <strong>Strings Go Fast</strong>
-            <span>100k appends, from 491.2 ms to 4.1 ms.</span>
-          </span>
-        </a>
+        {#each posts as post}
+          <PostCard {post} />
+        {/each}
       </div>
     </section>
     <RangeNucleus />

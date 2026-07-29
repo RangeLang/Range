@@ -1,4 +1,4 @@
-@graph(.declaration)
+@graph(.declaration, .application)
 construct Enum {
     @syntax {
         $macros
@@ -11,35 +11,27 @@ construct Enum {
         let macros: [Macro.Application]
         let identifier: Identifier
         let generics: [Parameter.Declaration]
-        let cases: [Case<Payload>]
+        let cases: [Case]
     }
 
+    @stored
     @syntax {
         $macros
         case $identifier$value
     }
+    @property
     @member
-    construct Case<Value = Nil> {
+    construct Case {
         let macros: [Macro.Application]
         let identifier: Identifier
-        let value: Value?
+        let value: @syntax?
     }
 
     @syntax {
-        ($fields)
+        $identifier.$selectedCase
     }
-    construct Payload {
-        let fields: [Field]
-
-        @syntax {
-            $label$identifier: $type
-        }
-        @member
-        construct Field {
-            let macros: [Macro.Application]
-            let identifier: Identifier?
-            let label: String?
-            let type: TypeReference
-        }
+    construct Application {
+        let identifier: Identifier
+        let selectedCase: Identifier?
     }
 }

@@ -2,6 +2,4 @@
 construct GenericTypeReference {
     let base: TypeReference
     let arguments: [TypeReference]
-
-    function replace(with replacement: TypeReference): TypeReference
 }

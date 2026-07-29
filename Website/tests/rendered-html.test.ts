@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
+import { posts, postImagePath, postImageUrl } from "../src/lib/posts";
 
 const port = 43_000 + (process.pid % 1_000);
 const origin = `http://127.0.0.1:${port}`;
@@ -49,6 +50,9 @@ describe("SvelteKit routes", () => {
     expect(html).toContain(
       'name="twitter:title" content="Range — A Graph-Backed Programming Language"',
     );
+    expect(html).toContain(
+      'property="og:image" content="https://rangelang.org/og-v3.png"',
+    );
     expect(html).not.toContain(
       "Native benchmark results for Range, C, C++, Rust, Go, and Swift",
     );
@@ -93,6 +97,12 @@ describe("SvelteKit routes", () => {
 
     expect(response.status).toBe(200);
     expect(html).toContain("<title>Codability Under 100 · Range</title>");
+    expect(html).toContain(
+      'property="og:image" content="https://rangelang.org/og/posts/codability-under-100.png"',
+    );
+    expect(html).toContain(
+      'name="twitter:image" content="https://rangelang.org/og/posts/codability-under-100.png"',
+    );
     expect(html).toContain("<h1");
     expect(html).toContain("Codability Under 100");
     expect(html).toContain("01 · metaprogramming");
@@ -226,11 +236,55 @@ describe("SvelteKit routes", () => {
 
     expect(response.status).toBe(200);
     expect(html).toContain("<title>Strings Go Fast · Range</title>");
+    expect(html).toContain(
+      'property="og:image" content="https://rangelang.org/og/posts/strings-go-fast.png"',
+    );
     expect(html).toContain("Strings Go Fast");
     expect(html).toContain("~120× faster");
     expect(html).toContain("491.2 ms");
     expect(html).toContain("10m appends");
   });
+
+  test("uses each exact post card as its article social preview", async () => {
+    for (const post of posts) {
+      const [articleResponse, cardResponse] = await Promise.all([
+        render(post.href),
+        render(`/og-card/posts/${post.slug}`),
+      ]);
+      const [articleHtml, cardHtml] = await Promise.all([
+        articleResponse.text(),
+        cardResponse.text(),
+      ]);
+
+      expect(articleResponse.status).toBe(200);
+      expect(articleHtml).toContain(
+        `property="og:image" content="${postImageUrl(post)}"`,
+      );
+      expect(articleHtml).toContain(
+        `name="twitter:image" content="${postImageUrl(post)}"`,
+      );
+      expect(cardResponse.status).toBe(200);
+      expect(cardHtml).toContain('name="robots" content="noindex, nofollow"');
+      expect(cardHtml).toContain(post.category);
+      expect(cardHtml).toContain(post.cardTitle);
+      expect(cardHtml).toContain(post.cardDescription);
+      expect(cardHtml).toContain(`data-palette="${post.palette}"`);
+    }
+  });
+});
+
+test("keeps every post social image generated at 1200 by 630", async () => {
+  for (const post of posts) {
+    expect(postImageUrl(post)).toBe(
+      `https://rangelang.org${postImagePath(post)}`,
+    );
+    const bytes = await readFile(
+      new URL(`../public${postImagePath(post)}`, import.meta.url),
+    );
+    expect(bytes.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    expect(bytes.readUInt32BE(16)).toBe(1200);
+    expect(bytes.readUInt32BE(20)).toBe(630);
+  }
 });
 
 test("keeps the generated benchmark artifact complete and versioned", async () => {

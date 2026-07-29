@@ -2,6 +2,4 @@
 construct FunctionTypeReference {
     let parameters: [TypeReference]
     let returnType: TypeReference
-
-    function replace(with replacement: TypeReference): TypeReference
 }

@@ -1,6 +1,4 @@
 @syntax
 construct Block {
     let syntax: [@syntax]
-
-    function replace(with replacement: Block): Block
 }
