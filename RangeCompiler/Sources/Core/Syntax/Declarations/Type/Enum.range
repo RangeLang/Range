@@ -1,15 +1,23 @@
 @graph(.declaration)
 construct Enum {
-    @syntax
+    @syntax {
+        $macros
+        enum $identifier<$generics> {
+            $cases
+        }
+    }
     @member
     construct Declaration {
         let macros: [Macro.Application]
         let identifier: Identifier
-        let generics: [Generic]
+        let generics: [Parameter.Declaration]
         let cases: [Case<Payload>]
     }
 
-    @syntax
+    @syntax {
+        $macros
+        case $identifier$value
+    }
     @member
     construct Case<Value = Nil> {
         let macros: [Macro.Application]
@@ -17,10 +25,15 @@ construct Enum {
         let value: Value?
     }
 
-    @syntax
+    @syntax {
+        ($fields)
+    }
     construct Payload {
         let fields: [Field]
 
+        @syntax {
+            $label$identifier: $type
+        }
         @member
         construct Field {
             let macros: [Macro.Application]

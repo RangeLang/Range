@@ -669,14 +669,31 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - `Construct.range` now authors declaration and application templates
           directly in its `@syntax` body, including ordered macro/member
           captures and optional generic groups.
+        - Every template capture uses `$field`, where `field` is the exact
+          member identifier on the construct carrying `@syntax`; capture
+          cardinality comes from that member's declared type.
       - [x] Remove the parallel `WrittenSyntax`, `WrittenExpression`, and
         macro `rawBody` text representations; typed syntax values and the
         syntax macro closure are the language model, while source offsets
         remain compiler-internal diagnostic/query indexes.
+      - [x] Remove the separate `Generic`, `TypeGeneric`, and `ValueGeneric`
+        syntax declarations; construct, enum, function, and macro generic
+        clauses now collect ordinary `Parameter.Declaration` bindings.
+        - A bare parameter is an unconstrained compile-time value binding, an
+          optional type constrains that value, and an optional default is any
+          syntax value; a type is one possible compile-time value.
+        - [ ] Collapse the compiler's separate type/value generic parameter
+          kinds onto this authored parameter model while preserving
+          specialization identity, labels, defaults, and graph requirements.
       - [x] Represent every enum case as the same generic
         `Case<Value> { identifier, value? }` shape; an enum declaration
         collects `Case<Payload>` values, and one payload packages the fixed
         ordered set of associated fields.
+        - [x] Delete the parallel top-level `EnumCaseExpression`; `Enum.Case`
+          is the nested inline syntax/storage value for both declaration and
+          selection.
+        - [x] Author the written enum declaration, case, payload, and payload
+          field forms directly in their nested `@syntax { ... }` closures.
         - Runtime enum tags and payload layout remain lowering details; the
           syntax model does not expose a second `associatedValues` shape.
         - [ ] Materialize compile-time enum results through this case shape:

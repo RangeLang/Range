@@ -524,9 +524,6 @@ check_canonical_declaration_envelopes() {
         RangeCompiler/Sources/Core/Macro/Syntax.range
         RangeCompiler/Sources/Core/Macro/Macro.range
         RangeCompiler/Sources/Core/Syntax/Identifier.range
-        RangeCompiler/Sources/Core/Syntax/Declarations/Generic/Generic.range
-        RangeCompiler/Sources/Core/Syntax/Declarations/Generic/TypeGeneric.range
-        RangeCompiler/Sources/Core/Syntax/Declarations/Generic/ValueGeneric.range
         RangeCompiler/Sources/Core/Syntax/Declarations/Type/Construct.range
         RangeCompiler/Sources/Core/Syntax/Declarations/Type/Function.range
         RangeCompiler/Sources/Core/Syntax/Declarations/Type/Enum.range
@@ -545,12 +542,6 @@ check_canonical_declaration_envelopes() {
         'Identifier.range|id'
         'Identifier.range|parent'
         'Identifier.range|source'
-        'Generic.range|macros'
-        'Generic.range|identifier'
-        'TypeGeneric.range|macros'
-        'TypeGeneric.range|identifier'
-        'ValueGeneric.range|macros'
-        'ValueGeneric.range|identifier'
         'Construct.range|macros'
         'Construct.range|identifier'
         'Function.range|macros'

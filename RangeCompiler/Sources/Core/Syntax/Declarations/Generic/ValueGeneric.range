@@ -1,7 +1,0 @@
-@syntax
-construct ValueGeneric {
-    let macros: [Macro.Application]
-    let identifier: Identifier
-    let type: TypeReference
-    let default: Expression?
-}

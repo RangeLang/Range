@@ -1,21 +1,21 @@
 @graph(.declaration, .application)
 construct Construct {
     @syntax {
-        [macros]
-        construct [identifier][generics?] {
-            [members]
+        $macros
+        construct $identifier$generics {
+            $members
         }
     }
     @member
     construct Declaration {
         let macros: [Macro.Application]
         let identifier: Identifier
-        let generics: [Generic]
+        let generics: [Parameter.Declaration]
         let members: [@member]
     }
 
     @syntax {
-        [type]([arguments])
+        $type($arguments)
     }
     construct Application {
         let type: TypeReference

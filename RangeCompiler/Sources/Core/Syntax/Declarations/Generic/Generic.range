@@ -1,5 +1,0 @@
-@syntax
-construct Generic {
-    let macros: [Macro.Application]
-    let identifier: Identifier
-}

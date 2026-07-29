@@ -31,7 +31,7 @@ construct Macro {
         let macros: [Macro.Application]
         let identifier: Identifier
         let packageVisibility: String
-        let generics: [Generic]
+        let generics: [Parameter.Declaration]
         let parameters: [Parameter.Declaration]
         let target: String
         let targetSyntax: Target?

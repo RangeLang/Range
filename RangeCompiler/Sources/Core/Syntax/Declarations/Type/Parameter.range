@@ -5,9 +5,8 @@ construct Parameter {
         let macros: [Macro.Application]
         let externalName: String?
         let identifier: Identifier
-        let type: TypeReference
-        let captureMetadataType: TypeReference?
-        let defaultValue: Expression?
+        let type: TypeReference?
+        let defaultValue: @syntax?
     }
 
     @syntax

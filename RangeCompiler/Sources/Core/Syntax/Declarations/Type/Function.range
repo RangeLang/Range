@@ -5,7 +5,7 @@ construct Function {
     construct Declaration {
         let macros: [Macro.Application]
         let identifier: Identifier
-        let generics: [Generic]
+        let generics: [Parameter.Declaration]
         let parameters: [Parameter.Declaration]
         let returnType: TypeReference?
         let body: Block

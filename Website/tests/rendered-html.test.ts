@@ -124,8 +124,11 @@ describe("SvelteKit routes", () => {
     expect(html).toContain('aria-label="Complete Equatable synthesis"');
     expect(html).not.toContain('aria-label="Query through the Construct access type"');
     expect(html).not.toContain('aria-label="Emit an Equatable implementation"');
-    expect(html).toContain("#properties");
+    expect(html).toContain("#values");
+    expect(html).toContain("@property");
     expect(html).toContain("The macro performs the complete synthesis.");
+    expect(html).toContain("invalidate and re-identify");
+    expect(html).toContain("Runtime equality then narrows");
     expect(html).toContain("An empty");
     expect(html).toContain(">Case iterable</h2>");
     expect(html).toContain('aria-label="A modern CaseIterable derivation"');

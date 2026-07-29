@@ -13,14 +13,17 @@
 }`;
 
   const equatableSynthesis = `macro equatable(): Construct { environment in
-    let properties: [@stored](
-        environment.target.Declaration.members.filter(all: @stored)
+    let properties: [@property](
+        environment.target.Declaration.members.filter(all: @property)
+    )
+    let values: [@stored](
+        properties.filter(all: @stored)
     )
 
     #environment {
         extension #environment.target.Declaration.identifier {
             function equals(_ other: Self): Bool {
-                #properties.map { property in
+                #values.map { property in
                     if self.#property.identifier != other.#property.identifier {
                         return false
                     }
@@ -118,10 +121,14 @@
     <CodeBlock source={equatableSynthesis} syntax="range" label="Complete Equatable synthesis" />
 
     <p>
-      The macro performs the complete synthesis. It queries the stored
-      properties, emits an <code>equals</code> function into the target, and
-      generates one short-circuiting comparison per property. An empty
-      construct naturally reaches <code>return true</code>.
+      The macro performs the complete synthesis. Its broad
+      <code>@property</code> query observes stored, derived, and binding nodes,
+      so changes to that property graph invalidate and re-identify the generated
+      implementation. Runtime equality then narrows to <code>@stored</code>
+      values, avoiding redundant derived computation or externally backed
+      bindings. It emits an <code>equals</code> function and generates one
+      short-circuiting comparison per stored value. An empty construct naturally
+      reaches <code>return true</code>.
     </p>
   </section>
 
