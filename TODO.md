@@ -568,9 +568,12 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           top-level `#expression` through the typed macro CFG/MIR boundary.
           - [x] Persist and compose scalar, array, optional, and source-backed
             syntax value trees without a Codable-specific splice path.
-          - [ ] Treat a mapped closure body in syntax position as a
+          - [x] Treat a mapped closure body in syntax position as a
             source-backed syntax value so `#fields.map { ... }` can compose
             heterogeneous generated statements through the same boundary.
+            - `Testing/Macros/Pass/InlineMappedSyntax.range` proves the
+              closure runs once per compile-time element and substitutes its
+              exact source-backed initializer into the generated function.
         - The canonical Core source bundle now links `@syntax`,
           `@syntax?`, `[@syntax]`, and qualified nested names such as
           `Macro.Application`; `Application<Value>` defaults to `Nil`.
@@ -687,9 +690,13 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - `CompilerMacroResult` is either `.value(...)` or `.noValue`; evaluation
           and invocation outcomes no longer transport a boolean plus parallel
           result fields.
-      - [ ] Prove construct-attached automatic fields and generated
+      - [x] Prove construct-attached automatic fields and generated
         encode/decode bodies through supported fixtures before adding the
         source to the accepted compiler manifest.
+        - `Testing/Macros/Pass/InlineCodable.range` is combined with the
+          actual `Core/Macro/Codable.range` source by `check-root-value`; one
+          macro invocation generates exactly `encode` and `decode` without
+          nested helper macros.
         - Treat field key overrides and exclusion as separate future coding
           policy features rather than requirements for baseline `@codable`.
     - [ ] Make authored `keyword + name` declarations the graph's canonical

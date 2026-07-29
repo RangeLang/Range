@@ -1,0 +1,72 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
+@builtin
+construct Array<Element> {}
+
+compilerSourceFile\trole=core\tpath=Core/Macro/InlineCodableSurface.range
+open macro member(): Declaration | Member -> Void {}
+open macro syntax(): Declaration -> Void {}
+open macro stored(): Construct -> Void {}
+
+construct Identifier {
+    let name: String
+}
+
+construct NominalTypeReference {}
+construct TypeReference {}
+construct Expression {}
+
+construct Construct {
+    let declaration: ConstructDeclaration
+}
+
+construct ConstructDeclaration {
+    let self: NominalTypeReference
+    let members: [@member]
+}
+
+@syntax
+@stored
+construct Let {
+    let identifier: Identifier
+    let type: TypeReference
+    let value: Expression?
+}
+
+@syntax
+@stored
+construct State {
+    let identifier: Identifier
+    let type: TypeReference
+    let value: Expression?
+}
+
+enum Result<Value, Failure> {
+    case success(result: Value)
+    case failure(cause: Failure)
+}
+
+construct EncodingError {}
+construct DecodingError {}
+
+construct Encoder<Format> {
+    function keyedContainer(): KeyedEncodingContainer<Format>
+}
+
+construct KeyedEncodingContainer<Format> {
+    function encode<Value>(_ value: Value, forKey key: String): Result<Void, EncodingError>
+}
+
+construct Decoder<Format> {
+    function keyedContainer(): KeyedDecodingContainer<Format>
+}
+
+construct KeyedDecodingContainer<Format> {
+    function decode<Value>(_ type: Value, forKey key: String, default defaultValue: Value?): Result<Value, DecodingError>
+}
+
+compilerSourceFile\trole=project\tpath=Project/User.range
+@codable
+construct User {
+    let count: Int(7)
+}

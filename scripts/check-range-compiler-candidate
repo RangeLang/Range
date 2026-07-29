@@ -4057,7 +4057,7 @@ write_macro_generated_function_bundle() {
         '        }' \
         '    }' \
         '    environment.expand {' \
-        '        extension #(environment.target.declaration.self) {' \
+        '        extension #environment.target.declaration.self {' \
         '            function memberFunction(delta: Int): Int {' \
         '                return delta + 3' \
         '            }' \
@@ -5014,7 +5014,7 @@ audit_macro_family_memory() {
     require_successful_output "$stage_label macro-family typed syntax" "$typed" "$error"
     /usr/bin/grep -Fq $'name=components\tnameStart=134\tnameEnd=144\ttype=[@component]' "$typed" \
         || fail "$stage_label typed syntax did not preserve the macro-family element type"
-    /usr/bin/grep -Fq $'type=[@component]\ttypeStart=146\ttypeEnd=158\tkind=state' "$typed" \
+    /usr/bin/grep -Eq $'name=components.*\ttype=\\[@component\\]\ttypeStart=146\ttypeEnd=158.*\tkind=state\t' "$typed" \
         || fail "$stage_label typed syntax did not preserve mutable family storage"
 
     run_capture "$executable" "$fixture_root/Pass/GeneralTargets.range" "$general" "$error"

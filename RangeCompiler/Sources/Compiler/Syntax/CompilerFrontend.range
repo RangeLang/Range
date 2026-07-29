@@ -8537,9 +8537,12 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
     } else if operationKind == compilerBodyMIROperationMacroCollectionFilter()
         || operationKind == compilerBodyMIROperationMacroCollectionMap() {
         let transformResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
+        let transformSourceNodeID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationSourceColumn()))
         let transformReceiverMIRValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
         let closureNodeID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationTargetIDColumn()))
         let operandCount: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()))
+        let materializesSyntax: Bool(operationKind == compilerBodyMIROperationMacroCollectionMap()
+            && compilerBodyArenaCollectionTransformIsExpansionSyntaxMap(arena: arena, applicationNodeID: transformSourceNodeID))
         state transformValid: Bool(transformReceiverMIRValueID >= 0 && transformReceiverMIRValueID < evaluationValues.count)
         state receiverStoreValueID: Int(0 - 1)
         if transformValid { receiverStoreValueID: evaluationValues.element(index: transformReceiverMIRValueID) }
@@ -8567,7 +8570,17 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
                 captureOrdinal: captureOrdinal + 1
             }
             if transformValid {
-                let closureOutcome: CompilerMacroFunctionOutcome(compilerMacroExecutionEvaluateClosure(parentArena: arena, index: index, store: store, parentOperationRow: operationRow, closureNodeID: closureNodeID, arguments: closureArguments, depth: depth + 1))
+                state closureOutcome: CompilerMacroFunctionOutcome(status: 0 - 1, valueID: 0 - 1, stepCount: 0)
+                if materializesSyntax {
+                    closureOutcome: compilerMacroExecutionMaterializeExpansionSyntaxClosure(
+                        arena: arena,
+                        store: store,
+                        closureNodeID: closureNodeID,
+                        elementValueID: childStoreValueID
+                    )
+                } else {
+                    closureOutcome: compilerMacroExecutionEvaluateClosure(parentArena: arena, index: index, store: store, parentOperationRow: operationRow, closureNodeID: closureNodeID, arguments: closureArguments, depth: depth + 1)
+                }
                 if closureOutcome.status != 0 || closureOutcome.valueID < 0 {
                     transformFailureStatus: closureOutcome.status
                     if transformFailureStatus == 0 { transformFailureStatus: 0 - 701 }
@@ -9203,6 +9216,170 @@ function compilerMacroExecutionEvaluateClosure(parentArena: CompilerBodyArena, i
     let outcome: CompilerMacroFunctionOutcome(compilerMacroExecutionEvaluatePreparedArena(arena: arena, index: index, store: store, arguments: arguments, depth: depth))
     compilerBodyArenaDestroy(arena: arena)
     return outcome
+}
+
+function compilerMacroExecutionAppendExpansionSyntaxCapture(
+    tables: CompilerSyntaxTables,
+    output: RawBuffer,
+    sourceSyntaxID: Int,
+    boundaryStart: Int,
+    boundaryEnd: Int
+): Int {
+    let sourceMemberRow: Int(compilerMacroExecutionMemberRowForSyntaxID(tables: tables, syntaxID: sourceSyntaxID))
+    if sourceMemberRow < 0 || boundaryStart < 0 || boundaryEnd <= boundaryStart { return 0 - 1 }
+    state cursor: CompilerTokenCursor(source: $tables.sourceStore.source, index: boundaryStart)
+    let maybeHash: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeHash == nil { return 0 - 1 }
+    let hash: RangeLexedToken(maybeHash ?? compilerFallbackToken(cursor: cursor))
+    if hash.kind != .hash { return 0 - 1 }
+    cursor: compilerCursorAdvance(cursor: cursor, token: hash)
+    let maybeRoot: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeRoot == nil { return 0 - 1 }
+    let root: RangeLexedToken(maybeRoot ?? compilerFallbackToken(cursor: cursor))
+    if root.kind != .identifier { return 0 - 1 }
+    cursor: compilerCursorAdvance(cursor: cursor, token: root)
+    let maybeDot: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeDot == nil { return 0 - 1 }
+    let dot: RangeLexedToken(maybeDot ?? compilerFallbackToken(cursor: cursor))
+    if dot.kind != .dot { return 0 - 1 }
+    cursor: compilerCursorAdvance(cursor: cursor, token: dot)
+    let maybeCapture: Optional<RangeLexedToken>(compilerCursorPeek(cursor: cursor))
+    if maybeCapture == nil { return 0 - 1 }
+    let capture: RangeLexedToken(maybeCapture ?? compilerFallbackToken(cursor: cursor))
+    if capture.kind != .identifier { return 0 - 1 }
+    cursor: compilerCursorAdvance(cursor: cursor, token: capture)
+    state projection: String("")
+    let fileID: Int(compilerIntTableValue(table: tables.members, row: sourceMemberRow, column: 1))
+    if capture.text == String("identifier") {
+        projection: compilerTypedSyntaxLocalText(
+            tables: tables,
+            fileID: fileID,
+            localStart: compilerIntTableValue(table: tables.members, row: sourceMemberRow, column: 6),
+            localEnd: compilerIntTableValue(table: tables.members, row: sourceMemberRow, column: 7)
+        )
+        let suffix: String(stringSliceUnchecked(source: tables.sourceStore.source, start: cursor.index, end: boundaryEnd))
+        if suffix == String(".name") {
+            projection: "\"\(projection)\""
+        } else if suffix != String("") { return 0 - 1 }
+    } else if capture.text == String("type") {
+        projection: compilerTypedSyntaxLocalText(
+            tables: tables,
+            fileID: fileID,
+            localStart: compilerIntTableValue(table: tables.members, row: sourceMemberRow, column: 8),
+            localEnd: compilerIntTableValue(table: tables.members, row: sourceMemberRow, column: 9)
+        )
+        let suffix: String(stringSliceUnchecked(source: tables.sourceStore.source, start: cursor.index, end: boundaryEnd))
+        if suffix == String(".self") {
+            projection: "\(projection).self"
+        } else if suffix != String("") { return 0 - 1 }
+    } else if capture.text == String("value") {
+        if cursor.index != boundaryEnd { return 0 - 1 }
+        let valueStart: Int(compilerIntTableValue(table: tables.members, row: sourceMemberRow, column: compilerSyntaxMemberValueStartColumn()))
+        let valueEnd: Int(compilerIntTableValue(table: tables.members, row: sourceMemberRow, column: compilerSyntaxMemberValueEndColumn()))
+        if valueStart >= 0 && valueEnd > valueStart {
+            projection: compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: valueStart, localEnd: valueEnd)
+        } else {
+            projection: "nil"
+        }
+    } else {
+        return 0 - 1
+    }
+    return rawBufferAppendText(buffer: output, text: projection)
+}
+
+function compilerMacroExecutionMaterializeExpansionSyntaxClosure(
+    arena: CompilerBodyArena,
+    store: CompilerMacroValueStore,
+    closureNodeID: Int,
+    elementValueID: Int
+): CompilerMacroFunctionOutcome {
+    let bodyRegionNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: closureNodeID, role: compilerSyntaxRoleClosureBody(), ordinal: 0))
+    if bodyRegionNodeID < 0 || elementValueID < 0 || elementValueID >= store.kinds.count {
+        return CompilerMacroFunctionOutcome(status: 0 - 702, valueID: 0 - 1, stepCount: 0)
+    }
+    if store.kinds.element(index: elementValueID) != compilerMacroValueKindSyntax() {
+        return CompilerMacroFunctionOutcome(status: 0 - 704, valueID: 0 - 1, stepCount: 0)
+    }
+    let sourceSyntaxID: Int(store.scalars.element(index: elementValueID))
+    let bodyStart: Int(compilerSourceStoreGlobalOffset(
+        store: arena.tables.sourceStore,
+        fileID: arena.fileID,
+        localOffset: compilerIntTableValue(table: arena.nodes, row: bodyRegionNodeID, column: 4)
+    ))
+    let bodyEnd: Int(compilerSourceStoreGlobalOffset(
+        store: arena.tables.sourceStore,
+        fileID: arena.fileID,
+        localOffset: compilerIntTableValue(table: arena.nodes, row: bodyRegionNodeID, column: 5)
+    ))
+    if bodyStart < 0 || bodyEnd <= bodyStart {
+        return CompilerMacroFunctionOutcome(status: 0 - 705, valueID: 0 - 1, stepCount: 0)
+    }
+    let output: RawBuffer(rawBufferCreate(capacity: bodyEnd - bodyStart + 64, stride: 1))
+    state cursor: Int(bodyStart)
+    state authoredStart: Int(bodyStart)
+    state valid: Bool(true)
+    while valid && cursor < bodyEnd {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
+        if maybeToken == nil {
+            valid: false
+        } else {
+            let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: cursor))
+            if token.start >= bodyEnd {
+                cursor: bodyEnd
+            } else if token.kind == .hash {
+                let maybeBoundary: Optional<CompilerSourceRange>(compilerMacroExpansionSyntaxSplice(source: arena.tables.sourceStore.source, start: token.start))
+                if maybeBoundary == nil {
+                    valid: false
+                } else {
+                    let boundary: CompilerSourceRange(maybeBoundary ?? CompilerSourceRange(start: token.start, end: token.end, next: token.end))
+                    if boundary.next > bodyEnd
+                        || rawBufferAppendText(buffer: output, text: stringSliceUnchecked(source: arena.tables.sourceStore.source, start: authoredStart, end: token.start)) != 0
+                        || compilerMacroExecutionAppendExpansionSyntaxCapture(
+                            tables: arena.tables,
+                            output: output,
+                            sourceSyntaxID: sourceSyntaxID,
+                            boundaryStart: boundary.start,
+                            boundaryEnd: boundary.end
+                        ) != 0 {
+                        valid: false
+                    } else {
+                        cursor: boundary.next
+                        authoredStart: cursor
+                    }
+                }
+            } else {
+                cursor: token.end
+            }
+        }
+    }
+    if valid && rawBufferAppendText(buffer: output, text: stringSliceUnchecked(source: arena.tables.sourceStore.source, start: authoredStart, end: bodyEnd)) != 0 {
+        valid: false
+    }
+    if !valid {
+        rawBufferDestroy(buffer: output)
+        return CompilerMacroFunctionOutcome(status: 0 - 706, valueID: 0 - 1, stepCount: 0)
+    }
+    let generated: String(compilerCoreRawBufferMaterializeAndDestroy(buffer: output))
+    let generatedFileID: Int(compilerSourceStoreAppendGeneratedFile(
+        store: arena.tables.sourceStore,
+        path: "MacroExpansion/SyntaxMap/\(store.kinds.count).range",
+        content: generated
+    ))
+    if generatedFileID < 0 {
+        return CompilerMacroFunctionOutcome(status: 0 - 707, valueID: 0 - 1, stepCount: 0)
+    }
+    let syntaxValueID: Int(compilerMacroExecutionMaterializeSyntaxValue(
+        tables: arena.tables,
+        store: store,
+        sourceSyntaxID: sourceSyntaxID,
+        fileID: generatedFileID,
+        valueStart: 0,
+        valueEnd: stringLength(value: generated)
+    ))
+    if syntaxValueID < 0 {
+        return CompilerMacroFunctionOutcome(status: 0 - 703, valueID: 0 - 1, stepCount: 0)
+    }
+    return CompilerMacroFunctionOutcome(status: 0, valueID: syntaxValueID, stepCount: 1)
 }
 
 function compilerMacroExecutionEvaluateFunction(

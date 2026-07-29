@@ -522,7 +522,7 @@ function compilerBodyArenaTrailingClosureParameterClauseEnd(arena: CompilerBodyA
     return 0 - 1
 }
 
-function compilerBodyArenaParseTrailingClosure(arena: CompilerBodyArena, leftBrace: RangeLexedToken, limit: Int): CompilerBodyParseResult {
+function compilerBodyArenaParseTrailingClosure(arena: CompilerBodyArena, leftBrace: RangeLexedToken, limit: Int, parsesBody: Bool): CompilerBodyParseResult {
     let maybeRange: Optional<CompilerSourceRange>(compilerCoreParseBalancedRange(cursor: CompilerTokenCursor(source: $arena.tables.sourceStore.source, index: leftBrace.start), leftKind: .leftBrace, rightKind: .rightBrace))
     if maybeRange == nil { return compilerBodyParseFailure(index: leftBrace.start) }
     let range: CompilerSourceRange(maybeRange ?? CompilerSourceRange(start: leftBrace.end, end: leftBrace.end, next: leftBrace.end))
@@ -587,7 +587,7 @@ function compilerBodyArenaParseTrailingClosure(arena: CompilerBodyArena, leftBra
         parameterOrdinal: parameterOrdinal + 1
     }
     if valid && compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: closureNodeID, childNodeID: bodyNodeID, role: compilerSyntaxRoleClosureBody(), ordinal: 0) != 0 { valid: false }
-    if valid {
+    if valid && parsesBody {
         let parsedBody: CompilerBodyParseResult(compilerBodyArenaParseRegionInto(arena: arena, regionNodeID: bodyNodeID, start: bodyStart, limit: range.end))
         if !parsedBody.isValid || parsedBody.nextIndex < range.end { valid: false }
     }
@@ -655,7 +655,16 @@ function compilerBodyArenaParsePostfix(arena: CompilerBodyArena, start: Int, lim
                         || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: callNodeID, childNodeID: calleeNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0) != 0 { return compilerBodyParseFailure(index: suffix.start) }
                 }
                 if compilerBodyArenaChild(arena: arena, ownerNodeID: callNodeID, role: compilerSyntaxRoleTrailingClosure(), ordinal: 0) >= 0 { return compilerBodyParseFailure(index: suffix.start) }
-                let closure: CompilerBodyParseResult(compilerBodyArenaParseTrailingClosure(arena: arena, leftBrace: suffix, limit: limit))
+                let callStartLocal: Int(compilerIntTableValue(table: arena.nodes, row: callNodeID, column: 4))
+                let callStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: callStartLocal))
+                state parsesClosureBody: Bool(true)
+                if callStartLocal > 0
+                    && callStart > 0
+                    && stringSliceUnchecked(source: arena.tables.sourceStore.source, start: callStart - 1, end: callStart) == String("#")
+                    && compilerBodyArenaNodeText(arena: arena, nodeID: compilerBodyArenaChild(arena: arena, ownerNodeID: callNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0)) == String("map") {
+                    parsesClosureBody: false
+                }
+                let closure: CompilerBodyParseResult(compilerBodyArenaParseTrailingClosure(arena: arena, leftBrace: suffix, limit: limit, parsesBody: parsesClosureBody))
                 if !closure.isValid
                     || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: callNodeID, childNodeID: closure.nodeID, role: compilerSyntaxRoleTrailingClosure(), ordinal: 0) != 0
                     || arena.nodes.values.update(element: compilerSourceStoreFileLocalOffsetForFileID(store: arena.tables.sourceStore, fileID: arena.fileID, globalOffset: closure.nextIndex), index: callNodeID * compilerBodyArenaNodeColumnCount() + 5) != 0 { return compilerBodyParseFailure(index: suffix.start) }
@@ -666,6 +675,19 @@ function compilerBodyArenaParsePostfix(arena: CompilerBodyArena, start: Int, lim
         }
     }
     return result
+}
+
+function compilerBodyArenaCollectionTransformIsExpansionSyntaxMap(arena: CompilerBodyArena, applicationNodeID: Int): Bool {
+    if applicationNodeID < 0 || applicationNodeID >= compilerIntTableRowCount(table: arena.nodes)
+        || compilerIntTableValue(table: arena.nodes, row: applicationNodeID, column: 1) != compilerSyntaxKindApplication() { return false }
+    let calleeNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: applicationNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0))
+    let applicationStartLocal: Int(compilerIntTableValue(table: arena.nodes, row: applicationNodeID, column: 4))
+    let applicationStart: Int(compilerSourceStoreGlobalOffset(store: arena.tables.sourceStore, fileID: arena.fileID, localOffset: applicationStartLocal))
+    return calleeNodeID >= 0
+        && applicationStartLocal > 0
+        && applicationStart > 0
+        && compilerBodyArenaNodeText(arena: arena, nodeID: calleeNodeID) == String("map")
+        && stringSliceUnchecked(source: arena.tables.sourceStore.source, start: applicationStart - 1, end: applicationStart) == String("#")
 }
 
 function compilerBodyArenaParsePrefix(arena: CompilerBodyArena, start: Int, limit: Int): CompilerBodyParseResult {

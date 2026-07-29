@@ -2569,6 +2569,32 @@ function compilerBodyArenaResolveCollectionTransform(arena: CompilerBodyArena, i
     ))
     if parameterSymbolID < 0
         || compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: parameterNodeID, targetKind: compilerBodyResolutionLocalSymbol(), targetID: parameterSymbolID, typeKind: elementTypeKind, typeID: closureElementTypeID, regionNodeID: bodyRegionNodeID) != 0 { return 0 - 1 }
+    if transformKind == compilerBodyCollectionTransformMap()
+        && compilerBodyArenaCollectionTransformIsExpansionSyntaxMap(arena: arena, applicationNodeID: applicationNodeID) {
+        let noArguments: Buffer<Int>(bufferCreateInt(capacity: 0))
+        let syntaxElementTypeID: Int(compilerBodyArenaTypeInstanceInternStructuralAtSpan(
+            arena: arena,
+            typeKind: compilerBodyTypeMacroTarget(),
+            nominalSyntaxID: 0 - 1,
+            fileID: arena.fileID,
+            start: compilerIntTableValue(table: arena.nodes, row: bodyRegionNodeID, column: 4),
+            end: compilerIntTableValue(table: arena.nodes, row: bodyRegionNodeID, column: 5),
+            argumentIDs: noArguments
+        ))
+        noArguments.destroy()
+        if syntaxElementTypeID < 0 { return 0 - 214 }
+        let syntaxArrayTypeID: Int(compilerBodyArenaArrayTypeID(arena: arena, sourceNodeID: applicationNodeID, elementTypeID: syntaxElementTypeID))
+        if !compilerBodyArenaTypeIDIsArray(arena: arena, typeID: syntaxArrayTypeID) { return 0 - 215 }
+        return compilerBodyArenaAppendResolution(
+            arena: arena,
+            sourceNodeID: calleeNodeID,
+            targetKind: compilerBodyResolutionMacroCollectionTransform(),
+            targetID: transformKind,
+            typeKind: compilerBodyTypeConstruct(),
+            typeID: syntaxArrayTypeID,
+            regionNodeID: regionNodeID
+        )
+    }
     let memberSeedStatus: Int(compilerBodyArenaSeedClosureParameterMemberResolutions(arena: arena, index: index, closureNodeID: closureNodeID, parameterNodeID: parameterNodeID, parameterSymbolID: parameterSymbolID, elementTypeID: closureElementTypeID, queriedElementSyntaxID: queriedElementSyntaxID, bodyRegionNodeID: bodyRegionNodeID))
     if memberSeedStatus != 0 { return memberSeedStatus }
     let failureCountBeforeClosureBody: Int(arena.failures.count)

@@ -8,7 +8,7 @@ macro codable(): Construct { environment in
             function encode<Format>(to encoder: Encoder<Format>): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer<Format>(encoder.keyedContainer())
                 #fields.map { property in
-                    switch container.encode(self.#property.identifier, forKey: property.identifier.name) {
+                    switch container.encode(self.#property.identifier, forKey: #property.identifier.name) {
                     case .success:
                         break
                     case .failure(error):
@@ -21,7 +21,7 @@ macro codable(): Construct { environment in
             function decode<Format>(from decoder: Decoder<Format>): Result<Self, DecodingError> {
                 let container: KeyedDecodingContainer<Format>(decoder.keyedContainer())
                 #fields.map { property in
-                    switch container.decode(#property.type.self, forKey: property.identifier.name, default: #property.value) {
+                    switch container.decode(#property.type.self, forKey: #property.identifier.name, default: #property.value) {
                     case .success(#property.identifier):
                         self.#property.identifier: #property.identifier
                     case .failure(error):

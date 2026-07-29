@@ -1,0 +1,41 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
+@builtin
+construct Array<Element> {}
+
+compilerSourceFile\trole=core\tpath=Core/Macro/InlineMappedSyntax.range
+open macro member(): Declaration | Member -> Void {}
+open macro syntax(): Declaration -> Void {}
+
+construct Construct {
+    let declaration: ConstructDeclaration
+}
+
+construct ConstructDeclaration {
+    let members: [@member]
+}
+
+@syntax
+construct Let {}
+
+macro inlineMappedSyntax(): Construct { environment in
+    let fields: [Let](
+        environment.target.declaration.members.filter(all: Let)
+    )
+
+    environment.expand {
+        extension #environment.target.declaration.self {
+            function mappedValue(): Int {
+                #fields.map { property in
+                    return #property.value
+                }
+            }
+        }
+    }
+}
+
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@inlineMappedSyntax
+construct Value {
+    let count: Int(7)
+}
