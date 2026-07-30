@@ -175,11 +175,18 @@ describe("SvelteKit routes", () => {
   });
 
   test("keeps the Range dual-shape observation hidden", async () => {
-    const [response, draft] = await Promise.all([
+    const [response, draft, previewGate] = await Promise.all([
       render("/updates/range-has-a-dual-shape"),
       readFile(
         new URL(
           "../src/routes/updates/range-has-a-dual-shape/+page.svelte",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../src/routes/updates/range-has-a-dual-shape/+page.server.ts",
           import.meta.url,
         ),
         "utf8",
@@ -189,6 +196,9 @@ describe("SvelteKit routes", () => {
 
     expect(response.status).toBe(404);
     expect(html).not.toContain("Range Has a Dual Shape");
+    expect(previewGate).toContain(
+      'dev && url.searchParams.get("preview") === "range-draft"',
+    );
     expect(draft).toContain("<h2>No language is ever done</h2>");
     expect(draft).toContain("C is more than fifty years");
     expect(draft).toContain("It can");
