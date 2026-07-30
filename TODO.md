@@ -81,10 +81,13 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     `state integer` / `state bool` extension and read-dependency behavior; it
     must be rewritten only after the generated construct has a supported
     compiler data path.
-- [ ] Execute the shared Range-authored graph body directly.
+- [ ] Execute the Range-authored graph body directly.
   - `Graph.range` now authors
-    `environment.graph.addNode(role:additionalRole:)`, uses implicit `nil` for
-    the optional second role, and includes the shared/private value model.
+    `environment.graph.addNode(role:additionalRole:)` and uses implicit `nil`
+    for the optional second role.
+  - The unimplemented `@shared` macro-on-macro marker and its unused
+    shared/private value model were removed; reintroduce sharing only with a
+    concrete cross-module graph ownership requirement and a focused proof.
   - The bootstrap `compilerFormulaExecuteApplication` graph-name bridge still
     performs role validation; `addNode` is not yet a supported ordinary graph
     capability operation.
@@ -122,6 +125,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 
 ## Website
 
+  - [x] Keep “Range Has a Dual Shape” hidden from the public Website.
+    - Remove its homepage card and make its former route return 404.
   - [x] Render the benchmark run procedure as a minimal top-down tree, with
     generated source branching into six optimized builds before the shared
     run, validation, and median-result trunk.
@@ -154,13 +159,18 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] Move the codability walkthrough from the homepage into a dedicated
     `/features/macros/codability-under-100` long-form article, with a concise
     homepage entry point.
-    - [x] Present the newest writing in a responsive homepage strip of
-      animated OKLCH shader cards, led by `Codability under 100`.
+    - [x] Present the newest writing in a responsive homepage strip of OKLCH
+      shader cards, led by `Codability under 100`, with one synchronized,
+      visible-only noise field sampled through card-shaped cutouts at their
+      actual layout coordinates.
       - [x] Generate a distinct shader palette for every post from an unbounded
         golden-angle OKLCH seed instead of reusing named color variants.
-      - [x] Measure each animated shader card in real time and derive a
-        complementary text palette that maintains at least 4.5:1 contrast in
-        the composited copy region.
+      - [x] Store each post’s measured complementary text palette with at
+        least 4.5:1 contrast instead of repeating GPU readback and candidate
+        analysis at runtime.
+      - [x] Give the post grid one canonical Range-accent cursor that travels
+        instantly between cards for hover and forward/reverse keyboard focus
+        and retains its last position between selections.
   - [x] Modulate the continuous Cardinality hum’s low-pass cutoff from homepage
     scroll proximity without changing its pitch, rhythm, or volume.
   - [x] Add a homepage codability sheet sourced from the Range-authored macro.
@@ -223,6 +233,16 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 
 ## Editor
 
+  - [x] Restore source-first go-to-definition through a Range-owned language
+    server launched by `scripts/range lsp`.
+    - [x] Cache a scoped workspace graph across requests, overlay unsaved open
+      documents, and rebuild the derived graph only when a file generation
+      changes.
+    - [x] Build and cache shortest-path jump links from symbol occurrences
+      through lexical scope, file, and workspace nodes to compatible
+      declarations.
+    - [x] Prove `@component`, `Header()`, nearest lexical binding, graph reuse,
+      and unsaved navigation with focused fixtures in `Testing/Editor/Pass`.
   - [x] Replace the generated Zed Xcode-style syntax theme with the website
     Codability palette.
     - [x] Keep neutral functions, declarations, variables, and strings while
@@ -233,6 +253,82 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [x] Parse current `{ environment in` macro bodies before applying syntax
       captures, so keyword and string highlighting does not depend on
       Tree-sitter error recovery.
+
+## RangeView
+
+  - [x] Establish `@app`, `@component`, and `@page` as the minimal
+    framework marker surface.
+  - [x] Move every foundational macro into `Macros/Core.range` and make
+    `Macros/` the ownership boundary for future concern-specific RangeView
+    macro files.
+  - [ ] Emit `.html`, `.css`, and `.js` files from ordinary Range strings once
+    that backend has a compiler-owned artifact boundary.
+  - [ ] Add an executable RangeView command only after the relevant framework
+    source has focused compiler fixtures; do not make RangeView itself a test
+    input.
+  - [ ] Prove the first executable `VStack` lowering through compiler-owned
+    component fixtures, without using the idealized framework as validation.
+  - [x] Replace the prototype declaration with the intended declaration-first
+    surface, even though compiler support remains pending:
+    `state spacing: Float` plus
+    `binding _ children: () -> [@component]`.
+  - [ ] Make `@app` discover `@page` declarations and generate the site entry
+    point once framework dependencies and emitted artifacts have a supported
+    project-graph consumer.
+    - [x] Declare the source-first `Route` model and one derived route tree on
+      the example app, with paths owned by routes rather than `@page`.
+    - [x] Declare the `@app` contract requiring exactly one
+      `derived routes: Route`, with distinct missing, duplicate, and wrong-type
+      diagnostics.
+    - [ ] Execute the typed `Derived<Route>` query and its missing, duplicate,
+      and wrong-type diagnostics through the current macro compiler.
+    - [ ] Recover route-builder expression, block, optional, either, and array
+      collection without restoring the old Swift result-builder runtime.
+    - [ ] Resolve nested prefixes and build both path-to-page and page-to-path
+      graph facts before artifact emission.
+      - [ ] Let each `Route` normalize its local segment and derive its resolved
+        canonical matcher signature from the parent prefix.
+      - [ ] Make `@app` reject duplicate matcher signatures across the complete
+        tree, treating parameter-name-only differences as the same matcher.
+      - [ ] Make `@app` reject a repeated page declaration so reverse lookup
+        has one canonical path; add aliases later through an explicit route
+        declaration if needed.
+  - [ ] Make `@component` generate or select its artifact lowering so callers
+    express `VStack` composition without invoking framework lowering functions.
+    - [x] Declare the macro contract requiring exactly one
+      `derived body: [@component]` on every component and page.
+    - [ ] Execute the typed `Derived<[@component]>` query and its missing,
+      duplicate, and wrong-type diagnostics through the current macro compiler.
+    - [ ] Admit constructing `VStack(spacing:)` and projecting its spacing into
+      the renderer; the first local instance attempt currently rejects during
+      `renderHomePage` function discovery with failure code `6595`.
+    - [ ] Recover the general builder operations proven by the earlier Neat
+      model: expression, block, optional, either, and array collection.
+    - [ ] Make `VStack { ... }` collect component values through those builder
+      operations without reparsing source or naming `VStack` in compiler code.
+      - [ ] Add independent external and local names to stored/binding
+        declarations so `binding _ children` parses; the literal form currently
+        rejects during top-level declaration capture.
+      - [ ] Admit a builder closure binding with type `() -> [@component]`;
+        `() -> [Int]` currently parses but rejects during enum-payload type
+        linking, while direct `[@component]` reaches
+        `invalidMacroFamilyMemoryGraph`.
+      - [ ] Consume the component-family result as compile-time child syntax
+        before runtime layout instead of storing it in every `VStack`.
+  - [ ] Add one unified 2D `Geometry` intent shared by components and pages.
+    - [ ] Expose `.geometry { geometry in ... }` as the observation and
+      transform boundary without a modifier registry or per-function macros.
+    - [ ] Support size and shape transforms, including rectangle-to-circle,
+      before lowering the final geometry into HTML, CSS, and JavaScript.
+  - [ ] Add `@styleModifier` declarations that produce backend-neutral style
+    transforms and chain on every component and page.
+    - [ ] Implement `.padding(10)` as the first modifier and merge it into the
+      target node rather than emitting a wrapper component.
+    - [ ] Lower static style transforms to CSS and reserve JavaScript for
+      observed or runtime-dependent values.
+  - [ ] Pass app values with owned dynamic strings through component and page
+    render boundaries after representation-sensitive aggregate calls are
+    admitted by the accepted compiler proof boundary.
 
 ## RangeStore
 
@@ -1219,6 +1315,118 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [ ] Collapse Foundation only if the dependency distinction no longer
     represents a real compilation or package boundary.
 
+## Compiler Simplification Execution Plan
+
+- [ ] Simplify the compiler in dependency order from one reproducible
+  checkpoint.
+  - `CompilerIntTable` already stores its values in `Buffer<Int>`; do not
+    replace dense integer storage merely to rename it.
+  - Keep `RawBuffer` as a private Core/runtime allocation substrate until
+    authored Buffer and String own allocation, growth, and destruction.
+  - Require each deletion or representation slice to remove its superseded
+    path in the same checkpoint instead of retaining parallel compiler models.
+  - [ ] Phase 0: restore a reproducible current compiler baseline.
+    - `scripts/range check-build-plan` passes, but the current accepted-seed
+      verifier reports changed compiler inputs across Syntax, Body, Driver,
+      and LLVM; the accepted artifact is not proof of the current source tree.
+    - [x] Re-run the manifest integrity check and record the exact current
+      mismatched input set before changing compiler semantics.
+      - The accepted manifest differs from 13 current compiler inputs:
+        `CompilerBodyCFG`, `CompilerBodyMIR`, `CompilerBodyModel`,
+        `CompilerBodyOwnership`, `CompilerBodyParsing`, `CompilerBodyTypes`,
+        `CompilerCore`, `CompilerDirectives`, `CompilerBodyLLVM`,
+        `CompilerLLVMPlan`, `CompilerFrontend`, `CompilerParsing`, and
+        `Lexer`; all manifested Core and runtime inputs still match.
+    - [ ] Resolve the current source capability blocker through the narrowest
+      relevant root-value proof, including its exact rejection controls.
+      - The current development Stage 2 now treats undeclared built-in target
+        category markers as scalar syntax metadata rather than macro-family
+        storage, and ownership construction ignores compile-time projection
+        values before requiring runtime tracked-storage metadata.
+      - The focused root-value run passes the uppercase/lowercase inline
+        projection pair, typed collection closures, Codable, rollback, and
+        typed macro parameter defaults. The unimplemented `@shared`
+        macro-on-macro marker was removed from the graph capability fixture
+        and Core surface so graph validation can proceed without inventing a
+        macro-declaration target model.
+      - Graph capabilities and both missing-role controls now pass. Root-value
+        next stops at the existing Range-native project macro boundary with
+        `diagnosticKind=macroExecutionBodyInvalid`, `pipelineStatus=1`, and
+        `pipelineFailureCode=1`; generated project configuration remains the
+        next independent capability slice.
+      - Keep the proof boundary explicit: root-value and its controls must pass
+        before advancing to smoke, candidate, Stage 2, or progression gates.
+    - [ ] Run the supported ladder in order: build plan, root value with
+      controls, compiler smoke, compiler candidate, Stage 2, and compiler
+      progression.
+    - [ ] Confirm Stage 2 and Stage 3 LLVM and executable identity, then
+      present the hashes and source/runtime inventories for explicit
+      promotion approval before changing the accepted seed.
+  - [ ] Phase 1: delete the obsolete string-record compiler path.
+    - [ ] Audit every supported command, proof script, and compiler directive
+      for consumers of the legacy `CompilerProgram` record fields and the
+      summary/legacy LLVM entry points.
+    - [ ] Classify the current static deletion candidates, including
+      `compilerCoreASTSummary`, the symbol/type/declaration summaries,
+      `compilerCoreLLVM`, `parseCompilerProgramForLLVMNamedBodies`,
+      `parseCompilerStatementLegacy`, and the old TypedIR LLVM helper.
+    - [ ] Remove only a complete unreachable chain: its record
+      encoders/decoders, parser/lowering functions, fields, column helpers,
+      and RawBuffer builders must leave together.
+    - [ ] Prove supported CLI behavior and compiler fixtures are unchanged,
+      record the compiler line-count and direct RawBuffer-call reduction, and
+      reproduce the fixed point.
+  - [ ] Phase 2: complete deterministic automatic String destruction.
+    - [ ] Complete the automatic-destruction slice under Compiler Storage for
+      normal fallthrough, early returns, branches, loops, moves, and aliases.
+    - [ ] Keep explicit destroy as an internal ownership effect while removing
+      it from ordinary authored String code.
+    - [ ] Do not migrate shared compiler text across function boundaries until
+      the ownership proofs and fixed point pass.
+  - [ ] Phase 3: remove direct RawBuffer use from the surviving compiler.
+    - [ ] Migrate function-local text builders to mutable authored String
+      storage first and guard compile time and peak memory against the rejected
+      immutable-concatenation regression.
+    - [ ] Migrate the shared LLVM block, function, global, and artifact-text
+      accumulators after cross-function String ownership is proven.
+    - [ ] Delete each compiler-facing raw text operation after its last
+      accepted caller disappears; retain the lower-level runtime primitive
+      while Buffer or String still lowers through it.
+  - [ ] Phase 4: collapse the parallel semantic/representation pipeline.
+    - [ ] Identify the exact macro-family representation and member-layout
+      facts still consumed from `CompilerMemoryGraph`.
+    - [ ] Move member-representation proof onto the same BodyArena/type-layout
+      decision used by ordinary native compilation.
+    - [ ] Extract the smallest retained macro-family representation component,
+      then delete the unconsumed general SemanticGraph, MemoryGraph, and
+      TypedIR directive chain.
+    - [ ] Preserve focused macro-family, inline/identity/transparent storage,
+      native compilation, and fixed-point proofs.
+  - [ ] Phase 5: replace anonymous IntTable programming with typed stores.
+    - [ ] Pilot declarations, members, functions, parameters, and type
+      references behind named store operations while retaining private
+      `Buffer<Int>` row-major or structure-of-arrays storage.
+    - [ ] Fold parallel fields such as function ownership into their domain
+      store when doing so removes an independently maintained invariant.
+    - [ ] Delete the corresponding public column constants, partial-row
+      appends, and direct `compilerIntTableValue` calls in the same slice.
+    - [ ] Keep `syntaxIndex` as a typed derived index rather than replacing
+      constant-time lookup with scans.
+    - [ ] Apply the proven store pattern in order to Body syntax and types,
+      CFG, ownership, MIR, reachability/ABI/LLVM, and finally macro/Graph
+      stores.
+  - [ ] Phase 6: measure and reduce derived compiler state.
+    - [ ] Mark each schedule, parent map, selection map, and expression-value
+      map with its producer, last consumer, and reconstruction cost.
+    - [ ] Release or rebuild phase-local derived state after its last consumer
+      instead of retaining it for the complete compile.
+    - [ ] Decide whether Graph 0 regions, dependencies, and frontiers remain on
+      the ordinary compile path only after measuring their time/RSS cost and
+      identifying a real scheduler consumer.
+    - [ ] Do not delete canonical syntax, resolution, type, CFG, ownership,
+      MIR, reachability, or macro-result facts merely because they use dense
+      integer storage.
+
 ## Compiler Storage
 
 - [ ] Replace the compiler's direct RawBuffer dependency incrementally.
@@ -1387,3 +1595,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     presents the triangle.
 - [ ] Add a native typed GPU/runtime consumer only after its shader values,
   resource ownership, effects, and Graph 0 scheduling boundary are explicit.
+- [ ] Complete compiler-owned `@commandGroup` dispatch after the generated-declaration checkpoint.
+  - [x] Prove a target-owned generated `Command` enum, generated callable `runCommandLine()` fallback, linked execution, and exact empty-group rejection through `scripts/range check-root-value`.
+  - [x] Stop RangeView from participating in this compiler checkpoint; RangeView remains idealized example code, not validation input.
+  - [ ] Support statement arrays produced by `#commands.map` inside generated function bodies without aborting native compilation, then prove argv key comparison and `self.<command>()` dispatch.
+  - [ ] Support fieldless construct values as method receivers so a command group does not need a stored control field solely to make `CLI()` representable.
+  - [ ] Replace the focused harness reflection prelude with canonical Core declaration envelopes only after their wider dependencies compile in the supported bundle.
