@@ -1,0 +1,11 @@
+@component
+construct HomePage {
+    derived body: [@component] {
+        Header()
+    }
+
+    function renderTitle(): String {
+        let title: String("nearest")
+        return title
+    }
+}

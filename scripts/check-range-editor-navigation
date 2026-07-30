@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SERVER="$REPO_ROOT/Editor/LanguageServer/range_lsp.py"
+USAGE="$REPO_ROOT/Testing/Editor/Pass/NavigationUsage.range"
+DECLARATIONS="$REPO_ROOT/Testing/Editor/Pass/NavigationDeclarations.range"
+
+macro_location="$(
+    /usr/bin/python3 "$SERVER" definition "$USAGE" 1 2 --root "$REPO_ROOT/Testing/Editor"
+)"
+construct_location="$(
+    /usr/bin/python3 "$SERVER" definition "$USAGE" 4 10 --root "$REPO_ROOT/Testing/Editor"
+)"
+nearest_location="$(
+    /usr/bin/python3 "$SERVER" definition "$USAGE" 9 16 --root "$REPO_ROOT/Testing/Editor"
+)"
+
+/usr/bin/python3 - \
+    "$macro_location" \
+    "$construct_location" \
+    "$nearest_location" \
+    "$DECLARATIONS" \
+    "$USAGE" <<'PY'
+import json
+import pathlib
+import sys
+
+macro = json.loads(sys.argv[1])
+construct = json.loads(sys.argv[2])
+nearest = json.loads(sys.argv[3])
+declarations_uri = pathlib.Path(sys.argv[4]).resolve().as_uri()
+usage_uri = pathlib.Path(sys.argv[5]).resolve().as_uri()
+
+assert macro["uri"] == declarations_uri, macro
+assert macro["range"]["start"] == {"line": 0, "character": 6}, macro
+assert construct["uri"] == declarations_uri, construct
+assert construct["range"]["start"] == {"line": 3, "character": 10}, construct
+assert nearest["uri"] == usage_uri, nearest
+assert nearest["range"]["start"] == {"line": 7, "character": 12}, nearest
+PY
+
+/usr/bin/python3 - "$REPO_ROOT" "$USAGE" "$SERVER" <<'PY'
+import importlib.util
+import json
+import pathlib
+import subprocess
+import sys
+
+root = pathlib.Path(sys.argv[1])
+usage = pathlib.Path(sys.argv[2])
+server_path = pathlib.Path(sys.argv[3])
+
+spec = importlib.util.spec_from_file_location("range_lsp", server_path)
+range_lsp = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(range_lsp)
+index = range_lsp.WorkspaceIndex(root / "Testing/Editor")
+first_graph = index.graph()
+first_definition = index.definition(usage.as_uri(), 3, 9)
+second_graph = index.graph()
+second_definition = index.definition(usage.as_uri(), 3, 9)
+assert first_graph is second_graph
+assert first_definition == second_definition
+assert len(second_graph.jump_links) == 1
+
+server = subprocess.Popen(
+    [str(root / "scripts/range"), "lsp"],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+)
+
+def send(message):
+    payload = json.dumps(message, separators=(",", ":")).encode("utf-8")
+    server.stdin.write(
+        "Content-Length: {}\r\n\r\n".format(len(payload)).encode("ascii")
+        + payload
+    )
+    server.stdin.flush()
+
+def receive():
+    headers = {}
+    while True:
+        line = server.stdout.readline()
+        if line == b"\r\n":
+            break
+        name, value = line.decode("ascii").split(":", 1)
+        headers[name.lower()] = value.strip()
+    return json.loads(server.stdout.read(int(headers["content-length"])))
+
+send({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {"rootUri": (root / "Testing/Editor").as_uri()},
+})
+initialized = receive()
+assert initialized["result"]["capabilities"]["definitionProvider"] is True
+
+send({
+    "jsonrpc": "2.0",
+    "method": "textDocument/didOpen",
+    "params": {
+        "textDocument": {
+            "uri": usage.as_uri(),
+            "languageId": "range",
+            "version": 1,
+            "text": (
+                "construct Draft {}\n"
+                "function use(): Draft { Draft() }\n"
+            ),
+        }
+    },
+})
+send({
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "textDocument/definition",
+    "params": {
+        "textDocument": {"uri": usage.as_uri()},
+        "position": {"line": 1, "character": 24},
+    },
+})
+definition = receive()["result"]
+assert definition["uri"] == usage.as_uri(), definition
+assert definition["range"]["start"] == {"line": 0, "character": 10}, definition
+
+send({"jsonrpc": "2.0", "id": 3, "method": "shutdown", "params": {}})
+receive()
+send({"jsonrpc": "2.0", "method": "exit", "params": {}})
+assert server.wait(timeout=5) == 0
+PY
+
+/usr/bin/printf '%s\n' \
+    "Range editor navigation proof passed: cached shortest-path jumps resolve saved and unsaved symbols."

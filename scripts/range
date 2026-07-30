@@ -11,6 +11,7 @@ Usage:
   range version
   range compile <FILE-OR-DIR>
   range run <PROGRAM-OR-DIR> [-- ARGS...]
+  range lsp
   range compiler next
   range compiler next --cached-only
   range compiler progression
@@ -58,6 +59,10 @@ case "$command" in
     run)
         if [[ $# -lt 1 ]]; then usage; exit 1; fi
         "$REPO_ROOT/scripts/run-range-project" "$@"
+        ;;
+    lsp)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        exec /usr/bin/python3 "$REPO_ROOT/Editor/LanguageServer/range_lsp.py"
         ;;
     compiler)
         compiler_command="${1:-}"

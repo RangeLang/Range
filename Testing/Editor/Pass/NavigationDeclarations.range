@@ -1,0 +1,8 @@
+macro component(): Construct -> Void {}
+
+@component
+construct Header {}
+
+function title(): String {
+    return String("workspace")
+}
