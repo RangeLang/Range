@@ -276,11 +276,18 @@ Outcome:
 The practical sequence from today is:
 
 1. Repair seed integrity and re-establish the accepted fixed point.
-2. Implement automatic destruction so normal String code does not call
+2. Delete the obsolete string-record parser/summary/lowering path after
+   proving that no supported command or fixture consumes it.
+3. Implement automatic destruction so normal String code does not call
    `destroy()`.
-3. Move compiler text builders and LLVM accumulators off direct RawBuffer use.
-4. Begin typed-store migration with declarations and type references.
-5. Delete obsolete dynamic-construct C compatibility.
+4. Move surviving compiler text builders and LLVM accumulators off direct
+   RawBuffer use.
+5. Extract the retained macro-family representation facts and delete any
+   unconsumed parallel SemanticGraph/MemoryGraph/TypedIR directive pipeline.
+6. Begin typed-store migration with declarations and type references.
+7. Measure derived tables and keep Graph 0 on the ordinary path only when it
+   has a real consumer.
+8. Delete obsolete dynamic-construct C compatibility.
 
 This sequence creates deletion leverage at every step and avoids a rewrite in
 which the same untyped tables and runtime semantics merely receive new names.
