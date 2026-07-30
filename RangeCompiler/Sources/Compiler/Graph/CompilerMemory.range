@@ -283,7 +283,12 @@ function compilerMemoryAppendRepresentationChange(memory: CompilerMemoryGraph, r
 function compilerMemoryBuildMacroFamilyForMember(tables: CompilerSyntaxTables, memory: CompilerMemoryGraph, memberRow: Int, name: String): Int {
     let macroDeclarationRow: Int(compilerMemoryMacroDeclarationForFamilyName(tables: tables, name: name))
     let memberKind: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 12))
-    if macroDeclarationRow < 0 || (memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState()) {
+    if macroDeclarationRow < 0 {
+        if compilerMacroTargetAtomMask(text: "@\(name)") > 0 { return 0 }
+        compilerMemoryGraphPoison(memory: memory)
+        return 0 - 1
+    }
+    if memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState() {
         compilerMemoryGraphPoison(memory: memory)
         return 0 - 1
     }

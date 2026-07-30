@@ -584,6 +584,114 @@ check_graph_capabilities() {
     echo "Macros graph-capabilities: pass"
 }
 
+write_command_group_bundle() {
+    local output="$1"
+    local header="$2"
+    local fixture="$3"
+
+    : > "$output"
+    if [[ -n "$header" ]]; then
+        /usr/bin/printf '%s\n' "$header" >> "$output"
+    fi
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro/CommandReflection.range' \
+        '@builtin' \
+        'construct Array<Element> {}' \
+        '' \
+        'macro member(): Declaration | Member -> Void {}' \
+        'macro syntax(): Declaration -> Void {}' \
+        '' \
+        'construct Identifier {' \
+        '    let name: String' \
+        '}' \
+        '' \
+        'construct Construct {' \
+        '    @member' \
+        '    construct Declaration {' \
+        '        let identifier: Identifier' \
+        '        let members: [@member]' \
+        '    }' \
+        '}' \
+        '' \
+        'construct Function {' \
+        '    @syntax' \
+        '    @member' \
+        '    construct Declaration {' \
+        '        let identifier: Identifier' \
+        '    }' \
+        '}' >> "$output"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/CommandGroup.range' >> "$output"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/CommandGroup.range" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "${fixture#"$REPO_ROOT/"}" >> "$output"
+    /bin/cat "$fixture" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+}
+
+check_command_group() {
+    local pass_fixture="$REPO_ROOT/Testing/CommandLine/Pass/Routes.range"
+    local fail_fixture="$REPO_ROOT/Testing/CommandLine/Fail/EmptyCommandGroup.range"
+    local snapshot_bundle="$WORK_ROOT/command-group.snapshot.range"
+    local snapshot_output="$WORK_ROOT/command-group.snapshot.out"
+    local snapshot_error="$WORK_ROOT/command-group.snapshot.err"
+    local native_bundle="$WORK_ROOT/command-group.native.range"
+    local native_llvm="$WORK_ROOT/command-group.native.ll"
+    local native_error="$WORK_ROOT/command-group.native.err"
+    local native_executable="$WORK_ROOT/command-group.native"
+    local run_output="$WORK_ROOT/command-group.run.out"
+    local run_error="$WORK_ROOT/command-group.run.err"
+    local fail_bundle="$WORK_ROOT/command-group.empty.range"
+    local fail_output="$WORK_ROOT/command-group.empty.out"
+    local fail_error="$WORK_ROOT/command-group.empty.err"
+    local actual_status
+
+    write_command_group_bundle "$snapshot_bundle" compilerMacroSnapshot "$pass_fixture"
+    "$STAGE2_EXECUTABLE" compile "$snapshot_bundle" > "$snapshot_output" 2> "$snapshot_error" \
+        || fail "@commandGroup snapshot did not compile"
+    [[ ! -s "$snapshot_error" ]] || fail "@commandGroup snapshot wrote stderr"
+    /usr/bin/grep -E -q $'macroGraphGeneratedEnum\trow=[0-9]+\tkind=enum\townerSyntaxID=[0-9]+.*\tname=Command\t' "$snapshot_output" \
+        || fail "@commandGroup snapshot omitted its target-owned Command enum"
+    /usr/bin/grep -E -q $'macroGraphGeneratedFunction\trow=[0-9]+\tkind=function\townerSyntaxID=[0-9]+.*\tname=runCommandLine\treturnType=Int\t' "$snapshot_output" \
+        || fail "@commandGroup snapshot omitted its target-owned runCommandLine function"
+
+    write_command_group_bundle "$native_bundle" "" "$pass_fixture"
+    "$STAGE2_EXECUTABLE" compile "$native_bundle" > "$native_llvm" 2> "$native_error" \
+        || fail "@commandGroup ordinary program did not emit LLVM"
+    [[ ! -s "$native_error" ]] || fail "@commandGroup ordinary program wrote stderr"
+    validate_llvm "$native_llvm"
+    link_llvm "$native_llvm" "$native_executable"
+    if "$native_executable" render > "$run_output" 2> "$run_error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 64 ]] || fail "@commandGroup generated fallback exited $actual_status instead of 64"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "@commandGroup render route wrote output"
+    if "$native_executable" unknown > "$run_output" 2> "$run_error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 64 ]] || fail "@commandGroup unknown route exited $actual_status instead of 64"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "@commandGroup unknown route wrote output"
+
+    write_command_group_bundle "$fail_bundle" compilerMacroSnapshot "$fail_fixture"
+    if "$STAGE2_EXECUTABLE" compile "$fail_bundle" > "$fail_output" 2> "$fail_error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] || fail "empty @commandGroup exited $actual_status instead of 65"
+    [[ ! -s "$fail_error" ]] || fail "empty @commandGroup rejection wrote stderr"
+    /usr/bin/grep -Fq '@commandGroup requires at least one @command function.' "$fail_output" \
+        || fail "empty @commandGroup omitted its focused diagnostic"
+    if /usr/bin/grep -Fq 'define ' "$fail_output"; then
+        fail "empty @commandGroup emitted LLVM before rejection"
+    fi
+    echo "CommandLine @commandGroup boundary: pass (generated enum/fallback snapshot, linked fallback execution, empty-group rejection)"
+}
+
 check_canonical_member_family() {
     local fixture="$REPO_ROOT/Testing/Members/Pass/CanonicalMemberFamily.range"
     local output="$WORK_ROOT/member-family-canonical.out"
@@ -1143,6 +1251,7 @@ main_root_value() {
     check_codable_composite_atomic_rollback
     check_typed_parameter_defaults
     check_graph_capabilities
+    check_command_group
     check_project_defaults
     check_storage_literals
     check_defaulted_generic_optional

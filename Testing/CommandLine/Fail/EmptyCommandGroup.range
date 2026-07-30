@@ -1,0 +1,7 @@
+@commandGroup
+construct CLI {}
+
+@main {
+    let cli: CLI()
+    return cli.runCommandLine()
+}

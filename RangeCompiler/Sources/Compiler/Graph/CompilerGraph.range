@@ -6,6 +6,7 @@ function compilerGraphGeneratedFunctionColumnCount(): Int { return 25 }
 function compilerGraphGeneratedMemberColumnCount(): Int { return 24 }
 function compilerGraphGeneratedKindFunction(): Int { return 1 }
 function compilerGraphGeneratedKindMember(): Int { return 2 }
+function compilerGraphGeneratedKindEnum(): Int { return 5 }
 function compilerGraphFactOwns(): Int { return 1 }
 function compilerGraphFactAppliesTo(): Int { return 2 }
 function compilerGraphFactOmitted(): Int { return 3 }

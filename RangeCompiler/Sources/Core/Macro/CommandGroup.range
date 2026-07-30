@@ -1,0 +1,26 @@
+macro command(): Function -> Void {}
+
+macro commandGroup(): Construct { environment in
+    let commands: [@command](
+        environment.target.Declaration.members.filter(all: @command)
+    )
+
+    if commands.count == 0 {
+        environment.diagnostics.error("@commandGroup requires at least one @command function.")
+    }
+
+    #environment {
+        extension #environment.target.Declaration.identifier {
+            enum Command {
+                case invalid
+                #commands.map { commandDeclaration in
+                    case #commandDeclaration.identifier
+                }
+            }
+
+            function runCommandLine(): Int {
+                return 64
+            }
+        }
+    }
+}

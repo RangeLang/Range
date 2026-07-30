@@ -1,5 +1,5 @@
 @statement
-@syntax
+@syntax(while $condition $body)
 construct While {
     let condition: Expression
     let body: Block

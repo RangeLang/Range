@@ -187,9 +187,10 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
         compilerSyntaxTablesDestroy(tables: tables)
         return "compilerError\tkind=invalidTextLiteralStorage\treason=\(compilerTextLiteralReasonName(reason: textLiteralFacts.reason))\trelatedRow=\(textLiteralFacts.relatedRow)"
     }
-    if compilerGraphDeltaCommitGeneratedDeclarations(tables: tables, delta: execution.graphDelta) != 0 {
+    let generatedCommitStatus: Int(compilerGraphDeltaCommitGeneratedDeclarations(tables: tables, delta: execution.graphDelta))
+    if generatedCommitStatus != 0 {
         compilerMacroRecordGeneratedFunctionCommitDiagnostic(tables: tables, delta: execution.graphDelta)
-        let commitOutput: String(compilerMacroRenderDiagnostics(tables: tables))
+        let commitOutput: String("\(compilerMacroRenderDiagnostics(tables: tables))macroGeneratedCommit\tstatus=\(generatedCommitStatus)\tpendingFunctionCount=\(compilerIntTableRowCount(table: tables.pendingGeneratedFunctions))\tpendingMemberCount=\(compilerIntTableRowCount(table: tables.pendingGeneratedMembers))\n")
         compilerGraphDeltaDestroy(delta: execution.graphDelta)
         compilerDeclarationIndexDestroy(index: executionIndex)
         compilerSyntaxTablesDestroy(tables: tables)
@@ -298,7 +299,8 @@ function compilerReachableLLVMStateRender(reachability: CompilerReachableLLVMSta
             }
             return "compilerError\tkind=invalidOwnedReturnSummary\tfunctionRow=\(returnFailureFunctionRow)\tfailureKind=\(returnFailureName)\tdetail=\(returnFailureDetail)"
         }
-        if failureStage == 2 || failureStage == 6 || (failureStage >= 6000 && failureStage < 100000) || failureStage >= 400000 {
+        if failureStage == 2 || failureStage == 6 || (failureStage >= 6000 && failureStage < 100000) || failureStage >= 400000
+            || reachability.counters.element(index: compilerReachableLLVMFunctionFailureFunction()) >= 0 {
             let failureFunctionRow: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureFunction()))
             let failureInstanceID: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureInstance()))
             let failureDetail: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureDetail()))

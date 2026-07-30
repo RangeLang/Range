@@ -1,5 +1,5 @@
 @statement
-@syntax
+@syntax(switch $expression $cases)
 construct Switch {
     let expression: Expression
     let cases: [SwitchCase]

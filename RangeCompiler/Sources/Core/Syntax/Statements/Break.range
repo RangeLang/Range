@@ -1,4 +1,4 @@
 @statement
-@syntax
+@syntax(break)
 construct Break {
 }

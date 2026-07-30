@@ -1,4 +1,4 @@
-@syntax
+@syntax(case $pattern $body)
 construct SwitchCase {
     let pattern: Expression
     let body: Block

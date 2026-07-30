@@ -1938,6 +1938,22 @@ function compilerBodyArenaBuildBindingAliasTopologyForConstruct(arena: CompilerB
     return 0
 }
 
+function compilerBodyArenaNodeHasScheduledEvaluation(arena: CompilerBodyArena, nodeID: Int): Bool {
+    state scheduleRow: Int(0)
+    while scheduleRow < compilerIntTableRowCount(table: arena.cfgSchedule) {
+        if compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleNodeColumn()) == nodeID
+            && compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleActionColumn()) == compilerBodyCFGScheduleEvaluateNode() { return true }
+        scheduleRow: scheduleRow + 1
+    }
+    return false
+}
+
+function compilerBodyArenaApplicationHasResolvedCallee(arena: CompilerBodyArena, applicationNodeID: Int): Bool {
+    let calleeNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: applicationNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0))
+    return calleeNodeID >= 0
+        && compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: calleeNodeID) >= 0
+}
+
 function compilerBodyArenaBuildOwnedPathTables(arena: CompilerBodyArena): Int {
     if compilerIntTableRowCount(table: arena.ownedPaths) != 0 || compilerIntTableRowCount(table: arena.runtimeCallContracts) != 0 { return 0 }
     state symbolRow: Int(0)
@@ -1952,8 +1968,24 @@ function compilerBodyArenaBuildOwnedPathTables(arena: CompilerBodyArena): Int {
                 if compilerBodyOwnedPathAppend(paths: arena.ownedPaths, rootKind: compilerBodyOwnedPathRootSymbol(), rootID: symbolRow, parentPathID: 0 - 1, memberRow: 0 - 1, typeID: symbolTypeID, policy: compilerBodyOwnedPathPolicyBorrowed()) < 0 { return 0 - 1 }
             }
             let symbolIsBorrowedAggregate: Bool(symbolKind == compilerBodySymbolParameter() || symbolKind == compilerBodySymbolReceiver())
+            let declarationNodeID: Int(compilerIntTableValue(table: arena.symbols, row: symbolRow, column: compilerBodySymbolDeclarationColumn()))
+            let initializerNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: declarationNodeID, role: compilerSyntaxRoleInitializer(), ordinal: 0))
+            let initializerIsNonOwningStringView: Bool(
+                initializerNodeID >= 0
+                    && compilerBodyArenaValueIsNonOwningStringView(arena: arena, valueNodeID: initializerNodeID)
+            )
+            let initializerIsSyntaxQueryProjection: Bool(
+                initializerNodeID >= 0
+                    && compilerBodyArenaValueIsDerivedSyntaxQueryProjection(arena: arena, valueNodeID: initializerNodeID)
+            )
+            let symbolNeedsTrackedStorage: Bool(
+                symbolIsBorrowedAggregate
+                    || (initializerNodeID >= 0
+                        && !initializerIsNonOwningStringView
+                        && !initializerIsSyntaxQueryProjection)
+            )
             state symbolTrackedStatus: Int(0)
-            if symbolTypeID >= 0 && !symbolIsOpaqueStorage {
+            if symbolTypeID >= 0 && !symbolIsOpaqueStorage && symbolNeedsTrackedStorage {
                 symbolTrackedStatus: compilerBodyArenaTypeTrackedStorageStatus(arena: arena, typeID: symbolTypeID)
                 if symbolTrackedStatus < 0 { return 0 - 1 }
             }
@@ -1962,20 +1994,7 @@ function compilerBodyArenaBuildOwnedPathTables(arena: CompilerBodyArena): Int {
                     || compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: symbolTypeID) == compilerBodyTypeString())
                 && !symbolIsOpaqueStorage
                 && symbolTrackedStatus == 1 {
-                let declarationNodeID: Int(compilerIntTableValue(table: arena.symbols, row: symbolRow, column: compilerBodySymbolDeclarationColumn()))
-                let initializerNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: declarationNodeID, role: compilerSyntaxRoleInitializer(), ordinal: 0))
-                let initializerIsNonOwningStringView: Bool(
-                    initializerNodeID >= 0
-                        && compilerBodyArenaValueIsNonOwningStringView(arena: arena, valueNodeID: initializerNodeID)
-                )
-                let initializerIsSyntaxQueryProjection: Bool(
-                    initializerNodeID >= 0
-                        && compilerBodyArenaValueIsDerivedSyntaxQueryProjection(arena: arena, valueNodeID: initializerNodeID)
-                )
-                if symbolIsBorrowedAggregate
-                    || (initializerNodeID >= 0
-                        && !initializerIsNonOwningStringView
-                        && !initializerIsSyntaxQueryProjection) {
+                if symbolNeedsTrackedStorage {
                     let rootPolicy: Int(compilerBodyOwnedPathPolicyForBorrowed(borrowed: symbolIsBorrowedAggregate))
                     let rootPathID: Int(compilerBodyOwnedPathAppend(paths: arena.ownedPaths, rootKind: compilerBodyOwnedPathRootSymbol(), rootID: symbolRow, parentPathID: 0 - 1, memberRow: 0 - 1, typeID: symbolTypeID, policy: rootPolicy))
                     if rootPathID < 0 { return 0 - 1 }
@@ -1997,7 +2016,9 @@ function compilerBodyArenaBuildOwnedPathTables(arena: CompilerBodyArena): Int {
     }
     state applicationNodeID: Int(0)
     while applicationNodeID < compilerIntTableRowCount(table: arena.nodes) {
-        if compilerIntTableValue(table: arena.nodes, row: applicationNodeID, column: 1) == compilerSyntaxKindApplication() {
+        if compilerIntTableValue(table: arena.nodes, row: applicationNodeID, column: 1) == compilerSyntaxKindApplication()
+            && compilerBodyArenaNodeHasScheduledEvaluation(arena: arena, nodeID: applicationNodeID)
+            && compilerBodyArenaApplicationHasResolvedCallee(arena: arena, applicationNodeID: applicationNodeID) {
             let applicationCalleeNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: applicationNodeID, role: compilerSyntaxRoleCallee(), ordinal: 0))
             let applicationResolutionRow: Int(compilerBodyArenaResolutionForSource(arena: arena, sourceNodeID: applicationCalleeNodeID))
             if applicationCalleeNodeID < 0 || applicationResolutionRow < 0 { return 0 - 1 }
@@ -2037,7 +2058,8 @@ function compilerBodyArenaBuildOwnedPathTables(arena: CompilerBodyArena): Int {
     }
     state coalescingNodeID: Int(0)
     while coalescingNodeID < compilerIntTableRowCount(table: arena.nodes) {
-        if compilerIntTableValue(table: arena.nodes, row: coalescingNodeID, column: 1) == compilerSyntaxKindOptionalCoalescing() {
+        if compilerIntTableValue(table: arena.nodes, row: coalescingNodeID, column: 1) == compilerSyntaxKindOptionalCoalescing()
+            && compilerBodyArenaNodeHasScheduledEvaluation(arena: arena, nodeID: coalescingNodeID) {
             let resultTypeID: Int(compilerBodyArenaExpressionTypeID(arena: arena, nodeID: coalescingNodeID))
             let resultTrackedStatus: Int(compilerBodyArenaTypeTrackedStorageStatus(arena: arena, typeID: resultTypeID))
             if resultTypeID < 0 || resultTrackedStatus < 0 { return 0 - 1 }
@@ -2052,6 +2074,8 @@ function compilerBodyArenaBuildOwnedPathTables(arena: CompilerBodyArena): Int {
     applicationNodeID: 0
     while applicationNodeID < compilerIntTableRowCount(table: arena.nodes) {
         if compilerIntTableValue(table: arena.nodes, row: applicationNodeID, column: 1) == compilerSyntaxKindApplication()
+            && compilerBodyArenaNodeHasScheduledEvaluation(arena: arena, nodeID: applicationNodeID)
+            && compilerBodyArenaApplicationHasResolvedCallee(arena: arena, applicationNodeID: applicationNodeID)
             && compilerBodyArenaBuildBindingAliasTopologyForConstruct(arena: arena, applicationNodeID: applicationNodeID) != 0 { return 0 - 1 }
         applicationNodeID: applicationNodeID + 1
     }
