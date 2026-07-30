@@ -3,6 +3,7 @@ import {
   contrastRatio,
   measurePostContrast,
 } from "../src/lib/post-contrast";
+import { posts } from "../src/lib/posts";
 
 const solidPixels = (
   width: number,
@@ -30,6 +31,15 @@ const parseRgb = (value: string) => {
 };
 
 describe("post card contrast", () => {
+  test("stores an accessible palette for every runtime card", () => {
+    for (const post of posts) {
+      expect(post.cardPalette.contrast).toBeGreaterThanOrEqual(4.5);
+      expect(post.cardPalette.foreground).toMatch(/^rgb\(/);
+      expect(post.cardPalette.mutedForeground).toMatch(/^rgb\(/);
+      expect(post.cardPalette.background).toMatch(/^rgb\(/);
+    }
+  });
+
   test("selects a dark complementary foreground for a bright pink field", () => {
     const measured = measurePostContrast(
       solidPixels(16, 10, 196, 89, 166),

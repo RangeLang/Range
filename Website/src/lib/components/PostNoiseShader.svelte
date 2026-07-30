@@ -7,16 +7,36 @@
 
   let {
     palette = 0,
+    palettes = [],
     still = false,
+    active = true,
+    maxFps = 60,
+    densityLimit = 2,
+    measure = true,
+    shared = false,
     oncontrast,
   }: {
     palette?: number;
+    palettes?: number[];
     still?: boolean;
+    active?: boolean;
+    maxFps?: number;
+    densityLimit?: number;
+    measure?: boolean;
+    shared?: boolean;
     oncontrast?: (palette: PostContrastPalette) => void;
   } = $props();
 
   let canvas: HTMLCanvasElement;
+  let requestRender = $state<() => void>(() => {});
   let paletteHue = $derived((22 + palette * 137.507764) % 360);
+
+  $effect(() => {
+    palette;
+    active;
+    still;
+    requestRender();
+  });
 
   const vertexSource = `
     attribute vec2 a_position;
@@ -30,8 +50,14 @@
     precision highp float;
 
     uniform vec2 u_resolution;
+    uniform vec2 u_origin;
     uniform float u_time;
     uniform float u_palette;
+    uniform float u_corner_radius;
+    uniform float u_shared;
+    uniform float u_card_count;
+    uniform vec4 u_card_rects[8];
+    uniform float u_card_palettes[8];
 
     float hash(vec2 point) {
       point = fract(point * vec2(123.34, 456.21));
@@ -99,30 +125,62 @@
     }
 
     void main() {
-      vec2 uv = gl_FragCoord.xy / u_resolution.xy;
-      float aspect = u_resolution.x / max(u_resolution.y, 1.0);
-      vec2 field = vec2(uv.x * aspect, uv.y);
+      vec2 localOrigin = u_origin;
+      vec2 localResolution = u_resolution;
+      float localPalette = u_palette;
+      float localCornerRadius = u_corner_radius;
+
+      if (u_shared > 0.5) {
+        bool insideCard = false;
+        for (int cardIndex = 0; cardIndex < 8; cardIndex += 1) {
+          if (float(cardIndex) < u_card_count) {
+            vec4 cardRect = u_card_rects[cardIndex];
+            bool inside =
+              gl_FragCoord.x >= cardRect.x
+              && gl_FragCoord.x <= cardRect.x + cardRect.z
+              && gl_FragCoord.y >= cardRect.y
+              && gl_FragCoord.y <= cardRect.y + cardRect.w;
+            if (inside) {
+              localOrigin = cardRect.xy;
+              localResolution = cardRect.zw;
+              localPalette = u_card_palettes[cardIndex];
+              localCornerRadius = 16.0;
+              insideCard = true;
+            }
+          }
+        }
+        if (!insideCard) discard;
+      }
+
+      vec2 fragmentPoint = gl_FragCoord.xy - localOrigin;
+      vec2 halfSize = localResolution * 0.5;
+      vec2 roundedOffset =
+        abs(fragmentPoint - halfSize)
+        - (halfSize - vec2(localCornerRadius));
+      float roundedDistance =
+        length(max(roundedOffset, 0.0))
+        + min(max(roundedOffset.x, roundedOffset.y), 0.0)
+        - localCornerRadius;
+      if (roundedDistance > 0.0) discard;
+
+      vec2 cardUv = fragmentPoint / localResolution.xy;
+      // Keep every procedural layer on one strip-wide coordinate plane.
+      // A non-shared shader retains its original card-local coordinates.
+      vec2 surfacePoint =
+        u_shared > 0.5
+          ? gl_FragCoord.xy
+          : fragmentPoint;
+      vec2 field =
+        surfacePoint / max(localResolution.y, 1.0);
       float time = u_time;
 
-      float palettePhase = fract(u_palette * 0.61803398875);
-      float paletteAngle = palettePhase * 6.28318530718;
-      float cloudScale = mix(0.58, 0.84, palettePhase);
-      vec2 flowDirection = vec2(
-        cos(paletteAngle),
-        sin(paletteAngle)
-      ) * 0.052;
-      vec2 paletteOrigin = vec2(
-        hash(vec2(u_palette + 1.7, 4.1)),
-        hash(vec2(8.3, u_palette + 2.9))
-      ) * 18.0;
+      float cloudScale = 0.72;
+      vec2 flowDirection = vec2(0.0406, 0.0322);
+      vec2 animationOrigin = vec2(7.4, 12.6);
       vec2 largeFlow = flowDirection * time;
       vec2 cloudField =
-        field * cloudScale + paletteOrigin;
-      float warpStrength = mix(
-        0.74,
-        1.22,
-        hash(vec2(u_palette + 5.3, 9.7))
-      );
+        field * cloudScale + animationOrigin;
+      float warpStrength = 0.98;
       float horizontalWarp = fbm(
         cloudField * 0.72 - largeFlow * 0.36 + vec2(3.1, 8.2)
       );
@@ -136,12 +194,12 @@
           + cloudWarp * warpStrength
       );
       float folding = fbm(
-        cloudField * mix(1.08, 1.5, palettePhase)
+        cloudField * 1.29
           - largeFlow * 0.5
           + vec2(hills * 1.3, -hills * 0.8)
       );
       float fineClouds = fbm(
-        cloudField * mix(2.45, 3.1, palettePhase)
+        cloudField * 2.78
           + largeFlow * 0.18
           + cloudWarp * 0.32
           + vec2(17.2, -9.4)
@@ -156,7 +214,7 @@
       float ridge = 1.0 - abs(fineClouds * 2.0 - 1.0);
       ridge = smoothstep(0.58, 0.94, ridge) * (0.35 + folding * 0.65);
 
-      float baseHue = 22.0 + u_palette * 137.507764;
+      float baseHue = 22.0 + localPalette * 137.507764;
       float hue = baseHue + mix(-38.0, 54.0, mapped) + ridge * 12.0;
       float lightness = mix(0.61, 0.89, mapped) + ridge * 0.025;
       float chroma =
@@ -172,10 +230,14 @@
 
       color = (color - 0.5) * 1.075 + 0.5;
 
-      float edgeShade = 1.0 - smoothstep(0.15, 0.82, distance(uv, vec2(0.5)));
+      float edgeShade =
+        1.0
+        - smoothstep(0.15, 0.82, distance(cardUv, vec2(0.5)));
       color *= 0.94 + edgeShade * 0.06;
 
-      vec2 grainCell = floor(gl_FragCoord.xy * 0.5);
+      // Preserve the original two-device-pixel grain size while letting a
+      // grain fleck continue naturally through neighboring card cutouts.
+      vec2 grainCell = floor(surfacePoint * 0.5);
       float grainFrame = floor(time * 8.0);
       vec3 grain = vec3(
         hash(grainCell + grainFrame * 17.0),
@@ -208,7 +270,7 @@
 
   onMount(() => {
     const context = canvas.getContext("webgl", {
-      alpha: false,
+      alpha: shared,
       antialias: false,
       powerPreference: "high-performance",
     });
@@ -239,25 +301,57 @@
 
     const positionLocation = context.getAttribLocation(program, "a_position");
     const resolutionLocation = context.getUniformLocation(program, "u_resolution");
+    const originLocation = context.getUniformLocation(program, "u_origin");
     const timeLocation = context.getUniformLocation(program, "u_time");
     const paletteLocation = context.getUniformLocation(program, "u_palette");
+    const cornerRadiusLocation = context.getUniformLocation(
+      program,
+      "u_corner_radius",
+    );
+    const sharedLocation = context.getUniformLocation(program, "u_shared");
+    const cardCountLocation = context.getUniformLocation(
+      program,
+      "u_card_count",
+    );
+    const cardRectsLocation = context.getUniformLocation(
+      program,
+      "u_card_rects[0]",
+    );
+    const cardPalettesLocation = context.getUniformLocation(
+      program,
+      "u_card_palettes[0]",
+    );
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sampleFramebuffer = context.createFramebuffer();
-    const sampleTexture = context.createTexture();
+    const sampleFramebuffer = measure ? context.createFramebuffer() : null;
+    const sampleTexture = measure ? context.createTexture() : null;
     let frame = 0;
     let start = performance.now();
+    let lastDraw = -Infinity;
     let lastMeasurement = -Infinity;
     let sampleWidth = 0;
     let sampleHeight = 0;
+    let intersecting = false;
+    let renderedFrames = 0;
 
     const resize = () => {
-      const density = Math.min(window.devicePixelRatio || 1, 2);
-      const width = Math.max(1, Math.round(canvas.clientWidth * density));
-      const height = Math.max(1, Math.round(canvas.clientHeight * density));
+      const density = Math.min(
+        window.devicePixelRatio || 1,
+        Math.max(1, densityLimit),
+      );
+      const parent = shared ? canvas.parentElement : null;
+      const cssWidth = parent?.scrollWidth ?? canvas.clientWidth;
+      const cssHeight = parent?.scrollHeight ?? canvas.clientHeight;
+      if (shared) {
+        canvas.style.width = `${cssWidth}px`;
+        canvas.style.height = `${cssHeight}px`;
+      }
+      const width = Math.max(1, Math.round(cssWidth * density));
+      const height = Math.max(1, Math.round(cssHeight * density));
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
         canvas.height = height;
       }
+      return density;
     };
 
     const draw = (
@@ -265,6 +359,10 @@
       height: number,
       time: number,
       framebuffer: WebGLFramebuffer | null,
+      paletteValue = palette,
+      originX = 0,
+      originY = 0,
+      cornerRadius = 0,
     ) => {
       context.bindFramebuffer(context.FRAMEBUFFER, framebuffer);
       context.viewport(0, 0, width, height);
@@ -273,9 +371,72 @@
       context.enableVertexAttribArray(positionLocation);
       context.vertexAttribPointer(positionLocation, 2, context.FLOAT, false, 0, 0);
       context.uniform2f(resolutionLocation, width, height);
+      context.uniform2f(originLocation, originX, originY);
+      context.uniform1f(timeLocation, time);
+      context.uniform1f(paletteLocation, paletteValue);
+      context.uniform1f(cornerRadiusLocation, cornerRadius);
+      context.uniform1f(sharedLocation, 0);
+      context.drawArrays(context.TRIANGLES, 0, 6);
+    };
+
+    const drawSharedCards = (time: number, density: number) => {
+      const parent = canvas.parentElement;
+      if (!parent) return;
+      const cards = Array.from(
+        parent.querySelectorAll<HTMLElement>(".latestPost"),
+      );
+      context.bindFramebuffer(context.FRAMEBUFFER, null);
+      context.viewport(0, 0, canvas.width, canvas.height);
+      context.clearColor(0, 0, 0, 0);
+      context.clear(context.COLOR_BUFFER_BIT);
+      let drawnCards = 0;
+      const cardRects = new Float32Array(8 * 4);
+      const cardPalettes = new Float32Array(8);
+
+      for (let index = 0; index < cards.length; index += 1) {
+        const card = cards[index];
+        if (!card) continue;
+        const visibleRect = card.getBoundingClientRect();
+        if (
+          visibleRect.bottom <= 0 ||
+          visibleRect.top >= window.innerHeight ||
+          visibleRect.right <= 0 ||
+          visibleRect.left >= window.innerWidth
+        ) {
+          continue;
+        }
+
+        const x = Math.round(card.offsetLeft * density);
+        const width = Math.max(1, Math.round(card.offsetWidth * density));
+        const height = Math.max(1, Math.round(card.offsetHeight * density));
+        const y = canvas.height
+          - Math.round((card.offsetTop + card.offsetHeight) * density);
+        const rectOffset = drawnCards * 4;
+        cardRects[rectOffset] = x;
+        cardRects[rectOffset + 1] = y;
+        cardRects[rectOffset + 2] = width;
+        cardRects[rectOffset + 3] = height;
+        cardPalettes[drawnCards] = palettes[index] ?? palette;
+        drawnCards += 1;
+      }
+
+      context.useProgram(program);
+      context.bindBuffer(context.ARRAY_BUFFER, positionBuffer);
+      context.enableVertexAttribArray(positionLocation);
+      context.vertexAttribPointer(positionLocation, 2, context.FLOAT, false, 0, 0);
+      context.uniform2f(resolutionLocation, canvas.width, canvas.height);
+      context.uniform2f(originLocation, 0, 0);
       context.uniform1f(timeLocation, time);
       context.uniform1f(paletteLocation, palette);
+      context.uniform1f(cornerRadiusLocation, 0);
+      context.uniform1f(sharedLocation, 1);
+      context.uniform1f(cardCountLocation, drawnCards);
+      context.uniform4fv(cardRectsLocation, cardRects);
+      context.uniform1fv(cardPalettesLocation, cardPalettes);
       context.drawArrays(context.TRIANGLES, 0, 6);
+
+      canvas.dataset.drawnCards = String(drawnCards);
+      if (drawnCards > 0) parent.dataset.shaderRendered = "";
     };
 
     const measureContrast = (time: number) => {
@@ -346,38 +507,86 @@
     };
 
     const render = (now: number) => {
-      resize();
-      const time = still || reducedMotion.matches ? 0 : (now - start) / 1000;
-      draw(canvas.width, canvas.height, time, null);
+      frame = 0;
+      if (!intersecting || document.hidden) return;
 
-      if (now - lastMeasurement >= 125) {
+      const shouldAnimate = !still && active && !reducedMotion.matches;
+      const frameInterval = 1000 / Math.max(1, maxFps);
+      if (shouldAnimate && now - lastDraw < frameInterval) {
+        frame = window.requestAnimationFrame(render);
+        return;
+      }
+
+      const density = resize();
+      const time = still || reducedMotion.matches ? 0 : (now - start) / 1000;
+      if (shared) drawSharedCards(time, density);
+      else draw(canvas.width, canvas.height, time, null);
+
+      if (measure && lastMeasurement === -Infinity) {
         measureContrast(time);
         lastMeasurement = now;
         context.bindFramebuffer(context.FRAMEBUFFER, null);
       }
       canvas.dataset.rendered = "true";
+      renderedFrames += 1;
+      canvas.dataset.frameCount = String(renderedFrames);
+      lastDraw = now;
 
-      if (!still && !reducedMotion.matches) {
+      if (shouldAnimate) {
         frame = window.requestAnimationFrame(render);
       }
     };
 
-    const restart = () => {
-      if (frame) window.cancelAnimationFrame(frame);
+    const cancelFrame = () => {
+      if (!frame) return;
+      window.cancelAnimationFrame(frame);
       frame = 0;
-      start = performance.now();
+    };
+
+    const scheduleRender = () => {
+      if (frame || !intersecting || document.hidden) return;
       frame = window.requestAnimationFrame(render);
     };
 
-    const observer = new ResizeObserver(restart);
-    observer.observe(canvas);
+    const restart = () => {
+      cancelFrame();
+      start = performance.now();
+      lastDraw = -Infinity;
+      scheduleRender();
+    };
+
+    const resizeObserver = new ResizeObserver(scheduleRender);
+    const intersectionObserver = new IntersectionObserver(([entry]) => {
+      intersecting = entry?.isIntersecting ?? false;
+      if (intersecting) scheduleRender();
+      else cancelFrame();
+    });
+    const handleVisibilityChange = () => {
+      if (document.hidden) cancelFrame();
+      else restart();
+    };
+    const scrollContainer = shared ? canvas.parentElement : null;
+
+    resizeObserver.observe(canvas);
+    intersectionObserver.observe(canvas);
     reducedMotion.addEventListener("change", restart);
-    frame = window.requestAnimationFrame(render);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    scrollContainer?.addEventListener("scroll", scheduleRender, {
+      passive: true,
+    });
+    requestRender = scheduleRender;
 
     return () => {
-      if (frame) window.cancelAnimationFrame(frame);
-      observer.disconnect();
+      cancelFrame();
+      requestRender = () => {};
+      resizeObserver.disconnect();
+      intersectionObserver.disconnect();
       reducedMotion.removeEventListener("change", restart);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      scrollContainer?.removeEventListener("scroll", scheduleRender);
+      if (shared && canvas.parentElement) {
+        delete canvas.parentElement.dataset.shaderRendered;
+      }
       context.deleteFramebuffer(sampleFramebuffer);
       context.deleteTexture(sampleTexture);
       context.deleteBuffer(positionBuffer);
@@ -390,8 +599,10 @@
 
 <canvas
   class="postShader"
+  class:latestPostShader={shared}
   aria-hidden="true"
   data-palette={palette}
+  data-active={active ? "" : undefined}
   style={`--palette-hue: ${paletteHue}`}
   bind:this={canvas}
 ></canvas>
@@ -402,5 +613,9 @@
     height: 100%;
     display: block;
     background: oklch(0.8 0.16 var(--palette-hue));
+  }
+
+  .postShader.latestPostShader {
+    background: transparent;
   }
 </style>

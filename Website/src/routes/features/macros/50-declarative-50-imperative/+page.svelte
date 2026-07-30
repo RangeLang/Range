@@ -66,7 +66,7 @@
 
 <EssayPage
   title="50% Declarative, 50% Imperative"
-  description="Describe the environment you want, then use ordinary macro code when getting there needs computation."
+  description="Two modes of execution. Same baseline."
   category="Language design"
   date="July 29, 2026"
 >

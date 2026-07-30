@@ -24,6 +24,8 @@ and typed title transition in the browser. Drizzle is available through
 `db/index.ts` when persistent data is needed; the benchmark pages use the
 versioned JSON artifact directly.
 
+Editorial copy follows [`STYLEGUIDE.md`](STYLEGUIDE.md).
+
 ## Benchmark data
 
 The repository benchmark runner at `../Benchmarks/Speed/run.py` writes the

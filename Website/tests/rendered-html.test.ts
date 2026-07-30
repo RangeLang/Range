@@ -72,14 +72,19 @@ describe("SvelteKit routes", () => {
     expect(html).toContain('href="/features/macros/codability-under-100"');
     expect(html).toContain('href="/features/macros/50-declarative-50-imperative"');
     expect(html).toContain('href="/features/macros/somewhere-sometime-some-here"');
+    expect(html).not.toContain('href="/updates/range-has-a-dual-shape"');
     expect(html).toContain("Latest posts");
+    expect(html).not.toContain("Range Has a Dual Shape");
     expect(html).toContain("50% Declarative, 50% Imperative");
     expect(html).toContain("Somewhere, Sometime, Some-here");
     expect(html).toContain("Codability under 100");
-    expect(html).toContain('class="postShader');
-    const postPalettes = html.match(/data-palette="[0-3]"/g) ?? [];
-    expect(postPalettes).toHaveLength(4);
-    expect(new Set(postPalettes).size).toBe(4);
+    expect(html).toContain("latestPostShader");
+    expect(html).toContain('class="latestPostCursor"');
+    expect(html).toContain('data-active-post="0"');
+    expect(html).not.toContain("data-range-focus-ring");
+    const postPalettes = html.match(/data-post-palette="\d+"/g) ?? [];
+    expect(postPalettes).toHaveLength(posts.length);
+    expect(new Set(postPalettes).size).toBe(posts.length);
     expect(html).not.toContain('variant="codability"');
     expect(html).not.toContain('variant="string"');
     expect(html).not.toContain("source() →");
@@ -167,6 +172,14 @@ describe("SvelteKit routes", () => {
     );
     expect(html).toContain("Not expand. Environment.");
     expect(html).not.toContain("environment.expand");
+  });
+
+  test("keeps the Range dual-shape observation hidden", async () => {
+    const response = await render("/updates/range-has-a-dual-shape");
+    const html = await response.text();
+
+    expect(response.status).toBe(404);
+    expect(html).not.toContain("Range Has a Dual Shape");
   });
 
   test("renders and filters the benchmark hierarchy", async () => {
@@ -277,6 +290,7 @@ describe("SvelteKit routes", () => {
       expect(cardHtml).toContain(post.cardTitle);
       expect(cardHtml).toContain(post.cardDescription);
       expect(cardHtml).toContain(`data-palette="${post.palette}"`);
+      expect(cardHtml).not.toContain("latestPostCursor");
     }
   });
 });
@@ -293,6 +307,84 @@ test("keeps every post social image generated at 1200 by 630", async () => {
     expect(bytes.readUInt32BE(16)).toBe(1200);
     expect(bytes.readUInt32BE(20)).toBe(630);
   }
+});
+
+test("jumps one post cursor between exact card-sized positions", async () => {
+  const [home, globals] = await Promise.all([
+    readFile(new URL("../src/routes/+page.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  expect(home).toContain('<span class="latestPostCursor" aria-hidden="true"></span>');
+  expect(globals).toContain("--latest-post-cursor-x: calc(100% + 16px);");
+  expect(globals).toContain("--latest-post-cursor-y: calc(100% + 16px);");
+  expect(globals).toContain("--latest-post-cursor-x: calc(200% + 32px);");
+  expect(globals).toContain("--latest-post-cursor-x: calc(300% + 48px);");
+  expect(globals).toContain("--latest-post-cursor-x: calc(400% + 64px);");
+  const cursorRule = globals.match(/\.latestPostCursor \{([\s\S]*?)\n\}/)?.[1];
+  expect(cursorRule).toBeDefined();
+  expect(cursorRule).not.toContain("transition");
+  expect(cursorRule).not.toContain("will-change");
+  expect(globals).not.toContain(
+    "--latest-post-cursor-x: calc(var(--latest-post-card-width) + 16px);",
+  );
+});
+
+test("runs one synchronized shader across the visible post cards", async () => {
+  const [home, card, shader] = await Promise.all([
+    readFile(new URL("../src/routes/+page.svelte", import.meta.url), "utf8"),
+    readFile(
+      new URL("../src/lib/components/PostCard.svelte", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/lib/components/PostNoiseShader.svelte", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  expect(home.match(/<PostNoiseShader/g)).toHaveLength(1);
+  expect(home).toContain("palettes={posts.map((post) => post.palette)}");
+  expect(home).toContain("maxFps={30}");
+  expect(home).toContain("densityLimit={1.25}");
+  expect(home).toContain("measure={false}");
+  expect(card).toContain("{#if social}");
+  expect(shader).toContain("new IntersectionObserver");
+  expect(shader).toContain('parent.querySelectorAll<HTMLElement>(".latestPost")');
+  expect(shader).toContain("palettes[index] ?? palette");
+  expect(shader).toContain('parent.dataset.shaderRendered = ""');
+  expect(shader).toContain("uniform vec4 u_card_rects[8]");
+  expect(shader).toContain("context.uniform4fv(cardRectsLocation, cardRects)");
+  expect(shader).toContain("card.offsetLeft * density");
+  expect(shader).toContain("card.offsetTop + card.offsetHeight");
+  expect(shader).toContain("vec2 animationOrigin");
+  expect(shader).not.toContain("paletteOrigin");
+  expect(shader).not.toContain("flowDirection = vec2(" + "\n        cos");
+  expect(shader).toContain("? gl_FragCoord.xy");
+  expect(shader).toContain("surfacePoint / max(localResolution.y, 1.0)");
+  expect(shader).toContain("vec2 grainCell = floor(surfacePoint * 0.5)");
+  expect(shader).toContain("distance(cardUv, vec2(0.5))");
+  expect(shader).toContain('document.addEventListener("visibilitychange"');
+  expect(shader).toContain("1000 / Math.max(1, maxFps)");
+  expect(shader).toContain("lastMeasurement === -Infinity");
+  expect(shader).not.toContain("now - lastMeasurement >= 125");
+});
+
+test("gives post copy a broad softly fading radial backing", async () => {
+  const [globals, card] = await Promise.all([
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(
+      new URL("../src/lib/components/PostCard.svelte", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  expect(globals).toContain("padding: 104px 24px 24px;");
+  expect(globals).toContain("ellipse 110% 150% at 50% 135%");
+  expect(globals).toContain("oklch(1 0 0 / 0.11) 66%");
+  expect(globals).toContain("transparent 90%");
+  expect(card).toContain("padding: 240px 72px 116px;");
+  expect(card).toContain("oklch(1 0 0 / 0.12) 66%");
 });
 
 test("keeps the generated benchmark artifact complete and versioned", async () => {

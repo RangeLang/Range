@@ -521,28 +521,97 @@ range-spline-nav a:focus-visible {
 }
 
 .latestPostStrip {
+  --latest-post-card-width: calc((100% - 16px) / 2);
+  --latest-post-card-height: clamp(280px, 29vw, 360px);
+  --latest-post-cursor-x: 0px;
+  --latest-post-cursor-y: 0px;
+  position: relative;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
+.latestPostStrip[data-active-post="1"] {
+  --latest-post-cursor-x: calc(100% + 16px);
+}
+
+.latestPostStrip[data-active-post="2"] {
+  --latest-post-cursor-y: calc(100% + 16px);
+}
+
+.latestPostStrip[data-active-post="3"] {
+  --latest-post-cursor-x: calc(100% + 16px);
+  --latest-post-cursor-y: calc(100% + 16px);
+}
+
+.latestPostStrip[data-active-post="4"] {
+  --latest-post-cursor-y: calc(200% + 32px);
+}
+
+.latestPostCursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  width: var(--latest-post-card-width);
+  height: var(--latest-post-card-height);
+  border-radius: 16px;
+  outline: 3px solid var(--range);
+  outline-offset: 5px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(
+    var(--latest-post-cursor-x),
+    var(--latest-post-cursor-y),
+    0
+  );
+}
+
+.latestPostStrip[data-focus-cursor-visible] .latestPostCursor {
+  opacity: 1;
+}
+
+.latestPostShader {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
 .latestPost {
   position: relative;
+  z-index: 2;
   min-width: 0;
   height: clamp(280px, 29vw, 360px);
   display: block;
   overflow: hidden;
-  isolation: isolate;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: var(--paper);
+  background:
+    radial-gradient(
+      circle at 24% 18%,
+      oklch(0.9 0.18 calc(var(--palette-hue) + 52) / 0.86),
+      transparent 58%
+    ),
+    linear-gradient(
+      138deg,
+      oklch(0.74 0.2 var(--palette-hue)),
+      oklch(0.86 0.17 calc(var(--palette-hue) + 142))
+    );
   color: var(--post-foreground, var(--ink));
   text-decoration: none;
 }
 
-.latestPost:hover,
+.latestPostStrip[data-shader-rendered] .latestPost {
+  background: transparent;
+}
+
 .latestPost:focus-visible {
-  border-color: color-mix(in oklch, var(--range), var(--line) 40%);
+  outline: 3px solid var(--range);
+  outline-offset: 5px;
+}
+
+.latestPostStrip[data-focus-cursor-ready] .latestPost:focus-visible {
   outline: none;
 }
 
@@ -555,16 +624,17 @@ range-spline-nav a:focus-visible {
 .postCopy {
   position: absolute;
   inset: auto 0 0;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   align-content: end;
   gap: 6px;
-  padding: 72px 24px 24px;
+  padding: 104px 24px 24px;
   background: radial-gradient(
-    ellipse 92% 118% at 50% 118%,
-    oklch(1 0 0 / 0.52),
-    oklch(1 0 0 / 0.18) 54%,
-    transparent 78%
+    ellipse 110% 150% at 50% 135%,
+    oklch(1 0 0 / 0.66),
+    oklch(1 0 0 / 0.3) 42%,
+    oklch(1 0 0 / 0.11) 66%,
+    transparent 90%
   );
 }
 
@@ -1915,6 +1985,8 @@ footer {
   }
 
   .latestPostStrip {
+    --latest-post-card-width: max(280px, 86vw);
+    --latest-post-cursor-y: 0px;
     grid-auto-columns: minmax(280px, 86vw);
     grid-template-columns: none;
     grid-auto-flow: column;
@@ -1922,6 +1994,25 @@ footer {
     padding-bottom: 8px;
     scroll-snap-type: x mandatory;
     scrollbar-width: thin;
+  }
+
+  .latestPostStrip[data-active-post="1"] {
+    --latest-post-cursor-x: calc(100% + 16px);
+  }
+
+  .latestPostStrip[data-active-post="2"] {
+    --latest-post-cursor-x: calc(200% + 32px);
+    --latest-post-cursor-y: 0px;
+  }
+
+  .latestPostStrip[data-active-post="3"] {
+    --latest-post-cursor-x: calc(300% + 48px);
+    --latest-post-cursor-y: 0px;
+  }
+
+  .latestPostStrip[data-active-post="4"] {
+    --latest-post-cursor-x: calc(400% + 64px);
+    --latest-post-cursor-y: 0px;
   }
 
   .latestPost {

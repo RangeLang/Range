@@ -98,10 +98,19 @@ const oklchToRgb = (lightness: number, chroma: number, hue: number): Rgb => {
 const rgbCss = ({ red, green, blue }: Rgb) =>
   `rgb(${Math.round(red * 255)} ${Math.round(green * 255)} ${Math.round(blue * 255)})`;
 
-const conservativeContrast = (foreground: Rgb, backgrounds: Rgb[]) => {
-  const ratios = backgrounds
-    .map((background) => contrastRatio(foreground, background))
-    .sort((first, second) => first - second);
+const conservativeContrast = (
+  foreground: Rgb,
+  backgroundLuminances: number[],
+  ratios: Float64Array,
+) => {
+  const foregroundLuminance = relativeLuminance(foreground);
+  for (let index = 0; index < backgroundLuminances.length; index += 1) {
+    const backgroundLuminance = backgroundLuminances[index] ?? 0;
+    const lighter = Math.max(foregroundLuminance, backgroundLuminance);
+    const darker = Math.min(foregroundLuminance, backgroundLuminance);
+    ratios[index] = (lighter + 0.05) / (darker + 0.05);
+  }
+  ratios.sort();
   return ratios[Math.floor((ratios.length - 1) * 0.1)] ?? 1;
 };
 
@@ -159,6 +168,8 @@ export function measurePostContrast(
       : ((Math.atan2(averageB, averageA) * 180) / Math.PI + 360) % 360;
   const complementHue = (sourceHue + 180) % 360;
   const candidates: Candidate[] = [];
+  const backgroundLuminances = backgrounds.map(relativeLuminance);
+  const contrastRatios = new Float64Array(backgroundLuminances.length);
 
   for (const requestedChroma of [0.04, 0.07, 0.1, 0.13, 0.16, 0.19]) {
     for (let step = 4; step <= 98; step += 2) {
@@ -172,7 +183,11 @@ export function measurePostContrast(
       candidates.push({
         color,
         css: rgbCss(color),
-        contrast: conservativeContrast(color, backgrounds),
+        contrast: conservativeContrast(
+          color,
+          backgroundLuminances,
+          contrastRatios,
+        ),
         chroma: Math.hypot(actualLab.a, actualLab.b),
         lightness: candidateLightness,
       });

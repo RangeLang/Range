@@ -7,16 +7,27 @@
     post,
     still = false,
     social = false,
+    onhoverchange,
+    onfocuschange,
   }: {
     post: Post;
     still?: boolean;
     social?: boolean;
+    onhoverchange?: (hovered: boolean) => void;
+    onfocuschange?: (focused: boolean) => void;
   } = $props();
 
-  let contrast = $state<PostContrastPalette>();
+  let measuredContrast = $state<PostContrastPalette>();
+  let contrast = $derived(
+    measuredContrast ?? {
+      ...post.cardPalette,
+      complementHue: 0,
+    },
+  );
+  let paletteHue = $derived((22 + post.palette * 137.507764) % 360);
 
   const applyContrast = (measured: PostContrastPalette) => {
-    contrast = measured;
+    measuredContrast = measured;
   };
 </script>
 
@@ -25,11 +36,18 @@
   class:socialPost={social}
   href={post.href}
   aria-label={post.cardTitle}
+  data-post-palette={post.palette}
   data-foreground-contrast={contrast?.contrast.toFixed(2)}
   data-measured-background={contrast?.background}
-  style={`--post-foreground: ${contrast?.foreground ?? "oklch(0.18 0.04 245)"}; --post-foreground-muted: ${contrast?.mutedForeground ?? "oklch(0.38 0.025 245)"}`}
+  style={`--palette-hue: ${paletteHue}; --post-foreground: ${contrast.foreground}; --post-foreground-muted: ${contrast.mutedForeground}`}
+  onpointerenter={() => onhoverchange?.(true)}
+  onpointerleave={() => onhoverchange?.(false)}
+  onfocus={() => onfocuschange?.(true)}
+  onblur={() => onfocuschange?.(false)}
 >
-  <PostNoiseShader palette={post.palette} {still} oncontrast={applyContrast} />
+  {#if social}
+    <PostNoiseShader palette={post.palette} {still} oncontrast={applyContrast} />
+  {/if}
   <span class="postCopy">
     <small>{post.category}</small>
     <strong>{post.cardTitle}</strong>
@@ -57,13 +75,14 @@
   }
 
   .socialPost .postCopy {
-    padding: 180px 72px 116px;
+    padding: 240px 72px 116px;
     gap: 14px;
     background: radial-gradient(
-      ellipse 94% 128% at 50% 118%,
-      oklch(1 0 0 / 0.58),
-      oklch(1 0 0 / 0.2) 56%,
-      transparent 80%
+      ellipse 110% 150% at 50% 135%,
+      oklch(1 0 0 / 0.68),
+      oklch(1 0 0 / 0.32) 42%,
+      oklch(1 0 0 / 0.12) 66%,
+      transparent 90%
     );
   }
 
