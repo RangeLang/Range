@@ -175,11 +175,28 @@ describe("SvelteKit routes", () => {
   });
 
   test("keeps the Range dual-shape observation hidden", async () => {
-    const response = await render("/updates/range-has-a-dual-shape");
+    const [response, draft] = await Promise.all([
+      render("/updates/range-has-a-dual-shape"),
+      readFile(
+        new URL(
+          "../src/routes/updates/range-has-a-dual-shape/+page.svelte",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ]);
     const html = await response.text();
 
     expect(response.status).toBe(404);
     expect(html).not.toContain("Range Has a Dual Shape");
+    expect(draft).toContain("<h2>No language is ever done</h2>");
+    expect(draft).toContain("C is more than fifty years");
+    expect(draft).toContain("It can");
+    expect(draft).toContain("create one.");
+    expect(draft).toContain("becomes an");
+    expect(draft).toContain("expectation across the field.");
+    expect(draft).toContain("a program has two");
+    expect(draft).toContain("shapes: the semantic shape held in the graph");
   });
 
   test("renders and filters the benchmark hierarchy", async () => {
