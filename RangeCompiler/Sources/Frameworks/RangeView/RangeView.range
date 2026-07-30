@@ -1,34 +1,65 @@
-macro inspect(owner: String, requiresBody: Bool): Construct { environment in
-    let bodies: [Derived](
-        environment.target.declaration.members.filter(all: Derived) { property in
-            property.identifier.name == "body"
-        }
-    )
-    let componentBodies: [Derived](
-        bodies.filter { property in
-            property.type.name == "@component"
-        }
-    )
+construct Route {
+    let _ path: String
+    binding _ page: @page?(nil)
+    binding _ children: () -> [Route]
+}
 
-    if requiresBody {
-        if bodies.count != 1 {
-            environment.diagnostics.error("@\(owner) requires exactly one derived body.")
-        }
-    } else if bodies.count > 1 {
-        environment.diagnostics.error("@\(owner) allows at most one derived body.")
+@entry
+@component
+construct VStack {
+    state spacing: Float
+    binding _ children: () -> [@component]
+
+    derived body: [@component] {
+        children()
     }
 
-    if bodies.count == 1 {
-        if componentBodies.count != 1 {
-            environment.diagnostics.error("@\(owner) derived body must be declared @component.")
-        }
+    function emit(): Fragment {
+        return Fragment(
+            html: "<div class=\"range-view-v-stack\" style=\"--range-view-v-stack-spacing: \(spacing)px\">\n",
+            css: ".range-view-v-stack { display: flex; flex-direction: column; gap: var(--range-view-v-stack-spacing); }\n",
+            children: children()
+        )
     }
 }
 
-macro component(element: String("div"), text: String("")): Construct -> Void { environment in
-    @inspect(owner: "component", requiresBody: false)
+
+construct Fragment {
+    let html: String
+    let css: String
+    let children: () -> [@component]
+
+    derived body: [@component] {
+        children()
+    }
 }
 
-macro page(path: String): Construct -> Void { environment in
-    @inspect(owner: "page", requiresBody: true)
+function rangeViewVStackBegin(spacing: Int, html: String, css: String): Int {
+    if html.append(text: "<div class=\"range-view-v-stack\" style=\"--range-view-v-stack-spacing: \(spacing)px\">\n") != 0 {
+        return 1
+    }
+    return css.append(text: ".range-view-v-stack { display: flex; flex-direction: column; gap: var(--range-view-v-stack-spacing); }\n")
+}
+
+function rangeViewVStackEnd(html: String): Int {
+    return html.append(text: "</div>\n")
+}
+
+function rangeViewEmit(
+    path: String,
+    html: String,
+    css: String,
+    javaScript: String
+): Int {
+    let htmlStatus: Int(writeFile(path: "\(path).html", text: html))
+    if htmlStatus != 0 {
+        return htmlStatus
+    }
+
+    let cssStatus: Int(writeFile(path: "\(path).css", text: css))
+    if cssStatus != 0 {
+        return cssStatus
+    }
+
+    return writeFile(path: "\(path).js", text: javaScript)
 }

@@ -1,9 +1,87 @@
-@page(path: "/")
-construct HomePage {
-    derived body: @component {
-        Header()
+@app
+construct Website {
+    let name: String
+
+    derived routes: Route {
+        Route("/") {
+            Route("home", HomePage())
+        }
     }
 }
 
-@component(element: "header", text: "Range")
-construct Header {}
+@component
+construct Header {
+    derived body: [@component] {}
+}
+
+function renderHeader(title: String, html: String): Int {
+    return html.append(text: "<header><h1>\(title)</h1></header>\n")
+}
+
+@page
+construct HomePage {
+    derived body: [@component] {
+        VStack(spacing: 10) {
+            Header()
+        }
+    }
+}
+
+function renderHomePage(name: String, html: String, css: String, javaScript: String): Int {
+    if html.append(text: "<!doctype html>\n<html><head><title>\(name)</title><link rel=stylesheet href=index.css></head><body>\n") != 0 {
+        return 1
+    }
+    if rangeViewVStackBegin(spacing: 16, html: html, css: css) != 0 {
+        return 2
+    }
+    if renderHeader(title: name, html: html) != 0 {
+        return 3
+    }
+    if rangeViewVStackEnd(html: html) != 0 {
+        return 4
+    }
+    if html.append(text: "</body><script src=index.js></script></html>\n") != 0 {
+        return 5
+    }
+    if css.append(text: "body { font-family: system-ui; }\n") != 0 {
+        return 6
+    }
+    return javaScript.append(text: "document.documentElement.dataset.rangeView = 'ready';\n")
+}
+
+function runRangeView(path: String): Int {
+    let name: String("Range")
+    state html: String("")
+    state css: String("")
+    state javaScript: String("")
+
+    let renderStatus: Int(renderHomePage(
+        name: name,
+        html: html,
+        css: css,
+        javaScript: javaScript))
+    if renderStatus != 0 {
+        return renderStatus
+    }
+
+    let emitStatus: Int(rangeViewEmit(
+        path: path,
+        html: html,
+        css: css,
+        javaScript: javaScript))
+
+    html.destroy()
+    css.destroy()
+    javaScript.destroy()
+    return emitStatus
+}
+
+@main {
+    if commandLineArgumentCount() > 1 {
+        return 64
+    }
+    if commandLineArgumentCount() == 1 {
+        return runRangeView(path: commandLineArgument(index: 0))
+    }
+    return runRangeView(path: String("index"))
+}

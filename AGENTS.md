@@ -53,6 +53,20 @@
   collection transforms; each surface needs its own focused fixture and
   supported proof command.
 
+## RangeView
+
+- Treat RangeView as the idealized version of Range. Its source and examples
+  may express the intended language and framework design ahead of what the
+  current compiler can compile.
+- Put every RangeView macro under
+  `RangeCompiler/Sources/Frameworks/RangeView/Macros/`, grouped by concern.
+  `Macros/Core.range` owns the foundational `@app`, `@component`, and `@page`
+  macros; do not duplicate macro declarations in `RangeView.range`.
+- Do not treat a RangeView compilation failure as evidence that its design is
+  invalid. Distinguish idealized RangeView code from compiler-backed language
+  support, and require a focused fixture and supported proof command before
+  claiming that a RangeView capability currently compiles.
+
 ## Deferred Unified Generic Parameters Review
 
 Do not change generic syntax or semantics as part of the current Buffer work.

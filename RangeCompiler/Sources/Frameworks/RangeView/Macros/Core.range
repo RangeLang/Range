@@ -1,0 +1,52 @@
+macro app(): Construct -> Void { environment in
+    let namedRoutes: [Derived](
+        environment.target.Declaration.members.filter(all: Derived) { property in
+            property.identifier.name == "routes"
+        }
+    )
+    let routeTrees: [Derived<Route>](
+        environment.target.Declaration.members.filter(all: Derived<Route>) { property in
+            property.identifier.name == "routes"
+        }
+    )
+
+    if namedRoutes.count == 0 {
+        environment.diagnostics.error("@app requires one derived routes declaration.")
+    }
+    if namedRoutes.count > 1 {
+        environment.diagnostics.error("@app routes declaration must not be duplicated.")
+    }
+    if namedRoutes.count == 1 && routeTrees.count != 1 {
+        environment.diagnostics.error("@app routes must have type Route.")
+    }
+}
+
+
+macro component(): Construct -> Void { environment in
+    @requireBody(owner: "component")
+}
+
+macro page(): Construct -> Void { environment in
+    @requireBody(owner: "page")
+}
+
+
+macro requireBody(owner: String): Construct { environment in
+    let namedBodies: [Derived](
+        environment.target.Declaration.members.filter(all: Derived) { property in
+            property.identifier.name == "body"
+        }
+    )
+    let componentBodies: [Derived<[@component]>](
+        environment.target.Declaration.members.filter(all: Derived<[@component]>) { property in
+            property.identifier.name == "body"
+        }
+    )
+
+    if namedBodies.count != 1 {
+        environment.diagnostics.error("@\(owner) requires exactly one derived body.")
+    }
+    if namedBodies.count == 1 && componentBodies.count != 1 {
+        environment.diagnostics.error("@\(owner) body must have type [@component].")
+    }
+}
