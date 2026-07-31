@@ -1,0 +1,11 @@
+macro capturedTemplate(@capture template: String): Construct -> Bool { environment in
+    return template == "construct $identifier { $members }"
+        && template.count == 34
+        && template.byte(index: 0) == 99
+        && template.byte(index: 10) == 36
+        && template.byte(index: 22) == 123
+        && template.byte(index: 33) == 125
+}
+
+@capturedTemplate {construct $identifier { $members }}
+construct CapturedBodyTarget {}

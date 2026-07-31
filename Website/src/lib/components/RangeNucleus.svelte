@@ -445,6 +445,15 @@
     playIntervalNote();
   }
 
+  async function togglePlayback() {
+    if (looping) {
+      stopPlayback();
+      return;
+    }
+
+    await startPlayback();
+  }
+
   function selectConcept(conceptID: ConceptID) {
     stopPlayback();
     selectedID = conceptID;
@@ -482,14 +491,7 @@
 
 </script>
 
-<section class="rangeSection" aria-labelledby="range-title" bind:this={sectionElement}>
-  <header class="rangeHeader">
-    <h2 id="range-title">Cardinality</h2>
-    <p>
-      Range treats source and compiler as one graph-backed model.
-    </p>
-  </header>
-
+<section class="rangeSection" aria-label="Range sound generator" bind:this={sectionElement}>
   <div class="graphControls">
     <div class="conceptPicker" role="group" aria-label="Range concept">
       {#each conceptIDs as conceptID}
@@ -503,30 +505,24 @@
       {/each}
     </div>
     <div class="pathPlayback">
-      <div class="playbackControls" role="group" aria-label="Interval note playback">
-        <button
-          class="playbackControl"
-          type="button"
-          aria-label="Play interval note"
-          disabled={looping}
-          onclick={startPlayback}
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M4.5 2.75 13 8l-8.5 5.25z"></path>
-          </svg>
-        </button>
-        <button
-          class="playbackControl"
-          type="button"
-          aria-label="Stop interval note"
-          disabled={!looping}
-          onclick={stopPlayback}
-        >
+      <button
+        class="playbackControl"
+        class:playing={looping}
+        type="button"
+        aria-label={looping ? "Stop interval note" : "Play interval note"}
+        aria-pressed={looping}
+        onclick={togglePlayback}
+      >
+        {#if looping}
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <rect x="3.5" y="3.5" width="9" height="9" rx="1"></rect>
           </svg>
-        </button>
-      </div>
+        {:else}
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4.5 2.75 13 8l-8.5 5.25z"></path>
+          </svg>
+        {/if}
+      </button>
     </div>
   </div>
 
@@ -659,31 +655,6 @@
     padding: 72px 0;
   }
 
-  .rangeHeader {
-    display: grid;
-    grid-template-columns: minmax(0, 0.8fr) minmax(280px, 1.2fr);
-    gap: 48px;
-    align-items: start;
-    margin-bottom: 36px;
-  }
-
-  .rangeHeader h2 {
-    margin: 0;
-    font-size: clamp(30px, 5vw, 54px);
-    font-weight: 500;
-    letter-spacing: -0.055em;
-    line-height: 0.95;
-  }
-
-  .rangeHeader p {
-    max-width: 610px;
-    margin: 0;
-    color: var(--muted);
-    font-size: clamp(16px, 2vw, 21px);
-    letter-spacing: -0.02em;
-    line-height: 1.45;
-  }
-
   .conceptPicker {
     width: fit-content;
     max-width: 100%;
@@ -732,11 +703,6 @@
     transform: translateY(-50%);
   }
 
-  .playbackControls {
-    display: flex;
-    gap: 4px;
-  }
-
   .playbackControl {
     display: grid;
     width: 30px;
@@ -745,9 +711,14 @@
     place-items: center;
     border: 0;
     border-radius: 8px;
-    background: var(--range-accent);
-    color: var(--range-accent-ink);
+    background: oklch(0 0 0);
+    color: var(--range);
     cursor: pointer;
+  }
+
+  .playbackControl.playing {
+    background: var(--range);
+    color: oklch(0 0 0);
   }
 
   .playbackControl svg {
@@ -756,14 +727,8 @@
     fill: currentColor;
   }
 
-  .playbackControl:disabled {
-    background: color-mix(in oklch, var(--range-accent) 28%, var(--paper));
-    color: color-mix(in oklch, var(--range-accent-ink) 42%, var(--paper));
-    cursor: default;
-  }
-
   .playbackControl:focus-visible {
-    outline: 2px solid var(--range-accent-ink);
+    outline: 2px solid var(--range);
     outline-offset: 2px;
   }
 
@@ -871,12 +836,6 @@
   @media (max-width: 760px) {
     .rangeSection {
       padding: 52px 0;
-    }
-
-    .rangeHeader {
-      grid-template-columns: 1fr;
-      gap: 18px;
-      margin-bottom: 30px;
     }
 
     .conceptPicker {

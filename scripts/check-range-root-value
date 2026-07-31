@@ -692,6 +692,349 @@ check_command_group() {
     echo "CommandLine @commandGroup boundary: pass (generated enum/fallback snapshot, linked fallback execution, empty-group rejection)"
 }
 
+check_macro_body_capture() {
+    local pass_fixture="$REPO_ROOT/Testing/Macros/Pass/CapturedBodyString.range"
+    local type_fixture="$REPO_ROOT/Testing/Macros/Fail/CapturedBodyRequiresString.range"
+    local body_fixture="$REPO_ROOT/Testing/Macros/Fail/CapturedBodyRequiresBody.range"
+    local pass_bundle="$WORK_ROOT/macro-captured-body.pass.range"
+    local pass_output="$WORK_ROOT/macro-captured-body.pass.out"
+    local type_output="$WORK_ROOT/macro-captured-body.type.out"
+    local body_output="$WORK_ROOT/macro-captured-body.missing.out"
+    local error="$WORK_ROOT/macro-captured-body.err"
+    local actual_status
+
+    /usr/bin/printf '%s\n' compilerMacroSnapshot > "$pass_bundle"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/System/Memory/RawBuffer.range' >> "$pass_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range" >> "$pass_bundle"
+    /usr/bin/printf '\n' >> "$pass_bundle"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/System/Memory/Buffer.range' >> "$pass_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/Buffer.range" >> "$pass_bundle"
+    /usr/bin/printf '\n' >> "$pass_bundle"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/System/Text/String.range' >> "$pass_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/String.range" >> "$pass_bundle"
+    /usr/bin/printf '\n' >> "$pass_bundle"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "${pass_fixture#"$REPO_ROOT/"}" >> "$pass_bundle"
+    /bin/cat "$pass_fixture" >> "$pass_bundle"
+    "$STAGE2_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$error" \
+        || fail "@capture body String did not compile"
+    [[ ! -s "$error" ]] || fail "@capture body String wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1' "$pass_output" \
+        || fail "@capture body String did not execute"
+    /usr/bin/grep -Fq $'scalar=1\tchildCount=0\tparentRow=-1' "$pass_output" \
+        || fail "@capture body String did not preserve the raw recipe text"
+
+    if "$STAGE2_EXECUTABLE" compile "$type_fixture" > "$type_output" 2> "$error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] || fail "non-String @capture exited $actual_status instead of 65"
+    [[ ! -s "$error" ]] || fail "non-String @capture rejection wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=macroExecution\tdiagnosticKind=macroExecutionBodyInvalid' "$type_output" \
+        || fail "non-String @capture did not fail at parameter materialization"
+
+    if "$STAGE2_EXECUTABLE" compile "$body_fixture" > "$body_output" 2> "$error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] || fail "bodyless @capture exited $actual_status instead of 65"
+    [[ ! -s "$error" ]] || fail "bodyless @capture rejection wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=macroExecution\tdiagnosticKind=macroExecutionBodyInvalid' "$body_output" \
+        || fail "bodyless @capture did not fail at parameter materialization"
+    echo "Macros raw body-to-String capture: pass"
+}
+
+check_syntax_recipes() {
+    local pass_fixture="$REPO_ROOT/Testing/Syntax/Pass/DeclarationRecipeCaptures.range"
+    local nested_fixture="$REPO_ROOT/Testing/Syntax/Pass/NestedRecipeCapture.range"
+    local fail_fixture="$REPO_ROOT/Testing/Syntax/Fail/UnknownDeclarationRecipeCapture.range"
+    local pass_bundle="$WORK_ROOT/syntax-recipes.pass.range"
+    local pass_output="$WORK_ROOT/syntax-recipes.pass.out"
+    local pass_error="$WORK_ROOT/syntax-recipes.pass.err"
+    local nested_bundle="$WORK_ROOT/syntax-recipes.nested.range"
+    local nested_output="$WORK_ROOT/syntax-recipes.nested.out"
+    local nested_error="$WORK_ROOT/syntax-recipes.nested.err"
+    local closure_bundle="$WORK_ROOT/syntax-recipes.closure.range"
+    local closure_output="$WORK_ROOT/syntax-recipes.closure.out"
+    local closure_error="$WORK_ROOT/syntax-recipes.closure.err"
+    local fail_bundle="$WORK_ROOT/syntax-recipes.fail.range"
+    local fail_output="$WORK_ROOT/syntax-recipes.fail.out"
+    local fail_error="$WORK_ROOT/syntax-recipes.fail.err"
+    local actual_status
+
+    /usr/bin/printf '%s\n' compilerSyntaxRecipes > "$pass_bundle"
+    /usr/bin/printf '%s\n' \
+        'macro syntax(@capture template: String): Declaration -> Void {}' >> "$pass_bundle"
+    /bin/cat "$pass_fixture" >> "$pass_bundle"
+    "$STAGE2_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
+        || fail "syntax recipe capture fixture did not compile"
+    [[ ! -s "$pass_error" ]] || fail "syntax recipe capture fixture wrote stderr"
+    /usr/bin/grep -Fq $'syntaxRecipes\tvalid=true\trecipeCount=1' "$pass_output" \
+        || fail "syntax recipe summary omitted its collected recipe counts"
+    /usr/bin/grep -Fq $'syntaxRecipeCapture\trecipeRow=0\tordinal=0\tname=attributes' "$pass_output" \
+        || fail "syntax recipe did not bind attributes"
+    /usr/bin/grep -Fq $'name=attributes\tmemberRow=0\ttype=[String]\tcardinality=many' "$pass_output" \
+        || fail "syntax recipe did not derive many cardinality"
+    /usr/bin/grep -Fq $'name=name\tmemberRow=1\ttype=String\tcardinality=one' "$pass_output" \
+        || fail "syntax recipe did not derive one cardinality"
+    /usr/bin/grep -Fq $'name=result\tmemberRow=3\ttype=String?\tcardinality=optional' "$pass_output" \
+        || fail "syntax recipe did not derive optional cardinality"
+
+    /usr/bin/printf '%s\n' compilerSyntaxRecipes > "$nested_bundle"
+    /usr/bin/printf '%s\n' \
+        'macro syntax(@capture template: String): Declaration -> Void {}' >> "$nested_bundle"
+    /bin/cat "$nested_fixture" >> "$nested_bundle"
+    "$STAGE2_EXECUTABLE" compile "$nested_bundle" > "$nested_output" 2> "$nested_error" \
+        || fail "nested syntax recipe fixture did not compile"
+    [[ ! -s "$nested_error" ]] || fail "nested syntax recipe fixture wrote stderr"
+    /usr/bin/grep -Fq $'syntaxRecipes\tvalid=true\trecipeCount=2' "$nested_output" \
+        || fail "nested syntax recipe summary omitted both recipes"
+    /usr/bin/grep -E -q $'name=clause\tmemberRow=0\ttype=Clause\\?\tcardinality=optional\tnestedTargetSyntaxID=[0-9]+\tnestedRecipeApplicationRow=1' "$nested_output" \
+        || fail "optional nominal capture did not resolve its nested syntax recipe"
+
+    /usr/bin/printf '%s\n' \
+        compilerSyntaxRecipes \
+        'macro stored(): Construct -> Void {}' \
+        'construct Nil {}' \
+        'construct Identifier {}' \
+        'construct Parsed<Value> {}' \
+        'construct TypeReference {}' \
+        '@syntax' \
+        'construct Expression {' \
+        '    let type: TypeReference?' \
+        '}' \
+        'construct Parameter {' \
+        '    @syntax' \
+        '    construct Declaration {}' \
+        '    @syntax' \
+        '    construct Application {}' \
+        '}' \
+        '@syntax' \
+        'construct Block {' \
+        '    let syntax: [@syntax]' \
+        '}' > "$closure_bundle"
+    /usr/bin/printf '%s\n' \
+        'macro syntax(@capture template: String): Declaration -> Void {}' >> "$closure_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Syntax/Expressions/Closure.range" >> "$closure_bundle"
+    "$STAGE2_EXECUTABLE" compile "$closure_bundle" > "$closure_output" 2> "$closure_error" \
+        || fail "canonical Core Closure syntax recipes did not compile"
+    [[ ! -s "$closure_error" ]] || fail "canonical Core Closure syntax recipes wrote stderr"
+    /usr/bin/grep -Fq $'syntaxRecipes\tvalid=true\trecipeCount=8' "$closure_output" \
+        || fail "canonical Core Closure syntax recipe count changed"
+    /usr/bin/grep -E -q $'name=parameters.*type=ParameterClause\\?.*nestedRecipeApplicationRow=7' "$closure_output" \
+        || fail "Closure.Literal parameters did not resolve ParameterClause syntax"
+    /usr/bin/grep -E -q $'name=closure.*type=Literal.*nestedRecipeApplicationRow=4' "$closure_output" \
+        || fail "Closure.Application did not resolve Closure.Literal syntax"
+    /usr/bin/grep -E -q $'name=closure.*type=Expression.*nestedRecipeApplicationRow=0' "$closure_output" \
+        || fail "Closure.Invocation did not resolve its expression syntax"
+    /usr/bin/grep -E -q $'name=arguments.*type=\\[Parameter.Application\\].*nestedRecipeApplicationRow=2' "$closure_output" \
+        || fail "Closure.Invocation arguments did not resolve Parameter.Application syntax"
+    /usr/bin/grep -E -q $'name=declarations.*type=\\[Parameter.Declaration\\].*nestedRecipeApplicationRow=1' "$closure_output" \
+        || fail "Closure.ParameterClause did not resolve Parameter.Declaration syntax"
+
+    /usr/bin/printf '%s\n' compilerSyntaxRecipes > "$fail_bundle"
+    /usr/bin/printf '%s\n' \
+        'macro syntax(@capture template: String): Declaration -> Void {}' >> "$fail_bundle"
+    /bin/cat "$fail_fixture" >> "$fail_bundle"
+    if "$STAGE2_EXECUTABLE" compile "$fail_bundle" > "$fail_output" 2> "$fail_error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] || fail "unknown syntax recipe capture exited $actual_status instead of 65"
+    [[ ! -s "$fail_error" ]] || fail "unknown syntax recipe capture wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=syntaxRecipeUnknownCapture' "$fail_output" \
+        || fail "unknown syntax recipe capture omitted its focused diagnostic"
+    /usr/bin/grep -Fq $'name=missing' "$fail_output" \
+        || fail "unknown syntax recipe capture omitted its capture name"
+    echo "Syntax declaration recipes: pass"
+}
+
+check_range_authored_syntax_template() {
+    local pass_fixture="$REPO_ROOT/Testing/Syntax/Pass/RangeAuthoredTemplateValue.range"
+    local fail_fixture="$REPO_ROOT/Testing/Syntax/Fail/RangeAuthoredUnknownCapture.range"
+    local match_fixture="$REPO_ROOT/Testing/Syntax/Pass/RangeAuthoredSingleCaptureMatch.range"
+    local mismatch_fixture="$REPO_ROOT/Testing/Syntax/Fail/RangeAuthoredLiteralMismatch.range"
+    local pass_bundle="$WORK_ROOT/range-authored-syntax-template.pass.range"
+    local fail_bundle="$WORK_ROOT/range-authored-syntax-template.fail.range"
+    local match_bundle="$WORK_ROOT/range-authored-syntax-template.match.range"
+    local mismatch_bundle="$WORK_ROOT/range-authored-syntax-template.mismatch.range"
+    local pass_output="$WORK_ROOT/range-authored-syntax-template.pass.out"
+    local fail_output="$WORK_ROOT/range-authored-syntax-template.fail.out"
+    local match_output="$WORK_ROOT/range-authored-syntax-template.match.out"
+    local mismatch_output="$WORK_ROOT/range-authored-syntax-template.mismatch.out"
+    local pass_error="$WORK_ROOT/range-authored-syntax-template.pass.err"
+    local fail_error="$WORK_ROOT/range-authored-syntax-template.fail.err"
+    local match_error="$WORK_ROOT/range-authored-syntax-template.match.err"
+    local mismatch_error="$WORK_ROOT/range-authored-syntax-template.mismatch.err"
+    local actual_status
+
+    /usr/bin/printf '%s\n' \
+        compilerMacroSnapshot \
+        'compilerSourceFile\trole=core\tpath=Core/SyntaxTemplatePrelude.range' \
+        'macro member(): Declaration | Member -> Void {}' \
+        'macro stored(): Construct -> Void {}' \
+        'construct Identifier {' \
+        '    let name: String' \
+        '}' \
+        'construct TypeReference {}' \
+        'construct Expression {}' \
+        'construct Parsed<ParsedValue> {' \
+        '    let value: ParsedValue' \
+        '    let diagnostics: [String]' \
+        '}' \
+        'construct Macro {' \
+        '    construct Declaration {}' \
+        '    construct Application<Value = Nil> {' \
+        '        let identifier: Identifier' \
+        '        let target: Identifier' \
+        '        let genericArguments: [TypeReference]' \
+        '        let argumentClause: String' \
+        '        let arguments: [Expression]' \
+        '        let declaration: Declaration?' \
+        '        let packageVisibility: String' \
+        '        let valueType: TypeReference' \
+        '        let value: Value' \
+        '    }' \
+        '}' \
+        'construct Construct {' \
+        '    construct Declaration {' \
+        '        let macros: [Macro.Application]' \
+        '        let identifier: Identifier' \
+        '        let members: [@member]' \
+        '    }' \
+        '}' \
+        '@stored' \
+        '@member' \
+        'construct Let {' \
+        '    let identifier: Identifier' \
+        '}' > "$pass_bundle"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/System/Memory/RawBuffer.range' >> "$pass_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range" >> "$pass_bundle"
+    /usr/bin/printf '\n' >> "$pass_bundle"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/System/Memory/Buffer.range' >> "$pass_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/Buffer.range" >> "$pass_bundle"
+    /usr/bin/printf '\n' >> "$pass_bundle"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/System/Text/String.range' >> "$pass_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/String.range" >> "$pass_bundle"
+    /usr/bin/printf '\n' >> "$pass_bundle"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/DataSystem/Array/Array.range' >> "$pass_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/DataSystem/Array/Array.range" >> "$pass_bundle"
+    /usr/bin/printf '\n' >> "$pass_bundle"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Syntax/Parsing/SyntaxTemplate.range' >> "$pass_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Syntax/Parsing/SyntaxTemplate.range" >> "$pass_bundle"
+    /usr/bin/printf '\n' >> "$pass_bundle"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Syntax.range' >> "$pass_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Syntax.range" >> "$pass_bundle"
+    /usr/bin/printf '\n' >> "$pass_bundle"
+    /bin/cp "$pass_bundle" "$fail_bundle"
+    /bin/cp "$pass_bundle" "$match_bundle"
+    /bin/cp "$pass_bundle" "$mismatch_bundle"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' \
+        "${pass_fixture#"$REPO_ROOT/"}" >> "$pass_bundle"
+    /bin/cat "$pass_fixture" >> "$pass_bundle"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' \
+        "${fail_fixture#"$REPO_ROOT/"}" >> "$fail_bundle"
+    /bin/cat "$fail_fixture" >> "$fail_bundle"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' \
+        "${match_fixture#"$REPO_ROOT/"}" >> "$match_bundle"
+    /bin/cat "$match_fixture" >> "$match_bundle"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' \
+        "${mismatch_fixture#"$REPO_ROOT/"}" >> "$mismatch_bundle"
+    /bin/cat "$mismatch_fixture" >> "$mismatch_bundle"
+    "$STAGE2_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
+        || fail "Range-authored syntax template value did not compile"
+    [[ ! -s "$pass_error" ]] || fail "Range-authored syntax template value wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1' "$pass_output" \
+        || fail "Range-authored syntax macro did not execute"
+    /usr/bin/grep -E -q $'macroResult\trow=0.*kind=3.*typeKind=4.*nominalSyntaxID=[0-9]+.*childCount=5.*parentRow=-1' "$pass_output" \
+        || fail "Range-authored syntax macro did not return a typed SyntaxTemplate"
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=2.*typeKind=4.*childCount=29.*parentRow=[0-9]+.*ordinal=0' "$pass_output" \
+        || fail "Range-authored SyntaxTemplate did not retain the captured recipe String"
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=2.*typeKind=4.*childCount=3.*parentRow=0.*ordinal=1' "$pass_output" \
+        || fail "Range-authored SyntaxTemplate did not retain its declaration members"
+    [[ "$(/usr/bin/grep -E -c $'macroResult\trow=[0-9]+.*kind=5.*typeKind=6.*childCount=0.*parentRow=[0-9]+' "$pass_output")" -eq 3 ]] \
+        || fail "Range-authored SyntaxTemplate did not retain three typed member syntax handles"
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=3.*typeKind=3.*childCount=1.*parentRow=0.*ordinal=2' "$pass_output" \
+        || fail "Range-authored SyntaxTemplate did not retain the resolved capture name"
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=17.*parentRow=0.*ordinal=3' "$pass_output" \
+        || fail "Range-authored SyntaxTemplate did not retain its derived literal prefix count"
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=2.*parentRow=0.*ordinal=4' "$pass_output" \
+        || fail "Range-authored SyntaxTemplate did not retain its derived literal suffix count"
+
+    if "$STAGE2_EXECUTABLE" compile "$fail_bundle" > "$fail_output" 2> "$fail_error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] \
+        || fail "Range-authored unknown syntax capture exited $actual_status instead of 65"
+    [[ ! -s "$fail_error" ]] || fail "Range-authored unknown syntax capture wrote stderr"
+    /usr/bin/grep -Fq $'diagnosticKind=macroExecutionError' "$fail_output" \
+        || fail "Range-authored unknown syntax capture did not fail through macro diagnostics"
+    /usr/bin/grep -Fq 'Every syntax capture must name a let member of its declaration.' "$fail_output" \
+        || fail "Range-authored unknown syntax capture omitted its diagnostic message"
+
+    if ! "$STAGE2_EXECUTABLE" compile "$match_bundle" > "$match_output" 2> "$match_error"; then
+        fail "Range-authored single-capture syntax match did not compile"
+    fi
+    [[ ! -s "$match_error" ]] \
+        || fail "Range-authored single-capture syntax match wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not execute"
+    /usr/bin/grep -E -q $'macroResult\trow=47.*invocationRow=1.*kind=3.*typeKind=4.*childCount=3.*parentRow=-1' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not return a populated Match"
+    /usr/bin/grep -E -q $'macroResult\trow=48.*invocationRow=1.*kind=3.*typeKind=4.*childCount=5.*parentRow=47.*ordinal=0' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not retain its derived template"
+    /usr/bin/grep -E -q $'macroResult\trow=95.*invocationRow=1.*kind=5.*typeKind=6.*parentRow=47.*ordinal=1' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not retain its source syntax"
+    /usr/bin/grep -E -q $'macroResult\trow=96.*invocationRow=1.*kind=3.*typeKind=4.*childCount=2.*parentRow=47.*ordinal=2' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not retain its populated Binding"
+    /usr/bin/grep -E -q $'macroResult\trow=98.*invocationRow=1.*kind=2.*typeKind=4.*scalar=4.*childCount=4.*parentRow=97.*ordinal=0' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not retain the four-byte capture name"
+    /usr/bin/grep -E -q $'macroResult\trow=99.*invocationRow=1.*kind=1.*scalar=110.*parentRow=98.*ordinal=0' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not start its name with n"
+    /usr/bin/grep -E -q $'macroResult\trow=100.*invocationRow=1.*kind=1.*scalar=97.*parentRow=98.*ordinal=1' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not retain a in its name"
+    /usr/bin/grep -E -q $'macroResult\trow=101.*invocationRow=1.*kind=1.*scalar=109.*parentRow=98.*ordinal=2' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not retain m in its name"
+    /usr/bin/grep -E -q $'macroResult\trow=102.*invocationRow=1.*kind=1.*scalar=101.*parentRow=98.*ordinal=3' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not end its name with e"
+    /usr/bin/grep -E -q $'macroResult\trow=103.*invocationRow=1.*kind=2.*typeKind=4.*childCount=1.*parentRow=96.*ordinal=1' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not retain one captured syntax value"
+    /usr/bin/grep -E -q $'macroResult\trow=104.*invocationRow=1.*kind=5.*typeKind=6.*childCount=3.*parentRow=103.*ordinal=0' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not materialize the captured syntax slice"
+    /usr/bin/grep -E -q $'macroResult\trow=106.*invocationRow=1.*kind=1.*scalar=434.*parentRow=104.*ordinal=1' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not start its slice at name"
+    /usr/bin/grep -E -q $'macroResult\trow=107.*invocationRow=1.*kind=1.*scalar=438.*parentRow=104.*ordinal=2' "$match_output" \
+        || fail "Range-authored single-capture syntax match did not end its slice after name"
+
+    if "$STAGE2_EXECUTABLE" compile "$mismatch_bundle" > "$mismatch_output" 2> "$mismatch_error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] \
+        || fail "Range-authored syntax literal mismatch exited $actual_status instead of 65"
+    [[ ! -s "$mismatch_error" ]] \
+        || fail "Range-authored syntax literal mismatch wrote stderr"
+    /usr/bin/grep -Fq $'diagnosticKind=macroExecutionError' "$mismatch_output" \
+        || fail "Range-authored syntax literal mismatch did not fail through macro diagnostics"
+    /usr/bin/grep -Fq 'Syntax template literal did not match source.' "$mismatch_output" \
+        || fail "Range-authored syntax literal mismatch omitted its diagnostic message"
+    echo "Syntax Range-authored template derivation, member matching, source text, and source slicing: pass"
+}
+
 check_canonical_member_family() {
     local fixture="$REPO_ROOT/Testing/Members/Pass/CanonicalMemberFamily.range"
     local output="$WORK_ROOT/member-family-canonical.out"
@@ -1252,6 +1595,9 @@ main_root_value() {
     check_typed_parameter_defaults
     check_graph_capabilities
     check_command_group
+    check_macro_body_capture
+    check_syntax_recipes
+    check_range_authored_syntax_template
     check_project_defaults
     check_storage_literals
     check_defaulted_generic_optional

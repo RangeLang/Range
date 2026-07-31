@@ -345,6 +345,34 @@ function compilerBodyMemoryBuildPassEscapePhase(arena: CompilerBodyArena, abiPla
                 let argumentValueNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: argumentNodeID, role: compilerSyntaxRoleArgumentValue(), ordinal: 0))
                 if argumentNodeID < 0 || argumentValueNodeID < 0 { return 20000 + nodeRow }
                 if compilerBodyMemoryAppendFact(arena: arena, phase: phase, kind: compilerBodyMemoryFactArgumentPass(), sourceNodeID: argumentNodeID, subjectKind: compilerBodyMemorySubjectNode(), subjectID: argumentValueNodeID, auxID: targetID) < 0 { return 21000 + nodeRow }
+                let expectedArgumentTypeID: Int(compilerBodyArenaExpectedApplicationArgumentTypeID(
+                    arena: arena,
+                    applicationNodeID: nodeRow,
+                    argumentNodeID: argumentNodeID
+                ))
+                let actualArgumentTypeID: Int(compilerBodyArenaExpressionTypeID(
+                    arena: arena,
+                    nodeID: argumentValueNodeID
+                ))
+                if arena.ownerKind == compilerBodyArenaOwnerFunction()
+                    && expectedArgumentTypeID >= 0
+                    && actualArgumentTypeID >= 0
+                    && expectedArgumentTypeID != actualArgumentTypeID
+                    && compilerBodyArenaTypeArgumentCountForTypeID(arena: arena, typeID: expectedArgumentTypeID) == 1
+                    && compilerBodyOptionalPayloadMatches(
+                        arena: arena,
+                        optionalTypeID: expectedArgumentTypeID,
+                        payloadTypeID: actualArgumentTypeID
+                    )
+                    && compilerBodyMemoryAppendFact(
+                        arena: arena,
+                        phase: phase,
+                        kind: compilerBodyMemoryFactOptionalInjection(),
+                        sourceNodeID: argumentValueNodeID,
+                        subjectKind: compilerBodyMemorySubjectNode(),
+                        subjectID: argumentValueNodeID,
+                        auxID: expectedArgumentTypeID
+                    ) < 0 { return 22000 + nodeRow }
                 ordinal: ordinal + 1
             }
             if compilerIntTableValue(table: arena.resolutions, row: resolutionRow, column: compilerBodyResolutionTargetKindColumn()) == compilerBodyResolutionFunction()
@@ -368,7 +396,8 @@ function compilerBodyMemoryBuildPassEscapePhase(arena: CompilerBodyArena, abiPla
                 let destinationTypeID: Int(compilerIntTableValue(table: arena.storages, row: returnStorageID, column: compilerBodyStorageTypeIDColumn()))
                 if returnTypeID < 0 { return 42000 + nodeRow }
                 if returnTypeID != destinationTypeID {
-                    if !compilerBodyOptionalPayloadMatches(arena: arena, optionalTypeID: destinationTypeID, payloadTypeID: returnTypeID) { return 43000 + nodeRow }
+                    if compilerBodyArenaTypeArgumentCountForTypeID(arena: arena, typeID: destinationTypeID) != 1
+                        || !compilerBodyOptionalPayloadMatches(arena: arena, optionalTypeID: destinationTypeID, payloadTypeID: returnTypeID) { return 43000 + nodeRow }
                     if compilerBodyMemoryAppendFact(arena: arena, phase: phase, kind: compilerBodyMemoryFactOptionalInjection(), sourceNodeID: returnValueNodeID, subjectKind: compilerBodyMemorySubjectNode(), subjectID: returnValueNodeID, auxID: destinationTypeID) < 0 { return 44000 + nodeRow }
                 }
                 if compilerBodyMemoryAppendFact(arena: arena, phase: phase, kind: compilerBodyMemoryFactInitialize(), sourceNodeID: nodeRow, subjectKind: compilerBodyMemorySubjectStorage(), subjectID: returnStorageID, auxID: destinationTypeID) < 0 { return 45000 + nodeRow }
@@ -1693,8 +1722,28 @@ function compilerBodyArenaTypeListContains(values: Buffer<Int>, value: Int): Boo
 function compilerBodyArenaTypeIDIsOptional(arena: CompilerBodyArena, typeID: Int): Bool {
     if typeID < 0 || typeID >= compilerIntTableRowCount(table: arena.typeInstances) { return false }
     let typeKind: Int(compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: typeID))
-    return (typeKind == compilerBodyTypeConstruct() || typeKind == compilerBodyTypeEnum())
-        && compilerBodyArenaTypeOuterName(typeName: compilerBodyArenaTypeNameForTypeID(arena: arena, typeID: typeID)) == String("Optional")
+    if typeKind != compilerBodyTypeConstruct() && typeKind != compilerBodyTypeEnum() { return false }
+    let nominalSyntaxID: Int(compilerIntTableValue(table: arena.typeInstances, row: typeID, column: compilerBodyTypeInstanceNominalSyntaxColumn()))
+    if nominalSyntaxID == compilerBodyBuiltinOptionalSyntaxID() { return true }
+    if nominalSyntaxID == compilerBodyBuiltinArraySyntaxID() { return false }
+    if nominalSyntaxID >= 0 {
+        let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: arena.tables, syntaxID: nominalSyntaxID))
+        if declarationRow >= 0 {
+            let declarationFileID: Int(compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 1))
+            if compilerSemanticLocalRangeEqualsText(
+                tables: arena.tables,
+                fileID: declarationFileID,
+                start: compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 7),
+                end: compilerIntTableValue(table: arena.tables.declarations, row: declarationRow, column: 8),
+                text: String("Optional")
+            ) { return true }
+        }
+        if compilerBodyArenaIsCompileTime(arena: arena)
+            && arena.ownerKind == compilerBodyArenaOwnerFunction() {
+            return false
+        }
+    }
+    return compilerBodyArenaTypeOuterName(typeName: compilerBodyArenaTypeNameForTypeID(arena: arena, typeID: typeID)) == String("Optional")
 }
 
 function compilerBodyOwnedPathOptionalPayloadMember(arena: CompilerBodyArena): Int {
@@ -1774,7 +1823,7 @@ function compilerBodyArenaTypeContainsOwnedStorage(arena: CompilerBodyArena, typ
 
 function compilerBodyArenaTypeTrackedStorageStatus(arena: CompilerBodyArena, typeID: Int): Int {
     if typeID < 0 || typeID >= compilerIntTableRowCount(table: arena.typeInstances) { return 0 - 1 }
-    if arena.ownerKind == compilerBodyArenaOwnerMacro() { return 0 }
+    if compilerBodyArenaIsCompileTime(arena: arena) { return 0 }
     let pending: Buffer<Int>(bufferCreateInt(capacity: compilerIntTableRowCount(table: arena.typeInstances) + 1))
     let visited: Buffer<Int>(bufferCreateInt(capacity: compilerIntTableRowCount(table: arena.typeInstances) + 1))
     state found: Bool(false)

@@ -1,1 +1,89 @@
-macro syntax(): Declaration -> Void {}
+macro syntax(@capture template: String): Construct -> SyntaxTemplate { environment in
+    let members: [Let](
+        environment.target.Declaration.members.filter(all: Let)
+    )
+    state captureCount: Int(0)
+    state resolvedCaptureCount: Int(0)
+    state templateIndex: Int(0)
+    state captureMemberIndex: Int(0)
+    state capturePrefixCount: Int(0)
+    state captureSuffixCount: Int(0)
+    let templateCount: Int(template.count)
+    while templateIndex < templateCount {
+        let byte: Int(template.byte(index: templateIndex))
+        state nextByte: Int(0)
+        if templateIndex + 1 < templateCount {
+            nextByte: template.byte(index: templateIndex + 1)
+        }
+        let nextIsIdentifier: Bool(
+            templateIndex + 1 < templateCount
+                && ((nextByte >= 48 && nextByte <= 57)
+                    || (nextByte >= 65 && nextByte <= 90)
+                    || nextByte == 95
+                    || (nextByte >= 97 && nextByte <= 122))
+        )
+        if byte == 36 && nextIsIdentifier {
+            captureCount: captureCount + 1
+            let captureStart: Int(templateIndex + 1)
+            templateIndex: captureStart + 1
+            state scanningName: Bool(true)
+            while templateIndex < templateCount && scanningName {
+                let nameByte: Int(template.byte(index: templateIndex))
+                if (nameByte >= 48 && nameByte <= 57)
+                    || (nameByte >= 65 && nameByte <= 90)
+                    || nameByte == 95
+                    || (nameByte >= 97 && nameByte <= 122) {
+                    templateIndex: templateIndex + 1
+                } else {
+                    scanningName: false
+                }
+            }
+            let captureEnd: Int(templateIndex)
+            capturePrefixCount: captureStart - 1
+            captureSuffixCount: templateCount - captureEnd
+            state memberIndex: Int(0)
+            state resolved: Bool(false)
+            while memberIndex < members.count && resolved == false {
+                let member: Let(members[memberIndex])
+                let memberNameCount: Int(
+                    stringLength(value: member.identifier.name)
+                )
+                if memberNameCount == captureEnd - captureStart {
+                    state nameIndex: Int(0)
+                    state same: Bool(true)
+                    while nameIndex < memberNameCount && same {
+                        if stringByteAt(
+                            source: member.identifier.name,
+                            index: nameIndex
+                        )
+                            != template.byte(index: captureStart + nameIndex) {
+                            same: false
+                        }
+                        nameIndex: nameIndex + 1
+                    }
+                    if same {
+                        resolved: true
+                        captureMemberIndex: memberIndex
+                        resolvedCaptureCount: resolvedCaptureCount + 1
+                    }
+                }
+                memberIndex: memberIndex + 1
+            }
+        } else {
+            templateIndex: templateIndex + 1
+        }
+    }
+    if resolvedCaptureCount != captureCount {
+        environment.diagnostics.error(
+            "Every syntax capture must name a let member of its declaration."
+        )
+    }
+    let capturedMember: Let(members[captureMemberIndex])
+    return SyntaxTemplate(
+        source: template,
+        members: members,
+        captureName: capturedMember.identifier.name,
+        prefixCount: capturePrefixCount,
+        suffixCount: captureSuffixCount
+    )
+}

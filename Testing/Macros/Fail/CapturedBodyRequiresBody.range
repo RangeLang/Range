@@ -1,0 +1,8 @@
+compilerMacroSnapshot
+
+macro missingCapture(@capture template: String): Construct -> Bool { environment in
+    return true
+}
+
+@missingCapture
+construct MissingCaptureTarget {}

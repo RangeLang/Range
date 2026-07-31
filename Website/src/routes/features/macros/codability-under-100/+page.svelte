@@ -1,5 +1,6 @@
 <script lang="ts">
   import CodabilitySheet from "$lib/components/CodabilitySheet.svelte";
+  import SiteHeader from "$lib/components/SiteHeader.svelte";
 </script>
 
 <svelte:head>
@@ -17,10 +18,7 @@
 </svelte:head>
 
 <main class="codabilityArticle">
-  <header class="articleNav">
-    <a href="/">Range</a>
-    <span>Metaprogramming</span>
-  </header>
+  <SiteHeader />
 
   <article>
     <CodabilitySheet />
@@ -32,34 +30,4 @@
     padding-bottom: 0;
   }
 
-  .articleNav {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 24px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .articleNav a {
-    color: var(--ink);
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.04em;
-    text-decoration: none;
-  }
-
-  .articleNav a:hover,
-  .articleNav a:focus-visible {
-    color: var(--range);
-    outline: none;
-  }
-
-  .articleNav span {
-    color: var(--muted);
-    font-family: var(--font-geist-mono), monospace;
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
 </style>

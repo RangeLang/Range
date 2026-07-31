@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { posts } from "../src/lib/posts";
+import { allPosts } from "../src/lib/posts";
 
 const websiteRoot = resolve(import.meta.dir, "..");
 const outputRoot = resolve(websiteRoot, "public/og/posts");
@@ -79,7 +79,7 @@ const server = Bun.spawn([process.execPath, "build/index.js"], {
 try {
   await waitForServer();
 
-  for (const post of posts) {
+  for (const post of allPosts) {
     const output = resolve(outputRoot, `${post.slug}.png`);
     await rm(output, { force: true });
     const capture = Bun.spawn(

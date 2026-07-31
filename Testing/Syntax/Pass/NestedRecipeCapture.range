@@ -1,0 +1,13 @@
+@syntax {
+    wrapper $clause
+}
+construct Wrapper {
+    let clause: Clause?
+}
+
+@syntax {
+    $values in
+}
+construct Clause {
+    let values: [String]
+}

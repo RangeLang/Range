@@ -13,6 +13,13 @@ function compilerBodyArenaOwnerEntry(): Int { return 2 }
 function compilerBodyArenaOwnerMacro(): Int { return 3 }
 function compilerBodyArenaOwnerClosure(): Int { return 4 }
 
+function compilerBodyArenaIsCompileTime(arena: CompilerBodyArena): Bool {
+    return arena.ownerKind == compilerBodyArenaOwnerMacro()
+        || arena.ownerKind == compilerBodyArenaOwnerClosure()
+        || (arena.ownerKind == compilerBodyArenaOwnerFunction()
+            && arena.ownerFunctionInstanceID < 0)
+}
+
 function compilerBodyArenaIsEntry(arena: CompilerBodyArena): Bool {
     return arena.ownerKind == compilerBodyArenaOwnerEntry()
 }

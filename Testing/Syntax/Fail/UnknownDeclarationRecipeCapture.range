@@ -1,0 +1,6 @@
+@syntax {
+    route $missing
+}
+construct RouteDeclaration {
+    let name: String
+}

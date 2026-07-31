@@ -64,6 +64,7 @@ function compilerMacroEnvironmentProjectionDiagnostics(): Int { return 2 }
 function compilerMacroEnvironmentProjectionGraph(): Int { return 3 }
 function compilerMacroEnvironmentProjectionInlineBase(): Int { return 1024 }
 function compilerBodyBuiltinArraySyntaxID(): Int { return 0 - 2 }
+function compilerBodyBuiltinOptionalSyntaxID(): Int { return 0 - 3 }
 function compilerBodyBuiltinString(): Int { return 1 }
 function compilerBodyBuiltinFloat(): Int { return 2 }
 function compilerBodyBuiltinRuntimeCall(): Int { return 2 }
@@ -115,7 +116,9 @@ function compilerBodyRuntimeBuiltinStringAppendStorage(): Int { return 43 }
 function compilerBodyRuntimeBuiltinStringDestroy(): Int { return 44 }
 function compilerBodyRuntimeBuiltinTargetPointerBits(): Int { return 45 }
 function compilerBodyRuntimeBuiltinBufferTruncateInt(): Int { return 46 }
-function compilerBodyRuntimeBuiltinCount(): Int { return 46 }
+function compilerBodyRuntimeBuiltinSyntaxText(): Int { return 47 }
+function compilerBodyRuntimeBuiltinSyntaxSlice(): Int { return 48 }
+function compilerBodyRuntimeBuiltinCount(): Int { return 48 }
 
 function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("stringTransientRegionMark") { return compilerBodyRuntimeBuiltinStringTransientRegionMark() }
@@ -164,6 +167,8 @@ function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("stringDestroy") { return compilerBodyRuntimeBuiltinStringDestroy() }
     if name == String("targetPointerBits") { return compilerBodyRuntimeBuiltinTargetPointerBits() }
     if name == String("bufferTruncateInt") { return compilerBodyRuntimeBuiltinBufferTruncateInt() }
+    if name == String("syntaxText") { return compilerBodyRuntimeBuiltinSyntaxText() }
+    if name == String("syntaxSlice") { return compilerBodyRuntimeBuiltinSyntaxSlice() }
     return compilerBodyRuntimeBuiltinNone()
 }
 
@@ -214,6 +219,8 @@ function compilerBodyRuntimeBuiltinName(id: Int): String {
     if id == compilerBodyRuntimeBuiltinStringDestroy() { return String("stringDestroy") }
     if id == compilerBodyRuntimeBuiltinTargetPointerBits() { return String("targetPointerBits") }
     if id == compilerBodyRuntimeBuiltinBufferTruncateInt() { return String("bufferTruncateInt") }
+    if id == compilerBodyRuntimeBuiltinSyntaxText() { return String("syntaxText") }
+    if id == compilerBodyRuntimeBuiltinSyntaxSlice() { return String("syntaxSlice") }
     return String("")
 }
 
@@ -230,7 +237,9 @@ function compilerBodyRuntimeBuiltinReturnType(id: Int): String {
         || id == compilerBodyRuntimeBuiltinStringSubstring()
         || id == compilerBodyRuntimeBuiltinCommandLineArgument()
         || id == compilerBodyRuntimeBuiltinReadFile()
-        || id == compilerBodyRuntimeBuiltinCompilerMetricsReport() { return String("ptr") }
+        || id == compilerBodyRuntimeBuiltinCompilerMetricsReport()
+        || id == compilerBodyRuntimeBuiltinSyntaxText()
+        || id == compilerBodyRuntimeBuiltinSyntaxSlice() { return String("ptr") }
     if id > compilerBodyRuntimeBuiltinNone() && id <= compilerBodyRuntimeBuiltinCount() { return String("i32") }
     return String("")
 }
@@ -250,7 +259,8 @@ function compilerBodyRuntimeBuiltinParameterCount(id: Int): Int {
         || id == compilerBodyRuntimeBuiltinReadFile()
         || id == compilerBodyRuntimeBuiltinCompilerMetricsSetEnabled()
         || id == compilerBodyRuntimeBuiltinPrint()
-        || id == compilerBodyRuntimeBuiltinStringDestroy() { return 1 }
+        || id == compilerBodyRuntimeBuiltinStringDestroy()
+        || id == compilerBodyRuntimeBuiltinSyntaxText() { return 1 }
     if id == compilerBodyRuntimeBuiltinBufferCreateInt()
         || id == compilerBodyRuntimeBuiltinBufferCreateUnsigned8() { return 1 }
     if id == compilerBodyRuntimeBuiltinStringHasPrefix()
@@ -262,6 +272,7 @@ function compilerBodyRuntimeBuiltinParameterCount(id: Int): Int {
         || id == compilerBodyRuntimeBuiltinRawBufferAppendTextCharacter()
         || id == compilerBodyRuntimeBuiltinStringIndexOf()
         || id == compilerBodyRuntimeBuiltinStringSubstring() { return 3 }
+    if id == compilerBodyRuntimeBuiltinSyntaxSlice() { return 3 }
     if id == compilerBodyRuntimeBuiltinStringFindByteOf() { return 5 }
     if id == compilerBodyRuntimeBuiltinCompilerMetricsFunctionBegin()
         || id == compilerBodyRuntimeBuiltinCompilerMetricsFunctionEnd() { return 2 }
@@ -338,6 +349,10 @@ function compilerBodyRuntimeBuiltinParameterType(id: Int, ordinal: Int): String 
         if ordinal == 0 { return String("ptr") }
         return String("i32")
     }
+    if id == compilerBodyRuntimeBuiltinSyntaxSlice() {
+        if ordinal == 0 { return String("ptr") }
+        return String("i32")
+    }
     if id == compilerBodyRuntimeBuiltinStringEqual() { return String("ptr") }
     return String("ptr")
 }
@@ -358,7 +373,9 @@ function compilerBodyRuntimeBuiltinReturnTypeKind(id: Int): Int {
         || id == compilerBodyRuntimeBuiltinStringSubstring()
         || id == compilerBodyRuntimeBuiltinCommandLineArgument()
         || id == compilerBodyRuntimeBuiltinReadFile()
-        || id == compilerBodyRuntimeBuiltinCompilerMetricsReport() { return compilerBodyTypeString() }
+        || id == compilerBodyRuntimeBuiltinCompilerMetricsReport()
+        || id == compilerBodyRuntimeBuiltinSyntaxText() { return compilerBodyTypeString() }
+    if id == compilerBodyRuntimeBuiltinSyntaxSlice() { return compilerBodyTypeMacroTarget() }
     return compilerBodyRuntimeBuiltinTypeKind(typeName: compilerBodyRuntimeBuiltinReturnType(id: id))
 }
 function compilerBodyMemberRuntimeBuiltinID(receiverTypeKind: Int, receiverTypeID: Int, memberName: String): Int {
@@ -556,7 +573,7 @@ function compilerBodyArenaOwnerIsParticipant(arena: CompilerBodyArena, plan: Com
 
 function compilerBodyArenaOwnerReturnMode(arena: CompilerBodyArena, plan: CompilerModuleABIPlan): Int {
     if compilerBodyArenaIsEntry(arena: arena) { return compilerFunctionReturnABIDirect() }
-    if arena.ownerKind == compilerBodyArenaOwnerMacro() || arena.ownerKind == compilerBodyArenaOwnerClosure() { return compilerFunctionReturnABIDirect() }
+    if compilerBodyArenaIsCompileTime(arena: arena) { return compilerFunctionReturnABIDirect() }
     if arena.ownerKind != compilerBodyArenaOwnerFunction() { return compilerFunctionReturnABINone() }
     return compilerModuleABIPlanReturnMode(plan: plan, tables: arena.tables, index: arena.declarationIndex, functionRow: arena.ownerFunctionRow)
 }

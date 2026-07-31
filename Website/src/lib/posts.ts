@@ -3,11 +3,13 @@ export const siteOrigin = "https://rangelang.org";
 export type Post = {
   slug: string;
   href: string;
+  previewHref?: string;
   category: string;
   cardTitle: string;
   cardDescription: string;
   description: string;
   palette: number;
+  socialShader?: "sphere-lines";
   cardPalette: {
     foreground: string;
     mutedForeground: string;
@@ -65,30 +67,57 @@ export const posts: Post[] = [
       contrast: 4.61,
     },
   },
+];
+
+export const draftPosts: Post[] = [
   {
-    slug: "strings-go-fast",
-    href: "/optimizations/general/strings-go-fast",
-    category: "Compiler update",
-    cardTitle: "Strings Go Fast",
-    cardDescription: "100k appends, from 491.2 ms to 4.1 ms.",
+    slug: "one-source-two-lenses",
+    href: "/posts/one-source-two-lenses",
+    previewHref:
+      "/posts/one-source-two-lenses?preview=range-draft",
+    category: "Observation",
+    cardTitle: "One Source, Two Lenses",
+    cardDescription:
+      "In Range, written source and intended meaning share one typed graph.",
     description:
-      "How Range made 100,000 String appends about 120 times faster while sharply reducing peak memory.",
-    palette: 3,
+      "In Range, written source and intended meaning share one typed graph.",
+    palette: 4,
+    socialShader: "sphere-lines",
     cardPalette: {
-      foreground: "rgb(47 0 126)",
-      mutedForeground: "rgb(40 28 86)",
-      background: "rgb(196 202 68)",
-      contrast: 4.67,
+      foreground: "rgb(15 21 31)",
+      mutedForeground: "rgb(53 59 68)",
+      background: "rgb(246 249 252)",
+      contrast: 17.2,
+    },
+  },
+  {
+    slug: "intro-to-range",
+    href: "/posts/intro-to-range",
+    previewHref: "/posts/intro-to-range?preview=range-draft",
+    category: "Introduction",
+    cardTitle: "Intro to Range",
+    cardDescription:
+      "Identity and value, four binding intents, three abstraction forms.",
+    description:
+      "The smallest pieces of Range: identity and value, binding intents, and the three abstraction forms.",
+    palette: 5,
+    cardPalette: {
+      foreground: "rgb(94 0 34)",
+      mutedForeground: "rgb(101 46 60)",
+      background: "rgb(255 166 184)",
+      contrast: 6.9,
     },
   },
 ];
 
+export const allPosts = [...posts, ...draftPosts];
+
 export function postForPath(pathname: string) {
-  return posts.find((post) => post.href === pathname);
+  return allPosts.find((post) => post.href === pathname);
 }
 
 export function postForSlug(slug: string) {
-  return posts.find((post) => post.slug === slug);
+  return allPosts.find((post) => post.slug === slug);
 }
 
 export function postImagePath(post: Post) {

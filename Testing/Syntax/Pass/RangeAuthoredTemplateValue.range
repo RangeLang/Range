@@ -1,0 +1,8 @@
+@syntax {
+    route $name($arguments)
+}
+construct RouteDeclaration {
+    let name: String
+    let arguments: [String]
+    let ignored: Bool
+}

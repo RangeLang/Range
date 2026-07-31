@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import SiteHeader from "$lib/components/SiteHeader.svelte";
   import SphereLineShader from "$lib/components/SphereLineShader.svelte";
 
   let {
@@ -29,10 +30,7 @@
 
 <range-essay-page>
   <main class="essayPage">
-    <header class="articleNav">
-      <a href="/">Range</a>
-      <span>{category}</span>
-    </header>
+    <SiteHeader />
 
     <article>
       <header class="essayHero" class:hasShader={heroShaderPalette !== undefined}>
@@ -65,30 +63,6 @@
     padding-bottom: 96px;
   }
 
-  .articleNav {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 24px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .articleNav a {
-    color: var(--ink);
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.04em;
-    text-decoration: none;
-  }
-
-  .articleNav a:hover,
-  .articleNav a:focus-visible {
-    color: var(--range);
-    outline: none;
-  }
-
-  .articleNav span,
   .eyebrow {
     color: var(--muted);
     font-family: var(--font-geist-mono), monospace;
@@ -256,7 +230,7 @@
   @media (max-width: 640px) {
     .essayPage {
       width: min(100% - 28px, 600px);
-      padding-top: 28px;
+      padding-top: 0;
       padding-bottom: 72px;
     }
 

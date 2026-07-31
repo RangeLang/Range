@@ -1,4 +1,5 @@
 import { createRangeMarks } from "./range-scale-math.js?profile=hover-log-origin-v1";
+import { createWheelDetentSound } from "./range-audio-effects.js?profile=audio-effects-v1";
 
 const defaults = {
   endpointGap: 8,
@@ -26,33 +27,37 @@ class RangeScale extends HTMLElement {
 
   #audioContext;
   #audioRequestIndex = 0;
-  #bristleBuffer;
   #canvas;
-  #clickCompressor;
-  #clickIndex = 0;
-  #clickOutput;
   #context;
   #colorProbe;
   #focusPosition = 0;
   #focusTarget = 0;
   #focusVelocity = 0;
   #hasHoverSample = false;
-  #hoverDistance = 0;
   #isHovered = false;
+  #lastDetentIndex = 0;
   #lastHoverTime = 0;
   #lastHoverY = 0;
   #lastMotionTime = 0;
+  #lastPointerDirection = 1;
+  #lastPointerSpeed = 0;
   #motionFrame;
-  #nextClickTime = 0;
   #resizeObserver;
+  #wheelDetentSound;
 
   #handlePointerEnter = (event) => {
+    const bounds = this.getBoundingClientRect();
     this.#hasHoverSample = true;
-    this.#hoverDistance = 0;
     this.#lastHoverTime = event.timeStamp;
     this.#lastHoverY = event.clientY;
     this.#focusVelocity = 0;
-    this.#nextClickTime = 0;
+    if (bounds.height > 0) {
+      const position = Math.min(
+        1,
+        Math.max(0, (event.clientY - bounds.top) / bounds.height),
+      );
+      this.#lastDetentIndex = this.#detentIndexFor(position);
+    }
     void this.#primeAudio();
   };
 
@@ -76,30 +81,19 @@ class RangeScale extends HTMLElement {
     const delta = event.clientY - this.#lastHoverY;
     const elapsed = Math.max(8, event.timeStamp - this.#lastHoverTime);
     const pointerSpeed = Math.abs(delta) / elapsed;
+    this.#lastPointerSpeed = pointerSpeed;
+    this.#lastPointerDirection = Math.sign(delta) || this.#lastPointerDirection;
     this.#lastHoverTime = event.timeStamp;
     this.#lastHoverY = event.clientY;
-    const fastMovement = Math.min(
-      1,
-      Math.max(0, (pointerSpeed - 0.18) / 0.62),
-    );
-    const transientLevel = 1 - fastMovement * 0.55;
-    this.#hoverDistance += Math.abs(delta);
-    const clickCount = Math.min(6, Math.floor(this.#hoverDistance / 3.2));
-    if (clickCount === 0) return;
-    this.#hoverDistance %= 3.2;
-    const direction = Math.sign(delta);
-    const speedAttenuation = Math.min(0.32, Math.abs(delta) / 120);
-    const intensity = Math.max(0.26, 0.58 - speedAttenuation);
     const audioRequestIndex = ++this.#audioRequestIndex;
     await audioReady;
     if (audioRequestIndex !== this.#audioRequestIndex) return;
-    this.#playClick(direction, intensity, transientLevel);
+    this.#playRenderedDetent();
   };
 
   #handlePointerDown = async () => {
     await this.#primeAudio();
-    this.#nextClickTime = 0;
-    this.#playClick(1, 0.58, 1);
+    this.#wheelDetentSound?.play(0.18, 1, this.#lastDetentIndex);
   };
 
   #handlePointerLeave = () => {
@@ -107,9 +101,7 @@ class RangeScale extends HTMLElement {
     this.#focusTarget = 0;
     this.#focusVelocity = 0;
     this.#hasHoverSample = false;
-    this.#hoverDistance = 0;
     this.#audioRequestIndex += 1;
-    this.#nextClickTime = 0;
     this.#startMotion();
   };
 
@@ -132,9 +124,13 @@ class RangeScale extends HTMLElement {
     const sequence = this.parentElement;
     const zero = sequence?.querySelector("[data-scale-zero]");
     const end = sequence?.querySelector("[data-scale-end]");
+    const zeroGlyph = zero?.parentElement?.querySelector(".rangeWord");
+    const endGlyph = end?.parentElement?.querySelector(".rangeTitleMeasure");
     if (sequence) this.#resizeObserver.observe(sequence);
     if (zero) this.#resizeObserver.observe(zero);
     if (end) this.#resizeObserver.observe(end);
+    if (zeroGlyph) this.#resizeObserver.observe(zeroGlyph);
+    if (endGlyph) this.#resizeObserver.observe(endGlyph);
     document.fonts.ready.then(() => this.#align());
   }
 
@@ -144,12 +140,10 @@ class RangeScale extends HTMLElement {
     this.removeEventListener("pointerdown", this.#handlePointerDown);
     this.removeEventListener("pointerleave", this.#handlePointerLeave);
     this.#cancelMotion();
+    this.#wheelDetentSound?.dispose();
     void this.#audioContext?.close();
     this.#audioContext = undefined;
-    this.#bristleBuffer = undefined;
-    this.#clickCompressor = undefined;
-    this.#clickOutput = undefined;
-    this.#nextClickTime = 0;
+    this.#wheelDetentSound = undefined;
     this.#resizeObserver?.disconnect();
   }
 
@@ -170,6 +164,37 @@ class RangeScale extends HTMLElement {
     };
   }
 
+  #detentIndexFor(position, focusPosition = this.#focusPosition) {
+    const marks = createRangeMarks({
+      ...this.#config(),
+      focusPosition,
+    });
+    let closestIndex = 0;
+    let closestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < marks.length; index += 1) {
+      const distance = Math.abs(marks[index].position - position);
+      if (distance >= closestDistance) continue;
+      closestDistance = distance;
+      closestIndex = index;
+    }
+    return closestIndex;
+  }
+
+  #playRenderedDetent() {
+    if (!this.#isHovered || this.#audioContext?.state !== "running") return;
+    const detentIndex = this.#detentIndexFor(
+      this.#focusTarget,
+      this.#focusPosition,
+    );
+    if (detentIndex === this.#lastDetentIndex) return;
+    this.#lastDetentIndex = detentIndex;
+    this.#wheelDetentSound?.play(
+      this.#lastPointerSpeed,
+      this.#lastPointerDirection,
+      detentIndex,
+    );
+  }
+
   #render() {
     const config = this.#config();
     const marks = createRangeMarks({
@@ -177,7 +202,7 @@ class RangeScale extends HTMLElement {
       focusPosition: this.#focusPosition,
     });
     if (!this.#canvas) {
-      this.shadowRoot.innerHTML = `<style>:host{display:block;position:absolute;width:48px;pointer-events:auto;cursor:ns-resize;transform:translateX(-50%)}canvas{display:block;width:100%;height:100%}.colorProbe{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}</style><canvas role="presentation"></canvas><span class="colorProbe" aria-hidden="true"></span>`;
+      this.shadowRoot.innerHTML = `<style>:host{display:block;position:absolute;width:48px;pointer-events:auto;cursor:ns-resize}canvas{display:block;width:100%;height:100%}.colorProbe{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}</style><canvas role="presentation"></canvas><span class="colorProbe" aria-hidden="true"></span>`;
       this.#canvas = this.shadowRoot.querySelector("canvas");
       this.#context = this.#canvas?.getContext("2d");
       this.#colorProbe = this.shadowRoot.querySelector(".colorProbe");
@@ -205,9 +230,12 @@ class RangeScale extends HTMLElement {
     const deviceHeight = this.#canvas.height;
     for (const mark of marks) {
       this.#context.fillStyle = color;
-      const markWidth = Math.max(1, Math.round(config.markLength * pixelRatio));
+      const markWidth = Math.max(
+        1,
+        Math.round(config.markLength * pixelRatio),
+      );
       const markHeight = config.markThickness * pixelRatio;
-      const x = Math.round(deviceWidth / 2 - markWidth / 2);
+      const x = 0;
       const y = mark.position * (deviceHeight - markHeight);
       this.#context.fillRect(x, y, markWidth, markHeight);
     }
@@ -218,79 +246,11 @@ class RangeScale extends HTMLElement {
     if (!AudioContextConstructor) return;
     if (!this.#audioContext) {
       this.#audioContext = new AudioContextConstructor();
-      this.#clickCompressor = this.#audioContext.createDynamicsCompressor();
-      this.#clickCompressor.threshold.value = -12;
-      this.#clickCompressor.knee.value = 2;
-      this.#clickCompressor.ratio.value = 8;
-      this.#clickCompressor.attack.value = 0.0005;
-      this.#clickCompressor.release.value = 0.03;
-      this.#clickOutput = this.#audioContext.createGain();
-      this.#clickOutput.gain.value = 1.15;
-      this.#clickCompressor.connect(this.#clickOutput);
-      this.#clickOutput.connect(this.#audioContext.destination);
-      const frameCount = Math.ceil(this.#audioContext.sampleRate * 0.008);
-      this.#bristleBuffer = this.#audioContext.createBuffer(
-        1,
-        frameCount,
-        this.#audioContext.sampleRate,
-      );
-      const channel = this.#bristleBuffer.getChannelData(0);
-      for (let index = 0; index < channel.length; index += 1) {
-        const envelope = Math.pow(1 - index / channel.length, 4);
-        channel[index] = (Math.random() * 2 - 1) * envelope;
-      }
+      this.#wheelDetentSound = createWheelDetentSound(this.#audioContext);
     }
     if (this.#audioContext.state === "suspended") {
       await this.#audioContext.resume();
     }
-  }
-
-  #playClick(direction, intensity, transientLevel) {
-    const audio = this.#audioContext;
-    if (
-      !audio
-      || audio.state !== "running"
-      || !this.#bristleBuffer
-      || !this.#clickCompressor
-    ) return;
-
-    const clickIndex = this.#clickIndex;
-    const intervalVariation = ((((clickIndex * 5) % 7) - 3) * 0.004);
-    const minimumClickInterval = 0.06 + intervalVariation;
-    if (audio.currentTime < this.#nextClickTime) return;
-    const time = audio.currentTime;
-    this.#nextClickTime = time + minimumClickInterval;
-    this.#clickIndex += 1;
-    const variation = (((clickIndex * 7) % 11) - 5) / 5;
-    const duration = 0.0062 + (variation + 1) * 0.0007;
-
-    const bristle = audio.createBufferSource();
-    const filter = audio.createBiquadFilter();
-    const bristleGain = audio.createGain();
-    bristle.buffer = this.#bristleBuffer;
-    bristle.playbackRate.value = 1 + variation * 0.05;
-    filter.type = "bandpass";
-    filter.frequency.value = 3_200 + variation * 420 + direction * 70;
-    filter.Q.value = 0.7;
-    const peakGain = (0.11 + intensity * 0.035) * transientLevel;
-    bristleGain.gain.setValueAtTime(0.0001, time);
-    bristleGain.gain.linearRampToValueAtTime(
-      peakGain,
-      time + 0.00035,
-    );
-    bristleGain.gain.exponentialRampToValueAtTime(
-      0.0001,
-      time + duration,
-    );
-    bristle.connect(filter);
-    filter.connect(bristleGain);
-    bristleGain.connect(this.#clickCompressor);
-    bristle.start(
-      time,
-      (clickIndex * 0.0007) % 0.003,
-      duration,
-    );
-    bristle.stop(time + duration);
   }
 
   #startMotion() {
@@ -328,6 +288,7 @@ class RangeScale extends HTMLElement {
       Math.max(0, this.#focusPosition + this.#focusVelocity * deltaTime),
     );
     this.#render();
+    this.#playRenderedDetent();
 
     if (
       Math.abs(this.#focusTarget - this.#focusPosition) < 0.0001
@@ -348,18 +309,106 @@ class RangeScale extends HTMLElement {
     const zero = sequence?.querySelector("[data-scale-zero]");
     const end = sequence?.querySelector("[data-scale-end]");
     if (!sequence || !zero || !end) return;
+    const zeroGlyph = zero.parentElement?.querySelector(".rangeWord");
+    const endGlyph = end.parentElement?.querySelector(".rangeTitleMeasure");
 
     const config = this.#config();
     const sequenceRect = sequence.getBoundingClientRect();
     const zeroRect = zero.getBoundingClientRect();
     const endRect = end.getBoundingClientRect();
-    const startX = zeroRect.left + zeroRect.width / 2 - sequenceRect.left;
+    const startStem = this.#measureLeadingStem(zeroGlyph);
+    const endStem = this.#measureLeadingStem(endGlyph);
+    const startX = startStem?.left
+      ?? zeroRect.left + zeroRect.width / 2;
+    const measuredEndX = endStem?.left
+      ?? endRect.left + endRect.width / 2;
+    const renderedTitleShift = Number.parseFloat(
+      getComputedStyle(sequence).getPropertyValue("--range-title-ink-shift"),
+    ) || 0;
+    const rawEndX = measuredEndX - renderedTitleShift;
+    const titleInkShift = startX - rawEndX;
+    sequence.style.setProperty(
+      "--range-title-ink-shift",
+      `${titleInkShift}px`,
+    );
+    const localStartX = startX - sequenceRect.left;
     const startY = zeroRect.bottom - sequenceRect.top + config.endpointGap;
     const endY = endRect.top - sequenceRect.top - config.endpointGapEnd;
 
-    this.style.left = `${startX}px`;
+    this.style.left = `${localStartX}px`;
     this.style.top = `${startY}px`;
+    this.style.width = `${Math.max(1, config.markLength)}px`;
     this.style.height = `${Math.max(1, endY - startY)}px`;
+    this.#render();
+  }
+
+  #measureLeadingStem(element) {
+    if (!(element instanceof Element)) return undefined;
+    const styles = getComputedStyle(element);
+    const fontSize = Number.parseFloat(styles.fontSize);
+    if (!Number.isFinite(fontSize) || fontSize <= 0) return undefined;
+    const scale = 4;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(fontSize * 2 * scale);
+    canvas.height = Math.ceil(fontSize * 1.5 * scale);
+    const probe = canvas.getContext("2d", { willReadFrequently: true });
+    if (!probe) return undefined;
+    probe.scale(scale, scale);
+    probe.font = [
+      styles.fontStyle,
+      styles.fontWeight,
+      styles.fontSize,
+      styles.fontFamily,
+    ].join(" ");
+    probe.textBaseline = "alphabetic";
+    const metrics = probe.measureText("R");
+    const padding = fontSize * 0.25;
+    const drawX = padding + Math.max(0, metrics.actualBoundingBoxLeft || 0);
+    const top = padding;
+    const baseline = top + metrics.actualBoundingBoxAscent;
+    probe.fillStyle = "black";
+    probe.fillText("R", drawX, baseline);
+
+    const pixels = probe.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    ).data;
+    const firstRuns = [];
+    const firstRow = Math.max(
+      0,
+      Math.floor((top + metrics.actualBoundingBoxAscent * 0.15) * scale),
+    );
+    const lastRow = Math.min(
+      canvas.height - 1,
+      Math.ceil((top + metrics.actualBoundingBoxAscent * 0.85) * scale),
+    );
+    for (let y = firstRow; y <= lastRow; y += 1) {
+      let start = -1;
+      let end = -1;
+      for (let x = 0; x < canvas.width; x += 1) {
+        const alpha = pixels[(y * canvas.width + x) * 4 + 3];
+        if (alpha >= 64 && start < 0) start = x;
+        if (start >= 0 && alpha < 64) {
+          end = x;
+          break;
+        }
+      }
+      if (start >= 0 && end > start) {
+        firstRuns.push({ start, width: end - start });
+      }
+    }
+    if (firstRuns.length === 0) return undefined;
+    firstRuns.sort((left, right) => left.width - right.width);
+    const stem = firstRuns[Math.floor(firstRuns.length * 0.2)];
+    return {
+      left:
+        element.getBoundingClientRect().left +
+        stem.start / scale -
+        drawX,
+      width: stem.width / scale,
+    };
   }
 }
 

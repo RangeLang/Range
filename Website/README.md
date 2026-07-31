@@ -8,7 +8,7 @@ installation, local scripts, tests, and the production server runtime.
 - `/`
 - `/benchmarks`
 - `/benchmarks/:benchmarkID`
-- `/updates/:updateID`
+- `/posts/:postID`
 
 ## Commands
 

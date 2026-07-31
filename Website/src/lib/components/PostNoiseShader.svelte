@@ -53,7 +53,6 @@
     uniform vec2 u_origin;
     uniform float u_time;
     uniform float u_palette;
-    uniform float u_corner_radius;
     uniform float u_shared;
     uniform float u_card_count;
     uniform vec4 u_card_rects[8];
@@ -128,7 +127,6 @@
       vec2 localOrigin = u_origin;
       vec2 localResolution = u_resolution;
       float localPalette = u_palette;
-      float localCornerRadius = u_corner_radius;
 
       if (u_shared > 0.5) {
         bool insideCard = false;
@@ -144,7 +142,6 @@
               localOrigin = cardRect.xy;
               localResolution = cardRect.zw;
               localPalette = u_card_palettes[cardIndex];
-              localCornerRadius = 16.0;
               insideCard = true;
             }
           }
@@ -153,15 +150,14 @@
       }
 
       vec2 fragmentPoint = gl_FragCoord.xy - localOrigin;
-      vec2 halfSize = localResolution * 0.5;
-      vec2 roundedOffset =
-        abs(fragmentPoint - halfSize)
-        - (halfSize - vec2(localCornerRadius));
-      float roundedDistance =
-        length(max(roundedOffset, 0.0))
-        + min(max(roundedOffset.x, roundedOffset.y), 0.0)
-        - localCornerRadius;
-      if (roundedDistance > 0.0) discard;
+      float cardEdgeAlpha = 1.0;
+      if (u_shared > 0.5) {
+        float edgeDistance = min(
+          min(fragmentPoint.x, localResolution.x - fragmentPoint.x),
+          min(fragmentPoint.y, localResolution.y - fragmentPoint.y)
+        );
+        cardEdgeAlpha = smoothstep(0.0, 1.0, edgeDistance);
+      }
 
       vec2 cardUv = fragmentPoint / localResolution.xy;
       // Keep every procedural layer on one strip-wide coordinate plane.
@@ -248,7 +244,7 @@
       color = mix(color, paletteGrain, 0.055);
       color += (grain - 0.5) * (0.008 + color * 0.008);
 
-      gl_FragColor = vec4(color, 1.0);
+      gl_FragColor = vec4(color, cardEdgeAlpha);
     }
   `;
 
@@ -304,10 +300,6 @@
     const originLocation = context.getUniformLocation(program, "u_origin");
     const timeLocation = context.getUniformLocation(program, "u_time");
     const paletteLocation = context.getUniformLocation(program, "u_palette");
-    const cornerRadiusLocation = context.getUniformLocation(
-      program,
-      "u_corner_radius",
-    );
     const sharedLocation = context.getUniformLocation(program, "u_shared");
     const cardCountLocation = context.getUniformLocation(
       program,
@@ -362,7 +354,6 @@
       paletteValue = palette,
       originX = 0,
       originY = 0,
-      cornerRadius = 0,
     ) => {
       context.bindFramebuffer(context.FRAMEBUFFER, framebuffer);
       context.viewport(0, 0, width, height);
@@ -374,7 +365,6 @@
       context.uniform2f(originLocation, originX, originY);
       context.uniform1f(timeLocation, time);
       context.uniform1f(paletteLocation, paletteValue);
-      context.uniform1f(cornerRadiusLocation, cornerRadius);
       context.uniform1f(sharedLocation, 0);
       context.drawArrays(context.TRIANGLES, 0, 6);
     };
@@ -428,7 +418,6 @@
       context.uniform2f(originLocation, 0, 0);
       context.uniform1f(timeLocation, time);
       context.uniform1f(paletteLocation, palette);
-      context.uniform1f(cornerRadiusLocation, 0);
       context.uniform1f(sharedLocation, 1);
       context.uniform1f(cardCountLocation, drawnCards);
       context.uniform4fv(cardRectsLocation, cardRects);

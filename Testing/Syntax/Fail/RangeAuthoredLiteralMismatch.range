@@ -1,0 +1,14 @@
+macro rejectLiteralMismatch(
+    @capture expected: String
+): Construct -> String { environment in
+    let source: String(syntaxText(source: environment.target))
+    if source != expected {
+        environment.diagnostics.error(
+            "Syntax template literal did not match source."
+        )
+    }
+    return source
+}
+
+@rejectLiteralMismatch {construct Value { state name: Int }}
+construct Value { let name: Int }

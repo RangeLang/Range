@@ -3,6 +3,99 @@
 Priority and dependency order live in [MILESTONES.md](MILESTONES.md). This file
 owns the actionable checkboxes for the active and deliberately deferred work.
 
+- [ ] Move declaration parsing toward Core-owned `@syntax` recipes.
+  - [x] Make compiler-owned `@capture` bind a macro application's balanced raw
+    body directly to a declared `String` parameter without expression parsing.
+    - The focused proof preserves recipe-shaped `$identifier` and `$members`
+      text with nested braces, and rejects non-`String` captures and missing
+      application bodies at macro parameter materialization.
+  - [x] Adopt that boundary in Core as
+    `macro syntax(@capture template: String)` and store the raw source on
+    `SyntaxTemplate`; `Closure.Literal` is no longer the transport type for a
+    freeform syntax recipe.
+  - [x] Collect body and argument recipes from the existing macro-application
+    graph, preserve lexer token boundaries, and bind `$field` captures to the
+    annotated declaration's members with type-derived cardinality.
+  - [x] Model closure literals, trailing applications, parameter clauses, and
+    value-producing invocations as separate compositional Core syntax nodes.
+  - [x] Replace `SyntaxTemplate`'s obsolete raw function field.
+    - A later design pass briefly modeled the field as `Closure.Literal`; the
+      compiler-backed `@capture String` boundary supersedes that transport.
+  - [x] Resolve optional and collection-wrapped nominal captures to the nested
+    declaration's own `@syntax` recipe.
+  - [ ] Move recipe derivation into the Range-authored `syntax` macro.
+    - [x] Materialize captured macro `String` values with their byte-backed
+      storage and execute Core-authored `String.count` and `String.byte`
+      through the macro evaluator.
+      - The focused proof preserves exact recipe equality, a byte count of 34,
+        and the expected bytes at the first character, both `$`/`{` capture
+        boundaries, and the closing brace.
+    - [x] Have the Range-authored `syntax` macro construct and return its typed
+      `SyntaxTemplate` value.
+      - `SyntaxTemplate` owns the captured recipe `String` and the target
+        construct declaration's `[Let]` member syntax handles. For the proven
+        single-capture boundary it also stores the resolved identifier and
+        derived literal prefix/suffix counts; it does not expose compiler table
+        rows or raw-buffer spans.
+      - The focused macro-execution proof observes the template value, exact
+        captured recipe bytes, three typed member syntax handles, the resolved
+        capture identifier, and its derived literal bounds.
+    - [x] Resolve every recipe `$name` against the declaration's real `Let`
+      members in the Range-authored `syntax` macro.
+      - The macro scans the captured recipe once, compares each capture with
+        `member.identifier.name`, and reports an error through
+        `environment.diagnostics` when any capture is unknown.
+      - Macro syntax identifiers now materialize their names as byte-backed
+        `String` values instead of hash-only placeholders, so Range-authored
+        matching can use ordinary `String` reads.
+      - The focused root-value proof covers both a two-capture recipe and the
+        exact unknown-capture rejection boundary.
+    - [x] Populate a single-capture `SyntaxTemplate.Match.binding` from an input
+      `@syntax`
+      value.
+      - [x] Expose compiler-known `syntaxText(source:)` and
+        `syntaxSlice(source:start:end:)` primitives to Range-authored macro
+        execution.
+        - The focused proof stringifies a declaration target, slices its
+          source-backed `name` fragment, materializes the exact four bytes, and
+          rejects a literal mismatch through macro diagnostics.
+      - [x] Execute the required-match success path through the Range-authored
+        member-function boundary and retain its populated `Binding.values`.
+        - `@syntax` derives the resolved capture identifier and literal bounds;
+          `matchRequired` stringifies the input, materializes a typed local
+          source slice, and returns a populated `Match`/`Binding`.
+        - The focused proof observes identifier bytes `name`, one syntax value,
+          and its exact source-backed span. The mismatch path still rejects
+          through the Range-authored `match` diagnostics.
+      - [ ] Generalize `Match.binding` to ordered bindings only after
+        multi-capture and cardinality semantics have their own focused proof.
+      - [ ] Prove the successful value-bearing `Parsed<Match>` return path;
+        the current success fixture intentionally uses the required-match
+        boundary while the rejection fixture exercises `match`.
+      - Move nested member/cardinality selection out of the temporary
+        `compilerSyntaxRecipes` observer after this source-binding layer has
+        equivalent positive and rejection proofs.
+    - [x] Restore the downstream Range-native project macro fixture without
+      `environment.system.defaults.map`.
+      - The Range-authored macro now emits only the missing `integer` and
+        `bool` states onto its project target and returns the typed
+        `ProjectDefaults` marker. The focused gate preserves an explicit
+        `Int<4>` override and passes the complete project-defaults section.
+  - [ ] Use the proven recipe graph for declaration recognition before
+    retiring the corresponding compiler-owned validation path.
+    - The first `Construct.Declaration` integration must preserve the bootstrap
+      boundary: Core recipe declarations are collected first, and later
+      declarations may consume them without invoking macro finalization during
+      syntax capture.
+    - Direct integration currently stops at the native ownership gate.
+      Extending `compilerCoreParseConstructDeclarationParts` invalidated its
+      owned aggregate-return proof (`detail=600011`); a scalar helper and an
+      in-place recognizer both reached
+      `representationSensitiveABICapabilityBlocked` at capability stage
+      `14111`, which decodes to the unsupported owned-path move case
+      `10000 + 411`. Upgrade that ownership path before routing authoritative
+      declaration capture through recipes.
+
 ## 2026-07-29 Inline Representation Handoff
 
 - [x] Migrate Core macro paths and focused fixtures from
@@ -71,9 +164,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     stops in the separate graph-capability draft with
     `macroMissingTarget`; do not fold that graph work into this cleanup.
 - [ ] Complete generated project configuration as a value/artifact.
-  - The current `Project.range` emits a `ProjectDefaults` construct from
-    `#environment.system.defaults`; it no longer returns
-    `-> ProjectDefaults`.
+  - The current `Project.range` directly emits missing default states onto the
+    project target and returns `-> ProjectDefaults`; it does not yet emit a
+    standalone generated project-configuration artifact.
   - Compiler lowering still recognizes only persisted macro-result nominals,
     and root expansion currently records arbitrary root constructs as opaque
     artifacts rather than committing them into the declaration graph.
@@ -125,6 +218,10 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 
 ## Website
 
+  - [x] Remove the Cardinality heading and explanatory copy from the homepage.
+    - Keep its sound generator and graph, with one black/accent start-stop
+      toggle.
+  - [x] Set the homepage description in the site monospace face.
   - [x] Keep “Range Has a Dual Shape” hidden from the public Website.
     - Remove its homepage card and make its former route return 404.
   - [x] Render the benchmark run procedure as a minimal top-down tree, with
@@ -499,6 +596,10 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - [x] Make the noise tooth reliably audible by unlocking its private
           AudioContext on scale press, playing one confirmation tooth, and
           replacing the over-aggressive compressor with a safety envelope.
+        - [x] Preserve the continuous, broadly filtered brushed-noise surface
+          as the reusable Hashing sound rather than leaving it on the scale.
+        - [x] Trigger one rounded Digital Crown-style tick when pointer motion
+          crosses each logarithmic scale detent, with no queued tick burst.
 - [x] Add an interactive concentric nucleus graph to the Svelte homepage.
   - [x] Render one shared source nucleus with persistent concept branches.
   - [x] Center the concept picker above the graph, remove its selected fill,

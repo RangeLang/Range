@@ -1,33 +1,10 @@
 const shellSelector = "range-site-shell";
 const routeCache = new Map();
 let navigationInFlight = false;
-let activeRoute = location.href;
 
 function routeKey(destination) {
   const url = new URL(destination, location.href);
   return `${url.pathname}${url.search}`;
-}
-
-function routeDepth(destination) {
-  const pathname = new URL(destination, location.href).pathname;
-  if (pathname === "/") return 0;
-  if (/^\/benchmarks\/[^/]+$/.test(pathname)) return 2;
-  return 1;
-}
-
-function routeDirection(destination) {
-  const currentDepth = routeDepth(activeRoute);
-  const nextDepth = routeDepth(destination);
-  if (nextDepth > currentDepth) return "forward";
-  if (nextDepth < currentDepth) return "backward";
-  return "lateral";
-}
-
-function isPerformanceTransition(destination) {
-  const currentPath = new URL(activeRoute, location.href).pathname;
-  const nextPath = new URL(destination, location.href).pathname;
-  return (currentPath === "/" && nextPath === "/benchmarks")
-    || (currentPath === "/benchmarks" && nextPath === "/");
 }
 
 function fetchRoute(destination) {
@@ -63,47 +40,20 @@ function warmRoute(anchor) {
 async function loadRoute(destination, historyMode) {
   if (navigationInFlight) return;
   navigationInFlight = true;
-  const direction = routeDirection(destination);
-  const transitionClass = `range-route-${direction}`;
-  const routeClasses = [transitionClass];
-  if (isPerformanceTransition(destination)) routeClasses.push("range-route-performance");
 
   try {
-    const nextDocumentPromise = fetchRoute(destination);
-    const typedTitle = direction === "backward" && routeClasses.includes("range-route-performance")
-      ? document.querySelector(".pageHeader range-typed-text")
-      : null;
-    const suffixWidth = typedTitle?.getBoundingClientRect().width;
-    if (suffixWidth > 0) {
-      document.documentElement.style.setProperty("--range-performance-suffix-width", `${suffixWidth}px`);
-    }
-    const nextDocument = await nextDocumentPromise;
+    const nextDocument = await fetchRoute(destination);
     const currentShell = document.querySelector(shellSelector);
     const nextShell = nextDocument.querySelector(shellSelector);
     if (!currentShell || !nextShell) throw new Error("Range shell missing");
 
-    const commit = () => {
-      currentShell.replaceChildren(...nextShell.cloneNode(true).childNodes);
-      document.title = nextDocument.title;
-      if (historyMode === "push") history.pushState({}, "", destination);
-      activeRoute = destination;
-      scrollTo({ top: 0, left: 0, behavior: "instant" });
-    };
-
-    if (typeof document.startViewTransition === "function") {
-      document.documentElement.classList.add(...routeClasses);
-      await document.startViewTransition(commit).finished;
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      dispatchEvent(new Event("range-route-transition-finished"));
-    } else {
-      if (typeof typedTitle?.collapse === "function") await typedTitle.collapse();
-      commit();
-    }
+    currentShell.replaceChildren(...nextShell.cloneNode(true).childNodes);
+    document.title = nextDocument.title;
+    if (historyMode === "push") history.pushState({}, "", destination);
+    scrollTo({ top: 0, left: 0, behavior: "instant" });
   } catch {
     location.assign(destination);
   } finally {
-    document.documentElement.style.removeProperty("--range-performance-suffix-width");
-    document.documentElement.classList.remove(...routeClasses);
     navigationInFlight = false;
   }
 }

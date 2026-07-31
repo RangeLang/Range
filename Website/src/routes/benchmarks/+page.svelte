@@ -3,6 +3,7 @@
   import Chart from "$lib/components/Chart.svelte";
   import Footer from "$lib/components/Footer.svelte";
   import Procedure from "$lib/components/Procedure.svelte";
+  import SiteHeader from "$lib/components/SiteHeader.svelte";
 
   let { data: pageData } = $props();
   let count = $derived(pageData.active.subcategories.reduce((sum: number, item: any) => sum + item.leaves.length, 0));
@@ -10,9 +11,10 @@
 
 <range-benchmarks-page>
   <main>
-    <header class="pageHeader"><a class="backLink routeWordmark" href="/"><span class="rangeWord">Range</span></a><h1><span>Range</span><range-typed-text text="Performance" delay="300" interval="45">Performance</range-typed-text></h1></header>
+    <SiteHeader />
+    <header class="pageHeader"><h1><span>Range</span><range-typed-text text="Performance" delay="300" interval="45">Performance</range-typed-text></h1></header>
     <section class="benchmarkProject" aria-labelledby="benchmark-project-title">
-      <div class="sectionHeader"><h2 id="benchmark-project-title">Benchmark suite</h2><div class="benchmarkHeaderMeta"><a href="/benchmarks/history">Performance over time</a><p class="dateLabel">{new Date(data.generatedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}</p></div></div>
+      <div class="sectionHeader"><h2 id="benchmark-project-title">Benchmark suite</h2><div class="benchmarkHeaderMeta"><p class="dateLabel">{new Date(data.generatedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}</p></div></div>
       <nav class="benchmarkIndex" aria-label="Benchmark categories">
         {#each pageData.categories as category}
           {@const categoryCount = category.subcategories.reduce((sum: number, item: any) => sum + item.leaves.length, 0)}
@@ -26,7 +28,6 @@
       </details>
       <div class="benchmarkRunStatus" aria-label="Current benchmark run status"><span>{data.summary.runLeafCount} of {data.summary.leafCount} leaves run</span><span>Range passed {data.summary.rangePassed}</span><span>Not emitted {data.summary.rangeNotEmitted}</span><span>Failed {data.summary.rangeFailed}</span></div>
     </section>
-    <section class="updatesSection" aria-labelledby="updates-title"><div class="sectionHeader"><h2 id="updates-title">Updates</h2></div><a class="updateLink" href="/optimizations/general/strings-go-fast"><span><strong>Strings Go Fast</strong><small>100k appends · 491.2 ms → 4.1 ms</small></span><time datetime="2026-07-18">July 18, 2026</time></a></section>
     <Footer />
   </main>
 </range-benchmarks-page>

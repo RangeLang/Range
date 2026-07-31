@@ -3,7 +3,7 @@ construct String {
     state bytes: Buffer<Int<.unsigned, 8>>
 
     derived count: Int {
-        bytes.count
+        stringLength(value: self)
     }
 
     function append(text: String): Int {

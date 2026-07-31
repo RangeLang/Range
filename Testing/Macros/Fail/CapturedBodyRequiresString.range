@@ -1,0 +1,8 @@
+compilerMacroSnapshot
+
+macro invalidCapture(@capture template: Int): Construct -> Bool { environment in
+    return true
+}
+
+@invalidCapture {anything}
+construct InvalidCaptureTarget {}

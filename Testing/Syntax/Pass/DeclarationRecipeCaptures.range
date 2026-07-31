@@ -1,0 +1,10 @@
+@syntax {
+    $attributes
+    route $name($arguments) -> $result
+}
+construct RouteDeclaration {
+    let attributes: [String]
+    let name: String
+    let arguments: [String]
+    let result: String?
+}

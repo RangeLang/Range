@@ -1,0 +1,13 @@
+macro consumeSingleCapture(): Construct -> SyntaxTemplate.Match {
+    environment in
+    let application: Macro.Application<SyntaxTemplate>(
+        environment.target.Declaration.macros[0]
+    )
+    let template: SyntaxTemplate(application.value)
+    let source: @syntax(environment.target)
+    return template.matchRequired(source: source)
+}
+
+@syntax {construct Value { let $name: Int }}
+@consumeSingleCapture
+construct Value { let name: Int }

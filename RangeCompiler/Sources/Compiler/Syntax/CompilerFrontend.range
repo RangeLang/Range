@@ -2383,6 +2383,56 @@ function compilerSyntaxAppendMacroParameter(tables: CompilerSyntaxTables, macroD
     return compilerSyntaxTableAppend(tables: tables, table: tables.macroParameters, value: fingerprint.second)
 }
 
+function compilerMacroParameterIsCapture(tables: CompilerSyntaxTables, parameterRow: Int): Bool {
+    if parameterRow < 0 || parameterRow >= compilerIntTableRowCount(table: tables.macroParameters) { return false }
+    let declarationRow: Int(compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 1))
+    if declarationRow < 0 || declarationRow >= compilerIntTableRowCount(table: tables.macroDeclarations) { return false }
+    let fileID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 1))
+    let parameterStart: Int(compilerSourceStoreGlobalOffset(
+        store: tables.sourceStore,
+        fileID: fileID,
+        localOffset: compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 3)
+    ))
+    let maybeAttribute: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: parameterStart))
+    if maybeAttribute == nil { return false }
+    let attribute: RangeLexedToken(maybeAttribute ?? compilerFallbackTokenAt(index: parameterStart))
+    return attribute.kind == .macroAttribute && attribute.text == String("@capture")
+}
+
+function compilerMacroExecutionBudgetForApplication(
+    tables: CompilerSyntaxTables,
+    applicationRow: Int,
+    declarationRow: Int
+): Int {
+    if applicationRow < 0 || applicationRow >= compilerIntTableRowCount(table: tables.macroApplications)
+        || declarationRow < 0 || declarationRow >= compilerIntTableRowCount(table: tables.macroDeclarations) {
+        return compilerMacroExecutionBudgetDefault()
+    }
+    let firstParameterRow: Int(compilerIntTableValue(
+        table: tables.macroDeclarations,
+        row: declarationRow,
+        column: 23
+    ))
+    let parameterCount: Int(compilerIntTableValue(
+        table: tables.macroDeclarations,
+        row: declarationRow,
+        column: 24
+    ))
+    state hasCapture: Bool(false)
+    state parameterOrdinal: Int(0)
+    while parameterOrdinal < parameterCount && hasCapture == false {
+        if compilerMacroParameterIsCapture(
+            tables: tables,
+            parameterRow: firstParameterRow + parameterOrdinal
+        ) {
+            hasCapture: true
+        }
+        parameterOrdinal: parameterOrdinal + 1
+    }
+    if hasCapture == false { return compilerMacroExecutionBudgetDefault() }
+    return 65536
+}
+
 function compilerSyntaxAppendMacroCapability(tables: CompilerSyntaxTables, macroDeclarationRow: Int, ordinal: Int, capabilityKind: Int, nameStart: Int, nameEnd: Int, authority: Int, capabilitySetID: Int, fingerprint: CompilerFingerprint): Int {
     if macroDeclarationRow < 0 || macroDeclarationRow >= compilerIntTableRowCount(table: tables.macroDeclarations)
         || capabilityKind < compilerMacroCapabilityTarget() || capabilityKind > compilerMacroCapabilityGraph()
@@ -4447,17 +4497,17 @@ function compilerSyntaxTypeReferenceBuildExpected(tables: CompilerSyntaxTables, 
             targetKind: compilerSyntaxTypeReferenceTargetBuiltin()
             targetID: builtinTypeID
         } else {
-            let declarationSyntaxID: Int(compilerSyntaxDeclarationSyntaxIDForQualifiedTypeNameInScope(tables: tables, typeName: name, scopeSyntaxID: ownerSyntaxID))
-            if declarationSyntaxID >= 0 {
-                targetKind: compilerSyntaxTypeReferenceTargetDeclaration()
-                targetID: declarationSyntaxID
-            } else if declarationSyntaxID == 0 - 2 {
-                targetKind: compilerSyntaxTypeReferenceTargetAmbiguous()
+            let genericParameterRow: Int(compilerSyntaxTypeReferenceGenericParameterForName(tables: tables, ownerSyntaxID: ownerSyntaxID, name: name))
+            if genericParameterRow >= 0 && kind == compilerSyntaxTypeReferenceNamed() {
+                targetKind: compilerSyntaxTypeReferenceTargetGenericParameter()
+                targetID: genericParameterRow
             } else {
-                let genericParameterRow: Int(compilerSyntaxTypeReferenceGenericParameterForName(tables: tables, ownerSyntaxID: ownerSyntaxID, name: name))
-                if genericParameterRow >= 0 && kind == compilerSyntaxTypeReferenceNamed() {
-                    targetKind: compilerSyntaxTypeReferenceTargetGenericParameter()
-                    targetID: genericParameterRow
+                let declarationSyntaxID: Int(compilerSyntaxDeclarationSyntaxIDForQualifiedTypeNameInScope(tables: tables, typeName: name, scopeSyntaxID: ownerSyntaxID))
+                if declarationSyntaxID >= 0 {
+                    targetKind: compilerSyntaxTypeReferenceTargetDeclaration()
+                    targetID: declarationSyntaxID
+                } else if declarationSyntaxID == 0 - 2 {
+                    targetKind: compilerSyntaxTypeReferenceTargetAmbiguous()
                 } else {
                     targetKind: compilerSyntaxTypeReferenceTargetMissing()
                 }
@@ -6499,6 +6549,53 @@ function compilerMacroValueStoreAppendAggregate(
     )
 }
 
+function compilerMacroValueStoreAppendString(
+    store: CompilerMacroValueStore,
+    typeID: Int,
+    text: String
+): Int {
+    let byteChildren: Buffer<Int>(bufferCreateInt(capacity: stringLength(value: text)))
+    state valid: Bool(true)
+    state index: Int(0)
+    while index < stringLength(value: text) && valid {
+        let byteValueID: Int(compilerMacroValueStoreAppendScalar(
+            store: store,
+            typeKind: compilerBodyTypeInt(),
+            typeID: 0 - 1,
+            scalar: stringByteAt(source: text, index: index)
+        ))
+        if byteValueID < 0 || byteChildren.append(element: byteValueID) != 0 { valid: false }
+        index: index + 1
+    }
+    state bufferValueID: Int(0 - 1)
+    if valid {
+        bufferValueID: compilerMacroValueStoreAppendAggregate(
+            store: store,
+            kind: compilerMacroValueKindArray(),
+            typeKind: compilerBodyTypeConstruct(),
+            typeID: 0 - 1,
+            scalar: stringLength(value: text),
+            children: byteChildren
+        )
+    }
+    let stringChildren: Buffer<Int>(bufferCreateInt(capacity: 1))
+    if bufferValueID < 0 || stringChildren.append(element: bufferValueID) != 0 { valid: false }
+    state stringValueID: Int(0 - 1)
+    if valid {
+        stringValueID: compilerMacroValueStoreAppendAggregate(
+            store: store,
+            kind: compilerMacroValueKindConstruct(),
+            typeKind: compilerBodyTypeString(),
+            typeID: typeID,
+            scalar: compilerDeclarationNameHash(name: text),
+            children: stringChildren
+        )
+    }
+    byteChildren.destroy()
+    stringChildren.destroy()
+    return stringValueID
+}
+
 function compilerMacroExecutionCapabilityHandleRow(tables: CompilerSyntaxTables, invocationRow: Int): Int {
     state row: Int(0)
     while row < compilerIntTableRowCount(table: tables.macroCapabilityHandles) {
@@ -6665,7 +6762,11 @@ function compilerMacroExecutionMaterializeIdentifier(
         localEnd: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 5)
     ))
     let identity: CompilerFingerprint(compilerMacroExecutionApplicationIdentity(tables: tables, applicationRow: applicationRow))
-    let nameValueID: Int(compilerMacroValueStoreAppendScalar(store: store, typeKind: compilerBodyTypeString(), typeID: 0 - 1, scalar: compilerDeclarationNameHash(name: name)))
+    let nameValueID: Int(compilerMacroValueStoreAppendString(
+        store: store,
+        typeID: 0 - 1,
+        text: name
+    ))
     let identityValueID: Int(compilerMacroValueStoreAppendScalar(store: store, typeKind: compilerBodyTypeString(), typeID: 0 - 1, scalar: identity.first))
     let parentValueID: Int(compilerMacroExecutionAppendPlaceholderValue(store: store))
     let sourceValueID: Int(compilerMacroExecutionAppendPlaceholderValue(store: store))
@@ -6719,7 +6820,11 @@ function compilerMacroExecutionMaterializeSyntaxIdentifier(
     }
     if fileID < 0 || nameStart < 0 || nameEnd <= nameStart { return 0 - 1 }
     let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: nameStart, localEnd: nameEnd))
-    let nameValueID: Int(compilerMacroValueStoreAppendScalar(store: store, typeKind: compilerBodyTypeString(), typeID: 0 - 1, scalar: compilerDeclarationNameHash(name: name)))
+    let nameValueID: Int(compilerMacroValueStoreAppendString(
+        store: store,
+        typeID: 0 - 1,
+        text: name
+    ))
     let identityValueID: Int(compilerMacroValueStoreAppendScalar(store: store, typeKind: compilerBodyTypeString(), typeID: 0 - 1, scalar: syntaxID))
     let parentValueID: Int(compilerMacroExecutionAppendPlaceholderValue(store: store))
     let sourceValueID: Int(compilerMacroValueStoreAppend(
@@ -8990,8 +9095,20 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
             && leftValueID >= 0 && leftValueID < evaluationValues.count
             && rightValueID >= 0 && rightValueID < evaluationValues.count)
         if binaryOperationValid {
-            let leftValue: Int(compilerMacroValueStoreScalar(store: store, valueID: evaluationValues.element(index: leftValueID)))
-            let rightValue: Int(compilerMacroValueStoreScalar(store: store, valueID: evaluationValues.element(index: rightValueID)))
+            let leftStoreValueID: Int(evaluationValues.element(index: leftValueID))
+            let rightStoreValueID: Int(evaluationValues.element(index: rightValueID))
+            state leftValue: Int(compilerMacroValueStoreScalar(store: store, valueID: leftStoreValueID))
+            state rightValue: Int(compilerMacroValueStoreScalar(store: store, valueID: rightStoreValueID))
+            let leftTypeKind: Int(compilerIntTableValue(table: arena.mirValues, row: leftValueID, column: compilerBodyMIRValueTypeColumn()))
+            let rightTypeKind: Int(compilerIntTableValue(table: arena.mirValues, row: rightValueID, column: compilerBodyMIRValueTypeColumn()))
+            if (operationKind == compilerBodyMIROperationEqual() || operationKind == compilerBodyMIROperationNotEqual())
+                && leftTypeKind == compilerBodyTypeString()
+                && rightTypeKind == compilerBodyTypeString()
+                && leftStoreValueID >= 0 && leftStoreValueID < store.scalars.count
+                && rightStoreValueID >= 0 && rightStoreValueID < store.scalars.count {
+                leftValue: store.scalars.element(index: leftStoreValueID)
+                rightValue: store.scalars.element(index: rightStoreValueID)
+            }
             if operationKind == compilerBodyMIROperationEqual() { if leftValue == rightValue { binaryScalarResult: 1 } }
             if operationKind == compilerBodyMIROperationNotEqual() { if leftValue != rightValue { binaryScalarResult: 1 } }
             if operationKind == compilerBodyMIROperationAnd() { if leftValue != 0 && rightValue != 0 { binaryScalarResult: 1 } }
@@ -9282,6 +9399,275 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
     return operationStatus
 }
 
+function compilerMacroExecutionSyntaxValueFileID(
+    tables: CompilerSyntaxTables,
+    store: CompilerMacroValueStore,
+    valueID: Int
+): Int {
+    if valueID < 0 || valueID >= store.kinds.count
+        || store.kinds.element(index: valueID) != compilerMacroValueKindSyntax() {
+        return 0 - 1
+    }
+    if store.childCounts.element(index: valueID) == 3 {
+        let childValueID: Int(compilerMacroValueStoreChild(
+            store: store,
+            valueID: valueID,
+            ordinal: 0
+        ))
+        if childValueID < 0 || childValueID >= store.scalars.count { return 0 - 1 }
+        return store.scalars.element(index: childValueID)
+    }
+    let syntaxID: Int(store.scalars.element(index: valueID))
+    if syntaxID < 0 || syntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex) {
+        return 0 - 1
+    }
+    return compilerMacroSyntaxNodeFileID(tables: tables, syntaxID: syntaxID)
+}
+
+function compilerMacroExecutionSyntaxValueStart(
+    tables: CompilerSyntaxTables,
+    store: CompilerMacroValueStore,
+    valueID: Int
+): Int {
+    if valueID < 0 || valueID >= store.kinds.count
+        || store.kinds.element(index: valueID) != compilerMacroValueKindSyntax() {
+        return 0 - 1
+    }
+    if store.childCounts.element(index: valueID) == 3 {
+        let childValueID: Int(compilerMacroValueStoreChild(
+            store: store,
+            valueID: valueID,
+            ordinal: 1
+        ))
+        if childValueID < 0 || childValueID >= store.scalars.count { return 0 - 1 }
+        return store.scalars.element(index: childValueID)
+    }
+    let syntaxID: Int(store.scalars.element(index: valueID))
+    if syntaxID < 0 || syntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex) {
+        return 0 - 1
+    }
+    return compilerMacroSyntaxNodeStart(tables: tables, syntaxID: syntaxID)
+}
+
+function compilerMacroExecutionSyntaxValueEnd(
+    tables: CompilerSyntaxTables,
+    store: CompilerMacroValueStore,
+    valueID: Int
+): Int {
+    if valueID < 0 || valueID >= store.kinds.count
+        || store.kinds.element(index: valueID) != compilerMacroValueKindSyntax() {
+        return 0 - 1
+    }
+    if store.childCounts.element(index: valueID) == 3 {
+        let childValueID: Int(compilerMacroValueStoreChild(
+            store: store,
+            valueID: valueID,
+            ordinal: 2
+        ))
+        if childValueID < 0 || childValueID >= store.scalars.count { return 0 - 1 }
+        return store.scalars.element(index: childValueID)
+    }
+    let syntaxID: Int(store.scalars.element(index: valueID))
+    if syntaxID < 0 || syntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex) {
+        return 0 - 1
+    }
+    return compilerMacroSyntaxNodeEnd(tables: tables, syntaxID: syntaxID)
+}
+
+function compilerMacroExecutionEvaluateRuntimeBuiltin(
+    tables: CompilerSyntaxTables,
+    store: CompilerMacroValueStore,
+    builtinID: Int,
+    arguments: Buffer<Int>,
+    resultTypeKind: Int,
+    resultTypeID: Int
+): Int {
+    if builtinID == compilerBodyRuntimeBuiltinRawBufferCount() {
+        if arguments.count != 1 { return 0 - 1 }
+        let bufferValueID: Int(arguments.element(index: 0))
+        if bufferValueID < 0 || bufferValueID >= store.kinds.count { return 0 - 1 }
+        return compilerMacroValueStoreAppendScalar(
+            store: store,
+            typeKind: resultTypeKind,
+            typeID: resultTypeID,
+            scalar: store.childCounts.element(index: bufferValueID)
+        )
+    }
+    if builtinID == compilerBodyRuntimeBuiltinRawBufferLoadInt()
+        || builtinID == compilerBodyRuntimeBuiltinRawBufferLoadUnsigned8() {
+        if arguments.count != 2 { return 0 - 1 }
+        let bufferValueID: Int(arguments.element(index: 0))
+        let indexValueID: Int(arguments.element(index: 1))
+        if bufferValueID < 0 || bufferValueID >= store.kinds.count
+            || indexValueID < 0 || indexValueID >= store.kinds.count { return 0 - 1 }
+        return compilerMacroValueStoreChild(
+            store: store,
+            valueID: bufferValueID,
+            ordinal: store.scalars.element(index: indexValueID)
+        )
+    }
+    if builtinID == compilerBodyRuntimeBuiltinStringByteAt()
+        || builtinID == compilerBodyRuntimeBuiltinStringLength() {
+        state expectedArgumentCount: Int(1)
+        if builtinID == compilerBodyRuntimeBuiltinStringByteAt() { expectedArgumentCount: 2 }
+        if arguments.count != expectedArgumentCount { return 0 - 1 }
+        let stringValueID: Int(arguments.element(index: 0))
+        if stringValueID < 0 || stringValueID >= store.kinds.count { return 0 - 1 }
+        let bufferValueID: Int(compilerMacroValueStoreChild(store: store, valueID: stringValueID, ordinal: 0))
+        if bufferValueID < 0 || bufferValueID >= store.kinds.count { return 0 - 1 }
+        if builtinID == compilerBodyRuntimeBuiltinStringLength() {
+            return compilerMacroValueStoreAppendScalar(
+                store: store,
+                typeKind: resultTypeKind,
+                typeID: resultTypeID,
+                scalar: store.childCounts.element(index: bufferValueID)
+            )
+        }
+        let indexValueID: Int(arguments.element(index: 1))
+        if indexValueID < 0 || indexValueID >= store.kinds.count { return 0 - 1 }
+        return compilerMacroValueStoreChild(
+            store: store,
+            valueID: bufferValueID,
+            ordinal: store.scalars.element(index: indexValueID)
+        )
+    }
+    if builtinID == compilerBodyRuntimeBuiltinStringSubstring() {
+        if arguments.count != 3 { return 0 - 1 }
+        let stringValueID: Int(arguments.element(index: 0))
+        let startValueID: Int(arguments.element(index: 1))
+        let endValueID: Int(arguments.element(index: 2))
+        if stringValueID < 0 || stringValueID >= store.kinds.count
+            || startValueID < 0 || startValueID >= store.scalars.count
+            || endValueID < 0 || endValueID >= store.scalars.count {
+            return 0 - 1
+        }
+        let bufferValueID: Int(compilerMacroValueStoreChild(
+            store: store,
+            valueID: stringValueID,
+            ordinal: 0
+        ))
+        if bufferValueID < 0 || bufferValueID >= store.kinds.count { return 0 - 1 }
+        let start: Int(store.scalars.element(index: startValueID))
+        let end: Int(store.scalars.element(index: endValueID))
+        if start < 0 || end < start
+            || end > store.childCounts.element(index: bufferValueID) {
+            return 0 - 1
+        }
+        let bytes: Buffer<Int>(bufferCreateInt(capacity: end - start))
+        state hash: Int(17)
+        state index: Int(start)
+        state valid: Bool(true)
+        while index < end && valid {
+            let byteValueID: Int(compilerMacroValueStoreChild(
+                store: store,
+                valueID: bufferValueID,
+                ordinal: index
+            ))
+            if byteValueID < 0 || byteValueID >= store.scalars.count
+                || bytes.append(element: byteValueID) != 0 {
+                valid: false
+            } else {
+                hash: (
+                    hash * 127
+                        + store.scalars.element(index: byteValueID)
+                        + 1
+                ) % 16000057
+            }
+            index: index + 1
+        }
+        state substringBufferValueID: Int(0 - 1)
+        if valid {
+            substringBufferValueID: compilerMacroValueStoreAppendAggregate(
+                store: store,
+                kind: compilerMacroValueKindArray(),
+                typeKind: compilerBodyTypeConstruct(),
+                typeID: 0 - 1,
+                scalar: end - start,
+                children: bytes
+            )
+        }
+        let children: Buffer<Int>(bufferCreateInt(capacity: 1))
+        if substringBufferValueID < 0
+            || children.append(element: substringBufferValueID) != 0 {
+            valid: false
+        }
+        state resultValueID: Int(0 - 1)
+        if valid {
+            resultValueID: compilerMacroValueStoreAppendAggregate(
+                store: store,
+                kind: compilerMacroValueKindConstruct(),
+                typeKind: resultTypeKind,
+                typeID: resultTypeID,
+                scalar: hash,
+                children: children
+            )
+        }
+        bytes.destroy()
+        children.destroy()
+        return resultValueID
+    }
+    if builtinID == compilerBodyRuntimeBuiltinSyntaxText()
+        || builtinID == compilerBodyRuntimeBuiltinSyntaxSlice() {
+        state expectedArgumentCount: Int(1)
+        if builtinID == compilerBodyRuntimeBuiltinSyntaxSlice() {
+            expectedArgumentCount: 3
+        }
+        if arguments.count != expectedArgumentCount { return 0 - 1 }
+        let syntaxValueID: Int(arguments.element(index: 0))
+        let fileID: Int(compilerMacroExecutionSyntaxValueFileID(
+            tables: tables,
+            store: store,
+            valueID: syntaxValueID
+        ))
+        let sourceStart: Int(compilerMacroExecutionSyntaxValueStart(
+            tables: tables,
+            store: store,
+            valueID: syntaxValueID
+        ))
+        let sourceEnd: Int(compilerMacroExecutionSyntaxValueEnd(
+            tables: tables,
+            store: store,
+            valueID: syntaxValueID
+        ))
+        if fileID < 0 || sourceStart < 0 || sourceEnd <= sourceStart {
+            return 0 - 1
+        }
+        if builtinID == compilerBodyRuntimeBuiltinSyntaxText() {
+            return compilerMacroValueStoreAppendString(
+                store: store,
+                typeID: resultTypeID,
+                text: compilerTypedSyntaxLocalText(
+                    tables: tables,
+                    fileID: fileID,
+                    localStart: sourceStart,
+                    localEnd: sourceEnd
+                )
+            )
+        }
+        let startValueID: Int(arguments.element(index: 1))
+        let endValueID: Int(arguments.element(index: 2))
+        if startValueID < 0 || startValueID >= store.scalars.count
+            || endValueID < 0 || endValueID >= store.scalars.count {
+            return 0 - 1
+        }
+        let relativeStart: Int(store.scalars.element(index: startValueID))
+        let relativeEnd: Int(store.scalars.element(index: endValueID))
+        if relativeStart < 0 || relativeEnd <= relativeStart
+            || relativeEnd > sourceEnd - sourceStart {
+            return 0 - 1
+        }
+        return compilerMacroExecutionMaterializeSyntaxValue(
+            tables: tables,
+            store: store,
+            sourceSyntaxID: store.scalars.element(index: syntaxValueID),
+            fileID: fileID,
+            valueStart: sourceStart + relativeStart,
+            valueEnd: sourceStart + relativeEnd
+        )
+    }
+    return 0 - 1
+}
+
 function compilerMacroExecutionPrepareFunctionArena(arena: CompilerBodyArena, index: CompilerDeclarationIndex): Int {
     let emptyReturnModes: Buffer<Int>(bufferCreateInt(capacity: 0))
     let emptyParticipants: Buffer<Int>(bufferCreateInt(capacity: 0))
@@ -9292,15 +9678,30 @@ function compilerMacroExecutionPrepareFunctionArena(arena: CompilerBodyArena, in
     let emptyReturnLeaves: CompilerIntTable(compilerIntTableCreate(columnCount: compilerReachableFunctionInstanceReturnLeafColumnCount(), estimatedRowCount: 0))
     let abiPlan: CompilerModuleABIPlan(returnModes: $emptyReturnModes, participants: $emptyParticipants, isFrozen: false)
     state status: Int(0)
-    if arena.failures.count != 0 || !compilerBodyArenaIsValid(arena: arena) { status: 0 - 1 }
-    if status == 0 && compilerBodyArenaBuildSymbolsAndResolutions(arena: arena, index: index) != 0 { status: 0 - 1 }
-    if status == 0 && compilerBodyArenaBuildCFG(arena: arena) != 0 { status: 0 - 1 }
+    if arena.failures.count != 0 || !compilerBodyArenaIsValid(arena: arena) { status: 0 - 101 }
+    if status == 0 && compilerBodyArenaBuildSymbolsAndResolutions(arena: arena, index: index) != 0 {
+        status: 0 - 102
+        if arena.failures.count > 1 { status: 0 - (200 + arena.failures.element(index: 1)) }
+    }
+    if status == 0 && compilerBodyArenaBuildCFG(arena: arena) != 0 { status: 0 - 103 }
     if status == 0 {
         let memoryStatus: Int(compilerBodyMemoryBuildAndFreeze(arena: arena, abiPlan: abiPlan, typeKeys: emptyTypeKeys, typeKeyArguments: emptyTypeKeyArguments, effects: arena.tables.bodyNodes, effectPaths: emptyEffectPaths, returnSummaries: emptyReturnSummaries, returnLeaves: emptyReturnLeaves, applyInstanceEffects: false, recordOwnedFacts: false))
-        if memoryStatus != 0 { status: 0 - 1 }
+        if memoryStatus > 0 {
+            status: 0 - (1000 + memoryStatus)
+        } else {
+            if memoryStatus < 0 {
+                status: 0 - (1000 + (0 - memoryStatus))
+            }
+        }
     }
-    if status == 0 && compilerBodyMIRBuild(arena: arena) != 0 { status: 0 - 1 }
-    if status == 0 && compilerBodyMIRValidationCode(arena: arena, abiPlan: abiPlan) != 0 { status: 0 - 1 }
+    if status == 0 {
+        let mirStatus: Int(compilerBodyMIRBuild(arena: arena))
+        if mirStatus != 0 { status: 0 - (2000 + (0 - mirStatus)) }
+    }
+    if status == 0 {
+        let validationStatus: Int(compilerBodyMIRValidationCode(arena: arena, abiPlan: abiPlan))
+        if validationStatus != 0 { status: 0 - (3000 + validationStatus) }
+    }
     compilerIntTableDestroy(table: emptyTypeKeys)
     compilerIntTableDestroy(table: emptyTypeKeyArguments)
     compilerIntTableDestroy(table: emptyEffectPaths)
@@ -9473,8 +9874,27 @@ function compilerMacroExecutionEvaluatePreparedArena(
                         let callOutcome: CompilerMacroFunctionOutcome(compilerMacroExecutionEvaluateFunction(tables: arena.tables, index: index, store: store, functionRow: targetID, arguments: callArguments, depth: depth + 1))
                         stepCount: stepCount + callOutcome.stepCount
                         let callResultMIRValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
-                        if callOutcome.status != 0 || callResultMIRValueID < 0
-                            || values.update(element: callOutcome.valueID, index: callResultMIRValueID) != 0 { status: 0 - 611 }
+                        if callOutcome.status != 0 {
+                            status: callOutcome.status
+                        } else if callResultMIRValueID < 0
+                            || values.update(element: callOutcome.valueID, index: callResultMIRValueID) != 0 {
+                            status: 0 - 611
+                        }
+                    } else if status == 0 && targetKind == compilerBodyMIROperationTargetRuntimeBuiltin() {
+                        let callResultMIRValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
+                        state builtinValueID: Int(0 - 1)
+                        if callResultMIRValueID >= 0 && callResultMIRValueID < compilerIntTableRowCount(table: arena.mirValues) {
+                            builtinValueID: compilerMacroExecutionEvaluateRuntimeBuiltin(
+                                tables: arena.tables,
+                                store: store,
+                                builtinID: targetID,
+                                arguments: callArguments,
+                                resultTypeKind: compilerIntTableValue(table: arena.mirValues, row: callResultMIRValueID, column: compilerBodyMIRValueTypeColumn()),
+                                resultTypeID: compilerIntTableValue(table: arena.mirValues, row: callResultMIRValueID, column: compilerBodyMIRValueTypeIDColumn())
+                            )
+                        }
+                        if builtinValueID < 0
+                            || values.update(element: builtinValueID, index: callResultMIRValueID) != 0 { status: 0 - 611 }
                     } else if status == 0 {
                         status: 0 - 612
                     }
@@ -9735,7 +10155,7 @@ function compilerMacroExecutionEvaluateFunction(
     let preparationStatus: Int(compilerMacroExecutionPrepareFunctionArena(arena: arena, index: index))
     if preparationStatus != 0 {
         compilerBodyArenaDestroy(arena: arena)
-        return CompilerMacroFunctionOutcome(status: 0 - 1, valueID: 0 - 1, stepCount: 0)
+        return CompilerMacroFunctionOutcome(status: preparationStatus, valueID: 0 - 1, stepCount: 0)
     }
     let outcome: CompilerMacroFunctionOutcome(compilerMacroExecutionEvaluatePreparedArena(arena: arena, index: index, store: store, arguments: arguments, depth: depth))
     compilerBodyArenaDestroy(arena: arena)
@@ -9859,6 +10279,24 @@ function compilerMacroExecutionParameterValue(
         localStart: compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 7),
         localEnd: compilerIntTableValue(table: tables.macroParameters, row: parameterRow, column: 8)
     ))
+    if compilerMacroParameterIsCapture(tables: tables, parameterRow: parameterRow) {
+        if parameterType != String("String") { return 0 - 1 }
+        let applicationFileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
+        let bodyStart: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 10))
+        let bodyEnd: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 11))
+        if bodyStart < 0 || bodyEnd < bodyStart { return 0 - 1 }
+        let captured: String(compilerTypedSyntaxLocalText(
+            tables: tables,
+            fileID: applicationFileID,
+            localStart: bodyStart,
+            localEnd: bodyEnd
+        ))
+        return compilerMacroValueStoreAppendString(
+            store: store,
+            typeID: typeID,
+            text: captured
+        )
+    }
     let valueText: String(compilerMacroExecutionParameterValueText(
         tables: tables,
         applicationRow: applicationRow,
@@ -10067,8 +10505,41 @@ function compilerMacroExecutionEvaluateInvocation(tables: CompilerSyntaxTables, 
                                 let directOutcome: CompilerMacroFunctionOutcome(compilerMacroExecutionEvaluateFunction(tables: tables, index: arena.declarationIndex, store: valueStore, functionRow: directTargetID, arguments: directArguments, depth: 1))
                                 stepCount: stepCount + directOutcome.stepCount
                                 let directResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
-                                if directOutcome.status != 0 || directResultValueID < 0
-                                    || evaluationValues.update(element: directOutcome.valueID, index: directResultValueID) != 0 {
+                                state directCallValid: Bool(true)
+                                if directOutcome.status != 0 {
+                                    directCallValid: false
+                                    evaluationFailureDetail: directOutcome.status
+                                    if directOutcome.status < 0 { evaluationFailureDetail: 0 - directOutcome.status }
+                                } else if directResultValueID < 0 || directResultValueID >= evaluationValues.count {
+                                    directCallValid: false
+                                    evaluationFailureDetail: 8001
+                                } else if directOutcome.valueID < 0 {
+                                    directCallValid: false
+                                    evaluationFailureDetail: 8002
+                                } else if evaluationValues.update(element: directOutcome.valueID, index: directResultValueID) != 0 {
+                                    directCallValid: false
+                                    evaluationFailureDetail: 8003
+                                }
+                                if !directCallValid {
+                                    status: 0 - 1
+                                    diagnosticCode: compilerMacroDiagnosticBodyInvalid()
+                                    failureOperationRow: operationRow
+                                }
+                            } else if status == 0 && directTargetKind == compilerBodyMIROperationTargetRuntimeBuiltin() {
+                                let directResultValueID: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationResultColumn()))
+                                state builtinValueID: Int(0 - 1)
+                                if directResultValueID >= 0 && directResultValueID < compilerIntTableRowCount(table: arena.mirValues) {
+                                    builtinValueID: compilerMacroExecutionEvaluateRuntimeBuiltin(
+                                        tables: tables,
+                                        store: valueStore,
+                                        builtinID: directTargetID,
+                                        arguments: directArguments,
+                                        resultTypeKind: compilerIntTableValue(table: arena.mirValues, row: directResultValueID, column: compilerBodyMIRValueTypeColumn()),
+                                        resultTypeID: compilerIntTableValue(table: arena.mirValues, row: directResultValueID, column: compilerBodyMIRValueTypeIDColumn())
+                                    )
+                                }
+                                if builtinValueID < 0
+                                    || evaluationValues.update(element: builtinValueID, index: directResultValueID) != 0 {
                                     status: 0 - 1
                                     diagnosticCode: compilerMacroDiagnosticBodyInvalid()
                                     failureOperationRow: operationRow
@@ -10437,7 +10908,16 @@ function compilerMacroExecution(tables: CompilerSyntaxTables, index: CompilerDec
                 let bodyStart: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 27))
                 let bodyEnd: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 28))
                 if capabilitySetID > 0 && bodyEnd > bodyStart {
-                let invocationRow: Int(compilerMacroExecutionAppendInvocation(tables: tables, applicationRow: applicationRow, declarationRow: declarationRow, budget: compilerMacroExecutionBudgetDefault()))
+                let invocationRow: Int(compilerMacroExecutionAppendInvocation(
+                    tables: tables,
+                    applicationRow: applicationRow,
+                    declarationRow: declarationRow,
+                    budget: compilerMacroExecutionBudgetForApplication(
+                        tables: tables,
+                        applicationRow: applicationRow,
+                        declarationRow: declarationRow
+                    )
+                ))
                 if invocationRow < 0 {
                     status: 0 - 1
                     diagnosticCode: compilerMacroDiagnosticBodyInvalid()

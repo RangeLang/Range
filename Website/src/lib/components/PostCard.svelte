@@ -2,15 +2,18 @@
   import type { Post } from "$lib/posts";
   import type { PostContrastPalette } from "$lib/post-contrast";
   import PostNoiseShader from "$lib/components/PostNoiseShader.svelte";
+  import SphereLineShader from "$lib/components/SphereLineShader.svelte";
 
   let {
     post,
+    href = post.href,
     still = false,
     social = false,
     onhoverchange,
     onfocuschange,
   }: {
     post: Post;
+    href?: string;
     still?: boolean;
     social?: boolean;
     onhoverchange?: (hovered: boolean) => void;
@@ -34,7 +37,7 @@
 <a
   class:latestPost={!social}
   class:socialPost={social}
-  href={post.href}
+  {href}
   aria-label={post.cardTitle}
   data-post-palette={post.palette}
   data-foreground-contrast={contrast?.contrast.toFixed(2)}
@@ -46,7 +49,13 @@
   onblur={() => onfocuschange?.(false)}
 >
   {#if social}
-    <PostNoiseShader palette={post.palette} {still} oncontrast={applyContrast} />
+    {#if post.socialShader === "sphere-lines"}
+      <div class="socialSphereShader">
+        <SphereLineShader palette={post.palette} topAligned />
+      </div>
+    {:else}
+      <PostNoiseShader palette={post.palette} {still} oncontrast={applyContrast} />
+    {/if}
   {/if}
   <span class="postCopy">
     <small>{post.category}</small>
@@ -74,6 +83,37 @@
     z-index: 0;
   }
 
+  .socialSphereShader {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .socialSphereShader::after {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(
+        180deg,
+        oklch(1 0 0 / 0.08),
+        oklch(1 0 0 / 0.18) 56%,
+        oklch(1 0 0 / 0.9)
+      ),
+      linear-gradient(
+        90deg,
+        oklch(1 0 0 / 0.96),
+        oklch(1 0 0 / 0.48) 47%,
+        transparent 80%
+      );
+    content: "";
+  }
+
+  .socialSphereShader :global(canvas) {
+    position: absolute;
+    inset: 0;
+  }
+
   .socialPost .postCopy {
     padding: 240px 72px 116px;
     gap: 14px;
@@ -84,6 +124,11 @@
       oklch(1 0 0 / 0.12) 66%,
       transparent 90%
     );
+  }
+
+  .socialPost:has(.socialSphereShader) .postCopy {
+    padding: 246px 72px 72px;
+    background: none;
   }
 
   .socialPost .postCopy small {

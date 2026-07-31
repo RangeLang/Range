@@ -1,7 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
-  let { palette = 0 }: { palette?: number } = $props();
+  let {
+    palette = 0,
+    topAligned = false,
+  }: {
+    palette?: number;
+    topAligned?: boolean;
+  } = $props();
 
   let canvas: HTMLCanvasElement;
   let paletteHue = $derived((22 + palette * 137.507764) % 360);
@@ -20,6 +26,7 @@
     uniform vec2 u_resolution;
     uniform float u_time;
     uniform float u_palette;
+    uniform float u_top_aligned;
 
     float hash(vec2 point) {
       point = fract(point * vec2(123.34, 456.21));
@@ -166,9 +173,18 @@
       float time = u_time;
       float paletteVariation = fract(u_palette * 0.61803398875);
 
-      vec2 first = vec2(aspect * 0.68, 0.58 + sin(time * 0.17) * 0.018);
-      vec2 second = vec2(aspect * 0.9, 0.68 + cos(time * 0.13) * 0.016);
-      vec2 third = vec2(aspect * 0.58, 0.2 + sin(time * 0.11) * 0.014);
+      vec2 first = vec2(
+        aspect * 0.68,
+        mix(0.58, 0.73, u_top_aligned) + sin(time * 0.17) * 0.018
+      );
+      vec2 second = vec2(
+        aspect * 0.9,
+        mix(0.68, 0.79, u_top_aligned) + cos(time * 0.13) * 0.016
+      );
+      vec2 third = vec2(
+        aspect * 0.58,
+        mix(0.2, 0.57, u_top_aligned) + sin(time * 0.11) * 0.014
+      );
 
       float firstGlow = glow(point, first, 0.16);
       float secondGlow = glow(point, second, 0.12);
@@ -288,6 +304,10 @@
     const resolutionLocation = context.getUniformLocation(program, "u_resolution");
     const timeLocation = context.getUniformLocation(program, "u_time");
     const paletteLocation = context.getUniformLocation(program, "u_palette");
+    const topAlignedLocation = context.getUniformLocation(
+      program,
+      "u_top_aligned",
+    );
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0;
     let start = performance.now();
@@ -313,6 +333,7 @@
       context.uniform2f(resolutionLocation, canvas.width, canvas.height);
       context.uniform1f(timeLocation, time);
       context.uniform1f(paletteLocation, palette);
+      context.uniform1f(topAlignedLocation, topAligned ? 1 : 0);
       context.drawArrays(context.TRIANGLES, 0, 6);
       canvas.dataset.rendered = "true";
 
@@ -350,6 +371,7 @@
   aria-hidden="true"
   data-palette={palette}
   data-shader="sphere-lines"
+  data-top-aligned={topAligned ? "" : undefined}
   style={`--palette-hue: ${paletteHue}`}
   bind:this={canvas}
 ></canvas>

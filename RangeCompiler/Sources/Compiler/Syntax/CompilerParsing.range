@@ -187,6 +187,223 @@ function compilerTypedSyntaxSummary(source: String): String {
     return summary
 }
 
+function compilerSyntaxRecipeMemberRow(tables: CompilerSyntaxTables, targetSyntaxID: Int, name: String): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.members) {
+        if compilerIntTableValue(table: tables.members, row: row, column: 2) == targetSyntaxID {
+            let fileID: Int(compilerIntTableValue(table: tables.members, row: row, column: 1))
+            let candidate: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: row, column: 6), localEnd: compilerIntTableValue(table: tables.members, row: row, column: 7)))
+            if candidate == name { return row }
+        }
+        row: row + 1
+    }
+    return 0 - 1
+}
+
+function compilerSyntaxRecipeCardinality(tables: CompilerSyntaxTables, memberRow: Int): String {
+    if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: tables.members) { return String("invalid") }
+    let fileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
+    let typeStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.members, row: memberRow, column: 8)))
+    let typeEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
+    state cursor: Int(typeStart)
+    state firstKind: RangeTokenKind(.eof)
+    state lastKind: RangeTokenKind(.eof)
+    state tokenCount: Int(0)
+    while cursor < typeEnd {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: cursor))
+        if maybeToken == nil { return String("invalid") }
+        let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: cursor))
+        if token.start >= typeEnd { cursor: typeEnd } else {
+            if tokenCount == 0 { firstKind: token.kind }
+            lastKind: token.kind
+            tokenCount: tokenCount + 1
+            cursor: token.end
+        }
+    }
+    if tokenCount == 0 { return String("invalid") }
+    if firstKind == .leftBracket && lastKind == .rightBracket { return String("many") }
+    if lastKind == .question { return String("optional") }
+    return String("one")
+}
+
+function compilerSyntaxRecipeNominalTargetSyntaxID(tables: CompilerSyntaxTables, memberRow: Int): Int {
+    if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: tables.members)
+        || compilerIntTableValue(table: tables.members, row: memberRow, column: 14) != compilerSyntaxTypeTargetReference() {
+        return 0 - 1
+    }
+    state referenceID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 15))
+    while referenceID >= 0 && referenceID < compilerIntTableRowCount(table: tables.typeReferences) {
+        let targetKind: Int(compilerIntTableValue(table: tables.typeReferences, row: referenceID, column: compilerSyntaxTypeReferenceTargetKindColumn()))
+        if targetKind == compilerSyntaxTypeReferenceTargetDeclaration() {
+            return compilerIntTableValue(table: tables.typeReferences, row: referenceID, column: compilerSyntaxTypeReferenceTargetIDColumn())
+        }
+        state childReferenceID: Int(0 - 1)
+        state candidate: Int(0)
+        while candidate < compilerIntTableRowCount(table: tables.typeReferences) {
+            if compilerIntTableValue(table: tables.typeReferences, row: candidate, column: compilerSyntaxTypeReferenceParentColumn()) == referenceID
+                && compilerIntTableValue(table: tables.typeReferences, row: candidate, column: compilerSyntaxTypeReferenceOrdinalColumn()) == 0 {
+                childReferenceID: candidate
+            }
+            candidate: candidate + 1
+        }
+        referenceID: childReferenceID
+    }
+    return 0 - 1
+}
+
+function compilerSyntaxRecipeApplicationRowForTarget(tables: CompilerSyntaxTables, targetSyntaxID: Int): Int {
+    if targetSyntaxID < 0 { return 0 - 1 }
+    state applicationRow: Int(0)
+    while applicationRow < compilerIntTableRowCount(table: tables.macroApplications) {
+        let fileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
+        let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 4), localEnd: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 5)))
+        if name == String("syntax")
+            && compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12) == targetSyntaxID {
+            return applicationRow
+        }
+        applicationRow: applicationRow + 1
+    }
+    return 0 - 1
+}
+
+function compilerSyntaxRecipeTemplateStart(tables: CompilerSyntaxTables, applicationRow: Int): Int {
+    let bodyStart: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 10))
+    if bodyStart >= 0 { return bodyStart }
+    let argumentStart: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 8))
+    if argumentStart >= 0 { return argumentStart }
+    return compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 3)
+}
+
+function compilerSyntaxRecipeTemplateEnd(tables: CompilerSyntaxTables, applicationRow: Int): Int {
+    let bodyEnd: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 11))
+    if bodyEnd >= 0 { return bodyEnd }
+    let argumentEnd: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 9))
+    if argumentEnd >= 0 { return argumentEnd }
+    return compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 3)
+}
+
+function compilerSyntaxRecipeTemplateMode(tables: CompilerSyntaxTables, applicationRow: Int): String {
+    if compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 10) >= 0 { return String("body") }
+    if compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 8) >= 0 { return String("argument") }
+    return String("implicit")
+}
+
+function compilerSyntaxRecipeProcessApplication(tables: CompilerSyntaxTables, rows: RawBuffer, applicationRow: Int, recipeRow: Int, render: Bool): Int {
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    let fileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
+    let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12))
+    if targetSyntaxID < 0 {
+        rawBufferAppendText(buffer: rows, text: "compilerError\(tab)kind=syntaxRecipeMissingTarget\(tab)applicationRow=\(applicationRow)\(newline)")
+        return 0 - 1
+    }
+    let templateStartLocal: Int(compilerSyntaxRecipeTemplateStart(tables: tables, applicationRow: applicationRow))
+    let templateEndLocal: Int(compilerSyntaxRecipeTemplateEnd(tables: tables, applicationRow: applicationRow))
+    let mode: String(compilerSyntaxRecipeTemplateMode(tables: tables, applicationRow: applicationRow))
+    let templateStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: templateStartLocal))
+    let templateEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: templateEndLocal))
+    if render {
+        rawBufferAppendText(buffer: rows, text: "syntaxRecipe\(tab)row=\(recipeRow)\(tab)applicationRow=\(applicationRow)\(tab)targetSyntaxID=\(targetSyntaxID)\(tab)mode=\(mode)\(newline)")
+    }
+    state cursor: Int(templateStart)
+    state ordinal: Int(0)
+    while cursor < templateEnd {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: cursor))
+        if maybeToken == nil {
+            rawBufferAppendText(buffer: rows, text: "compilerError\(tab)kind=syntaxRecipeMalformedTemplate\(tab)applicationRow=\(applicationRow)\(newline)")
+            return 0 - 1
+        }
+        let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: cursor))
+        if token.start >= templateEnd {
+            cursor: templateEnd
+        } else if token.kind == .dollar {
+            let maybeCapture: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: token.end))
+            if maybeCapture == nil {
+                rawBufferAppendText(buffer: rows, text: "compilerError\(tab)kind=syntaxRecipeMalformedCapture\(tab)applicationRow=\(applicationRow)\(tab)ordinal=\(ordinal)\(newline)")
+                return 0 - 1
+            }
+            let capture: RangeLexedToken(maybeCapture ?? compilerFallbackTokenAt(index: token.end))
+            if capture.kind != .identifier && capture.kind != .keyword {
+                rawBufferAppendText(buffer: rows, text: "compilerError\(tab)kind=syntaxRecipeMalformedCapture\(tab)applicationRow=\(applicationRow)\(tab)ordinal=\(ordinal)\(newline)")
+                return 0 - 1
+            }
+            let memberRow: Int(compilerSyntaxRecipeMemberRow(tables: tables, targetSyntaxID: targetSyntaxID, name: capture.text))
+            if memberRow < 0 {
+                rawBufferAppendText(buffer: rows, text: "compilerError\(tab)kind=syntaxRecipeUnknownCapture\(tab)applicationRow=\(applicationRow)\(tab)ordinal=\(ordinal)\(tab)name=\(capture.text)\(newline)")
+                return 0 - 1
+            }
+            if render {
+                let memberFileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
+                let memberType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: memberFileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
+                let nestedTargetSyntaxID: Int(compilerSyntaxRecipeNominalTargetSyntaxID(tables: tables, memberRow: memberRow))
+                let nestedRecipeApplicationRow: Int(compilerSyntaxRecipeApplicationRowForTarget(tables: tables, targetSyntaxID: nestedTargetSyntaxID))
+                rawBufferAppendText(buffer: rows, text: "syntaxRecipeCapture\(tab)recipeRow=\(recipeRow)\(tab)ordinal=\(ordinal)\(tab)name=\(capture.text)\(tab)memberRow=\(memberRow)\(tab)type=\(memberType)\(tab)cardinality=\(compilerSyntaxRecipeCardinality(tables: tables, memberRow: memberRow))\(tab)nestedTargetSyntaxID=\(nestedTargetSyntaxID)\(tab)nestedRecipeApplicationRow=\(nestedRecipeApplicationRow)\(newline)")
+            }
+            ordinal: ordinal + 1
+            cursor: capture.end
+        } else {
+            if render {
+                rawBufferAppendText(buffer: rows, text: "syntaxRecipeLiteral\(tab)recipeRow=\(recipeRow)\(tab)ordinal=\(ordinal)\(tab)kind=\(rangeTokenKindName(kind: token.kind))\(tab)text=\(token.text)\(newline)")
+            }
+            ordinal: ordinal + 1
+            cursor: token.end
+        }
+    }
+    return 0
+}
+
+function compilerSyntaxRecipeRender(tables: CompilerSyntaxTables): String {
+    let rows: RawBuffer(rawBufferCreate(capacity: 4096, stride: 1))
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    state recipeCount: Int(0)
+    state applicationRow: Int(0)
+    while applicationRow < compilerIntTableRowCount(table: tables.macroApplications) {
+        let countFileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
+        let countName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: countFileID, localStart: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 4), localEnd: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 5)))
+        if countName == String("syntax") {
+            if compilerSyntaxRecipeProcessApplication(tables: tables, rows: rows, applicationRow: applicationRow, recipeRow: recipeCount, render: false) != 0 {
+                return compilerCoreRawBufferMaterializeAndDestroy(buffer: rows)
+            }
+            recipeCount: recipeCount + 1
+        }
+        applicationRow: applicationRow + 1
+    }
+    applicationRow: 0
+    state recipeRow: Int(0)
+    while applicationRow < compilerIntTableRowCount(table: tables.macroApplications) {
+        let fileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
+        let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 4), localEnd: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 5)))
+        if name == String("syntax") {
+            if compilerSyntaxRecipeProcessApplication(tables: tables, rows: rows, applicationRow: applicationRow, recipeRow: recipeRow, render: true) != 0 {
+                return compilerCoreRawBufferMaterializeAndDestroy(buffer: rows)
+            }
+            recipeRow: recipeRow + 1
+        }
+        applicationRow: applicationRow + 1
+    }
+    rawBufferAppendText(buffer: rows, text: "syntaxRecipes\(tab)valid=true\(tab)recipeCount=\(recipeCount)\(newline)")
+    return compilerCoreRawBufferMaterializeAndDestroy(buffer: rows)
+}
+
+function compilerSyntaxRecipeSummary(source: String): String {
+    let tables: CompilerSyntaxTables(compilerSyntaxTablesCreate(source: source))
+    let captureStatus: Int(compilerTypedSyntaxCapture(source: source, tables: tables))
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    state summary: String("")
+    if captureStatus != 0 || !compilerSyntaxTablesIsValid(tables: tables) || compilerMacroFinalizeApplications(tables: tables) != 0 {
+        summary: "compilerError\(tab)kind=invalidSyntaxRecipes\(newline)"
+    } else {
+        summary: compilerSyntaxRecipeRender(tables: tables)
+    }
+    let destroyStatus: Int(compilerSyntaxTablesDestroy(tables: tables))
+    if destroyStatus != 0 {
+        return "compilerError\(tab)kind=syntaxRecipeOwnershipFailure\(newline)"
+    }
+    return summary
+}
+
 function compilerMacroDiagnosticName(code: Int): String {
     if code == compilerMacroDiagnosticMalformedDeclaration() { return String("malformedMacroDeclaration") }
     if code == compilerMacroDiagnosticMalformedApplication() { return String("malformedMacroApplication") }

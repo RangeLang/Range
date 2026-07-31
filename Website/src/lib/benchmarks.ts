@@ -20,20 +20,9 @@ export type Benchmark = {
 export const data: any = benchmarkData;
 export const githubUrl = "https://github.com/georgetchelidze/Range/tree/development";
 
-export const improvedStringsBenchmark: Benchmark = {
-  name: "Strings",
-  scale: "100k appends",
-  axisMax: 6,
-  results: [["C", 3.9], ["C++", 3.9], ["Range", 4.1], ["Rust", 4.2], ["Go", 4.8], ["Swift", 5.6]],
-  note: "Range peak memory: 1.9 MB",
-};
 
-export const stringScalingBenchmarks: Benchmark[] = [
-  { name: "100k appends", scale: "30 runs", axisMax: 7, results: [["C", 4.2], ["C++", 4.3], ["Range", 4.3], ["Rust", 4.4], ["Go", 5.3], ["Swift", 6.2]] },
-  { name: "1m appends", scale: "30 runs", axisMax: 24, results: [["C++", 8.2], ["C", 8.7], ["Rust", 8.9], ["Go", 9.5], ["Range", 10.1], ["Swift", 20.7]] },
-  { name: "5m appends", scale: "30 runs", axisMax: 70, results: [["C", 20.0], ["C++", 20.2], ["Rust", 20.3], ["Go", 21.3], ["Range", 27.2], ["Swift", 62.1]] },
-  { name: "10m appends", scale: "30 runs", axisMax: 130, results: [["C", 36.1], ["Rust", 36.2], ["C++", 36.3], ["Go", 37.0], ["Range", 50.1], ["Swift", 118.4]] },
-];
+
+
 
 export function slug(value: string): string {
   return value.toLowerCase().replaceAll(" ", "-");

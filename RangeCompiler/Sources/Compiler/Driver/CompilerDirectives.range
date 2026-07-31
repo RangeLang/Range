@@ -14,6 +14,10 @@ function compilerSourceRequestsTypedSyntax(source: String): Bool {
     return hasRangePrefix(source: source, start: 0, prefix: String("compilerTypedSyntax"))
 }
 
+function compilerSourceRequestsSyntaxRecipes(source: String): Bool {
+    return hasRangePrefix(source: source, start: 0, prefix: String("compilerSyntaxRecipes"))
+}
+
 function compilerSourceRequestsMacroSnapshot(source: String): Bool {
     return hasRangePrefix(source: source, start: 0, prefix: String("compilerMacroSnapshot"))
 }
