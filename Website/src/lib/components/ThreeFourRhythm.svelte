@@ -1,18 +1,48 @@
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+  import { getContext, onDestroy, onMount } from "svelte";
   import type { Snippet } from "svelte";
+  import {
+    DEFAULT_INTRO_MIX,
+    type IntroMixChannel,
+    type IntroMixSettings,
+  } from "$lib/audio/intro-mix";
+  import {
+    RANGE_SOUND_MANAGER_CONTEXT,
+    RANGE_RHYTHM_SUBDIVISION_MS,
+    type RangeSoundManager,
+    type RangeSoundRoute,
+  } from "$lib/audio/sound-manager";
+
+  type FigureAudioPhase = "before" | "entering" | "centered" | "passed";
+
+  type FigureAudioState = {
+    phase: FigureAudioPhase;
+    lastDistance: number;
+  };
+
+  type FigureScrollPosition = {
+    distancePastCenter: number;
+    height: number;
+    entryStartDistance: number;
+    centerRadius: number;
+    progress: number;
+  };
+
+  const soundManager = getContext<RangeSoundManager | undefined>(
+    RANGE_SOUND_MANAGER_CONTEXT,
+  );
 
   let {
-    abstractionIntro,
-    abstractionCode,
+    functionIntro,
+    functionCode,
     bindingIntro,
     bindingCode,
     bindingDetail,
     identityIntro,
     identityDetail,
   }: {
-    abstractionIntro: Snippet;
-    abstractionCode: Snippet;
+    functionIntro: Snippet;
+    functionCode: Snippet;
     bindingIntro: Snippet;
     bindingCode: Snippet;
     bindingDetail: Snippet;
@@ -20,33 +50,45 @@
     identityDetail: Snippet;
   } = $props();
 
-  const subdivisionMilliseconds = 150;
-  const enabledMasterLevel = 0.85;
+  const subdivisionMilliseconds = RANGE_RHYTHM_SUBDIVISION_MS;
+  const enumCases = ["north", "east", "south", "west"] as const;
   let playing = $state(true);
   let audioEnabled = $state(false);
   let step = $state(-1);
+  let rhythmTick = 0;
   let triangleBeat = $state(-1);
   let squareBeat = $state(-1);
+  let enumPulse = $state(-1);
+  let enumCaseBeat = $state(-1);
+  let introMix = $state<IntroMixSettings>({ ...DEFAULT_INTRO_MIX });
   let nextStepAt = 0;
+  let rhythmClockStartedAt = 0;
   let loopTimer: number | undefined;
   let audioContext: AudioContext | undefined;
-  let clickBuffer: AudioBuffer | undefined;
+  let audioRoute: RangeSoundRoute | undefined;
+  let triangleBuffer: AudioBuffer | undefined;
+  let blockBuffer: AudioBuffer | undefined;
   let masterGain: GainNode | undefined;
   let masterDryGain: GainNode | undefined;
   let masterLimiter: DynamicsCompressorNode | undefined;
   let masterReverb: ConvolverNode | undefined;
   let masterReverbWet: GainNode | undefined;
+  let enumReverbSend: GainNode | undefined;
+  let scoreGain: GainNode | undefined;
+  const voiceBuses = new Map<IntroMixChannel, GainNode>();
   let rhythmElement: HTMLDivElement;
   let shaderCanvas: HTMLCanvasElement;
   let identityTrack: HTMLDivElement;
   let identityFigure: HTMLElement;
   let triangleStage: HTMLDivElement;
   let triangleFigure: HTMLElement;
+  let enumFigure: HTMLElement;
   let squareStage: HTMLDivElement;
   let squareFigure: HTMLElement;
   let startShaderAnimation = () => {};
   let stopShaderAnimation = () => {};
   const activeOscillators = new Set<OscillatorNode>();
+  const figureAudioStates = new WeakMap<HTMLElement, FigureAudioState>();
 
   const vertexSource = `
     attribute vec2 a_position;
@@ -81,6 +123,11 @@
 
     void chooseClosest(inout vec2 closest, vec2 candidate) {
       if (candidate.x < closest.x) closest = candidate;
+    }
+
+    float cyclicDistance(float first, float second, float period) {
+      float direct = abs(first - second);
+      return min(direct, period - direct);
     }
 
     vec3 srgbToLinear(vec3 color) {
@@ -144,6 +191,8 @@
       float perimeter = 1.0;
       float head = 0.0;
       float lineValueX = 0.0;
+      float nearestVertexDistance = 0.0;
+      float edgeSpan = 1.0;
 
       if (u_shape < 0.5) {
         vec2 start = vec2(8.0, u_resolution.y * 0.5);
@@ -155,6 +204,8 @@
         float progress = cycle < 1.0 ? cycle : 2.0 - cycle;
         head = progress * perimeter;
         lineValueX = mix(start.x, end.x, progress);
+        nearestVertexDistance = min(head, perimeter - head);
+        edgeSpan = perimeter;
       } else if (u_shape < 1.5) {
         float scale = min(u_resolution.x / 320.0, u_resolution.y / 255.0);
         vec2 inset = (u_resolution - vec2(320.0, 255.0) * scale) * 0.5;
@@ -168,7 +219,21 @@
         closest = segmentInfo(point, a, b, 0.0);
         chooseClosest(closest, segmentInfo(point, b, c, ab));
         chooseClosest(closest, segmentInfo(point, c, a, ab + bc));
-        head = fract(u_time / 1.8) * perimeter;
+        edgeSpan = perimeter / 3.0;
+        float circuitProgress = fract(u_time / 1.8);
+        float edgePosition = circuitProgress * 3.0;
+        float edgeIndex = floor(edgePosition);
+        float edgeProgress = fract(edgePosition);
+        float easedEdgeProgress = edgeProgress * edgeProgress *
+          (3.0 - 2.0 * edgeProgress);
+        head = (edgeIndex + easedEdgeProgress) * edgeSpan;
+        nearestVertexDistance = min(
+          cyclicDistance(head, 0.0, perimeter),
+          min(
+            cyclicDistance(head, ab, perimeter),
+            cyclicDistance(head, ab + bc, perimeter)
+          )
+        );
       } else {
         float scale = min(u_resolution.x / 320.0, u_resolution.y / 260.0);
         vec2 inset = (u_resolution - vec2(320.0, 260.0) * scale) * 0.5;
@@ -185,7 +250,24 @@
         chooseClosest(closest, segmentInfo(point, b, c, ab));
         chooseClosest(closest, segmentInfo(point, c, d, ab + bc));
         chooseClosest(closest, segmentInfo(point, d, a, ab + bc + cd));
-        head = fract(u_time / 1.8) * perimeter;
+        edgeSpan = perimeter / 4.0;
+        float circuitProgress = fract(u_time / 1.8);
+        float edgePosition = circuitProgress * 4.0;
+        float edgeIndex = floor(edgePosition);
+        float edgeProgress = fract(edgePosition);
+        float easedEdgeProgress = edgeProgress * edgeProgress *
+          (3.0 - 2.0 * edgeProgress);
+        head = (edgeIndex + easedEdgeProgress) * edgeSpan;
+        nearestVertexDistance = min(
+          min(
+            cyclicDistance(head, 0.0, perimeter),
+            cyclicDistance(head, ab, perimeter)
+          ),
+          min(
+            cyclicDistance(head, ab + bc, perimeter),
+            cyclicDistance(head, ab + bc + cd, perimeter)
+          )
+        );
       }
 
       vec3 color;
@@ -195,9 +277,17 @@
       if (u_shape >= 0.5) {
         pathDistance = min(pathDistance, perimeter - pathDistance);
       }
-      float valueRadius = u_shape < 0.5
+      float vertexProximity = 1.0 - smoothstep(
+        0.0,
+        edgeSpan * 0.42,
+        nearestVertexDistance
+      );
+      float vertexEase = vertexProximity * vertexProximity *
+        (3.0 - 2.0 * vertexProximity);
+      float bloomScale = mix(0.52, 1.7, vertexEase);
+      float valueRadius = (u_shape < 0.5
         ? max(u_resolution.x * 0.24, 1.0)
-        : max(perimeter * 0.18, 1.0);
+        : max(perimeter * 0.18, 1.0)) * bloomScale;
       float valueDistance = smoothstep(
         0.0,
         valueRadius,
@@ -257,26 +347,34 @@
       !masterDryGain ||
       !masterLimiter ||
       !masterReverb ||
-      !masterReverbWet
+      !masterReverbWet ||
+      !scoreGain
     ) {
       masterGain = audioContext.createGain();
       masterDryGain = audioContext.createGain();
       masterLimiter = audioContext.createDynamicsCompressor();
       masterReverb = audioContext.createConvolver();
       masterReverbWet = audioContext.createGain();
+      enumReverbSend = audioContext.createGain();
+      scoreGain = audioContext.createGain();
       masterGain.gain.setValueAtTime(
-        enabledMasterLevel,
+        introMix.master,
         audioContext.currentTime,
       );
-      masterDryGain.gain.setValueAtTime(0.94, audioContext.currentTime);
-      masterReverbWet.gain.setValueAtTime(0.12, audioContext.currentTime);
-      masterLimiter.threshold.setValueAtTime(-12, audioContext.currentTime);
-      masterLimiter.knee.setValueAtTime(10, audioContext.currentTime);
-      masterLimiter.ratio.setValueAtTime(4, audioContext.currentTime);
-      masterLimiter.attack.setValueAtTime(0.006, audioContext.currentTime);
-      masterLimiter.release.setValueAtTime(0.12, audioContext.currentTime);
+      scoreGain.gain.setValueAtTime(
+        audioEnabled ? 1 : 0.0001,
+        audioContext.currentTime,
+      );
+      masterDryGain.gain.setValueAtTime(0.96, audioContext.currentTime);
+      masterReverbWet.gain.setValueAtTime(0.32, audioContext.currentTime);
+      enumReverbSend.gain.setValueAtTime(0.78, audioContext.currentTime);
+      masterLimiter.threshold.setValueAtTime(-16, audioContext.currentTime);
+      masterLimiter.knee.setValueAtTime(12, audioContext.currentTime);
+      masterLimiter.ratio.setValueAtTime(2.5, audioContext.currentTime);
+      masterLimiter.attack.setValueAtTime(0.012, audioContext.currentTime);
+      masterLimiter.release.setValueAtTime(0.18, audioContext.currentTime);
 
-      const impulseLength = Math.round(audioContext.sampleRate * 0.72);
+      const impulseLength = Math.round(audioContext.sampleRate * 2.4);
       const impulse = audioContext.createBuffer(
         2,
         impulseLength,
@@ -289,47 +387,99 @@
           seed = (seed * 1664525 + 1013904223) >>> 0;
           const noise = seed / 2147483648 - 1;
           const progress = index / Math.max(1, channel.length - 1);
-          channel[index] = noise * Math.pow(1 - progress, 3.4) * 0.36;
+          channel[index] = noise * Math.pow(1 - progress, 2.3) * 0.25;
         }
       }
       masterReverb.buffer = impulse;
 
+      scoreGain.connect(masterGain);
       masterGain.connect(masterDryGain).connect(masterLimiter);
       masterGain
         .connect(masterReverb)
         .connect(masterReverbWet)
         .connect(masterLimiter);
-      masterLimiter.connect(audioContext.destination);
+      enumReverbSend.connect(masterReverb);
+      if (audioRoute) masterLimiter.connect(audioRoute.input);
     }
 
     return masterGain;
   }
 
+  function mixLevel(channel: IntroMixChannel) {
+    return introMix[channel];
+  }
+
+  function pitchRatioFor(channel: IntroMixChannel) {
+    void channel;
+    return Math.pow(2, introMix.transpose / 12);
+  }
+
+  function voiceOutput(channel: IntroMixChannel) {
+    const master = masterOutput();
+    if (!master || !audioContext) return;
+    const destination = channel === "keyboard" ? master : scoreGain;
+    if (!destination) return;
+
+    let bus = voiceBuses.get(channel);
+    if (!bus) {
+      bus = audioContext.createGain();
+      bus.gain.setValueAtTime(mixLevel(channel), audioContext.currentTime);
+      bus.connect(destination);
+      if (channel === "enums" && enumReverbSend) {
+        bus.connect(enumReverbSend);
+      }
+      voiceBuses.set(channel, bus);
+    }
+    return bus;
+  }
+
+  function syncMixGains() {
+    if (!audioContext) return;
+    const now = audioContext.currentTime;
+    masterGain?.gain.setTargetAtTime(introMix.master, now, 0.025);
+    for (const [channel, bus] of voiceBuses) {
+      bus.gain.setTargetAtTime(mixLevel(channel), now, 0.025);
+    }
+  }
+
+  function setScoreGain(level: number) {
+    if (!audioContext || !scoreGain) return;
+    scoreGain.gain.setTargetAtTime(level, audioContext.currentTime, 0.012);
+  }
+
   function playTone(
+    channel: IntroMixChannel,
     frequency: number,
     type: OscillatorType,
     volume: number,
-    duration = 0.14,
+    duration = 0.22,
   ) {
-    if (!audioEnabled || !audioContext) return;
-    const destination = masterOutput();
+    if (!audioEnabled || !audioContext || volume <= 0.0005) return;
+    const destination = voiceOutput(channel);
     if (!destination) return;
 
     const now = audioContext.currentTime;
     const oscillator = audioContext.createOscillator();
+    const filter = audioContext.createBiquadFilter();
     const gain = audioContext.createGain();
     const peakVolume = Math.max(0.0001, volume);
+    const velocity = Math.max(0, Math.min(1, volume / 0.16));
+    const noteDuration = Math.max(0.05, duration * (0.7 + Math.sqrt(velocity) * 0.3));
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(frequency, now);
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(Math.max(420, frequency * 3.25), now);
+    filter.Q.setValueAtTime(0.55, now);
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(peakVolume, now + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration - 0.01);
-    oscillator.connect(gain);
+    gain.gain.exponentialRampToValueAtTime(peakVolume, now + 0.024);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + noteDuration - 0.01);
+    oscillator.connect(filter);
+    filter.connect(gain);
     gain.connect(destination);
     activeOscillators.add(oscillator);
     oscillator.onended = () => activeOscillators.delete(oscillator);
     oscillator.start(now);
-    oscillator.stop(now + duration);
+    oscillator.stop(now + noteDuration);
   }
 
   function smoothRange(start: number, end: number, value: number) {
@@ -339,78 +489,133 @@
   }
 
   function centeredRhythmVolume(target: HTMLElement) {
-    const figures = [identityFigure, triangleFigure, squareFigure];
-    const targetIndex = figures.indexOf(target);
-    if (targetIndex < 0) return 0;
+    trackFigureAudioStates();
+    const position = figureScrollPosition(target);
+    const { distancePastCenter, height, entryStartDistance, centerRadius } = position;
+    const peakLevel = 0.92;
+    const backgroundLevel = 0.48;
+    const phase = figureAudioStates.get(target)?.phase ?? "before";
 
-    const scrollPosition = window.scrollY;
-    const viewportAnchor = scrollPosition + window.innerHeight * 0.5;
-    const centers = figures.map((figure) => {
-      const rect = figure.getBoundingClientRect();
-      return rect.top + scrollPosition + rect.height * 0.5;
-    });
-    const targetCenter = centers[targetIndex];
-    const previousCenter = targetIndex > 0
-      ? centers[targetIndex - 1]
-      : targetCenter - window.innerHeight * 0.72;
-
-    if (viewportAnchor < targetCenter) {
-      return smoothRange(
-        previousCenter,
-        targetCenter,
-        viewportAnchor,
-      ) * 0.8;
+    if (phase === "before") return 0;
+    if (phase === "entering") {
+      return smoothRange(entryStartDistance, -centerRadius, distancePastCenter)
+        * peakLevel;
     }
+    if (phase === "centered") return peakLevel;
 
-    for (
-      let stageIndex = targetIndex;
-      stageIndex < centers.length - 1;
-      stageIndex += 1
-    ) {
-      const nextCenter = centers[stageIndex + 1];
-      if (viewportAnchor <= nextCenter) {
-        const passedFigures = stageIndex - targetIndex;
-        const startLevel = Math.max(0.2, Math.pow(0.45, passedFigures));
-        const endLevel = Math.max(0.2, Math.pow(0.45, passedFigures + 1));
-        const progress = smoothRange(
-          centers[stageIndex],
-          nextCenter,
-          viewportAnchor,
-        );
-        return (startLevel + (endLevel - startLevel) * progress) * 0.8;
+    const normalizationDistance = Math.max(
+      window.innerHeight * 0.42,
+      height * 0.75,
+    );
+    const centeredProximity = 1 - smoothRange(
+      centerRadius,
+      normalizationDistance,
+      Math.abs(distancePastCenter),
+    );
+    return backgroundLevel + (peakLevel - backgroundLevel) * centeredProximity;
+  }
+
+  function figureScrollPosition(target: HTMLElement): FigureScrollPosition {
+    const glyph = target.querySelector<HTMLElement>(
+      ".identityExpression, .shapeStage, .enumStage",
+    ) ?? target;
+    const rect = glyph.getBoundingClientRect();
+    const distancePastCenter = window.innerHeight * 0.5 - (rect.top + rect.height * 0.5);
+    const height = rect.height;
+    const entryStartDistance = -(window.innerHeight + height) * 0.5;
+    const centerRadius = Math.max(18, height * 0.14);
+    return {
+      distancePastCenter,
+      height,
+      entryStartDistance,
+      centerRadius,
+      progress: smoothRange(entryStartDistance, centerRadius, distancePastCenter),
+    };
+  }
+
+  function phaseForFigurePosition(position: FigureScrollPosition): FigureAudioPhase {
+    if (position.distancePastCenter < position.entryStartDistance) return "before";
+    if (position.distancePastCenter < -position.centerRadius) return "entering";
+    if (position.distancePastCenter <= position.centerRadius) return "centered";
+    return "passed";
+  }
+
+  function exposeFigureScrollPosition(
+    target: HTMLElement,
+    state: FigureAudioState,
+    position: FigureScrollPosition,
+  ) {
+    target.dataset.scrollPhase = state.phase;
+    target.style.setProperty("--scroll-progress", position.progress.toFixed(4));
+    target.style.setProperty(
+      "--scroll-distance",
+      `${position.distancePastCenter.toFixed(1)}px`,
+    );
+  }
+
+  function trackFigureAudioStates() {
+    for (const target of [
+      identityFigure,
+      triangleFigure,
+      enumFigure,
+      squareFigure,
+    ]) {
+      if (!target) continue;
+      const position = figureScrollPosition(target);
+      const { distancePastCenter, entryStartDistance, centerRadius } = position;
+      const state = figureAudioStates.get(target);
+
+      if (!state) {
+        const initialState = {
+          phase: "before",
+          lastDistance: distancePastCenter,
+        } satisfies FigureAudioState;
+        figureAudioStates.set(target, initialState);
+        exposeFigureScrollPosition(target, initialState, position);
+        continue;
       }
+
+      const movingDown = distancePastCenter > state.lastDistance + 0.5;
+      const movingUp = distancePastCenter < state.lastDistance - 0.5;
+
+      if (state.phase === "before" && movingDown && distancePastCenter >= entryStartDistance) {
+        state.phase = phaseForFigurePosition(position);
+      } else if (state.phase === "entering") {
+        if (movingDown && distancePastCenter >= -centerRadius) {
+          state.phase = phaseForFigurePosition(position);
+        } else if (movingUp && distancePastCenter < entryStartDistance) {
+          state.phase = "before";
+        }
+      } else if (state.phase === "centered") {
+        if (movingDown && distancePastCenter > centerRadius) {
+          state.phase = "passed";
+        } else if (movingUp && distancePastCenter < -centerRadius) {
+          state.phase = "entering";
+        }
+      } else if (state.phase === "passed" && movingUp) {
+        state.phase = phaseForFigurePosition(position);
+      }
+
+      state.lastDistance = distancePastCenter;
+      exposeFigureScrollPosition(target, state, position);
     }
-
-    const passedFigures = centers.length - 1 - targetIndex;
-    const retainedLevel = Math.max(0.2, Math.pow(0.45, passedFigures));
-    const finalCenter = centers.at(-1) ?? targetCenter;
-    const tail = 1 - smoothRange(
-      finalCenter,
-      finalCenter + window.innerHeight * 1.1,
-      viewportAnchor,
-    );
-    return retainedLevel * tail * 0.8;
   }
 
-  function pulseTriangle(beat: number) {
-    triangleBeat = beat;
-    playTone(
-      220,
-      "triangle",
-      0.09 * centeredRhythmVolume(triangleFigure),
-    );
-  }
-
-  function playSquarePercussion(volumeScale: number) {
-    if (!audioEnabled || !audioContext) return;
-    const destination = masterOutput();
+  function playTrianglePercussion(
+    volumeScale: number,
+    channel: IntroMixChannel = "forms",
+  ) {
+    if (!audioEnabled || !audioContext || volumeScale <= 0.01) return;
+    const destination = voiceOutput(channel);
     if (!destination) return;
 
     const now = audioContext.currentTime;
-    clickBuffer ??= (() => {
+    const pitchRatio = pitchRatioFor(channel);
+    triangleBuffer ??= (() => {
+      const duration = 0.22;
       const length = Math.max(
         1,
-        Math.round(audioContext.sampleRate * 0.006),
+        Math.round(audioContext.sampleRate * duration),
       );
       const buffer = audioContext.createBuffer(
         1,
@@ -418,74 +623,164 @@
         audioContext.sampleRate,
       );
       const samples = buffer.getChannelData(0);
-      let seed = 0x72e5a91d;
+      let seed = 0x6d2b79f5;
+      let previousNoise = 0;
+
       for (let index = 0; index < length; index += 1) {
+        const time = index / audioContext.sampleRate;
+        const attack = Math.min(1, time / 0.0015);
         seed = (seed * 1664525 + 1013904223) >>> 0;
         const noise = seed / 2147483648 - 1;
-        samples[index] = noise * (1 - index / length);
+        const brightNoise = noise - previousNoise * 0.82;
+        const envelope = Math.exp(-time * 24);
+        samples[index] = brightNoise * envelope * attack * 0.22;
+        previousNoise = noise;
       }
       return buffer;
     })();
 
-    const click = audioContext.createBufferSource();
-    const clickHighpass = audioContext.createBiquadFilter();
-    const clickGain = audioContext.createGain();
-    click.buffer = clickBuffer;
-    clickHighpass.type = "bandpass";
-    clickHighpass.frequency.setValueAtTime(620, now);
-    clickHighpass.Q.setValueAtTime(0.65, now);
-    clickGain.gain.setValueAtTime(0.0001, now);
-    clickGain.gain.linearRampToValueAtTime(
-      Math.max(0.0001, 0.16 * volumeScale),
-      now + 0.001,
+    const strike = audioContext.createBufferSource();
+    const highpass = audioContext.createBiquadFilter();
+    const lowpass = audioContext.createBiquadFilter();
+    const gain = audioContext.createGain();
+    strike.buffer = triangleBuffer;
+    highpass.type = "highpass";
+    highpass.frequency.setValueAtTime(1800 * pitchRatio, now);
+    highpass.Q.setValueAtTime(0.18, now);
+    lowpass.type = "lowpass";
+    lowpass.frequency.setValueAtTime(6200 * pitchRatio, now);
+    lowpass.frequency.setTargetAtTime(3400 * pitchRatio, now + 0.008, 0.045);
+    lowpass.Q.setValueAtTime(0.18, now);
+    gain.gain.setValueAtTime(0.2 * volumeScale, now);
+    strike.connect(highpass).connect(lowpass).connect(gain).connect(destination);
+    strike.start(now);
+  }
+
+  function pulseTriangle(beat: number) {
+    triangleBeat = beat;
+    playTrianglePercussion(centeredRhythmVolume(triangleFigure));
+  }
+
+  function nextEnumCase() {
+    if (enumCases.length < 2) return 0;
+    if (enumCaseBeat < 0) return Math.floor(Math.random() * enumCases.length);
+    const previous = enumCaseBeat;
+    const offset = 1 + Math.floor(Math.random() * (enumCases.length - 1));
+    return (previous + offset) % enumCases.length;
+  }
+
+  function pulseEnumSplit() {
+    enumPulse = enumPulse === 0 ? 1 : 0;
+    enumCaseBeat = nextEnumCase();
+    const volume = centeredRhythmVolume(enumFigure);
+    playTrianglePercussion(volume * 0.56, "enums");
+    playEnumTailBend(volume);
+  }
+
+  function playEnumTailBend(volumeScale: number) {
+    if (!audioEnabled || !audioContext || volumeScale <= 0.01) return;
+    const destination = voiceOutput("enums");
+    if (!destination) return;
+
+    const startAt = audioContext.currentTime + 0.024;
+    const pitchRatio = pitchRatioFor("enums");
+    const oscillator = audioContext.createOscillator();
+    const filter = audioContext.createBiquadFilter();
+    const gain = audioContext.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(278 * pitchRatio, startAt);
+    oscillator.frequency.exponentialRampToValueAtTime(
+      278 * Math.pow(2, -1 / 12) * pitchRatio,
+      startAt + 0.34,
     );
-    clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.006);
-    click.connect(clickHighpass);
-    clickHighpass.connect(clickGain);
-    clickGain.connect(destination);
-    click.start(now);
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(1_050 * pitchRatio, startAt);
+    filter.Q.setValueAtTime(0.55, startAt);
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.linearRampToValueAtTime(0.026 * volumeScale, startAt + 0.045);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.38);
+    oscillator.connect(filter).connect(gain).connect(destination);
+    activeOscillators.add(oscillator);
+    oscillator.onended = () => activeOscillators.delete(oscillator);
+    oscillator.start(startAt);
+    oscillator.stop(startAt + 0.4);
+  }
 
-    const resonances = [
-      { frequency: 461.75, volume: 0.14, duration: 0.042 },
-      { frequency: 740.75, volume: 0.08, duration: 0.034 },
-    ];
+  function clearEnumVisuals() {
+    enumPulse = -1;
+    enumCaseBeat = -1;
+  }
 
-    for (const resonance of resonances) {
-      const oscillator = audioContext.createOscillator();
-      const gain = audioContext.createGain();
+  function playSquarePercussion(
+    beat: number,
+    volumeScale: number,
+  ) {
+    if (!audioEnabled || !audioContext || volumeScale <= 0.01) return;
+    const destination = voiceOutput("properties");
+    if (!destination) return;
 
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(resonance.frequency, now);
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.linearRampToValueAtTime(
-        Math.max(0.0001, resonance.volume * volumeScale),
-        now + 0.0015,
+    const now = audioContext.currentTime;
+    blockBuffer ??= (() => {
+      const length = Math.max(
+        1,
+        Math.round(audioContext.sampleRate * 0.032),
       );
-      gain.gain.exponentialRampToValueAtTime(
-        0.0001,
-        now + resonance.duration,
+      const buffer = audioContext.createBuffer(
+        1,
+        length,
+        audioContext.sampleRate,
       );
+      const samples = buffer.getChannelData(0);
+      let seed = 0x2c9277b5;
+      for (let index = 0; index < length; index += 1) {
+        seed = (seed * 1664525 + 1013904223) >>> 0;
+        const noise = seed / 2147483648 - 1;
+        const progress = index / Math.max(1, length - 1);
+        samples[index] = noise * Math.pow(1 - progress, 4.8);
+      }
+      return buffer;
+    })();
 
-      oscillator.connect(gain);
-      gain.connect(destination);
-      activeOscillators.add(oscillator);
-      oscillator.onended = () => activeOscillators.delete(oscillator);
-      oscillator.start(now);
-      oscillator.stop(now + resonance.duration + 0.003);
-    }
+    const strike = audioContext.createBufferSource();
+    const bodyFilter = audioContext.createBiquadFilter();
+    const knockFilter = audioContext.createBiquadFilter();
+    const bodyGain = audioContext.createGain();
+    const knockGain = audioContext.createGain();
+    const baseFrequency = (340 + (beat % 2) * 22) * pitchRatioFor("properties");
+
+    strike.buffer = blockBuffer;
+    bodyFilter.type = "bandpass";
+    bodyFilter.frequency.setValueAtTime(baseFrequency, now);
+    bodyFilter.Q.setValueAtTime(4.2, now);
+    knockFilter.type = "bandpass";
+    knockFilter.frequency.setValueAtTime(baseFrequency * 2.35, now);
+    knockFilter.Q.setValueAtTime(5.8, now);
+
+    bodyGain.gain.setValueAtTime(0.0001, now);
+    bodyGain.gain.linearRampToValueAtTime(0.46 * volumeScale, now + 0.0015);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.062);
+    knockGain.gain.setValueAtTime(0.0001, now);
+    knockGain.gain.linearRampToValueAtTime(0.24 * volumeScale, now + 0.001);
+    knockGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.038);
+
+    strike.connect(bodyFilter).connect(bodyGain).connect(destination);
+    strike.connect(knockFilter).connect(knockGain).connect(destination);
+    strike.start(now);
+    strike.stop(now + 0.065);
   }
 
   function pulseSquare(beat: number) {
     squareBeat = beat;
-    playSquarePercussion(centeredRhythmVolume(squareFigure));
+    playSquarePercussion(beat, centeredRhythmVolume(squareFigure));
   }
 
   function pulseLine(side: "identity" | "value") {
     playTone(
-      side === "identity" ? 27.5 : 41.2034,
+      "identity",
+      (side === "identity" ? 55 : 82.4069) * pitchRatioFor("identity"),
       "sine",
-      0.11 * centeredRhythmVolume(identityFigure),
-      0.34,
+      0.16 * centeredRhythmVolume(identityFigure),
+      2.1,
     );
   }
 
@@ -498,6 +793,12 @@
     }
 
     step = (step + 1) % 12;
+    rhythmTick += 1;
+    soundManager?.publishRhythmBeat?.({
+      step,
+      tick: rhythmTick,
+      audioTime: audioContext?.currentTime,
+    });
 
     // Three accents divide the shared 12-step cycle into groups of four.
     if (step % 4 === 0) pulseTriangle(step / 4);
@@ -507,6 +808,11 @@
 
     // Identity and value alternate across the same shared cycle.
     if (step % 6 === 0) pulseLine(step === 0 ? "identity" : "value");
+
+    // Enum makes one split at the midpoint of each two-loop phrase.
+    if (rhythmTick % 24 === 13) {
+      pulseEnumSplit();
+    }
 
     nextStepAt += subdivisionMilliseconds;
     loopTimer = window.setTimeout(
@@ -518,7 +824,9 @@
   function startRhythm() {
     playing = true;
     step = -1;
-    nextStepAt = performance.now();
+    rhythmTick = 0;
+    rhythmClockStartedAt = performance.now();
+    nextStepAt = rhythmClockStartedAt;
     startShaderAnimation();
     playStep();
   }
@@ -529,36 +837,45 @@
       window.clearTimeout(loopTimer);
     }
     loopTimer = undefined;
+    clearEnumVisuals();
     stopShaderAnimation();
+  }
+
+  async function ensureAudioRoute() {
+    const context = await soundManager?.resume();
+    if (!context || !soundManager) return false;
+    audioContext = context;
+    audioRoute ??= soundManager.register("range-rhythm", 1.2);
+    if (!audioRoute) return false;
+    masterOutput();
+    return true;
   }
 
   async function toggleAudio() {
     if (audioEnabled) {
       audioEnabled = false;
-      if (audioContext && masterGain) {
-        masterGain.gain.setTargetAtTime(
-          0.0001,
-          audioContext.currentTime,
-          0.01,
-        );
-      }
+      soundManager?.setEnabled(false);
+      setScoreGain(0.0001);
       return;
     }
 
-    audioContext ??= new AudioContext();
-    if (audioContext.state === "suspended") await audioContext.resume();
+    if (!(await ensureAudioRoute()) || !audioContext || !soundManager) return;
     audioEnabled = true;
-
-    const output = masterOutput();
-    if (output) {
-      output.gain.cancelScheduledValues(audioContext.currentTime);
-      output.gain.setTargetAtTime(
-        enabledMasterLevel,
-        audioContext.currentTime,
-        0.01,
-      );
-    }
+    soundManager.setEnabled(true);
+    trackFigureAudioStates();
+    setScoreGain(1);
+    syncMixGains();
   }
+
+  onMount(() => {
+    trackFigureAudioStates();
+    window.addEventListener("scroll", trackFigureAudioStates, { passive: true });
+    window.addEventListener("resize", trackFigureAudioStates);
+    return () => {
+      window.removeEventListener("scroll", trackFigureAudioStates);
+      window.removeEventListener("resize", trackFigureAudioStates);
+    };
+  });
 
   onMount(() => {
     if (
@@ -609,7 +926,7 @@
     const accentLocation = context.getUniformLocation(program, "u_accent");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0;
-    let startedAt = performance.now();
+    let startedAt = rhythmClockStartedAt;
 
     const readAccent = () => {
       const colorElement = document.createElement("span");
@@ -710,7 +1027,7 @@
     };
 
     startShaderAnimation = () => {
-      startedAt = performance.now();
+      startedAt = rhythmClockStartedAt;
       redraw();
     };
     stopShaderAnimation = redraw;
@@ -739,9 +1056,27 @@
   });
 
   onDestroy(() => {
-    for (const oscillator of activeOscillators) oscillator.stop();
+    soundManager?.setEnabled(false);
+    clearEnumVisuals();
+    for (const oscillator of activeOscillators) {
+      try {
+        oscillator.stop();
+      } catch {
+        // The oscillator may already have completed.
+      }
+    }
     activeOscillators.clear();
-    void audioContext?.close();
+    for (const bus of voiceBuses.values()) bus.disconnect();
+    voiceBuses.clear();
+    scoreGain?.disconnect();
+    masterGain?.disconnect();
+    masterDryGain?.disconnect();
+    masterReverb?.disconnect();
+    masterReverbWet?.disconnect();
+    enumReverbSend?.disconnect();
+    masterLimiter?.disconnect();
+    audioRoute?.dispose();
+    audioRoute = undefined;
   });
 </script>
 
@@ -775,11 +1110,7 @@
       onclick={toggleAudio}
       title={audioEnabled ? "Mute rhythm" : "Enable rhythm sound"}
     >
-      <svg
-        class="volumeIcon"
-        viewBox="0 0 20 20"
-        aria-hidden="true"
-      >
+      <svg class="volumeIcon" viewBox="0 0 20 20" aria-hidden="true">
         <path d="M3 8h3l4-3v10l-4-3H3z"></path>
         {#if audioEnabled}
           <path class="volumeWave" d="M13 7.2c1.6 1.5 1.6 4.1 0 5.6"></path>
@@ -811,13 +1142,13 @@
     {@render identityDetail()}
   </div>
 
-  <div class="abstractionIntro">
-    {@render abstractionIntro()}
+  <div class="functionIntro">
+    {@render functionIntro()}
   </div>
 
   <figure
     class="shapeFigure triangleFigure"
-    aria-label="Constructs, enums, and macros"
+    aria-label="Construct, enum, and function"
     bind:this={triangleFigure}
   >
     <div class="figureHeader">
@@ -831,25 +1162,52 @@
           x="160"
           y="17"
           text-anchor="middle"
-        >Constructs</text>
+        >Construct</text>
         <text
           class="shapeLabel triangleLabel triangleLabel1"
           x="292"
           y="247"
           text-anchor="end"
-        >Enums</text>
+        >Enum</text>
         <text
           class="shapeLabel triangleLabel triangleLabel2"
           x="28"
           y="247"
-        >Macros</text>
+        >Function</text>
       </svg>
     </div>
   </figure>
 
-  <div class="abstractionCode">
-    {@render abstractionCode()}
+  <div class="functionCode">
+    {@render functionCode()}
   </div>
+
+  <figure
+    class="enumFigure"
+    aria-label="A Direction enum with four alternative cases"
+    bind:this={enumFigure}
+  >
+    <div class="enumStage">
+      <div
+        class="enumDeclaration"
+        class:enumPulseFirst={enumPulse === 0}
+        class:enumPulseSecond={enumPulse === 1}
+      >
+        <div class="enumLine enumHeader">
+          <span class="enumKeyword">enum</span> Direction {"{"}
+        </div>
+        {#each enumCases as caseName, index}
+          <div
+            class="enumLine enumCase"
+            class:activeEnumCase={enumCaseBeat === index}
+          >
+            <span class="enumCaseKeyword">case</span> {caseName}
+          </div>
+        {/each}
+        <div class="enumLine">{"}"}</div>
+      </div>
+    </div>
+  </figure>
 
   <div class="bindingIntro">
     {@render bindingIntro()}
@@ -926,7 +1284,7 @@
     margin: 30px 0 38px;
   }
 
-  .identityDetail + .abstractionIntro {
+  .identityDetail + .functionIntro {
     margin-top: 20px;
   }
 
@@ -934,8 +1292,58 @@
     margin-top: 30px;
   }
 
-  .abstractionCode :global(range-code-block) {
+  .functionCode :global(range-code-block) {
     margin-top: 30px;
+  }
+
+  .enumFigure {
+    position: relative;
+    z-index: 3;
+    display: grid;
+    width: 100vw;
+    min-height: min(80svh, 720px);
+    margin: 42px calc(50% - 50vw) 62px;
+    padding: 32px clamp(28px, 10vw, 176px);
+    place-items: center;
+  }
+
+  .enumStage {
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .enumDeclaration {
+    display: grid;
+    gap: 0.16em;
+    font-family: var(--font-geist-mono), monospace;
+    font-size: clamp(24px, min(4.4vw, 7.2svh), 68px);
+    font-weight: 500;
+    letter-spacing: -0.07em;
+    line-height: 1.15;
+    color: var(--ink);
+    transform-origin: 0 50%;
+  }
+
+  .enumKeyword,
+  .enumCaseKeyword {
+    color: var(--range);
+  }
+
+  .enumLine {
+    min-width: 0;
+  }
+
+  .enumCase {
+    padding-left: 1.7ch;
+    transition:
+      color 160ms ease,
+      text-shadow 160ms ease,
+      transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .enumCase.activeEnumCase {
+    color: var(--range);
+    transform: translateX(0.08em);
   }
 
   .figureHeader {
@@ -1106,8 +1514,22 @@
       align-items: flex-start;
     }
 
-    .volumeButton {
-      flex: 0 0 auto;
+    .enumFigure {
+      min-height: 70svh;
+      margin-top: 28px;
+      margin-bottom: 44px;
+      padding: 32px 22px;
+    }
+
+    .enumDeclaration {
+      font-size: clamp(22px, min(8.6vw, 6.4svh), 42px);
+      letter-spacing: -0.075em;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .enumCase {
+      transition: none;
     }
   }
 </style>

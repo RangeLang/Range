@@ -1,9 +1,18 @@
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+  import { getContext, onDestroy, onMount } from "svelte";
   import {
     rangePlaybackOrder,
     rangePlaybackStep,
   } from "$lib/range-rhythm";
+  import {
+    RANGE_SOUND_MANAGER_CONTEXT,
+    type RangeSoundManager,
+    type RangeSoundRoute,
+  } from "$lib/audio/sound-manager";
+
+  const soundManager = getContext<RangeSoundManager | undefined>(
+    RANGE_SOUND_MANAGER_CONTEXT,
+  );
 
   type ConceptID = "shape" | "ownership" | "capability";
 
@@ -52,6 +61,7 @@
   let audioMasterInput: GainNode | undefined;
   let audioMasterCompressor: DynamicsCompressorNode | undefined;
   let audioMasterOutput: GainNode | undefined;
+  let audioRoute: RangeSoundRoute | undefined;
   let reverbInput: GainNode | undefined;
   let distantVoiceGain: GainNode | undefined;
   let distantVoiceFilter: BiquadFilterNode | undefined;
@@ -68,6 +78,8 @@
   const spiralDashEndLength = 12;
   const innerRingRadius = 64;
   const outerRadius = 290;
+  const distantSoundFloor = 0;
+  const distantSoundCeiling = 0.58;
   const circularScaleValues = [2, 4, 8, 16];
   const branchAngles: Record<ConceptID, number> = {
     shape: (-90 * Math.PI) / 180,
@@ -202,16 +214,16 @@
     audioMasterInput = audioContext.createGain();
     audioMasterCompressor = audioContext.createDynamicsCompressor();
     audioMasterOutput = audioContext.createGain();
-    audioMasterInput.gain.value = 1.8;
+    audioMasterInput.gain.value = 0.82;
     audioMasterCompressor.threshold.value = -28;
     audioMasterCompressor.knee.value = 8;
     audioMasterCompressor.ratio.value = 12;
     audioMasterCompressor.attack.value = 0.003;
     audioMasterCompressor.release.value = 0.12;
-    audioMasterOutput.gain.value = 1;
+    audioMasterOutput.gain.value = scrollSoundGain(scrollFilterPosition);
     audioMasterInput.connect(audioMasterCompressor);
     audioMasterCompressor.connect(audioMasterOutput);
-    audioMasterOutput.connect(audioContext.destination);
+    if (audioRoute) audioMasterOutput.connect(audioRoute.input);
     return audioMasterInput;
   }
 
@@ -284,6 +296,11 @@
     return minimum + (maximum - minimum) * position;
   }
 
+  function scrollSoundGain(position: number) {
+    return distantSoundFloor
+      + (distantSoundCeiling - distantSoundFloor) * position;
+  }
+
   function updateScrollFilter() {
     if (!sectionElement || typeof window === "undefined") return;
     const bounds = sectionElement.getBoundingClientRect();
@@ -296,13 +313,20 @@
     );
     scrollFilterPosition = proximity * proximity * (3 - 2 * proximity);
 
-    if (!audioContext || !distantVoiceFilter) return;
+    if (!audioContext) return;
     const now = audioContext.currentTime;
-    distantVoiceFilter.frequency.cancelScheduledValues(now);
-    distantVoiceFilter.frequency.setTargetAtTime(
-      scrollFilterFrequency(scrollFilterPosition),
+    if (distantVoiceFilter) {
+      distantVoiceFilter.frequency.cancelScheduledValues(now);
+      distantVoiceFilter.frequency.setTargetAtTime(
+        scrollFilterFrequency(scrollFilterPosition),
+        now,
+        0.08,
+      );
+    }
+    audioMasterOutput?.gain.setTargetAtTime(
+      scrollSoundGain(scrollFilterPosition),
       now,
-      0.08,
+      0.12,
     );
   }
 
@@ -438,8 +462,11 @@
   async function startPlayback() {
     if (looping) return;
     stopPlayback();
-    audioContext ??= new AudioContext();
-    if (audioContext.state === "suspended") await audioContext.resume();
+    const context = await soundManager?.resume();
+    if (!context || !soundManager) return;
+    audioContext = context;
+    audioRoute ??= soundManager.register("range-nucleus", 0.45);
+    if (!audioRoute) return;
     looping = true;
     startDistantVoice();
     playIntervalNote();
@@ -482,11 +509,12 @@
 
   onDestroy(() => {
     stopPlayback();
-    void audioContext?.close();
+    audioRoute?.dispose();
     audioMasterInput = undefined;
     audioMasterCompressor = undefined;
     audioMasterOutput = undefined;
     reverbInput = undefined;
+    audioRoute = undefined;
   });
 
 </script>
@@ -710,14 +738,13 @@
     padding: 0;
     place-items: center;
     border: 0;
-    border-radius: 8px;
-    background: oklch(0 0 0);
-    color: var(--range);
+    border-radius: 0;
+    background: transparent;
+    color: oklch(0 0 0);
     cursor: pointer;
   }
 
   .playbackControl.playing {
-    background: var(--range);
     color: oklch(0 0 0);
   }
 

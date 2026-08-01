@@ -3,6 +3,7 @@
   import type { PostContrastPalette } from "$lib/post-contrast";
   import PostNoiseShader from "$lib/components/PostNoiseShader.svelte";
   import SphereLineShader from "$lib/components/SphereLineShader.svelte";
+  import RelationshipDotsShader from "$lib/components/RelationshipDotsShader.svelte";
 
   let {
     post,
@@ -52,6 +53,10 @@
     {#if post.socialShader === "sphere-lines"}
       <div class="socialSphereShader">
         <SphereLineShader palette={post.palette} topAligned />
+      </div>
+    {:else if post.socialShader === "relationship-dots"}
+      <div class="socialSphereShader">
+        <RelationshipDotsShader />
       </div>
     {:else}
       <PostNoiseShader palette={post.palette} {still} oncontrast={applyContrast} />
@@ -145,5 +150,23 @@
   .socialPost .postCopy > span {
     font-size: 27px;
     line-height: 1.35;
+  }
+
+  .latestPost .postCopy strong,
+  .latestPost .postCopy > span {
+    display: -webkit-box;
+    max-block-size: 2lh;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .latestPost .postCopy strong {
+    min-block-size: 1lh;
+  }
+
+  .latestPost .postCopy > span {
+    min-block-size: 2lh;
   }
 </style>

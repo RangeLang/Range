@@ -1,20 +1,39 @@
 <script lang="ts">
   import { page } from "$app/state";
+  import { onMount, setContext } from "svelte";
+  import {
+    createRangeSoundManager,
+    RANGE_SOUND_MANAGER_CONTEXT,
+  } from "$lib/audio/sound-manager";
   import { postForPath, postImageUrl } from "$lib/posts";
+  import Footer from "$lib/components/Footer.svelte";
   import "../../app/globals.css";
 
-  const siteTitle = "Range — A Graph-Backed Programming Language";
+  const siteTitle = "Range — An Applied Programming Language";
   const siteDescription = "A love letter to electrons, logic and abstraction.";
-  const defaultImage = "https://rangelang.org/og-v3.png";
+  const defaultImage = "https://rangelang.org/og-homepage.png";
   let activePost = $derived(postForPath(page.url.pathname));
   let socialImage = $derived(activePost ? postImageUrl(activePost) : defaultImage);
   let socialImageAlt = $derived(
     activePost
       ? `${activePost.cardTitle} — ${activePost.cardDescription}`
-      : "Range programming language",
+      : "Range — an applied programming language",
   );
 
+  const soundManager = createRangeSoundManager();
+  setContext(RANGE_SOUND_MANAGER_CONTEXT, soundManager);
+  if (typeof window !== "undefined") {
+    window.__rangeSoundManager = soundManager;
+  }
+
   let { children } = $props();
+
+  onMount(() => () => {
+    if (window.__rangeSoundManager === soundManager) {
+      delete window.__rangeSoundManager;
+    }
+    soundManager.dispose();
+  });
 </script>
 
 <svelte:head>
@@ -34,4 +53,7 @@
   <meta name="twitter:image:alt" content={socialImageAlt} />
 </svelte:head>
 
-<range-site-shell>{@render children()}</range-site-shell>
+<range-site-shell>
+  {@render children()}
+  <Footer />
+</range-site-shell>

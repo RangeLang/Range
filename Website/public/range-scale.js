@@ -1,5 +1,5 @@
 import { createRangeMarks } from "./range-scale-math.js?profile=hover-log-origin-v1";
-import { createWheelDetentSound } from "./range-audio-effects.js?profile=audio-effects-v1";
+import { createScaleClickerSound } from "./range-audio-effects.js?profile=audio-effects-v2";
 
 const defaults = {
   endpointGap: 8,
@@ -23,6 +23,8 @@ class RangeScale extends HTMLElement {
     "division-levels",
     "mark-length",
     "mark-thickness",
+    "orientation",
+    "rest-position",
   ];
 
   #audioContext;
@@ -39,23 +41,20 @@ class RangeScale extends HTMLElement {
   #lastHoverTime = 0;
   #lastHoverY = 0;
   #lastMotionTime = 0;
-  #lastPointerDirection = 1;
   #lastPointerSpeed = 0;
   #motionFrame;
   #resizeObserver;
-  #wheelDetentSound;
+  #soundRoute;
+  #scaleClickerSound;
 
   #handlePointerEnter = (event) => {
     const bounds = this.getBoundingClientRect();
     this.#hasHoverSample = true;
     this.#lastHoverTime = event.timeStamp;
-    this.#lastHoverY = event.clientY;
+    this.#lastHoverY = this.#pointerCoordinate(event);
     this.#focusVelocity = 0;
     if (bounds.height > 0) {
-      const position = Math.min(
-        1,
-        Math.max(0, (event.clientY - bounds.top) / bounds.height),
-      );
+      const position = this.#pointerPosition(event, bounds);
       this.#lastDetentIndex = this.#detentIndexFor(position);
     }
     void this.#primeAudio();
@@ -65,10 +64,7 @@ class RangeScale extends HTMLElement {
     const bounds = this.getBoundingClientRect();
     if (bounds.height <= 0) return;
     this.#isHovered = true;
-    this.#focusTarget = Math.min(
-      1,
-      Math.max(0, (event.clientY - bounds.top) / bounds.height),
-    );
+    this.#focusTarget = this.#pointerPosition(event, bounds);
     this.#startMotion();
 
     const audioReady = this.#primeAudio();
@@ -78,13 +74,13 @@ class RangeScale extends HTMLElement {
       await audioReady;
       return;
     }
-    const delta = event.clientY - this.#lastHoverY;
+    const pointerCoordinate = this.#pointerCoordinate(event);
+    const delta = pointerCoordinate - this.#lastHoverY;
     const elapsed = Math.max(8, event.timeStamp - this.#lastHoverTime);
     const pointerSpeed = Math.abs(delta) / elapsed;
     this.#lastPointerSpeed = pointerSpeed;
-    this.#lastPointerDirection = Math.sign(delta) || this.#lastPointerDirection;
     this.#lastHoverTime = event.timeStamp;
-    this.#lastHoverY = event.clientY;
+    this.#lastHoverY = pointerCoordinate;
     const audioRequestIndex = ++this.#audioRequestIndex;
     await audioReady;
     if (audioRequestIndex !== this.#audioRequestIndex) return;
@@ -93,12 +89,12 @@ class RangeScale extends HTMLElement {
 
   #handlePointerDown = async () => {
     await this.#primeAudio();
-    this.#wheelDetentSound?.play(0.18, 1, this.#lastDetentIndex);
+    this.#scaleClickerSound?.play(0.18);
   };
 
   #handlePointerLeave = () => {
     this.#isHovered = false;
-    this.#focusTarget = 0;
+    this.#focusTarget = this.#restPosition();
     this.#focusVelocity = 0;
     this.#hasHoverSample = false;
     this.#audioRequestIndex += 1;
@@ -111,8 +107,8 @@ class RangeScale extends HTMLElement {
   }
 
   connectedCallback() {
-    this.#focusPosition = 0;
-    this.#focusTarget = 0;
+    this.#focusPosition = this.#restPosition();
+    this.#focusTarget = this.#restPosition();
     this.#focusVelocity = 0;
     this.#align();
     this.#render();
@@ -121,6 +117,7 @@ class RangeScale extends HTMLElement {
     this.addEventListener("pointerdown", this.#handlePointerDown);
     this.addEventListener("pointerleave", this.#handlePointerLeave);
     this.#resizeObserver = new ResizeObserver(() => this.#align());
+    if (this.hasAttribute("standalone")) this.#resizeObserver.observe(this);
     const sequence = this.parentElement;
     const zero = sequence?.querySelector("[data-scale-zero]");
     const end = sequence?.querySelector("[data-scale-end]");
@@ -140,10 +137,11 @@ class RangeScale extends HTMLElement {
     this.removeEventListener("pointerdown", this.#handlePointerDown);
     this.removeEventListener("pointerleave", this.#handlePointerLeave);
     this.#cancelMotion();
-    this.#wheelDetentSound?.dispose();
-    void this.#audioContext?.close();
+    this.#scaleClickerSound?.dispose();
+    this.#soundRoute?.dispose();
     this.#audioContext = undefined;
-    this.#wheelDetentSound = undefined;
+    this.#soundRoute = undefined;
+    this.#scaleClickerSound = undefined;
     this.#resizeObserver?.disconnect();
   }
 
@@ -162,6 +160,30 @@ class RangeScale extends HTMLElement {
       markLength: Math.max(1, finiteAttribute(this, "mark-length", defaults.markLength)),
       markThickness: Math.max(0.1, finiteAttribute(this, "mark-thickness", defaults.markThickness)),
     };
+  }
+
+  #restPosition() {
+    return Math.min(1, Math.max(0, finiteAttribute(this, "rest-position", 0)));
+  }
+
+  #isHorizontal() {
+    return this.getAttribute("orientation") === "horizontal";
+  }
+
+  #pointerCoordinate(event) {
+    return this.#isHorizontal() ? event.clientX : event.clientY;
+  }
+
+  #pointerPosition(event, bounds) {
+    const pointerOffset = this.#isHorizontal()
+      ? event.clientX - bounds.left
+      : event.clientY - bounds.top;
+    const extent = this.#isHorizontal() ? bounds.width : bounds.height;
+    const position = Math.min(
+      1,
+      Math.max(0, pointerOffset / extent),
+    );
+    return this.hasAttribute("reversed") ? 1 - position : position;
   }
 
   #detentIndexFor(position, focusPosition = this.#focusPosition) {
@@ -188,11 +210,7 @@ class RangeScale extends HTMLElement {
     );
     if (detentIndex === this.#lastDetentIndex) return;
     this.#lastDetentIndex = detentIndex;
-    this.#wheelDetentSound?.play(
-      this.#lastPointerSpeed,
-      this.#lastPointerDirection,
-      detentIndex,
-    );
+    this.#scaleClickerSound?.play(this.#lastPointerSpeed);
   }
 
   #render() {
@@ -202,7 +220,7 @@ class RangeScale extends HTMLElement {
       focusPosition: this.#focusPosition,
     });
     if (!this.#canvas) {
-      this.shadowRoot.innerHTML = `<style>:host{display:block;position:absolute;width:48px;pointer-events:auto;cursor:ns-resize}canvas{display:block;width:100%;height:100%}.colorProbe{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}</style><canvas role="presentation"></canvas><span class="colorProbe" aria-hidden="true"></span>`;
+      this.shadowRoot.innerHTML = `<style>:host{display:block;position:absolute;width:48px;pointer-events:auto;cursor:ns-resize}:host([standalone]){position:relative;width:20px;height:28px;contain:layout paint}:host([standalone][orientation="horizontal"]){width:44px;height:14px;cursor:ew-resize}canvas{display:block;width:100%;height:100%}.colorProbe{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}</style><canvas role="presentation"></canvas><span class="colorProbe" aria-hidden="true"></span>`;
       this.#canvas = this.shadowRoot.querySelector("canvas");
       this.#context = this.#canvas?.getContext("2d");
       this.#colorProbe = this.shadowRoot.querySelector(".colorProbe");
@@ -228,28 +246,39 @@ class RangeScale extends HTMLElement {
       : ink;
     const deviceWidth = this.#canvas.width;
     const deviceHeight = this.#canvas.height;
+    const horizontal = this.#isHorizontal();
     for (const mark of marks) {
       this.#context.fillStyle = color;
-      const markWidth = Math.max(
-        1,
-        Math.round(config.markLength * pixelRatio),
-      );
-      const markHeight = config.markThickness * pixelRatio;
-      const x = 0;
-      const y = mark.position * (deviceHeight - markHeight);
+      const markWidth = horizontal
+        ? config.markThickness * pixelRatio
+        : Math.max(1, Math.round(config.markLength * pixelRatio));
+      const markHeight = horizontal
+        ? Math.max(1, Math.round(config.markLength * pixelRatio))
+        : config.markThickness * pixelRatio;
+      const x = horizontal
+        ? mark.position * (deviceWidth - markWidth)
+        : 0;
+      const y = horizontal
+        ? (deviceHeight - markHeight) / 2
+        : mark.position * (deviceHeight - markHeight);
       this.#context.fillRect(x, y, markWidth, markHeight);
     }
   }
 
   async #primeAudio() {
-    const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextConstructor) return;
-    if (!this.#audioContext) {
-      this.#audioContext = new AudioContextConstructor();
-      this.#wheelDetentSound = createWheelDetentSound(this.#audioContext);
-    }
-    if (this.#audioContext.state === "suspended") {
-      await this.#audioContext.resume();
+    const soundManager = globalThis.__rangeSoundManager;
+    if (!soundManager) return;
+    const audio = await soundManager.resume();
+    if (!audio) return;
+    if (this.#audioContext !== audio || !this.#scaleClickerSound) {
+      this.#audioContext = audio;
+      this.#soundRoute?.dispose();
+      this.#soundRoute = soundManager.register("range-scale");
+      if (!this.#soundRoute) return;
+      this.#scaleClickerSound = createScaleClickerSound(
+        audio,
+        this.#soundRoute.input,
+      );
     }
   }
 
@@ -305,6 +334,10 @@ class RangeScale extends HTMLElement {
   }
 
   #align() {
+    if (this.hasAttribute("standalone")) {
+      this.#render();
+      return;
+    }
     const sequence = this.parentElement;
     const zero = sequence?.querySelector("[data-scale-zero]");
     const end = sequence?.querySelector("[data-scale-end]");

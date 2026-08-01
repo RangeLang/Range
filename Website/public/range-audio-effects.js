@@ -11,7 +11,7 @@ function makeNoiseBuffer(audio, duration, sampleAtTime) {
   return buffer;
 }
 
-export function createHashingSound(audio) {
+export function createHashingSound(audio, destination) {
   const filter = audio.createBiquadFilter();
   filter.type = "bandpass";
   filter.frequency.value = 1_900;
@@ -22,7 +22,7 @@ export function createHashingSound(audio) {
   output.gain.value = 1;
   filter.connect(gain);
   gain.connect(output);
-  output.connect(audio.destination);
+  output.connect(destination);
 
   const buffer = makeNoiseBuffer(audio, 1.5, (_time, noise) => noise);
   const channel = buffer.getChannelData(0);
@@ -67,44 +67,41 @@ export function createHashingSound(audio) {
   };
 }
 
-export function createWheelDetentSound(audio) {
+export function createScaleClickerSound(audio, destination) {
   const output = audio.createGain();
   output.gain.value = 1;
-  output.connect(audio.destination);
+  output.connect(destination);
 
-  const buffer = makeNoiseBuffer(audio, 0.032, (time, noise) => {
-    const attack = Math.min(1, time / 0.0014);
-    const decay = Math.exp(-time * 108);
-    const release = Math.max(0, 1 - time / 0.032);
-    const body = Math.sin(Math.PI * 2 * 720 * time) * 0.5;
-    const edge = Math.sin(Math.PI * 2 * 1_420 * time + 0.38) * 0.16;
-    return attack * decay * release * release * (body + edge + noise * 0.13);
+  const buffer = makeNoiseBuffer(audio, 0.014, (time, noise) => {
+    const attack = Math.min(1, time / 0.0003);
+    const decay = Math.exp(-time * 430);
+    const mechanicalSnap = Math.max(0, 1 - time / 0.0011);
+    return attack * decay * (noise * 0.76 + mechanicalSnap * 0.42);
   });
-  let nextDetentTime = 0;
+  let nextClickTime = 0;
 
   return {
-    play(pointerSpeed, direction, detentIndex) {
+    play(pointerSpeed) {
       const time = audio.currentTime;
-      if (time < nextDetentTime) return;
-      nextDetentTime = time + 0.022;
+      if (time < nextClickTime) return;
+      nextClickTime = time + 0.028;
 
       const speed = Math.min(1, Math.max(0, pointerSpeed / 0.72));
-      const variation = ((detentIndex * 7) % 9 - 4) / 4;
       const source = audio.createBufferSource();
-      const filter = audio.createBiquadFilter();
+      const clickFilter = audio.createBiquadFilter();
       const gain = audio.createGain();
       source.buffer = buffer;
-      source.playbackRate.value = 0.96 + speed * 0.07 + variation * 0.008;
-      filter.type = "lowpass";
-      filter.frequency.value = 3_100 - speed * 420 + direction * 35;
-      filter.Q.value = 0.52;
-      gain.gain.value = 0.052 - speed * 0.015;
-      source.connect(filter);
-      filter.connect(gain);
+      source.playbackRate.value = 0.98 + speed * 0.025;
+      clickFilter.type = "bandpass";
+      clickFilter.frequency.value = 2_350;
+      clickFilter.Q.value = 0.72;
+      gain.gain.value = 0.044 - speed * 0.008;
+      source.connect(clickFilter);
+      clickFilter.connect(gain);
       gain.connect(output);
       source.addEventListener("ended", () => {
         source.disconnect();
-        filter.disconnect();
+        clickFilter.disconnect();
         gain.disconnect();
       }, { once: true });
       source.start(time);

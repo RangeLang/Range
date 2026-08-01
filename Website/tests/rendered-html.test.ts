@@ -51,19 +51,19 @@ describe("SvelteKit routes", () => {
 
     expect(response.status).toBe(200);
     expect(html).toContain(
-      "<title>Range — A Graph-Backed Programming Language</title>",
+      "<title>Range — An Applied Programming Language</title>",
     );
     expect(html).toContain(
       'name="description" content="A love letter to electrons, logic and abstraction."',
     );
     expect(html).toContain(
-      'property="og:title" content="Range — A Graph-Backed Programming Language"',
+      'property="og:title" content="Range — An Applied Programming Language"',
     );
     expect(html).toContain(
-      'name="twitter:title" content="Range — A Graph-Backed Programming Language"',
+      'name="twitter:title" content="Range — An Applied Programming Language"',
     );
     expect(html).toContain(
-      'property="og:image" content="https://rangelang.org/og-v3.png"',
+      'property="og:image" content="https://rangelang.org/og-homepage.png"',
     );
     expect(html).not.toContain(
       "Native benchmark results for Range, C, C++, Rust, Go, and Swift",
@@ -71,6 +71,9 @@ describe("SvelteKit routes", () => {
     expect(html).toContain("a love letter to electrons, logic and abstraction");
     expect(html).toContain("<range-spline-nav");
     expect(html).toContain("<range-scale");
+    expect(html).toContain('class="landingLowerScale"');
+    expect(html).toContain('<range-scale reversed=""');
+    expect(html).toContain("<range-optical-guide");
     expect(html).not.toContain('aria-label="Homepage composition"');
     expect(html).not.toContain('data-scale-zero>0</span>');
     expect(html).not.toContain('data-scale-end><span>1</span>');
@@ -88,6 +91,7 @@ describe("SvelteKit routes", () => {
     expect(html).not.toContain("Spiral track");
     expect(html).not.toContain("Codability lives in the language.");
     expect(html).toContain('href="/features/macros/codability-under-100"');
+    expect(html).toContain('href="/features/macros/command-group-registration"');
     expect(html).toContain('href="/features/macros/50-declarative-50-imperative"');
     expect(html).toContain('href="/features/macros/somewhere-sometime-some-here"');
     expect(html).not.toContain('href="/posts/one-source-two-lenses"');
@@ -99,6 +103,7 @@ describe("SvelteKit routes", () => {
     expect(html).toContain("50% Declarative, 50% Imperative");
     expect(html).toContain("Somewhere, Sometime, Some-here");
     expect(html).toContain("Codability under 100");
+    expect(html).toContain("Registration by declaration");
     expect(html).toContain("latestPostShader");
     expect(html).toContain('class="latestPostCursor"');
     expect(html).toContain('data-active-post="0"');
@@ -125,8 +130,9 @@ describe("SvelteKit routes", () => {
       'import { dev } from "$app/environment"',
     );
     expect(latestPostsSource).toContain(
-      "const visiblePosts = dev ? allPosts : posts",
+      'post.slug !== "intro-to-range" &&',
     );
+    expect(latestPostsSource).toContain('post.slug !== "intro-to-range-3"');
     expect(latestPostsSource).toContain(
       "palettes={visiblePosts.map((post) => post.palette)}",
     );
@@ -137,27 +143,166 @@ describe("SvelteKit routes", () => {
       "href={dev ? post.previewHref ?? post.href : post.href}",
     );
 
+    const postCardSource = await readFile(
+      new URL("../src/lib/components/PostCard.svelte", import.meta.url),
+      "utf8",
+    );
+    expect(postCardSource).toContain(
+      ".latestPost .postCopy strong {\n    min-block-size: 1lh;",
+    );
+    expect(postCardSource).toContain(
+      ".latestPost .postCopy > span {\n    min-block-size: 2lh;",
+    );
+
     const rangeTitleSource = await readFile(
       new URL("../src/lib/components/RangeTitle.svelte", import.meta.url),
       "utf8",
     );
     expect(rangeTitleSource).toContain("float width = 0.24");
-    expect(rangeTitleSource).toContain("uRevealColor,\n        focus");
+    expect(rangeTitleSource).toContain("vec4(uCharcoalColor, base)");
     expect(rangeTitleSource).toContain(
       "gl.uniform3f(uniformLocations.charcoalColor, 0, 0, 0)",
     );
-    expect(rangeTitleSource).toContain(
-      "gl.uniform3f(uniformLocations.revealColor, 0.24, 0.25, 0.27)",
-    );
+    expect(rangeTitleSource).not.toContain("revealColor");
     expect(rangeTitleSource).toContain("gl.RGBA8");
     expect(rangeTitleSource).toContain("gl.UNSIGNED_BYTE");
-    expect(rangeTitleSource).toContain("const reanchorDelay = 1000");
+    expect(rangeTitleSource).toContain("const outwardPaletteOklch");
     expect(rangeTitleSource).toContain(
-      "setTimeout(beginReanchor, reanchorDelay)",
+      "0.73, 0.27, radians(20)",
+    );
+    expect(rangeTitleSource).toContain(
+      "0.848829, 0.368528, radians(145.645)",
+    );
+    expect(rangeTitleSource).toContain(
+      "0.62, 0.22, radians(280)",
+    );
+    expect(rangeTitleSource).toContain("float channelOpacity = 0.95");
+    expect(rangeTitleSource).toContain(
+      "float redBand = max(0.0, redOutside - greenOutside)",
+    );
+    expect(rangeTitleSource).toContain(
+      "float greenBand = max(0.0, greenOutside - blueOutside)",
+    );
+    expect(rangeTitleSource).toContain(
+      "oklchToOutput(uOutwardOklch[0]) * redBand",
+    );
+    expect(rangeTitleSource).toContain(
+      "oklchToOutput(uOutwardOklch[1]) * greenBand",
+    );
+    expect(rangeTitleSource).toContain(
+      "oklchToOutput(uOutwardOklch[2]) * blueOutside",
+    );
+    expect(rangeTitleSource).toContain(
+      "channelColor / max(channelAlpha, 0.00001)",
+    );
+    expect(rangeTitleSource).toContain("float whiteInnerOpacity = 0.68");
+    expect(rangeTitleSource).toContain(
+      "float innerGlyphEdgeMask(vec2 uv, float center)",
+    );
+    expect(rangeTitleSource).toContain(
+      "innerGlyphEdgeMask(vUv, base) *",
+    );
+    expect(rangeTitleSource).toContain(
+      'gl.drawingBufferColorSpace = "display-p3"',
+    );
+    expect(rangeTitleSource).toContain(
+      'usesDisplayP3 = gl.drawingBufferColorSpace === "display-p3"',
+    );
+    expect(rangeTitleSource).not.toContain("blueBand");
+    expect(rangeTitleSource).not.toContain("outwardOpacity");
+    expect(rangeTitleSource).not.toContain("outwardLuma");
+    expect(rangeTitleSource).not.toContain("const reanchorDelay = 1200");
+    expect(rangeTitleSource).toContain("const reanchorDuration = 1200");
+    expect(rangeTitleSource).toContain("const updateTitleSound = () =>");
+    expect(rangeTitleSource).toContain('soundManager?.register("range-title")');
+    expect(rangeTitleSource).toContain(
+      "createDeepAcidWow(audio, titleSoundRoute.input)",
+    );
+    expect(rangeTitleSource).not.toContain("new AudioContext()");
+    expect(rangeTitleSource).toContain(
+      "Math.abs(distortionCenter - anchorX)",
+    );
+    expect(rangeTitleSource).toContain("updateTitleSound();\n    renderCanvas();");
+    expect(rangeTitleSource).not.toContain("Math.abs(nextX - anchorX)");
+    expect(rangeTitleSource).toContain("canvas.getBoundingClientRect()");
+    expect(rangeTitleSource).not.toContain("deepAcidWowAxisAudibility");
+    expect(rangeTitleSource).not.toContain("soundAxisAudibility");
+    expect(rangeTitleSource).not.toContain("abs(vUv.y - 0.5)");
+    expect(rangeTitleSource).not.toContain("linePosition");
+    expect(rangeTitleSource).not.toContain("lineGradient");
+    expect(rangeTitleSource).not.toContain("axisMask");
+    expect(rangeTitleSource).not.toContain("soundAxisStrength");
+    expect(rangeTitleSource).toContain("const pointerStopDelay = 1000");
+    expect(rangeTitleSource).toContain("const soundFalloffScale = 1.15");
+    expect(rangeTitleSource).toContain("const soundFalloffPadding = 80");
+    expect(rangeTitleSource).toContain("const soundIdleWait = 600");
+    expect(rangeTitleSource).toContain("const soundFalloffDuration = 1200");
+    expect(rangeTitleSource).toContain(
+      "const soundMotionVolumeDuration = 60",
+    );
+    expect(rangeTitleSource).toContain("const updateSoundProximity = (");
+    expect(rangeTitleSource).toContain(
+      "const followPixelX = titleBounds.left + distortionCenter * titleBounds.width",
+    );
+    expect(rangeTitleSource).toContain(
+      "const followPixelY = distortionVerticalCenter * window.innerHeight",
+    );
+    expect(rangeTitleSource).toContain("lastPointerClientX - followPixelX");
+    expect(rangeTitleSource).toContain(
+      "const falloffRadiusX = canvasBounds.width * 0.5 + soundFalloffPadding",
+    );
+    expect(rangeTitleSource).toContain(
+      "const falloffRadiusY = canvasBounds.height * 0.5 + soundFalloffPadding",
+    );
+    expect(rangeTitleSource).toContain("const normalizedDistance = Math.hypot(");
+    expect(rangeTitleSource).toContain(
+      "1 - normalizedDistance / soundFalloffScale",
+    );
+    expect(rangeTitleSource).toContain(
+      "soundProximity = normalized * normalized * normalized",
+    );
+    expect(rangeTitleSource).toContain(
+      "titleSound?.volume(soundProximity, soundMotionVolumeDuration / 1000)",
+    );
+    expect(rangeTitleSource).toContain("const refreshSoundForViewportShift = () =>");
+    expect(rangeTitleSource).toContain("if (pointerInside) updateTitleSound();");
+    expect(rangeTitleSource).toContain(
+      'window.addEventListener("scroll", refreshSoundForViewportShift, { passive: true });',
+    );
+    expect(rangeTitleSource).toContain(
+      'window.removeEventListener("scroll", refreshSoundForViewportShift);',
+    );
+    expect(rangeTitleSource).toContain(
+      "titleSound?.idleFade(1, soundMotionVolumeDuration / 1000)",
+    );
+    expect(rangeTitleSource).toContain("titleSound?.sustain(1)");
+    expect(rangeTitleSource).not.toContain("pointerInsideCanvas");
+    expect(rangeTitleSource).not.toContain("titleSound?.release(");
+    expect(rangeTitleSource).not.toContain("handleTitlePointerLeave");
+    expect(rangeTitleSource).not.toContain("releaseSoundThenReanchor");
+    expect(rangeTitleSource).not.toContain("releaseTimeout");
+    expect(rangeTitleSource).toContain("pointerInside = false;");
+    expect(rangeTitleSource).toContain(
+      "titleSound?.idleFade(0, soundFalloffDuration / 1000)",
+    );
+    expect(rangeTitleSource).toContain("const beginIdleFade = ()");
+    expect(rangeTitleSource).toContain("const schedulePointerStop = ()");
+    expect(rangeTitleSource).toContain("reanchorTimeout = setTimeout(() =>");
+    expect(rangeTitleSource).toContain(
+      "reanchorStartVelocityX * reanchorDuration * velocityWeight",
+    );
+    expect(rangeTitleSource).toContain(
+      "reanchorStartVelocityY * reanchorDuration * velocityWeight",
+    );
+    expect(rangeTitleSource).toContain(
+      "const frameVelocityX = (distortionCenter - previousCenter) / elapsed",
+    );
+    expect(rangeTitleSource).not.toContain(
+      "const weightedProgress = 1 - Math.pow(1 - progress, 3)",
     );
     expect(rangeTitleSource).not.toContain("}, 5000)");
     expect(rangeTitleSource).toContain(
-      "clamp(glyph.rgb, 0.0, 1.0) * glyph.a",
+      "clamp(composition.rgb, 0.0, 1.0) * composition.a",
     );
     expect(rangeTitleSource).not.toContain("focus * 1.08");
     expect(rangeTitleSource).not.toContain("gl.RGBA16F");
@@ -206,7 +351,7 @@ describe("SvelteKit routes", () => {
     );
     expect(html).toContain("<h1");
     expect(html).toContain("Codability Under 100");
-    expect(html).toContain("01 · metaprogramming");
+    expect(html).toContain("01 · macro breakdown");
     expect(html).toContain("Core/Macro/Codable.range");
     expect(html).toContain("#environment");
     expect(html).not.toContain("environment.expand");
@@ -217,6 +362,24 @@ describe("SvelteKit routes", () => {
       new Set(html.match(/data-inspection-id="[^"]+"/g) ?? []).size,
     ).toBe(7);
     expect(html).toContain('class="codabilityStage');
+  });
+
+  test("renders command-group registration as a source-first macro breakdown", async () => {
+    const response = await render("/features/macros/command-group-registration");
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain("<title>Registration by Declaration · Range</title>");
+    expect(html).toContain('aria-label="Core/Macro/CommandGroup.range"');
+    expect(html).toContain('aria-label="Code inspection"');
+    expect(html).toContain("Discover registered commands");
+    expect(html).toContain("The complete macro");
+    expect(html).toContain("commandGroup");
+    expect(html).toContain("filter(all: @command)");
+    expect(html).toContain("@commandGroup requires at least one @command function.");
+    expect(html).toContain("#commands.map");
+    expect(html).toContain("Dispatch is the next boundary");
+    expect(html).toContain("does not yet parse argv");
   });
 
   test("renders the declarative and imperative essay", async () => {
@@ -270,8 +433,8 @@ describe("SvelteKit routes", () => {
     expect(html).not.toContain("environment.expand");
   });
 
-  test("keeps the One Source, Two Lenses observation hidden", async () => {
-    const [response, draft, previewGate] = await Promise.all([
+  test("renders the One Source, Two Lenses observation", async () => {
+    const [response, draft] = await Promise.all([
       render("/posts/one-source-two-lenses", "manual"),
       readFile(
         new URL(
@@ -280,22 +443,11 @@ describe("SvelteKit routes", () => {
         ),
         "utf8",
       ),
-      readFile(
-        new URL(
-          "../src/routes/posts/one-source-two-lenses/+page.server.ts",
-          import.meta.url,
-        ),
-        "utf8",
-      ),
     ]);
-    expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("/");
+    expect(response.status).toBe(200);
     expect(draft).toContain('title="One Source, Two Lenses"');
     expect(draft).toContain(
       'description="In Range, written source and intended meaning share one typed graph."',
-    );
-    expect(previewGate).toContain(
-      'dev && url.searchParams.get("preview") === "range-draft"',
     );
     expect(draft).toContain("<h2>No language is ever done</h2>");
     expect(draft).toContain("C is more than fifty years");
@@ -364,74 +516,122 @@ describe("SvelteKit routes", () => {
     ]);
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe("/");
-    expect(intro).toContain('title="Intro to Range"');
+    expect(intro).toContain('title="Intro to Range: The Material"');
+    expect(intro).toContain('heroShader="fibonacci-sphere"');
     expect(previewGate).toContain(
       'dev && url.searchParams.get("preview") === "range-draft"',
     );
     expect(intro).toContain("Constructs describe");
     expect(intro).toContain("enums describe alternatives");
-    expect(intro).toContain("macros describe");
+    expect(intro).not.toContain("macros describe");
     expect(intro).toContain("<ThreeFourRhythm>");
-    expect(intro).toContain(
-      '<span class="accentTerm">value</span> form the smallest semantic unit',
+    expect(intro).toContain("<MacroWordCloud />");
+    expect(intro.indexOf("<MacroWordCloud />")).toBeGreaterThan(
+      intro.indexOf("</ThreeFourRhythm>"),
     );
-    expect(intro).toContain("tracked independently through the program graph");
-    expect(intro).toContain("A value can contain smaller structure");
-    expect(intro).toContain("identity and value move through those");
+    expect(intro).toContain(
+      '<span class="accentTerm">value</span> form the smallest unit of',
+    );
+    expect(intro).toContain("Nothing smaller is tracked.");
+    expect(intro).toContain("Lowering pulls them apart");
+    expect(intro).not.toContain("identityValue");
+    expect(intro).not.toContain("identity-value-sweep");
+    expect(intro).toContain("But the meaning never splits.");
+    expect(intro).toContain(
+      '<span class="accentTerm">value | no value | many values</span>',
+    );
+    expect(intro).toContain("<em>this</em> value");
     expect(rhythm).toContain("step % 4 === 0");
     expect(rhythm).toContain("step % 3 === 0");
     expect(rhythm).toContain("step % 6 === 0");
     expect(rhythm).toContain("mod(u_time, 1.8) / 0.9");
     expect(rhythm).toContain(
-      "const enabledMasterLevel = 0.85",
+      "const enabledMasterLevel = 0.78",
     );
     expect(rhythm).toContain(
-      "masterLimiter.ratio.setValueAtTime(4, audioContext.currentTime)",
+      "masterLimiter.ratio.setValueAtTime(2.5, audioContext.currentTime)",
     );
-    expect(rhythm).toContain("gain.connect(destination)");
+    expect(rhythm).toContain("filter.connect(gain)");
     expect(rhythm).toContain("const peakVolume = Math.max(0.0001, volume)");
     expect(rhythm).toContain(
       "gain.gain.exponentialRampToValueAtTime(peakVolume",
     );
-    expect(rhythm).toContain("clickGain.connect(destination)");
+    expect(rhythm).toContain("bodyGain).connect(destination)");
     expect(rhythm).toContain("createDynamicsCompressor");
     expect(rhythm).not.toContain("output.gain.setValueAtTime(15, now)");
-    expect(rhythm).toContain("audioContext.sampleRate * 0.006");
+    expect(rhythm).toContain("audioContext.sampleRate * 0.032");
     expect(rhythm).toContain("audioContext.createBufferSource()");
     expect(rhythm).toContain("seed = (seed * 1664525 + 1013904223)");
-    expect(rhythm).toContain('clickHighpass.type = "bandpass"');
-    expect(rhythm).toContain("clickHighpass.frequency.setValueAtTime(620");
-    expect(rhythm).toContain("0.16 * volumeScale");
-    expect(rhythm).toContain("frequency: 461.75");
-    expect(rhythm).toContain("frequency: 740.75");
-    expect(rhythm).toContain("volume: 0.14");
-    expect(rhythm).toContain("volume: 0.08");
-    expect(rhythm).toContain('oscillator.type = "sine"');
-    expect(rhythm).toContain("gain.gain.linearRampToValueAtTime");
+    expect(rhythm).toContain('bodyFilter.type = "bandpass"');
+    expect(rhythm).toContain("const baseFrequency = 340 + (beat % 2) * 22");
+    expect(rhythm).not.toContain("frequency: 440");
+    expect(rhythm).not.toContain("frequency: 659.255");
+    expect(rhythm).not.toContain("const resonances = [");
+    expect(rhythm).toContain('side === "identity" ? 55 : 82.4069');
+    expect(rhythm).toContain('      "sine",');
+    expect(rhythm).toContain("0.08 * centeredRhythmVolume(identityFigure)");
+    expect(rhythm).toContain("bodyGain.gain.linearRampToValueAtTime");
     expect(rhythm).not.toContain("metallicResonances");
     expect(rhythm).not.toContain("createDynamicsCompressor();\n\n    output");
     expect(rhythm).not.toContain(
       "gain.gain.exponentialRampToValueAtTime(partial.volume",
     );
-    expect(rhythm).not.toContain("oscillator.frequency.exponentialRamp");
+    expect(rhythm).toContain('filter.type = "lowpass"');
     expect(rhythm).toContain("createBiquadFilter");
     expect(rhythm).toContain("gain.gain.exponentialRampToValueAtTime(0.0001");
-    expect(rhythm).toContain('side === "identity" ? 27.5 : 41.2034');
+    expect(rhythm).toContain("function playSquarePercussion(");
+    expect(rhythm).toContain("audioContext.sampleRate * 0.032");
+    expect(rhythm).toContain("const baseFrequency = 340 + (beat % 2) * 22");
+    expect(rhythm).toContain('bodyFilter.type = "bandpass"');
+    expect(rhythm).toContain("bodyFilter.Q.setValueAtTime(4.2");
+    expect(rhythm).toContain("knockFilter.Q.setValueAtTime(5.8");
+    expect(rhythm).toContain("bodyGain.gain.linearRampToValueAtTime(0.16");
+    expect(rhythm).toContain("knockGain.gain.linearRampToValueAtTime(0.08");
+    expect(rhythm).toContain("bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.062)");
+    expect(rhythm).toContain("strike.stop(now + 0.065)");
+    expect(rhythm).toContain(
+      "playSquarePercussion(beat, centeredRhythmVolume(squareFigure))",
+    );
+    expect(rhythm).toContain('side === "identity" ? 55 : 82.4069');
     expect(rhythm).toContain("function centeredRhythmVolume");
     expect(rhythm).toContain("window.innerHeight * 0.5");
-    expect(rhythm).toContain(
-      "const figures = [identityFigure, triangleFigure, squareFigure]",
-    );
     expect(rhythm).toContain("function smoothRange");
-    expect(rhythm).toContain("Math.pow(0.45, passedFigures)");
-    expect(rhythm).toContain("Math.max(0.2");
-    expect(rhythm).toContain("window.innerHeight * 1.1");
-    expect(rhythm).toContain("return retainedLevel * tail * 0.8");
-    expect(rhythm).toContain("audioContext.createConvolver()");
-    expect(rhythm).toContain("audioContext.sampleRate * 0.72");
+    expect(rhythm).toContain('".identityExpression, .shapeStage"');
+    expect(rhythm).toContain("const activatedFigures = new WeakSet<HTMLElement>()");
+    expect(rhythm).toContain("const distancePastCenter = viewportCenter - glyphCenter");
+    expect(rhythm).toContain("if (distancePastCenter >= 0) activatedFigures.add(target)");
+    expect(rhythm).toContain("const backgroundLevel = 0.28");
+    expect(rhythm).toContain("if (!activatedFigures.has(target))");
+    expect(rhythm).toContain("if (distancePastCenter < 0) return backgroundLevel");
+    expect(rhythm).toContain("const normalizationDistance = Math.max(");
+    expect(rhythm).toContain("window.innerHeight * 0.48");
     expect(rhythm).toContain(
-      "masterReverbWet.gain.setValueAtTime(0.12",
+      "return peakLevel + (backgroundLevel - peakLevel) * normalized",
     );
+    expect(rhythm).toContain("volume <= 0.0005");
+    expect(rhythm).toContain("volumeScale <= 0.01");
+    expect(rhythm).toContain("audioContext.createConvolver()");
+    expect(rhythm).toContain("audioContext.sampleRate * 2.4");
+    expect(rhythm).toContain("masterDryGain.gain.setValueAtTime(0.88");
+    expect(rhythm).toContain(
+      "masterReverbWet.gain.setValueAtTime(0.28",
+    );
+    expect(rhythm).toContain("function playTrianglePercussion(");
+    expect(rhythm).toContain("gain.gain.setValueAtTime(0.08 * volumeScale");
+    expect(rhythm).toContain("audioContext.sampleRate * duration");
+    expect(rhythm).toContain("const duration = 0.22");
+    expect(rhythm).toContain("let previousNoise = 0");
+    expect(rhythm).toContain("const brightNoise = noise - previousNoise * 0.82");
+    expect(rhythm).toContain("const envelope = Math.exp(-time * 24)");
+    expect(rhythm).not.toContain("const partials = [");
+    expect(rhythm).toContain('highpass.type = "highpass"');
+    expect(rhythm).toContain("highpass.frequency.setValueAtTime(2800");
+    expect(rhythm).toContain("lowpass.frequency.setValueAtTime(10500");
+    expect(rhythm).toContain(
+      "playTrianglePercussion(centeredRhythmVolume(triangleFigure))",
+    );
+    expect(rhythm).not.toContain('      220,');
+    expect(rhythm).toContain('      2.1,');
     expect(rhythm).toContain(
       "masterGain.connect(masterDryGain).connect(masterLimiter)",
     );
@@ -442,24 +642,33 @@ describe("SvelteKit routes", () => {
     expect(rhythm).toContain(
       "nextStepAt < now - subdivisionMilliseconds",
     );
-    expect(rhythm).toContain("audioContext ??= new AudioContext()");
+    expect(rhythm).toContain("const context = await soundManager?.resume()");
+    expect(rhythm).toContain('soundManager.register("range-rhythm")');
+    expect(rhythm).toContain("masterLimiter.connect(audioRoute.input)");
     expect(rhythm).toContain("startRhythm();");
     expect(rhythm).toContain("return stopRhythm");
     expect(rhythm).toContain('class="volumeButton"');
     expect(rhythm).toContain('"Mute rhythm" : "Enable rhythm sound"');
     expect(rhythm).toContain("onclick={toggleAudio}");
+    expect(rhythm).toContain(
+      "drop-shadow(0 2px 2px oklch(0.65 0.2 var(--range-hue) / 0.18))",
+    );
+    expect(rhythm).toContain(
+      "drop-shadow(0 8px 12px oklch(0.65 0.2 var(--range-hue) / 0.13))",
+    );
+    expect(rhythm).toContain(
+      "drop-shadow(0 18px 28px oklch(0.65 0.2 var(--range-hue) / 0.08))",
+    );
+    expect(rhythm).not.toContain(
+      "box-shadow: 0 4px 18px color-mix(in oklch, var(--range), transparent 86%)",
+    );
     expect(rhythm).not.toContain("Play 3 against 4 rhythm");
     expect(rhythm).not.toContain("Stop rhythm");
     expect(rhythm).not.toContain("one shared clock");
     expect(intro).toContain('label="Three abstraction forms"');
-    expect(intro).toContain(
-      "macro component(): Construct -> Void {}",
-    );
-    expect(intro).toContain("@component");
     expect(intro).toContain("construct Point");
     expect(intro).toContain("enum Axis");
-    expect(intro).toContain("case horizontal");
-    expect(intro).toContain("case vertical");
+    expect(intro).toContain("function clamp(value: Int, min: Int, max: Int): Int");
     expect(intro).toContain('label="Binding access"');
     expect(intro).toContain("let seed: Int");
     expect(intro).toContain("state count: Int");
@@ -480,7 +689,7 @@ describe("SvelteKit routes", () => {
       "each property’s storage and access relationship",
     );
     expect(intro).toContain("representation more composable");
-    expect(intro).toContain("mutable, computed, or projected:");
+    expect(intro).toContain("mutable, projected, or computed:");
     expect(intro).not.toContain('<p class="bindingIntro">');
     expect(intro.indexOf("{#snippet bindingIntro()}")).toBeLessThan(
       intro.indexOf("{#snippet bindingCode()}"),
@@ -488,12 +697,16 @@ describe("SvelteKit routes", () => {
     expect(rhythm).toContain(
       'aria-label="Let, state, binding, and derived rhythm"',
     );
-    expect(rhythm.indexOf('class="abstractionIntro"')).toBeLessThan(
+    expect(rhythm).toContain('aria-label="Construct, enum, and function"');
+    expect(rhythm).toContain(">Function</text>");
+    expect(rhythm).toContain(">Construct</text>");
+    expect(rhythm).toContain(">Enum</text>");
+    expect(rhythm.indexOf('class="functionIntro"')).toBeLessThan(
       rhythm.indexOf('class="shapeFigure triangleFigure"'),
     );
     expect(
       rhythm.indexOf('class="shapeFigure triangleFigure"'),
-    ).toBeLessThan(rhythm.indexOf('class="abstractionCode"'));
+    ).toBeLessThan(rhythm.indexOf('class="functionCode"'));
     expect(rhythm.indexOf('class="bindingCode"')).toBeLessThan(
       rhythm.indexOf('class="bindingDetail"'),
     );
@@ -521,7 +734,16 @@ describe("SvelteKit routes", () => {
     expect(rhythm).toContain("pathDistance = min(pathDistance, perimeter - pathDistance)");
     expect(rhythm).toContain("max(perimeter * 0.18, 1.0)");
     expect(rhythm).toContain("float capsuleAlpha = 1.0 - smoothstep(");
-    expect(rhythm).toContain("float valueRadius = u_shape < 0.5");
+    expect(rhythm).toContain("float valueRadius = (u_shape < 0.5");
+    expect(rhythm).toContain("float bloomScale = mix(");
+    expect(rhythm).toContain("float cyclicDistance(");
+    expect(rhythm).toContain("float nearestVertexDistance = 0.0");
+    expect(rhythm).toContain("cyclicDistance(head, ab + bc, perimeter)");
+    expect(rhythm).toContain("edgeSpan * 0.42");
+    expect(rhythm).toContain("float vertexEase = vertexProximity * vertexProximity");
+    expect(rhythm).toContain("(3.0 - 2.0 * vertexProximity)");
+    expect(rhythm).toContain("mix(0.52, 1.7, vertexEase)");
+    expect(rhythm).not.toContain("u_volume");
     expect(rhythm).toContain("max(u_resolution.x * 0.24, 1.0)");
     expect(rhythm).toContain("abs(point.x - lineValueX)");
     expect(rhythm).toContain("alpha = capsuleAlpha");
@@ -551,7 +773,7 @@ describe("SvelteKit routes", () => {
       rhythm.indexOf('class="identityDetail"'),
     );
     expect(rhythm).toContain(
-      ".identityDetail + .abstractionIntro",
+      ".identityDetail + .functionIntro",
     );
     expect(rhythm).toContain("margin-top: 20px");
     expect(rhythm).not.toContain("identityConnectors");
@@ -563,15 +785,138 @@ describe("SvelteKit routes", () => {
     expect(rhythm).toContain("gap: 56px");
     expect(rhythm).toContain("padding: 40px 20px");
     expect(rhythm).not.toContain("data-line-side");
-    expect(intro).toContain("smallest semantic unit");
+    expect(intro).toContain("smallest unit of");
     expect(intro).not.toContain("The name is not the identity");
     expect(intro).toContain(
       "Lowering",
     );
+    expect(intro).not.toContain("<h2>Functions</h2>");
+    expect(intro).not.toContain("<FunctionNetwork />");
+  });
+
+  test("renders a dark Fresnel sphere in the Intro hero", async () => {
+    const [essayPage, shader] = await Promise.all([
+      readFile(
+        new URL("../src/lib/components/EssayPage.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../src/lib/components/FibonacciSphereShader.svelte",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ]);
+
+    expect(essayPage).toContain("<FibonacciSphereShader />");
+    expect(essayPage).toContain(
+      'class:darkShader={heroShader === "fibonacci-sphere"}',
+    );
+    expect(essayPage).toContain(".heroShader.darkShader {");
+    expect(essayPage).toContain("-webkit-mask-image: none");
+    expect(essayPage).toContain(".heroShader.darkShader::after");
+    expect(essayPage).toContain("display: none");
+    expect(shader).toContain('data-shader="fibonacci-sphere"');
+    expect(shader).toContain("float fresnel = pow(1.0 - surfaceZ, 2.15)");
+    expect(shader).toContain("float innerShadow = smoothstep(0.12, 0.96, fresnel)");
+    expect(shader).toContain("sphere *= 1.0 - innerShadow * 0.58");
+    expect(shader).toContain("float darkField = 1.0 - smoothstep(");
+    expect(shader).toContain("vec3 scene = darkSpace + vec3(starField");
+    expect(shader).toContain("scene = mix(scene, sphere, sphereMask)");
+    expect(shader).toContain("(1.0 - uv.x) / 1.16");
+    expect(shader).toContain("(1.0 - uv.y) / 1.4");
+    expect(shader).toContain("smoothstep(0.18, 0.92, length(fieldPoint))");
+    expect(shader).toContain("vec3 color = mix(vec3(1.0), scene, darkField)");
+    expect(shader).toContain("vec3(0.035, 0.055, 0.095)");
+    expect(shader).toContain("vec3(0.13, 0.22, 0.36)");
+    expect(shader).not.toContain("fibonacciGraphField");
+    expect(shader).not.toContain("distanceToSegment");
+    expect(shader).not.toContain("dotMask");
+    expect(shader).not.toContain("lineMask");
+    expect(shader).toContain("vec2 sphereCenter = vec2(");
+    expect(shader).toContain("float starField(vec2 pixel)");
+    expect(shader).toContain("1000 / 30");
+    expect(shader).toContain("new IntersectionObserver");
+    expect(shader).toContain('document.addEventListener("visibilitychange"');
+  });
+
+  test("keeps Intro to Range 2 hidden with typed relationship metadata", async () => {
+    const compilerPost = draftPosts.find(
+      (post) => post.slug === "intro-to-range-2",
+    );
+    expect(compilerPost).toBeDefined();
+
+    const [response, page, previewGate, essayPage, shader, cardResponse] =
+      await Promise.all([
+        render("/posts/intro-to-range-2", "manual"),
+        readFile(
+          new URL(
+            "../src/routes/posts/intro-to-range-2/+page.svelte",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+        readFile(
+          new URL(
+            "../src/routes/posts/intro-to-range-2/+page.server.ts",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+        readFile(
+          new URL("../src/lib/components/EssayPage.svelte", import.meta.url),
+          "utf8",
+        ),
+        readFile(
+          new URL(
+            "../src/lib/components/RelationshipDotsShader.svelte",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+        render("/og-card/posts/intro-to-range-2"),
+      ]);
+    const cardHtml = await cardResponse.text();
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/");
+    expect(previewGate).toContain(
+      'dev && url.searchParams.get("preview") === "range-draft"',
+    );
+    expect(page).toContain('title="Intro to Range: The Concrete"');
+    expect(page).toContain('heroShader="fibonacci-sphere"');
+    expect(page).toContain("the value produced by");
+    expect(page).toContain("let multiplicity: RelationshipMultiplicity");
+    expect(page).toContain("let ordering: RelationshipOrdering");
+    expect(page).toContain("let separator: RelationshipSeparator");
+    expect(page).toContain("let enclosure: RelationshipEnclosure");
+    expect(page).toContain("let origin: Identifier");
+    expect(page).toContain("let role: Identifier");
+    expect(page).toContain("let destination: Identifier");
+    expect(page).toContain("Multiplicity is not a container");
+    expect(page).toContain("LLVM then receives a concrete representation");
+    expect(page).toContain("Identity gives the compiler a universe");
+    expect(page).toContain("set-theoretic operations");
+    expect(page).toContain("It is cheap because the compiler is not manufacturing a new world");
+    expect(page).toContain("common identity-bearing universe");
+    expect(essayPage).toContain("<RelationshipDotsShader compact />");
+    expect(shader).toContain('data-shader="relationship-dots"');
+    expect(shader).toContain('data-dot-count="3"');
+    expect(shader.match(/float \w+Dot = dotMask/g)).toHaveLength(3);
+    expect(shader).toContain("distanceToSegment(point, origin, role)");
+    expect(shader).toContain("distanceToSegment(point, role, destination)");
+    expect(shader).toContain("1000 / 30");
+    expect(shader).toContain("new IntersectionObserver");
+    expect(cardResponse.status).toBe(200);
+    expect(cardHtml).toContain('data-shader="relationship-dots"');
+    expect(cardHtml).toContain("Intro to Range: The Concrete");
   });
 
   test("renders the hidden observation's sphere shader social card", async () => {
-    const [draftPost] = draftPosts;
+    const draftPost = draftPosts.find(
+      (post) => post.slug === "one-source-two-lenses",
+    )!;
     const response = await render(`/og-card/posts/${draftPost.slug}`);
     const html = await response.text();
 
@@ -770,16 +1115,126 @@ test("renders the homepage description in the site monospace face", async () => 
   const descriptionRule = globals.match(
     /\.landingHero p \{([\s\S]*?)\n\}/,
   )?.[1];
+  const wordmarkRule = globals.match(
+    /\.landingWordmark \{([\s\S]*?)\n\}/,
+  )?.[1];
 
   expect(descriptionRule).toBeDefined();
   expect(descriptionRule).toContain(
     "font-family: var(--font-geist-mono), monospace",
   );
+  expect(descriptionRule).toContain(
+    "font-size: var(--range-site-header-wordmark-size)",
+  );
+  expect(globals).toContain("--range-site-header-wordmark-size: 20px");
+  expect(wordmarkRule).toContain(
+    "font-size: var(--range-site-header-wordmark-size)",
+  );
+  expect(globals).not.toContain("--range-home-wordmark-size");
+  expect(globals).not.toContain(".routeWordmark");
   expect(descriptionRule).toContain("max-width: none");
   expect(descriptionRule).toContain("white-space: nowrap");
   expect(globals).toContain(
     "max-width: 620px;\n    white-space: normal;",
   );
+});
+
+test("attaches the lower scale to the leading title stem", async () => {
+  const [globals, guide] = await Promise.all([
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(
+      new URL("../public/range-optical-guide.js", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  expect(globals).toContain("var(--range-lower-scale-x, 0px)");
+  expect(globals).toContain("var(--range-lower-scale-y, 0px)");
+  const lowerScaleRule = globals.match(
+    /\.landingLowerScale range-scale \{([\s\S]*?)\n\}/,
+  )?.[1];
+  expect(lowerScaleRule).toContain("pointer-events: auto");
+  expect(lowerScaleRule).toContain("touch-action: none");
+  expect(lowerScaleRule).toContain("transform: scaleY(-1)");
+  expect(guide).toContain("#titleInkBounds(element)");
+  expect(guide).toContain(
+    "const guide = upperScale.getBoundingClientRect().left",
+  );
+  expect(guide).toContain("titleInk.top - upperScaleRect.bottom");
+  expect(guide).toContain("titleInk.leadingBottom +");
+  expect(guide).not.toContain("element.append(marker)");
+  expect(guide).toContain('"--range-lower-scale-x"');
+  expect(guide).toContain('"--range-lower-scale-y"');
+  expect(guide).toContain("upperScaleRect.top - wordmarkInk.bottom");
+  expect(guide).toContain("projectedLowerScaleBottom +");
+  expect(guide).toContain('"--range-copy-vertical-shift"');
+  expect(guide).toContain("#leadingInkCenter(element, appliedShift = 0)");
+  expect(guide).toContain("lowerScaleMarksRect.width / 2");
+  expect(guide).toContain(
+    "projectedLowerScaleCenter -\n      this.#leadingInkCenter(copy",
+  );
+});
+
+test("gates whole-page HTML-in-Canvas edge distortion behind feature detection", async () => {
+  const [homepage, renderer] = await Promise.all([
+    readFile(new URL("../src/routes/+page.svelte", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../src/lib/components/PageDistortionCanvas.svelte",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  expect(homepage).toContain("<PageDistortionCanvas>");
+  expect(renderer).toContain("texElementImage2D");
+  expect(renderer).toContain("layoutsubtree");
+  expect(renderer).toContain("htmlCanvas.requestPaint()");
+  expect(renderer).toContain("float topEdge");
+  expect(renderer).toContain("float bottomEdge");
+  expect(renderer).toContain('{#if supported}');
+  expect(renderer).toContain('class="pageDistortionFallback"');
+});
+
+test("lays out a deterministic weighted circular Voronoi map of Range macros", async () => {
+  const [wordCloud, packageJson] = await Promise.all([
+    readFile(
+      new URL("../src/lib/components/MacroWordCloud.svelte", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+  ]);
+
+  expect(packageJson).toContain('"d3-voronoi-map": "2.1.1"');
+  expect(packageJson).not.toContain('"d3-cloud"');
+  expect(packageJson).not.toContain('"d3-voronoi-treemap"');
+  expect(wordCloud).toContain("voronoiMapSimulation,");
+  expect(wordCloud).toContain('{ text: "@equatable", weight: 100 }');
+  expect(wordCloud).toContain('{ text: "@codable", weight: 94 }');
+  expect(wordCloud).toContain('{ text: "@background", weight: 88 }');
+  expect(wordCloud).toContain(".initialPosition(centerSeekingPosition)");
+  expect(wordCloud).toContain("const distance = (macroWords[0].weight - datum.weight) * 0.5");
+  expect(wordCloud).toContain(".prng(seededRandom(0x72616e67))");
+  expect(wordCloud).toContain("function pullNodesTowardCenter");
+  expect(wordCloud).toContain("const centerForce = 0.007 + weightRatio * 0.005");
+  expect(wordCloud).toContain("createSimulation(140, 0.00005)");
+  expect(wordCloud).toContain('window.matchMedia("(prefers-reduced-motion: reduce)")');
+  expect(wordCloud).toContain("animationFrame = requestAnimationFrame(animate)");
+  expect(wordCloud).toContain("const spans = spansThrough(point, polygon)");
+  expect(wordCloud).toContain("(spans.width * 0.82) / (text.length * 0.61)");
+  expect(wordCloud).toContain("const initialCells = makeSettledCells()");
+  expect(wordCloud).toContain("makeInternalEdges(initialCells)");
+  expect(wordCloud).toContain("function smoothingAmount(elapsed: number)");
+  expect(wordCloud).toContain("return 1 - Math.exp(-elapsed / 260)");
+  expect(wordCloud).toContain("function interpolateEdges(");
+  expect(wordCloud).toContain('id: [...edge.owners].sort().join("|")');
+  expect(wordCloud).toContain("nextSimulationTick = time + 220");
+  expect(wordCloud).toContain("{#each internalEdges as edge (edge.id)}");
+  expect(wordCloud).toContain('<g class="voronoiTexture" aria-hidden="true">');
+  expect(wordCloud).not.toContain('class="voronoiBoundary"');
+  expect(wordCloud).not.toContain("palette0");
+  expect(wordCloud).toContain('aria-label="Weighted circular Voronoi map of Range macros"');
 });
 
 test("jumps one post cursor between exact card-sized positions", async () => {
@@ -804,6 +1259,9 @@ test("jumps one post cursor between exact card-sized positions", async () => {
   expect(globals).toContain("scrollbar-color:");
   expect(globals).toContain(".latestPostStrip::-webkit-scrollbar-track");
   expect(globals).toContain(".latestPostStrip::-webkit-scrollbar-thumb");
+  expect(globals).toContain(".latestPostsHeader span {\n  position: absolute;");
+  expect(globals).toContain("top: -50px;");
+  expect(globals).toContain("left: 50%;");
   expect(globals).toContain("background: transparent;");
   const cursorRule = globals.match(/\.latestPostCursor \{([\s\S]*?)\n\}/)?.[1];
   expect(cursorRule).toBeDefined();
@@ -820,13 +1278,23 @@ test("jumps one post cursor between exact card-sized positions", async () => {
   );
   expect(globals).toContain(".latestPost::after {");
   expect(globals).toContain("mix-blend-mode: screen");
+  expect(globals).not.toContain(".latestPost::before");
+  expect(globals).not.toContain(".latestPost:hover::before");
   expect(globals).toContain(
-    "inset 0 0 3px 1px oklch(1 0 0 / 0.78)",
+    "inset 0 0 4px 2px oklch(1 0 0 / 0.5)",
   );
   expect(globals).toContain(
-    "inset 0 0 14px 2px oklch(1 0 0 / 0.38)",
+    "inset 0 0 26px 10px oklch(1 0 0 / 0.16)",
   );
-  expect(globals).toContain("inset 0 0 38px oklch(1 0 0 / 0.16)");
+  expect(globals).toContain(
+    "0 0 0.1em",
+  );
+  expect(globals).toContain(
+    "color-mix(in oklch, var(--post-foreground, var(--ink)), transparent 64%)",
+  );
+  expect(globals).toContain(
+    "0 0 0.28em",
+  );
   expect(globals).toContain(".latestPost:hover::after");
   expect(globals).not.toContain(
     "box-shadow: inset 0 0 0 3px var(--range);",
@@ -917,16 +1385,40 @@ test("keeps the generated benchmark artifact complete and versioned", async () =
 });
 
 test("uses Svelte components and Bun without the legacy renderer", async () => {
-  const [packageText, layout, home, chart] = await Promise.all([
+  const [
+    packageText,
+    layout,
+    home,
+    chart,
+    soundManager,
+    nucleus,
+    rhythm,
+  ] = await Promise.all([
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../src/routes/+layout.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/routes/+page.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/components/Chart.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/audio/sound-manager.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/components/RangeNucleus.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/components/ThreeFourRhythm.svelte", import.meta.url), "utf8"),
   ]);
 
   expect(packageText).toContain('"svelte": "5.56.7"');
   expect(packageText).toContain('"@sveltejs/kit": "2.70.1"');
   expect(layout).toContain("{@render children()}");
+  expect(layout).toContain('import Footer from "$lib/components/Footer.svelte"');
+  expect(layout).toContain("<Footer />");
+  expect(layout).toContain("createRangeSoundManager()");
+  expect(layout).toContain("setContext(RANGE_SOUND_MANAGER_CONTEXT, soundManager)");
+  expect(layout).toContain("window.__rangeSoundManager = soundManager");
+  expect(soundManager).toContain("masterInput.connect(masterLimiter)");
+  expect(soundManager).toContain("register: (name: string, level?: number)");
+  expect(nucleus).toContain('soundManager.register("range-nucleus"');
+  expect(nucleus).toContain("audioMasterOutput.connect(audioRoute.input)");
+  expect(nucleus).not.toContain("audioContext.destination");
+  expect(rhythm).toContain('soundManager.register("range-rhythm", 1.2)');
+  expect(rhythm).toContain("masterLimiter.connect(audioRoute.input)");
+  expect(rhythm).not.toContain("audioContext.destination");
   expect(home).toContain("<range-home-page>");
   expect(chart).toContain("<range-benchmark-chart>");
   const [scale, audioEffects, app] = await Promise.all([
@@ -936,8 +1428,10 @@ test("uses Svelte components and Bun without the legacy renderer", async () => {
   ]);
   expect(scale).toContain("const damping = this.#isHovered ? 36 : 32;");
   expect(scale).toContain("Math.max(0, this.#focusPosition");
-  expect(scale).toContain("new AudioContextConstructor()");
-  expect(scale).toContain("createWheelDetentSound");
+  expect(scale).toContain("const soundManager = globalThis.__rangeSoundManager;");
+  expect(scale).toContain('soundManager.register("range-scale")');
+  expect(scale).not.toContain("new AudioContextConstructor()");
+  expect(scale).toContain("createScaleClickerSound");
   expect(scale).toContain(
     "this.#focusTarget,\n      this.#focusPosition,",
   );
@@ -947,7 +1441,7 @@ test("uses Svelte components and Bun without the legacy renderer", async () => {
   expect(scale).toContain("await audioReady;");
   expect(scale).toContain("audioRequestIndex !== this.#audioRequestIndex");
   expect(scale).toContain("const pointerSpeed = Math.abs(delta) / elapsed;");
-  expect(scale).toContain("this.#wheelDetentSound?.play(");
+  expect(scale).toContain("this.#scaleClickerSound?.play(");
   expect(scale).toContain('this.addEventListener("pointerdown", this.#handlePointerDown);');
   expect(scale).toContain("const renderedTitleShift = Number.parseFloat(");
   expect(scale).toContain("const rawEndX = measuredEndX - renderedTitleShift;");
@@ -955,15 +1449,22 @@ test("uses Svelte components and Bun without the legacy renderer", async () => {
   expect(scale).not.toContain("createOscillator()");
   expect(scale).not.toContain("createDynamicsCompressor()");
   expect(app).toContain(
-    "range-scale.js?profile=hover-rendered-scale-audio-v19",
+    "range-scale.js?profile=hover-rendered-scale-audio-v21",
   );
-  expect(audioEffects).toContain("export function createHashingSound(audio)");
-  expect(audioEffects).toContain("export function createWheelDetentSound(audio)");
+  expect(scale).toContain('this.hasAttribute("reversed") ? 1 - position : position');
+  expect(audioEffects).toContain(
+    "export function createHashingSound(audio, destination)",
+  );
+  expect(audioEffects).toContain(
+    "export function createScaleClickerSound(audio, destination)",
+  );
+  expect(audioEffects).not.toContain("audio.destination");
   expect(audioEffects).toContain('filter.type = "bandpass";');
   expect(audioEffects).toContain("source.loop = true;");
-  expect(audioEffects).toContain("const body = Math.sin(Math.PI * 2 * 720 * time)");
-  expect(audioEffects).toContain("nextDetentTime = time + 0.022;");
-  expect(audioEffects).toContain('filter.type = "lowpass";');
+  expect(audioEffects).toContain("const mechanicalSnap = Math.max(0");
+  expect(audioEffects).toContain("nextClickTime = time + 0.028;");
+  expect(audioEffects).toContain('clickFilter.type = "bandpass";');
+  expect(audioEffects).not.toContain("Math.sin(Math.PI * 2 * 720 * time)");
 });
 
 test("navigates between pages without cross-page transitions", async () => {
@@ -1017,6 +1518,9 @@ test("humanizes the benchmark heading with learned timing and synthesized keys",
   expect(typedText).toContain("this.#pendingArticulation = nextStroke.articulation;");
   expect(typedText).toContain("commonDigraph ? 0.84 : 1");
   expect(typedText).toContain("typingAudioUnlocked");
+  expect(typedText).toContain("window.__rangeSoundManager");
+  expect(typedText).toContain('soundManager.register("typed-text")');
+  expect(typedText).not.toContain("new AudioContext()");
   expect(typedText).toContain('addEventListener("pointerdown", unlockTypingAudio');
   expect(typedText).toContain("prefers-reduced-motion: reduce");
   expect(typedText).not.toContain(
@@ -1054,6 +1558,61 @@ test("keeps the scale math deterministic", async () => {
     index === 0 || mark.position >= focusedMarks[index - 1].position
   ))).toBe(true);
   expect(logarithmicScalePositionAround(0.5, { center: 0.5 })).toBe(0.5);
+});
+
+test("keeps the anchored Range sound deep and restrained", async () => {
+  const {
+    deepAcidWowAxisStrength,
+    deepAcidWowEnvelope,
+    deepAcidWowParameters,
+  } = await import(
+    "../src/lib/audio/deep-acid-wow"
+  );
+  const resting = deepAcidWowParameters(0, 0, 0);
+  const pulled = deepAcidWowParameters(1, 1, 1);
+
+  expect(resting).toEqual({
+    cutoff: 105,
+    gain: 0.018,
+    resonance: 2.15,
+    sawLevel: 0.1,
+  });
+  expect(deepAcidWowEnvelope).toEqual({
+    attackTimeConstant: 0.035,
+    axisTimeConstant: 0.055,
+    releaseDuration: 1.2,
+  });
+  expect(deepAcidWowAxisStrength(0.5)).toBe(1);
+  expect(deepAcidWowAxisStrength(0.46)).toBe(1);
+  expect(deepAcidWowAxisStrength(0)).toBeCloseTo(0.22);
+  expect(deepAcidWowAxisStrength(1)).toBeCloseTo(0.22);
+  expect(deepAcidWowAxisStrength(0.25)).toBeCloseTo(
+    deepAcidWowAxisStrength(0.75),
+  );
+  expect(pulled.cutoff).toBe(500);
+  expect(pulled.gain).toBe(0.05);
+  expect(pulled.resonance).toBe(3);
+  expect(pulled.sawLevel).toBe(0.15000000000000002);
+
+  const source = await readFile(
+    new URL("../src/lib/audio/deep-acid-wow.ts", import.meta.url),
+    "utf8",
+  );
+  expect(source).toContain("volume: (level?: number, duration?: number) => void");
+  expect(source).toContain("idleFade: (level?: number, duration?: number) => void");
+  expect(source).toContain("output.connect(volumeGain).connect(idleGain)");
+  expect(source).toContain("volumeGain.gain.setTargetAtTime(target, time, duration)");
+  expect(source).toContain(
+    "envelopeGain.gain.cancelAndHoldAtTime(time)",
+  );
+  expect(source).toContain("sustain(strength = 1) {");
+  expect(source).toContain("sustainEnvelope(strength)");
+  expect(source).not.toContain("shape(displacement, speed, vertical, axisAudibility)");
+  expect(source).toContain(
+    "envelopeGain.gain.linearRampToValueAtTime(0.0001, time + duration)",
+  );
+  expect(source).not.toContain("axisGain");
+  expect(source).not.toContain("presenceGain");
 });
 
 test("maps Range values into expanding rhythm windows", async () => {
@@ -1096,16 +1655,22 @@ test("keeps the homepage sound generator continuous beneath its visual rhythm", 
     'aria-label={looping ? "Stop interval note" : "Play interval note"}',
   );
   expect(nucleus).toContain("onclick={togglePlayback}");
-  expect(nucleus).toContain("background: oklch(0 0 0)");
-  expect(nucleus).toContain("background: var(--range)");
+  expect(nucleus).toContain("background: transparent;");
+  expect(nucleus).toContain("color: oklch(0 0 0);");
+  expect(nucleus).toContain("border-radius: 0;");
   expect(nucleus).toContain("function startDistantVoice()");
   expect(nucleus).toContain("breath.frequency.value = 0.037;");
   expect(nucleus).toContain("voiceGain.gain.setValueAtTime(0.09, startAt);");
   expect(nucleus).toContain("direct.gain.value = 0.14;");
   expect(nucleus).toContain("function getAudioMasterInput()");
-  expect(nucleus).toContain("audioMasterInput.gain.value = 1.8;");
+  expect(nucleus).toContain("audioMasterInput.gain.value = 0.82;");
   expect(nucleus).toContain("audioMasterCompressor.ratio.value = 12;");
-  expect(nucleus).toContain("audioMasterOutput.gain.value = 1;");
+  expect(nucleus).toContain("audioMasterOutput.gain.value = scrollSoundGain(scrollFilterPosition);");
+  expect(nucleus).toContain("const distantSoundFloor = 0;");
+  expect(nucleus).toContain("const distantSoundCeiling = 0.58;");
+  expect(nucleus).toContain("function scrollSoundGain(position: number)");
+  expect(nucleus).toContain("audioMasterOutput?.gain.setTargetAtTime(");
+  expect(nucleus).toContain('soundManager.register("range-nucleus", 0.45)');
   expect(nucleus).toContain("function scrollFilterFrequency(position: number)");
   expect(nucleus).toContain("const minimum = 190;");
   expect(nucleus).toContain("const maximum = 760;");
@@ -1226,15 +1791,9 @@ test("keeps the concrete codability application example", async () => {
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
-  expect(sheet).toContain("construct User");
-  expect(sheet).toContain('let name: String("George")');
-  expect(sheet).toContain('state message: String("Working on Range!")');
-  expect(sheet).toContain('label: "Usage"');
   expect(sheet).toContain('label: "Declaration"');
-  expect(sheet.match(/label: "Usage"/g)).toHaveLength(1);
-  expect(sheet.indexOf('label: "Declaration"')).toBeLessThan(
-    sheet.indexOf('id: "usage"'),
-  );
+  expect(sheet).not.toContain('label: "Usage"');
+  expect(sheet).not.toContain('id: "usage"');
   expect(sheet).not.toContain('label: "Field"');
   expect(sheet).not.toContain('id: "usage-before-fields"');
   expect(sheet).not.toContain('id: "usage-after-fields"');
@@ -1377,7 +1936,7 @@ test("keeps the concrete codability application example", async () => {
   expect(sheet).not.toContain("const shouldClear");
   expect(sheet).toContain("storyMode = true;");
   expect(sheet).toContain("activeInspectionID = chapter.id;");
-  expect(sheet).toContain('{#if activeID === "macro" && storyMode}');
+  expect(sheet).toContain("{#if storyMode}");
   expect(sheet).toContain('class="chapterNav"');
   expect(sheet).toContain('class="storyModeToggle"');
   expect(sheet).toContain('aria-label="Story mode"');
@@ -1497,7 +2056,7 @@ test("keeps the concrete codability application example", async () => {
   expect(sheet).toContain("centerChapterInViewport(activeInspectionID);");
   expect(sheet).toContain("data-inspection-id={line.inspectionID}");
   expect(sheet).toContain(
-    'if (storyMode && activeID === "macro" && activeInspectionID)',
+    "if (storyMode && activeInspectionID)",
   );
   expect(sheet).toContain(
     "const nextScrollChapterIndex = codabilityChapterIndex(",
@@ -1515,7 +2074,7 @@ test("keeps the concrete codability application example", async () => {
   expect(codable).not.toContain("macro encode(");
   expect(codable).not.toContain("codableEncodeStateBody");
   expect(codable).not.toContain("codableDecodeStateBody");
-  expect(codable).toContain("let fields: [@stored](");
+  expect(codable).toContain("let fields: Array<@stored>(");
   expect(codable).toContain("members.filter(all: @stored)");
   expect(codable).toContain(
     "function encode<Format>(to encoder: Encoder<Format>): Result<Void, EncodingError> {",

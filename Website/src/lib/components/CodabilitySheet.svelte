@@ -10,11 +10,18 @@
     type CodabilityFocusState,
   } from "$lib/codability-focus";
   import codableSource from "../../../../RangeCompiler/Sources/Core/Macro/Codable.range?raw";
+  import commandGroupSource from "../../../../RangeCompiler/Sources/Core/Macro/CommandGroup.range?raw";
 
-  type PaneID = "macro" | "usage";
+  let {
+    variant = "codability",
+    showIntro = true,
+  }: {
+    variant?: "codability" | "commandGroup";
+    showIntro?: boolean;
+  } = $props();
+
   type ChapterStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
   type InspectionID =
-    | "decorator"
     | "macro-declaration"
     | "declaration-query"
     | "expansion"
@@ -24,7 +31,12 @@
     | "property-map"
     | "value-mention"
     | "type-mention"
-    | "decode-body";
+    | "decode-body"
+    | "command-declaration"
+    | "command-query"
+    | "command-validation"
+    | "command-expansion"
+    | "command-map";
 
   type Inspection = {
     id: InspectionID;
@@ -107,8 +119,39 @@
     return highlightRange(responsiveIndent(value));
   }
 
-  const macroMarker = "macro codable(): Construct";
-  const declarationSource = sourceFrom(codableSource, macroMarker).replace(
+  const isCommandGroup = variant === "commandGroup";
+  const breakdown = isCommandGroup
+    ? {
+        index: "02 · macro breakdown",
+        title: "Registration by Declaration",
+        summary:
+          "@commandGroup reads annotated functions, validates the group, and expands a construct-owned command set.",
+        file: "Core/Macro/CommandGroup.range",
+        flow: [
+          { number: "01", title: "Collect", detail: "@command functions" },
+          { number: "02", title: "Validate", detail: "non-empty group" },
+          { number: "03", title: "Expand", detail: "Command enum" },
+        ],
+      }
+    : {
+        index: "01 · macro breakdown",
+        title: "Codability Under 100",
+        summary:
+          "@codable reads the target construct’s stored values, maps each field through Range-authored helpers, and expands a typed coding extension.",
+        file: "Core/Macro/Codable.range",
+        flow: [
+          { number: "01", title: "Collect", detail: "stored properties" },
+          { number: "02", title: "Map", detail: "property keys and types" },
+          { number: "04", title: "Expand", detail: "encode + decode bodies" },
+        ],
+      };
+  const macroMarker = isCommandGroup
+    ? "macro command(): Function"
+    : "macro codable(): Construct";
+  const declarationSource = sourceFrom(
+    isCommandGroup ? commandGroupSource : codableSource,
+    macroMarker,
+  ).replace(
     /environment\.expand(?=\s*\{)/g,
     "#environment",
   );
@@ -117,9 +160,11 @@
   const macroDeclarationSection = "macro codable(): Construct { environment in";
   const macroSection = sourceBlock(declarationSource, macroDeclarationSection);
   const extensionSection = sourceBlock(declarationSource, extensionMarker);
-  const fieldQuerySection = `    let fields: [@stored](
-        environment.target.Declaration.members.filter(all: @stored)
-    )`;
+  const fieldQuerySection = sourceBetween(
+    declarationSource,
+    "    let fields:",
+    "\n\n    #environment",
+  );
   const encodeFunctionSection =
     `            function encode<Format>(to encoder: Encoder<Format>): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer<Format>(encoder.keyedContainer())`;
@@ -139,36 +184,16 @@
     declarationSource,
     "function decode<Format>(from decoder: Decoder<Format>): Result<Self, DecodingError> {",
   );
-  const userExample = `@codable
-construct User {
-    let name: String("George")
-    state message: String("Working on Range!")
-}`;
   const panes = [
     {
       id: "macro",
       label: "Declaration",
-      file: "Core/Macro/Codable.range",
+      file: breakdown.file,
       source: declarationSource,
-    },
-    {
-      id: "usage",
-      label: "Usage",
-      file: "Project/User.range",
-      source: userExample,
     },
   ] as const;
 
-  const inspections: Inspection[] = [
-    {
-      id: "decorator",
-      token: "@codable",
-      title: "Attaching a macro",
-      phase: "declaration",
-      result: "one attached macro application",
-      description:
-        "Attaches codability to the construct. The User now carries `@codable` behavior.",
-    },
+  const codabilityInspections: Inspection[] = [
     {
       id: "macro-declaration",
       token: macroDeclarationSection,
@@ -278,15 +303,66 @@ construct User {
       scopeToken: decodeFunctionSection,
     },
   ];
+  const commandGroupInspections: Inspection[] = [
+    {
+      id: "command-declaration",
+      token: "macro command(): Function {}",
+      title: "Declare the registration marker",
+      description:
+        "@command is a typed Function marker. It records registration in the declaration graph without creating a runtime registry.",
+      kind: "section",
+      step: 1,
+    },
+    {
+      id: "command-query",
+      token: sourceBetween(declarationSource, "    let commands:", "\n\n    if commands.count"),
+      title: "Discover registered commands",
+      description:
+        "The group queries its own declared members and retains only those carrying @command, producing an ordered typed collection.",
+      kind: "section",
+      step: 2,
+    },
+    {
+      id: "command-validation",
+      token: sourceBlock(declarationSource, "if commands.count == 0"),
+      title: "Validate the registration set",
+      description:
+        "An empty group is rejected with a specific diagnostic before the macro emits any generated declarations.",
+      kind: "section",
+      step: 3,
+    },
+    {
+      id: "command-expansion",
+      token: "#environment",
+      title: "Expand onto the target",
+      description:
+        "The macro emits an extension on the command-group construct, keeping the generated command surface owned by its target.",
+      kind: "section",
+      step: 4,
+      scopeToken: sourceBlock(declarationSource, "#environment"),
+    },
+    {
+      id: "command-map",
+      token: "#commands.map",
+      title: "Generate one case per registration",
+      description:
+        "Each registered command declaration is mapped to an enum case. The generated Command set stays synchronized with the annotations.",
+      kind: "section",
+      step: 5,
+      scopeToken: sourceBlock(declarationSource, "#commands.map"),
+    },
+  ];
+  const inspections = isCommandGroup
+    ? commandGroupInspections
+    : codabilityInspections;
   const inspectionByID = new Map(inspections.map((inspection) => [inspection.id, inspection]));
   const chapters = inspections.filter(
     (inspection): inspection is Inspection & { step: ChapterStep } =>
       inspection.step !== undefined,
   );
-  const paneDefaults: Record<PaneID, InspectionID> = {
-    macro: "macro-declaration",
-    usage: "decorator",
-  };
+  const initialInspectionID: InspectionID = isCommandGroup
+    ? "command-declaration"
+    : "macro-declaration";
 
   function tokenIndex(source: string, token: string, fromIndex: number) {
     let index = source.indexOf(token, fromIndex);
@@ -301,7 +377,7 @@ construct User {
   for (const chapter of chapters) {
     if (tokenIndex(declarationSource, chapter.token, 0) === -1) {
       throw new Error(
-        `Codability chapter ${chapter.step} no longer matches Codable.range`,
+        `${breakdown.title} chapter ${chapter.step} no longer matches ${breakdown.file}`,
       );
     }
   }
@@ -359,8 +435,7 @@ construct User {
     return lines;
   }
 
-  let activeID = $state<PaneID>("macro");
-  let activeInspectionID = $state<InspectionID | null>(paneDefaults.macro);
+  let activeInspectionID = $state<InspectionID | null>(initialInspectionID);
   let stageElement: HTMLDivElement;
   let previewElement: HTMLElement;
   let codeViewportElement: HTMLDivElement;
@@ -373,7 +448,7 @@ construct User {
   let latestStageScrollProgress = 0;
   let storyMode = $state(true);
   let stageFocused = $state(false);
-  let activePane = $derived(panes.find((pane) => pane.id === activeID) ?? panes[0]);
+  let activePane = $derived(panes[0]);
   let activeInspection = $derived(
     activeInspectionID ? inspectionByID.get(activeInspectionID) : undefined,
   );
@@ -384,28 +459,8 @@ construct User {
   let highlightedLines = $derived(highlightInspectableLines(activePane.source));
   let lineNumbers = $derived(activePane.source.split("\n").map((_, index) => index + 1));
 
-  function selectPane(paneID: PaneID) {
-    manualChapterIndex = null;
-    activeID = paneID;
-    if (paneID === "macro") {
-      if (storyMode) {
-        scrollChapterIndex = codabilityChapterIndex(
-          latestStageScrollProgress,
-          chapters.length,
-        );
-        activeInspectionID =
-          chapters[scrollChapterIndex]?.id ?? paneDefaults[paneID];
-      } else {
-        activeInspectionID = null;
-      }
-    } else {
-      activeInspectionID = paneDefaults[paneID];
-    }
-  }
-
   function selectChapter(chapter: (typeof chapters)[number]) {
     storyMode = true;
-    activeID = "macro";
     activeInspectionID = chapter.id;
     scrollChapterIndex = chapters.indexOf(chapter);
     manualChapterIndex = scrollChapterIndex;
@@ -438,14 +493,13 @@ construct User {
   function setStoryMode(enabled: boolean) {
     manualChapterIndex = null;
     storyMode = enabled;
-    if (activeID !== "macro") return;
     if (enabled) {
       scrollChapterIndex = codabilityChapterIndex(
         latestStageScrollProgress,
         chapters.length,
       );
       activeInspectionID =
-        chapters[scrollChapterIndex]?.id ?? paneDefaults.macro;
+        chapters[scrollChapterIndex]?.id ?? initialInspectionID;
     } else {
       scrollChapterIndex = -1;
       activeInspectionID = null;
@@ -537,7 +591,6 @@ construct User {
       });
     if (
       storyMode &&
-      activeID === "macro" &&
       canSynchronizeStoryChapter &&
       nextScrollChapterIndex !== scrollChapterIndex
     ) {
@@ -545,7 +598,7 @@ construct User {
       scrollChapterIndex = nextScrollChapterIndex;
       activeInspectionID = chapters[nextScrollChapterIndex]?.id ?? null;
     }
-    if (storyMode && activeID === "macro" && activeInspectionID) {
+    if (storyMode && activeInspectionID) {
       centerChapterInViewport(activeInspectionID);
     } else {
       const codeScrollDistance = Math.max(
@@ -588,30 +641,24 @@ construct User {
 </script>
 
 <section class="codabilitySheet" aria-labelledby="codability-title">
-  <div class="codabilityIntro">
-    <p class="sheetIndex">01 · metaprogramming</p>
-    <h1 class="codabilityTitle" id="codability-title">Codability Under 100</h1>
-    <p class="sheetSummary">
-      <code>@codable</code> reads the target construct’s stored values, maps
-      each field through Range-authored helpers, and expands a typed coding
-      extension.
-    </p>
+  {#if showIntro}
+    <div class="codabilityIntro">
+      <p class="sheetIndex">{breakdown.index}</p>
+      <h1 class="codabilityTitle" id="codability-title">{breakdown.title}</h1>
+      <p class="sheetSummary">
+        {breakdown.summary}
+      </p>
 
-    <ol class="codabilityFlow">
-      <li>
-        <span>01</span>
-        <div><strong>Collect</strong><small>stored properties</small></div>
-      </li>
-      <li>
-        <span>02</span>
-        <div><strong>Map</strong><small>property keys and types</small></div>
-      </li>
-      <li>
-        <span>04</span>
-        <div><strong>Expand</strong><small>encode + decode bodies</small></div>
-      </li>
-    </ol>
-  </div>
+      <ol class="codabilityFlow">
+        {#each breakdown.flow as step}
+          <li>
+            <span>{step.number}</span>
+            <div><strong>{step.title}</strong><small>{step.detail}</small></div>
+          </li>
+        {/each}
+      </ol>
+    </div>
+  {/if}
 
   <div class="codabilityStage" bind:this={stageElement}>
   <article
@@ -631,35 +678,20 @@ construct User {
       </div>
 
       <div class="previewControls">
-        {#if activeID === "macro"}
-          <button
-            class="storyModeToggle"
-            type="button"
-            aria-label="Story mode"
-            aria-pressed={storyMode}
-            onclick={() => setStoryMode(!storyMode)}
-          >
-            Story
-          </button>
-        {/if}
-        <div class="previewTabs" role="tablist" aria-label="Codability source view">
-          {#each panes as pane}
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeID === pane.id}
-              aria-controls="codability-source"
-              onclick={() => selectPane(pane.id)}
-            >
-              {pane.label}
-            </button>
-          {/each}
-        </div>
+        <button
+          class="storyModeToggle"
+          type="button"
+          aria-label="Story mode"
+          aria-pressed={storyMode}
+          onclick={() => setStoryMode(!storyMode)}
+        >
+          Story
+        </button>
       </div>
     </header>
 
-    {#if activeID === "macro" && storyMode}
-      <nav class="chapterNav" aria-label="Codability chapters">
+    {#if storyMode}
+      <nav class="chapterNav" aria-label={`${breakdown.title} chapters`}>
         <button
           type="button"
           aria-label="Previous chapter"

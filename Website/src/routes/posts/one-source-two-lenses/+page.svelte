@@ -1,13 +1,19 @@
 <script lang="ts">
   import EssayPage from "$lib/components/EssayPage.svelte";
+  import SphereLineShader from "$lib/components/SphereLineShader.svelte";
 </script>
+
+{#snippet heroShader()}
+  <SphereLineShader palette={4} offsetX={0.3} />
+{/snippet}
 
 <EssayPage
   title="One Source, Two Lenses"
   description="In Range, written source and intended meaning share one typed graph."
   category="Observation"
   date="July 30, 2026"
-  heroShaderPalette={4}
+  {heroShader}
+  heroShaderFocusX={98}
 >
   <section>
     <h2>No language is ever done</h2>

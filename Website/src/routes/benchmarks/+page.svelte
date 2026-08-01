@@ -1,7 +1,6 @@
 <script lang="ts">
   import { benchmarkFromLeaf, data } from "$lib/benchmarks";
   import Chart from "$lib/components/Chart.svelte";
-  import Footer from "$lib/components/Footer.svelte";
   import Procedure from "$lib/components/Procedure.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
 
@@ -28,6 +27,5 @@
       </details>
       <div class="benchmarkRunStatus" aria-label="Current benchmark run status"><span>{data.summary.runLeafCount} of {data.summary.leafCount} leaves run</span><span>Range passed {data.summary.rangePassed}</span><span>Not emitted {data.summary.rangeNotEmitted}</span><span>Failed {data.summary.rangeFailed}</span></div>
     </section>
-    <Footer />
   </main>
 </range-benchmarks-page>

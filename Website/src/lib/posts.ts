@@ -9,7 +9,7 @@ export type Post = {
   cardDescription: string;
   description: string;
   palette: number;
-  socialShader?: "sphere-lines";
+  socialShader?: "sphere-lines" | "relationship-dots";
   cardPalette: {
     foreground: string;
     mutedForeground: string;
@@ -19,6 +19,22 @@ export type Post = {
 };
 
 export const posts: Post[] = [
+  {
+    slug: "command-group-registration",
+    href: "/features/macros/command-group-registration",
+    category: "Macro breakdown",
+    cardTitle: "Registration by declaration",
+    cardDescription: "A command group derives its closed command set.",
+    description:
+      "A source-first walkthrough of how @commandGroup discovers annotated functions and generates a command enum.",
+    palette: 3,
+    cardPalette: {
+      foreground: "rgb(31 42 6)",
+      mutedForeground: "rgb(72 75 44)",
+      background: "rgb(221 244 134)",
+      contrast: 8.84,
+    },
+  },
   {
     slug: "50-declarative-50-imperative",
     href: "/features/macros/50-declarative-50-imperative",
@@ -54,7 +70,7 @@ export const posts: Post[] = [
   {
     slug: "codability-under-100",
     href: "/features/macros/codability-under-100",
-    category: "Metaprogramming",
+    category: "Macro breakdown",
     cardTitle: "Codability under 100",
     cardDescription: "One Range-authored macro, explained line by line.",
     description:
@@ -70,6 +86,25 @@ export const posts: Post[] = [
 ];
 
 export const draftPosts: Post[] = [
+  {
+    slug: "intro-to-range-2",
+    href: "/posts/intro-to-range-2",
+    previewHref: "/posts/intro-to-range-2?preview=range-draft",
+    category: "Introduction",
+    cardTitle: "Intro to Range: The Concrete",
+    cardDescription:
+      "One plotted graph. Values carry the metadata for their relationships.",
+    description:
+      "How the Range compiler uses typed relationship values to describe multiplicity, order, separators, and enclosure.",
+    palette: 6,
+    socialShader: "relationship-dots",
+    cardPalette: {
+      foreground: "rgb(40 20 88)",
+      mutedForeground: "rgb(76 64 103)",
+      background: "rgb(239 239 252)",
+      contrast: 13.84,
+    },
+  },
   {
     slug: "one-source-two-lenses",
     href: "/posts/one-source-two-lenses",
@@ -95,7 +130,7 @@ export const draftPosts: Post[] = [
     href: "/posts/intro-to-range",
     previewHref: "/posts/intro-to-range?preview=range-draft",
     category: "Introduction",
-    cardTitle: "Intro to Range",
+    cardTitle: "Intro to Range: The Material",
     cardDescription:
       "Identity and value, four binding intents, three abstraction forms.",
     description:
@@ -106,6 +141,42 @@ export const draftPosts: Post[] = [
       mutedForeground: "rgb(101 46 60)",
       background: "rgb(255 166 184)",
       contrast: 6.9,
+    },
+  },
+  {
+    slug: "intro-to-range-3",
+    href: "/posts/intro-to-range-3",
+    previewHref: "/posts/intro-to-range-3?preview=range-draft",
+    category: "Introduction",
+    cardTitle: "Intro to Range: The Meta",
+    cardDescription:
+      "Macros use identities, values, and relationships to make structure.",
+    description:
+      "How Range macros operate on the identity-bearing graph to make reusable program structure.",
+    palette: 7,
+    cardPalette: {
+      foreground: "rgb(54 23 0)",
+      mutedForeground: "rgb(101 62 35)",
+      background: "rgb(255 226 180)",
+      contrast: 9.2,
+    },
+  },
+  {
+    slug: "intro-to-range-4",
+    href: "/posts/intro-to-range-4",
+    previewHref: "/posts/intro-to-range-4?preview=range-draft",
+    category: "Introduction",
+    cardTitle: "Intro to Range: The Substrate",
+    cardDescription:
+      "One graph pattern scales from syntax to databases and beyond.",
+    description:
+      "How one graph pattern can represent written syntax, databases, and anything else you need to express.",
+    palette: 8,
+    cardPalette: {
+      foreground: "rgb(24 28 65)",
+      mutedForeground: "rgb(67 70 109)",
+      background: "rgb(214 228 255)",
+      contrast: 10.4,
     },
   },
 ];

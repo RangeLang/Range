@@ -1,10 +1,59 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { getContext, onMount } from "svelte";
+  import {
+    createDeepAcidWow,
+  } from "$lib/audio/deep-acid-wow";
+  import {
+    RANGE_SOUND_MANAGER_CONTEXT,
+    type RangeSoundManager,
+    type RangeSoundRoute,
+  } from "$lib/audio/sound-manager";
 
-  const text = "Range";
+  let {
+    text = "Range",
+    base = "dark",
+    colors = "spectrum",
+    transpose = 0,
+    hdr = false,
+    effect = "interactive",
+  }: {
+    text?: string;
+    base?: "dark" | "white";
+    colors?: "spectrum" | "warm-light";
+    transpose?: number;
+    hdr?: boolean;
+    effect?: "interactive" | "radiate";
+  } = $props();
   const anchorX = 0.59;
   const anchorY = 0.5;
-  const reanchorDelay = 1000;
+  const reanchorDuration = 1200;
+  const pointerStopDelay = 1000;
+  const soundFalloffScale = 1.15;
+  const soundFalloffPadding = 80;
+  const soundIdleWait = 600;
+  const soundFalloffDuration = 1200;
+  const soundMotionVolumeDuration = 60;
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  // Wide-gamut basis colors expressed in OKLCH. The blue is pulled inward
+  // from the P3 boundary so it reads as radiant color rather than neon.
+  const outwardPaletteOklch = new Float32Array([
+    0.73, 0.27, radians(20),
+    0.848829, 0.368528, radians(145.645),
+    0.62, 0.22, radians(280),
+  ]);
+  const warmLightPaletteOklch = new Float32Array([
+    0.86, 0.12, radians(52),
+    0.94, 0.1, radians(76),
+    0.985, 0.008, radians(82),
+  ]);
+  const warmHdrPaletteOklch = new Float32Array([
+    0.86, 0.22, radians(52),
+    0.95, 0.18, radians(76),
+    0.995, 0.015, radians(82),
+  ]);
+  const soundManager = getContext<RangeSoundManager | undefined>(
+    RANGE_SOUND_MANAGER_CONTEXT,
+  );
 
   let titleElement: HTMLSpanElement;
   let canvas: HTMLCanvasElement;
@@ -21,20 +70,36 @@
   let glyphSource: HTMLCanvasElement | null = null;
   let uniformLocations: Record<string, WebGLUniformLocation | null> = {};
   let blurUniformLocations: Record<string, WebGLUniformLocation | null> = {};
+  let usesDisplayP3 = false;
+  let titleAudioContext: AudioContext | null = null;
+  let titleSoundRoute: RangeSoundRoute | null = null;
+  let titleSound: ReturnType<typeof createDeepAcidWow> | null = null;
 
   let distortionCenter = anchorX;
   let distortionVerticalCenter = anchorY;
   let targetDistortionCenter = anchorX;
   let targetDistortionVerticalCenter = anchorY;
   let pointerRenderFrame: number | null = null;
+  let radiateRenderFrame: number | null = null;
+  let radiateStartedAt = 0;
+  let lastRadiateFrame = -Infinity;
+  let radiateTime = 0;
+  let viewportSoundFrame: number | null = null;
   let pointerAnimationTime = 0;
   let pointerInside = false;
+  let soundProximity = 0;
+  let lastPointerClientX = 0;
+  let lastPointerClientY = 0;
   let idleTimeout: ReturnType<typeof setTimeout> | null = null;
   let reanchorTimeout: ReturnType<typeof setTimeout> | null = null;
   let reanchorStartedAt = 0;
   let reanchorStartX = anchorX;
   let reanchorStartY = anchorY;
+  let reanchorStartVelocityX = 0;
+  let reanchorStartVelocityY = 0;
   let reanchoring = false;
+  let distortionVelocityX = 0;
+  let distortionVelocityY = 0;
   let pointerVelocityX = 0;
   let pointerVelocityY = 0;
   let lastPointerX = anchorX;
@@ -70,8 +135,11 @@
     uniform float uAnchorX;
     uniform float uPointerY;
     uniform vec3 uCharcoalColor;
-    uniform vec3 uRevealColor;
     uniform vec3 uOutwardOklch[3];
+    uniform int uDisplayP3;
+    uniform int uWarmOnly;
+    uniform int uRadiate;
+    uniform float uTime;
 
     in vec2 vUv;
     out vec4 outputColor;
@@ -91,6 +159,37 @@
 
     float glyphMask(vec2 uv) {
       return texture(uGlyph, uv).a;
+    }
+
+    float radiatingGlyphMask(vec2 uv, float radius, float pulse) {
+      vec2 textureDimensions = vec2(textureSize(uGlyph, 0));
+      vec2 texel = 1.0 / textureDimensions;
+      float inkPixels = uInkY.y * textureDimensions.y;
+      float breathingRadius = radius * mix(0.72, 1.0, pulse);
+      float expanded = glyphMask(uv);
+      for (int sampleIndex = 0; sampleIndex < 12; sampleIndex += 1) {
+        float angle = float(sampleIndex) * 0.5235987756;
+        vec2 direction = vec2(cos(angle), sin(angle));
+        expanded = max(
+          expanded,
+          glyphMask(
+            uv + direction * inkPixels * breathingRadius * texel
+          )
+        );
+      }
+      return expanded;
+    }
+
+    float innerGlyphEdgeMask(vec2 uv, float center) {
+      vec2 texel = 1.0 / vec2(textureSize(uGlyph, 0));
+      vec2 radius = texel * 3.0;
+      float surrounding = (
+        glyphMask(uv + vec2(radius.x, 0.0)) +
+        glyphMask(uv - vec2(radius.x, 0.0)) +
+        glyphMask(uv + vec2(0.0, radius.y)) +
+        glyphMask(uv - vec2(0.0, radius.y))
+      ) * 0.25;
+      return center * clamp(1.0 - surrounding, 0.0, 1.0);
     }
 
     float warpedMask(
@@ -137,7 +236,7 @@
       return vec4(color, alpha);
     }
 
-    vec3 oklchToSrgb(vec3 color) {
+    vec3 oklchToOutput(vec3 color) {
       float labA = color.y * cos(color.z);
       float labB = color.y * sin(color.z);
       float lPrime = color.x + 0.3963377774 * labA + 0.2158037573 * labB;
@@ -146,11 +245,25 @@
       float l = lPrime * lPrime * lPrime;
       float m = mPrime * mPrime * mPrime;
       float s = sPrime * sPrime * sPrime;
-      vec3 linear = vec3(
-        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
-      );
+      vec3 linear;
+      if (uDisplayP3 == 1) {
+        vec3 xyz = vec3(
+          1.2268798734 * l - 0.5578149966 * m - 0.2813910502 * s,
+          -0.0405757452 * l + 1.1122868294 * m - 0.0717110667 * s,
+          -0.0763729497 * l - 0.4214933240 * m + 1.5869240244 * s
+        );
+        linear = vec3(
+          2.4934969119 * xyz.x - 0.9313836179 * xyz.y - 0.4027107845 * xyz.z,
+          -0.8294889696 * xyz.x + 1.7626640603 * xyz.y + 0.0236246858 * xyz.z,
+          0.0358458302 * xyz.x - 0.0761723893 * xyz.y + 0.9568845240 * xyz.z
+        );
+      } else {
+        linear = vec3(
+          4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+          -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+          -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
+        );
+      }
       vec3 low = linear * 12.92;
       vec3 high =
         1.055 *
@@ -165,30 +278,49 @@
 
     void main() {
       float contentX = (vUv.x - uContentRect.x) / uContentRect.z;
-      float focus = focusEnvelope(contentX);
+      float rawPulse = 0.5 + 0.5 * sin(uTime * 0.9);
+      float pulse = rawPulse * rawPulse * (3.0 - 2.0 * rawPulse);
+      float focus = uRadiate == 1
+        ? mix(0.72, 1.0, pulse)
+        : focusEnvelope(contentX);
       float base = glyphMask(vUv);
 
       // Group(.outward) {
       //   Red -> Green -> Blue
       // }
-      float redMask = warpedMask(vUv, 3.0, 0.4, 1.0, 0.22);
-      float greenMask = warpedMask(vUv, 2.4, 0.36, 1.0, 0.22);
-      float blueMask = warpedMask(vUv, 1.8, 0.32, 1.0, 0.22);
+      float redMask = uRadiate == 1
+        ? radiatingGlyphMask(vUv, 0.072, pulse)
+        : warpedMask(vUv, 3.0, 0.4, 1.0, 0.22);
+      float greenMask = uRadiate == 1
+        ? radiatingGlyphMask(vUv, 0.045, pulse)
+        : warpedMask(vUv, 2.15, 0.36, 1.0, 0.22);
+      float blueMask = uRadiate == 1
+        ? radiatingGlyphMask(vUv, 0.022, pulse)
+        : warpedMask(vUv, 1.3, 0.32, 1.0, 0.22);
       float redOutside = max(0.0, redMask - base);
       float greenOutside = max(0.0, greenMask - base);
       float blueOutside = max(0.0, blueMask - base);
-      vec4 outward = vec4(0.0);
-      outward = over(
-        outward,
-        vec4(oklchToSrgb(uOutwardOklch[0]), redOutside * focus * 0.9)
+      // Give every basis color its own shell. The Gaussian blur creates the
+      // yellow and cyan transitions without turning the whole blue shell cyan.
+      float redBand = max(0.0, redOutside - greenOutside);
+      float greenBand = max(0.0, greenOutside - blueOutside);
+      float channelOpacity = 0.95;
+      float channelAlpha = max(
+        redBand,
+        max(greenBand, blueOutside)
       );
-      outward = over(
-        outward,
-        vec4(oklchToSrgb(uOutwardOklch[1]), greenOutside * focus * 0.9)
+      vec3 channelColor =
+        oklchToOutput(uOutwardOklch[0]) * redBand +
+        oklchToOutput(uOutwardOklch[1]) * greenBand +
+        oklchToOutput(uOutwardOklch[2]) * blueOutside;
+      vec3 outwardColor = clamp(
+        channelColor / max(channelAlpha, 0.00001),
+        0.0,
+        1.0
       );
-      outward = over(
-        outward,
-        vec4(oklchToSrgb(uOutwardOklch[2]), blueOutside * focus * 0.9)
+      vec4 outward = vec4(
+        outwardColor,
+        channelAlpha * focus * channelOpacity
       );
 
       if (uPass == 0) {
@@ -197,21 +329,65 @@
       }
 
       vec4 blurredPremultiplied = texture(uOutwardBlur, vUv);
+      vec3 blurredOutwardColor = blurredPremultiplied.rgb /
+        max(blurredPremultiplied.a, 0.00001);
       vec4 blurredOutward = vec4(
-        blurredPremultiplied.rgb /
-          max(blurredPremultiplied.a, 0.00001),
+        blurredOutwardColor,
         blurredPremultiplied.a
       );
-
-      // Two-tone base: pitch black by default, charcoal at the reveal.
-      vec3 glyphColor = mix(
-        uCharcoalColor,
-        uRevealColor,
-        focus
+      // Three independent layers: outward color, black glyph, then a white
+      // mask made from the blurred color intersecting the glyph's inside edge.
+      vec4 glyph = over(
+        blurredOutward,
+        vec4(uCharcoalColor, base)
       );
-      vec4 glyph = over(blurredOutward, vec4(glyphColor, base));
+      float whiteInnerOpacity = 0.68;
+      float whiteInnerAnchor = smoothstep(
+        0.0,
+        0.22,
+        blurredPremultiplied.a
+      );
+      float whiteInnerMask =
+        innerGlyphEdgeMask(vUv, base) *
+        whiteInnerAnchor *
+        whiteInnerOpacity;
+      vec4 illuminatedGlyph = over(
+        glyph,
+        vec4(vec3(1.0), whiteInnerMask)
+      );
+      vec4 composition = illuminatedGlyph;
 
-      outputColor = vec4(clamp(glyph.rgb, 0.0, 1.0) * glyph.a, glyph.a);
+      if (uWarmOnly == 1) {
+        float glowEnergy = clamp(blurredPremultiplied.a * 2.15, 0.0, 1.0);
+        vec3 amber = vec3(1.0, 0.24, 0.008);
+        vec3 gold = vec3(1.0, 0.7, 0.08);
+        vec3 warmWhite = vec3(1.0, 0.99, 0.94);
+        vec3 emittedLight = mix(
+          amber,
+          gold,
+          smoothstep(0.04, 0.58, glowEnergy)
+        );
+        emittedLight = mix(
+          emittedLight,
+          warmWhite,
+          smoothstep(0.5, 0.96, glowEnergy)
+        );
+        composition.rgb = mix(
+          emittedLight,
+          uCharcoalColor,
+          smoothstep(0.04, 0.82, base)
+        );
+        float softGlow = pow(
+          clamp(blurredPremultiplied.a, 0.0, 1.0),
+          0.72
+        ) * 0.86 * (uRadiate == 1 ? mix(0.76, 1.0, pulse) : 1.0);
+        composition.a = max(base, softGlow);
+      }
+
+      outputColor = vec4(
+        clamp(composition.rgb, 0.0, 1.0) * composition.a,
+        composition.a
+      );
     }
   `;
 
@@ -304,8 +480,11 @@
       anchorX: gl.getUniformLocation(program, "uAnchorX"),
       pointerY: gl.getUniformLocation(program, "uPointerY"),
       charcoalColor: gl.getUniformLocation(program, "uCharcoalColor"),
-      revealColor: gl.getUniformLocation(program, "uRevealColor"),
       outwardOklch: gl.getUniformLocation(program, "uOutwardOklch"),
+      displayP3: gl.getUniformLocation(program, "uDisplayP3"),
+      warmOnly: gl.getUniformLocation(program, "uWarmOnly"),
+      radiate: gl.getUniformLocation(program, "uRadiate"),
+      time: gl.getUniformLocation(program, "uTime"),
     };
     blurUniformLocations = {
       source: gl.getUniformLocation(blurProgram, "uSource"),
@@ -452,15 +631,25 @@
       (renderHeight - inkTop - inkHeight) / renderHeight,
       inkHeight / renderHeight,
     );
-    gl.uniform3f(uniformLocations.charcoalColor, 0, 0, 0);
-    gl.uniform3f(uniformLocations.revealColor, 0.24, 0.25, 0.27);
+    const baseChannel = base === "white" ? 1 : 0;
+    gl.uniform3f(
+      uniformLocations.charcoalColor,
+      baseChannel,
+      baseChannel,
+      baseChannel,
+    );
     gl.uniform3fv(
       uniformLocations.outwardOklch,
-      new Float32Array([
-        0.9, 0.31, 0.4886922,
-        0.93, 0.3, 2.5307274,
-        0.88, 0.29, 4.4505896,
-      ]),
+      hdr
+        ? warmHdrPaletteOklch
+        : colors === "warm-light"
+          ? warmLightPaletteOklch
+          : outwardPaletteOklch,
+    );
+    gl.uniform1i(uniformLocations.displayP3, usesDisplayP3 ? 1 : 0);
+    gl.uniform1i(
+      uniformLocations.warmOnly,
+      colors === "warm-light" ? 1 : 0,
     );
     if (blurProgram) {
       gl.useProgram(blurProgram);
@@ -488,6 +677,11 @@
     // Render the unblurred outward RGB group into texture A.
     gl.bindFramebuffer(gl.FRAMEBUFFER, outwardFramebufferA);
     gl.useProgram(program);
+    gl.uniform1i(
+      uniformLocations.radiate,
+      effect === "radiate" ? 1 : 0,
+    );
+    gl.uniform1f(uniformLocations.time, radiateTime);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, glyphTexture);
     gl.activeTexture(gl.TEXTURE1);
@@ -504,7 +698,9 @@
     // Several narrow separable passes converge to a smooth Gaussian without
     // exposing the sparse sampling lattice of one oversized kernel.
     gl.useProgram(blurProgram);
-    const blurScales = [0.9, 1.1, 1.3, 1.5];
+    const blurScales = hdr
+      ? [1.1, 1.5, 2.0, 2.6, 3.2]
+      : [0.9, 1.1, 1.3, 1.5];
     for (const blurScale of blurScales) {
       // Horizontal Gaussian pass: A -> B.
       gl.bindFramebuffer(gl.FRAMEBUFFER, outwardFramebufferB);
@@ -542,21 +738,74 @@
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
 
+  const animateRadiation = (timestamp: number) => {
+    if (effect !== "radiate") {
+      radiateRenderFrame = null;
+      return;
+    }
+    if (!radiateStartedAt) radiateStartedAt = timestamp;
+    if (timestamp - lastRadiateFrame >= 1_000 / 24) {
+      radiateTime = (timestamp - radiateStartedAt) / 1_000;
+      renderCanvas();
+      lastRadiateFrame = timestamp;
+    }
+    radiateRenderFrame = requestAnimationFrame(animateRadiation);
+  };
+
+  const startRadiating = () => {
+    if (radiateRenderFrame !== null || effect !== "radiate") return;
+    radiateStartedAt = 0;
+    lastRadiateFrame = -Infinity;
+    radiateRenderFrame = requestAnimationFrame(animateRadiation);
+  };
+
+  const updateTitleSound = () => {
+    if (titleAudioContext?.state !== "running") return;
+    const displacement = Math.min(
+      1,
+      Math.abs(distortionCenter - anchorX) / Math.max(anchorX, 1 - anchorX),
+    );
+    const shaderSpeed = Math.min(
+      1,
+      Math.hypot(distortionVelocityX, distortionVelocityY) * 900,
+    );
+    titleSound?.shape(
+      displacement,
+      shaderSpeed,
+      distortionVerticalCenter,
+    );
+    updateSoundProximity(canvas.getBoundingClientRect());
+    titleSound?.volume(soundProximity, soundMotionVolumeDuration / 1000);
+    titleSound?.sustain(1);
+  };
+
   const animatePointer = (timestamp: number) => {
     const elapsed = pointerAnimationTime
       ? Math.min(64, timestamp - pointerAnimationTime)
       : 16;
     pointerAnimationTime = timestamp;
+    const previousCenter = distortionCenter;
+    const previousVerticalCenter = distortionVerticalCenter;
 
     if (reanchoring) {
-      const progress = Math.min(1, (timestamp - reanchorStartedAt) / 3000);
-      const weightedProgress = 1 - Math.pow(1 - progress, 3);
+      const progress = Math.min(
+        1,
+        (timestamp - reanchorStartedAt) / reanchorDuration,
+      );
+      const progressSquared = progress * progress;
+      const progressCubed = progressSquared * progress;
+      const startWeight = 2 * progressCubed - 3 * progressSquared + 1;
+      const velocityWeight =
+        progressCubed - 2 * progressSquared + progress;
+      const targetWeight = -2 * progressCubed + 3 * progressSquared;
       distortionCenter =
-        reanchorStartX +
-        (targetDistortionCenter - reanchorStartX) * weightedProgress;
+        reanchorStartX * startWeight +
+        reanchorStartVelocityX * reanchorDuration * velocityWeight +
+        targetDistortionCenter * targetWeight;
       distortionVerticalCenter =
-        reanchorStartY +
-        (targetDistortionVerticalCenter - reanchorStartY) * weightedProgress;
+        reanchorStartY * startWeight +
+        reanchorStartVelocityY * reanchorDuration * velocityWeight +
+        targetDistortionVerticalCenter * targetWeight;
       if (progress >= 1) reanchoring = false;
     } else {
       const horizontalResponse = pointerInside ? 280 : 360;
@@ -570,6 +819,16 @@
         verticalAmount;
     }
 
+    const frameVelocityX = (distortionCenter - previousCenter) / elapsed;
+    const frameVelocityY =
+      (distortionVerticalCenter - previousVerticalCenter) / elapsed;
+    const velocityBlend = reanchoring ? 1 : 0.35;
+    distortionVelocityX +=
+      (frameVelocityX - distortionVelocityX) * velocityBlend;
+    distortionVelocityY +=
+      (frameVelocityY - distortionVelocityY) * velocityBlend;
+
+    updateTitleSound();
     renderCanvas();
     const unsettled =
       reanchoring ||
@@ -586,6 +845,9 @@
       renderCanvas();
       pointerRenderFrame = null;
       pointerAnimationTime = 0;
+      distortionVelocityX = 0;
+      distortionVelocityY = 0;
+      updateTitleSound();
     }
   };
 
@@ -599,24 +861,61 @@
   const beginReanchor = () => {
     reanchorStartX = distortionCenter;
     reanchorStartY = distortionVerticalCenter;
+    reanchorStartVelocityX = distortionVelocityX;
+    reanchorStartVelocityY = distortionVelocityY;
     reanchorStartedAt = performance.now();
     reanchoring = true;
     targetDistortionCenter = anchorX;
     targetDistortionVerticalCenter = anchorY;
-    reanchorTimeout = null;
     startPointerAnimation();
   };
 
-  const scheduleIdleReanchor = () => {
+  const beginIdleFade = () => {
+    pointerInside = false;
+    soundProximity = 0;
+    titleSound?.idleFade(0, soundFalloffDuration / 1000);
+    beginReanchor();
+  };
+
+  const schedulePointerStop = () => {
     if (idleTimeout !== null) clearTimeout(idleTimeout);
+    if (reanchorTimeout !== null) clearTimeout(reanchorTimeout);
+    reanchorTimeout = null;
     idleTimeout = setTimeout(() => {
       idleTimeout = null;
-      pointerInside = false;
-      beginReanchor();
-    }, reanchorDelay);
+      reanchorTimeout = setTimeout(() => {
+        reanchorTimeout = null;
+        beginIdleFade();
+      }, soundIdleWait);
+    }, pointerStopDelay);
+  };
+
+  const updateSoundProximity = (
+    canvasBounds: DOMRect,
+  ) => {
+    const titleBounds = titleElement.getBoundingClientRect();
+    const followPixelX = titleBounds.left + distortionCenter * titleBounds.width;
+    const followPixelY = distortionVerticalCenter * window.innerHeight;
+    const falloffRadiusX = canvasBounds.width * 0.5 + soundFalloffPadding;
+    const falloffRadiusY = canvasBounds.height * 0.5 + soundFalloffPadding;
+    const normalizedDistance = Math.hypot(
+      (lastPointerClientX - followPixelX) / Math.max(1, falloffRadiusX),
+      (lastPointerClientY - followPixelY) / Math.max(1, falloffRadiusY),
+    );
+    const normalized = Math.max(
+      0,
+      Math.min(1, 1 - normalizedDistance / soundFalloffScale),
+    );
+    soundProximity = normalized * normalized * normalized * (
+      normalized * (normalized * 6 - 15) + 10
+    );
   };
 
   const trackPointer = (event: PointerEvent) => {
+    const canvasBounds = canvas.getBoundingClientRect();
+    lastPointerClientX = event.clientX;
+    lastPointerClientY = event.clientY;
+    updateSoundProximity(canvasBounds);
     const bounds = titleElement.getBoundingClientRect();
     if (idleTimeout !== null) {
       clearTimeout(idleTimeout);
@@ -626,6 +925,7 @@
       clearTimeout(reanchorTimeout);
       reanchorTimeout = null;
     }
+    titleSound?.idleFade(1, soundMotionVolumeDuration / 1000);
     reanchoring = false;
     const wasInside = pointerInside;
     pointerInside = true;
@@ -659,33 +959,45 @@
     targetDistortionCenter = nextX;
     targetDistortionVerticalCenter = nextY;
     startPointerAnimation();
-    scheduleIdleReanchor();
+    schedulePointerStop();
   };
 
   const stopTrackingPointer = () => {
-    if (!pointerInside && reanchorTimeout !== null) return;
     if (idleTimeout !== null) {
       clearTimeout(idleTimeout);
       idleTimeout = null;
     }
-    pointerInside = false;
-    const coastX = Math.max(-0.12, Math.min(0.12, pointerVelocityX * 140));
-    const coastY = Math.max(-0.1, Math.min(0.1, pointerVelocityY * 140));
-    targetDistortionCenter = Math.max(
-      0.03,
-      Math.min(0.97, targetDistortionCenter + coastX),
-    );
-    targetDistortionVerticalCenter = Math.max(
-      0,
-      Math.min(1, targetDistortionVerticalCenter + coastY),
-    );
-    startPointerAnimation();
-    if (reanchorTimeout !== null) clearTimeout(reanchorTimeout);
-    reanchorTimeout = setTimeout(beginReanchor, reanchorDelay);
+    beginIdleFade();
+  };
+
+  const refreshSoundForViewportShift = () => {
+    if (viewportSoundFrame !== null) return;
+    viewportSoundFrame = requestAnimationFrame(() => {
+      viewportSoundFrame = null;
+      if (pointerInside) updateTitleSound();
+    });
   };
 
   const handlePointerWindowExit = (event: PointerEvent) => {
     if (event.relatedTarget === null) stopTrackingPointer();
+  };
+
+  const primeTitleSound = async (event: PointerEvent) => {
+    const audio = await soundManager?.resume();
+    if (!audio) return;
+    if (!titleAudioContext) {
+      titleAudioContext = audio;
+      titleSoundRoute = soundManager?.register("range-title") ?? null;
+      if (!titleSoundRoute) return;
+      titleSound = createDeepAcidWow(audio, titleSoundRoute.input, {
+        transposeSemitones: transpose,
+      });
+    }
+    if (titleAudioContext.state === "suspended") {
+      await titleAudioContext.resume();
+    }
+    trackPointer(event);
+    updateTitleSound();
   };
 
   onMount(() => {
@@ -698,6 +1010,12 @@
         powerPreference: "high-performance",
       });
       if (!gl) throw new Error("WebGL 2 is unavailable.");
+      try {
+        gl.drawingBufferColorSpace = "display-p3";
+      } catch {
+        // Older browsers retain their default sRGB drawing buffer.
+      }
+      usesDisplayP3 = gl.drawingBufferColorSpace === "display-p3";
       gl.disable(gl.BLEND);
       gl.disable(gl.DITHER);
       program = createProgram(gl);
@@ -726,10 +1044,17 @@
     window.addEventListener("pointermove", trackPointer, { passive: true });
     window.addEventListener("pointerout", handlePointerWindowExit);
     window.addEventListener("blur", stopTrackingPointer);
+    window.addEventListener("scroll", refreshSoundForViewportShift, { passive: true });
+    window.addEventListener("resize", refreshSoundForViewportShift);
+    titleElement.addEventListener("pointerdown", primeTitleSound);
 
     const renderWhenReady = async () => {
       await document.fonts.ready;
-      if (active) rebuildGlyphTexture();
+      if (!active) return;
+      rebuildGlyphTexture();
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        startRadiating();
+      }
     };
     void renderWhenReady();
 
@@ -742,11 +1067,25 @@
       if (pointerRenderFrame !== null) {
         cancelAnimationFrame(pointerRenderFrame);
       }
-      if (reanchorTimeout !== null) clearTimeout(reanchorTimeout);
+      if (radiateRenderFrame !== null) {
+        cancelAnimationFrame(radiateRenderFrame);
+      }
+      if (viewportSoundFrame !== null) {
+        cancelAnimationFrame(viewportSoundFrame);
+      }
       if (idleTimeout !== null) clearTimeout(idleTimeout);
+      if (reanchorTimeout !== null) clearTimeout(reanchorTimeout);
       window.removeEventListener("pointermove", trackPointer);
       window.removeEventListener("pointerout", handlePointerWindowExit);
       window.removeEventListener("blur", stopTrackingPointer);
+      window.removeEventListener("scroll", refreshSoundForViewportShift);
+      window.removeEventListener("resize", refreshSoundForViewportShift);
+      titleElement.removeEventListener("pointerdown", primeTitleSound);
+      titleSound?.dispose();
+      titleSoundRoute?.dispose();
+      titleSound = null;
+      titleSoundRoute = null;
+      titleAudioContext = null;
       if (gl && glyphTexture) gl.deleteTexture(glyphTexture);
       if (gl && outwardTextureA) gl.deleteTexture(outwardTextureA);
       if (gl && outwardTextureB) gl.deleteTexture(outwardTextureB);
@@ -765,6 +1104,8 @@
 <span
   class="rangeTitleWord"
   class:canvasReady
+  class:hdr
+  class:darkBase={base === "dark"}
   bind:this={titleElement}
 >
   <span class="rangeTitleMeasure">{text}</span>
@@ -778,6 +1119,8 @@
 <style>
   .rangeTitleWord {
     position: relative;
+    width: fit-content;
+    display: block;
     isolation: isolate;
     overflow: visible;
     touch-action: none;
@@ -788,6 +1131,10 @@
     display: block;
   }
 
+  .darkBase .rangeTitleMeasure {
+    color: oklch(0.12 0.012 255);
+  }
+
   .canvasReady .rangeTitleMeasure {
     color: transparent;
   }
@@ -796,5 +1143,15 @@
     position: absolute;
     display: block;
     pointer-events: none;
+  }
+
+  .hdr .rangeTitleCanvas {
+    filter: brightness(1.04);
+  }
+
+  @media (dynamic-range: high) {
+    .hdr .rangeTitleCanvas {
+      filter: brightness(1.12);
+    }
   }
 </style>

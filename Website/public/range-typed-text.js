@@ -35,22 +35,19 @@ const keyboardProfiles = new Map();
 keyboardProfiles.set(" ", { row: 3, x: 4.75, finger: "thumb", hand: "thumb" });
 
 let typingAudioContext;
+let typingSoundRoute;
 let typingNoiseBuffer;
 let typingAudioOutput;
 let typingAudioUnlocked = false;
 
-function getTypingAudioContext() {
-  if (typingAudioContext) return typingAudioContext;
-  const AudioContextConstructor = window.AudioContext ?? window.webkitAudioContext;
-  if (!AudioContextConstructor) return undefined;
-  typingAudioContext = new AudioContextConstructor();
-  return typingAudioContext;
-}
-
 async function unlockTypingAudio() {
-  const context = getTypingAudioContext();
+  const soundManager = window.__rangeSoundManager;
+  if (!soundManager) return;
+  const context = await soundManager.resume();
   if (!context) return;
-  await context.resume();
+  typingAudioContext = context;
+  typingSoundRoute ??= soundManager.register("typed-text");
+  if (!typingSoundRoute) return;
   typingAudioUnlocked = context.state === "running";
   if (typingAudioUnlocked) {
     removeEventListener("pointerdown", unlockTypingAudio, true);
@@ -76,6 +73,7 @@ function typingNoise(context) {
 
 function typingOutput(context) {
   if (typingAudioOutput) return typingAudioOutput;
+  if (!typingSoundRoute) return undefined;
   const smoothingFilter = context.createBiquadFilter();
   const compressor = context.createDynamicsCompressor();
   const outputGain = context.createGain();
@@ -88,7 +86,7 @@ function typingOutput(context) {
   compressor.attack.value = 0.003;
   compressor.release.value = 0.08;
   outputGain.gain.value = 1;
-  smoothingFilter.connect(compressor).connect(outputGain).connect(context.destination);
+  smoothingFilter.connect(compressor).connect(outputGain).connect(typingSoundRoute.input);
   typingAudioOutput = smoothingFilter;
   return typingAudioOutput;
 }
@@ -96,6 +94,8 @@ function typingOutput(context) {
 function playSynthesizedKey(character, articulation) {
   const context = typingAudioContext;
   if (!typingAudioUnlocked || !context || context.state !== "running") return;
+  const output = typingOutput(context);
+  if (!output) return;
   const now = context.currentTime;
   const isSpace = character === " ";
   const isPunctuation = /[.,;:!?]/.test(character);
@@ -118,9 +118,9 @@ function playSynthesizedKey(character, articulation) {
   transient.connect(transientFilter).connect(transientGain);
   if (panner) {
     panner.pan.value = articulation.pan;
-    transientGain.connect(panner).connect(typingOutput(context));
+    transientGain.connect(panner).connect(output);
   } else {
-    transientGain.connect(typingOutput(context));
+    transientGain.connect(output);
   }
   transient.start(now);
   transient.stop(now + duration + 0.006);
@@ -142,7 +142,7 @@ function playSynthesizedKey(character, articulation) {
   if (panner) {
     bodyGain.connect(panner);
   } else {
-    bodyGain.connect(typingOutput(context));
+    bodyGain.connect(output);
   }
   body.start(now);
   body.stop(now + 0.036 * articulation.durationScale);

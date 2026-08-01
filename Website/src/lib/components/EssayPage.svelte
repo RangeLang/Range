@@ -1,21 +1,39 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
-  import SphereLineShader from "$lib/components/SphereLineShader.svelte";
+  import ArticleHeader from "$lib/components/ArticleHeader.svelte";
 
   let {
     title,
     description,
     category,
     date,
-    heroShaderPalette,
+    heroShader,
+    heroHeading,
+    heroShaderFocusX = 78,
+    heroShaderFocusY = 42,
+    heroShaderOffsetX = 0,
+    heroShaderOpacity = 0.9,
+    heroShaderFade = true,
+    heroAlignment = "default",
+    heroTone = "default",
+    heroVariant = "default",
     children,
   }: {
     title: string;
     description: string;
     category: string;
     date: string;
-    heroShaderPalette?: number;
+    heroShader?: Snippet;
+    heroHeading?: Snippet;
+    heroShaderFocusX?: number;
+    heroShaderFocusY?: number;
+    heroShaderOffsetX?: number;
+    heroShaderOpacity?: number;
+    heroShaderFade?: boolean;
+    heroAlignment?: "default" | "center";
+    heroTone?: "default" | "inverse";
+    heroVariant?: "default" | "saturated-p3";
     children: Snippet;
   } = $props();
 </script>
@@ -33,18 +51,22 @@
     <SiteHeader />
 
     <article>
-      <header class="essayHero" class:hasShader={heroShaderPalette !== undefined}>
-        {#if heroShaderPalette !== undefined}
-          <div class="heroShader">
-            <SphereLineShader palette={heroShaderPalette} />
-          </div>
-        {/if}
-        <div class="heroCopy">
-          <p class="eyebrow">{category} · {date}</p>
-          <h1>{title}</h1>
-          <p class="description">{description}</p>
-        </div>
-      </header>
+      <ArticleHeader
+        {title}
+        {description}
+        {category}
+        {date}
+        shader={heroShader}
+        heading={heroHeading}
+        shaderFocusX={heroShaderFocusX}
+        shaderFocusY={heroShaderFocusY}
+        shaderOffsetX={heroShaderOffsetX}
+        shaderOpacity={heroShaderOpacity}
+        shaderFade={heroShaderFade}
+        alignment={heroAlignment}
+        tone={heroTone}
+        variant={heroVariant}
+      />
 
       <div class="essayBody">
         {@render children()}
@@ -61,114 +83,6 @@
   .essayPage {
     width: min(820px, calc(100% - 48px));
     padding-bottom: 96px;
-  }
-
-  .eyebrow {
-    color: var(--muted);
-    font-family: var(--font-geist-mono), monospace;
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .essayHero {
-    position: relative;
-    display: grid;
-    gap: 24px;
-    padding: 88px 0 64px;
-    overflow: hidden;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .essayHero.hasShader {
-    min-height: 380px;
-    align-items: end;
-    margin-top: 0;
-    padding: 88px 0 56px;
-    border-bottom: 1px solid var(--line);
-    isolation: isolate;
-  }
-
-  .heroShader {
-    position: absolute;
-    inset: 28px -18vw 0 30%;
-    z-index: 0;
-    overflow: hidden;
-    opacity: 0.9;
-    -webkit-mask-image: linear-gradient(90deg, transparent, black 32%);
-    mask-image: linear-gradient(90deg, transparent, black 32%);
-  }
-
-  .heroShader::after {
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(
-        180deg,
-        oklch(1 0 0 / 0.18),
-        oklch(1 0 0 / 0.22) 58%,
-        oklch(1 0 0 / 0.94)
-      ),
-      linear-gradient(
-        90deg,
-        oklch(1 0 0 / 0.94),
-        oklch(1 0 0 / 0.42) 42%,
-        transparent 76%
-      );
-    content: "";
-  }
-
-  .heroShader :global(canvas) {
-    position: absolute;
-    inset: 0;
-  }
-
-  .heroCopy {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    gap: 24px;
-  }
-
-  .eyebrow,
-  .essayHero h1,
-  .description {
-    margin: 0;
-  }
-
-  .essayHero h1 {
-    max-width: 760px;
-    font-size: clamp(44px, 8vw, 82px);
-    font-weight: 520;
-    letter-spacing: -0.065em;
-    line-height: 0.96;
-  }
-
-  .description {
-    max-width: 650px;
-    color: var(--muted);
-    font-size: clamp(19px, 2.6vw, 25px);
-    letter-spacing: -0.025em;
-    line-height: 1.38;
-  }
-
-  .hasShader .eyebrow {
-    color: color-mix(in oklch, var(--ink), transparent 22%);
-  }
-
-  .hasShader .description {
-    color: color-mix(in oklch, var(--ink), transparent 14%);
-  }
-
-  .essayHero.hasShader h1 {
-    max-width: 680px;
-    font-size: clamp(44px, 6vw, 66px);
-    line-height: 0.98;
-  }
-
-  .essayHero.hasShader .description {
-    max-width: 560px;
-    font-size: clamp(18px, 2.2vw, 22px);
   }
 
   .essayBody {
@@ -232,26 +146,6 @@
       width: min(100% - 28px, 600px);
       padding-top: 0;
       padding-bottom: 72px;
-    }
-
-    .essayHero {
-      gap: 20px;
-      padding: 64px 0 48px;
-    }
-
-    .essayHero.hasShader {
-      min-height: 340px;
-      margin-top: 0;
-      padding: 64px 0 40px;
-    }
-
-    .heroShader {
-      inset: 16px -48px 0 18%;
-      opacity: 0.7;
-    }
-
-    .heroCopy {
-      gap: 20px;
     }
 
     .essayBody {

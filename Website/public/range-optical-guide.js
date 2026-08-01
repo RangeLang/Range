@@ -17,7 +17,13 @@ class RangeOpticalGuide extends HTMLElement {
   #context;
   #frame;
   #resizeObserver;
-  #shifts = { actionEnd: 0, copy: 0, oneContact: 0, wordmark: 0 };
+  #shifts = {
+    actionEnd: 0,
+    copy: 0,
+    copyY: 0,
+    lowerScaleX: 0,
+    lowerScaleY: 0,
+  };
 
   connectedCallback() {
     this.#canvas = document.createElement("canvas");
@@ -55,6 +61,23 @@ class RangeOpticalGuide extends HTMLElement {
     return rect.left - appliedShift - metrics.actualBoundingBoxLeft;
   }
 
+  #leadingInkCenter(element, appliedShift = 0) {
+    const character = firstVisibleCharacter(element);
+    const rect = element.getBoundingClientRect();
+    if (!character || !this.#context) {
+      return rect.left - appliedShift + rect.width / 2;
+    }
+    const style = getComputedStyle(element);
+    this.#context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    this.#context.fontKerning = style.fontKerning;
+    const metrics = this.#context.measureText(character);
+    const inkStart =
+      rect.left - appliedShift - metrics.actualBoundingBoxLeft;
+    const inkWidth =
+      metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight;
+    return inkStart + inkWidth / 2;
+  }
+
   #inkEnd(element, appliedShift = 0) {
     const node = lastVisibleTextNode(element);
     const end = node?.data.trimEnd().length ?? 0;
@@ -73,31 +96,41 @@ class RangeOpticalGuide extends HTMLElement {
     return rect.left - appliedShift + metrics.actualBoundingBoxRight;
   }
 
-  #baseline(element) {
-    const marker = document.createElement("span");
-    marker.style.cssText = "display:inline-block;width:0;height:0;padding:0;margin:0;border:0;vertical-align:baseline";
-    element.append(marker);
-    const baseline = marker.getBoundingClientRect().top;
-    marker.remove();
-    return baseline;
-  }
-
-  #inkTop(element) {
+  #titleInkBounds(element) {
     const character = firstVisibleCharacter(element);
-    if (!character || !this.#context) return element.getBoundingClientRect().top;
+    if (!character || !this.#context) {
+      const rect = element.getBoundingClientRect();
+      return { top: rect.top, leadingBottom: rect.bottom };
+    }
     const style = getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
     this.#context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
     this.#context.fontKerning = style.fontKerning;
-    return this.#baseline(element) - this.#context.measureText(character).actualBoundingBoxAscent;
+    const titleMetrics = this.#context.measureText(element.textContent?.trim() ?? "");
+    const leadingMetrics = this.#context.measureText(character);
+    const inkHeight =
+      titleMetrics.actualBoundingBoxAscent +
+      titleMetrics.actualBoundingBoxDescent;
+    const top = rect.top + (rect.height - inkHeight) / 2;
+    const baseline = top + titleMetrics.actualBoundingBoxAscent;
+    return {
+      top,
+      bottom: top + inkHeight,
+      leadingBottom: baseline + leadingMetrics.actualBoundingBoxDescent,
+    };
   }
 
-  #inkBottom(element, appliedShift = 0) {
-    const character = element.textContent?.trim().at(-1) ?? "";
-    if (!character || !this.#context) return element.getBoundingClientRect().bottom - appliedShift;
+  #textInkBounds(element) {
+    if (!this.#context) return element.getBoundingClientRect();
     const style = getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
     this.#context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
     this.#context.fontKerning = style.fontKerning;
-    return this.#baseline(element) - appliedShift + this.#context.measureText(character).actualBoundingBoxDescent;
+    const metrics = this.#context.measureText(element.textContent?.trim() ?? "");
+    const height =
+      metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+    const top = rect.top + (rect.height - height) / 2;
+    return { top, bottom: top + height };
   }
 
   #align() {
@@ -106,24 +139,69 @@ class RangeOpticalGuide extends HTMLElement {
     const wordmark = sequence?.querySelector(".landingWordmark .rangeWord");
     const copy = sequence?.querySelector(".landingHero p");
     const github = sequence?.querySelector(".secondaryAction");
-    const one = sequence?.querySelector("[data-scale-end] > span");
-    if (!sequence || !reference || !wordmark || !copy || !github || !one) return;
+    const upperScale = sequence?.querySelector(":scope > range-scale");
+    const lowerScale = sequence?.querySelector(".landingLowerScale");
+    const lowerScaleMarks = lowerScale?.querySelector("range-scale");
+    if (
+      !sequence ||
+      !reference ||
+      !wordmark ||
+      !copy ||
+      !github ||
+      !upperScale ||
+      !lowerScale ||
+      !lowerScaleMarks
+    ) return;
 
-    const guide = this.#inkStart(reference);
-    const copyShift = guide - this.#inkStart(copy, this.#shifts.copy);
+    const guide = upperScale.getBoundingClientRect().left;
+    const titleInk = this.#titleInkBounds(reference);
+    const wordmarkInk = this.#textInkBounds(wordmark);
+    const copyInk = this.#textInkBounds(copy);
+    const upperScaleRect = upperScale.getBoundingClientRect();
+    const outerGap = Math.max(
+      0,
+      upperScaleRect.top - wordmarkInk.bottom,
+    );
+    const upperGap = Math.max(
+      0,
+      titleInk.top - upperScaleRect.bottom,
+    );
+    const lowerScaleRect = lowerScale.getBoundingClientRect();
+    const lowerScaleMarksRect = lowerScaleMarks.getBoundingClientRect();
+    const lowerScaleX =
+      guide - (lowerScaleRect.left - this.#shifts.lowerScaleX);
+    const lowerScaleY =
+      titleInk.leadingBottom +
+      upperGap -
+      (lowerScaleRect.top - this.#shifts.lowerScaleY);
+    const projectedLowerScaleBottom =
+      lowerScaleRect.bottom - this.#shifts.lowerScaleY + lowerScaleY;
+    const projectedLowerScaleCenter =
+      lowerScaleMarksRect.left -
+      this.#shifts.lowerScaleX +
+      lowerScaleX +
+      lowerScaleMarksRect.width / 2;
+    const copyShift =
+      projectedLowerScaleCenter -
+      this.#leadingInkCenter(copy, this.#shifts.copy);
     const copyEnd = this.#inkEnd(copy, this.#shifts.copy) + copyShift;
     const nextShifts = {
       actionEnd: copyEnd - this.#inkEnd(github, this.#shifts.actionEnd),
       copy: copyShift,
-      oneContact: this.#inkTop(reference) - this.#inkBottom(one, this.#shifts.oneContact),
-      wordmark: guide - this.#inkStart(wordmark, this.#shifts.wordmark),
+      copyY:
+        projectedLowerScaleBottom +
+        outerGap -
+        (copyInk.top - this.#shifts.copyY),
+      lowerScaleX,
+      lowerScaleY,
     };
 
     this.#shifts = nextShifts;
     sequence.style.setProperty("--range-actions-end-shift", `${nextShifts.actionEnd}px`);
     sequence.style.setProperty("--range-copy-optical-shift", `${nextShifts.copy}px`);
-    sequence.style.setProperty("--range-one-contact-shift", `${nextShifts.oneContact}px`);
-    sequence.style.setProperty("--range-wordmark-optical-shift", `${nextShifts.wordmark}px`);
+    sequence.style.setProperty("--range-copy-vertical-shift", `${nextShifts.copyY}px`);
+    sequence.style.setProperty("--range-lower-scale-x", `${nextShifts.lowerScaleX}px`);
+    sequence.style.setProperty("--range-lower-scale-y", `${nextShifts.lowerScaleY}px`);
   }
 }
 
