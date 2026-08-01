@@ -175,6 +175,13 @@ construct CompilerFingerprint {
     let second: Int
 }
 
+construct CompilerSourceGapMetrics {
+    let lineBreakCount: Int
+    let indentationSpaceCount: Int
+    let indentationTabCount: Int
+    let isValid: Bool
+}
+
 construct CompilerProjectDefaults {
     let targetPointerBits: Int
     let integerBits: Int
@@ -221,6 +228,8 @@ construct CompilerSyntaxTables {
     let macroParameters: CompilerIntTable
     let macroApplications: CompilerIntTable
     let relationships: CompilerIntTable
+    let slots: CompilerIntTable
+    let slotOccurrences: CompilerIntTable
     let macroDiagnostics: CompilerIntTable
     let macroCapabilities: CompilerIntTable
     let macroInvocations: CompilerIntTable
@@ -238,6 +247,7 @@ construct CompilerSyntaxTables {
     let pendingGeneratedMembers: CompilerIntTable
     let bodyNodes: CompilerIntTable
     let bodyEdges: CompilerIntTable
+    let sourceGaps: CompilerIntTable
     let failures: Buffer<Int>
 }
 
@@ -250,8 +260,11 @@ construct CompilerGeneratedCommitSnapshot {
     let parameterValueCount: Int
     let genericParameterValueCount: Int
     let typeReferenceValueCount: Int
+    let slotValueCount: Int
+    let slotOccurrenceValueCount: Int
     let bodyNodeValueCount: Int
     let bodyEdgeValueCount: Int
+    let sourceGapValueCount: Int
     let pendingFunctionValueCount: Int
     let pendingMemberValueCount: Int
     let failureCount: Int

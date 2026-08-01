@@ -1,0 +1,15 @@
+compilerPlotter
+compilerSourceFile\trole=project\tpath=Project/SlotRegistration.range
+
+construct Pair {
+    let left: Int
+    let right: Int
+}
+
+function choose(first: Int, second: Int): Int {
+    return first
+}
+
+enum Choice {
+    case pair(left: Int, right: Int)
+}

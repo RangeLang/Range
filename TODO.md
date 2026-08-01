@@ -1201,21 +1201,24 @@ owns the actionable checkboxes for the active and deliberately deferred work.
                   - Root-value graph proofs cover resolved, missing,
                     target-mismatched, and ambiguous macro applications, plus an
                     ordered many member relationship.
-                - [ ] Move parameter and body edges into the same
-                  cardinality-aware identity relationship projection.
-                  - [x] Register function parameters as an ordered many
-                    relationship from the function identity to each parameter
-                    identity, with comma separation and parentheses enclosure
-                    recorded directly on the relationship.
-                    - The semantic parameter fact is now a lowering adapter of
-                      that registered relationship rather than a parallel scan
-                      of `tables.parameters`.
-                    - Registration belongs to graph projection, not raw
-                      declaration capture, so declaration-only compiler phases
-                      remain valid before they request a graph.
-                  - Do this only after each body role declares its actual
-                    one/none/many bounds instead of inventing scalar metadata
-                    from the old syntax-fact table.
+              - [ ] Move every containment relationship onto named slots before
+                retiring the remaining direct/table-local representations.
+                - [x] Establish named slots as the canonical registration for
+                  declarations and callable shapes.
+                  - The active slice registers a reusable `owner → slot →
+                    occurrence` graph shape. `members`, function `parameters`,
+                    and enum-case `payloads` carry their own ordered-many bounds,
+                    separator, and enclosure metadata; the old direct
+                    member/parameter edges are derived compatibility projections.
+                  - Slot lookup is idempotent by owner identity plus canonical
+                    slot name. A future persistent graph index can make that
+                    filter a cache lookup without changing the registration API.
+                  - `Testing/Graph/Pass/SlotRegistration.range` now proves the
+                    slot identities and owner-to-slot-to-occurrence projection;
+                    `scripts/range check-root-value` passes it alongside the
+                    declaration-envelope graph.
+                - [ ] Move `Block → statements` and its source-layout gaps from
+                  block-owned tables to a `statements` slot.
               - [ ] Expose type and metatype filtering over that plotted graph,
                 then make `@syntax`, `@value`, and nominal selection use the same
                 query operation and occurrence-backed result instead of
@@ -1255,6 +1258,17 @@ owns the actionable checkboxes for the active and deliberately deferred work.
               - Expansion templates retain their parent macro declaration and
                 application while each fragment retains its own file-local
                 span, parent fragment, and source ordinal.
+            - [ ] Capture source-layout gaps as a first-class ECS-style syntax
+              table before formatting or projecting presentation into the graph.
+              - Each row is anchored by a `Block` and its surrounding syntax
+                identities, retains its exact source span, and records line
+                breaks plus independent space and tab indentation counts.
+              - The first proof covers typed block statements and empty blocks;
+                comments, width wrapping, and user-facing formatter macros stay
+                separate from semantic containment.
+              - Do not encode `none`/`spaces`/`tabs`/`mixed` as a compiler
+                enum. A later Range macro may derive that presentation view from
+                the independent table properties.
           - [x] Replace the generated function body's single contiguous
             source range with an ordered expansion-artifact fragment list.
             - A fragment is either authored template syntax, a `#` boundary

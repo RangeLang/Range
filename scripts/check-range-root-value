@@ -220,6 +220,29 @@ check_block_value_shape_identity() {
     echo "Syntax Block value/shape identity: pass"
 }
 
+check_block_source_layout() {
+    local fixture="$REPO_ROOT/Testing/Syntax/Pass/BlockSourceLayout.range"
+    local output="$WORK_ROOT/block-source-layout.out"
+    local error="$WORK_ROOT/block-source-layout.err"
+
+    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "Block source-layout fixture did not compile"
+    [[ ! -s "$error" ]] || fail "Block source-layout fixture wrote stderr"
+    /usr/bin/grep -Fq $'typedSyntax\tvalid=true' "$output" \
+        || fail "Block source-layout fixture did not produce valid typed syntax"
+    /usr/bin/grep -Fq $'typedTable\tname=sourceGap\tversion=1\tcolumns=11\trows=4' "$output" \
+        || fail "Block source-layout fixture did not retain one gap before, between, and after its statements"
+    /usr/bin/grep -Eq $'^sourceGap\trow=0\tvalues=[0-9]+,0,1,[0-9]+,2,[0-9]+,[0-9]+,[0-9]+,1,4,0$' "$output" \
+        || fail "Block source-layout fixture did not retain the opening newline and four-space indent"
+    /usr/bin/grep -Eq $'^sourceGap\trow=1\tvalues=[0-9]+,1,2,[0-9]+,2,[0-9]+,[0-9]+,[0-9]+,2,1,1$' "$output" \
+        || fail "Block source-layout fixture did not retain the blank line and mixed space-tab indent"
+    /usr/bin/grep -Eq $'^sourceGap\trow=2\tvalues=[0-9]+,2,2,[0-9]+,2,[0-9]+,[0-9]+,[0-9]+,1,4,0$' "$output" \
+        || fail "Block source-layout fixture did not retain the next four-space indent"
+    /usr/bin/grep -Eq $'^sourceGap\trow=3\tvalues=[0-9]+,3,2,[0-9]+,3,[0-9]+,[0-9]+,[0-9]+,1,0,0$' "$output" \
+        || fail "Block source-layout fixture did not retain the closing newline without indentation"
+    echo "Syntax Block source-layout: pass"
+}
+
 check_postfix_zero_or_one_occurrence() {
     local fixture="$REPO_ROOT/Testing/Syntax/Pass/PostfixZeroOrOneOccurrence.range"
     local output="$WORK_ROOT/postfix-zero-or-one-occurrence.out"
@@ -1307,7 +1330,7 @@ check_missing_nominal_graph_warning() {
         || fail "Graph artifact did not retain every keyword-plus-name declaration"
     /usr/bin/grep -F $'graphRelationship\t' "$declarations_output" | /usr/bin/grep -F $'role=member' | /usr/bin/grep -F $'minimum=0\tmaximumKind=unbounded\tmaximum=-1\tordering=ordered' > /dev/null \
         || fail "Graph artifact did not retain the ordered many member relationship"
-    /usr/bin/grep -Fq $'graphRelationship\tid=7\trole=parameter\toriginNodeID=12\toriginKind=syntax\toriginID=12\tdestinationNodeID=13\tdestinationKind=syntax\tdestinationID=13\tordinal=0\tminimum=0\tmaximumKind=unbounded\tmaximum=-1\tordering=ordered\tseparatorKind=1\tseparatorID=12\tenclosureKind=1\tenclosureID=12' "$declarations_output" \
+    /usr/bin/grep -F $'graphRelationship\t' "$declarations_output" | /usr/bin/grep -F $'role=parameter' | /usr/bin/grep -F $'originKind=syntax' | /usr/bin/grep -F $'destinationKind=syntax' | /usr/bin/grep -F $'minimum=0\tmaximumKind=unbounded\tmaximum=-1\tordering=ordered\tseparatorKind=1\tseparatorID=' | /usr/bin/grep -F $'\tenclosureKind=1' > /dev/null \
         || fail "Graph artifact did not retain the comma-separated parenthesized parameter relationship"
     for declaration in \
         $'keyword=macro\tname=observed' \
@@ -1352,7 +1375,7 @@ check_missing_nominal_graph_warning() {
     [[ ! -s "$error" ]] || fail "Graph macro-nominal fixture wrote stderr"
     /usr/bin/grep -Fq $'graphDelta\tvalid=true\tnodeCount=1\tfactCount=0\tgeneratedFunctionCount=0\tnominalCount=2\tnominalReferenceCount=2\twarningCount=1' "$macro_output" \
         || fail "Graph artifact did not retain macro declarations and applications"
-    /usr/bin/grep -Fq $'identityCount=4\trelationshipCount=4' "$macro_output" \
+    /usr/bin/grep -Fq $'identityCount=5\trelationshipCount=5' "$macro_output" \
         || fail "Graph artifact did not project macro declarations and applications as identities"
     /usr/bin/grep -Fq $'graphIdentity\tid=1\tkind=macroDeclaration\tidentityID=0\tsyntaxKind=macro\tname=observed' "$macro_output" \
         || fail "Graph artifact did not plot the macro declaration identity"
@@ -1384,7 +1407,7 @@ check_missing_nominal_graph_warning() {
     [[ ! -s "$error" ]] || fail "Graph macro target-mismatch fixture wrote stderr"
     /usr/bin/grep -Fq $'role=macroApplication\texpectedKinds=macro\tname=observed\ttargetKind=targetMismatch\ttargetID=1\ttargetNominalID=1\tdeclared=true\tapplicable=false' "$macro_mismatch_output" \
         || fail "Graph artifact did not preserve target-aware macro resolution"
-    /usr/bin/grep -Fq $'identityCount=3\trelationshipCount=2' "$macro_mismatch_output" \
+    /usr/bin/grep -Fq $'identityCount=4\trelationshipCount=3' "$macro_mismatch_output" \
         || fail "Graph artifact did not retain the mismatch application and candidate identities"
     /usr/bin/grep -Fq $'role=references\toriginNodeID=2\toriginKind=macroApplication\toriginID=0\tdestinationNodeID=1\tdestinationKind=macroDeclaration\tdestinationID=0' "$macro_mismatch_output" \
         || fail "Graph artifact did not retain the mismatch candidate relationship"
@@ -1398,7 +1421,7 @@ check_missing_nominal_graph_warning() {
     [[ ! -s "$error" ]] || fail "Graph ambiguous-nominal fixture wrote stderr"
     /usr/bin/grep -Fq $'role=macroApplication\texpectedKinds=macro\tname=repeated\ttargetKind=ambiguous\ttargetID=-1\ttargetNominalID=-1\tdeclared=true\tapplicable=false' "$ambiguous_output" \
         || fail "Graph artifact did not separate an ambiguous declaration from applicability"
-    /usr/bin/grep -Fq $'identityCount=4\trelationshipCount=3' "$ambiguous_output" \
+    /usr/bin/grep -Fq $'identityCount=5\trelationshipCount=4' "$ambiguous_output" \
         || fail "Graph artifact did not retain every ambiguous declaration candidate"
     [[ "$(/usr/bin/grep -F -c $'role=references\toriginNodeID=3\toriginKind=macroApplication\toriginID=0' "$ambiguous_output" || true)" -eq 2 ]] \
         || fail "Graph artifact did not retain both ambiguous declaration candidates"
@@ -1407,6 +1430,36 @@ check_missing_nominal_graph_warning() {
     /usr/bin/grep -Fq $'graphWarning\tseverity=warning\tkind=ambiguousNominal' "$ambiguous_output" \
         || fail "Graph artifact omitted the ambiguous-nominal warning"
     echo "Graph missing-nominal-warning: pass"
+}
+
+check_slot_graph_projection() {
+    local fixture="$REPO_ROOT/Testing/Graph/Pass/SlotRegistration.range"
+    local output="$WORK_ROOT/graph-slot-registration.out"
+    local error="$WORK_ROOT/graph-slot-registration.err"
+    local member_slot_count parameter_slot_count payload_slot_count slot_relationship_count occurrence_relationship_count
+
+    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "Graph slot-registration fixture did not compile"
+    [[ ! -s "$error" ]] || fail "Graph slot-registration fixture wrote stderr"
+
+    member_slot_count="$(/usr/bin/grep -F $'graphIdentity\t' "$output" | /usr/bin/grep -F $'kind=slot\t' | /usr/bin/grep -F $'name=members\t' | /usr/bin/wc -l | /usr/bin/tr -d ' ' || true)"
+    parameter_slot_count="$(/usr/bin/grep -F $'graphIdentity\t' "$output" | /usr/bin/grep -F $'kind=slot\t' | /usr/bin/grep -F $'name=parameters\t' | /usr/bin/wc -l | /usr/bin/tr -d ' ' || true)"
+    payload_slot_count="$(/usr/bin/grep -F $'graphIdentity\t' "$output" | /usr/bin/grep -F $'kind=slot\t' | /usr/bin/grep -F $'name=payloads\t' | /usr/bin/wc -l | /usr/bin/tr -d ' ' || true)"
+    [[ "$member_slot_count" -eq 2 && "$parameter_slot_count" -eq 1 && "$payload_slot_count" -eq 1 ]] \
+        || fail "Graph slot-registration fixture did not register the expected named slot identities"
+
+    slot_relationship_count="$(/usr/bin/grep -F $'graphRelationship\t' "$output" | /usr/bin/grep -F $'role=slot\t' | /usr/bin/wc -l | /usr/bin/tr -d ' ' || true)"
+    occurrence_relationship_count="$(/usr/bin/grep -F $'graphRelationship\t' "$output" | /usr/bin/grep -F $'role=slotOccurrence\t' | /usr/bin/wc -l | /usr/bin/tr -d ' ' || true)"
+    [[ "$slot_relationship_count" -eq 4 && "$occurrence_relationship_count" -eq 7 ]] \
+        || fail "Graph slot-registration fixture did not retain its canonical owner-to-slot-to-occurrence edges"
+
+    [[ "$(/usr/bin/grep -F $'graphRelationship\t' "$output" | /usr/bin/grep -F $'role=slot\t' | /usr/bin/grep -F $'separatorKind=0\tseparatorID=-1\tenclosureKind=2' | /usr/bin/wc -l | /usr/bin/tr -d ' ' || true)" -eq 2 ]] \
+        || fail "Graph slot-registration fixture did not retain brace-enclosed member slots"
+    [[ "$(/usr/bin/grep -F $'graphRelationship\t' "$output" | /usr/bin/grep -F $'role=slot\t' | /usr/bin/grep -F $'separatorKind=1\tseparatorID=' | /usr/bin/grep -F $'\tenclosureKind=1' | /usr/bin/wc -l | /usr/bin/tr -d ' ' || true)" -eq 2 ]] \
+        || fail "Graph slot-registration fixture did not retain comma-separated parenthesized slots"
+    /usr/bin/grep -F $'graphRelationship\t' "$output" | /usr/bin/grep -F $'role=parameter\t' | /usr/bin/grep -F $'separatorKind=1\tseparatorID=' | /usr/bin/grep -F $'\tenclosureKind=1' > /dev/null \
+        || fail "Graph slot-registration fixture did not derive the legacy parameter edge from its slot"
+    echo "Graph slot-registration: pass"
 }
 
 check_project_defaults() {
@@ -1442,6 +1495,7 @@ check_project_defaults() {
     check_canonical_member_family
     check_canonical_declaration_envelopes
     check_missing_nominal_graph_warning
+    check_slot_graph_projection
     echo "checkpoint root-value:project-defaults-complete: pass"
 }
 
@@ -1721,6 +1775,7 @@ main_root_value() {
     check_macro_environment
     check_non_generic_stored_assignment
     check_block_value_shape_identity
+    check_block_source_layout
     check_postfix_zero_or_one_occurrence
     check_legacy_macro_modifiers_rejected
     check_legacy_environment_expand_rejected

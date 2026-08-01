@@ -41,9 +41,12 @@ function compilerTypedSyntaxRenderSnapshot(tables: CompilerSyntaxTables): String
     let parameterCount: Int(compilerIntTableRowCount(table: tables.parameters))
     let genericParameterCount: Int(compilerIntTableRowCount(table: tables.genericParameters))
     let typeReferenceCount: Int(compilerIntTableRowCount(table: tables.typeReferences))
+    let slotCount: Int(compilerIntTableRowCount(table: tables.slots))
+    let slotOccurrenceCount: Int(compilerIntTableRowCount(table: tables.slotOccurrences))
     let bodyNodeCount: Int(compilerIntTableRowCount(table: tables.bodyNodes))
     let bodyEdgeCount: Int(compilerIntTableRowCount(table: tables.bodyEdges))
-    rawBufferAppendText(buffer: outputBuffer, text: "typedSyntax\(tab)valid=true\(tab)identityScope=pathStable,pathlessSnapshotLocal\(tab)fileCount=\(compilerSourceStoreFileCount(store: tables.sourceStore))\(tab)syntaxCount=\(syntaxCount)\(tab)declarationCount=\(declarationCount)\(tab)memberCount=\(memberCount)\(tab)functionCount=\(functionCount)\(tab)parameterCount=\(parameterCount)\(tab)genericParameterCount=\(genericParameterCount)\(tab)typeReferenceCount=\(typeReferenceCount)\(tab)bodyNodeCount=\(bodyNodeCount)\(tab)bodyEdgeCount=\(bodyEdgeCount)\(newline)")
+    let sourceGapCount: Int(compilerIntTableRowCount(table: tables.sourceGaps))
+    rawBufferAppendText(buffer: outputBuffer, text: "typedSyntax\(tab)valid=true\(tab)identityScope=pathStable,pathlessSnapshotLocal\(tab)fileCount=\(compilerSourceStoreFileCount(store: tables.sourceStore))\(tab)syntaxCount=\(syntaxCount)\(tab)declarationCount=\(declarationCount)\(tab)memberCount=\(memberCount)\(tab)functionCount=\(functionCount)\(tab)parameterCount=\(parameterCount)\(tab)genericParameterCount=\(genericParameterCount)\(tab)typeReferenceCount=\(typeReferenceCount)\(tab)slotCount=\(slotCount)\(tab)slotOccurrenceCount=\(slotOccurrenceCount)\(tab)bodyNodeCount=\(bodyNodeCount)\(tab)bodyEdgeCount=\(bodyEdgeCount)\(tab)sourceGapCount=\(sourceGapCount)\(newline)")
 
     state row: Int(0)
     while row < syntaxCount {
@@ -164,8 +167,11 @@ function compilerTypedSyntaxRenderSnapshot(tables: CompilerSyntaxTables): String
     }
     rawBufferAppendText(buffer: outputBuffer, text: compilerTypedSyntaxRenderRawTable(name: String("genericParameterTable"), table: tables.genericParameters))
     rawBufferAppendText(buffer: outputBuffer, text: compilerTypedSyntaxRenderRawTable(name: String("typeReferenceTable"), table: tables.typeReferences))
+    rawBufferAppendText(buffer: outputBuffer, text: compilerTypedSyntaxRenderRawTable(name: String("syntaxSlot"), table: tables.slots))
+    rawBufferAppendText(buffer: outputBuffer, text: compilerTypedSyntaxRenderRawTable(name: String("slotOccurrence"), table: tables.slotOccurrences))
     rawBufferAppendText(buffer: outputBuffer, text: compilerTypedSyntaxRenderRawTable(name: String("bodyNode"), table: tables.bodyNodes))
     rawBufferAppendText(buffer: outputBuffer, text: compilerTypedSyntaxRenderRawTable(name: String("bodyEdge"), table: tables.bodyEdges))
+    rawBufferAppendText(buffer: outputBuffer, text: compilerTypedSyntaxRenderRawTable(name: String("sourceGap"), table: tables.sourceGaps))
     return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
 }
 

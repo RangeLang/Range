@@ -1,0 +1,8 @@
+compilerTypedSyntaxSnapshot
+
+function sourceLayout(): Int {
+    let first: Int(1)
+
+	 let second: Int(2)
+    return second
+}

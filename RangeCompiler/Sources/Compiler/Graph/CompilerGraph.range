@@ -27,6 +27,7 @@ function compilerGraphFacetApplication(): Int { return 9 }
 function compilerGraphFacetRegion(): Int { return 10 }
 function compilerGraphFacetMacroDeclaration(): Int { return 11 }
 function compilerGraphFacetMacroApplication(): Int { return 12 }
+function compilerGraphFacetSlot(): Int { return 13 }
 function compilerGraphNominalRoleMemberType(): Int { return 1 }
 function compilerGraphNominalRoleParameterType(): Int { return 2 }
 function compilerGraphNominalRoleFunctionReturn(): Int { return 3 }
@@ -169,7 +170,8 @@ function compilerGraphDeltaAppendIdentity(delta: CompilerGraphDelta, identityKin
     let identityNodeID: Int(compilerIntTableRowCount(table: delta.identities))
     if (identityKind != compilerGraphIdentitySyntax()
         && identityKind != compilerGraphIdentityMacroDeclaration()
-        && identityKind != compilerGraphIdentityMacroApplication())
+        && identityKind != compilerGraphIdentityMacroApplication()
+        && identityKind != compilerGraphIdentitySlot())
         || identityID < 0 || kindTag < 0 || fileID < 0 || start < 0 || end < start || facetKind <= 0 {
         compilerGraphDeltaPoison(delta: delta)
         return 0 - 1
@@ -332,6 +334,22 @@ function compilerPlotterAppendMacroApplicationIdentity(tables: CompilerSyntaxTab
     )
 }
 
+function compilerPlotterAppendSlotIdentity(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, slotID: Int): Int {
+    let ownerKind: Int(compilerIntTableValue(table: tables.slots, row: slotID, column: 1))
+    let ownerSyntaxID: Int(compilerIntTableValue(table: tables.slots, row: slotID, column: 2))
+    if ownerKind != compilerGraphIdentitySyntax() { return 0 - 1 }
+    return compilerGraphDeltaAppendIdentity(
+        delta: delta,
+        identityKind: compilerGraphIdentitySlot(),
+        identityID: slotID,
+        kindTag: compilerIntTableValue(table: tables.slots, row: slotID, column: 3),
+        fileID: compilerMacroSyntaxNodeFileID(tables: tables, syntaxID: ownerSyntaxID),
+        start: compilerMacroSyntaxNodeStart(tables: tables, syntaxID: ownerSyntaxID),
+        end: compilerMacroSyntaxNodeEnd(tables: tables, syntaxID: ownerSyntaxID),
+        facetKind: compilerGraphFacetSlot()
+    )
+}
+
 function compilerPlotterAppendIdentityNodes(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
     state syntaxID: Int(0)
     while syntaxID < compilerIntTableRowCount(table: tables.syntaxIndex) {
@@ -349,6 +367,12 @@ function compilerPlotterAppendIdentityNodes(tables: CompilerSyntaxTables, delta:
         let identityNodeID: Int(compilerPlotterAppendMacroApplicationIdentity(tables: tables, delta: delta, macroApplicationRow: macroApplicationRow))
         if identityNodeID < 0 { return 0 - 1 }
         macroApplicationRow: macroApplicationRow + 1
+    }
+    state slotID: Int(0)
+    while slotID < compilerIntTableRowCount(table: tables.slots) {
+        let identityNodeID: Int(compilerPlotterAppendSlotIdentity(tables: tables, delta: delta, slotID: slotID))
+        if identityNodeID < 0 { return 0 - 1 }
+        slotID: slotID + 1
     }
     return 0
 }
@@ -382,6 +406,61 @@ function compilerPlotterAppendRegisteredRelationships(tables: CompilerSyntaxTabl
             enclosureID: compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 14)
         ) != relationshipRow { return 0 - 1 }
         relationshipRow: relationshipRow + 1
+    }
+    return 0
+}
+
+function compilerPlotterAppendSlotRelationships(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
+    state slotID: Int(0)
+    while slotID < compilerIntTableRowCount(table: tables.slots) {
+        let ownerNodeID: Int(compilerGraphIdentityNodeIDFor(
+            delta: delta,
+            identityKind: compilerIntTableValue(table: tables.slots, row: slotID, column: 1),
+            identityID: compilerIntTableValue(table: tables.slots, row: slotID, column: 2)
+        ))
+        let slotNodeID: Int(compilerGraphIdentityNodeIDFor(delta: delta, identityKind: compilerGraphIdentitySlot(), identityID: slotID))
+        if compilerGraphDeltaAppendRelationship(
+            delta: delta,
+            role: compilerGraphRelationshipSlot(),
+            originNodeID: ownerNodeID,
+            destinationNodeID: slotNodeID,
+            ordinal: compilerIntTableValue(table: tables.slots, row: slotID, column: 4),
+            minimum: compilerIntTableValue(table: tables.slots, row: slotID, column: 5),
+            maximumKind: compilerIntTableValue(table: tables.slots, row: slotID, column: 6),
+            maximum: compilerIntTableValue(table: tables.slots, row: slotID, column: 7),
+            ordering: compilerIntTableValue(table: tables.slots, row: slotID, column: 8),
+            separatorKind: compilerIntTableValue(table: tables.slots, row: slotID, column: 9),
+            separatorID: compilerIntTableValue(table: tables.slots, row: slotID, column: 10),
+            enclosureKind: compilerIntTableValue(table: tables.slots, row: slotID, column: 11),
+            enclosureID: compilerIntTableValue(table: tables.slots, row: slotID, column: 12)
+        ) < 0 { return 0 - 1 }
+        slotID: slotID + 1
+    }
+    state occurrenceID: Int(0)
+    while occurrenceID < compilerIntTableRowCount(table: tables.slotOccurrences) {
+        let slotID: Int(compilerIntTableValue(table: tables.slotOccurrences, row: occurrenceID, column: 1))
+        let slotNodeID: Int(compilerGraphIdentityNodeIDFor(delta: delta, identityKind: compilerGraphIdentitySlot(), identityID: slotID))
+        let targetNodeID: Int(compilerGraphIdentityNodeIDFor(
+            delta: delta,
+            identityKind: compilerIntTableValue(table: tables.slotOccurrences, row: occurrenceID, column: 2),
+            identityID: compilerIntTableValue(table: tables.slotOccurrences, row: occurrenceID, column: 3)
+        ))
+        if compilerGraphDeltaAppendRelationship(
+            delta: delta,
+            role: compilerGraphRelationshipSlotOccurrence(),
+            originNodeID: slotNodeID,
+            destinationNodeID: targetNodeID,
+            ordinal: compilerIntTableValue(table: tables.slotOccurrences, row: occurrenceID, column: 4),
+            minimum: 1,
+            maximumKind: compilerGraphBoundFinite(),
+            maximum: 1,
+            ordering: compilerGraphOrderingOrdered(),
+            separatorKind: compilerGraphSeparatorNone(),
+            separatorID: 0 - 1,
+            enclosureKind: compilerGraphEnclosureNone(),
+            enclosureID: 0 - 1
+        ) < 0 { return 0 - 1 }
+        occurrenceID: occurrenceID + 1
     }
     return 0
 }
@@ -973,7 +1052,7 @@ function compilerPlotterAppendNominalReferences(tables: CompilerSyntaxTables, de
 }
 
 function compilerPlotterBuild(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
-    if compilerGraphRegisterParameterRelationships(tables: tables) != 0 { return 0 - 1 }
+    if compilerGraphRegisterSlotRelationships(tables: tables) != 0 { return 0 - 1 }
     if !compilerSyntaxTablesIsValid(tables: tables) {
         compilerGraphDeltaPoison(delta: delta)
         return 0 - 1
@@ -1001,6 +1080,7 @@ function compilerPlotterBuild(tables: CompilerSyntaxTables, delta: CompilerGraph
         plotSubjectSyntaxID: plotSubjectSyntaxID + 1
     }
     if compilerPlotterAppendRegisteredRelationships(tables: tables, delta: delta) != 0 { return 0 - 1 }
+    if compilerPlotterAppendSlotRelationships(tables: tables, delta: delta) != 0 { return 0 - 1 }
     if compilerPlotterAppendNominalDeclarations(tables: tables, delta: delta) != 0 { return 0 - 1 }
     return compilerPlotterAppendNominalReferences(tables: tables, delta: delta)
 }
@@ -1120,10 +1200,25 @@ function compilerGraphIdentityNodeIsValid(tables: CompilerSyntaxTables, delta: C
             && end == compilerIntTableValue(table: tables.macroApplications, row: identityID, column: 3)
             && facetKind == compilerGraphFacetMacroApplication()
     }
+    if identityKind == compilerGraphIdentitySlot() {
+        let syntaxCount: Int(compilerIntTableRowCount(table: tables.syntaxIndex))
+        let macroDeclarationCount: Int(compilerIntTableRowCount(table: tables.macroDeclarations))
+        let macroApplicationCount: Int(compilerIntTableRowCount(table: tables.macroApplications))
+        if identityID >= compilerIntTableRowCount(table: tables.slots)
+            || identityNodeID != syntaxCount + macroDeclarationCount + macroApplicationCount + identityID { return false }
+        let ownerKind: Int(compilerIntTableValue(table: tables.slots, row: identityID, column: 1))
+        let ownerSyntaxID: Int(compilerIntTableValue(table: tables.slots, row: identityID, column: 2))
+        return ownerKind == compilerGraphIdentitySyntax()
+            && kindTag == compilerIntTableValue(table: tables.slots, row: identityID, column: 3)
+            && fileID == compilerMacroSyntaxNodeFileID(tables: tables, syntaxID: ownerSyntaxID)
+            && start == compilerMacroSyntaxNodeStart(tables: tables, syntaxID: ownerSyntaxID)
+            && end == compilerMacroSyntaxNodeEnd(tables: tables, syntaxID: ownerSyntaxID)
+            && facetKind == compilerGraphFacetSlot()
+    }
     return false
 }
 
-function compilerGraphPlottedRelationshipIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, relationshipRow: Int): Bool {
+function compilerGraphRegisteredRelationshipIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, relationshipRow: Int): Bool {
     let originNodeID: Int(compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 2))
     let destinationNodeID: Int(compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 3))
     if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 0) != relationshipRow
@@ -1149,6 +1244,79 @@ function compilerGraphPlottedRelationshipIsValid(tables: CompilerSyntaxTables, d
     return true
 }
 
+function compilerGraphSlotRelationshipIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, relationshipRow: Int, slotID: Int): Bool {
+    if slotID < 0 || slotID >= compilerIntTableRowCount(table: tables.slots) { return false }
+    let ownerNodeID: Int(compilerGraphIdentityNodeIDFor(
+        delta: delta,
+        identityKind: compilerIntTableValue(table: tables.slots, row: slotID, column: 1),
+        identityID: compilerIntTableValue(table: tables.slots, row: slotID, column: 2)
+    ))
+    let slotNodeID: Int(compilerGraphIdentityNodeIDFor(
+        delta: delta,
+        identityKind: compilerGraphIdentitySlot(),
+        identityID: slotID
+    ))
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 0) != relationshipRow { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 1) != compilerGraphRelationshipSlot() { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 2) != ownerNodeID { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 3) != slotNodeID { return false }
+    state column: Int(4)
+    while column < compilerGraphPlottedRelationshipColumnCount() {
+        if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: column)
+            != compilerIntTableValue(table: tables.slots, row: slotID, column: column) { return false }
+        column: column + 1
+    }
+    return true
+}
+
+function compilerGraphSlotOccurrenceRelationshipIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, relationshipRow: Int, occurrenceRow: Int): Bool {
+    if occurrenceRow < 0 || occurrenceRow >= compilerIntTableRowCount(table: tables.slotOccurrences) { return false }
+    let slotID: Int(compilerIntTableValue(table: tables.slotOccurrences, row: occurrenceRow, column: 1))
+    let slotNodeID: Int(compilerGraphIdentityNodeIDFor(
+        delta: delta,
+        identityKind: compilerGraphIdentitySlot(),
+        identityID: slotID
+    ))
+    let targetNodeID: Int(compilerGraphIdentityNodeIDFor(
+        delta: delta,
+        identityKind: compilerIntTableValue(table: tables.slotOccurrences, row: occurrenceRow, column: 2),
+        identityID: compilerIntTableValue(table: tables.slotOccurrences, row: occurrenceRow, column: 3)
+    ))
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 0) != relationshipRow { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 1) != compilerGraphRelationshipSlotOccurrence() { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 2) != slotNodeID { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 3) != targetNodeID { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 4)
+        != compilerIntTableValue(table: tables.slotOccurrences, row: occurrenceRow, column: 4) { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 5) != 1 { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 6) != compilerGraphBoundFinite() { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 7) != 1 { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 8) != compilerGraphOrderingOrdered() { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 9) != compilerGraphSeparatorNone() { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 10) != 0 - 1 { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 11) != compilerGraphEnclosureNone() { return false }
+    if compilerIntTableValue(table: delta.relationships, row: relationshipRow, column: 12) != 0 - 1 { return false }
+    return true
+}
+
+function compilerGraphPlottedRelationshipIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, relationshipRow: Int): Bool {
+    let registeredRelationshipCount: Int(compilerIntTableRowCount(table: tables.relationships))
+    if relationshipRow < registeredRelationshipCount {
+        return compilerGraphRegisteredRelationshipIsValid(tables: tables, delta: delta, relationshipRow: relationshipRow)
+    }
+    let slotRelationshipRow: Int(relationshipRow - registeredRelationshipCount)
+    let slotCount: Int(compilerIntTableRowCount(table: tables.slots))
+    if slotRelationshipRow < slotCount {
+        return compilerGraphSlotRelationshipIsValid(tables: tables, delta: delta, relationshipRow: relationshipRow, slotID: slotRelationshipRow)
+    }
+    return compilerGraphSlotOccurrenceRelationshipIsValid(
+        tables: tables,
+        delta: delta,
+        relationshipRow: relationshipRow,
+        occurrenceRow: slotRelationshipRow - slotCount
+    )
+}
+
 function compilerGraphDeltaIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Bool {
     if delta.failures.count != 0 || !compilerIntTableIsComplete(table: delta.nodes) || !compilerIntTableIsComplete(table: delta.facts)
         || !compilerIntTableIsComplete(table: delta.identities) || !compilerIntTableIsComplete(table: delta.relationships)
@@ -1157,9 +1325,10 @@ function compilerGraphDeltaIsValid(tables: CompilerSyntaxTables, delta: Compiler
         || !compilerIntTableIsComplete(table: delta.generatedMembers) { return false }
     let graphNodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
     if graphNodeCount != compilerIntTableRowCount(table: tables.syntaxIndex) { return false }
-    let expectedIdentityNodeCount: Int(graphNodeCount + compilerIntTableRowCount(table: tables.macroDeclarations) + compilerIntTableRowCount(table: tables.macroApplications))
+    let expectedIdentityNodeCount: Int(graphNodeCount + compilerIntTableRowCount(table: tables.macroDeclarations) + compilerIntTableRowCount(table: tables.macroApplications) + compilerIntTableRowCount(table: tables.slots))
+    let expectedRelationshipCount: Int(compilerIntTableRowCount(table: tables.relationships) + compilerIntTableRowCount(table: tables.slots) + compilerIntTableRowCount(table: tables.slotOccurrences))
     if compilerIntTableRowCount(table: delta.identities) != expectedIdentityNodeCount
-        || compilerIntTableRowCount(table: delta.relationships) != compilerIntTableRowCount(table: tables.relationships) { return false }
+        || compilerIntTableRowCount(table: delta.relationships) != expectedRelationshipCount { return false }
     if compilerIntTableRowCount(table: delta.nominals) != compilerPlotterExpectedNominalCount(tables: tables) { return false }
     let expectedGraphFactCount: Int(compilerPlotterMemberRelationshipCount(tables: tables) + compilerIntTableRowCount(table: tables.parameters) + compilerIntTableRowCount(table: tables.bodyEdges))
     if compilerIntTableRowCount(table: delta.facts) != expectedGraphFactCount { return false }
@@ -1339,6 +1508,7 @@ function compilerGraphIdentityKindName(kind: Int): String {
     if kind == compilerGraphIdentitySyntax() { return String("syntax") }
     if kind == compilerGraphIdentityMacroDeclaration() { return String("macroDeclaration") }
     if kind == compilerGraphIdentityMacroApplication() { return String("macroApplication") }
+    if kind == compilerGraphIdentitySlot() { return String("slot") }
     return String("unknown")
 }
 
@@ -1348,6 +1518,8 @@ function compilerGraphRelationshipRoleName(role: Int): String {
     if role == compilerGraphRelationshipReferences() { return String("references") }
     if role == compilerGraphRelationshipMember() { return String("member") }
     if role == compilerGraphRelationshipParameter() { return String("parameter") }
+    if role == compilerGraphRelationshipSlot() { return String("slot") }
+    if role == compilerGraphRelationshipSlotOccurrence() { return String("slotOccurrence") }
     return String("unknown")
 }
 
@@ -1382,6 +1554,9 @@ function compilerGraphIdentityName(tables: CompilerSyntaxTables, delta: Compiler
             localEnd: compilerIntTableValue(table: tables.macroApplications, row: identityID, column: 5)
         )
     }
+    if identityKind == compilerGraphIdentitySlot() {
+        return compilerSyntaxSlotName(kind: compilerIntTableValue(table: delta.identities, row: identityNodeID, column: 3))
+    }
     return String("")
 }
 
@@ -1396,6 +1571,7 @@ function compilerPlotterRenderIdentities(tables: CompilerSyntaxTables, delta: Co
         state kindName: String("macro")
         if identityKind == compilerGraphIdentitySyntax() { kindName: compilerSyntaxKindName(kindTag: kindTag) }
         if identityKind == compilerGraphIdentityMacroApplication() { kindName: compilerSyntaxKindName(kindTag: kindTag) }
+        if identityKind == compilerGraphIdentitySlot() { kindName: compilerSyntaxSlotName(kind: kindTag) }
         output: "\(output)graphIdentity\(tab)id=\(row)\(tab)kind=\(compilerGraphIdentityKindName(kind: identityKind))\(tab)identityID=\(compilerIntTableValue(table: delta.identities, row: row, column: 2))\(tab)syntaxKind=\(kindName)\(tab)name=\(compilerGraphIdentityName(tables: tables, delta: delta, identityNodeID: row))\(tab)fileID=\(compilerIntTableValue(table: delta.identities, row: row, column: 4))\(tab)start=\(compilerIntTableValue(table: delta.identities, row: row, column: 5))\(tab)end=\(compilerIntTableValue(table: delta.identities, row: row, column: 6))\(tab)facet=\(compilerIntTableValue(table: delta.identities, row: row, column: 7))\(newline)"
         row: row + 1
     }
