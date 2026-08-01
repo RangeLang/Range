@@ -1,10 +1,13 @@
+@builtin
+construct Array<Element> {}
+
 enum MutableNumberToken {
     case value(value: Int)
     case eof
 }
 
 @main {
-    state tokens: [MutableNumberToken]([.value(value: 4), .eof])
+    state tokens: Array<MutableNumberToken>([.value(value: 4), .eof])
     tokens[1]: .value(value: 7)
     switch tokens[1] {
     case .value(number):

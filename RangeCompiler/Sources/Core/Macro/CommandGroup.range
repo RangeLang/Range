@@ -1,7 +1,7 @@
 macro command(): Function -> Void {}
 
 macro commandGroup(): Construct { environment in
-    let commands: [@command](
+    let commands: Array<@command>(
         environment.target.Declaration.members.filter(all: @command)
     )
 

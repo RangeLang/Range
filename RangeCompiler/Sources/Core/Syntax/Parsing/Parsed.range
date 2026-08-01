@@ -1,5 +1,6 @@
 @syntax
 construct Parsed<Value> {
+    @value
     let value: Value?
-    let diagnostics: [String]
+    let diagnostics: Array<String>
 }

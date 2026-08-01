@@ -5,10 +5,10 @@ construct Closure {
             $body
         }
     }
-    construct Literal {
+    construct Literal<Value = @syntax, shape: DelimiterPair = .braces> {
         let type: TypeReference?
         let parameters: ParameterClause?
-        let body: Block
+        let body: Block<Value, shape>
     }
 
     @syntax {
@@ -24,8 +24,9 @@ construct Closure {
     }
     construct Invocation<Value = Nil> {
         let closure: Expression
-        let arguments: [Parameter.Application]
+        let arguments: Array<Parameter.Application>
         let valueType: TypeReference
+        @value
         let value: Value
     }
 
@@ -33,6 +34,6 @@ construct Closure {
         $declarations in
     }
     construct ParameterClause {
-        let declarations: [Parameter.Declaration]
+        let declarations: Array<Parameter.Declaration>
     }
 }

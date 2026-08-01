@@ -33,9 +33,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [x] Have the Range-authored `syntax` macro construct and return its typed
       `SyntaxTemplate` value.
       - `SyntaxTemplate` owns the captured recipe `String` and the target
-        construct declaration's `[Let]` member syntax handles. For the proven
-        single-capture boundary it also stores the resolved identifier and
-        derived literal prefix/suffix counts; it does not expose compiler table
+        construct declaration's `[Let]` member syntax handles. It stores the
+        first two resolved capture members plus their derived
+        prefix/separator/suffix boundaries; it does not expose compiler table
         rows or raw-buffer spans.
       - The focused macro-execution proof observes the template value, exact
         captured recipe bytes, three typed member syntax handles, the resolved
@@ -50,7 +50,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         matching can use ordinary `String` reads.
       - The focused root-value proof covers both a two-capture recipe and the
         exact unknown-capture rejection boundary.
-    - [x] Populate a single-capture `SyntaxTemplate.Match.binding` from an input
+    - [x] Populate a single-capture `SyntaxTemplate.Match.capture` from an input
       `@syntax`
       value.
       - [x] Expose compiler-known `syntaxText(source:)` and
@@ -60,18 +60,43 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           source-backed `name` fragment, materializes the exact four bytes, and
           rejects a literal mismatch through macro diagnostics.
       - [x] Execute the required-match success path through the Range-authored
-        member-function boundary and retain its populated `Binding.values`.
-        - `@syntax` derives the resolved capture identifier and literal bounds;
+        member-function boundary and retain its populated `Capture.values`.
+        - `@syntax` derives the resolved capture member and literal bounds;
           `matchRequired` stringifies the input, materializes a typed local
-          source slice, and returns a populated `Match`/`Binding`.
-        - The focused proof observes identifier bytes `name`, one syntax value,
+          source slice, and returns a populated `Match`/`Capture`.
+        - The focused proof observes the referenced `Let`, one syntax value,
           and its exact source-backed span. The mismatch path still rejects
           through the Range-authored `match` diagnostics.
-      - [ ] Generalize `Match.binding` to ordered bindings only after
+      - [x] Align template captures with declaration members instead of the
+        unrelated property `Binding<T>` model.
+        - `SyntaxTemplate` retains the resolved `Let` handles directly, and
+          `Capture.member` is the identifier authority instead of duplicating
+          its name as a `String`.
+      - [ ] Generalize `Match.capture` to ordered captures only after
         multi-capture and cardinality semantics have their own focused proof.
+        - [x] Derive and retain two ordered capture members and their literal
+          separator bounds in the Range-authored `syntax` macro.
+        - [ ] Materialize ordered `Capture` values in `[Capture]` on the
+          returned `Match`.
+          - Two directly constructed `Capture` fields on `Match` compile and
+            execute successfully, so multiple capture children are not the
+            blocker.
+          - An inline `[Capture]` argument fails the called Range function's
+            array-literal resolution with `pipelineFailureCode=9504010`, with
+            either one or two elements. The propagated detail is `504`, which
+            decodes to an expected `@syntax` element kind versus the actual
+            nominal `Capture` construct kind. Moving an explicitly typed
+            `[Capture]` into a local advances past resolution but fails later with
+            `pipelineFailureCode=11372010`; two `Capture` locals similarly
+            reach `11362010`.
+          - Upgrade contextual array-of-nominal resolution and the subsequent
+            local aggregate MIR path before adding the ordered-capture fixture.
       - [ ] Prove the successful value-bearing `Parsed<Match>` return path;
         the current success fixture intentionally uses the required-match
         boundary while the rejection fixture exercises `match`.
+        - Direct return, a typed local, and explicit `Optional.exists` all
+          reach the same Range-function preparation boundary
+          (`pipelineFailureCode=9504010`).
       - Move nested member/cardinality selection out of the temporary
         `compilerSyntaxRecipes` observer after this source-binding layer has
         equivalent positive and rejection proofs.
@@ -600,6 +625,10 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           as the reusable Hashing sound rather than leaving it on the scale.
         - [x] Trigger one rounded Digital Crown-style tick when pointer motion
           crosses each logarithmic scale detent, with no queued tick burst.
+- [x] Let the homepage title sound taper over a 1.2-second pointer-exit release
+  and render its horizontal axis as a bounded, mirrored gradient.
+- [x] Register one root-owned Web Audio manager/master bus and route title,
+  nucleus, rhythm, scale, and typed-text sounds through named bus inputs.
 - [x] Add an interactive concentric nucleus graph to the Svelte homepage.
   - [x] Render one shared source nucleus with persistent concept branches.
   - [x] Center the concept picker above the graph, remove its selected fill,
@@ -724,7 +753,15 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       direct `Let`, `State`, `Binding`, `Derived`, nested `Construct`,
       `Function`, `Enum`, and `Extension` syntax representations.
     - [x] Replace `Construct.Declaration`'s parallel per-kind arrays with the
-      canonical `members: [@member]` collection.
+      canonical `members: Array<@member>` collection.
+    - [x] Make `Array<Element>` the sole compiler-backed collection type
+      spelling and reject legacy `[Element]` during typed syntax capture.
+      - Core and compiler fixtures use explicit declaration initializers such
+        as `Array<Int>([1, 2, 3])`; brackets remain the value payload and index
+        operators, not a competing type or inferred declaration form.
+      - Verification: `scripts/range check-root-value` passes the canonical
+        nested-generic, macro-family, recipe-cardinality, indexing, and focused
+        legacy-rejection proofs.
     - [x] Prove one macro-family representation retains mixed authored
       `let`, `state`, `construct`, and `function` values.
     - [x] Normalize parser-backed declaration envelopes in the direct syntax
@@ -766,7 +803,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
             `target` operation is path-sensitive and an executed denied
             `graph` operation emits `macroCapabilityDenied`.
       - [x] Declare the Range-authored generic projection surface as
-        `function filter<T>(all: T): [T]` on the single `Array<Element>`
+        `function filter<T>(all: T): Array<T>` on the single `Array<Element>`
         primitive.
       - [x] Execute fluent exact nominal selection over source-backed member
         views and preserve original order.
@@ -818,7 +855,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           continuation.
         - `Testing/Macros/Pass/BranchJoinReturn.range` and the Range-authored
           `project` macro prove the shared return after conditional expansion.
-      - [ ] Treat `[@member]` as a deferred compile-time collection: collect
+      - [ ] Treat `Array<@member>` as a deferred compile-time collection: collect
         the complete conforming child set before synthesizing its physical
         storage.
         - [x] Intern macro-family member types as deferred `Array` views and
@@ -931,6 +968,15 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           - [ ] Complete ordinary runtime collection operations through the
             existing closure, generic specialization, and ownership work;
             compile-time macro transforms do not prove the runtime surface.
+            - [ ] Fix the optimized candidate's Array out-of-bounds trap
+              boundary: emitted read/write LLVM contains `icmp ult i32` and
+              `llvm.trap`, and both linked ARM64 executables lower `main` to
+              `brk #0x1`, but trap termination is nondeterministic in the current
+              environment. One run spun in the read fixture; the bounded rerun
+              trapped on read and timed out on write. Keep the new five-second
+              harness deadline so this boundary fails explicitly instead of
+              consuming CPU forever. All preceding macro, graph, ownership, and
+              body-replay candidate sections passed.
         - [x] Generalize `Return<Value>` over its carried value; an absent
           return value defaults the generic payload to `Nil`.
       - [x] Remove the separate `Generic`, `TypeGeneric`, and `ValueGeneric`
@@ -1068,9 +1114,95 @@ owns the actionable checkboxes for the active and deliberately deferred work.
             unexecuted template text.
           - [x] Make `Block` the canonical ordered body syntax relationship
             before composing generated bodies.
-            - [x] Define the Range-authored surface as
-              `Block.syntax: [@syntax]`; do not use physical lines or a
-              statement-only parallel hierarchy as the semantic container.
+            - [x] Parameterize the Range-authored surface as
+              `Block<Value, shape: DelimiterPair>` and forward the same
+              identity parameters through `Closure.Literal`.
+              - `DelimiterPair` provides `parentheses`, `braces`, `brackets`,
+                and `angles`; the focused proof retains the authored opener,
+                closer, and pair value without deriving collection semantics
+                from the delimiters.
+              - Bodyless functions no longer synthesize an empty `Block`.
+            - [ ] Replace `Block.values: Array<Value>` with the core occurrence
+              relationship: one identity owns zero, one, or many value edges.
+              - [x] Add the Core `@value` member-relationship marker and annotate
+                the first value-owning syntax surfaces (`Block`, `Let`, `State`,
+                macro execution/application, closure invocation, and `Parsed`).
+              - [x] Define the canonical non-generic relationship registration
+                model and make `@value` return its one-to-one default.
+                - Multiplicity is an independent minimum/maximum bound with an
+                  explicit unbounded case. Ordering, separator syntax identity,
+                  and delimiter enclosure are independent representation facts.
+                - `RangeGraphRelationship` now relates origin, role, and
+                  destination identities through that registration instead of
+                  storing a compiler-defined `kind` string.
+                - The focused macro proof executes `@value`, persists the full
+                  typed registration, and reads its lower bound through a later
+                  macro application.
+              - [x] Make macro-family filtering select through the linked
+                `appliesTo` and `resolvedBy` graph edges instead of rescanning
+                raw macro-application target/declaration columns.
+                - The focused proof selects exactly one directly `@value`-related
+                  member while excluding an unmarked sibling.
+              - [x] Make selected compiler values retain the relationship that
+                justified their graph query match.
+                - Macro-family filtering copies the syntax value with its exact
+                  `appliesTo` relationship row; persisted results keep that
+                  provenance so later compiler work can recover multiplicity,
+                  ordering, separator, enclosure, and the producing application
+                  without changing the source-facing value type.
+                - Macro-family filtering now produces the compiler-only
+                  `selection` collection kind instead of a semantic `Array`.
+                  Count, indexing, closure filtering, and expansion boundaries
+                  treat it as a collection adapter while the selected syntax
+                  values retain their individual relationship rows.
+              - [ ] Merge macro application relationships into the canonical
+                plotted graph so declarations, applications, members, and body
+                syntax are one queryable node/relationship soup rather than a
+                plot plus a parallel macro-edge table.
+                - [x] Replace the macro-only edge schema with the shared
+                  identity-to-identity relationship table.
+                  - Every relationship now records its role, typed origin and
+                    destination identities, ordinal, multiplicity bounds,
+                    ordering, separator identity, and delimiter enclosure.
+                    Existing macro-link relationships use the canonical
+                    one-to-one registration rather than leaving cardinality to
+                    a later compiler inference.
+                  - Authored and generated macro applications both register
+                    `appliesTo` and `resolvedBy` through the same append path;
+                    execution and macro-family selection read that graph.
+                  - The old `macroEdges` field and helper family no longer exist.
+                - [x] Make the semantic plotter consume these relationships
+                  directly instead of reconstructing macro nominal references
+                  from application spelling and target proximity.
+                  - Macro linking records name candidates through the
+                    `references` role alongside `appliesTo` and `resolvedBy`.
+                    The plotter now derives the application owner, successful
+                    declaration, ambiguity, missing target, and mismatch from
+                    those relationships plus the linked diagnostic identity.
+              - [ ] Expose type and metatype filtering over that plotted graph,
+                then make `@syntax`, `@value`, and nominal selection use the same
+                query operation and occurrence-backed result instead of
+                `Array<...>` materialization.
+              - A many-valued relationship records the syntax separating
+                adjacent values; it is not a `Variadic` type or an `Array`
+                inference.
+              - Remove `VariadicTypeReference` as a semantic concept instead
+                of adding an ellipsis-backed compiler path.
+              - [x] Reclassify postfix `?` in typed syntax as a zero-or-one
+                occurrence relationship whose child retains the underlying
+                identity; syntax recipes now report `occurrence=zeroOrOne`
+                instead of optional cardinality.
+                - The body compiler still lowers this relationship through
+                  its built-in Optional sentinel as a compatibility adapter.
+              - [ ] Remove the built-in Optional sentinel after stored values,
+                parameters/results, calls, pattern matching, ownership, and
+                LLVM lowering consume zero-or-one occurrence directly.
+              - Model array syntax as element occurrences enclosed by `[]`
+                and separated by `,`; argument lists, parameter lists, syntax
+                captures, and blocks must reuse the same occurrence machinery.
+              - Delimiter shape and separator syntax are independently
+                swappable representation knowledge and must not choose value
+                identity, runtime layout, or collection type.
             - [x] Capture every authored/generated function and entry body as
               one `body` edge to a `Block`, with the block owning its ordered
               syntax children and nested control-flow bodies using the same

@@ -1,5 +1,8 @@
+@builtin
+construct Array<Element> {}
+
 construct MutableArrayLeaf {
-    state values: [Int]
+    state values: Array<Int>
 }
 
 construct StableArrayRoot {

@@ -9,5 +9,5 @@ construct Wrapper {
     $values in
 }
 construct Clause {
-    let values: [String]
+    let values: Array<String>
 }

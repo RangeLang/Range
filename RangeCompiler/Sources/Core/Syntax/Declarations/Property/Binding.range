@@ -2,7 +2,7 @@
 @property
 @member
 construct Binding<T> {
-    let macros: [Macro.Application]
+    let macros: Array<Macro.Application>
     let identifier: Identifier
     let type: TypeReference
     let getterBody: Block?

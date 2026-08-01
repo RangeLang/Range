@@ -1,4 +1,6 @@
 compilerMacroSnapshot
+@builtin
+construct Array<Element> {}
 construct TypeReference {}
 construct Expression {}
 
@@ -16,9 +18,9 @@ construct Macro {
 construct MacroApplication {
     let identifier: Identifier
     let target: Identifier
-    let genericArguments: [TypeReference]
+    let genericArguments: Array<TypeReference>
     let argumentClause: String
-    let arguments: [Expression]
+    let arguments: Array<Expression>
     let declaration: Macro.Declaration?
     let packageVisibility: String
     let valueType: TypeReference
@@ -26,7 +28,7 @@ construct MacroApplication {
 }
 
 construct Member {
-    let macros: [MacroApplication]
+    let macros: Array<MacroApplication>
 }
 
 construct Metadata {

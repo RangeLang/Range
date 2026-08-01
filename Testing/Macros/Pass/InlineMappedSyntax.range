@@ -12,7 +12,7 @@ construct Identifier {}
 construct Construct {
     construct Declaration {
         let identifier: Identifier
-        let members: [@member]
+        let members: Array<@member>
     }
 }
 
@@ -20,7 +20,7 @@ construct Construct {
 construct Let {}
 
 macro inlineMappedSyntax(): Construct { environment in
-    let fields: [Let](
+    let fields: Array<Let>(
         environment.target.Declaration.members.filter(all: Let)
     )
 

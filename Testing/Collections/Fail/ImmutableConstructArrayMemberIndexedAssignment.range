@@ -1,5 +1,8 @@
+@builtin
+construct Array<Element> {}
+
 construct ImmutableArrayBox {
-    let values: [Int]
+    let values: Array<Int>
 }
 
 @main {

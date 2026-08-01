@@ -8,10 +8,10 @@ construct Enum {
     }
     @member
     construct Declaration {
-        let macros: [Macro.Application]
+        let macros: Array<Macro.Application>
         let identifier: Identifier
-        let generics: [Parameter.Declaration]
-        let cases: [Case]
+        let generics: Array<Parameter.Declaration>
+        let cases: Array<Case>
     }
 
     @stored
@@ -22,7 +22,7 @@ construct Enum {
     @property
     @member
     construct Case {
-        let macros: [Macro.Application]
+        let macros: Array<Macro.Application>
         let identifier: Identifier
         let value: @syntax?
     }

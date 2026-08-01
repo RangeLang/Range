@@ -1,0 +1,4 @@
+compilerTypedSyntaxSnapshot
+construct MaybeName {
+    let name: String?
+}

@@ -12,7 +12,7 @@ construct Identifier {}
 construct Construct {
     construct Declaration {
         let identifier: Identifier
-        let members: [@member]
+        let members: Array<@member>
     }
 }
 

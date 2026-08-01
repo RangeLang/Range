@@ -3,10 +3,10 @@ construct Function {
     @syntax
     @member
     construct Declaration {
-        let macros: [Macro.Application]
+        let macros: Array<Macro.Application>
         let identifier: Identifier
-        let generics: [Parameter.Declaration]
-        let parameters: [Parameter.Declaration]
+        let generics: Array<Parameter.Declaration>
+        let parameters: Array<Parameter.Declaration>
         let returnType: TypeReference?
         let body: Block
     }
@@ -14,6 +14,6 @@ construct Function {
     @syntax
     construct Application {
         let identifier: Identifier
-        let arguments: [Parameter.Application]
+        let arguments: Array<Parameter.Application>
     }
 }

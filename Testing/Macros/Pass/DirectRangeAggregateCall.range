@@ -11,7 +11,7 @@ function macroPair(value: Int): MacroPair {
 
 macro directAggregateCall(): Construct { environment in
     let pair: MacroPair(macroPair(value: 4))
-    let values: [Int]([5, 6])
+    let values: Array<Int>([5, 6])
     if pair.left == 4 && pair.right == 5 && values.count == 2 && values[1] == 6 {
         #environment {
             extension #environment.target.Declaration.identifier {

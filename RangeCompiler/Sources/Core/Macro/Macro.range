@@ -3,9 +3,9 @@ construct Macro {
     construct Environment<Target> {
         let target: Target
         let parent: @syntax?
-        let children: [@syntax]
-        let ancestors: [@syntax]
-        let siblings: [@syntax]
+        let children: Array<@syntax>
+        let ancestors: Array<@syntax>
+        let siblings: Array<@syntax>
         let diagnostics: MacroDiagnostics
         let graph: RangeGraph
         let source: ProgramSourceFile
@@ -14,6 +14,7 @@ construct Macro {
     }
 
     construct Execution<Value> {
+        @value
         let value: Value
         let delta: RangeGraphDelta
     }
@@ -22,16 +23,16 @@ construct Macro {
         let kind: String
         let name: String
         let type: TypeReference?
-        let elements: [Target]
+        let elements: Array<Target>
     }
 
     @syntax
     construct Declaration {
-        let macros: [Macro.Application]
+        let macros: Array<Macro.Application>
         let identifier: Identifier
         let packageVisibility: String
-        let generics: [Parameter.Declaration]
-        let parameters: [Parameter.Declaration]
+        let generics: Array<Parameter.Declaration>
+        let parameters: Array<Parameter.Declaration>
         let target: String
         let targetSyntax: Target?
         let expansionType: TypeReference?
@@ -42,12 +43,13 @@ construct Macro {
     construct Application<Value = Nil> {
         let identifier: Identifier
         let target: Identifier
-        let genericArguments: [TypeReference]
+        let genericArguments: Array<TypeReference>
         let argumentClause: String
-        let arguments: [Expression]
+        let arguments: Array<Expression>
         let declaration: Declaration?
         let packageVisibility: String
         let valueType: TypeReference
+        @value
         let value: Value
     }
 }

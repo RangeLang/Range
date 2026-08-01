@@ -8,8 +8,8 @@ enum JSONValue {
     case boolean(value: Bool)
     case number(value: String)
     case string(value: String)
-    case array(indirect elements: [JSONValue])
-    case object(indirect members: [JSONMember])
+    case array(indirect elements: Array<JSONValue>)
+    case object(indirect members: Array<JSONMember>)
 }
 
 construct JSONMember {

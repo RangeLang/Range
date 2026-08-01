@@ -1,3 +1,4 @@
+@builtin
 construct Array<Element> {
     state storage: Buffer<Element>
 
@@ -17,8 +18,8 @@ construct Array<Element> {
         return storage.update(element: element, index: index)
     }
 
-    function filter<T>(all: T): [T]
-    function filter(named identifier: Identifier): [Element]
+    function filter<T>(all: T): Array<T>
+    function filter(named identifier: Identifier): Array<Element>
 
     function destroy(): Int {
         return storage.destroy()

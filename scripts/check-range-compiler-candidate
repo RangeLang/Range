@@ -672,7 +672,7 @@ audit_native_arrays() {
         if /usr/bin/grep -Eq 'call .*@(rangeConstruct(Create|Get|Set)|rawBufferCreate|malloc|calloc|realloc)' "$first"; then
             fail "$stage_label native Array $kind introduced dynamic-record or allocator calls"
         fi
-        if [[ "$kind" == mutation-nested-member || "$kind" == mutation-let-intermediate ]]; then
+        if [[ "$kind" == mutation-member || "$kind" == mutation-nested-member || "$kind" == mutation-let-owner || "$kind" == mutation-let-intermediate ]]; then
             /usr/bin/grep -Fq 'call ptr @rangeConstructIdentityCreate(i64 ' "$first" \
                 || fail "$stage_label native Array $kind omitted its direct identity link"
         elif /usr/bin/grep -Fq 'call ptr @rangeConstructIdentityCreate(i64 ' "$first"; then
@@ -744,11 +744,12 @@ audit_native_arrays() {
     /usr/bin/grep -Fq 'call void @llvm.trap()' "$oob_first" || fail "$stage_label native Array out-of-bounds omitted its trap"
     validate_llvm "$oob_first"
     link_llvm "$oob_first" "$oob_linked"
-    if "$oob_linked" > "$oob_run_output" 2> "$oob_run_error"; then
+    if /usr/bin/perl -e '$seconds = shift; alarm $seconds; exec @ARGV' 5 "$oob_linked" > "$oob_run_output" 2> "$oob_run_error"; then
         RUN_STATUS=0
     else
         RUN_STATUS=$?
     fi
+    [[ "$RUN_STATUS" -ne 142 ]] || fail "$stage_label native Array out-of-bounds did not terminate at its trap"
     [[ "$RUN_STATUS" -ne 0 ]] || fail "$stage_label native Array out-of-bounds unexpectedly succeeded"
     [[ ! -s "$oob_run_output" && ! -s "$oob_run_error" ]] || fail "$stage_label native Array out-of-bounds wrote output"
 
@@ -763,11 +764,12 @@ audit_native_arrays() {
     /usr/bin/grep -Fq 'call void @llvm.trap()' "$write_oob_llvm" || fail "$stage_label native Array write out-of-bounds omitted its trap"
     validate_llvm "$write_oob_llvm"
     link_llvm "$write_oob_llvm" "$write_oob_linked"
-    if "$write_oob_linked" > "$write_oob_run_output" 2> "$write_oob_run_error"; then
+    if /usr/bin/perl -e '$seconds = shift; alarm $seconds; exec @ARGV' 5 "$write_oob_linked" > "$write_oob_run_output" 2> "$write_oob_run_error"; then
         RUN_STATUS=0
     else
         RUN_STATUS=$?
     fi
+    [[ "$RUN_STATUS" -ne 142 ]] || fail "$stage_label native Array write out-of-bounds did not terminate at its trap"
     [[ "$RUN_STATUS" -ne 0 ]] || fail "$stage_label native Array write out-of-bounds unexpectedly succeeded"
     [[ ! -s "$write_oob_run_output" && ! -s "$write_oob_run_error" ]] || fail "$stage_label native Array write out-of-bounds wrote output"
 
@@ -3500,7 +3502,7 @@ write_macro_positive_bundle() {
     fi
     /usr/bin/printf '%s\n' \
         'compilerSourceFile\trole=core\tpath=Core/Macro.range' \
-        'open macro CrossConstruct(): Construct -> Void {}' \
+        'macro CrossConstruct(): Construct -> Void {}' \
         'macro CrossFunction(): Function -> Void {}' \
         'macro CrossMember(): Member -> Void {}' \
         'macro CrossParameter(value: Int): Parameter -> Void {}' >> "$output"
@@ -5012,9 +5014,9 @@ audit_macro_family_memory() {
 
     run_capture "$executable" "$fixture_root/Pass/TypedSyntax.range" "$typed" "$error"
     require_successful_output "$stage_label macro-family typed syntax" "$typed" "$error"
-    /usr/bin/grep -Fq $'name=components\tnameStart=134\tnameEnd=144\ttype=[@component]' "$typed" \
+    /usr/bin/grep -Fq $'name=components\tnameStart=134\tnameEnd=144\ttype=Array<@component>' "$typed" \
         || fail "$stage_label typed syntax did not preserve the macro-family element type"
-    /usr/bin/grep -Eq $'name=components.*\ttype=\\[@component\\]\ttypeStart=146\ttypeEnd=158.*\tkind=state\t' "$typed" \
+    /usr/bin/grep -Eq $'name=components.*\ttype=Array<@component>\ttypeStart=146\ttypeEnd=163.*\tkind=state\t' "$typed" \
         || fail "$stage_label typed syntax did not preserve mutable family storage"
 
     run_capture "$executable" "$fixture_root/Pass/GeneralTargets.range" "$general" "$error"
@@ -5463,13 +5465,16 @@ main() {
         '}' \
         '' \
         '@main {' \
-        '    let numbers: [1, 2, 3]' \
+        '    let numbers: Array<Int>([1, 2, 3])' \
         '    return selected(numbers: numbers)' \
         '}' > "$ARRAY_ARGUMENT_SOURCE"
     ARRAY_OUT_OF_BOUNDS_SOURCE="$WORK_ROOT/ArrayOutOfBounds.range"
     /usr/bin/printf '%s\n' \
+        '@builtin' \
+        'construct Array<Element> {}' \
+        '' \
         '@main {' \
-        '    let numbers: [1, 2, 3]' \
+        '    let numbers: Array<Int>([1, 2, 3])' \
         '    return numbers[3]' \
         '}' > "$ARRAY_OUT_OF_BOUNDS_SOURCE"
     ARRAY_RETURN_ESCAPE_SOURCE="$WORK_ROOT/ArrayReturnEscape.range"
@@ -5478,7 +5483,7 @@ main() {
         'construct Array<Element> {}' \
         '' \
         'function escaped(): Array<Int> {' \
-        '    let numbers: [1, 2, 3]' \
+        '    let numbers: Array<Int>([1, 2, 3])' \
         '    return numbers' \
         '}' \
         '' \

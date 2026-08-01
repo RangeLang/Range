@@ -1,5 +1,5 @@
 construct CodingPath {
-    let components: [String]
+    let components: Array<String>
 }
 
 construct EncodingError {

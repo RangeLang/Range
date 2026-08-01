@@ -200,13 +200,22 @@ function compilerSyntaxRecipeMemberRow(tables: CompilerSyntaxTables, targetSynta
     return 0 - 1
 }
 
-function compilerSyntaxRecipeCardinality(tables: CompilerSyntaxTables, memberRow: Int): String {
+function compilerSyntaxRecipeOccurrence(tables: CompilerSyntaxTables, memberRow: Int): String {
     if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: tables.members) { return String("invalid") }
+    if compilerIntTableValue(table: tables.members, row: memberRow, column: 14) == compilerSyntaxTypeTargetReference() {
+        let referenceID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 15))
+        if referenceID >= 0 && referenceID < compilerIntTableRowCount(table: tables.typeReferences)
+            && compilerIntTableValue(table: tables.typeReferences, row: referenceID, column: compilerSyntaxTypeReferenceKindColumn())
+                == compilerSyntaxTypeReferenceZeroOrOneOccurrence() {
+            return String("zeroOrOne")
+        }
+    }
     let fileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
     let typeStart: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.members, row: memberRow, column: 8)))
     let typeEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
     state cursor: Int(typeStart)
-    state firstKind: RangeTokenKind(.eof)
+    state firstIsArray: Bool(false)
+    state secondKind: RangeTokenKind(.eof)
     state lastKind: RangeTokenKind(.eof)
     state tokenCount: Int(0)
     while cursor < typeEnd {
@@ -214,15 +223,26 @@ function compilerSyntaxRecipeCardinality(tables: CompilerSyntaxTables, memberRow
         if maybeToken == nil { return String("invalid") }
         let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: cursor))
         if token.start >= typeEnd { cursor: typeEnd } else {
-            if tokenCount == 0 { firstKind: token.kind }
+            if tokenCount == 0 {
+                firstIsArray: token.kind == .identifier
+                    && token.end - token.start == 5
+                    && stringByteAt(source: tables.sourceStore.source, index: token.start) == 65
+                    && stringByteAt(source: tables.sourceStore.source, index: token.start + 1) == 114
+                    && stringByteAt(source: tables.sourceStore.source, index: token.start + 2) == 114
+                    && stringByteAt(source: tables.sourceStore.source, index: token.start + 3) == 97
+                    && stringByteAt(source: tables.sourceStore.source, index: token.start + 4) == 121
+            }
+            if tokenCount == 1 { secondKind: token.kind }
             lastKind: token.kind
             tokenCount: tokenCount + 1
             cursor: token.end
         }
     }
     if tokenCount == 0 { return String("invalid") }
-    if firstKind == .leftBracket && lastKind == .rightBracket { return String("many") }
-    if lastKind == .question { return String("optional") }
+    if tokenCount >= 4
+        && firstIsArray
+        && secondKind == .less
+        && lastKind == .greater { return String("many") }
     return String("one")
 }
 
@@ -337,7 +357,7 @@ function compilerSyntaxRecipeProcessApplication(tables: CompilerSyntaxTables, ro
                 let memberType: String(compilerTypedSyntaxLocalText(tables: tables, fileID: memberFileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
                 let nestedTargetSyntaxID: Int(compilerSyntaxRecipeNominalTargetSyntaxID(tables: tables, memberRow: memberRow))
                 let nestedRecipeApplicationRow: Int(compilerSyntaxRecipeApplicationRowForTarget(tables: tables, targetSyntaxID: nestedTargetSyntaxID))
-                rawBufferAppendText(buffer: rows, text: "syntaxRecipeCapture\(tab)recipeRow=\(recipeRow)\(tab)ordinal=\(ordinal)\(tab)name=\(capture.text)\(tab)memberRow=\(memberRow)\(tab)type=\(memberType)\(tab)cardinality=\(compilerSyntaxRecipeCardinality(tables: tables, memberRow: memberRow))\(tab)nestedTargetSyntaxID=\(nestedTargetSyntaxID)\(tab)nestedRecipeApplicationRow=\(nestedRecipeApplicationRow)\(newline)")
+                rawBufferAppendText(buffer: rows, text: "syntaxRecipeCapture\(tab)recipeRow=\(recipeRow)\(tab)ordinal=\(ordinal)\(tab)name=\(capture.text)\(tab)memberRow=\(memberRow)\(tab)type=\(memberType)\(tab)occurrence=\(compilerSyntaxRecipeOccurrence(tables: tables, memberRow: memberRow))\(tab)nestedTargetSyntaxID=\(nestedTargetSyntaxID)\(tab)nestedRecipeApplicationRow=\(nestedRecipeApplicationRow)\(newline)")
             }
             ordinal: ordinal + 1
             cursor: capture.end
@@ -463,10 +483,10 @@ function compilerMacroObserverDigest(tables: CompilerSyntaxTables): CompilerFing
     }
     digest: compilerFingerprintAppendInt(fingerprint: digest, value: 300)
     row: 0
-    while row < compilerIntTableRowCount(table: tables.macroEdges) {
+    while row < compilerIntTableRowCount(table: tables.relationships) {
         column: 0
-        while column < compilerSyntaxMacroEdgeColumnCount() {
-            digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: tables.macroEdges, row: row, column: column))
+        while column < compilerGraphRelationshipColumnCount() {
+            digest: compilerFingerprintAppendInt(fingerprint: digest, value: compilerIntTableValue(table: tables.relationships, row: row, column: column))
             column: column + 1
         }
         row: row + 1
@@ -534,11 +554,11 @@ function compilerMacroGraphDeltaDigest(delta: CompilerGraphDelta): CompilerFinge
     return digest
 }
 
-function compilerMacroEdgeCount(tables: CompilerSyntaxTables, edgeKind: Int): Int {
+function compilerGraphRelationshipCount(tables: CompilerSyntaxTables, edgeKind: Int): Int {
     state count: Int(0)
     state row: Int(0)
-    while row < compilerIntTableRowCount(table: tables.macroEdges) {
-        if compilerIntTableValue(table: tables.macroEdges, row: row, column: 1) == edgeKind { count: count + 1 }
+    while row < compilerIntTableRowCount(table: tables.relationships) {
+        if compilerIntTableValue(table: tables.relationships, row: row, column: 1) == edgeKind { count: count + 1 }
         row: row + 1
     }
     return count
@@ -810,7 +830,7 @@ function compilerMacroRenderExecutionSnapshot(tables: CompilerSyntaxTables, resu
     }
     row: 0
     while row < compilerIntTableRowCount(table: tables.macroResults) {
-        output: "\(output)macroResult\trow=\(row)\tinvocationRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 1))\tapplicationRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 2))\tkind=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 5))\ttypeKind=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 6))\tnominalSyntaxID=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 7))\tscalar=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 8))\tchildCount=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 9))\tparentRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 10))\tordinal=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 11))\n"
+        output: "\(output)macroResult\trow=\(row)\tinvocationRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 1))\tapplicationRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 2))\tkind=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 5))\ttypeKind=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 6))\tnominalSyntaxID=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 7))\tscalar=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 8))\tchildCount=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 9))\tparentRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 10))\tordinal=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 11))\trelationshipRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 12))\n"
         row: row + 1
     }
     row: 0
@@ -830,9 +850,9 @@ function compilerMacroRenderSnapshot(tables: CompilerSyntaxTables): String {
     let declarationCount: Int(compilerIntTableRowCount(table: tables.macroDeclarations))
     let parameterCount: Int(compilerIntTableRowCount(table: tables.macroParameters))
     let applicationCount: Int(compilerIntTableRowCount(table: tables.macroApplications))
-    let edgeCount: Int(compilerIntTableRowCount(table: tables.macroEdges))
-    let appliesToCount: Int(compilerMacroEdgeCount(tables: tables, edgeKind: compilerMacroEdgeAppliesTo()))
-    let resolvedByCount: Int(compilerMacroEdgeCount(tables: tables, edgeKind: compilerMacroEdgeResolvedBy()))
+    let appliesToCount: Int(compilerGraphRelationshipCount(tables: tables, edgeKind: compilerGraphRelationshipAppliesTo()))
+    let resolvedByCount: Int(compilerGraphRelationshipCount(tables: tables, edgeKind: compilerGraphRelationshipResolvedBy()))
+    let edgeCount: Int(appliesToCount + resolvedByCount)
     let digest: CompilerFingerprint(compilerMacroObserverDigest(tables: tables))
     let identityDigest: CompilerFingerprint(compilerMacroIdentityProjectionDigest(tables: tables))
     return "macroGraph\tvalid=true\tdeclarationCount=\(declarationCount)\tparameterCount=\(parameterCount)\tapplicationCount=\(applicationCount)\tedgeCount=\(edgeCount)\tappliesToCount=\(appliesToCount)\tresolvedByCount=\(resolvedByCount)\tdigest=\(digest.first):\(digest.second)\nmacroStableProjection\tidentityDigest=\(identityDigest.first):\(identityDigest.second)\n"
@@ -1345,12 +1365,6 @@ function compilerCoreParseTypeReferenceToken(parseState: CompilerTypeReferencePa
 function compilerCoreParseTypeReferenceTokenPunctuation(parseState: CompilerTypeReferenceParseState, token: RangeLexedToken): CompilerTypeReferenceParseState {
     if token.kind == .greater {
         return compilerCoreTypeReferenceCloseGeneric(parseState: parseState, token: token)
-    }
-    if token.kind == .leftBracket {
-        return compilerCoreTypeReferenceAppend(parseState: parseState, token: token, text: String("["), genericDelta: 0, arrayDelta: 1)
-    }
-    if token.kind == .rightBracket {
-        return compilerCoreTypeReferenceCloseArray(parseState: parseState, token: token)
     }
     if token.kind == .comma {
         return compilerCoreTypeReferenceComma(parseState: parseState, token: token)

@@ -11,5 +11,5 @@ construct Transform {
     let x: Int
 }
 construct Scene {
-    state components: [@component]
+    state components: Array<@component>
 }

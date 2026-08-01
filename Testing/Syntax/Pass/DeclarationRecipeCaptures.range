@@ -3,8 +3,8 @@
     route $name($arguments) -> $result
 }
 construct RouteDeclaration {
-    let attributes: [String]
+    let attributes: Array<String>
     let name: String
-    let arguments: [String]
+    let arguments: Array<String>
     let result: String?
 }

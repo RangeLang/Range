@@ -2,5 +2,5 @@
 @syntax(switch $expression $cases)
 construct Switch {
     let expression: Expression
-    let cases: [SwitchCase]
+    let cases: Array<SwitchCase>
 }

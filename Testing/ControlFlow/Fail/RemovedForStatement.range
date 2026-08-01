@@ -1,5 +1,8 @@
+@builtin
+construct Array<Element> {}
+
 @main {
-    let elements: [1, 2, 3]
+    let elements: Array<Int>([1, 2, 3])
     for element in elements {}
     return 0
 }

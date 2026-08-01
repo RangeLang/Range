@@ -5,7 +5,7 @@ construct Array<Element> {}
 
 compilerSourceFile\trole=core\tpath=Core/Macro/GenericBoundaryMaterialization.range
 macro genericBoundaryMaterialization(): Construct { environment in
-    let values: [Int]([3, 4])
+    let values: Array<Int>([3, 4])
     let enabled: Bool(true)
 
     #environment {
@@ -14,7 +14,7 @@ macro genericBoundaryMaterialization(): Construct { environment in
                 return #values.count
             }
 
-            function generatedValues(): [Int] {
+            function generatedValues(): Array<Int> {
                 return #values
             }
 

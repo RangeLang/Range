@@ -10,6 +10,6 @@ construct Transform {
 construct Registry {
     @observed
     let count: Int
-    let components: [@component]
-    state observations: [@observed]
+    let components: Array<@component>
+    state observations: Array<@observed>
 }

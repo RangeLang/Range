@@ -220,7 +220,7 @@ construct CompilerSyntaxTables {
     let macroDeclarations: CompilerIntTable
     let macroParameters: CompilerIntTable
     let macroApplications: CompilerIntTable
-    let macroEdges: CompilerIntTable
+    let relationships: CompilerIntTable
     let macroDiagnostics: CompilerIntTable
     let macroCapabilities: CompilerIntTable
     let macroInvocations: CompilerIntTable
@@ -459,6 +459,7 @@ construct CompilerMacroValueStore {
     let typeKinds: Buffer<Int>
     let typeIDs: Buffer<Int>
     let scalars: Buffer<Int>
+    let relationshipRows: Buffer<Int>
     let firstChildren: Buffer<Int>
     let childCounts: Buffer<Int>
     let children: Buffer<Int>

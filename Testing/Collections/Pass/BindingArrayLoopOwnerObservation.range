@@ -1,9 +1,12 @@
+@builtin
+construct Array<Element> {}
+
 construct MutableArrayView {
-    binding values: [Int]
+    binding values: Array<Int>
 }
 
 @main {
-    state numbers: [0]
+    state numbers: Array<Int>([0])
     let view: MutableArrayView(values: $numbers)
     state index: Int(0)
     state checksum: Int(0)

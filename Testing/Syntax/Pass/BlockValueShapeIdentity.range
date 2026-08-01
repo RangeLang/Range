@@ -1,0 +1,32 @@
+compilerTypedSyntaxSnapshot
+enum DelimiterPair {
+    case parentheses
+    case braces
+    case brackets
+    case angles
+}
+
+@syntax
+construct Block<Value = @syntax, shape: DelimiterPair = .braces> {
+    let values: Array<Value>
+}
+
+construct Closure {
+    @syntax {
+        $body
+    }
+    construct Literal<Value = @syntax, shape: DelimiterPair = .braces> {
+        let body: Block<Value, shape>
+    }
+}
+
+construct ShapeIdentities {
+    let parentheses: Block<Int, .parentheses>
+    let braces: Block<Int, .braces>
+    let brackets: Block<Int, .brackets>
+    let angles: Block<Int, .angles>
+}
+
+function braceBlock(): Int {
+    return 1
+}

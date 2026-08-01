@@ -1,12 +1,17 @@
 macro syntax(@capture template: String): Construct -> SyntaxTemplate { environment in
-    let members: [Let](
+    let members: Array<Let>(
         environment.target.Declaration.members.filter(all: Let)
     )
     state captureCount: Int(0)
     state resolvedCaptureCount: Int(0)
     state templateIndex: Int(0)
     state captureMemberIndex: Int(0)
+    state firstCaptureMemberIndex: Int(0)
+    state secondCaptureMemberIndex: Int(0)
     state capturePrefixCount: Int(0)
+    state firstCaptureEnd: Int(0)
+    state separatorStart: Int(0)
+    state separatorCount: Int(0)
     state captureSuffixCount: Int(0)
     let templateCount: Int(template.count)
     while templateIndex < templateCount {
@@ -39,8 +44,6 @@ macro syntax(@capture template: String): Construct -> SyntaxTemplate { environme
                 }
             }
             let captureEnd: Int(templateIndex)
-            capturePrefixCount: captureStart - 1
-            captureSuffixCount: templateCount - captureEnd
             state memberIndex: Int(0)
             state resolved: Bool(false)
             while memberIndex < members.count && resolved == false {
@@ -69,6 +72,19 @@ macro syntax(@capture template: String): Construct -> SyntaxTemplate { environme
                 }
                 memberIndex: memberIndex + 1
             }
+            if resolved && captureCount == 1 {
+                firstCaptureMemberIndex: captureMemberIndex
+                secondCaptureMemberIndex: captureMemberIndex
+                capturePrefixCount: captureStart - 1
+                firstCaptureEnd: captureEnd
+                captureSuffixCount: templateCount - captureEnd
+            }
+            if resolved && captureCount == 2 {
+                secondCaptureMemberIndex: captureMemberIndex
+                separatorStart: firstCaptureEnd
+                separatorCount: captureStart - 1 - firstCaptureEnd
+                captureSuffixCount: templateCount - captureEnd
+            }
         } else {
             templateIndex: templateIndex + 1
         }
@@ -78,12 +94,22 @@ macro syntax(@capture template: String): Construct -> SyntaxTemplate { environme
             "Every syntax capture must name a let member of its declaration."
         )
     }
-    let capturedMember: Let(members[captureMemberIndex])
+    if captureCount == 0 || captureCount > 2 {
+        environment.diagnostics.error(
+            "A syntax template currently requires one or two captures."
+        )
+    }
+    let capturedMember: Let(members[firstCaptureMemberIndex])
+    let secondCapturedMember: Let(members[secondCaptureMemberIndex])
     return SyntaxTemplate(
         source: template,
         members: members,
-        captureName: capturedMember.identifier.name,
+        captureMember: capturedMember,
+        secondCaptureMember: secondCapturedMember,
+        captureCount: captureCount,
         prefixCount: capturePrefixCount,
+        separatorStart: separatorStart,
+        separatorCount: separatorCount,
         suffixCount: captureSuffixCount
     )
 }

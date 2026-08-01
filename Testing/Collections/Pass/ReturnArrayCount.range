@@ -1,4 +1,7 @@
+@builtin
+construct Array<Element> {}
+
 @main {
-    let numbers: [1, 2, 3]
+    let numbers: Array<Int>([1, 2, 3])
     return numbers.count
 }

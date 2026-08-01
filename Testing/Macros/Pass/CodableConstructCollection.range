@@ -15,7 +15,7 @@ construct Identifier {
 construct Construct {
     construct Declaration {
         let identifier: Identifier
-        let members: [@member]
+        let members: Array<@member>
     }
 }
 
@@ -33,7 +33,7 @@ construct State {
 
 construct Binding {}
 
-macro codableEncodeBody(properties: [@stored]) -> Int { environment in
+macro codableEncodeBody(properties: Array<@stored>) -> Int { environment in
     if properties.count == 2 {
         #environment {
             let encodedProperties: Int(2)
@@ -42,7 +42,7 @@ macro codableEncodeBody(properties: [@stored]) -> Int { environment in
     return properties.count
 }
 
-macro codableDecodeBody(properties: [@stored]) -> Int { environment in
+macro codableDecodeBody(properties: Array<@stored>) -> Int { environment in
     if properties.count == 2 {
         #environment {
             let decodedProperties: Int(2)
@@ -52,7 +52,7 @@ macro codableDecodeBody(properties: [@stored]) -> Int { environment in
 }
 
 macro codable(): Construct { environment in
-    let properties: [@stored](
+    let properties: Array<@stored>(
         environment.target.Declaration.members.filter(all: @stored)
     )
 

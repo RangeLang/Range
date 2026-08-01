@@ -1,19 +1,23 @@
 construct SyntaxTemplate {
     let source: String
-    let members: [Let]
-    let captureName: String
+    let members: Array<Let>
+    let captureMember: Let
+    let secondCaptureMember: Let
+    let captureCount: Int
     let prefixCount: Int
+    let separatorStart: Int
+    let separatorCount: Int
     let suffixCount: Int
 
-    construct Binding {
-        let name: String
-        let values: [@syntax]
+    construct Capture {
+        let member: Let
+        let values: Array<@syntax>
     }
 
     construct Match {
         let template: SyntaxTemplate
         let source: @syntax
-        let binding: Binding
+        let capture: Capture
     }
 
     function matchRequired(source: @syntax): Match {
@@ -29,8 +33,8 @@ construct SyntaxTemplate {
         return Match(
             template: self,
             source: source,
-            binding: Binding(
-                name: self.captureName,
+            capture: Capture(
+                member: self.captureMember,
                 values: [capture]
             )
         )
@@ -81,9 +85,6 @@ construct SyntaxTemplate {
                 ]
             )
         }
-        let captureName: String(
-            self.source.substring(start: captureStart, end: captureEnd)
-        )
         let prefixCount: Int(captureStart - 1)
         let suffixCount: Int(self.source.count - captureEnd)
         if sourceText.count < prefixCount + suffixCount {
@@ -126,8 +127,8 @@ construct SyntaxTemplate {
             value: Match(
                 template: self,
                 source: source,
-                binding: Binding(
-                    name: captureName,
+                capture: Capture(
+                    member: self.captureMember,
                     values: [
                         syntaxSlice(
                             source: source,

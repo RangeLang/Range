@@ -3,6 +3,6 @@
 }
 construct RouteDeclaration {
     let name: String
-    let arguments: [String]
+    let arguments: Array<String>
     let ignored: Bool
 }

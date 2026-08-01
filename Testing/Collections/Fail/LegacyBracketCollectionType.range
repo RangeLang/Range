@@ -1,0 +1,7 @@
+compilerTypedSyntax
+@builtin
+construct Array<Element> {}
+
+construct LegacyCollectionType {
+    let values: [Int]
+}

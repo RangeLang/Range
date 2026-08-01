@@ -1,3 +1,6 @@
+@builtin
+construct Array<Element> {}
+
 function makeArray(): Array<Int> {
     state storage: Buffer<Int>(capacity: 1)
     state numbers: Array<Int>(storage: storage)

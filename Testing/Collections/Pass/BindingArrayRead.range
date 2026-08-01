@@ -1,9 +1,12 @@
+@builtin
+construct Array<Element> {}
+
 construct ArrayView {
-    binding values: [Int]
+    binding values: Array<Int>
 }
 
 @main {
-    state numbers: [1, 2, 3]
+    state numbers: Array<Int>([1, 2, 3])
     let view: ArrayView(values: $numbers)
     return view.values[1]
 }

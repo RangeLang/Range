@@ -3,8 +3,9 @@
 @property
 @member
 construct Let<Value> {
-  let macros: [Macro.Application]
+  let macros: Array<Macro.Application>
   let identifier: Identifier
+  @value
   let value: Value
 
   function initializer(transform: (Value) -> Value)

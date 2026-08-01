@@ -1,5 +1,5 @@
 compilerMacroSnapshot
 compilerSourceFile\trole=project\tpath=Project/Components.range
 construct Scene {
-    state components: [@missing]
+    state components: Array<@missing>
 }

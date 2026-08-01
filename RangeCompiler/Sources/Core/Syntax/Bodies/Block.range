@@ -1,4 +1,5 @@
 @syntax
-construct Block {
-    let syntax: [@syntax]
+construct Block<Value = @syntax, shape: DelimiterPair = .braces> {
+    @value
+    let values: Array<Value>
 }

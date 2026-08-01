@@ -2,7 +2,7 @@
 construct Parameter {
     @syntax
     construct Declaration {
-        let macros: [Macro.Application]
+        let macros: Array<Macro.Application>
         let externalName: String?
         let identifier: Identifier
         let type: TypeReference?

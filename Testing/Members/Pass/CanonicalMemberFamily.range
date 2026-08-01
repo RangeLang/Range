@@ -9,7 +9,7 @@ construct Model {
     @member
     state count: Int
 
-    let members: [@member]
+    let members: Array<@member>
 }
 
 @member

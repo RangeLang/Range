@@ -1,0 +1,49 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
+@builtin
+construct Array<Element> {}
+
+compilerSourceFile\trole=core\tpath=Core/Macro/ValueRelationshipSelection.range
+macro member(): Declaration | Member -> Void {}
+macro value(): Member -> Void {}
+
+construct Identifier {}
+
+construct Construct {
+    construct Declaration {
+        let identifier: Identifier
+        let members: Array<@member>
+    }
+}
+
+macro collectValues(): Construct { environment in
+    let valueCount: Int(
+        environment.target.Declaration.members.filter(all: @value).count
+    )
+    if valueCount == 1 {
+        #environment {
+            extension #environment.target.Declaration.identifier {
+                let valueRelationshipSelectionWorked: Int
+            }
+        }
+    }
+}
+
+macro retainSelectedValue(): Construct -> @syntax { environment in
+    let selected: Array<@syntax>(
+        environment.target.Declaration.members.filter(all: @value)
+    )
+    let narrowed: Array<@syntax>(
+        selected.filter(all: @value)
+    )
+    return narrowed[0]
+}
+
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@collectValues
+@retainSelectedValue
+construct Value {
+    @value
+    let payload: Int
+    let metadata: Bool
+}

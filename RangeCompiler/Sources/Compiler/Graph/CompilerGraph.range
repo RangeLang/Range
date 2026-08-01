@@ -720,22 +720,7 @@ function compilerGraphNominalIDForMacroRow(delta: CompilerGraphDelta, macroRow: 
 
 function compilerPlotterMacroApplicationOwnerNodeID(tables: CompilerSyntaxTables, applicationRow: Int): Int {
     if applicationRow < 0 || applicationRow >= compilerIntTableRowCount(table: tables.macroApplications) { return 0 - 1 }
-    let fileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
-    let applicationEnd: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 3))
-    state ownerNodeID: Int(0 - 1)
-    state ownerStart: Int(2147483647)
-    state syntaxID: Int(0)
-    while syntaxID < compilerIntTableRowCount(table: tables.syntaxIndex) {
-        if compilerMacroSyntaxNodeFileID(tables: tables, syntaxID: syntaxID) == fileID {
-            let candidateStart: Int(compilerMacroSyntaxNodeStart(tables: tables, syntaxID: syntaxID))
-            if candidateStart >= applicationEnd && candidateStart < ownerStart {
-                ownerNodeID: syntaxID
-                ownerStart: candidateStart
-            }
-        }
-        syntaxID: syntaxID + 1
-    }
-    return ownerNodeID
+    return compilerGraphApplicationRelationshipDestination(tables: tables, applicationRow: applicationRow, role: compilerGraphRelationshipAppliesTo(), destinationKind: compilerGraphIdentitySyntax(), ordinal: 0)
 }
 
 function compilerPlotterAppendMacroApplicationNominals(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Int {
@@ -746,44 +731,26 @@ function compilerPlotterAppendMacroApplicationNominals(tables: CompilerSyntaxTab
         let end: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 5))
         let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: start, localEnd: end))
         let ownerNodeID: Int(compilerPlotterMacroApplicationOwnerNodeID(tables: tables, applicationRow: applicationRow))
-        state macroTargetKind: Int(0 - 1)
-        if ownerNodeID >= 0 { macroTargetKind: compilerIntTableValue(table: tables.syntaxIndex, row: ownerNodeID, column: 0) }
-        state nameMatchCount: Int(0)
-        state compatibleMatchCount: Int(0)
-        state firstNameMacroRow: Int(0 - 1)
-        state matchedMacroRow: Int(0 - 1)
-        state macroRow: Int(0)
-        while macroRow < compilerIntTableRowCount(table: tables.macroDeclarations) {
-            let candidateFileID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: macroRow, column: 1))
-            let candidateName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: candidateFileID, localStart: compilerIntTableValue(table: tables.macroDeclarations, row: macroRow, column: 4), localEnd: compilerIntTableValue(table: tables.macroDeclarations, row: macroRow, column: 5)))
-            if candidateName == name {
-                if nameMatchCount == 0 { firstNameMacroRow: macroRow }
-                nameMatchCount: nameMatchCount + 1
-                if macroTargetKind >= 0 && compilerMacroTargetDeclarationAccepts(tables: tables, declarationRow: macroRow, targetKind: macroTargetKind, depth: 0) {
-                    compatibleMatchCount: compatibleMatchCount + 1
-                    matchedMacroRow: macroRow
-                }
-            }
-            macroRow: macroRow + 1
-        }
+        let resolvedMacroRow: Int(compilerGraphApplicationRelationshipDestination(tables: tables, applicationRow: applicationRow, role: compilerGraphRelationshipResolvedBy(), destinationKind: compilerGraphIdentityMacroDeclaration(), ordinal: 0))
+        let referenceCount: Int(compilerGraphApplicationRelationshipDestinationCount(tables: tables, applicationRow: applicationRow, role: compilerGraphRelationshipReferences(), destinationKind: compilerGraphIdentityMacroDeclaration()))
+        let diagnosticCode: Int(compilerMacroDiagnosticCodeForApplication(tables: tables, applicationRow: applicationRow))
         state targetKind: Int(compilerSyntaxTypeReferenceTargetMissing())
         state targetID: Int(0 - 1)
-        if compatibleMatchCount == 1 {
+        if resolvedMacroRow >= 0 {
             targetKind: compilerSyntaxTypeReferenceTargetDeclaration()
-            targetID: compilerGraphNominalIDForMacroRow(delta: delta, macroRow: matchedMacroRow)
+            targetID: compilerGraphNominalIDForMacroRow(delta: delta, macroRow: resolvedMacroRow)
             if targetID < 0 { return 0 - 1 }
-        } else if compatibleMatchCount > 1 {
+        } else if diagnosticCode == compilerMacroDiagnosticAmbiguous() {
             targetKind: compilerSyntaxTypeReferenceTargetAmbiguous()
-        } else if nameMatchCount > 0 {
-            if ownerNodeID < 0 {
-                targetKind: compilerGraphNominalMissingTarget()
-            } else {
-                targetKind: compilerGraphNominalTargetMismatch()
-            }
-            if nameMatchCount == 1 {
-                targetID: compilerGraphNominalIDForMacroRow(delta: delta, macroRow: firstNameMacroRow)
+        } else if diagnosticCode == compilerMacroDiagnosticTargetMismatch() {
+            targetKind: compilerGraphNominalTargetMismatch()
+            if referenceCount == 1 {
+                let referencedMacroRow: Int(compilerGraphApplicationRelationshipDestination(tables: tables, applicationRow: applicationRow, role: compilerGraphRelationshipReferences(), destinationKind: compilerGraphIdentityMacroDeclaration(), ordinal: 0))
+                targetID: compilerGraphNominalIDForMacroRow(delta: delta, macroRow: referencedMacroRow)
                 if targetID < 0 { return 0 - 1 }
             }
+        } else if diagnosticCode == compilerMacroDiagnosticMissingTarget() {
+            targetKind: compilerGraphNominalMissingTarget()
         }
         state fingerprint: CompilerFingerprint(
             first: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 17),
@@ -1180,10 +1147,14 @@ function compilerPlotterRenderSnapshot(tables: CompilerSyntaxTables, delta: Comp
 function compilerPlotterSummary(source: String): String {
     let plotterTables: CompilerSyntaxTables(compilerSyntaxTablesCreate(source: source))
     let plotterCaptureStatus: Int(compilerTypedSyntaxCapture(source: source, tables: plotterTables))
+    state plotterLinkStatus: Int(0)
+    if plotterCaptureStatus == 0 { plotterLinkStatus: compilerMacroLink(tables: plotterTables) }
     let plotterDelta: CompilerGraphDelta(compilerGraphDeltaCreate())
     state plotterSummary: String("")
     if plotterCaptureStatus != 0 || !compilerSyntaxTablesIsValid(tables: plotterTables) {
         plotterSummary: compilerInvalidTypedDeclarationsDiagnostic(tables: plotterTables)
+    } else if plotterLinkStatus != 0 && compilerIntTableRowCount(table: plotterTables.macroDiagnostics) == 0 {
+        plotterSummary: String("compilerError\tkind=invalidGraphRelationships\n")
     } else {
         let plotterBuildStatus: Int(compilerPlotterBuild(tables: plotterTables, delta: plotterDelta))
         if plotterBuildStatus != 0 || !compilerGraphDeltaIsValid(tables: plotterTables, delta: plotterDelta) {

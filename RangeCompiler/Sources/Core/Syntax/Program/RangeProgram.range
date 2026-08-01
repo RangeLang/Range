@@ -5,13 +5,13 @@ construct RangeProgram {
 
 @builtin
 construct RangeGraph {
-    let files: [FileTreeNode]
-    let sources: [ProgramSourceFile]
-    let lexedSources: [ProgramLexedSource]
-    let artifacts: [ProgramArtifact]
+    let files: Array<FileTreeNode>
+    let sources: Array<ProgramSourceFile>
+    let lexedSources: Array<ProgramLexedSource>
+    let artifacts: Array<ProgramArtifact>
     let topology: RangeGraphTopology
     state main: Optional<@main>
-    state syntax: [@syntax]
+    state syntax: Array<@syntax>
 }
 
 @builtin
@@ -23,7 +23,7 @@ construct ProgramSourceFile {
 @builtin
 construct ProgramLexedSource {
     let path: String
-    let tokens: [LexicalToken]
+    let tokens: Array<LexicalToken>
 }
 
 @builtin
@@ -34,29 +34,30 @@ construct ProgramArtifact {
 
 @builtin
 construct RangeGraphTopology {
-    let nodes: [RangeGraphNode]
-    let relationships: [RangeGraphRelationship]
+    let nodes: Array<RangeGraphNode>
+    let relationships: Array<RangeGraphRelationship>
 }
 
 @builtin
 construct RangeGraphNode {
     let identifier: Identifier
     let sourcePath: String
-    let labels: [String]
+    let labels: Array<String>
 }
 
 @builtin
 construct RangeGraphRelationship {
     let origin: Identifier
+    let role: Identifier
     let destination: Identifier
-    let kind: String
+    let registration: RelationshipRegistration
 }
 
 construct RangeGraphDelta {
     let origin: Identifier
-    let changes: [Change]
-    let dependencies: [Dependency]
-    let diagnostics: [Diagnostic]
+    let changes: Array<Change>
+    let dependencies: Array<Dependency>
+    let diagnostics: Array<Diagnostic>
 
     enum Change {
         case insert(value: @syntax, parent: Identifier?, ordinal: Int)

@@ -1,5 +1,5 @@
 macro codable(): Construct { environment in
-    let fields: [@stored](
+    let fields: Array<@stored>(
         environment.target.Declaration.members.filter(all: @stored)
     )
 

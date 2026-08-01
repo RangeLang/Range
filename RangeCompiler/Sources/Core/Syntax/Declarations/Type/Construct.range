@@ -8,10 +8,10 @@ construct Construct {
     }
     @member
     construct Declaration {
-        let macros: [Macro.Application]
+        let macros: Array<Macro.Application>
         let identifier: Identifier
-        let generics: [Parameter.Declaration]
-        let members: [@member]
+        let generics: Array<Parameter.Declaration>
+        let members: Array<@member>
     }
 
     @syntax {
@@ -19,6 +19,6 @@ construct Construct {
     }
     construct Application {
         let type: TypeReference
-        let arguments: [Parameter.Application]
+        let arguments: Array<Parameter.Application>
     }
 }

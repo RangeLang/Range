@@ -14,7 +14,7 @@ construct Identifier {
 construct Construct {
     construct Declaration {
         let identifier: Identifier
-        let members: [@member]
+        let members: Array<@member>
     }
 }
 
@@ -25,15 +25,15 @@ construct Let {
 
 macro collectionClosureExecution(): Construct { environment in
     let expected: String("first")
-    let lets: [Let](
+    let lets: Array<Let>(
         environment.target.Declaration.members.filter(all: Let)
     )
-    let selected: [Let](
+    let selected: Array<Let>(
         lets.filter { property in
             return property.identifier.name == expected
         }
     )
-    let names: [String](
+    let names: Array<String>(
         selected.map { property in
             return property.identifier.name
         }

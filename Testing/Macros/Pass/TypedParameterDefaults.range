@@ -20,9 +20,9 @@ construct Macro {
     construct Application {
         let identifier: Identifier
         let target: Identifier
-        let genericArguments: [TypeReference]
+        let genericArguments: Array<TypeReference>
         let argumentClause: String
-        let arguments: [Expression]
+        let arguments: Array<Expression>
         let declaration: Declaration?
         let packageVisibility: String
         let valueType: TypeReference
@@ -33,7 +33,7 @@ construct Macro {
 construct Construct {
     construct Declaration {
         let identifier: Identifier
-        let members: [@member]
+        let members: Array<@member>
     }
 }
 
@@ -44,7 +44,7 @@ construct Metadata {
 
 @syntax
 construct Let {
-    let macros: [Macro.Application]
+    let macros: Array<Macro.Application>
 }
 
 macro metadata(_ key: String?(nil), enabled: Bool(false)): Let -> Metadata { environment in
@@ -52,22 +52,22 @@ macro metadata(_ key: String?(nil), enabled: Bool(false)): Let -> Metadata { env
 }
 
 macro inspectMetadata(): Construct { environment in
-    let lets: [Let](
+    let lets: Array<Let>(
         environment.target.Declaration.members.filter(all: Let)
     )
-    let enabledProperties: [Let](
+    let enabledProperties: Array<Let>(
         lets.filter { property in
-            let applications: [Macro.Application](
+            let applications: Array<Macro.Application>(
                 property.macros.filter { application in
                     return application.identifier.name == "metadata"
                 }
             )
-            let values: [Metadata](
+            let values: Array<Metadata>(
                 applications.map { application in
                     return application.value
                 }
             )
-            let enabled: [Metadata](
+            let enabled: Array<Metadata>(
                 values.filter { value in
                     return value.enabled
                 }

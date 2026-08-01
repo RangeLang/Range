@@ -5,5 +5,5 @@ construct RangeCompiler {
     let version: Version(0.1.0)
     let author: "George"
     let commandLine: "Sources/Compiler"
-    let remotes: [Remote]([])
+    let remotes: Array<Remote>([])
 }

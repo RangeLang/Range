@@ -1,0 +1,3 @@
+macro value(): Member -> RelationshipRegistration { environment in
+    return scalarValueRelationship()
+}

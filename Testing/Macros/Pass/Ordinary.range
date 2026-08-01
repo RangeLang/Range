@@ -10,7 +10,7 @@ construct Sprite {
     let texture: String
 }
 construct Scene {
-    state components: [@component]
+    state components: Array<@component>
 }
 @main {
     return 7

@@ -50,14 +50,14 @@ function compilerSyntaxGenericParameterKindName(kind: Int): String {
 function compilerSyntaxMacroDeclarationColumnCount(): Int { return 32 }
 function compilerSyntaxMacroParameterColumnCount(): Int { return 11 }
 function compilerSyntaxMacroApplicationColumnCount(): Int { return 19 }
-function compilerSyntaxMacroEdgeColumnCount(): Int { return 6 }
+function compilerGraphRelationshipColumnCount(): Int { return 15 }
 function compilerSyntaxMacroDiagnosticColumnCount(): Int { return 8 }
 function compilerSyntaxMacroCapabilityColumnCount(): Int { return 10 }
 function compilerSyntaxMacroInvocationColumnCount(): Int { return 35 }
 function compilerSyntaxMacroCapabilityHandleColumnCount(): Int { return 8 }
 function compilerSyntaxMacroExecutionEventColumnCount(): Int { return 12 }
 function compilerSyntaxMacroReadDependencyColumnCount(): Int { return 18 }
-function compilerSyntaxMacroResultColumnCount(): Int { return 12 }
+function compilerSyntaxMacroResultColumnCount(): Int { return 13 }
 function compilerFormulaFactColumnCount(): Int { return 10 }
 function compilerSyntaxMacroExpansionTemplateColumnCount(): Int { return 27 }
 function compilerSyntaxMacroExpansionFragmentColumnCount(): Int { return 10 }
@@ -179,8 +179,20 @@ function compilerSyntaxKindFunction(): Int {
 
 function compilerSyntaxMacroVisibilityDefault(): Int { return 0 }
 
-function compilerMacroEdgeAppliesTo(): Int { return 1 }
-function compilerMacroEdgeResolvedBy(): Int { return 2 }
+function compilerGraphRelationshipAppliesTo(): Int { return 1 }
+function compilerGraphRelationshipResolvedBy(): Int { return 2 }
+function compilerGraphRelationshipReferences(): Int { return 3 }
+function compilerGraphIdentitySyntax(): Int { return 1 }
+function compilerGraphIdentityMacroDeclaration(): Int { return 2 }
+function compilerGraphIdentityMacroApplication(): Int { return 3 }
+function compilerGraphBoundFinite(): Int { return 1 }
+function compilerGraphBoundUnbounded(): Int { return 2 }
+function compilerGraphOrderingUnordered(): Int { return 0 }
+function compilerGraphOrderingOrdered(): Int { return 1 }
+function compilerGraphSeparatorNone(): Int { return 0 }
+function compilerGraphSeparatorSyntax(): Int { return 1 }
+function compilerGraphEnclosureNone(): Int { return 0 }
+function compilerGraphEnclosureDelimited(): Int { return 1 }
 
 function compilerMacroDiagnosticMalformedDeclaration(): Int { return 1 }
 function compilerMacroDiagnosticMalformedApplication(): Int { return 2 }
@@ -246,6 +258,19 @@ function compilerSyntaxKindClosure(): Int { return 45 }
 function compilerSyntaxKindLastBody(): Int { return compilerSyntaxKindClosure() }
 function compilerSyntaxKindEnum(): Int { return 46 }
 
+function compilerSyntaxDelimiterPairParentheses(): Int { return 1 }
+function compilerSyntaxDelimiterPairBraces(): Int { return 2 }
+function compilerSyntaxDelimiterPairBrackets(): Int { return 3 }
+function compilerSyntaxDelimiterPairAngles(): Int { return 4 }
+
+function compilerSyntaxDelimiterPairKind(leftKind: RangeTokenKind, rightKind: RangeTokenKind): Int {
+    if leftKind == .leftParen && rightKind == .rightParen { return compilerSyntaxDelimiterPairParentheses() }
+    if leftKind == .leftBrace && rightKind == .rightBrace { return compilerSyntaxDelimiterPairBraces() }
+    if leftKind == .leftBracket && rightKind == .rightBracket { return compilerSyntaxDelimiterPairBrackets() }
+    if leftKind == .less && rightKind == .greater { return compilerSyntaxDelimiterPairAngles() }
+    return 0
+}
+
 function compilerSyntaxLocalKindLet(): Int { return 1 }
 function compilerSyntaxLocalKindState(): Int { return 2 }
 function compilerSyntaxMemberKindLet(): Int { return 1 }
@@ -301,7 +326,8 @@ function compilerSyntaxTypeReferenceNameEndColumn(): Int { return 11 }
 function compilerSyntaxTypeReferenceNamed(): Int { return 1 }
 function compilerSyntaxTypeReferenceApplication(): Int { return 2 }
 function compilerSyntaxTypeReferenceArray(): Int { return 3 }
-function compilerSyntaxTypeReferenceOptional(): Int { return 4 }
+function compilerSyntaxTypeReferenceZeroOrOneOccurrence(): Int { return 4 }
+function compilerSyntaxTypeReferenceOptional(): Int { return compilerSyntaxTypeReferenceZeroOrOneOccurrence() }
 function compilerSyntaxTypeReferenceValue(): Int { return 5 }
 function compilerSyntaxTypeReferenceTargetNone(): Int { return 0 }
 function compilerSyntaxTypeReferenceTargetBuiltin(): Int { return 1 }
@@ -355,7 +381,7 @@ function compilerSyntaxTablesCreate(source: String): CompilerSyntaxTables {
         macroDeclarations: compilerIntTableCreate(columnCount: compilerSyntaxMacroDeclarationColumnCount(), estimatedRowCount: 32),
         macroParameters: compilerIntTableCreate(columnCount: compilerSyntaxMacroParameterColumnCount(), estimatedRowCount: 64),
         macroApplications: compilerIntTableCreate(columnCount: compilerSyntaxMacroApplicationColumnCount(), estimatedRowCount: 128),
-        macroEdges: compilerIntTableCreate(columnCount: compilerSyntaxMacroEdgeColumnCount(), estimatedRowCount: 256),
+        relationships: compilerIntTableCreate(columnCount: compilerGraphRelationshipColumnCount(), estimatedRowCount: 256),
         macroDiagnostics: compilerIntTableCreate(columnCount: compilerSyntaxMacroDiagnosticColumnCount(), estimatedRowCount: 16),
         macroCapabilities: compilerIntTableCreate(columnCount: compilerSyntaxMacroCapabilityColumnCount(), estimatedRowCount: 96),
         macroInvocations: compilerIntTableCreate(columnCount: compilerSyntaxMacroInvocationColumnCount(), estimatedRowCount: 128),
@@ -412,7 +438,7 @@ function compilerSyntaxTablesDestroy(tables: CompilerSyntaxTables): Int {
     if compilerIntTableDestroy(table: tables.macroApplications) != 0 {
         status: 0 - 1
     }
-    if compilerIntTableDestroy(table: tables.macroEdges) != 0 {
+    if compilerIntTableDestroy(table: tables.relationships) != 0 {
         status: 0 - 1
     }
     if compilerIntTableDestroy(table: tables.macroDiagnostics) != 0 {
@@ -535,7 +561,7 @@ function compilerSyntaxTablesIsValid(tables: CompilerSyntaxTables): Bool {
         && compilerIntTableIsComplete(table: tables.macroDeclarations)
         && compilerIntTableIsComplete(table: tables.macroParameters)
         && compilerIntTableIsComplete(table: tables.macroApplications)
-        && compilerIntTableIsComplete(table: tables.macroEdges)
+        && compilerIntTableIsComplete(table: tables.relationships)
         && compilerIntTableIsComplete(table: tables.macroDiagnostics)
         && compilerIntTableIsComplete(table: tables.macroCapabilities)
         && compilerIntTableIsComplete(table: tables.macroInvocations)
@@ -599,7 +625,7 @@ function compilerSyntaxTablesEnsureFailure(tables: CompilerSyntaxTables): Int {
         && compilerIntTableIsComplete(table: tables.macroDeclarations)
         && compilerIntTableIsComplete(table: tables.macroParameters)
         && compilerIntTableIsComplete(table: tables.macroApplications)
-        && compilerIntTableIsComplete(table: tables.macroEdges)
+        && compilerIntTableIsComplete(table: tables.relationships)
         && compilerIntTableIsComplete(table: tables.macroDiagnostics)
         && compilerIntTableIsComplete(table: tables.macroCapabilities)
         && compilerIntTableIsComplete(table: tables.macroInvocations)
@@ -1331,14 +1357,40 @@ function compilerBodySyntaxAppendEdge(tables: CompilerSyntaxTables, ownerSyntaxI
     return compilerSyntaxTableAppend(tables: tables, table: tables.bodyEdges, value: ordinal)
 }
 
-function compilerBodySyntaxAppendBlock(tables: CompilerSyntaxTables, fileID: Int, ownerSyntaxID: Int, roleTag: Int, start: Int, end: Int): Int {
+function compilerBodySyntaxAppendBlock(tables: CompilerSyntaxTables, fileID: Int, ownerSyntaxID: Int, roleTag: Int, start: Int, end: Int, openingStart: Int, openingEnd: Int, closingStart: Int, closingEnd: Int, delimiterPairKind: Int): Int {
     let ownerContext: CompilerBodySyntaxCaptureContext(fileID: fileID, ownerSyntaxID: ownerSyntaxID, statementOrdinal: 0)
-    let blockSyntaxID: Int(compilerBodySyntaxAppendNode(tables: tables, context: ownerContext, kindTag: compilerSyntaxKindBlock(), ordinal: 0, start: start, end: end, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    let blockSyntaxID: Int(compilerBodySyntaxAppendNode(tables: tables, context: ownerContext, kindTag: compilerSyntaxKindBlock(), ordinal: 0, start: start, end: end, firstStart: openingStart, firstEnd: openingEnd, secondStart: closingStart, secondEnd: closingEnd, aux: delimiterPairKind))
     if blockSyntaxID < 0
         || compilerBodySyntaxAppendEdge(tables: tables, ownerSyntaxID: ownerSyntaxID, childSyntaxID: blockSyntaxID, roleTag: roleTag, ordinal: 0) != 0 {
         return 0 - 1
     }
     return blockSyntaxID
+}
+
+function compilerBodySyntaxAppendSourceBlock(source: String, tables: CompilerSyntaxTables, fileID: Int, ownerSyntaxID: Int, roleTag: Int, start: Int, end: Int): Int {
+    if start <= 0 || end < start { return 0 - 1 }
+    let openingCursor: CompilerTokenCursor(source: $source, index: start - 1)
+    let closingCursor: CompilerTokenCursor(source: $source, index: end)
+    let maybeOpening: Optional<RangeLexedToken>(compilerCursorPeek(cursor: openingCursor))
+    let maybeClosing: Optional<RangeLexedToken>(compilerCursorPeek(cursor: closingCursor))
+    if maybeOpening == nil || maybeClosing == nil { return 0 - 1 }
+    let opening: RangeLexedToken(maybeOpening ?? compilerFallbackToken(cursor: openingCursor))
+    let closing: RangeLexedToken(maybeClosing ?? compilerFallbackToken(cursor: closingCursor))
+    let delimiterPairKind: Int(compilerSyntaxDelimiterPairKind(leftKind: opening.kind, rightKind: closing.kind))
+    if opening.end != start || closing.start != end || delimiterPairKind == 0 { return 0 - 1 }
+    return compilerBodySyntaxAppendBlock(
+        tables: tables,
+        fileID: fileID,
+        ownerSyntaxID: ownerSyntaxID,
+        roleTag: roleTag,
+        start: start,
+        end: end,
+        openingStart: opening.start,
+        openingEnd: opening.end,
+        closingStart: closing.start,
+        closingEnd: closing.end,
+        delimiterPairKind: delimiterPairKind
+    )
 }
 
 function compilerBodySyntaxExpressionRecordRangeIsValid(source: String, record: String): Bool {
@@ -3190,7 +3242,7 @@ function compilerTypedSyntaxCaptureBlockContents(source: String, tables: Compile
 }
 
 function compilerTypedSyntaxCaptureBlock(source: String, tables: CompilerSyntaxTables, fileID: Int, ownerSyntaxID: Int, roleTag: Int, start: Int, end: Int): Int {
-    let blockSyntaxID: Int(compilerBodySyntaxAppendBlock(tables: tables, fileID: fileID, ownerSyntaxID: ownerSyntaxID, roleTag: roleTag, start: start, end: end))
+    let blockSyntaxID: Int(compilerBodySyntaxAppendSourceBlock(source: source, tables: tables, fileID: fileID, ownerSyntaxID: ownerSyntaxID, roleTag: roleTag, start: start, end: end))
     if blockSyntaxID < 0 { return 0 - 1 }
     return compilerTypedSyntaxCaptureBlockContents(source: source, tables: tables, fileID: fileID, blockSyntaxID: blockSyntaxID, start: start, end: end)
 }
@@ -3829,7 +3881,7 @@ function compilerTypedSyntaxCaptureDerivedBody(source: String, tables: CompilerS
     if maybeExpression == nil { return 0 - 1 }
     let expression: CompilerExpression(maybeExpression ?? compilerCoreMissingExpression(start: start))
     if compilerCoreFirstNonWhitespaceIndex(source: source, start: expression.end, end: end) < end { return 0 - 1 }
-    let blockSyntaxID: Int(compilerBodySyntaxAppendBlock(tables: tables, fileID: fileID, ownerSyntaxID: ownerSyntaxID, roleTag: compilerSyntaxRoleBody(), start: start, end: end))
+    let blockSyntaxID: Int(compilerBodySyntaxAppendSourceBlock(source: source, tables: tables, fileID: fileID, ownerSyntaxID: ownerSyntaxID, roleTag: compilerSyntaxRoleBody(), start: start, end: end))
     if blockSyntaxID < 0 { return 0 - 1 }
     let context: CompilerBodySyntaxCaptureContext(fileID: fileID, ownerSyntaxID: blockSyntaxID, statementOrdinal: 0)
     let expressionSyntaxID: Int(compilerBodySyntaxCaptureExpressionRecord(source: source, tables: tables, record: expression.record, context: context))
@@ -4024,7 +4076,7 @@ function compilerTypedSyntaxCaptureFunctionWithPolicy(source: String, tables: Co
         compilerSyntaxTablesPoison(tables: tables)
         return CompilerTypedDeclarationCaptureStep(captured: true, nextIndex: parts.bodyRange.next)
     }
-    if captureBody && builtinPolicy == compilerBuiltinPolicyNone() {
+    if captureBody && builtinPolicy == compilerBuiltinPolicyNone() && parts.bodyRange.next > parts.bodyRange.end {
         if compilerTypedSyntaxCaptureBody(source: source, tables: tables, fileID: fileID, ownerSyntaxID: syntaxID, start: parts.bodyRange.start, end: parts.bodyRange.end) != 0 {
             compilerSyntaxTablesPoison(tables: tables)
         }
@@ -4470,14 +4522,9 @@ function compilerSyntaxTypeReferenceBuildExpected(tables: CompilerSyntaxTables, 
     if expectedValue {
         kind: compilerSyntaxTypeReferenceValue()
     } else if lastByte == 63 {
-        kind: compilerSyntaxTypeReferenceOptional()
+        kind: compilerSyntaxTypeReferenceZeroOrOneOccurrence()
         childCount: 1
         childRangeStart: normalized.start
-        childRangeEnd: normalized.end - 1
-    } else if firstByte == 91 && lastByte == 93 {
-        kind: compilerSyntaxTypeReferenceArray()
-        childCount: 1
-        childRangeStart: normalized.start + 1
         childRangeEnd: normalized.end - 1
     } else if outerRange.start >= 0 {
         kind: compilerSyntaxTypeReferenceApplication()
@@ -4513,10 +4560,8 @@ function compilerSyntaxTypeReferenceBuildExpected(tables: CompilerSyntaxTables, 
                 }
             }
         }
-    } else if kind != compilerSyntaxTypeReferenceValue() {
-        state wrapperName: String("Array")
-        if kind == compilerSyntaxTypeReferenceOptional() { wrapperName: String("Optional") }
-        let wrapperSyntaxID: Int(compilerSyntaxDeclarationSyntaxIDForTypeName(tables: tables, typeName: wrapperName))
+    } else if kind == compilerSyntaxTypeReferenceArray() {
+        let wrapperSyntaxID: Int(compilerSyntaxDeclarationSyntaxIDForTypeName(tables: tables, typeName: String("Array")))
         if wrapperSyntaxID >= 0 {
             targetKind: compilerSyntaxTypeReferenceTargetDeclaration()
             targetID: wrapperSyntaxID
@@ -4574,9 +4619,11 @@ function compilerSyntaxMemberMacroFamilyName(tables: CompilerSyntaxTables, membe
     if start < 0 || end <= start { return String("") }
     state attributeSearchStart: Int(start)
     state closingCharacter: String("")
-    if tables.sourceStore.source.character(index: start) == String("[") {
-        attributeSearchStart: start + 1
-        closingCharacter: String("]")
+    if end - start >= 8
+        && tables.sourceStore.source.substring(start: start, end: start + 6) == String("Array<")
+        && tables.sourceStore.source.character(index: end - 1) == String(">") {
+        attributeSearchStart: start + 6
+        closingCharacter: String(">")
     }
     let attributeStart: Int(compilerCoreFirstNonWhitespaceIndex(source: tables.sourceStore.source, start: attributeSearchStart, end: end))
     if attributeStart >= end || tables.sourceStore.source.character(index: attributeStart) != String("@") { return String("") }
@@ -5042,14 +5089,24 @@ function compilerSyntaxGenericParameterDefaultRange(tables: CompilerSyntaxTables
     let globalNameEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: nameEnd))
     let globalParameterEnd: Int(compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: parameterEnd))
     if globalNameEnd < 0 || globalParameterEnd <= globalNameEnd { return invalid }
-    let maybeEqual: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: globalNameEnd))
-    if maybeEqual == nil { return invalid }
-    let equal: RangeLexedToken(maybeEqual ?? compilerFallbackTokenAt(index: globalNameEnd))
-    if equal.kind != .equal || equal.end >= globalParameterEnd { return invalid }
-    let maybeDefault: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: equal.end))
+    state cursor: Int(globalNameEnd)
+    state equalEnd: Int(0 - 1)
+    while cursor < globalParameterEnd && equalEnd < 0 {
+        let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: cursor))
+        if maybeToken == nil { return invalid }
+        let token: RangeLexedToken(maybeToken ?? compilerFallbackTokenAt(index: cursor))
+        if token.start >= globalParameterEnd { return invalid }
+        if token.kind == .equal {
+            equalEnd: token.end
+        } else {
+            cursor: token.end
+        }
+    }
+    if equalEnd < 0 || equalEnd >= globalParameterEnd { return invalid }
+    let maybeDefault: Optional<RangeLexedToken>(lexNextRangeToken(source: tables.sourceStore.source, start: equalEnd))
     if maybeDefault == nil { return invalid }
-    let first: RangeLexedToken(maybeDefault ?? compilerFallbackTokenAt(index: equal.end))
-    if first.start < equal.end || first.end > globalParameterEnd { return invalid }
+    let first: RangeLexedToken(maybeDefault ?? compilerFallbackTokenAt(index: equalEnd))
+    if first.start < equalEnd || first.end > globalParameterEnd { return invalid }
     let localStart: Int(compilerSourceStoreFileLocalOffsetForFileID(store: tables.sourceStore, fileID: fileID, globalOffset: first.start))
     if localStart < 0 { return invalid }
     return CompilerSourceRange(start: localStart, end: parameterEnd, next: parameterEnd)
@@ -5427,19 +5484,44 @@ function compilerMacroApplicationsAreStructurallyValid(tables: CompilerSyntaxTab
     return true
 }
 
-function compilerMacroEdgesAreStructurallyValid(tables: CompilerSyntaxTables): Bool {
-    let edgeCount: Int(compilerIntTableRowCount(table: tables.macroEdges))
+function compilerGraphRelationshipsAreStructurallyValid(tables: CompilerSyntaxTables): Bool {
+    let relationshipCount: Int(compilerIntTableRowCount(table: tables.relationships))
     let applicationCount: Int(compilerIntTableRowCount(table: tables.macroApplications))
     let declarationCount: Int(compilerIntTableRowCount(table: tables.macroDeclarations))
+    let syntaxCount: Int(compilerIntTableRowCount(table: tables.syntaxIndex))
     state row: Int(0)
-    while row < edgeCount {
-        let edgeKind: Int(compilerIntTableValue(table: tables.macroEdges, row: row, column: 1))
-        let applicationRow: Int(compilerIntTableValue(table: tables.macroEdges, row: row, column: 2))
-        let objectID: Int(compilerIntTableValue(table: tables.macroEdges, row: row, column: 3))
-        if compilerIntTableValue(table: tables.macroEdges, row: row, column: 0) != row || applicationRow < 0 || applicationRow >= applicationCount
-            || (edgeKind != compilerMacroEdgeAppliesTo() && edgeKind != compilerMacroEdgeResolvedBy()) || objectID < 0 { return false }
-        if edgeKind == compilerMacroEdgeResolvedBy() && objectID >= declarationCount { return false }
-        if edgeKind == compilerMacroEdgeAppliesTo() && objectID >= compilerIntTableRowCount(table: tables.syntaxIndex) { return false }
+    while row < relationshipCount {
+        let role: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 1))
+        let originKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 2))
+        let originID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 3))
+        let destinationKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 4))
+        let destinationID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 5))
+        let minimum: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 7))
+        let maximumKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 8))
+        let maximum: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 9))
+        let ordering: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 10))
+        let separatorKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 11))
+        let separatorID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 12))
+        let enclosureKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 13))
+        let enclosureID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 14))
+        if compilerIntTableValue(table: tables.relationships, row: row, column: 0) != row
+            || originKind != compilerGraphIdentityMacroApplication() || originID < 0 || originID >= applicationCount
+            || (role != compilerGraphRelationshipAppliesTo() && role != compilerGraphRelationshipResolvedBy() && role != compilerGraphRelationshipReferences())
+            || destinationID < 0 || compilerIntTableValue(table: tables.relationships, row: row, column: 6) < 0
+            || minimum < 0 || (maximumKind != compilerGraphBoundFinite() && maximumKind != compilerGraphBoundUnbounded())
+            || (maximumKind == compilerGraphBoundFinite() && maximum < minimum)
+            || (maximumKind == compilerGraphBoundUnbounded() && maximum != 0 - 1)
+            || (ordering != compilerGraphOrderingUnordered() && ordering != compilerGraphOrderingOrdered())
+            || (separatorKind != compilerGraphSeparatorNone() && separatorKind != compilerGraphSeparatorSyntax())
+            || (separatorKind == compilerGraphSeparatorNone() && separatorID != 0 - 1)
+            || (separatorKind == compilerGraphSeparatorSyntax() && separatorID < 0)
+            || (enclosureKind != compilerGraphEnclosureNone() && enclosureKind != compilerGraphEnclosureDelimited())
+            || (enclosureKind == compilerGraphEnclosureNone() && enclosureID != 0 - 1)
+            || (enclosureKind == compilerGraphEnclosureDelimited() && enclosureID < 0) { return false }
+        if (role == compilerGraphRelationshipResolvedBy() || role == compilerGraphRelationshipReferences())
+            && (destinationKind != compilerGraphIdentityMacroDeclaration() || destinationID >= declarationCount) { return false }
+        if role == compilerGraphRelationshipAppliesTo()
+            && (destinationKind != compilerGraphIdentitySyntax() || destinationID >= syntaxCount) { return false }
         row: row + 1
     }
     return true
@@ -5540,16 +5622,19 @@ function compilerMacroExecutionTablesAreStructurallyValid(tables: CompilerSyntax
         let resultNominalSyntaxID: Int(compilerIntTableValue(table: tables.macroResults, row: row, column: 7))
         let parentResultRow: Int(compilerIntTableValue(table: tables.macroResults, row: row, column: 10))
         let childOrdinal: Int(compilerIntTableValue(table: tables.macroResults, row: row, column: 11))
+        let resultRelationshipRow: Int(compilerIntTableValue(table: tables.macroResults, row: row, column: 12))
         if compilerIntTableValue(table: tables.macroResults, row: row, column: 0) != row
             || resultInvocationRow < 0 || resultInvocationRow >= invocationCount
             || resultApplicationRow < 0 || resultApplicationRow >= applicationCount
             || resultDeclarationRow < 0 || resultDeclarationRow >= declarationCount
             || resultTargetSyntaxID < 0 || resultTargetSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
-            || resultKind < compilerMacroValueKindScalar() || resultKind > compilerMacroValueKindEnvironment()
+            || resultKind < compilerMacroValueKindScalar() || resultKind > compilerMacroValueKindSelection()
             || resultNominalSyntaxID < 0 - 1 || resultNominalSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
             || compilerIntTableValue(table: tables.macroResults, row: row, column: 9) < 0
             || parentResultRow < 0 - 1 || parentResultRow >= row
             || childOrdinal < 0
+            || resultRelationshipRow < 0 - 1 || resultRelationshipRow >= compilerIntTableRowCount(table: tables.relationships)
+            || (resultRelationshipRow >= 0 && resultKind != compilerMacroValueKindSyntax())
             || (parentResultRow < 0 && childOrdinal != 0)
             || (parentResultRow >= 0
                 && (compilerIntTableValue(table: tables.macroResults, row: parentResultRow, column: 1) != resultInvocationRow
@@ -5741,7 +5826,7 @@ function compilerMacroTablesAreStructurallyValid(tables: CompilerSyntaxTables): 
     return compilerMacroDeclarationsAreStructurallyValid(tables: tables)
         && compilerMacroParametersAreStructurallyValid(tables: tables)
         && compilerMacroApplicationsAreStructurallyValid(tables: tables)
-        && compilerMacroEdgesAreStructurallyValid(tables: tables)
+        && compilerGraphRelationshipsAreStructurallyValid(tables: tables)
         && compilerMacroDiagnosticsAreStructurallyValid(tables: tables)
         && compilerMacroCapabilitiesAreStructurallyValid(tables: tables)
         && compilerMacroExpansionTemplatesAreStructurallyValid(tables: tables)
@@ -6010,14 +6095,42 @@ function compilerMacroFinalizeApplications(tables: CompilerSyntaxTables): Int {
     return 0
 }
 
-function compilerMacroGraphAppendEdge(tables: CompilerSyntaxTables, edgeKind: Int, applicationRow: Int, objectID: Int, objectKind: Int, ordinal: Int): Int {
-    let edgeRow: Int(compilerIntTableRowCount(table: tables.macroEdges))
-    if compilerSyntaxTableAppend(tables: tables, table: tables.macroEdges, value: edgeRow) != 0 { return 0 - 1 }
-    if compilerSyntaxTableAppend(tables: tables, table: tables.macroEdges, value: edgeKind) != 0 { return 0 - 1 }
-    if compilerSyntaxTableAppend(tables: tables, table: tables.macroEdges, value: applicationRow) != 0 { return 0 - 1 }
-    if compilerSyntaxTableAppend(tables: tables, table: tables.macroEdges, value: objectID) != 0 { return 0 - 1 }
-    if compilerSyntaxTableAppend(tables: tables, table: tables.macroEdges, value: objectKind) != 0 { return 0 - 1 }
-    return compilerSyntaxTableAppend(tables: tables, table: tables.macroEdges, value: ordinal)
+function compilerGraphAppendRelationship(tables: CompilerSyntaxTables, role: Int, originKind: Int, originID: Int, destinationKind: Int, destinationID: Int, ordinal: Int, minimum: Int, maximumKind: Int, maximum: Int, ordering: Int, separatorKind: Int, separatorID: Int, enclosureKind: Int, enclosureID: Int): Int {
+    let relationshipRow: Int(compilerIntTableRowCount(table: tables.relationships))
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: relationshipRow) != 0 { return 0 - 1 }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: role) != 0 { return 0 - 1 }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: originKind) != 0 { return 0 - 1 }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: originID) != 0 { return 0 - 1 }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: destinationKind) != 0 { return 0 - 1 }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: destinationID) != 0 { return 0 - 1 }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: ordinal) != 0 { return 0 - 1 }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: minimum) != 0 { return 0 - 1 }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: maximumKind) != 0 { return 0 - 1 }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: maximum) != 0 { return 0 - 1 }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: ordering) != 0 { return 0 - 1 }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: separatorKind) != 0 { return 0 - 1 }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: separatorID) != 0 { return 0 - 1 }
+    if compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: enclosureKind) != 0 { return 0 - 1 }
+    return compilerSyntaxTableAppend(tables: tables, table: tables.relationships, value: enclosureID)
+}
+
+function compilerGraphAppendScalarRelationship(tables: CompilerSyntaxTables, role: Int, originKind: Int, originID: Int, destinationKind: Int, destinationID: Int, ordinal: Int): Int {
+    return compilerGraphAppendRelationship(tables: tables, role: role, originKind: originKind, originID: originID, destinationKind: destinationKind, destinationID: destinationID, ordinal: ordinal, minimum: 1, maximumKind: compilerGraphBoundFinite(), maximum: 1, ordering: compilerGraphOrderingUnordered(), separatorKind: compilerGraphSeparatorNone(), separatorID: 0 - 1, enclosureKind: compilerGraphEnclosureNone(), enclosureID: 0 - 1)
+}
+
+function compilerGraphAppendMacroReferenceRelationships(tables: CompilerSyntaxTables, applicationRow: Int, name: String): Int {
+    state declarationRow: Int(0)
+    state ordinal: Int(0)
+    while declarationRow < compilerIntTableRowCount(table: tables.macroDeclarations) {
+        let declarationFileID: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 1))
+        let declarationName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: declarationFileID, localStart: compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 4), localEnd: compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 5)))
+        if declarationName == name {
+            if compilerGraphAppendScalarRelationship(tables: tables, role: compilerGraphRelationshipReferences(), originKind: compilerGraphIdentityMacroApplication(), originID: applicationRow, destinationKind: compilerGraphIdentityMacroDeclaration(), destinationID: declarationRow, ordinal: ordinal) != 0 { return 0 - 1 }
+            ordinal: ordinal + 1
+        }
+        declarationRow: declarationRow + 1
+    }
+    return 0
 }
 
 function compilerMacroLink(tables: CompilerSyntaxTables): Int {
@@ -6040,14 +6153,16 @@ function compilerMacroLink(tables: CompilerSyntaxTables): Int {
         if targetSyntaxID < 0 {
             compilerMacroDiagnosticAppend(tables: tables, code: compilerMacroDiagnosticMissingTarget(), fileID: fileID, start: authoredStart, end: authoredEnd, relatedKind: 2, relatedRow: applicationRow, identity: identity)
             status: 0 - 1
-        } else if compilerMacroGraphAppendEdge(tables: tables, edgeKind: compilerMacroEdgeAppliesTo(), applicationRow: applicationRow, objectID: targetSyntaxID, objectKind: targetKind, ordinal: ordinal) != 0 {
+        } else if compilerGraphAppendScalarRelationship(tables: tables, role: compilerGraphRelationshipAppliesTo(), originKind: compilerGraphIdentityMacroApplication(), originID: applicationRow, destinationKind: compilerGraphIdentitySyntax(), destinationID: targetSyntaxID, ordinal: ordinal) != 0 {
                 status: 0 - 1
         } else {
             let exactCount: Int(compilerMacroIndexMatchCount(tables: tables, index: index, name: name, targetKind: targetKind, compatibleOnly: true))
             let nameCount: Int(compilerMacroIndexMatchCount(tables: tables, index: index, name: name, targetKind: targetKind, compatibleOnly: false))
-            if exactCount == 1 {
+            if compilerGraphAppendMacroReferenceRelationships(tables: tables, applicationRow: applicationRow, name: name) != 0 {
+                status: 0 - 1
+            } else if exactCount == 1 {
                 let declarationMatch: Int(compilerMacroIndexFirstMatch(tables: tables, index: index, name: name, targetKind: targetKind))
-                if compilerMacroGraphAppendEdge(tables: tables, edgeKind: compilerMacroEdgeResolvedBy(), applicationRow: applicationRow, objectID: declarationMatch, objectKind: 1, ordinal: ordinal) != 0 { status: 0 - 1 }
+                if compilerGraphAppendScalarRelationship(tables: tables, role: compilerGraphRelationshipResolvedBy(), originKind: compilerGraphIdentityMacroApplication(), originID: applicationRow, destinationKind: compilerGraphIdentityMacroDeclaration(), destinationID: declarationMatch, ordinal: ordinal) != 0 { status: 0 - 1 }
             } else if exactCount > 1 {
                 compilerMacroDiagnosticAppend(tables: tables, code: compilerMacroDiagnosticAmbiguous(), fileID: fileID, start: authoredStart, end: authoredEnd, relatedKind: 2, relatedRow: applicationRow, identity: identity)
                 status: 0 - 1
@@ -6066,15 +6181,106 @@ function compilerMacroLink(tables: CompilerSyntaxTables): Int {
 }
 
 function compilerMacroExecutionResolvedDeclaration(tables: CompilerSyntaxTables, applicationRow: Int): Int {
-    state edgeRow: Int(0)
-    while edgeRow < compilerIntTableRowCount(table: tables.macroEdges) {
-        if compilerIntTableValue(table: tables.macroEdges, row: edgeRow, column: 1) == compilerMacroEdgeResolvedBy()
-            && compilerIntTableValue(table: tables.macroEdges, row: edgeRow, column: 2) == applicationRow {
-            return compilerIntTableValue(table: tables.macroEdges, row: edgeRow, column: 3)
+    state relationshipRow: Int(0)
+    while relationshipRow < compilerIntTableRowCount(table: tables.relationships) {
+        if compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 1) == compilerGraphRelationshipResolvedBy()
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 2) == compilerGraphIdentityMacroApplication()
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 3) == applicationRow
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 4) == compilerGraphIdentityMacroDeclaration() {
+            return compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 5)
         }
-        edgeRow: edgeRow + 1
+        relationshipRow: relationshipRow + 1
     }
     return 0 - 1
+}
+
+function compilerGraphApplicationRelatesTo(tables: CompilerSyntaxTables, applicationRow: Int, role: Int, destinationKind: Int, destinationID: Int): Bool {
+    state relationshipRow: Int(0)
+    while relationshipRow < compilerIntTableRowCount(table: tables.relationships) {
+        if compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 1) == role
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 2) == compilerGraphIdentityMacroApplication()
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 3) == applicationRow
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 4) == destinationKind
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 5) == destinationID {
+            return true
+        }
+        relationshipRow: relationshipRow + 1
+    }
+    return false
+}
+
+function compilerGraphApplicationRelationshipRow(tables: CompilerSyntaxTables, applicationRow: Int, role: Int, destinationKind: Int, destinationID: Int): Int {
+    state relationshipRow: Int(0)
+    while relationshipRow < compilerIntTableRowCount(table: tables.relationships) {
+        if compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 1) == role
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 2) == compilerGraphIdentityMacroApplication()
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 3) == applicationRow
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 4) == destinationKind
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 5) == destinationID {
+            return relationshipRow
+        }
+        relationshipRow: relationshipRow + 1
+    }
+    return 0 - 1
+}
+
+function compilerGraphApplicationRelationshipDestinationCount(tables: CompilerSyntaxTables, applicationRow: Int, role: Int, destinationKind: Int): Int {
+    state count: Int(0)
+    state relationshipRow: Int(0)
+    while relationshipRow < compilerIntTableRowCount(table: tables.relationships) {
+        if compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 1) == role
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 2) == compilerGraphIdentityMacroApplication()
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 3) == applicationRow
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 4) == destinationKind { count: count + 1 }
+        relationshipRow: relationshipRow + 1
+    }
+    return count
+}
+
+function compilerGraphApplicationRelationshipDestination(tables: CompilerSyntaxTables, applicationRow: Int, role: Int, destinationKind: Int, ordinal: Int): Int {
+    state found: Int(0)
+    state relationshipRow: Int(0)
+    while relationshipRow < compilerIntTableRowCount(table: tables.relationships) {
+        if compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 1) == role
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 2) == compilerGraphIdentityMacroApplication()
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 3) == applicationRow
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 4) == destinationKind {
+            if found == ordinal { return compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 5) }
+            found: found + 1
+        }
+        relationshipRow: relationshipRow + 1
+    }
+    return 0 - 1
+}
+
+function compilerMacroDiagnosticCodeForApplication(tables: CompilerSyntaxTables, applicationRow: Int): Int {
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.macroDiagnostics) {
+        if compilerIntTableValue(table: tables.macroDiagnostics, row: row, column: 4) == 2
+            && compilerIntTableValue(table: tables.macroDiagnostics, row: row, column: 5) == applicationRow {
+            return compilerIntTableValue(table: tables.macroDiagnostics, row: row, column: 0)
+        }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerMacroGraphSyntaxFamilyRelationshipRow(tables: CompilerSyntaxTables, syntaxID: Int, macroDeclarationRow: Int): Int {
+    if syntaxID < 0 || syntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
+        || macroDeclarationRow < 0 || macroDeclarationRow >= compilerIntTableRowCount(table: tables.macroDeclarations) { return 0 - 1 }
+    state applicationRow: Int(0)
+    while applicationRow < compilerIntTableRowCount(table: tables.macroApplications) {
+        if compilerGraphApplicationRelatesTo(tables: tables, applicationRow: applicationRow, role: compilerGraphRelationshipResolvedBy(), destinationKind: compilerGraphIdentityMacroDeclaration(), destinationID: macroDeclarationRow) {
+            let relationshipRow: Int(compilerGraphApplicationRelationshipRow(tables: tables, applicationRow: applicationRow, role: compilerGraphRelationshipAppliesTo(), destinationKind: compilerGraphIdentitySyntax(), destinationID: syntaxID))
+            if relationshipRow >= 0 { return relationshipRow }
+        }
+        applicationRow: applicationRow + 1
+    }
+    return 0 - 1
+}
+
+function compilerMacroGraphSyntaxHasFamily(tables: CompilerSyntaxTables, syntaxID: Int, macroDeclarationRow: Int): Bool {
+    return compilerMacroGraphSyntaxFamilyRelationshipRow(tables: tables, syntaxID: syntaxID, macroDeclarationRow: macroDeclarationRow) >= 0
 }
 
 function compilerFormulaFactAppend(tables: CompilerSyntaxTables, kind: Int, invocationRow: Int, applicationRow: Int, targetSyntaxID: Int, category: Int, semanticElementSyntaxID: Int, encoding: Int, bits: Int, signedness: Int): Int {
@@ -6345,7 +6551,8 @@ function compilerMacroExecutionAppendResult(
     resultScalar: Int,
     resultChildCount: Int,
     parentResultRow: Int,
-    childOrdinal: Int
+    childOrdinal: Int,
+    resultRelationshipRow: Int
 ): Int {
     let row: Int(compilerIntTableRowCount(table: tables.macroResults))
     if compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: row) != 0
@@ -6359,7 +6566,8 @@ function compilerMacroExecutionAppendResult(
         || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: resultScalar) != 0
         || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: resultChildCount) != 0
         || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: parentResultRow) != 0
-        || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: childOrdinal) != 0 { return 0 - 1 }
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: childOrdinal) != 0
+        || compilerSyntaxTableAppend(tables: tables, table: tables.macroResults, value: resultRelationshipRow) != 0 { return 0 - 1 }
     return row
 }
 
@@ -6397,7 +6605,8 @@ function compilerMacroExecutionPersistResultValue(
         resultScalar: store.scalars.element(index: storeValueID),
         resultChildCount: store.childCounts.element(index: storeValueID),
         parentResultRow: parentResultRow,
-        childOrdinal: childOrdinal
+        childOrdinal: childOrdinal,
+        resultRelationshipRow: store.relationshipRows.element(index: storeValueID)
     ))
     if resultRow < 0 { return 0 - 1 }
     state ordinal: Int(0)
@@ -6460,6 +6669,11 @@ function compilerMacroValueKindEnum(): Int { return 4 }
 function compilerMacroValueKindSyntax(): Int { return 5 }
 function compilerMacroValueKindCapability(): Int { return 6 }
 function compilerMacroValueKindEnvironment(): Int { return 7 }
+function compilerMacroValueKindSelection(): Int { return 8 }
+
+function compilerMacroValueKindIsCollection(kind: Int): Bool {
+    return kind == compilerMacroValueKindArray() || kind == compilerMacroValueKindSelection()
+}
 
 function compilerMacroValueStoreCreate(): CompilerMacroValueStore {
     return CompilerMacroValueStore(
@@ -6467,6 +6681,7 @@ function compilerMacroValueStoreCreate(): CompilerMacroValueStore {
         typeKinds: bufferCreateInt(capacity: 64),
         typeIDs: bufferCreateInt(capacity: 64),
         scalars: bufferCreateInt(capacity: 64),
+        relationshipRows: bufferCreateInt(capacity: 64),
         firstChildren: bufferCreateInt(capacity: 64),
         childCounts: bufferCreateInt(capacity: 64),
         children: bufferCreateInt(capacity: 128)
@@ -6479,6 +6694,7 @@ function compilerMacroValueStoreDestroy(store: CompilerMacroValueStore): Int {
     if store.typeKinds.destroy() != 0 { status: 0 - 1 }
     if store.typeIDs.destroy() != 0 { status: 0 - 1 }
     if store.scalars.destroy() != 0 { status: 0 - 1 }
+    if store.relationshipRows.destroy() != 0 { status: 0 - 1 }
     if store.firstChildren.destroy() != 0 { status: 0 - 1 }
     if store.childCounts.destroy() != 0 { status: 0 - 1 }
     if store.children.destroy() != 0 { status: 0 - 1 }
@@ -6496,15 +6712,31 @@ function compilerMacroValueStoreAppend(
 ): Int {
     let valueID: Int(store.kinds.count)
     if store.typeKinds.count != valueID || store.typeIDs.count != valueID
-        || store.scalars.count != valueID || store.firstChildren.count != valueID
+        || store.scalars.count != valueID || store.relationshipRows.count != valueID || store.firstChildren.count != valueID
         || store.childCounts.count != valueID { return 0 - 1 }
     if store.kinds.append(element: kind) != 0
         || store.typeKinds.append(element: typeKind) != 0
         || store.typeIDs.append(element: typeID) != 0
         || store.scalars.append(element: scalar) != 0
+        || store.relationshipRows.append(element: 0 - 1) != 0
         || store.firstChildren.append(element: firstChild) != 0
         || store.childCounts.append(element: childCount) != 0 { return 0 - 1 }
     return valueID
+}
+
+function compilerMacroValueStoreCopyWithRelationship(store: CompilerMacroValueStore, valueID: Int, relationshipRow: Int): Int {
+    if valueID < 0 || valueID >= store.kinds.count || relationshipRow < 0 { return 0 - 1 }
+    let copiedValueID: Int(compilerMacroValueStoreAppend(
+        store: store,
+        kind: store.kinds.element(index: valueID),
+        typeKind: store.typeKinds.element(index: valueID),
+        typeID: store.typeIDs.element(index: valueID),
+        scalar: store.scalars.element(index: valueID),
+        firstChild: store.firstChildren.element(index: valueID),
+        childCount: store.childCounts.element(index: valueID)
+    ))
+    if copiedValueID < 0 || store.relationshipRows.update(element: relationshipRow, index: copiedValueID) != 0 { return 0 - 1 }
+    return copiedValueID
 }
 
 function compilerMacroValueStoreAppendScalar(
@@ -6732,6 +6964,10 @@ function compilerMacroExecutionMaterializePersistedResult(
             scalar: compilerIntTableValue(table: tables.macroResults, row: resultRow, column: 8),
             children: children
         )
+        if valueID >= 0
+            && store.relationshipRows.update(element: compilerIntTableValue(table: tables.macroResults, row: resultRow, column: 12), index: valueID) != 0 {
+            valueID: 0 - 1
+        }
     }
     children.destroy()
     return valueID
@@ -7602,7 +7838,7 @@ function compilerMacroAppendExpansionBindingValue(tables: CompilerSyntaxTables, 
         }
         return 0 - 1
     }
-    if kind == compilerMacroValueKindArray() {
+    if compilerMacroValueKindIsCollection(kind: kind) {
         state syntaxElements: Bool(true)
         state ordinal: Int(0)
         while ordinal < childCount && syntaxElements {
@@ -7648,7 +7884,7 @@ function compilerMacroAppendExpansionBindingValue(tables: CompilerSyntaxTables, 
 
 function compilerMacroAppendExpansionBoundaryBindingValue(tables: CompilerSyntaxTables, output: RawBuffer, bindingRow: Int): Int {
     if bindingRow < 0 || bindingRow >= compilerIntTableRowCount(table: tables.macroExpansionBindings) { return 0 - 1 }
-    if compilerIntTableValue(table: tables.macroExpansionBindings, row: bindingRow, column: 6) != compilerMacroValueKindArray() {
+    if !compilerMacroValueKindIsCollection(kind: compilerIntTableValue(table: tables.macroExpansionBindings, row: bindingRow, column: 6)) {
         return compilerMacroAppendExpansionBindingValue(tables: tables, output: output, bindingRow: bindingRow)
     }
     let childCount: Int(compilerIntTableValue(table: tables.macroExpansionBindings, row: bindingRow, column: 10))
@@ -8611,8 +8847,8 @@ function compilerMacroExpansionRegisterChildApplication(
         || tables.macroApplications.values.update(element: compilerDeclarationNameHash(name: compilerMacroTargetKindName(kindTag: targetKind)), index: applicationRow * tables.macroApplications.columnCount + 16) != 0
         || tables.macroApplications.values.update(element: identity.first, index: applicationRow * tables.macroApplications.columnCount + 17) != 0
         || tables.macroApplications.values.update(element: identity.second, index: applicationRow * tables.macroApplications.columnCount + 18) != 0
-        || compilerMacroGraphAppendEdge(tables: tables, edgeKind: compilerMacroEdgeAppliesTo(), applicationRow: applicationRow, objectID: targetSyntaxID, objectKind: targetKind, ordinal: ordinal) != 0
-        || compilerMacroGraphAppendEdge(tables: tables, edgeKind: compilerMacroEdgeResolvedBy(), applicationRow: applicationRow, objectID: declarationRow, objectKind: 1, ordinal: ordinal) != 0 { return 0 - 1 }
+        || compilerGraphAppendScalarRelationship(tables: tables, role: compilerGraphRelationshipAppliesTo(), originKind: compilerGraphIdentityMacroApplication(), originID: applicationRow, destinationKind: compilerGraphIdentitySyntax(), destinationID: targetSyntaxID, ordinal: ordinal) != 0
+        || compilerGraphAppendScalarRelationship(tables: tables, role: compilerGraphRelationshipResolvedBy(), originKind: compilerGraphIdentityMacroApplication(), originID: applicationRow, destinationKind: compilerGraphIdentityMacroDeclaration(), destinationID: declarationRow, ordinal: ordinal) != 0 { return 0 - 1 }
     let childRow: Int(compilerIntTableRowCount(table: tables.macroChildApplications))
     if compilerSyntaxTableAppend(tables: tables, table: tables.macroChildApplications, value: childRow) != 0
         || compilerSyntaxTableAppend(tables: tables, table: tables.macroChildApplications, value: applicationRow) != 0
@@ -8844,52 +9080,41 @@ function compilerMacroExecutionMemberKindNominalName(kind: Int): String {
     return String("")
 }
 
-function compilerMacroExecutionSyntaxMatchesSyntaxFilter(
+function compilerMacroExecutionSyntaxFilterRelationshipRow(
     tables: CompilerSyntaxTables,
     index: CompilerDeclarationIndex,
     syntaxID: Int,
     selector: Int
-): Bool {
-    if syntaxID < 0 || syntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex) { return false }
+): Int {
+    if syntaxID < 0 || syntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex) { return 0 - 2 }
     let syntaxKind: Int(compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 0))
     let facetRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 1))
     if selector < compilerBodyMacroSyntaxFilterFamilyBase() {
-        return syntaxKind == compilerSyntaxKindMember()
+        if syntaxKind == compilerSyntaxKindMember()
             && facetRow >= 0
             && facetRow < compilerIntTableRowCount(table: tables.members)
-            && compilerIntTableValue(table: tables.members, row: facetRow, column: 12) == selector
+            && compilerIntTableValue(table: tables.members, row: facetRow, column: 12) == selector { return 0 - 1 }
+        return 0 - 2
     }
     let macroDeclarationRow: Int(selector - compilerBodyMacroSyntaxFilterFamilyBase())
-    if macroDeclarationRow < 0 || macroDeclarationRow >= compilerIntTableRowCount(table: tables.macroDeclarations) { return false }
-    state applicationRow: Int(0)
-    while applicationRow < compilerIntTableRowCount(table: tables.macroApplications) {
-        if compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12) == syntaxID
-            && compilerMacroExecutionResolvedDeclaration(tables: tables, applicationRow: applicationRow) == macroDeclarationRow {
-            return true
-        }
-        applicationRow: applicationRow + 1
-    }
-    if syntaxKind != compilerSyntaxKindMember() || facetRow < 0 || facetRow >= compilerIntTableRowCount(table: tables.members) { return false }
+    if macroDeclarationRow < 0 || macroDeclarationRow >= compilerIntTableRowCount(table: tables.macroDeclarations) { return 0 - 2 }
+    let directRelationshipRow: Int(compilerMacroGraphSyntaxFamilyRelationshipRow(tables: tables, syntaxID: syntaxID, macroDeclarationRow: macroDeclarationRow))
+    if directRelationshipRow >= 0 { return directRelationshipRow }
+    if syntaxKind != compilerSyntaxKindMember() || facetRow < 0 || facetRow >= compilerIntTableRowCount(table: tables.members) { return 0 - 2 }
     let memberKind: Int(compilerIntTableValue(table: tables.members, row: facetRow, column: 12))
     let nominalName: String(compilerMacroExecutionMemberKindNominalName(kind: memberKind))
-    if nominalName == String("") { return false }
+    if nominalName == String("") { return 0 - 2 }
     let nominalDeclarationRow: Int(compilerDeclarationIndexLookup(
         tables: tables,
         index: index,
         name: nominalName,
         kindTag: compilerSyntaxKindConstruct()
     ))
-    if nominalDeclarationRow < 0 { return false }
+    if nominalDeclarationRow < 0 { return 0 - 2 }
     let nominalSyntaxID: Int(compilerIntTableValue(table: tables.declarations, row: nominalDeclarationRow, column: 0))
-    applicationRow: 0
-    while applicationRow < compilerIntTableRowCount(table: tables.macroApplications) {
-        if compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12) == nominalSyntaxID
-            && compilerMacroExecutionResolvedDeclaration(tables: tables, applicationRow: applicationRow) == macroDeclarationRow {
-            return true
-        }
-        applicationRow: applicationRow + 1
-    }
-    return false
+    let nominalRelationshipRow: Int(compilerMacroGraphSyntaxFamilyRelationshipRow(tables: tables, syntaxID: nominalSyntaxID, macroDeclarationRow: macroDeclarationRow))
+    if nominalRelationshipRow >= 0 { return nominalRelationshipRow }
+    return 0 - 2
 }
 
 function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, index: CompilerDeclarationIndex, store: CompilerMacroValueStore, evaluationValues: Buffer<Int>, currentBlockID: Int, previousBlockID: Int, targetSyntaxID: Int, operationRow: Int, operationKind: Int, depth: Int): Int {
@@ -8903,7 +9128,7 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
         state filterReceiverStoreValueID: Int(0 - 1)
         if filterValid { filterReceiverStoreValueID: evaluationValues.element(index: filterReceiverMIRValueID) }
         if filterReceiverStoreValueID < 0 || filterReceiverStoreValueID >= store.kinds.count
-            || store.kinds.element(index: filterReceiverStoreValueID) != compilerMacroValueKindArray() { filterValid: false }
+            || !compilerMacroValueKindIsCollection(kind: store.kinds.element(index: filterReceiverStoreValueID)) { filterValid: false }
         state childOrdinal: Int(0)
         if filterValid {
             let childCount: Int(store.childCounts.element(index: filterReceiverStoreValueID))
@@ -8914,13 +9139,18 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
                     filterValid: false
                 } else {
                     let childSyntaxID: Int(store.scalars.element(index: childStoreValueID))
-                    if compilerMacroExecutionSyntaxMatchesSyntaxFilter(
+                    let relationshipRow: Int(compilerMacroExecutionSyntaxFilterRelationshipRow(
                         tables: arena.tables,
                         index: index,
                         syntaxID: childSyntaxID,
                         selector: filterMemberKind
-                    ) {
-                        if filteredChildren.append(element: childStoreValueID) != 0 { filterValid: false }
+                    ))
+                    if relationshipRow >= 0 - 1 {
+                        state filteredChildStoreValueID: Int(childStoreValueID)
+                        if relationshipRow >= 0 {
+                            filteredChildStoreValueID: compilerMacroValueStoreCopyWithRelationship(store: store, valueID: childStoreValueID, relationshipRow: relationshipRow)
+                        }
+                        if filteredChildStoreValueID < 0 || filteredChildren.append(element: filteredChildStoreValueID) != 0 { filterValid: false }
                     }
                 }
                 childOrdinal: childOrdinal + 1
@@ -8930,7 +9160,7 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
         if filterValid {
             filteredStoreValueID: compilerMacroValueStoreAppendAggregate(
                 store: store,
-                kind: compilerMacroValueKindArray(),
+                kind: compilerMacroValueKindSelection(),
                 typeKind: compilerIntTableValue(table: arena.mirValues, row: filterResultValueID, column: compilerBodyMIRValueTypeColumn()),
                 typeID: compilerIntTableValue(table: arena.mirValues, row: filterResultValueID, column: compilerBodyMIRValueTypeIDColumn()),
                 scalar: store.scalars.element(index: filterReceiverStoreValueID),
@@ -8954,7 +9184,7 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
         state receiverStoreValueID: Int(0 - 1)
         if transformValid { receiverStoreValueID: evaluationValues.element(index: transformReceiverMIRValueID) }
         if receiverStoreValueID < 0 || receiverStoreValueID >= store.kinds.count
-            || store.kinds.element(index: receiverStoreValueID) != compilerMacroValueKindArray() { transformValid: false }
+            || !compilerMacroValueKindIsCollection(kind: store.kinds.element(index: receiverStoreValueID)) { transformValid: false }
         let captureValues: Buffer<Int>(bufferCreateInt(capacity: operandCount - 1))
         state captureOrdinal: Int(1)
         while transformValid && captureOrdinal < operandCount {
@@ -9008,9 +9238,14 @@ function compilerMacroExecutionEvaluateValueOperation(arena: CompilerBodyArena, 
         }
         state transformedStoreValueID: Int(0 - 1)
         if transformValid {
+            state transformedKind: Int(compilerMacroValueKindArray())
+            if operationKind == compilerBodyMIROperationMacroCollectionFilter()
+                && store.kinds.element(index: receiverStoreValueID) == compilerMacroValueKindSelection() {
+                transformedKind: compilerMacroValueKindSelection()
+            }
             transformedStoreValueID: compilerMacroValueStoreAppendAggregate(
                 store: store,
-                kind: compilerMacroValueKindArray(),
+                kind: transformedKind,
                 typeKind: compilerIntTableValue(table: arena.mirValues, row: transformResultValueID, column: compilerBodyMIRValueTypeColumn()),
                 typeID: compilerIntTableValue(table: arena.mirValues, row: transformResultValueID, column: compilerBodyMIRValueTypeIDColumn()),
                 scalar: store.scalars.element(index: receiverStoreValueID),
@@ -11122,7 +11357,7 @@ function compilerSyntaxTypeReferenceKindName(kind: Int): String {
     if kind == compilerSyntaxTypeReferenceNamed() { return String("named") }
     if kind == compilerSyntaxTypeReferenceApplication() { return String("application") }
     if kind == compilerSyntaxTypeReferenceArray() { return String("array") }
-    if kind == compilerSyntaxTypeReferenceOptional() { return String("optional") }
+    if kind == compilerSyntaxTypeReferenceZeroOrOneOccurrence() { return String("zeroOrOneOccurrence") }
     if kind == compilerSyntaxTypeReferenceValue() { return String("value") }
     return String("unknown")
 }

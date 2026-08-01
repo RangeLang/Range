@@ -1,0 +1,104 @@
+compilerMacroSnapshot
+@builtin
+construct Array<Element> {}
+construct TypeReference {}
+construct Expression {}
+
+construct Identifier {
+    let name: String
+    let id: String
+    let parent: Identifier?
+    let source: @syntax?
+}
+
+construct Macro {
+    construct Declaration {}
+}
+
+construct MacroApplication {
+    let identifier: Identifier
+    let target: Identifier
+    let genericArguments: Array<TypeReference>
+    let argumentClause: String
+    let arguments: Array<Expression>
+    let declaration: Macro.Declaration?
+    let packageVisibility: String
+    let valueType: TypeReference
+    let value: RelationshipRegistration
+}
+
+construct Member {
+    let macros: Array<MacroApplication>
+}
+
+enum RelationshipBound {
+    case finite(value: Int)
+    case unbounded
+}
+
+construct RelationshipMultiplicity {
+    let minimum: Int
+    let maximum: RelationshipBound
+}
+
+enum RelationshipOrdering {
+    case unordered
+    case ordered
+}
+
+enum RelationshipSeparator {
+    case none
+    case syntax(identifier: Identifier)
+}
+
+enum DelimiterPair {
+    case parentheses
+    case braces
+    case brackets
+    case angles
+}
+
+enum RelationshipEnclosure {
+    case none
+    case delimited(pair: DelimiterPair)
+}
+
+construct RelationshipRegistration {
+    let multiplicity: RelationshipMultiplicity
+    let ordering: RelationshipOrdering
+    let separator: RelationshipSeparator
+    let enclosure: RelationshipEnclosure
+}
+
+function oneRelationshipMultiplicity(): RelationshipMultiplicity {
+    return RelationshipMultiplicity(minimum: 1, maximum: .finite(value: 1))
+}
+
+function scalarValueRelationship(): RelationshipRegistration {
+    return RelationshipRegistration(
+        multiplicity: oneRelationshipMultiplicity(),
+        ordering: .unordered,
+        separator: .none,
+        enclosure: .none
+    )
+}
+
+construct Observation {
+    let minimum: Int
+}
+
+macro value(): Member -> RelationshipRegistration { environment in
+    return scalarValueRelationship()
+}
+
+macro observeValue(): Member -> Observation { environment in
+    let application: MacroApplication(environment.target.macros[0])
+    let registration: RelationshipRegistration(application.value)
+    return Observation(minimum: registration.multiplicity.minimum)
+}
+
+construct ValueRelationshipTarget {
+    @value
+    @observeValue
+    let payload: Int
+}

@@ -1,5 +1,8 @@
+@builtin
+construct Array<Element> {}
+
 @main {
-    state numbers: [1, 2, 3]
+    state numbers: Array<Int>([1, 2, 3])
     numbers[3]: 7
     return 0
 }
