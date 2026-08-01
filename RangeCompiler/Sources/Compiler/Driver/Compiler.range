@@ -32,6 +32,10 @@ function compileRangeNativeSourceDirectiveOutput(source: String): String {
         return compilerSyntaxRecipeSummary(source: source)
     }
 
+    if compilerSourceRequestsMacroSyntaxSnapshot(source: source) {
+        return compilerMacroSyntaxSummary(source: source)
+    }
+
     if compilerSourceRequestsMacroSnapshot(source: source) {
         return compilerMacroSummary(source: source)
     }

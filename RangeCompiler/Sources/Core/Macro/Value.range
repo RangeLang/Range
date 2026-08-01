@@ -1,3 +1,17 @@
+function oneRelationshipMultiplicity(): RelationshipMultiplicity {
+    return RelationshipMultiplicity(minimum: 1, maximum: .finite(value: 1))
+}
+
+function scalarValueRelationship(): RelationshipRegistration {
+    return RelationshipRegistration(
+        multiplicity: oneRelationshipMultiplicity(),
+        ordering: .unordered,
+        separator: .none,
+        enclosure: .none,
+        admission: .any
+    )
+}
+
 macro value(): Member -> RelationshipRegistration { environment in
     return scalarValueRelationship()
 }

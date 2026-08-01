@@ -1,0 +1,14 @@
+macro many(): Member { environment in
+    #environment {
+      RelationshipRegistration(
+        multiplicity: RelationshipMultiplicity(
+            minimum: 0,
+            maximum: .unbounded
+        ),
+        ordering: .ordered,
+        separator: .none,
+        enclosure: .none,
+        admission: .any
+    )
+    }
+}

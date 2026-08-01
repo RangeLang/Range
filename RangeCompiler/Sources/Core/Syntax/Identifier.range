@@ -8,6 +8,7 @@ macro identifierSyntaxName(): Init { environment in
 
 @syntax
 @identifierSyntaxName
+@hashable
 construct Identifier {
     let name: String
     let id: String

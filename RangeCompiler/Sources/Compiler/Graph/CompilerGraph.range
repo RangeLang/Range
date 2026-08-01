@@ -6,6 +6,30 @@ function compilerGraphNominalColumnCount(): Int { return 10 }
 function compilerGraphNominalReferenceColumnCount(): Int { return 14 }
 function compilerGraphGeneratedFunctionColumnCount(): Int { return 25 }
 function compilerGraphGeneratedMemberColumnCount(): Int { return 24 }
+function compilerGraphGeneratedMemberRowColumn(): Int { return 0 }
+function compilerGraphGeneratedMemberKindColumn(): Int { return 1 }
+function compilerGraphGeneratedMemberOwnerColumn(): Int { return 2 }
+function compilerGraphGeneratedMemberFileColumn(): Int { return 3 }
+function compilerGraphGeneratedMemberStartColumn(): Int { return 4 }
+function compilerGraphGeneratedMemberEndColumn(): Int { return 5 }
+function compilerGraphGeneratedMemberNameStartColumn(): Int { return 6 }
+function compilerGraphGeneratedMemberNameEndColumn(): Int { return 7 }
+function compilerGraphGeneratedMemberTypeStartColumn(): Int { return 8 }
+function compilerGraphGeneratedMemberTypeEndColumn(): Int { return 9 }
+function compilerGraphGeneratedMemberMacroDeclarationColumn(): Int { return 10 }
+function compilerGraphGeneratedMemberApplicationColumn(): Int { return 11 }
+function compilerGraphGeneratedMemberTemplateOrdinalColumn(): Int { return 12 }
+function compilerGraphGeneratedMemberApplicationIdentityFirstColumn(): Int { return 13 }
+function compilerGraphGeneratedMemberApplicationIdentitySecondColumn(): Int { return 14 }
+function compilerGraphGeneratedMemberTargetIdentityFirstColumn(): Int { return 15 }
+function compilerGraphGeneratedMemberTargetIdentitySecondColumn(): Int { return 16 }
+function compilerGraphGeneratedMemberStableIdentityFirstColumn(): Int { return 17 }
+function compilerGraphGeneratedMemberStableIdentitySecondColumn(): Int { return 18 }
+function compilerGraphGeneratedMemberPlacementColumn(): Int { return 19 }
+function compilerGraphGeneratedMemberLexicalParentOrdinalColumn(): Int { return 20 }
+function compilerGraphGeneratedMemberParentIdentityFirstColumn(): Int { return 21 }
+function compilerGraphGeneratedMemberParentIdentitySecondColumn(): Int { return 22 }
+function compilerGraphGeneratedMemberMemberKindColumn(): Int { return 23 }
 function compilerGraphGeneratedKindFunction(): Int { return 1 }
 function compilerGraphGeneratedKindMember(): Int { return 2 }
 function compilerGraphGeneratedKindEnum(): Int { return 5 }
@@ -82,6 +106,72 @@ function compilerGraphDeltaAppend(delta: CompilerGraphDelta, table: CompilerIntT
     let graphAppendStatus: Int(compilerIntTableAppend(table: table, value: value))
     if graphAppendStatus != 0 { compilerGraphDeltaPoison(delta: delta) }
     return graphAppendStatus
+}
+
+function compilerGraphDeltaAppendGeneratedMember(delta: CompilerGraphDelta, change: CompilerGeneratedMemberDelta): Int {
+    let row: Int(compilerIntTableRowCount(table: delta.generatedMembers))
+    if compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: row) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: compilerGraphGeneratedKindMember()) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.ownerSyntaxID) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.fileID) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.memberStart) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.memberEnd) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.nameStart) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.nameEnd) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.typeStart) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.typeEnd) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.macroDeclarationRow) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.applicationRow) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.templateOrdinal) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.applicationIdentity.first) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.applicationIdentity.second) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.targetIdentity.first) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.targetIdentity.second) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.stableIdentity.first) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.stableIdentity.second) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.placement) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.lexicalParentOrdinal) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.parentIdentity.first) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.parentIdentity.second) != 0
+        || compilerGraphDeltaAppend(delta: delta, table: delta.generatedMembers, value: change.memberKind) != 0 {
+        return 0 - 1
+    }
+    return row
+}
+
+function compilerGraphGeneratedMemberDelta(table: CompilerIntTable, row: Int): CompilerGeneratedMemberDelta {
+    return CompilerGeneratedMemberDelta(
+        ownerSyntaxID: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberOwnerColumn()),
+        fileID: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberFileColumn()),
+        memberStart: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberStartColumn()),
+        memberEnd: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberEndColumn()),
+        nameStart: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberNameStartColumn()),
+        nameEnd: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberNameEndColumn()),
+        typeStart: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberTypeStartColumn()),
+        typeEnd: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberTypeEndColumn()),
+        macroDeclarationRow: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberMacroDeclarationColumn()),
+        applicationRow: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberApplicationColumn()),
+        templateOrdinal: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberTemplateOrdinalColumn()),
+        applicationIdentity: CompilerFingerprint(
+            first: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberApplicationIdentityFirstColumn()),
+            second: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberApplicationIdentitySecondColumn())
+        ),
+        targetIdentity: CompilerFingerprint(
+            first: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberTargetIdentityFirstColumn()),
+            second: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberTargetIdentitySecondColumn())
+        ),
+        stableIdentity: CompilerFingerprint(
+            first: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberStableIdentityFirstColumn()),
+            second: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberStableIdentitySecondColumn())
+        ),
+        placement: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberPlacementColumn()),
+        lexicalParentOrdinal: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberLexicalParentOrdinalColumn()),
+        parentIdentity: CompilerFingerprint(
+            first: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberParentIdentityFirstColumn()),
+            second: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberParentIdentitySecondColumn())
+        ),
+        memberKind: compilerIntTableValue(table: table, row: row, column: compilerGraphGeneratedMemberMemberKindColumn())
+    )
 }
 
 function compilerGraphDeltaMergeIdentityTable(delta: CompilerGraphDelta, destination: CompilerIntTable, source: CompilerIntTable): Int {

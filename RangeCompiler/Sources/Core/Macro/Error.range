@@ -1,0 +1,5 @@
+macro error(): Construct { environment in
+    if environment.target.memberCount("message") != 1 {
+        environment.diagnostics.error("@error requires exactly one message declaration.")
+    }
+}

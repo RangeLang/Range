@@ -1,0 +1,11 @@
+construct HashableRegistration {
+    let target: Identifier
+}
+
+macro hashable(): Construct { environment in
+    #environment {
+        HashableRegistration(
+            target: environment.target.Declaration.identifier
+        )
+    }
+}

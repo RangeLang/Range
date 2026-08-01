@@ -1,4 +1,4 @@
-macro command(): Function -> Void {}
+macro command(): Function {}
 
 macro commandGroup(): Construct { environment in
     let commands: Array<@command>(

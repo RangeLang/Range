@@ -684,7 +684,7 @@ audit_native_arrays() {
         else
             /usr/bin/grep -Fq 'icmp ult i32' "$first" \
                 || fail "$stage_label native Array $kind omitted the unsigned bounds proof"
-            /usr/bin/grep -Fq 'call void @llvm.trap()' "$first" \
+            /usr/bin/grep -Fq 'call void @rangeTrap()' "$first" \
                 || fail "$stage_label native Array $kind omitted the out-of-bounds trap"
             /usr/bin/grep -Fq 'getelementptr inbounds' "$first" \
                 || fail "$stage_label native Array $kind omitted typed element addressing"
@@ -741,7 +741,7 @@ audit_native_arrays() {
     require_successful_output "$stage_label repeated native Array out-of-bounds" "$oob_second" "$oob_error"
     /usr/bin/cmp -s "$oob_first" "$oob_second" || fail "$stage_label native Array out-of-bounds was not deterministic"
     /usr/bin/grep -Fq 'icmp ult i32' "$oob_first" || fail "$stage_label native Array out-of-bounds omitted its bounds comparison"
-    /usr/bin/grep -Fq 'call void @llvm.trap()' "$oob_first" || fail "$stage_label native Array out-of-bounds omitted its trap"
+    /usr/bin/grep -Fq 'call void @rangeTrap()' "$oob_first" || fail "$stage_label native Array out-of-bounds omitted its trap"
     validate_llvm "$oob_first"
     link_llvm "$oob_first" "$oob_linked"
     if /usr/bin/perl -e '$seconds = shift; alarm $seconds; exec @ARGV' 5 "$oob_linked" > "$oob_run_output" 2> "$oob_run_error"; then
@@ -761,7 +761,7 @@ audit_native_arrays() {
     run_capture "$executable" "$ARRAY_WRITE_OUT_OF_BOUNDS_SOURCE" "$write_oob_llvm" "$write_oob_error"
     require_successful_output "$stage_label native Array write out-of-bounds" "$write_oob_llvm" "$write_oob_error"
     /usr/bin/grep -Fq 'array.store.' "$write_oob_llvm" || fail "$stage_label native Array write out-of-bounds omitted its indexed store"
-    /usr/bin/grep -Fq 'call void @llvm.trap()' "$write_oob_llvm" || fail "$stage_label native Array write out-of-bounds omitted its trap"
+    /usr/bin/grep -Fq 'call void @rangeTrap()' "$write_oob_llvm" || fail "$stage_label native Array write out-of-bounds omitted its trap"
     validate_llvm "$write_oob_llvm"
     link_llvm "$write_oob_llvm" "$write_oob_linked"
     if /usr/bin/perl -e '$seconds = shift; alarm $seconds; exec @ARGV' 5 "$write_oob_linked" > "$write_oob_run_output" 2> "$write_oob_run_error"; then

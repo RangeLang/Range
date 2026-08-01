@@ -1366,9 +1366,16 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
     let probeEdgeTargets: Buffer<Int>(bufferCreateInt(capacity: 16))
     let sensitiveCountBefore: Int(compilerReachableLLVMStateSensitiveCount(reachability: reachability))
     let candidatePlan: CompilerModuleABIPlan(returnModes: $reachability.abiReturnModes, participants: $reachability.abiParticipants, isFrozen: true)
+    let profileSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: functionRow, column: 0))
+    let profileDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: profileSyntaxID))
+    let profileFileID: Int(compilerIntTableValue(table: reachability.context.tables.declarations, row: profileDeclarationRow, column: 1))
+    let profileName: String(compilerTypedSyntaxLocalText(tables: reachability.context.tables, fileID: profileFileID, localStart: compilerIntTableValue(table: reachability.context.tables.declarations, row: profileDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: reachability.context.tables.declarations, row: profileDeclarationRow, column: 8)))
+    compilerMetricsFunctionBegin(functionID: functionRow, name: "abi.parse.\(profileName)")
     let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreateForFunctionInstance(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow, functionInstanceID: instanceID, receiverTypeKeyID: compilerReachableLLVMStateFunctionInstanceReceiverKey(reachability: reachability, instanceID: instanceID), typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments)))
+    compilerMetricsFunctionEnd(legacyParses: 0, recordBytes: 0)
     state capable: Bool(compilerBodyArenaIsValid(arena: arena))
     state failureStage: Int(1)
+    compilerMetricsFunctionBegin(functionID: functionRow, name: "abi.resolve.\(profileName)")
     if capable {
         if compilerBodyArenaBuildSymbolsAndResolutions(arena: arena, index: reachability.context.declarationIndex) != 0 {
             failureStage: 2
@@ -1394,8 +1401,10 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
             capable: false
         }
     }
+    compilerMetricsFunctionEnd(legacyParses: 0, recordBytes: 0)
     stringTransientRegionReset(mark: transientMark)
     transientMark: stringTransientRegionMark()
+    compilerMetricsFunctionBegin(functionID: functionRow, name: String("abi.cfg"))
     if capable {
         if compilerBodyArenaBuildCFG(arena: arena) != 0 {
             failureStage: 4
@@ -1408,17 +1417,21 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
             capable: false
         }
     }
+    compilerMetricsFunctionEnd(legacyParses: 0, recordBytes: 0)
     stringTransientRegionReset(mark: transientMark)
     transientMark: stringTransientRegionMark()
     if capable {
+        compilerMetricsFunctionBegin(functionID: functionRow, name: String("abi.ownership"))
         let memoryBuildStatus: Int(compilerBodyMemoryBuildAndFreeze(arena: arena, abiPlan: candidatePlan, typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments, effects: reachability.functionInstanceEffects, effectPaths: reachability.functionInstanceEffectPaths, returnSummaries: reachability.functionInstanceReturnSummaries, returnLeaves: reachability.functionInstanceReturnLeaves, applyInstanceEffects: true, recordOwnedFacts: true))
         if memoryBuildStatus != 0 {
             failureStage: 6000 + memoryBuildStatus
             capable: false
         }
+        compilerMetricsFunctionEnd(legacyParses: 0, recordBytes: 0)
     }
     stringTransientRegionReset(mark: transientMark)
     transientMark: stringTransientRegionMark()
+    compilerMetricsFunctionBegin(functionID: functionRow, name: String("abi.mir"))
     if capable {
         let mirBuildStatus: Int(compilerBodyMIRBuild(arena: arena))
         if mirBuildStatus != 0 {
@@ -1432,6 +1445,7 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
             capable: false
         }
     }
+    compilerMetricsFunctionEnd(legacyParses: 0, recordBytes: 0)
     if capable {
         if compilerBodyMIRMarkRepresentationSensitiveTargets(arena: arena, sensitiveFunctions: reachability.abiSensitiveFunctions) != 0 {
             failureStage: 10001
@@ -1453,18 +1467,22 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
     stringTransientRegionReset(mark: transientMark)
     transientMark: stringTransientRegionMark()
     if capable && !discoveredSensitiveTarget {
+        compilerMetricsFunctionBegin(functionID: functionRow, name: String("abi.validate"))
         let validationCode: Int(compilerBodyMIRValidationCode(arena: arena, abiPlan: candidatePlan))
         if validationCode != 0 {
             failureStage: 8000 + validationCode
             capable: false
         }
+        compilerMetricsFunctionEnd(legacyParses: 0, recordBytes: 0)
     }
     if capable && !discoveredSensitiveTarget {
+        compilerMetricsFunctionBegin(functionID: functionRow, name: String("abi.emit"))
         let capabilityEmission: CompilerBodyLLVMEmissionResult(compilerBodyLLVMEmit(arena: arena, initialTemporary: 0, initialBranch: 0, abiPlan: candidatePlan, typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments, functionInstances: reachability.functionInstances, functionInstanceSignatures: reachability.functionInstanceSignatures, functionInstanceSignatureParameters: reachability.functionInstanceSignatureParameters))
         if !capabilityEmission.isValid {
             failureStage: 900000 + capabilityEmission.runtimeRequirements
             capable: false
         }
+        compilerMetricsFunctionEnd(legacyParses: 0, recordBytes: 0)
     }
     stringTransientRegionReset(mark: transientMark)
     transientMark: stringTransientRegionMark()
@@ -1472,11 +1490,13 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
     if !capable { capabilityValue: 0 - failureStage }
     if discoveredSensitiveTarget { capabilityValue: 0 }
     state status: Int(reachability.abiCapabilities.update(element: capabilityValue, index: functionRow))
+    compilerMetricsFunctionBegin(functionID: functionRow, name: String("abi.cleanup"))
     if compilerBodyArenaDestroy(arena: arena) != 0 { status: 0 - 1 }
     let probeEdgeOwnersDestroyStatus: Int(probeEdgeOwners.destroy())
     let probeEdgeTargetsDestroyStatus: Int(probeEdgeTargets.destroy())
     if probeEdgeOwnersDestroyStatus != 0 || probeEdgeTargetsDestroyStatus != 0 { status: 0 - 1 }
     stringTransientRegionReset(mark: transientMark)
+    compilerMetricsFunctionEnd(legacyParses: 0, recordBytes: 0)
     return status
 }
 

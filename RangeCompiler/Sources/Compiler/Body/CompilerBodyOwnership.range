@@ -1991,7 +1991,8 @@ function compilerBodyArenaNodeHasScheduledEvaluation(arena: CompilerBodyArena, n
     state scheduleRow: Int(0)
     while scheduleRow < compilerIntTableRowCount(table: arena.cfgSchedule) {
         if compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleNodeColumn()) == nodeID
-            && compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleActionColumn()) == compilerBodyCFGScheduleEvaluateNode() { return true }
+            && (compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleActionColumn()) == compilerBodyCFGScheduleEvaluateNode()
+                || compilerIntTableValue(table: arena.cfgSchedule, row: scheduleRow, column: compilerBodyCFGScheduleActionColumn()) == compilerBodyCFGScheduleOptionalJoin()) { return true }
         scheduleRow: scheduleRow + 1
     }
     return false
@@ -4801,7 +4802,7 @@ function compilerBodyArenaValidateOwnedPaths(arena: CompilerBodyArena, typeKeys:
                 let blockEvaluationStatus: Int(compilerBodyArenaOwnedPathEvaluateBlock(arena: arena, blockID: nextBlockID, states: states, origins: origins, scheduleStarts: scheduleStarts, scheduleCounts: scheduleCounts, scheduleRows: scheduleRows, typeKeys: typeKeys, typeKeyArguments: typeKeyArguments, effects: effects, effectPaths: effectPaths, returnSummaries: returnSummaries, returnLeaves: returnLeaves, applyInstanceEffects: applyInstanceEffects, recordFacts: recordFacts))
                 if blockEvaluationStatus != 0 {
                     status: 0 - 1
-                    failureStage: 12
+                    failureStage: 12000000 + (0 - blockEvaluationStatus)
                 }
             }
             if status == 0 {

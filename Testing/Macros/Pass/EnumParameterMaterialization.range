@@ -1,0 +1,58 @@
+compilerMacroSyntaxSnapshot
+
+@builtin
+construct Array<Element> {}
+
+construct TypeReference {}
+construct Expression {}
+
+construct Identifier {
+    let name: String
+    let id: String
+    let parent: Identifier?
+    let source: @syntax?
+}
+
+construct Macro {
+    construct Declaration {}
+}
+
+construct MacroApplication {
+    let identifier: Identifier
+    let target: Identifier
+    let genericArguments: Array<TypeReference>
+    let argumentClause: String
+    let arguments: Array<Expression>
+    let declaration: Macro.Declaration?
+    let packageVisibility: String
+    let valueType: TypeReference
+    let value: DelimiterPair
+}
+
+construct Member {
+    let macros: Array<MacroApplication>
+}
+
+construct Construct {}
+macro syntax(): Construct -> Void {}
+
+enum DelimiterPair {
+    case parentheses
+    case braces
+    case brackets
+    case angles
+}
+
+macro choose(_ shape: DelimiterPair): Member -> DelimiterPair { environment in
+    return shape
+}
+
+@syntax
+construct Value {
+    @choose(.braces)
+    let payload: Int
+}
+
+function proof(): Int {
+    return 1
+}

@@ -1,0 +1,21 @@
+construct SyntaxFormAnchor {
+    let introducer: String
+    let identifier: Identifier
+}
+
+construct SyntaxFormSlot {
+    let role: Identifier
+    let enclosure: DelimiterPair
+    let child: @syntax
+}
+
+enum SyntaxFormPart {
+    case anchor(value: SyntaxFormAnchor)
+    case slot(value: SyntaxFormSlot)
+}
+
+@syntax
+construct SyntaxForm {
+    @many
+    let parts: SyntaxFormPart
+}

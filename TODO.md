@@ -3,6 +3,23 @@
 Priority and dependency order live in [MILESTONES.md](MILESTONES.md). This file
 owns the actionable checkboxes for the active and deliberately deferred work.
 
+- [ ] Migrate compiler failures to typed `@error` values at phase boundaries.
+  - [x] Add the validation-only construct-level `@error` macro, require exactly
+    one member named `message`, and provide the general concrete
+    `Error(message:)`.
+  - [x] Annotate `EncodingError` and `DecodingError` with the same macro.
+  - [ ] Constrain the required message declaration to `String` once generic
+    syntax-member selection is supported in compiler-executed macros.
+  - [ ] Let generic constraints require a registered error capability so
+    boundaries can express `Result<Value, Failure: @error>` without naming a
+    privileged error base type.
+  - [ ] Replace cross-function and cross-phase negative integers, packed
+    arithmetic failure codes, and late diagnostic strings with nominal error
+    values. Keep private local sentinels only inside bounded algorithms.
+  - [ ] Retain typed compiler errors with their product observations and reuse
+    or invalidate them through the same graph dependency rules as successful
+    phase products.
+
 - [ ] Move declaration parsing toward Core-owned `@syntax` recipes.
   - [x] Make compiler-owned `@capture` bind a macro application's balanced raw
     body directly to a declared `String` parameter without expression parsing.
@@ -243,6 +260,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 
 ## Website
 
+  - [x] Add a source-first Command Group macro breakdown at
+    `/features/macros/command-group-registration`.
+    - Show the complete live Core macro, a representative annotated command
+      group, and the discovery, validation, generated-enum, and still-deferred
+      dispatch boundaries.
   - [x] Remove the Cardinality heading and explanatory copy from the homepage.
     - Keep its sound generator and graph, with one black/accent start-stop
       toggle.
@@ -1044,6 +1066,16 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           representation (`state count: Int` means nominal `Count` represented
           by `Int`); the source syntax provides `State`, `Let`, and other
           metadata without duplicating either fact in `Identifier`.
+      - [ ] Derive stable `Identifier` hashing through `@hashable` without
+        making the hash the semantic identity.
+        - [ ] Hash the canonical ID and parent chain deterministically, then
+          confirm structural equality after every hash-index match.
+        - [ ] Make graph insertion idempotent for the same identity and value,
+          reject the same identity with a different value, and allow equal
+          names under different identities.
+        - [ ] Derive generated identities from macro application, target,
+          emitted role, ordinal, and nominal type rather than allocation order
+          or reconstructed source text.
       - [ ] Materialize every syntax-facing `Identifier` directly from the
         compiler's existing stable fingerprint, parent relationship, and
         canonical syntax node when its source-backed view is projected; do not
@@ -1124,6 +1156,28 @@ owns the actionable checkboxes for the active and deliberately deferred work.
               - Bodyless functions no longer synthesize an empty `Block`.
             - [ ] Replace `Block.values: Array<Value>` with the core occurrence
               relationship: one identity owns zero, one, or many value edges.
+              - [x] Name the source relationship `contents` and register it with
+                Core `@contents`; `Array<Value>` is currently only the parser's
+                storage transport, not the authored cardinality model.
+              - [x] Decode executed `RelationshipRegistration` values into a
+                typed compiler table keyed by the target-member and result
+                identities.
+                - `@value`, `@many`, and `@contents` now reach the same
+                  projection without a macro-name branch.
+                - [x] Let an authored `@block` registration select a
+                  member-owned `contents` relationship and materialize it onto
+                  the physical `{}` source slot.
+                  - The selection is a typed `BlockRegistration` result joined
+                    to the relationship row, not a compiler branch on `Block`
+                    or on a macro name. Bootstrap slot values remain only until
+                    that source registration is available.
+                  - `Testing/Macros/Pass/BlockRelationshipReification.range`
+                    proves the actual typed source slot retains the authored
+                    ordered, unbounded, braced, block-admitted relationship.
+                - [ ] Generalize the one braced physical block registration
+                  into delimiter-keyed source forms, so `()`, `[]`, `{}`, and
+                  `<>` can each be described by a Range-authored relationship
+                  without compiler-owned collection or closure cases.
               - [x] Add the Core `@value` member-relationship marker and annotate
                 the first value-owning syntax surfaces (`Block`, `Let`, `State`,
                 macro execution/application, closure invocation, and `Parsed`).
@@ -1217,8 +1271,48 @@ owns the actionable checkboxes for the active and deliberately deferred work.
                     slot identities and owner-to-slot-to-occurrence projection;
                     `scripts/range check-root-value` passes it alongside the
                     declaration-envelope graph.
-                - [ ] Move `Block → statements` and its source-layout gaps from
-                  block-owned tables to a `statements` slot.
+                - [x] Move `Block → contents` and its source-layout gaps from
+                  block-owned tables to one enclosed containment slot.
+                  - The slot carries ordered-many bounds, its delimiter pair,
+                    and an admission environment; a syntax form declares the
+                    environments it can inhabit. The legacy body `statement`
+                    edge remains a lowering adapter until body parsing is fully
+                    slot-native.
+                  - [ ] Generalize the same slot registration to `()`, `[]`, and
+                    `<>` once their parser paths emit occurrence-backed syntax.
+                - [ ] Represent every syntax form as ordered anchors and shaped
+                  child slots.
+                  - An anchor is an introducer or literal plus an `Identifier`;
+                    a slot is a role identity, delimiter enclosure, and nested
+                    syntax child. `@foo() {}` and `#environment {}` must use
+                    this same representation.
+                  - Derive prefix, postfix, infix, and circumfix views from the
+                    anchor's position among slots instead of storing separate
+                    parser kinds.
+                  - Keep slot enclosure independent from multiplicity,
+                    ordering, separator, admission, identity, and runtime
+                    representation.
+                  - [ ] Prove the smallest Core `SyntaxForm` model through a
+                    focused graph fixture, record its first compiler rejection,
+                    and upgrade only that general boundary.
+                    - [x] Add `SyntaxFormAnchor`, `SyntaxFormSlot`, and the
+                      ordered-many `SyntaxForm.parts` model to Core; the
+                      canonical declaration-envelope proof compiles it with
+                      `@hashable Identifier` and preserves every declared field.
+                    - [ ] Commit root `#environment` values as typed graph
+                      contributions before querying relationship registrations
+                      by type and target identity.
+                      - The first live rejection is the old
+                        `Macro.Application.value` observer after `@many` stops
+                        returning its registration:
+                        `macroExecutionBodyInvalid`,
+                        `pipelineFailureCode=9012007`, at
+                        `registration.multiplicity`. The `@many` producer is
+                        not the failing application; `@observeMany` is.
+                      - Replace the observer with a graph query only after the
+                        contributed `RelationshipRegistration` has a typed node
+                        identity. Do not restore the persistent return channel
+                        merely to satisfy the old fixture.
               - [ ] Expose type and metatype filtering over that plotted graph,
                 then make `@syntax`, `@value`, and nominal selection use the same
                 query operation and occurrence-backed result instead of
@@ -1258,10 +1352,10 @@ owns the actionable checkboxes for the active and deliberately deferred work.
               - Expansion templates retain their parent macro declaration and
                 application while each fragment retains its own file-local
                 span, parent fragment, and source ordinal.
-            - [ ] Capture source-layout gaps as a first-class ECS-style syntax
+            - [x] Capture source-layout gaps as a first-class ECS-style syntax
               table before formatting or projecting presentation into the graph.
-              - Each row is anchored by a `Block` and its surrounding syntax
-                identities, retains its exact source span, and records line
+              - Each row is anchored by its enclosed containment slot and its
+                surrounding syntax identities, retains its exact source span, and records line
                 breaks plus independent space and tab indentation counts.
               - The first proof covers typed block statements and empty blocks;
                 comments, width wrapping, and user-facing formatter macros stay
@@ -1446,6 +1540,50 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       1 second validating LLVM, and 2 seconds linking Stage 2.
   - [ ] Make compiler LLVM emission incremental or cacheable below the full
     source-bundle key.
+    - [ ] Make compiler performance observable at authored phase and work-unit boundaries.
+      - [x] Add exact monotonic begin/end duration for every emitted function
+        without changing the compiler/runtime ABI, and expose it through
+        `scripts/range compiler profile` alongside the existing phase trace.
+      - [ ] Add Range-owned work counters for repeated arena construction,
+        parsing, resolution, CFG, ownership, MIR, ABI probing, and emission so
+        time can be compared with exact units of work rather than wall time alone.
+        - The first matched development profile spent 308,982 of 393,134 ms in
+          ABI components and 61,356 ms in effects/return summaries. Declaration
+          capture plus macro linking/execution took 1,103 ms. Treat this as
+          evidence that graph cutovers did not remove typed-body recomputation.
+        - Instrument ABI probes as parse, resolution, CFG, ownership, MIR,
+          validation, emission, and cleanup intervals, then rank both aggregate
+          stages and individual specialized functions.
+      - [ ] Eliminate repeated per-function ownership reconstruction only after
+        the profile proves which reusable frozen facts preserve specialization,
+        effect, return-summary, and ABI dependencies.
+        - The graph owns identity, observations, dependency edges, and reverse
+          invalidation. It does not recreate resolved bodies, CFG, ownership,
+          MIR, ABI proofs, or LLVM. Retain those typed products explicitly and
+          make later phases consume them.
+      - [ ] Represent compiler errors as typed, retainable phase products.
+        - [ ] Introduce stable error identity, nominal kind, phase/operation,
+          subject identity, source witness, expected/observed fields, optional
+          cause, and observed dependency fingerprints.
+        - [ ] Make one narrow phase return an explicit success-product or
+          error-product outcome and render its existing diagnostic only at the
+          outer CLI boundary.
+        - [ ] Persist and invalidate failed outcomes by the same observation
+          rules as successful products so unchanged failures do not rerun the
+          complete phase.
+        - [ ] Replace cross-boundary arithmetic codes and overloaded negative
+          IDs incrementally; keep private local sentinels only where they cannot
+          escape their typed algorithm boundary.
+        - The current compiler stores failures in `Buffer<Int>`, multiplexes
+          reachability errors through shared counter slots, encodes ownership
+          and MIR context into decimal ranges, and reconstructs the diagnostic
+          later. This loses error identity and prevents safe failed-product
+          reuse.
+      - An 8-second live sample of the frozen Stage 3 run placed 6,377 of 6,468
+        samples in per-function emission, 3,420 in memory construction, and
+        3,259 in owned-path validation; the sampled process had reached a 16.9
+        GB peak physical footprint. Treat this as hotspot evidence, not an
+        exact whole-build phase total.
     - Phase timings show self-emission, not Clang or linking, dominates a
       compiler-source cache miss; preserve full candidate/fixed-point proofs.
     - The `@stored` selector proof measured 916 seconds emitting LLVM, 2
@@ -1503,16 +1641,17 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           focused validation pass.
         - `per-function-artifacts-v1` requires a bundle on every source-key
           miss; missing or malformed artifact state is a hard failure.
-      - [ ] Persist a stable `[@syntax]` artifact graph and store unchanged
-        LLVM fragments as immutable chunks.
+      - [ ] Persist typed phase products and use the graph only for observation
+        identity and reverse invalidation.
         - Fingerprint each syntax value independently, including blocks,
           functions, local and stored bindings, macro applications,
-          constructs, and enumerations. Key its phase artifacts by the syntax
-          fingerprint, compiler/seed/toolchain identity, and the fingerprints
-          of dependencies actually observed by that phase.
-        - Invalidate the changed syntax values plus their reverse dependency
-          closure. Functions remain LLVM-fragment owners, but are no longer
-          the only reusable compiler unit.
+          constructs, and enumerations. Retain resolved-body, CFG, ownership,
+          MIR, ABI-proof, and LLVM products under the syntax/function-instance
+          identity plus the fingerprints actually observed by that phase.
+        - Invalidate the first changed product plus its reverse dependency
+          closure. Functions remain LLVM-fragment owners, but later phases
+          consume retained typed predecessors rather than reconstructing them
+          from source and graph tables.
         - The exact-hit run still reparses/replans the complete compiler and
           reconstructs an approximately 8.3 MB artifact/module String.
           Dense instance indexing and unchecked string slices preserved the
@@ -1690,6 +1829,18 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [ ] Preserve focused macro-family, inline/identity/transparent storage,
       native compilation, and fixed-point proofs.
   - [ ] Phase 5: replace anonymous IntTable programming with typed stores.
+    - [ ] Complete the generated-member delta store cutover.
+      - [x] Make macro expansion construct a named
+        `CompilerGeneratedMemberDelta`, and make validation, collision checks,
+        commit, and diagnostics consume its named fields.
+      - [ ] Replace the private 24-column backing table and pending-table copy
+        with a typed delta store and an explicit resolved-member product.
+        - The development Stage 2 compiler accepted the 18-field scalar delta
+          aggregate; canonical-target and project macro fixtures committed one
+          and two generated members respectively through that boundary.
+      - [ ] Record delta provenance and observations as typed identities rather
+        than integer rows before making generated-member products reusable
+        across compiler runs.
     - [ ] Pilot declarations, members, functions, parameters, and type
       references behind named store operations while retaining private
       `Buffer<Int>` row-major or structure-of-arrays storage.

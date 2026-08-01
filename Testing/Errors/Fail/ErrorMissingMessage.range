@@ -1,0 +1,4 @@
+@error
+construct MissingMessageError {
+    let code: Int
+}

@@ -502,7 +502,8 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
             if compilerIntTableValue(table: arena.resolutions, row: enumResolutionRow, column: compilerBodyResolutionTargetKindColumn()) != compilerBodyResolutionEnumCase() { return CompilerBodyMIRValueResult(valueID: 0 - 1, isValid: false) }
             literalTypeKind: compilerBodyTypeEnum()
             literalTypeID: compilerIntTableValue(table: arena.resolutions, row: enumResolutionRow, column: compilerBodyResolutionTypeIDColumn())
-            if compilerBodyArenaTypeIDHasNativeNominalLayout(arena: arena, typeID: literalTypeID) {
+            if compilerBodyArenaIsCompileTime(arena: arena)
+                || compilerBodyArenaTypeIDHasNativeNominalLayout(arena: arena, typeID: literalTypeID) {
                 return compilerBodyMIRBuildBareEnumCase(arena: arena, enumCaseNodeID: nodeID, resolutionRow: enumResolutionRow, blockID: blockID)
             }
         }

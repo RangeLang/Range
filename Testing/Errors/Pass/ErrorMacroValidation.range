@@ -1,0 +1,5 @@
+@error
+construct UserError {
+    let message: String
+    let userID: String
+}

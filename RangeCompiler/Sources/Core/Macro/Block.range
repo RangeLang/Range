@@ -1,0 +1,5 @@
+construct BlockRegistration {}
+
+macro block(): Member -> BlockRegistration { environment in
+    return BlockRegistration()
+}

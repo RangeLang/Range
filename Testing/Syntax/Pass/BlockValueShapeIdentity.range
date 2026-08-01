@@ -8,7 +8,7 @@ enum DelimiterPair {
 
 @syntax
 construct Block<Value = @syntax, shape: DelimiterPair = .braces> {
-    let values: Array<Value>
+    let contents: Array<Value>
 }
 
 construct Closure {

@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+COMPILER_DIRECTORY="${1:-$REPO_ROOT/RangeCompiler/Sources/Compiler}"
+
+fail() {
+    echo "Range compiler profile failed: $*" >&2
+    exit 1
+}
+
+manifest_value() {
+    /usr/bin/plutil -extract "$1" raw -o - "$MANIFEST"
+}
+
+profile_root="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-profile.XXXXXX")"
+cleanup() {
+    /bin/rm -rf "$profile_root"
+}
+trap cleanup EXIT
+
+[[ -d "$COMPILER_DIRECTORY" ]] || fail "missing compiler directory: $COMPILER_DIRECTORY"
+COMPILER_DIRECTORY="$(cd "$COMPILER_DIRECTORY" && pwd)"
+
+profiled_compiler="$profile_root/RangeCompilerProfiled"
+profile_clock="$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerProfileClock.c"
+source_bundle="$profile_root/CompilerSourceSet.range"
+llvm_output="$profile_root/Compiler.ll"
+trace_output="$profile_root/Trace.tsv"
+resource_output="$profile_root/Resources.txt"
+compiler_llvm="${RANGE_COMPILER_PROFILE_LLVM:-$REPO_ROOT/$(manifest_value seed.path)}"
+provided_source_bundle="${RANGE_COMPILER_PROFILE_SOURCE_BUNDLE:-}"
+profile_artifact_input="${RANGE_COMPILER_PROFILE_ARTIFACT_INPUT:-}"
+profile_development="${RANGE_COMPILER_PROFILE_DEVELOPMENT:-0}"
+[[ -f "$compiler_llvm" ]] || fail "missing compiler LLVM: $compiler_llvm"
+
+runtime_inputs=()
+runtime_count="$(manifest_value runtimeSources)"
+for ((index = 0; index < runtime_count; index += 1)); do
+    runtime_inputs+=("$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")")
+done
+
+profile_objects=()
+clang -O2 -flto=thin -Wno-override-module -c "$compiler_llvm" -o "$profile_root/Compiler.o"
+profile_objects+=("$profile_root/Compiler.o")
+for ((index = 0; index < runtime_count; index += 1)); do
+    runtime_source="${runtime_inputs[$index]}"
+    runtime_object="$profile_root/Runtime-$index.o"
+    if [[ "$runtime_source" == "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerMetrics.c" ]]; then
+        clang -O2 -flto=thin \
+            -DcompilerMetricsFunctionBegin=compilerMetricsFunctionBeginBase \
+            -DcompilerMetricsFunctionEnd=compilerMetricsFunctionEndBase \
+            -c "$runtime_source" -o "$runtime_object"
+    else
+        clang -O2 -flto=thin -c "$runtime_source" -o "$runtime_object"
+    fi
+    profile_objects+=("$runtime_object")
+done
+clang -O2 -flto=thin -c "$profile_clock" -o "$profile_root/ProfileClock.o"
+profile_objects+=("$profile_root/ProfileClock.o")
+clang -O2 -flto=thin "${profile_objects[@]}" -o "$profiled_compiler"
+
+if [[ -n "$provided_source_bundle" ]]; then
+    [[ -f "$provided_source_bundle" ]] || fail "missing provided source bundle: $provided_source_bundle"
+    source_bundle="$provided_source_bundle"
+else
+    /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$source_bundle"
+    if [[ "$profile_development" == 1 ]]; then
+        /usr/bin/printf '%s\n' '// range-development-compiler' >> "$source_bundle"
+    fi
+    if [[ -n "$profile_artifact_input" ]]; then
+        [[ -f "$profile_artifact_input" ]] || fail "missing function artifact input: $profile_artifact_input"
+        /usr/bin/printf '// range-function-artifact-input %s\n' "$profile_artifact_input" >> "$source_bundle"
+        /usr/bin/printf '// range-function-artifact-output %s\n' "$profile_root/FunctionArtifacts.next" >> "$source_bundle"
+    fi
+    compiler_source_count="$(manifest_value compilerSources)"
+    for ((index = 0; index < compiler_source_count; index += 1)); do
+        role="$(manifest_value "compilerSources.$index.role")"
+        [[ "$role" == core ]] || continue
+        relative="$(manifest_value "compilerSources.$index.path")"
+        source="$REPO_ROOT/$relative"
+        [[ -f "$source" ]] || fail "missing compiler Core source: $relative"
+        /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=%s\n' "$relative" >> "$source_bundle"
+        /bin/cat "$source" >> "$source_bundle"
+        [[ -z "$(/usr/bin/tail -c 1 "$source")" ]] || /usr/bin/printf '\n' >> "$source_bundle"
+    done
+
+    while IFS= read -r source; do
+        relative="${source#"$COMPILER_DIRECTORY/"}"
+        /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "$relative" >> "$source_bundle"
+        /bin/cat "$source" >> "$source_bundle"
+        [[ -z "$(/usr/bin/tail -c 1 "$source")" ]] || /usr/bin/printf '\n' >> "$source_bundle"
+    done < <(/usr/bin/find "$COMPILER_DIRECTORY" -path '*/.range' -prune -o -type f -name '*.range' -print | LC_ALL=C /usr/bin/sort)
+fi
+
+set +e
+RANGE_COMPILER_PHASE_TRACE=1 RANGE_COMPILER_FUNCTION_TRACE=1 \
+    /usr/bin/time -l -o "$resource_output" \
+    "$profiled_compiler" "$source_bundle" > "$llvm_output" 2> "$trace_output"
+profile_status=$?
+set -e
+
+/usr/bin/printf 'compilerProfile\tstatus=%s\tllvmBytes=%s\tfunctionCount=%s\n' \
+    "$profile_status" "$(/usr/bin/stat -f %z "$llvm_output")" \
+    "$(/usr/bin/grep -c $'^compilerFunctionEnd\t' "$trace_output" || true)"
+/usr/bin/awk '
+    /maximum resident set size/ { maximum = $1 }
+    /peak memory footprint/ { peak = $1 }
+    END { printf "compilerResources\tmaximumResidentBytes=%s\tpeakFootprintBytes=%s\n", maximum, peak }
+' "$resource_output"
+/usr/bin/grep $'^compilerPhase\t' "$trace_output" || true
+/usr/bin/grep $'^compilerFunctionEnd\t' "$trace_output" \
+    | /usr/bin/awk -F '\t' '
+        {
+            name = ""
+            duration = 0
+            for (field = 1; field <= NF; field += 1) {
+                if ($field ~ /^name=abi\./) {
+                    name = $field
+                    sub(/^name=abi\./, "", name)
+                    sub(/\..*$/, "", name)
+                } else if ($field ~ /^durationMicroseconds=/) {
+                    split($field, pair, "=")
+                    duration = pair[2]
+                }
+            }
+            if (name != "") {
+                count[name] += 1
+                microseconds[name] += duration
+            }
+        }
+        END {
+            split("parse resolve cfg ownership mir validate emit cleanup", order, " ")
+            for (ordinal = 1; ordinal <= 8; ordinal += 1) {
+                name = order[ordinal]
+                printf "compilerABIStage\tname=%s\tcount=%d\tdurationMicroseconds=%d\n", name, count[name], microseconds[name]
+            }
+        }
+    ' || true
+/usr/bin/grep $'^compilerFunctionEnd\t' "$trace_output" \
+    | /usr/bin/awk -F '\t' '
+        {
+            duration = 0
+            for (field = 1; field <= NF; field += 1) {
+                if ($field ~ /^durationMicroseconds=/) {
+                    split($field, pair, "=")
+                    duration = pair[2]
+                }
+            }
+            print duration "\t" $0
+        }
+    ' \
+    | LC_ALL=C /usr/bin/sort -nr \
+    | /usr/bin/sed -n '1,50p' \
+    | /usr/bin/cut -f 2- || true
+
+if [[ "$profile_status" -ne 0 ]]; then
+    /usr/bin/tail -n 20 "$llvm_output" >&2
+    /usr/bin/tail -n 40 "$trace_output" >&2
+fi
+exit "$profile_status"

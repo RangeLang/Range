@@ -1,10 +1,27 @@
 <div align="center">
 
-# Range Performance
+<a href="https://rangelang.org">
+  <img src="Website/public/og-homepage.png" alt="Range — a love letter to electrons, logic and abstraction" width="100%">
+</a>
 
-Native LLVM · `-O3` · July 2026
+### An applied programming language
+
+[Website](https://rangelang.org) · [Intro to Range](https://rangelang.org/posts/intro-to-range) · [Benchmarks](https://rangelang.org/benchmarks)
 
 </div>
+
+Range describes a program as a typed graph. Identity and value are its smallest
+unit of meaning; binding intents describe access; constructs, enums, and
+functions compose the graph. Macros receive program structure and return a
+transformed execution graph.
+
+The supported implementation is the Range-authored self-hosted compiler. It
+emits native LLVM and must reproduce byte-identical LLVM and linked compiler
+executables before a compiler change is accepted.
+
+## Performance
+
+Native LLVM · `-O3` · July 2026
 
 ![Range String performance improved from 491.2 ms and 5.3 GB to 4.1 ms and 1.9 MB](Benchmarks/Speed/range-strings-improvement.svg)
 
@@ -116,13 +133,10 @@ scripts/range compiler progression
 scripts/range check-stage2-compiler
 ```
 
-The supported implementation is the Range-authored self-hosted compiler kernel.
-It emits native LLVM and must reproduce byte-identical LLVM and linked compiler
-executables before a compiler change is accepted. The ordinary file/directory
-wrapper bundles canonical Core sources through the accepted compiler;
-`range run` additionally links the manifest-declared runtime inputs and
-executes `@main`. See the [speed benchmark](Benchmarks/Speed/README.md) for
-performance comparisons.
+The ordinary file/directory wrapper bundles canonical Core sources through the
+accepted compiler; `range run` additionally links the manifest-declared runtime
+inputs and executes `@main`. See the
+[speed benchmark](Benchmarks/Speed/README.md) for performance comparisons.
 
 ## License
 

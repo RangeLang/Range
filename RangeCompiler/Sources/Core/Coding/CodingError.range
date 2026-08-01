@@ -2,11 +2,13 @@ construct CodingPath {
     let components: Array<String>
 }
 
+@error
 construct EncodingError {
     let message: String
     let path: CodingPath
 }
 
+@error
 construct DecodingError {
     let message: String
     let path: CodingPath

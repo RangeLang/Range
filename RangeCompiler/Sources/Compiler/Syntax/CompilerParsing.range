@@ -781,6 +781,13 @@ function compilerMacroRenderExpansionExecution(tables: CompilerSyntaxTables): St
         row: row + 1
     }
     row: 0
+    while row < compilerIntTableRowCount(table: tables.macroContributions) {
+        let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroContributions, row: row, column: 3))
+        let nominalSyntaxID: Int(compilerIntTableValue(table: tables.macroContributions, row: row, column: 5))
+        rawBufferAppendText(buffer: outputBuffer, text: "macroContribution\(tab)row=\(row)\(tab)invocationRow=\(compilerIntTableValue(table: tables.macroContributions, row: row, column: 1))\(tab)applicationRow=\(compilerIntTableValue(table: tables.macroContributions, row: row, column: 2))\(tab)targetSyntaxID=\(targetSyntaxID)\(tab)targetName=\(compilerRelationshipRegistrationTargetName(tables: tables, targetMemberSyntaxID: targetSyntaxID))\(tab)resultRow=\(compilerIntTableValue(table: tables.macroContributions, row: row, column: 4))\(tab)nominalSyntaxID=\(nominalSyntaxID)\(tab)nominalName=\(compilerDeclarationNameForSyntaxID(tables: tables, syntaxID: nominalSyntaxID))\(tab)ordinal=\(compilerIntTableValue(table: tables.macroContributions, row: row, column: 6))\(tab)stableIdentity=\(compilerIntTableValue(table: tables.macroContributions, row: row, column: 7)):\(compilerIntTableValue(table: tables.macroContributions, row: row, column: 8))\(newline)")
+        row: row + 1
+    }
+    row: 0
     while row < compilerIntTableRowCount(table: tables.macroExpansionBindings) {
         rawBufferAppendText(buffer: outputBuffer, text: "macroExpansionBinding\(tab)row=\(row)\(tab)parentInvocationRow=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 1))\(tab)childApplicationRow=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 2))\(tab)templateRow=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 3))\(tab)fragmentRow=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 4))\(tab)symbolID=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 5))\(tab)kind=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 6))\(tab)typeKind=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 7))\(tab)scalar=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 9))\(tab)childCount=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 10))\(tab)parentRow=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 11))\(tab)ordinal=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 12))\(tab)nameHash=\(compilerIntTableValue(table: tables.macroExpansionBindings, row: row, column: 14))\(newline)")
         row: row + 1
@@ -801,6 +808,30 @@ function compilerMacroRenderExecutionError(tables: CompilerSyntaxTables, result:
     let applicationRow: Int(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 1))
     let declarationRow: Int(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 2))
     let applicationFileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
+    let applicationArgumentStart: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 8))
+    let applicationArgumentEnd: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 9))
+    let firstMacroParameterRow: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 23))
+    let macroParameterCount: Int(compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 24))
+    state firstMacroParameterOrdinal: Int(0 - 1)
+    state firstMacroParameterName: String("")
+    state firstMacroParameterType: String("")
+    if macroParameterCount > 0
+        && firstMacroParameterRow >= 0
+        && firstMacroParameterRow < compilerIntTableRowCount(table: tables.macroParameters) {
+        firstMacroParameterOrdinal: compilerIntTableValue(table: tables.macroParameters, row: firstMacroParameterRow, column: 2)
+        firstMacroParameterName: compilerTypedSyntaxLocalText(
+            tables: tables,
+            fileID: compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 1),
+            localStart: compilerIntTableValue(table: tables.macroParameters, row: firstMacroParameterRow, column: 5),
+            localEnd: compilerIntTableValue(table: tables.macroParameters, row: firstMacroParameterRow, column: 6)
+        )
+        firstMacroParameterType: compilerTypedSyntaxLocalText(
+            tables: tables,
+            fileID: compilerIntTableValue(table: tables.macroDeclarations, row: declarationRow, column: 1),
+            localStart: compilerIntTableValue(table: tables.macroParameters, row: firstMacroParameterRow, column: 7),
+            localEnd: compilerIntTableValue(table: tables.macroParameters, row: firstMacroParameterRow, column: 8)
+        )
+    }
     let identityFirst: Int(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 23))
     let identitySecond: Int(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 24))
     state message: String("")
@@ -819,8 +850,66 @@ function compilerMacroRenderExecutionError(tables: CompilerSyntaxTables, result:
         }
         eventRow: eventRow + 1
     }
-    state output: String("compilerError\tkind=macroExecution\tdiagnosticKind=\(compilerMacroDiagnosticName(code: compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 10)))\tmessage=\(message)\tdiagnosticFileID=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 11))\tdiagnosticStart=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 12))\tdiagnosticEnd=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 13))\tapplicationFileID=\(applicationFileID)\tapplicationStart=\(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 2))\tapplicationEnd=\(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 3))\ttargetFileID=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 17))\ttargetStart=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 18))\ttargetEnd=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 19))\tmacroDeclarationFileID=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 20))\tmacroDeclarationStart=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 21))\tmacroDeclarationEnd=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 22))\tmacroBodyStart=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 15))\tmacroBodyEnd=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 16))\tpipelineStatus=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 33))\tpipelineFailureCode=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 34))\teventSourceFileID=\(eventSourceFileID)\teventSourceStart=\(eventSourceStart)\teventSourceEnd=\(eventSourceEnd)\tgraphDeltaNodeCount=\(compilerIntTableRowCount(table: result.graphDelta.nodes))\tgraphDeltaFactCount=\(compilerIntTableRowCount(table: result.graphDelta.facts))\treadDependencyCount=\(result.readDependencyCount)\tinvocationIdentity=\(identityFirst):\(identitySecond)\n")
+    state output: String("compilerError\tkind=macroExecution\tdiagnosticKind=\(compilerMacroDiagnosticName(code: compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 10)))\tmessage=\(message)\tdiagnosticFileID=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 11))\tdiagnosticStart=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 12))\tdiagnosticEnd=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 13))\tapplicationFileID=\(applicationFileID)\tapplicationStart=\(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 2))\tapplicationEnd=\(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 3))\tapplicationArgumentStart=\(applicationArgumentStart)\tapplicationArgumentEnd=\(applicationArgumentEnd)\tmacroParameterFirst=\(firstMacroParameterRow)\tmacroParameterCount=\(macroParameterCount)\tfirstMacroParameterOrdinal=\(firstMacroParameterOrdinal)\tfirstMacroParameterName=\(firstMacroParameterName)\tfirstMacroParameterType=\(firstMacroParameterType)\ttargetFileID=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 17))\ttargetStart=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 18))\ttargetEnd=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 19))\tmacroDeclarationFileID=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 20))\tmacroDeclarationStart=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 21))\tmacroDeclarationEnd=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 22))\tmacroBodyStart=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 15))\tmacroBodyEnd=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 16))\tpipelineStatus=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 33))\tpipelineFailureCode=\(compilerIntTableValue(table: tables.macroInvocations, row: invocationRow, column: 34))\teventSourceFileID=\(eventSourceFileID)\teventSourceStart=\(eventSourceStart)\teventSourceEnd=\(eventSourceEnd)\tgraphDeltaNodeCount=\(compilerIntTableRowCount(table: result.graphDelta.nodes))\tgraphDeltaFactCount=\(compilerIntTableRowCount(table: result.graphDelta.facts))\treadDependencyCount=\(result.readDependencyCount)\tinvocationIdentity=\(identityFirst):\(identitySecond)\n")
     output: "\(output)\(compilerMacroRenderReadDependencies(tables: tables))"
+    return output
+}
+
+function compilerRelationshipRegistrationTargetName(tables: CompilerSyntaxTables, targetMemberSyntaxID: Int): String {
+    if targetMemberSyntaxID < 0 || targetMemberSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
+        || compilerIntTableValue(table: tables.syntaxIndex, row: targetMemberSyntaxID, column: 0) != compilerSyntaxKindMember() {
+        return String("")
+    }
+    let memberRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: targetMemberSyntaxID, column: 1))
+    if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: tables.members) { return String("") }
+    let fileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
+    return compilerTypedSyntaxLocalText(
+        tables: tables,
+        fileID: fileID,
+        localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 6),
+        localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 7)
+    )
+}
+
+function compilerRelationshipRegistrationRenderSnapshot(tables: CompilerSyntaxTables): String {
+    state output: String("")
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.relationshipRegistrations) {
+        let targetMemberSyntaxID: Int(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationTargetMemberColumn()))
+        let ownerSyntaxID: Int(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationOwnerColumn()))
+        output: "\(output)relationshipRegistration\trow=\(row)\tresultRow=\(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationSourceResultColumn()))\tinvocationRow=\(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationInvocationColumn()))\tapplicationRow=\(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationApplicationColumn()))\ttargetMemberSyntaxID=\(targetMemberSyntaxID)\ttargetName=\(compilerRelationshipRegistrationTargetName(tables: tables, targetMemberSyntaxID: targetMemberSyntaxID))\townerSyntaxID=\(ownerSyntaxID)\townerName=\(compilerDeclarationNameForSyntaxID(tables: tables, syntaxID: ownerSyntaxID))\tminimum=\(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationMinimumColumn()))\tmaximumKind=\(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationMaximumKindColumn()))\tmaximum=\(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationMaximumColumn()))\tordering=\(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationOrderingColumn()))\tseparatorKind=\(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationSeparatorKindColumn()))\tseparatorValueResultRow=\(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationSeparatorValueResultColumn()))\tenclosureKind=\(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationEnclosureKindColumn()))\tdelimiterPair=\(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationDelimiterPairColumn()))\tadmission=\(compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationAdmissionColumn()))\n"
+        row: row + 1
+    }
+    return output
+}
+
+function compilerBlockRegistrationRenderSnapshot(tables: CompilerSyntaxTables): String {
+    state output: String("")
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.blockRegistrations) {
+        let targetMemberSyntaxID: Int(compilerIntTableValue(table: tables.blockRegistrations, row: row, column: compilerBlockRegistrationTargetMemberColumn()))
+        let ownerSyntaxID: Int(compilerIntTableValue(table: tables.blockRegistrations, row: row, column: compilerBlockRegistrationOwnerColumn()))
+        output: "\(output)blockRegistration\trow=\(row)\tresultRow=\(compilerIntTableValue(table: tables.blockRegistrations, row: row, column: compilerBlockRegistrationSourceResultColumn()))\tinvocationRow=\(compilerIntTableValue(table: tables.blockRegistrations, row: row, column: compilerBlockRegistrationInvocationColumn()))\tapplicationRow=\(compilerIntTableValue(table: tables.blockRegistrations, row: row, column: compilerBlockRegistrationApplicationColumn()))\ttargetMemberSyntaxID=\(targetMemberSyntaxID)\ttargetName=\(compilerRelationshipRegistrationTargetName(tables: tables, targetMemberSyntaxID: targetMemberSyntaxID))\townerSyntaxID=\(ownerSyntaxID)\townerName=\(compilerDeclarationNameForSyntaxID(tables: tables, syntaxID: ownerSyntaxID))\trelationshipRow=\(compilerIntTableValue(table: tables.blockRegistrations, row: row, column: compilerBlockRegistrationRelationshipColumn()))\n"
+        row: row + 1
+    }
+    return output
+}
+
+function compilerBlockContentsSlotRenderSnapshot(tables: CompilerSyntaxTables): String {
+    state output: String("")
+    state slotID: Int(0)
+    while slotID < compilerIntTableRowCount(table: tables.slots) {
+        if compilerIntTableValue(table: tables.slots, row: slotID, column: 3) == compilerSyntaxSlotContents() {
+            let ownerSyntaxID: Int(compilerIntTableValue(table: tables.slots, row: slotID, column: 2))
+            let delimiterPairKind: Int(compilerSyntaxBlockDelimiterPairKind(tables: tables, blockSyntaxID: ownerSyntaxID))
+            let relationshipRow: Int(compilerSyntaxBlockRegistrationRelationshipRow(tables: tables, delimiterPairKind: delimiterPairKind))
+            let registrationRow: Int(compilerBlockRegistrationRowForRelationship(tables: tables, relationshipRow: relationshipRow))
+            if registrationRow >= 0 {
+                output: "\(output)blockContentsSlot\trow=\(slotID)\tregistrationRow=\(registrationRow)\trelationshipRow=\(relationshipRow)\townerSyntaxID=\(ownerSyntaxID)\tdelimiterPair=\(delimiterPairKind)\tminimum=\(compilerIntTableValue(table: tables.slots, row: slotID, column: 5))\tmaximumKind=\(compilerIntTableValue(table: tables.slots, row: slotID, column: 6))\tmaximum=\(compilerIntTableValue(table: tables.slots, row: slotID, column: 7))\tordering=\(compilerIntTableValue(table: tables.slots, row: slotID, column: 8))\tseparatorKind=\(compilerIntTableValue(table: tables.slots, row: slotID, column: 9))\tenclosureKind=\(compilerIntTableValue(table: tables.slots, row: slotID, column: 11))\tadmission=\(compilerIntTableValue(table: tables.slots, row: slotID, column: compilerSyntaxSlotAdmissionEnvironmentColumn()))\n"
+            }
+        }
+        slotID: slotID + 1
+    }
     return output
 }
 
@@ -839,6 +928,9 @@ function compilerMacroRenderExecutionSnapshot(tables: CompilerSyntaxTables, resu
         output: "\(output)macroResult\trow=\(row)\tinvocationRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 1))\tapplicationRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 2))\tkind=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 5))\ttypeKind=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 6))\tnominalSyntaxID=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 7))\tscalar=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 8))\tchildCount=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 9))\tparentRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 10))\tordinal=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 11))\trelationshipRow=\(compilerIntTableValue(table: tables.macroResults, row: row, column: 12))\n"
         row: row + 1
     }
+    output: "\(output)\(compilerRelationshipRegistrationRenderSnapshot(tables: tables))"
+    output: "\(output)\(compilerBlockRegistrationRenderSnapshot(tables: tables))"
+    output: "\(output)\(compilerBlockContentsSlotRenderSnapshot(tables: tables))"
     row: 0
     while row < compilerIntTableRowCount(table: tables.compilerFormulaFacts) {
         output: "\(output)compilerFormulaFact\trow=\(row)\tkind=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 1))\tinvocationRow=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 2))\tapplicationRow=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 3))\ttargetSyntaxID=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 4))\tcategory=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 5))\tsemanticElementSyntaxID=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 6))\tencoding=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 7))\tbits=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 8))\tsignedness=\(compilerIntTableValue(table: tables.compilerFormulaFacts, row: row, column: 9))\n"
@@ -928,6 +1020,42 @@ function compilerMacroSummary(source: String): String {
     }
     if compilerSyntaxTablesDestroy(tables: tables) != 0 {
         return "compilerError(compilerCoreTabCharacter())kind=macroOwnershipFailure(compilerCoreNewlineCharacter())"
+    }
+    return output
+}
+
+function compilerMacroSyntaxSummary(source: String): String {
+    let tables: CompilerSyntaxTables(compilerSyntaxTablesCreate(source: source))
+    let captureStatus: Int(compilerTypedSyntaxCapture(source: source, tables: tables))
+    state output: String("")
+    if captureStatus != 0 || !compilerSyntaxTablesIsValid(tables: tables) {
+        output: compilerInvalidTypedDeclarationsDiagnostic(tables: tables)
+    } else {
+        let linkStatus: Int(compilerMacroLink(tables: tables))
+        if linkStatus != 0 || compilerIntTableRowCount(table: tables.macroDiagnostics) != 0 {
+            output: compilerMacroRenderDiagnostics(tables: tables)
+        } else {
+            let index: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: tables))
+            if !index.isValid {
+                output: String("compilerError\tkind=invalidDeclarationIndex\n")
+            } else {
+                let execution: CompilerMacroExecutionResult(compilerMacroExecution(tables: tables, index: index))
+                if execution.status != 0 {
+                    output: compilerMacroRenderExecutionError(tables: tables, result: execution)
+                } else {
+                    output: "\(compilerTypedSyntaxRenderSnapshot(tables: tables))\(compilerMacroRenderExecutionSnapshot(tables: tables, result: execution))"
+                }
+                if compilerGraphDeltaDestroy(delta: execution.graphDelta) != 0 {
+                    output: String("compilerError\tkind=macroOwnershipFailure\n")
+                }
+            }
+            if compilerDeclarationIndexDestroy(index: index) != 0 {
+                output: String("compilerError\tkind=macroOwnershipFailure\n")
+            }
+        }
+    }
+    if compilerSyntaxTablesDestroy(tables: tables) != 0 {
+        return String("compilerError\tkind=macroOwnershipFailure\n")
     }
     return output
 }

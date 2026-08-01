@@ -1,0 +1,14 @@
+macro contents(_ shape: DelimiterPair): Member { environment in
+    #environment {
+        RelationshipRegistration(
+            multiplicity: RelationshipMultiplicity(
+                minimum: 0,
+                maximum: .unbounded
+            ),
+            ordering: .ordered,
+            separator: .none,
+            enclosure: .delimited(pair: shape),
+            admission: .block
+        )
+    }
+}

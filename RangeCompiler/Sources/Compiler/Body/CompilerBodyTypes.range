@@ -2247,6 +2247,23 @@ function compilerBodyArenaExpectedApplicationArgumentTypeID(arena: CompilerBodyA
     if targetKind == compilerBodyResolutionEnum() {
         return compilerIntTableValue(table: arena.resolutions, row: calleeResolutionRow, column: compilerBodyResolutionTypeIDColumn())
     }
+    if targetKind == compilerBodyResolutionEnumCase() {
+        let enumTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: calleeResolutionRow, column: compilerBodyResolutionTypeIDColumn()))
+        let payloadRow: Int(
+            compilerBodyArenaEnumPayloadRowForArgument(
+                arena: arena,
+                caseMemberRow: targetID,
+                argumentNodeID: argumentNodeID,
+                allowUnlabeled: false
+            )
+        )
+        if enumTypeID < 0 || payloadRow < 0 { return 0 - 1 }
+        return compilerBodyArenaEnumPayloadTypeID(
+            arena: arena,
+            enumTypeID: enumTypeID,
+            payloadRow: payloadRow
+        )
+    }
     if targetKind == compilerBodyResolutionConstruct() {
         let memberRow: Int(compilerBodyArenaConstructMemberRowForArgument(arena: arena, constructSyntaxID: targetID, argumentNodeID: argumentNodeID))
         let receiverTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: calleeResolutionRow, column: compilerBodyResolutionTypeIDColumn()))

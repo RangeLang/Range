@@ -1091,6 +1091,7 @@ function compilerBodyArenaAppendExpandStatement(arena: CompilerBodyArena, statem
     state cursor: Int(expansion.start)
     state boundaryOrdinal: Int(0)
     state previousWasExtension: Bool(false)
+    state enclosureDepth: Int(0)
     while cursor < expansion.end {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
         if maybeToken == nil { return compilerBodyParseFailure(index: cursor) }
@@ -1119,9 +1120,33 @@ function compilerBodyArenaAppendExpandStatement(arena: CompilerBodyArena, statem
             }
             previousWasExtension: false
             cursor: boundary.next
+        } else if boundaryOrdinal == 0 && enclosureDepth == 0 && token.kind == .identifier {
+            let maybeFollowing: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: token.end))
+            state parsesRootValue: Bool(false)
+            if maybeFollowing != nil {
+                let following: RangeLexedToken(maybeFollowing ?? compilerFallbackTokenAt(index: token.end))
+                if following.kind == .leftParen { parsesRootValue: true }
+            }
+            if parsesRootValue {
+                let value: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: token.start, limit: expansion.end, minimumPrecedence: 0))
+                if !value.isValid || compilerCoreFirstNonWhitespaceIndex(source: arena.tables.sourceStore.source, start: value.nextIndex, end: expansion.end) < expansion.end
+                    || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: applicationNodeID, childNodeID: value.nodeID, role: compilerSyntaxRoleExpansionValue(), ordinal: boundaryOrdinal) != 0 {
+                    return compilerBodyParseFailure(index: token.start)
+                }
+                boundaryOrdinal: boundaryOrdinal + 1
+                cursor: expansion.end
+            } else {
+                previousWasExtension: false
+                cursor: token.end
+            }
         } else {
             previousWasExtension: false
             if token.kind == .keyword && token.text == String("extension") { previousWasExtension: true }
+            if token.kind == .leftBrace || token.kind == .leftBracket || token.kind == .leftParen { enclosureDepth: enclosureDepth + 1 }
+            if token.kind == .rightBrace || token.kind == .rightBracket || token.kind == .rightParen {
+                if enclosureDepth <= 0 { return compilerBodyParseFailure(index: token.start) }
+                enclosureDepth: enclosureDepth - 1
+            }
             cursor: token.end
         }
     }

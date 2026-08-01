@@ -237,6 +237,9 @@ construct CompilerSyntaxTables {
     let macroExecutionEvents: CompilerIntTable
     let macroReadDependencies: CompilerIntTable
     let macroResults: CompilerIntTable
+    let macroContributions: CompilerIntTable
+    let relationshipRegistrations: CompilerIntTable
+    let blockRegistrations: CompilerIntTable
     let compilerFormulaFacts: CompilerIntTable
     let macroExpansionTemplates: CompilerIntTable
     let macroExpansionFragments: CompilerIntTable
@@ -431,6 +434,31 @@ construct CompilerBodySyntaxCaptureContext {
     let statementOrdinal: Int
 }
 
+// A generated member is an incomplete graph contribution until the frontend
+// validates its source witnesses, identities, placement, and target. The
+// compact integer table remains private storage; phase logic constructs and
+// consumes this named delta value.
+construct CompilerGeneratedMemberDelta {
+    let ownerSyntaxID: Int
+    let fileID: Int
+    let memberStart: Int
+    let memberEnd: Int
+    let nameStart: Int
+    let nameEnd: Int
+    let typeStart: Int
+    let typeEnd: Int
+    let macroDeclarationRow: Int
+    let applicationRow: Int
+    let templateOrdinal: Int
+    let applicationIdentity: CompilerFingerprint
+    let targetIdentity: CompilerFingerprint
+    let stableIdentity: CompilerFingerprint
+    let placement: Int
+    let lexicalParentOrdinal: Int
+    let parentIdentity: CompilerFingerprint
+    let memberKind: Int
+}
+
 construct CompilerGraphDelta {
     let nodes: CompilerIntTable
     let facts: CompilerIntTable
@@ -473,6 +501,7 @@ construct CompilerMacroValueStore {
     let kinds: Buffer<Int>
     let typeKinds: Buffer<Int>
     let typeIDs: Buffer<Int>
+    let nominalSyntaxIDs: Buffer<Int>
     let scalars: Buffer<Int>
     let relationshipRows: Buffer<Int>
     let firstChildren: Buffer<Int>

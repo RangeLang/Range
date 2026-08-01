@@ -1,0 +1,7 @@
+construct RelationshipRegistrationTarget {
+    @many
+    let values: Int
+
+    @contents(.braces)
+    let contents: Int
+}

@@ -1,6 +1,8 @@
-compilerMacroSnapshot
+compilerMacroSyntaxSnapshot
+
 @builtin
 construct Array<Element> {}
+
 construct TypeReference {}
 construct Expression {}
 
@@ -31,6 +33,16 @@ construct Member {
     let macros: Array<MacroApplication>
 }
 
+construct Construct {}
+macro syntax(): Construct -> Void {}
+
+enum DelimiterPair {
+    case parentheses
+    case braces
+    case brackets
+    case angles
+}
+
 enum RelationshipBound {
     case finite(value: Int)
     case unbounded
@@ -48,14 +60,6 @@ enum RelationshipOrdering {
 
 enum RelationshipSeparator {
     case none
-    case syntax(identifier: Identifier)
-}
-
-enum DelimiterPair {
-    case parentheses
-    case braces
-    case brackets
-    case angles
 }
 
 enum RelationshipEnclosure {
@@ -76,40 +80,39 @@ construct RelationshipRegistration {
     let admission: RelationshipAdmission
 }
 
-function oneRelationshipMultiplicity(): RelationshipMultiplicity {
-    return RelationshipMultiplicity(minimum: 1, maximum: .finite(value: 1))
-}
+construct BlockRegistration {}
 
-function scalarValueRelationship(): RelationshipRegistration {
+macro contents(_ shape: DelimiterPair): Member -> RelationshipRegistration { environment in
     return RelationshipRegistration(
-        multiplicity: oneRelationshipMultiplicity(),
-        ordering: .unordered,
+        multiplicity: RelationshipMultiplicity(
+            minimum: 0,
+            maximum: .unbounded
+        ),
+        ordering: .ordered,
         separator: .none,
-        enclosure: .none,
-        admission: .any
+        enclosure: .delimited(pair: shape),
+        admission: .block
     )
 }
 
-construct Observation {
-    let minimum: Int
-    let admission: RelationshipAdmission
+macro block(): Member -> BlockRegistration { environment in
+    return BlockRegistration()
 }
 
-macro value(): Member -> RelationshipRegistration { environment in
-    return scalarValueRelationship()
+@syntax
+construct FirstBlock {
+    @contents(.braces)
+    @block
+    let contents: Array<@syntax>
 }
 
-macro observeValue(): Member -> Observation { environment in
-    let application: MacroApplication(environment.target.macros[0])
-    let registration: RelationshipRegistration(application.value)
-    return Observation(
-        minimum: registration.multiplicity.minimum,
-        admission: registration.admission
-    )
+@syntax
+construct SecondBlock {
+    @contents(.braces)
+    @block
+    let contents: Array<@syntax>
 }
 
-construct ValueRelationshipTarget {
-    @value
-    @observeValue
-    let payload: Int
+function proof(): Int {
+    return 1
 }

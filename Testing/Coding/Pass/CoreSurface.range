@@ -1,6 +1,13 @@
 compilerTypedSyntaxSnapshot
 compilerSourceFile\trole=core\tpath=Core/Syntax/Construct.range
 construct Construct {}
+macro error(): Construct -> Void {}
+
+compilerSourceFile\trole=core\tpath=Core/System/Result/Error.range
+@error
+construct Error {
+    let message: String
+}
 
 compilerSourceFile\trole=core\tpath=Core/System/Result/Result.range
 enum Result<Value, Failure> {
@@ -16,11 +23,13 @@ construct CodingPath {
     let components: Array<String>
 }
 
+@error
 construct EncodingError {
     let message: String
     let path: CodingPath
 }
 
+@error
 construct DecodingError {
     let message: String
     let path: CodingPath
