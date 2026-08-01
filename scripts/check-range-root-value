@@ -1305,6 +1305,10 @@ check_missing_nominal_graph_warning() {
     [[ ! -s "$error" ]] || fail "Graph nominal-declaration fixture wrote stderr"
     /usr/bin/grep -Fq $'graphDelta\tvalid=true\tnodeCount=17\tfactCount=15\tgeneratedFunctionCount=0\tnominalCount=9\tnominalReferenceCount=6\twarningCount=0' "$declarations_output" \
         || fail "Graph artifact did not retain every keyword-plus-name declaration"
+    /usr/bin/grep -F $'graphRelationship\t' "$declarations_output" | /usr/bin/grep -F $'role=member' | /usr/bin/grep -F $'minimum=0\tmaximumKind=unbounded\tmaximum=-1\tordering=ordered' > /dev/null \
+        || fail "Graph artifact did not retain the ordered many member relationship"
+    /usr/bin/grep -Fq $'graphRelationship\tid=7\trole=parameter\toriginNodeID=12\toriginKind=syntax\toriginID=12\tdestinationNodeID=13\tdestinationKind=syntax\tdestinationID=13\tordinal=0\tminimum=0\tmaximumKind=unbounded\tmaximum=-1\tordering=ordered\tseparatorKind=1\tseparatorID=12\tenclosureKind=1\tenclosureID=12' "$declarations_output" \
+        || fail "Graph artifact did not retain the comma-separated parenthesized parameter relationship"
     for declaration in \
         $'keyword=macro\tname=observed' \
         $'keyword=construct\tname=Model' \
@@ -1348,6 +1352,22 @@ check_missing_nominal_graph_warning() {
     [[ ! -s "$error" ]] || fail "Graph macro-nominal fixture wrote stderr"
     /usr/bin/grep -Fq $'graphDelta\tvalid=true\tnodeCount=1\tfactCount=0\tgeneratedFunctionCount=0\tnominalCount=2\tnominalReferenceCount=2\twarningCount=1' "$macro_output" \
         || fail "Graph artifact did not retain macro declarations and applications"
+    /usr/bin/grep -Fq $'identityCount=4\trelationshipCount=4' "$macro_output" \
+        || fail "Graph artifact did not project macro declarations and applications as identities"
+    /usr/bin/grep -Fq $'graphIdentity\tid=1\tkind=macroDeclaration\tidentityID=0\tsyntaxKind=macro\tname=observed' "$macro_output" \
+        || fail "Graph artifact did not plot the macro declaration identity"
+    /usr/bin/grep -Fq $'graphIdentity\tid=2\tkind=macroApplication\tidentityID=0\tsyntaxKind=construct\tname=observed' "$macro_output" \
+        || fail "Graph artifact did not plot the resolved macro application identity"
+    /usr/bin/grep -Fq $'graphIdentity\tid=3\tkind=macroApplication\tidentityID=1\tsyntaxKind=construct\tname=missing' "$macro_output" \
+        || fail "Graph artifact did not plot the unresolved macro application identity"
+    /usr/bin/grep -Fq $'graphRelationship\tid=0\trole=appliesTo\toriginNodeID=2\toriginKind=macroApplication\toriginID=0\tdestinationNodeID=0\tdestinationKind=syntax\tdestinationID=0\tordinal=0\tminimum=1\tmaximumKind=finite\tmaximum=1\tordering=unordered' "$macro_output" \
+        || fail "Graph artifact did not project the macro appliesTo relationship"
+    /usr/bin/grep -Fq $'graphRelationship\tid=1\trole=references\toriginNodeID=2\toriginKind=macroApplication\toriginID=0\tdestinationNodeID=1\tdestinationKind=macroDeclaration\tdestinationID=0' "$macro_output" \
+        || fail "Graph artifact did not project the macro references relationship"
+    /usr/bin/grep -Fq $'graphRelationship\tid=2\trole=resolvedBy\toriginNodeID=2\toriginKind=macroApplication\toriginID=0\tdestinationNodeID=1\tdestinationKind=macroDeclaration\tdestinationID=0' "$macro_output" \
+        || fail "Graph artifact did not project the macro resolvedBy relationship"
+    /usr/bin/grep -Fq $'graphRelationship\tid=3\trole=appliesTo\toriginNodeID=3\toriginKind=macroApplication\toriginID=1\tdestinationNodeID=0\tdestinationKind=syntax\tdestinationID=0\tordinal=1' "$macro_output" \
+        || fail "Graph artifact did not retain the unresolved application's target relationship"
     /usr/bin/grep -Fq $'role=macroApplication\texpectedKinds=macro\tname=observed\ttargetKind=declaration' "$macro_output" \
         || fail "Graph artifact did not link the declared macro application"
     /usr/bin/grep -Fq $'sourceKind=macroApplication\tsourceReferenceID=0\tparentSourceReferenceID=-1' "$macro_output" \
@@ -1364,6 +1384,12 @@ check_missing_nominal_graph_warning() {
     [[ ! -s "$error" ]] || fail "Graph macro target-mismatch fixture wrote stderr"
     /usr/bin/grep -Fq $'role=macroApplication\texpectedKinds=macro\tname=observed\ttargetKind=targetMismatch\ttargetID=1\ttargetNominalID=1\tdeclared=true\tapplicable=false' "$macro_mismatch_output" \
         || fail "Graph artifact did not preserve target-aware macro resolution"
+    /usr/bin/grep -Fq $'identityCount=3\trelationshipCount=2' "$macro_mismatch_output" \
+        || fail "Graph artifact did not retain the mismatch application and candidate identities"
+    /usr/bin/grep -Fq $'role=references\toriginNodeID=2\toriginKind=macroApplication\toriginID=0\tdestinationNodeID=1\tdestinationKind=macroDeclaration\tdestinationID=0' "$macro_mismatch_output" \
+        || fail "Graph artifact did not retain the mismatch candidate relationship"
+    ! /usr/bin/grep -Fq $'role=resolvedBy\toriginNodeID=2\toriginKind=macroApplication\toriginID=0' "$macro_mismatch_output" \
+        || fail "Graph artifact resolved a target-mismatched macro application"
     /usr/bin/grep -Fq $'graphWarning\tseverity=warning\tkind=nominalTargetMismatch' "$macro_mismatch_output" \
         || fail "Graph artifact mislabeled a macro target mismatch as a missing declaration"
 
@@ -1372,6 +1398,12 @@ check_missing_nominal_graph_warning() {
     [[ ! -s "$error" ]] || fail "Graph ambiguous-nominal fixture wrote stderr"
     /usr/bin/grep -Fq $'role=macroApplication\texpectedKinds=macro\tname=repeated\ttargetKind=ambiguous\ttargetID=-1\ttargetNominalID=-1\tdeclared=true\tapplicable=false' "$ambiguous_output" \
         || fail "Graph artifact did not separate an ambiguous declaration from applicability"
+    /usr/bin/grep -Fq $'identityCount=4\trelationshipCount=3' "$ambiguous_output" \
+        || fail "Graph artifact did not retain every ambiguous declaration candidate"
+    [[ "$(/usr/bin/grep -F -c $'role=references\toriginNodeID=3\toriginKind=macroApplication\toriginID=0' "$ambiguous_output" || true)" -eq 2 ]] \
+        || fail "Graph artifact did not retain both ambiguous declaration candidates"
+    ! /usr/bin/grep -Fq $'role=resolvedBy\toriginNodeID=3\toriginKind=macroApplication\toriginID=0' "$ambiguous_output" \
+        || fail "Graph artifact resolved an ambiguous macro application"
     /usr/bin/grep -Fq $'graphWarning\tseverity=warning\tkind=ambiguousNominal' "$ambiguous_output" \
         || fail "Graph artifact omitted the ambiguous-nominal warning"
     echo "Graph missing-nominal-warning: pass"

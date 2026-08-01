@@ -1188,6 +1188,34 @@ owns the actionable checkboxes for the active and deliberately deferred work.
                     The plotter now derives the application owner, successful
                     declaration, ambiguity, missing target, and mismatch from
                     those relationships plus the linked diagnostic identity.
+                - [x] Plot the registered relationships as canonical graph
+                  identities and edges.
+                  - `CompilerGraphDelta.identities` contains every syntax
+                    identity plus macro-declaration and macro-application
+                    identities; `relationships` projects the shared registration
+                    rows with their exact ordinal, bounds, ordering, separator,
+                    and enclosure metadata.
+                  - The semantic syntax-node/fact projection remains a lowering
+                    adapter for now, so macro identities cannot be misread as
+                    runtime syntax by MIR or memory analysis.
+                  - Root-value graph proofs cover resolved, missing,
+                    target-mismatched, and ambiguous macro applications, plus an
+                    ordered many member relationship.
+                - [ ] Move parameter and body edges into the same
+                  cardinality-aware identity relationship projection.
+                  - [x] Register function parameters as an ordered many
+                    relationship from the function identity to each parameter
+                    identity, with comma separation and parentheses enclosure
+                    recorded directly on the relationship.
+                    - The semantic parameter fact is now a lowering adapter of
+                      that registered relationship rather than a parallel scan
+                      of `tables.parameters`.
+                    - Registration belongs to graph projection, not raw
+                      declaration capture, so declaration-only compiler phases
+                      remain valid before they request a graph.
+                  - Do this only after each body role declares its actual
+                    one/none/many bounds instead of inventing scalar metadata
+                    from the old syntax-fact table.
               - [ ] Expose type and metatype filtering over that plotted graph,
                 then make `@syntax`, `@value`, and nominal selection use the same
                 query operation and occurrence-backed result instead of

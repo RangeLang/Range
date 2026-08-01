@@ -183,6 +183,7 @@ function compilerGraphRelationshipAppliesTo(): Int { return 1 }
 function compilerGraphRelationshipResolvedBy(): Int { return 2 }
 function compilerGraphRelationshipReferences(): Int { return 3 }
 function compilerGraphRelationshipMember(): Int { return 4 }
+function compilerGraphRelationshipParameter(): Int { return 5 }
 function compilerGraphIdentitySyntax(): Int { return 1 }
 function compilerGraphIdentityMacroDeclaration(): Int { return 2 }
 function compilerGraphIdentityMacroApplication(): Int { return 3 }
@@ -191,9 +192,24 @@ function compilerGraphBoundUnbounded(): Int { return 2 }
 function compilerGraphOrderingUnordered(): Int { return 0 }
 function compilerGraphOrderingOrdered(): Int { return 1 }
 function compilerGraphSeparatorNone(): Int { return 0 }
-function compilerGraphSeparatorSyntax(): Int { return 1 }
+function compilerGraphSeparatorComma(): Int { return 1 }
 function compilerGraphEnclosureNone(): Int { return 0 }
-function compilerGraphEnclosureDelimited(): Int { return 1 }
+function compilerGraphEnclosureParentheses(): Int { return 1 }
+function compilerGraphEnclosureBraces(): Int { return 2 }
+function compilerGraphEnclosureBrackets(): Int { return 3 }
+function compilerGraphEnclosureAngles(): Int { return 4 }
+
+function compilerGraphSeparatorKindIsValid(kind: Int): Bool {
+    return kind == compilerGraphSeparatorNone() || kind == compilerGraphSeparatorComma()
+}
+
+function compilerGraphEnclosureKindIsValid(kind: Int): Bool {
+    return kind == compilerGraphEnclosureNone()
+        || kind == compilerGraphEnclosureParentheses()
+        || kind == compilerGraphEnclosureBraces()
+        || kind == compilerGraphEnclosureBrackets()
+        || kind == compilerGraphEnclosureAngles()
+}
 
 function compilerMacroDiagnosticMalformedDeclaration(): Int { return 1 }
 function compilerMacroDiagnosticMalformedApplication(): Int { return 2 }
@@ -5498,6 +5514,93 @@ function compilerMacroApplicationsAreStructurallyValid(tables: CompilerSyntaxTab
     return true
 }
 
+function compilerGraphRelationshipRoleIsKnown(role: Int): Bool {
+    return role == compilerGraphRelationshipAppliesTo()
+        || role == compilerGraphRelationshipResolvedBy()
+        || role == compilerGraphRelationshipReferences()
+        || role == compilerGraphRelationshipMember()
+        || role == compilerGraphRelationshipParameter()
+}
+
+function compilerGraphRelationshipRowHasValidShape(tables: CompilerSyntaxTables, row: Int): Bool {
+    let role: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 1))
+    let destinationID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 5))
+    let minimum: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 7))
+    let maximumKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 8))
+    let maximum: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 9))
+    let ordering: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 10))
+    let separatorKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 11))
+    let separatorID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 12))
+    let enclosureKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 13))
+    let enclosureID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 14))
+    return compilerIntTableValue(table: tables.relationships, row: row, column: 0) == row
+        && compilerGraphRelationshipRoleIsKnown(role: role)
+        && destinationID >= 0 && compilerIntTableValue(table: tables.relationships, row: row, column: 6) >= 0
+        && minimum >= 0 && (maximumKind == compilerGraphBoundFinite() || maximumKind == compilerGraphBoundUnbounded())
+        && (maximumKind != compilerGraphBoundFinite() || maximum >= minimum)
+        && (maximumKind != compilerGraphBoundUnbounded() || maximum == 0 - 1)
+        && (ordering == compilerGraphOrderingUnordered() || ordering == compilerGraphOrderingOrdered())
+        && compilerGraphSeparatorKindIsValid(kind: separatorKind)
+        && (separatorKind != compilerGraphSeparatorNone() || separatorID == 0 - 1)
+        && (separatorKind == compilerGraphSeparatorNone() || separatorID >= 0)
+        && compilerGraphEnclosureKindIsValid(kind: enclosureKind)
+        && (enclosureKind != compilerGraphEnclosureNone() || enclosureID == 0 - 1)
+        && (enclosureKind == compilerGraphEnclosureNone() || enclosureID >= 0)
+}
+
+function compilerGraphMemberRelationshipRowIsStructurallyValid(tables: CompilerSyntaxTables, row: Int, syntaxCount: Int): Bool {
+    let originKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 2))
+    let originID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 3))
+    let destinationKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 4))
+    let destinationID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 5))
+    return originKind == compilerGraphIdentitySyntax() && originID >= 0 && originID < syntaxCount
+        && destinationKind == compilerGraphIdentitySyntax() && destinationID < syntaxCount
+        && compilerIntTableValue(table: tables.relationships, row: row, column: 7) == 0
+        && compilerIntTableValue(table: tables.relationships, row: row, column: 8) == compilerGraphBoundUnbounded()
+        && compilerIntTableValue(table: tables.relationships, row: row, column: 9) == 0 - 1
+        && compilerIntTableValue(table: tables.relationships, row: row, column: 10) == compilerGraphOrderingOrdered()
+        && compilerIntTableValue(table: tables.relationships, row: row, column: 11) == compilerGraphSeparatorNone()
+        && compilerIntTableValue(table: tables.relationships, row: row, column: 13) == compilerGraphEnclosureNone()
+}
+
+function compilerGraphParameterRelationshipRowIsStructurallyValid(tables: CompilerSyntaxTables, row: Int, syntaxCount: Int): Bool {
+    let originID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 3))
+    let destinationID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 5))
+    if compilerIntTableValue(table: tables.relationships, row: row, column: 2) != compilerGraphIdentitySyntax()
+        || originID < 0 || originID >= syntaxCount
+        || compilerIntTableValue(table: tables.relationships, row: row, column: 4) != compilerGraphIdentitySyntax()
+        || destinationID >= syntaxCount
+        || compilerIntTableValue(table: tables.relationships, row: row, column: 7) != 0
+        || compilerIntTableValue(table: tables.relationships, row: row, column: 8) != compilerGraphBoundUnbounded()
+        || compilerIntTableValue(table: tables.relationships, row: row, column: 9) != 0 - 1
+        || compilerIntTableValue(table: tables.relationships, row: row, column: 10) != compilerGraphOrderingOrdered()
+        || compilerIntTableValue(table: tables.relationships, row: row, column: 11) != compilerGraphSeparatorComma()
+        || compilerIntTableValue(table: tables.relationships, row: row, column: 12) != originID
+        || compilerIntTableValue(table: tables.relationships, row: row, column: 13) != compilerGraphEnclosureParentheses()
+        || compilerIntTableValue(table: tables.relationships, row: row, column: 14) != originID { return false }
+    let parameterRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: destinationID, column: 1))
+    if compilerIntTableValue(table: tables.syntaxIndex, row: destinationID, column: 0) != compilerSyntaxKindParameter()
+        || parameterRow < 0 || parameterRow >= compilerIntTableRowCount(table: tables.parameters)
+        || compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 0) != destinationID
+        || compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 3) != compilerIntTableValue(table: tables.relationships, row: row, column: 6) { return false }
+    let functionRow: Int(compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 2))
+    return functionRow >= 0 && functionRow < compilerIntTableRowCount(table: tables.functions)
+        && compilerIntTableValue(table: tables.functions, row: functionRow, column: 0) == originID
+}
+
+function compilerGraphMacroRelationshipRowIsStructurallyValid(tables: CompilerSyntaxTables, row: Int, applicationCount: Int, declarationCount: Int, syntaxCount: Int): Bool {
+    let role: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 1))
+    let originKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 2))
+    let originID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 3))
+    let destinationKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 4))
+    let destinationID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 5))
+    if originKind != compilerGraphIdentityMacroApplication() || originID < 0 || originID >= applicationCount { return false }
+    if (role == compilerGraphRelationshipResolvedBy() || role == compilerGraphRelationshipReferences())
+        && (destinationKind != compilerGraphIdentityMacroDeclaration() || destinationID >= declarationCount) { return false }
+    return role != compilerGraphRelationshipAppliesTo()
+        || (destinationKind == compilerGraphIdentitySyntax() && destinationID >= 0 && destinationID < syntaxCount)
+}
+
 function compilerGraphRelationshipsAreStructurallyValid(tables: CompilerSyntaxTables): Bool {
     let relationshipCount: Int(compilerIntTableRowCount(table: tables.relationships))
     let applicationCount: Int(compilerIntTableRowCount(table: tables.macroApplications))
@@ -5506,47 +5609,12 @@ function compilerGraphRelationshipsAreStructurallyValid(tables: CompilerSyntaxTa
     state row: Int(0)
     while row < relationshipCount {
         let role: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 1))
-        let originKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 2))
-        let originID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 3))
-        let destinationKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 4))
-        let destinationID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 5))
-        let minimum: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 7))
-        let maximumKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 8))
-        let maximum: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 9))
-        let ordering: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 10))
-        let separatorKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 11))
-        let separatorID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 12))
-        let enclosureKind: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 13))
-        let enclosureID: Int(compilerIntTableValue(table: tables.relationships, row: row, column: 14))
-        if compilerIntTableValue(table: tables.relationships, row: row, column: 0) != row
-            || (role != compilerGraphRelationshipAppliesTo()
-                && role != compilerGraphRelationshipResolvedBy()
-                && role != compilerGraphRelationshipReferences()
-                && role != compilerGraphRelationshipMember())
-            || destinationID < 0 || compilerIntTableValue(table: tables.relationships, row: row, column: 6) < 0
-            || minimum < 0 || (maximumKind != compilerGraphBoundFinite() && maximumKind != compilerGraphBoundUnbounded())
-            || (maximumKind == compilerGraphBoundFinite() && maximum < minimum)
-            || (maximumKind == compilerGraphBoundUnbounded() && maximum != 0 - 1)
-            || (ordering != compilerGraphOrderingUnordered() && ordering != compilerGraphOrderingOrdered())
-            || (separatorKind != compilerGraphSeparatorNone() && separatorKind != compilerGraphSeparatorSyntax())
-            || (separatorKind == compilerGraphSeparatorNone() && separatorID != 0 - 1)
-            || (separatorKind == compilerGraphSeparatorSyntax() && separatorID < 0)
-            || (enclosureKind != compilerGraphEnclosureNone() && enclosureKind != compilerGraphEnclosureDelimited())
-            || (enclosureKind == compilerGraphEnclosureNone() && enclosureID != 0 - 1)
-            || (enclosureKind == compilerGraphEnclosureDelimited() && enclosureID < 0) { return false }
+        if !compilerGraphRelationshipRowHasValidShape(tables: tables, row: row) { return false }
         if role == compilerGraphRelationshipMember() {
-            if originKind != compilerGraphIdentitySyntax() || originID < 0 || originID >= syntaxCount
-                || destinationKind != compilerGraphIdentitySyntax() || destinationID >= syntaxCount
-                || minimum != 0 || maximumKind != compilerGraphBoundUnbounded() || maximum != 0 - 1
-                || ordering != compilerGraphOrderingOrdered()
-                || separatorKind != compilerGraphSeparatorNone() || enclosureKind != compilerGraphEnclosureNone() { return false }
-        } else {
-            if originKind != compilerGraphIdentityMacroApplication() || originID < 0 || originID >= applicationCount { return false }
-            if (role == compilerGraphRelationshipResolvedBy() || role == compilerGraphRelationshipReferences())
-                && (destinationKind != compilerGraphIdentityMacroDeclaration() || destinationID >= declarationCount) { return false }
-            if role == compilerGraphRelationshipAppliesTo()
-                && (destinationKind != compilerGraphIdentitySyntax() || destinationID >= syntaxCount) { return false }
-        }
+            if !compilerGraphMemberRelationshipRowIsStructurallyValid(tables: tables, row: row, syntaxCount: syntaxCount) { return false }
+        } else if role == compilerGraphRelationshipParameter() {
+            if !compilerGraphParameterRelationshipRowIsStructurallyValid(tables: tables, row: row, syntaxCount: syntaxCount) { return false }
+        } else if !compilerGraphMacroRelationshipRowIsStructurallyValid(tables: tables, row: row, applicationCount: applicationCount, declarationCount: declarationCount, syntaxCount: syntaxCount) { return false }
         row: row + 1
     }
     return true
@@ -6164,6 +6232,49 @@ function compilerGraphAppendMemberRelationship(tables: CompilerSyntaxTables, par
         enclosureKind: compilerGraphEnclosureNone(),
         enclosureID: 0 - 1
     )
+}
+
+function compilerGraphParameterRelationshipExists(tables: CompilerSyntaxTables, functionSyntaxID: Int, parameterSyntaxID: Int): Bool {
+    state relationshipRow: Int(0)
+    while relationshipRow < compilerIntTableRowCount(table: tables.relationships) {
+        if compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 1) == compilerGraphRelationshipParameter()
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 2) == compilerGraphIdentitySyntax()
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 3) == functionSyntaxID
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 4) == compilerGraphIdentitySyntax()
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 5) == parameterSyntaxID { return true }
+        relationshipRow: relationshipRow + 1
+    }
+    return false
+}
+
+function compilerGraphRegisterParameterRelationships(tables: CompilerSyntaxTables): Int {
+    state parameterRow: Int(0)
+    while parameterRow < compilerIntTableRowCount(table: tables.parameters) {
+        let parameterSyntaxID: Int(compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 0))
+        let functionRow: Int(compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 2))
+        if functionRow < 0 || functionRow >= compilerIntTableRowCount(table: tables.functions) { return 0 - 1 }
+        let functionSyntaxID: Int(compilerIntTableValue(table: tables.functions, row: functionRow, column: 0))
+        if !compilerGraphParameterRelationshipExists(tables: tables, functionSyntaxID: functionSyntaxID, parameterSyntaxID: parameterSyntaxID)
+            && compilerGraphAppendRelationship(
+                tables: tables,
+                role: compilerGraphRelationshipParameter(),
+                originKind: compilerGraphIdentitySyntax(),
+                originID: functionSyntaxID,
+                destinationKind: compilerGraphIdentitySyntax(),
+                destinationID: parameterSyntaxID,
+                ordinal: compilerIntTableValue(table: tables.parameters, row: parameterRow, column: 3),
+                minimum: 0,
+                maximumKind: compilerGraphBoundUnbounded(),
+                maximum: 0 - 1,
+                ordering: compilerGraphOrderingOrdered(),
+                separatorKind: compilerGraphSeparatorComma(),
+                separatorID: functionSyntaxID,
+                enclosureKind: compilerGraphEnclosureParentheses(),
+                enclosureID: functionSyntaxID
+            ) != 0 { return 0 - 1 }
+        parameterRow: parameterRow + 1
+    }
+    return 0
 }
 
 function compilerGraphAppendMacroReferenceRelationships(tables: CompilerSyntaxTables, applicationRow: Int, name: String): Int {
@@ -8694,6 +8805,8 @@ function compilerMacroExecutionRecordFinalFailure(tables: CompilerSyntaxTables, 
 
 function compilerMacroGraphDeltaIsValid(tables: CompilerSyntaxTables, delta: CompilerGraphDelta): Bool {
     if delta.failures.count != 0 || !compilerIntTableIsComplete(table: delta.nodes) || !compilerIntTableIsComplete(table: delta.facts)
+        || !compilerIntTableIsComplete(table: delta.identities) || !compilerIntTableIsComplete(table: delta.relationships)
+        || compilerIntTableRowCount(table: delta.identities) != 0 || compilerIntTableRowCount(table: delta.relationships) != 0
         || !compilerMacroGraphDeltaGeneratedMembersAreValid(tables: tables, delta: delta)
         || !compilerMacroGraphDeltaGeneratedFunctionsAreValid(tables: tables, delta: delta) { return false }
     let nodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
