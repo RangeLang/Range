@@ -1150,11 +1150,20 @@ owns the actionable checkboxes for the active and deliberately deferred work.
                   provenance so later compiler work can recover multiplicity,
                   ordering, separator, enclosure, and the producing application
                   without changing the source-facing value type.
-                - Macro-family filtering now produces the compiler-only
-                  `selection` collection kind instead of a semantic `Array`.
-                  Count, indexing, closure filtering, and expansion boundaries
-                  treat it as a collection adapter while the selected syntax
+                - Macro-family filtering, source collection literals, closure
+                  filtering/mapping, counting, and expansion now use one
+                  compiler-only `many` execution shape rather than separate
+                  `Array` and `selection` collection kinds. Selected syntax
                   values retain their individual relationship rows.
+              - [x] Register declaration membership once as an ordered
+                syntax-to-syntax relationship, then use it for both macro
+                `members` projection and semantic graph ownership facts.
+                - Parser member indexes remain lexical/facet indexes only;
+                  they no longer define the macro-visible or plotted ownership
+                  relation.
+                - Direct nested `construct`, `enum`, and `function`
+                  declarations register through that same relation, so macro
+                  filtering does not fall back to a declaration-table scan.
               - [ ] Merge macro application relationships into the canonical
                 plotted graph so declarations, applications, members, and body
                 syntax are one queryable node/relationship soup rather than a
@@ -1183,6 +1192,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
                 then make `@syntax`, `@value`, and nominal selection use the same
                 query operation and occurrence-backed result instead of
                 `Array<...>` materialization.
+                - [ ] Make indexed access require an explicitly ordered many
+                  relationship; current source-member indexing remains a
+                  compatibility adapter until member ordering is plotted.
               - A many-valued relationship records the syntax separating
                 adjacent values; it is not a `Variadic` type or an `Array`
                 inference.

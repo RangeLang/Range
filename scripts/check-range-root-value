@@ -1050,8 +1050,8 @@ check_range_authored_syntax_template() {
         || fail "Range-authored syntax macro did not return a typed SyntaxTemplate"
     /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=2.*typeKind=4.*childCount=29.*parentRow=[0-9]+.*ordinal=0' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain the captured recipe String"
-    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=8.*typeKind=4.*childCount=3.*parentRow=0.*ordinal=1' "$pass_output" \
-        || fail "Range-authored SyntaxTemplate did not retain its declaration-member selection"
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=2.*typeKind=4.*childCount=3.*parentRow=0.*ordinal=1' "$pass_output" \
+        || fail "Range-authored SyntaxTemplate did not retain its declaration-member many"
     [[ "$(/usr/bin/grep -E -c $'macroResult\trow=[0-9]+.*kind=5.*typeKind=6.*childCount=0.*parentRow=[0-9]+' "$pass_output")" -eq 5 ]] \
         || fail "Range-authored SyntaxTemplate did not retain its members and resolved capture handles"
     /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=5.*typeKind=6.*scalar=152.*childCount=0.*parentRow=0.*ordinal=2' "$pass_output" \
@@ -1303,7 +1303,7 @@ check_missing_nominal_graph_warning() {
     "$STAGE2_EXECUTABLE" compile "$declarations_fixture" > "$declarations_output" 2> "$error" \
         || fail "Graph nominal-declaration fixture did not compile"
     [[ ! -s "$error" ]] || fail "Graph nominal-declaration fixture wrote stderr"
-    /usr/bin/grep -Fq $'graphDelta\tvalid=true\tnodeCount=17\tfactCount=13\tgeneratedFunctionCount=0\tnominalCount=9\tnominalReferenceCount=6\twarningCount=0' "$declarations_output" \
+    /usr/bin/grep -Fq $'graphDelta\tvalid=true\tnodeCount=17\tfactCount=15\tgeneratedFunctionCount=0\tnominalCount=9\tnominalReferenceCount=6\twarningCount=0' "$declarations_output" \
         || fail "Graph artifact did not retain every keyword-plus-name declaration"
     for declaration in \
         $'keyword=macro\tname=observed' \

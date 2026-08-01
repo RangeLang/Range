@@ -218,17 +218,33 @@ function compilerPlotterNodeIDForSyntaxID(delta: CompilerGraphDelta, syntaxID: I
 }
 
 function compilerPlotterAppendMemberFacts(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, subjectSyntaxID: Int): Int {
-    state plotMemberRow: Int(0)
-    let plotMemberCount: Int(compilerIntTableRowCount(table: tables.members))
-    while plotMemberRow < plotMemberCount {
-        if compilerIntTableValue(table: tables.members, row: plotMemberRow, column: 2) == subjectSyntaxID {
-            let plotMemberSyntaxID: Int(compilerIntTableValue(table: tables.members, row: plotMemberRow, column: 0))
-            let plotMemberOrdinal: Int(compilerIntTableValue(table: tables.members, row: plotMemberRow, column: 3))
-            if compilerGraphDeltaAppendFact(delta: delta, factKind: compilerGraphFactOwns(), subjectNodeID: compilerPlotterNodeIDForSyntaxID(delta: delta, syntaxID: subjectSyntaxID), objectNodeID: compilerPlotterNodeIDForSyntaxID(delta: delta, syntaxID: plotMemberSyntaxID), roleTag: compilerGraphRoleMember(), ordinal: plotMemberOrdinal) != 0 { return 0 - 1 }
+    state relationshipRow: Int(0)
+    while relationshipRow < compilerIntTableRowCount(table: tables.relationships) {
+        if compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 1) == compilerGraphRelationshipMember()
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 2) == compilerGraphIdentitySyntax()
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 3) == subjectSyntaxID
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 4) == compilerGraphIdentitySyntax() {
+            let memberSyntaxID: Int(compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 5))
+            let memberOrdinal: Int(compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 6))
+            if compilerGraphDeltaAppendFact(delta: delta, factKind: compilerGraphFactOwns(), subjectNodeID: compilerPlotterNodeIDForSyntaxID(delta: delta, syntaxID: subjectSyntaxID), objectNodeID: compilerPlotterNodeIDForSyntaxID(delta: delta, syntaxID: memberSyntaxID), roleTag: compilerGraphRoleMember(), ordinal: memberOrdinal) != 0 { return 0 - 1 }
         }
-        plotMemberRow: plotMemberRow + 1
+        relationshipRow: relationshipRow + 1
     }
     return 0
+}
+
+function compilerPlotterMemberRelationshipCount(tables: CompilerSyntaxTables): Int {
+    state count: Int(0)
+    state relationshipRow: Int(0)
+    while relationshipRow < compilerIntTableRowCount(table: tables.relationships) {
+        if compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 1) == compilerGraphRelationshipMember()
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 2) == compilerGraphIdentitySyntax()
+            && compilerIntTableValue(table: tables.relationships, row: relationshipRow, column: 4) == compilerGraphIdentitySyntax() {
+            count: count + 1
+        }
+        relationshipRow: relationshipRow + 1
+    }
+    return count
 }
 
 function compilerPlotterAppendParameterFacts(tables: CompilerSyntaxTables, delta: CompilerGraphDelta, subjectSyntaxID: Int): Int {
@@ -899,7 +915,7 @@ function compilerGraphDeltaIsValid(tables: CompilerSyntaxTables, delta: Compiler
     let graphNodeCount: Int(compilerIntTableRowCount(table: delta.nodes))
     if graphNodeCount != compilerIntTableRowCount(table: tables.syntaxIndex) { return false }
     if compilerIntTableRowCount(table: delta.nominals) != compilerPlotterExpectedNominalCount(tables: tables) { return false }
-    let expectedGraphFactCount: Int(compilerIntTableRowCount(table: tables.members) + compilerIntTableRowCount(table: tables.parameters) + compilerIntTableRowCount(table: tables.bodyEdges))
+    let expectedGraphFactCount: Int(compilerPlotterMemberRelationshipCount(tables: tables) + compilerIntTableRowCount(table: tables.parameters) + compilerIntTableRowCount(table: tables.bodyEdges))
     if compilerIntTableRowCount(table: delta.facts) != expectedGraphFactCount { return false }
     state graphNodeRow: Int(0)
     while graphNodeRow < graphNodeCount {
@@ -921,9 +937,15 @@ function compilerGraphDeltaIsValid(tables: CompilerSyntaxTables, delta: Compiler
             if compilerIntTableValue(table: delta.facts, row: graphIncomingFactRow, column: 2) == graphNodeID { graphIncomingCount: graphIncomingCount + 1 }
             graphIncomingFactRow: graphIncomingFactRow + 1
         }
-        if graphNodeKindTag == compilerSyntaxKindConstruct() || graphNodeKindTag == compilerSyntaxKindFunction() || graphNodeKindTag == compilerSyntaxKindEnum() || graphNodeKindTag == compilerSyntaxKindMainAnnotation() {
-            if graphIncomingCount != 0 { return false }
-        } else if graphIncomingCount != 1 {
+        state expectedIncomingCount: Int(1)
+        if graphNodeKindTag == compilerSyntaxKindConstruct() || graphNodeKindTag == compilerSyntaxKindFunction() || graphNodeKindTag == compilerSyntaxKindEnum() {
+            let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: tables, syntaxID: graphNodeSyntaxID))
+            if declarationRow < 0 { return false }
+            if compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 3) < 0 { expectedIncomingCount: 0 }
+        } else if graphNodeKindTag == compilerSyntaxKindMainAnnotation() {
+            expectedIncomingCount: 0
+        }
+        if graphIncomingCount != expectedIncomingCount {
             return false
         }
         graphNodeRow: graphNodeRow + 1
