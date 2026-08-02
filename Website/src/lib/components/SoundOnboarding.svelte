@@ -151,6 +151,7 @@
 
   function unlockFromPointer(event: PointerEvent) {
     event.preventDefault();
+    if (event.pointerType !== "mouse") dragging = true;
     void unlock(event.clientX, event.clientY);
   }
 
@@ -224,11 +225,6 @@
     setPointerTarget(event.clientX, event.clientY);
   }
 
-  function moveDrag(event: PointerEvent) {
-    if (!dragging) return;
-    setPointerTarget(event.clientX, event.clientY);
-  }
-
   function completeExperience() {
     if (phase !== "explore") return;
     if (!import.meta.env.DEV) {
@@ -243,15 +239,19 @@
     }, 820);
   }
 
-  function followMouse(event: PointerEvent) {
-    if (phase !== "explore" || event.pointerType !== "mouse") return;
+  function followPointer(event: PointerEvent) {
+    if (
+      phase !== "explore"
+      || (event.pointerType !== "mouse" && !dragging)
+    ) return;
+    if (event.pointerType !== "mouse") event.preventDefault();
     setPointerTarget(event.clientX, event.clientY);
   }
 
   function finishDrag(event: PointerEvent) {
-    if (!dragging || !fieldElement) return;
+    if (!dragging) return;
     dragging = false;
-    if (fieldElement.hasPointerCapture(event.pointerId)) {
+    if (fieldElement?.hasPointerCapture(event.pointerId)) {
       fieldElement.releasePointerCapture(event.pointerId);
     }
   }
@@ -282,7 +282,11 @@
   });
 </script>
 
-<svelte:window onpointermove={followMouse} />
+<svelte:window
+  onpointermove={followPointer}
+  onpointerup={finishDrag}
+  onpointercancel={finishDrag}
+/>
 
 {#if phase !== "hidden"}
   <div
@@ -298,7 +302,8 @@
         onclick={unlockFromKeyboard}
       >
         <span class="entryDot" aria-hidden="true"></span>
-        <small>Press here</small>
+        <small class="finePrompt">Press here</small>
+        <small class="coarsePrompt">Drag here</small>
       </button>
     {:else}
       <div class="lesson">
@@ -313,9 +318,6 @@
           bind:this={fieldElement}
           aria-label="Explore sound in two dimensions"
           onpointerdown={beginDrag}
-          onpointermove={moveDrag}
-          onpointerup={finishDrag}
-          onpointercancel={finishDrag}
         >
           <span class="fieldBackdrop" aria-hidden="true"></span>
           <svg class="torus" viewBox="0 0 100 100" aria-hidden="true">
@@ -354,6 +356,8 @@
     place-items: center;
     overflow: hidden;
     background: white;
+    touch-action: none;
+    overscroll-behavior: none;
     transition: background-color 760ms cubic-bezier(0.22, 0.61, 0.36, 1);
   }
 
@@ -392,6 +396,20 @@
     font-family: var(--font-geist-mono), monospace;
     font-size: 10px;
     letter-spacing: 0.045em;
+  }
+
+  .coarsePrompt {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .finePrompt {
+      display: none;
+    }
+
+    .coarsePrompt {
+      display: block;
+    }
   }
 
   .entryPrompt:focus-visible,
