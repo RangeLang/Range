@@ -353,24 +353,18 @@ function compilerSourceMarkerValid(source: String, markerStart: Int, markerEnd: 
 
 function compilerSourceDecodeNextMarker(source: String, start: Int): CompilerSourceMarker {
     let sourceLength: Int(stringLength(value: source))
-    let marker: String(compilerSourceFileMarker())
     let candidate: Int(compilerSourceNextMarkerCandidate(source: source, start: start))
     if candidate >= sourceLength {
         return compilerSourceMarkerNotFound(sourceLength: sourceLength)
     }
 
     let newline: String(compilerCoreNewlineCharacter())
-    if candidate > 0 && source.character(index: candidate - 1) != newline {
-        return compilerSourceMarkerInvalid(markerStart: candidate)
-    }
     let lineEnd: Int(stringIndexOf(source: source, needle: newline, start: candidate))
     if lineEnd >= sourceLength {
         return compilerSourceMarkerInvalid(markerStart: candidate)
     }
 
-    let markerLength: Int(20)
-    let fieldsStart: Int(candidate + markerLength)
-    if fieldsStart >= lineEnd {
+    if candidate + 20 >= lineEnd {
         return compilerSourceMarkerInvalid(markerStart: candidate)
     }
 
@@ -379,9 +373,9 @@ function compilerSourceDecodeNextMarker(source: String, start: Int): CompilerSou
     let encodedTab: String("\(slash)t")
     let rolePrefix: String("role=")
     let rolePathSeparator: String("\(encodedTab)path=")
-    if hasRangePrefix(source: source, start: fieldsStart, prefix: rolePrefix) {
-        let separator: Int(stringIndexOf(source: source, needle: rolePathSeparator, start: fieldsStart))
-        let roleNameStart: Int(fieldsStart + 5)
+    if hasRangePrefix(source: source, start: candidate + 20, prefix: rolePrefix) {
+        let separator: Int(stringIndexOf(source: source, needle: rolePathSeparator, start: candidate + 20))
+        let roleNameStart: Int(candidate + 25)
         if separator >= lineEnd || separator <= roleNameStart {
             return compilerSourceMarkerInvalid(markerStart: candidate)
         }
@@ -396,11 +390,11 @@ function compilerSourceDecodeNextMarker(source: String, start: Int): CompilerSou
         }
         return compilerSourceMarkerValid(source: source, markerStart: candidate, markerEnd: lineEnd, role: role, pathStart: pathStart)
     }
-    if stringIndexOf(source: source, needle: encodedTab, start: fieldsStart) < lineEnd
-        || !compilerSourceMarkerPathIsValid(source: source, start: fieldsStart, end: lineEnd) {
+    if stringIndexOf(source: source, needle: encodedTab, start: candidate + 20) < lineEnd
+        || !compilerSourceMarkerPathIsValid(source: source, start: candidate + 20, end: lineEnd) {
         return compilerSourceMarkerInvalid(markerStart: candidate)
     }
-    return compilerSourceMarkerValid(source: source, markerStart: candidate, markerEnd: lineEnd, role: compilerSourceRoleProject(), pathStart: fieldsStart)
+    return compilerSourceMarkerValid(source: source, markerStart: candidate, markerEnd: lineEnd, role: compilerSourceRoleProject(), pathStart: candidate + 20)
 }
 
 function compilerSourceNextMarkerCandidate(source: String, start: Int): Int {

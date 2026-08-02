@@ -11,7 +11,7 @@ macro identifierSyntaxName(): Init { environment in
 @hashable
 construct Identifier {
     let name: String
-    let id: String
+    let id: UUID
     let parent: Identifier?
     let source: @syntax?
 }

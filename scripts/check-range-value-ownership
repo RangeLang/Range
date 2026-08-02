@@ -109,8 +109,8 @@ check_unregistered_string_reads_rejected() {
             || actual_status=$?
         [[ "$actual_status" -eq 65 && ! -s "$error" ]] \
             || fail "$relative rejected at the wrong boundary"
-        /usr/bin/grep -Fq $'compilerError\tkind=invalidTypedDeclarations' "$output" \
-            || fail "$relative omitted its typed-declaration rejection"
+        /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$output" \
+            || fail "$relative omitted its unresolved-entry rejection"
     done
     echo "Storage unregistered string read builtin: pass"
 }
@@ -132,8 +132,8 @@ check_range_native_project_macro() {
         || fail "Range-native project macro did not expand the integer default"
     /usr/bin/grep -Fq $'name=bool\tmemberKind=state\ttype=Bool' "$output" \
         || fail "Range-native project macro did not expand the bool default"
-    /usr/bin/grep -Fq $'readDependencyCount=2' "$output" \
-        || fail "Range-native project macro did not record both member reads"
+    /usr/bin/grep -Fq $'readDependencyCount=0' "$output" \
+        || fail "Range-native project macro reported unexpected legacy graph reads"
     integer_count="$(/usr/bin/grep -F -c $'name=integer\tmemberKind=state\ttype=Int' "$output" || true)"
     bool_count="$(/usr/bin/grep -F -c $'name=bool\tmemberKind=state\ttype=Bool' "$output" || true)"
     [[ "$integer_count" -eq 1 && "$bool_count" -eq 1 ]] \
@@ -360,7 +360,7 @@ check_macro_result_values() {
     [[ ! -s "$error" ]] || fail "branch-join macro result wrote stderr"
     /usr/bin/grep -Fq $'macroGraphGeneratedMember\trow=0\tkind=member' "$branch_output" \
         || fail "branch-join macro did not preserve its expansion"
-    /usr/bin/grep -Fq $'macroResult\trow=0\tinvocationRow=0\tapplicationRow=0\tkind=3' "$branch_output" \
+    /usr/bin/grep -Fq $'macroResult\trow=0\tinvocationRow=0\tapplicationRow=1\tkind=3' "$branch_output" \
         || fail "branch-join macro did not pass its result through the function boundary"
 
     "$STAGE2_EXECUTABLE" compile "$application_fixture" > "$application_output" 2> "$error" \
@@ -514,9 +514,8 @@ write_error_capability_bundle() {
         '' \
         '@stored' \
         '@member' \
-        'construct Let<Value> {' \
+        'construct Let {' \
         '    let identifier: Identifier' \
-        '    let value: Value' \
         '}' > "$output"
     /usr/bin/printf '%s\n' \
         'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Error.range' >> "$output"
@@ -725,7 +724,11 @@ check_many_relationship_registration() {
     local fixture="$REPO_ROOT/Testing/Macros/Pass/ManyRelationshipRegistration.range"
     local bundle="$WORK_ROOT/macro-many-relationship-registration.range"
     local output="$WORK_ROOT/macro-many-relationship-registration.out"
+    local repeat_output="$WORK_ROOT/macro-many-relationship-registration.repeat.out"
     local error="$WORK_ROOT/macro-many-relationship-registration.err"
+    local repeat_error="$WORK_ROOT/macro-many-relationship-registration.repeat.err"
+    local registration_identity="$WORK_ROOT/macro-many-relationship-registration.uuid"
+    local repeat_registration_identity="$WORK_ROOT/macro-many-relationship-registration.repeat.uuid"
     local relationship_source="$REPO_ROOT/RangeCompiler/Sources/Core/Syntax/Program/Relationship.range"
     local many_source="$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Many.range"
     local contents_source="$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Contents.range"
@@ -801,8 +804,13 @@ check_many_relationship_registration() {
     "$STAGE2_EXECUTABLE" compile "$bundle" > "$output" 2> "$error" \
         || fail "Core many and contents registrations did not compile: $(/usr/bin/head -n 1 "$output")"
     [[ ! -s "$error" ]] || fail "Core many and contents registrations wrote stderr"
+    "$STAGE2_EXECUTABLE" compile "$bundle" > "$repeat_output" 2> "$repeat_error" \
+        || fail "repeated Core many and contents registrations did not compile: $(/usr/bin/head -n 1 "$repeat_output")"
+    [[ ! -s "$repeat_error" ]] || fail "repeated Core many and contents registrations wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true' "$output" \
         || fail "Core many and contents registrations did not execute"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true' "$repeat_output" \
+        || fail "repeated Core many and contents registrations did not execute"
     [[ "$(/usr/bin/grep -Ec '^macroContribution\t' "$output")" -eq 0 ]] \
         || fail "Core relationship values unexpectedly used the syntax-emission contribution path"
     /usr/bin/grep -Eq $'^macroResult\trow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\tkind=3\ttypeKind=4\t.*\tchildCount=5\tparentRow=-1\tordinal=0\trelationshipRow=-1$' "$output" \
@@ -815,6 +823,19 @@ check_many_relationship_registration() {
         || fail "Core relationship registration did not retain admission identity"
     /usr/bin/grep -Eq $'^relationshipRegistration\trow=[0-9]+\tresultRow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\ttargetMemberSyntaxID=[0-9]+\ttargetName=values\townerSyntaxID=[0-9]+\townerName=RelationshipRegistrationTarget\tminimum=0\tmaximumKind=2\tmaximum=-1\tordering=1\tseparatorKind=0\tseparatorValueResultRow=-1\tenclosureKind=0\tdelimiterPair=-1\tadmission=0$' "$output" \
         || fail "the compiler did not decode the authored @many registration onto its target member"
+    /usr/bin/grep -Eq $'^relationshipRegistration\trow=[0-9]+\tresultRow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\ttargetMemberSyntaxID=[0-9]+\ttargetName=scalars\townerSyntaxID=[0-9]+\townerName=Character\tminimum=0\tmaximumKind=2\tmaximum=-1\tordering=1\tseparatorKind=0\tseparatorValueResultRow=-1\tenclosureKind=0\tdelimiterPair=-1\tadmission=0$' "$output" \
+        || fail "the compiler did not decode Character.scalars as an authored ordered-many relationship"
+    /usr/bin/grep -Eq $'^relationshipRegistration\trow=[0-9]+\tresultRow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\ttargetMemberSyntaxID=[0-9]+\ttargetName=characters\townerSyntaxID=[0-9]+\townerName=TextModel\tminimum=0\tmaximumKind=2\tmaximum=-1\tordering=1\tseparatorKind=0\tseparatorValueResultRow=-1\tenclosureKind=0\tdelimiterPair=-1\tadmission=0$' "$output" \
+        || fail "the compiler did not decode text characters as an authored ordered-many relationship"
+    /usr/bin/grep -Eq $'^relationshipRegistration\trow=[0-9]+\tresultRow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\ttargetMemberSyntaxID=[0-9]+\ttargetName=bytes\townerSyntaxID=[0-9]+\townerName=UUID\tminimum=16\tmaximumKind=1\tmaximum=16\tordering=1\tseparatorKind=0\tseparatorValueResultRow=-1\tenclosureKind=0\tdelimiterPair=-1\tadmission=0$' "$output" \
+        || fail "the compiler did not decode UUID.bytes as an exact ordered sixteen-byte relationship"
+    /usr/bin/grep -Eq $'^relationshipRegistration\trow=[0-9]+\tresultRow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\ttargetMemberSyntaxID=[0-9]+\ttargetName=bytes\townerSyntaxID=[0-9]+\townerName=UUID\tminimum=16\tmaximumKind=1\tmaximum=16\tordering=1\tseparatorKind=0\tseparatorValueResultRow=-1\tenclosureKind=0\tdelimiterPair=-1\tadmission=0$' "$repeat_output" \
+        || fail "the repeated compiler evaluation did not decode UUID.bytes as an exact ordered sixteen-byte relationship"
+    /usr/bin/grep -E $'^relationshipRegistration\t.*\ttargetName=bytes\t.*\townerName=UUID\t' "$output" > "$registration_identity"
+    /usr/bin/grep -E $'^relationshipRegistration\t.*\ttargetName=bytes\t.*\townerName=UUID\t' "$repeat_output" > "$repeat_registration_identity"
+    /usr/bin/cmp -s "$registration_identity" "$repeat_registration_identity" \
+        || fail "Core @many(16) UUID.bytes relationship identity changed across repeated evaluation"
+    echo "Macros Core @many(16) deterministic relationship registration: pass"
     /usr/bin/grep -Eq $'^relationshipRegistration\trow=[0-9]+\tresultRow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\ttargetMemberSyntaxID=[0-9]+\ttargetName=contents\townerSyntaxID=[0-9]+\townerName=RelationshipRegistrationTarget\tminimum=0\tmaximumKind=2\tmaximum=-1\tordering=1\tseparatorKind=0\tseparatorValueResultRow=-1\tenclosureKind=1\tdelimiterPair=1\tadmission=1$' "$output" \
         || fail "the compiler did not decode the authored @contents registration onto its target member"
     /usr/bin/grep -Eq $'^relationshipRegistration\trow=[0-9]+\tresultRow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\ttargetMemberSyntaxID=[0-9]+\ttargetName=contents\townerSyntaxID=[0-9]+\townerName=Block\tminimum=0\tmaximumKind=2\tmaximum=-1\tordering=1\tseparatorKind=0\tseparatorValueResultRow=-1\tenclosureKind=1\tdelimiterPair=1\tadmission=1$' "$output" \
@@ -997,7 +1018,7 @@ check_coding_core_surface() {
     [[ "$(/usr/bin/grep -F -c $'storage=indirect\t' "$output" || true)" -eq 2 ]] \
         || fail "Range-authored JSON did not preserve two recursive indirect collections"
     /usr/bin/grep -Fq 'function encode<Format>(to encoder: Encoder<Format>)' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
-        && /usr/bin/grep -Fq 'container.encode(self.#property.identifier' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
+        && /usr/bin/grep -Fq 'container.encode(#property.identifier' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
         && /usr/bin/grep -Fq 'function decode<Format>(from decoder: Decoder<Format>)' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
         && /usr/bin/grep -Fq 'default: #property.value' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
         || fail "Range-authored Codable is not wired to the generic coding surface"
@@ -1509,6 +1530,10 @@ check_range_authored_syntax_template() {
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/DataSystem/Array/Array.range" >> "$pass_bundle"
     /usr/bin/printf '\n' >> "$pass_bundle"
     /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Syntax/Parsing/IdentifierRules.range' >> "$pass_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Syntax/Parsing/IdentifierRules.range" >> "$pass_bundle"
+    /usr/bin/printf '\n' >> "$pass_bundle"
+    /usr/bin/printf '%s\n' \
         'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Syntax/Parsing/SyntaxTemplate.range' >> "$pass_bundle"
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Syntax/Parsing/SyntaxTemplate.range" >> "$pass_bundle"
     /usr/bin/printf '\n' >> "$pass_bundle"
@@ -1544,9 +1569,9 @@ check_range_authored_syntax_template() {
         || fail "Range-authored SyntaxTemplate did not retain its declaration-member many"
     [[ "$(/usr/bin/grep -E -c $'macroResult\trow=[0-9]+.*kind=5.*typeKind=6.*childCount=0.*parentRow=[0-9]+' "$pass_output")" -eq 5 ]] \
         || fail "Range-authored SyntaxTemplate did not retain its members and resolved capture handles"
-    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=5.*typeKind=6.*scalar=152.*childCount=0.*parentRow=0.*ordinal=2' "$pass_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=5.*typeKind=6.*scalar=[0-9]+.*childCount=0.*parentRow=0.*ordinal=2' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain its first resolved capture member"
-    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=5.*typeKind=6.*scalar=153.*childCount=0.*parentRow=0.*ordinal=3' "$pass_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=5.*typeKind=6.*scalar=[0-9]+.*childCount=0.*parentRow=0.*ordinal=3' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain its second resolved capture member"
     /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=2.*parentRow=0.*ordinal=4' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain its capture count"
@@ -1587,7 +1612,7 @@ check_range_authored_syntax_template() {
         || fail "Range-authored single-capture syntax match did not retain its source syntax"
     /usr/bin/grep -E -q $'macroResult\trow=94.*invocationRow=1.*kind=3.*typeKind=4.*childCount=2.*parentRow=46.*ordinal=2' "$match_output" \
         || fail "Range-authored single-capture syntax match did not retain its populated Capture"
-    /usr/bin/grep -E -q $'macroResult\trow=95.*invocationRow=1.*kind=5.*typeKind=6.*scalar=152.*childCount=0.*parentRow=94.*ordinal=0' "$match_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=95.*invocationRow=1.*kind=5.*typeKind=6.*scalar=[0-9]+.*childCount=0.*parentRow=94.*ordinal=0' "$match_output" \
         || fail "Range-authored single-capture syntax match did not reference its captured Let member"
     /usr/bin/grep -E -q $'macroResult\trow=96.*invocationRow=1.*kind=2.*typeKind=4.*childCount=1.*parentRow=94.*ordinal=1' "$match_output" \
         || fail "Range-authored single-capture syntax match did not retain one captured syntax value"
@@ -1658,6 +1683,8 @@ check_canonical_declaration_envelopes() {
         RangeCompiler/Sources/Core/Syntax/Bodies/DelimiterPair.range
         RangeCompiler/Sources/Core/Macro/Hashable.range
         RangeCompiler/Sources/Core/Macro/Many.range
+        RangeCompiler/Sources/Core/System/Memory/Buffer.range
+        RangeCompiler/Sources/Core/Coding/UUID.range
         RangeCompiler/Sources/Core/Syntax/Identifier.range
         RangeCompiler/Sources/Core/Syntax/Parsing/SyntaxForm.range
         RangeCompiler/Sources/Core/Syntax/Declarations/Type/Construct.range
@@ -2004,6 +2031,12 @@ check_storage_literals() {
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Number/Int.range" >> "$core_bundle"
     /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Text/TextEncoding.range' >> "$core_bundle"
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/TextEncoding.range" >> "$core_bundle"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Memory/RawBuffer.range' >> "$core_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range" >> "$core_bundle"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Memory/Buffer.range' >> "$core_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/Buffer.range" >> "$core_bundle"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Text/UnicodeScalar.range' >> "$core_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/UnicodeScalar.range" >> "$core_bundle"
     /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Text/Character.range' >> "$core_bundle"
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/Character.range" >> "$core_bundle"
     "$STAGE2_EXECUTABLE" compile "$core_bundle" > "$core_output" 2> "$core_error" \

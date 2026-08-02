@@ -181,7 +181,7 @@ function compilerBodyArenaCreateForFunctionInstance(tables: CompilerSyntaxTables
 }
 
 function compilerBodyArenaCreateEntry(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex): CompilerBodyArena {
-    let maybeMain: Optional<CompilerMainBlock>(compilerCoreParseMainBlock(source: tables.sourceStore.source))
+    let maybeMain: Optional<CompilerMainBlock>(compilerSyntaxCollectedMainBlock(tables: tables))
     state isValid: Bool(false)
     state ownerSyntaxID: Int(0 - 1)
     state fileID: Int(0)
@@ -1092,6 +1092,7 @@ function compilerBodyArenaAppendExpandStatement(arena: CompilerBodyArena, statem
     state boundaryOrdinal: Int(0)
     state previousWasExtension: Bool(false)
     state enclosureDepth: Int(0)
+    state allowsStandaloneValue: Bool(true)
     while cursor < expansion.end {
         let maybeToken: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: cursor))
         if maybeToken == nil { return compilerBodyParseFailure(index: cursor) }
@@ -1099,6 +1100,7 @@ function compilerBodyArenaAppendExpandStatement(arena: CompilerBodyArena, statem
         if token.start >= expansion.end {
             cursor: expansion.end
         } else if token.kind == .macroAttribute {
+            allowsStandaloneValue: false
             let application: CompilerMacroApplicationParseResult(compilerCoreParseMacroApplicationParts(source: arena.tables.sourceStore.source, macroToken: token))
             if !application.isValid { return compilerBodyParseFailure(index: token.start) }
             let parts: CompilerMacroApplicationParts(compilerCoreOwnedMacroApplicationPartsCopy(parts: application.parts))
@@ -1106,6 +1108,7 @@ function compilerBodyArenaAppendExpandStatement(arena: CompilerBodyArena, statem
             previousWasExtension: false
             cursor: parts.nextIndex
         } else if token.kind == .hash {
+            allowsStandaloneValue: false
             let maybeBoundary: Optional<CompilerSourceRange>(compilerBodyExpansionBoundary(source: arena.tables.sourceStore.source, start: token.start, isExtensionTarget: previousWasExtension))
             if maybeBoundary == nil { return compilerBodyParseFailure(index: token.start) }
             let boundary: CompilerSourceRange(maybeBoundary ?? CompilerSourceRange(start: token.start, end: token.end, next: token.end))
@@ -1120,7 +1123,7 @@ function compilerBodyArenaAppendExpandStatement(arena: CompilerBodyArena, statem
             }
             previousWasExtension: false
             cursor: boundary.next
-        } else if boundaryOrdinal == 0 && enclosureDepth == 0 && token.kind == .identifier {
+        } else if allowsStandaloneValue && boundaryOrdinal == 0 && enclosureDepth == 0 && token.kind == .identifier {
             let maybeFollowing: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: token.end))
             state parsesExpansionValue: Bool(false)
             if maybeFollowing != nil {
@@ -1136,10 +1139,12 @@ function compilerBodyArenaAppendExpandStatement(arena: CompilerBodyArena, statem
                 boundaryOrdinal: boundaryOrdinal + 1
                 cursor: expansion.end
             } else {
+                allowsStandaloneValue: false
                 previousWasExtension: false
                 cursor: token.end
             }
         } else {
+            allowsStandaloneValue: false
             previousWasExtension: false
             if token.kind == .keyword && token.text == String("extension") { previousWasExtension: true }
             if token.kind == .leftBrace || token.kind == .leftBracket || token.kind == .leftParen { enclosureDepth: enclosureDepth + 1 }

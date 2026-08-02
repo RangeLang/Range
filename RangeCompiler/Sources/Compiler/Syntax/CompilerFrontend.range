@@ -3626,6 +3626,58 @@ function compilerTypedSyntaxCaptureMain(source: String, tables: CompilerSyntaxTa
     return compilerTypedSyntaxCaptureBody(source: source, tables: tables, fileID: fileID, ownerSyntaxID: entrySyntaxID, start: mainBlock.bodyStart, end: mainBlock.bodyEnd)
 }
 
+function compilerTypedSyntaxCaptureMainRoot(source: String, tables: CompilerSyntaxTables): Int {
+    let maybeMain: Optional<CompilerMainBlock>(compilerCoreParseMainBlock(source: source))
+    if maybeMain == nil { return 0 }
+    let mainBlock: CompilerMainBlock(maybeMain ?? CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
+    let fileID: Int(compilerSourceStoreFileIDAtGlobalOffset(store: tables.sourceStore, globalOffset: mainBlock.attributeStart))
+    let mainRootContext: CompilerBodySyntaxCaptureContext(fileID: fileID, ownerSyntaxID: 0 - 1, statementOrdinal: 0)
+    let mainAnnotationSyntaxID: Int(compilerBodySyntaxAppendNode(tables: tables, context: mainRootContext, kindTag: compilerSyntaxKindMainAnnotation(), ordinal: 0, start: mainBlock.attributeStart, end: mainBlock.bodyStart, firstStart: mainBlock.attributeStart, firstEnd: mainBlock.bodyStart, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    let entrySyntaxID: Int(compilerBodySyntaxAppendNode(tables: tables, context: mainRootContext, kindTag: compilerSyntaxKindEntry(), ordinal: 0, start: mainBlock.bodyStart, end: mainBlock.bodyEnd, firstStart: 0 - 1, firstEnd: 0 - 1, secondStart: 0 - 1, secondEnd: 0 - 1, aux: 0))
+    if mainAnnotationSyntaxID < 0 || entrySyntaxID < 0
+        || compilerBodySyntaxAppendEdge(tables: tables, ownerSyntaxID: mainAnnotationSyntaxID, childSyntaxID: entrySyntaxID, roleTag: compilerSyntaxRoleAppliesTo(), ordinal: 0) != 0 { return 0 - 1 }
+    let blockSyntaxID: Int(compilerBodySyntaxAppendSourceBlock(source: source, tables: tables, fileID: fileID, ownerSyntaxID: entrySyntaxID, roleTag: compilerSyntaxRoleBody(), start: mainBlock.bodyStart, end: mainBlock.bodyEnd))
+    if blockSyntaxID < 0 || compilerSyntaxEnsureContentsSlot(tables: tables, ownerSyntaxID: blockSyntaxID) < 0 { return 0 - 1 }
+    return 0
+}
+
+function compilerSyntaxCollectedMainBlock(tables: CompilerSyntaxTables): Optional<CompilerMainBlock> {
+    state mainSyntaxID: Int(0 - 1)
+    state syntaxID: Int(0)
+    while syntaxID < compilerIntTableRowCount(table: tables.syntaxIndex) {
+        if compilerIntTableValue(table: tables.syntaxIndex, row: syntaxID, column: 0) == compilerSyntaxKindMainAnnotation() {
+            if mainSyntaxID >= 0 { return nil }
+            mainSyntaxID: syntaxID
+        }
+        syntaxID: syntaxID + 1
+    }
+    if mainSyntaxID < 0 { return nil }
+    state entrySyntaxID: Int(0 - 1)
+    state edgeRow: Int(0)
+    while edgeRow < compilerIntTableRowCount(table: tables.bodyEdges) {
+        if compilerIntTableValue(table: tables.bodyEdges, row: edgeRow, column: 0) == mainSyntaxID
+            && compilerIntTableValue(table: tables.bodyEdges, row: edgeRow, column: 2) == compilerSyntaxRoleAppliesTo()
+            && compilerIntTableValue(table: tables.bodyEdges, row: edgeRow, column: 3) == 0 {
+            if entrySyntaxID >= 0 { return nil }
+            entrySyntaxID: compilerIntTableValue(table: tables.bodyEdges, row: edgeRow, column: 1)
+        }
+        edgeRow: edgeRow + 1
+    }
+    if entrySyntaxID < 0 || entrySyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
+        || compilerIntTableValue(table: tables.syntaxIndex, row: entrySyntaxID, column: 0) != compilerSyntaxKindEntry() { return nil }
+    let mainNodeRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: mainSyntaxID, column: 1))
+    let entryNodeRow: Int(compilerIntTableValue(table: tables.syntaxIndex, row: entrySyntaxID, column: 1))
+    if mainNodeRow < 0 || mainNodeRow >= compilerIntTableRowCount(table: tables.bodyNodes)
+        || entryNodeRow < 0 || entryNodeRow >= compilerIntTableRowCount(table: tables.bodyNodes) { return nil }
+    let fileID: Int(compilerIntTableValue(table: tables.bodyNodes, row: mainNodeRow, column: 1))
+    if fileID != compilerIntTableValue(table: tables.bodyNodes, row: entryNodeRow, column: 1) { return nil }
+    return CompilerMainBlock(
+        attributeStart: compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.bodyNodes, row: mainNodeRow, column: 4)),
+        bodyStart: compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.bodyNodes, row: entryNodeRow, column: 4)),
+        bodyEnd: compilerSourceStoreGlobalOffset(store: tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: tables.bodyNodes, row: entryNodeRow, column: 5))
+    )
+}
+
 function compilerTypedSyntaxCaptureTopLevelToken(source: String, tables: CompilerSyntaxTables, declarationOrdinal: Int, token: RangeLexedToken): CompilerTypedDeclarationCaptureStep {
     return compilerTypedSyntaxCaptureTopLevelTokenWithPolicy(source: source, tables: tables, declarationOrdinal: declarationOrdinal, token: token, captureBodies: true, builtinPolicy: compilerBuiltinPolicyNone(), fileEnd: stringLength(value: source))
 }
@@ -8045,6 +8097,85 @@ function compilerMacroValueStoreAppendString(
     return stringValueID
 }
 
+function compilerFingerprintUUIDByte(identity: CompilerFingerprint, index: Int): Int {
+    if index < 0 || index >= 16 { return 0 - 1 }
+    state word: Int(identity.first)
+    if index >= 4 && index < 8 {
+        word: identity.second
+    } else if index >= 8 && index < 12 {
+        word: (identity.first * 127 + identity.second + 97) % 16000057
+    } else if index >= 12 {
+        word: (identity.second * 131 + identity.first + 193) % 15000017
+    }
+    state divisor: Int(1)
+    state byteOrdinal: Int(index % 4)
+    while byteOrdinal > 0 {
+        divisor: divisor * 256
+        byteOrdinal: byteOrdinal - 1
+    }
+    state byte: Int((word / divisor) % 256)
+    if index == 6 { byte: (byte % 16) + 80 }
+    if index == 8 { byte: (byte % 64) + 128 }
+    return byte
+}
+
+function compilerMacroValueStoreAppendByte(
+    store: CompilerMacroValueStore,
+    value: Int
+): Int {
+    if value < 0 || value > 255 { return 0 - 1 }
+    return compilerMacroValueStoreAppendScalar(
+        store: store,
+        typeKind: compilerBodyTypeUnsigned8(),
+        typeID: 0 - 1,
+        scalar: value
+    )
+}
+
+function compilerMacroValueStoreAppendUUID(
+    store: CompilerMacroValueStore,
+    identity: CompilerFingerprint
+): Int {
+    let byteChildren: Buffer<Int>(bufferCreateInt(capacity: 16))
+    state valid: Bool(true)
+    state index: Int(0)
+    while index < 16 && valid {
+        let byteValueID: Int(compilerMacroValueStoreAppendByte(
+            store: store,
+            value: compilerFingerprintUUIDByte(identity: identity, index: index)
+        ))
+        if byteValueID < 0 || byteChildren.append(element: byteValueID) != 0 { valid: false }
+        index: index + 1
+    }
+    state bytesValueID: Int(0 - 1)
+    if valid {
+        bytesValueID: compilerMacroValueStoreAppendAggregate(
+            store: store,
+            kind: compilerMacroValueKindMany(),
+            typeKind: compilerBodyTypeConstruct(),
+            typeID: 0 - 1,
+            scalar: 16,
+            children: byteChildren
+        )
+    }
+    let uuidChildren: Buffer<Int>(bufferCreateInt(capacity: 1))
+    if bytesValueID < 0 || uuidChildren.append(element: bytesValueID) != 0 { valid: false }
+    state uuidValueID: Int(0 - 1)
+    if valid {
+        uuidValueID: compilerMacroValueStoreAppendAggregate(
+            store: store,
+            kind: compilerMacroValueKindConstruct(),
+            typeKind: compilerBodyTypeConstruct(),
+            typeID: 0 - 1,
+            scalar: identity.first,
+            children: uuidChildren
+        )
+    }
+    byteChildren.destroy()
+    uuidChildren.destroy()
+    return uuidValueID
+}
+
 function compilerMacroExecutionCapabilityHandleRow(tables: CompilerSyntaxTables, invocationRow: Int): Int {
     state row: Int(0)
     while row < compilerIntTableRowCount(table: tables.macroCapabilityHandles) {
@@ -8522,7 +8653,7 @@ function compilerMacroExecutionMaterializeIdentifier(
         typeID: 0 - 1,
         text: name
     ))
-    let identityValueID: Int(compilerMacroValueStoreAppendScalar(store: store, typeKind: compilerBodyTypeString(), typeID: 0 - 1, scalar: identity.first))
+    let identityValueID: Int(compilerMacroValueStoreAppendUUID(store: store, identity: identity))
     let parentValueID: Int(compilerMacroExecutionAppendPlaceholderValue(store: store))
     let sourceValueID: Int(compilerMacroExecutionAppendPlaceholderValue(store: store))
     let children: Buffer<Int>(bufferCreateInt(capacity: 4))
@@ -8555,12 +8686,17 @@ function compilerMacroExecutionMaterializeSyntaxIdentifier(
     state fileID: Int(0 - 1)
     state nameStart: Int(0 - 1)
     state nameEnd: Int(0 - 1)
+    state identity: CompilerFingerprint(compilerFingerprintInitial())
     state memberRow: Int(0)
     while memberRow < compilerIntTableRowCount(table: tables.members) && fileID < 0 {
         if compilerIntTableValue(table: tables.members, row: memberRow, column: 0) == syntaxID {
             fileID: compilerIntTableValue(table: tables.members, row: memberRow, column: 1)
             nameStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 6)
             nameEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 7)
+            identity: CompilerFingerprint(
+                first: compilerIntTableValue(table: tables.members, row: memberRow, column: 10),
+                second: compilerIntTableValue(table: tables.members, row: memberRow, column: 11)
+            )
         }
         memberRow: memberRow + 1
     }
@@ -8570,6 +8706,10 @@ function compilerMacroExecutionMaterializeSyntaxIdentifier(
             fileID: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 1)
             nameStart: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 7)
             nameEnd: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 8)
+            identity: CompilerFingerprint(
+                first: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 11),
+                second: compilerIntTableValue(table: tables.declarations, row: declarationRow, column: 12)
+            )
         }
         declarationRow: declarationRow + 1
     }
@@ -8580,7 +8720,7 @@ function compilerMacroExecutionMaterializeSyntaxIdentifier(
         typeID: 0 - 1,
         text: name
     ))
-    let identityValueID: Int(compilerMacroValueStoreAppendScalar(store: store, typeKind: compilerBodyTypeString(), typeID: 0 - 1, scalar: syntaxID))
+    let identityValueID: Int(compilerMacroValueStoreAppendUUID(store: store, identity: identity))
     let parentValueID: Int(compilerMacroExecutionAppendPlaceholderValue(store: store))
     let sourceValueID: Int(compilerMacroValueStoreAppend(
         store: store,
@@ -12374,6 +12514,20 @@ function compilerMacroExecutionEnumCaseMemberRow(arena: CompilerBodyArena, enumS
     return matchingMemberRow
 }
 
+function compilerMacroExecutionNonnegativeIntArgument(value: String): Int {
+    let count: Int(stringLength(value: value))
+    if count == 0 { return 0 - 1 }
+    state result: Int(0)
+    state index: Int(0)
+    while index < count {
+        let byte: Int(stringByteAt(source: value, index: index))
+        if byte < 48 || byte > 57 { return 0 - 1 }
+        result: result * 10 + byte - 48
+        index: index + 1
+    }
+    return result
+}
+
 function compilerMacroExecutionParameterValue(
     tables: CompilerSyntaxTables,
     arena: CompilerBodyArena,
@@ -12456,6 +12610,42 @@ function compilerMacroExecutionParameterValue(
             typeID: resolvedTypeID,
             scalar: compilerDeclarationNameHash(name: compilerCoreStringLiteralContent(text: valueText))
         )
+    }
+    if parameterType == String("Int") {
+        let integer: Int(compilerMacroExecutionNonnegativeIntArgument(value: valueText))
+        if integer < 0 { return 0 - 1 }
+        return compilerMacroValueStoreAppendScalar(
+            store: store,
+            typeKind: resolvedTypeKind,
+            typeID: resolvedTypeID,
+            scalar: integer
+        )
+    }
+    if parameterType == String("Int?") && valueText != String("nil") {
+        let integer: Int(compilerMacroExecutionNonnegativeIntArgument(value: valueText))
+        if integer < 0 { return 0 - 1 }
+        let integerValueID: Int(compilerMacroValueStoreAppendScalar(
+            store: store,
+            typeKind: compilerBodyTypeInt(),
+            typeID: 0 - 1,
+            scalar: integer
+        ))
+        if integerValueID < 0 { return 0 - 1 }
+        let optionalChildren: Buffer<Int>(bufferCreateInt(capacity: 1))
+        if optionalChildren.append(element: integerValueID) != 0 {
+            optionalChildren.destroy()
+            return 0 - 1
+        }
+        let optionalValueID: Int(compilerMacroValueStoreAppendAggregate(
+            store: store,
+            kind: compilerMacroValueKindEnum(),
+            typeKind: resolvedTypeKind,
+            typeID: resolvedTypeID,
+            scalar: 1,
+            children: optionalChildren
+        ))
+        optionalChildren.destroy()
+        return optionalValueID
     }
     if resolvedTypeKind == compilerBodyTypeEnum() {
         let valueTextLength: Int(stringLength(value: valueText))

@@ -1,10 +1,43 @@
 compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
+@builtin
+construct Array<Element> {}
+
 compilerSourceFile\trole=core\tpath=Core/Macro/Project.range
 construct ProjectDefaults {}
 
+macro member(): Declaration | Member -> Void {}
+
+construct Identifier {
+    let name: String
+}
+
+construct Construct {
+    construct Declaration {
+        let identifier: Identifier
+        let members: Array<@member>
+    }
+}
+
+@member
+construct State {
+    let identifier: Identifier
+}
+
 macro project(): Construct -> ProjectDefaults { environment in
-    let integerCount: Int(environment.target.memberCount("integer"))
-    let boolCount: Int(environment.target.memberCount("bool"))
+    let members: Array<State>(
+        environment.target.Declaration.members.filter(all: State)
+    )
+    let integerCount: Int(
+        members.filter { member in
+            return member.identifier.name == "integer"
+        }.count
+    )
+    let boolCount: Int(
+        members.filter { member in
+            return member.identifier.name == "bool"
+        }.count
+    )
 
     if integerCount == 0 && boolCount == 0 {
         #environment {

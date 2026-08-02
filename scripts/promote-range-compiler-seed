@@ -104,15 +104,47 @@ compiler_version="bootstrap-${seed_hash:0:12}"
 /usr/bin/plutil -replace executable.sha256 -string "$executable_hash" "$next_manifest"
 /usr/bin/plutil -replace producer.clang -string "$(clang --version | /usr/bin/head -1)" "$next_manifest"
 
+compiler_source_paths=()
+compiler_source_roles=()
 compiler_source_count="$(manifest_value compilerSources)"
 for ((source_index = 0; source_index < compiler_source_count; source_index += 1)); do
+    source_role="$(/usr/bin/plutil -extract "compilerSources.$source_index.role" raw -o - "$next_manifest")"
+    [[ "$source_role" == core ]] || continue
     source_relative="$(/usr/bin/plutil -extract "compilerSources.$source_index.path" raw -o - "$next_manifest")"
+    compiler_source_paths+=("$source_relative")
+    compiler_source_roles+=("core")
+done
+
+compiler_directory="$REPO_ROOT/RangeCompiler/Sources/Compiler"
+compiler_source_list="$promotion_root/compiler-sources.txt"
+/usr/bin/find "$compiler_directory" \
+    -type d \( -name .git -o -name .range -o -name .build \) -prune -o \
+    -type f -name '*.range' -print > "$compiler_source_list"
+LC_ALL=C /usr/bin/sort -o "$compiler_source_list" "$compiler_source_list"
+while IFS= read -r source_path; do
+    source_relative="${source_path#"$REPO_ROOT/"}"
+    if [[ "$source_relative" == *$' '* || "$source_relative" == *$'\t'* || "$source_relative" == *$'\n'* ]]; then
+        echo "Range compiler source paths may not contain whitespace: $source_relative" >&2
+        exit 66
+    fi
+    compiler_source_paths+=("$source_relative")
+    compiler_source_roles+=("project")
+done < "$compiler_source_list"
+
+/usr/bin/plutil -remove compilerSources "$next_manifest"
+/usr/bin/plutil -insert compilerSources -json '[]' "$next_manifest"
+for ((source_index = 0; source_index < ${#compiler_source_paths[@]}; source_index += 1)); do
+    source_relative="${compiler_source_paths[$source_index]}"
+    source_role="${compiler_source_roles[$source_index]}"
     source_path="$REPO_ROOT/$source_relative"
     [[ -f "$source_path" ]] || {
         echo "Missing compiler source during promotion: $source_relative" >&2
         exit 66
     }
-    /usr/bin/plutil -replace "compilerSources.$source_index.sha256" -string "$(sha256 "$source_path")" "$next_manifest"
+    /usr/bin/plutil -insert "compilerSources.$source_index" -json '{}' "$next_manifest"
+    /usr/bin/plutil -insert "compilerSources.$source_index.path" -string "$source_relative" "$next_manifest"
+    /usr/bin/plutil -insert "compilerSources.$source_index.role" -string "$source_role" "$next_manifest"
+    /usr/bin/plutil -insert "compilerSources.$source_index.sha256" -string "$(sha256 "$source_path")" "$next_manifest"
 done
 
 runtime_source_count="$(manifest_value runtimeSources)"

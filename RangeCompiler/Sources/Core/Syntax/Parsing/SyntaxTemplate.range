@@ -49,7 +49,7 @@ construct SyntaxTemplate {
         while recipeIndex < source.count {
             if source.byte(index: recipeIndex) == 36
                 && recipeIndex + 1 < source.count
-                && syntaxTemplateIdentifierByte(
+                && identifierAcceptsContinuation(
                     byte: source.byte(index: recipeIndex + 1)
                 ) {
                 if captureStart >= 0 {
@@ -58,7 +58,7 @@ construct SyntaxTemplate {
                     captureStart: recipeIndex + 1
                     recipeIndex: captureStart + 1
                     while recipeIndex < source.count
-                        && syntaxTemplateIdentifierByte(
+                        && identifierAcceptsContinuation(
                             byte: source.byte(index: recipeIndex)
                         ) {
                         recipeIndex: recipeIndex + 1
@@ -148,11 +148,4 @@ construct SyntaxTemplate {
 
     function render(match: Match): @syntax
 
-}
-
-function syntaxTemplateIdentifierByte(byte: Int): Bool {
-    return (byte >= 48 && byte <= 57)
-        || (byte >= 65 && byte <= 90)
-        || byte == 95
-        || (byte >= 97 && byte <= 122)
 }

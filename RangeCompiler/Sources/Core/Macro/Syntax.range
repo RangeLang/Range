@@ -22,10 +22,7 @@ macro syntax(@capture template: String): Construct -> SyntaxTemplate { environme
         }
         let nextIsIdentifier: Bool(
             templateIndex + 1 < templateCount
-                && ((nextByte >= 48 && nextByte <= 57)
-                    || (nextByte >= 65 && nextByte <= 90)
-                    || nextByte == 95
-                    || (nextByte >= 97 && nextByte <= 122))
+                && identifierAcceptsContinuation(byte: nextByte)
         )
         if byte == 36 && nextIsIdentifier {
             captureCount: captureCount + 1
@@ -34,10 +31,7 @@ macro syntax(@capture template: String): Construct -> SyntaxTemplate { environme
             state scanningName: Bool(true)
             while templateIndex < templateCount && scanningName {
                 let nameByte: Int(template.byte(index: templateIndex))
-                if (nameByte >= 48 && nameByte <= 57)
-                    || (nameByte >= 65 && nameByte <= 90)
-                    || nameByte == 95
-                    || (nameByte >= 97 && nameByte <= 122) {
+                if identifierAcceptsContinuation(byte: nameByte) {
                     templateIndex: templateIndex + 1
                 } else {
                     scanningName: false

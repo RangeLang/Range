@@ -295,7 +295,7 @@ resolve_stage2_compiler() {
     local legacy_cache_key legacy_cache_directory
     local build_directory seed seed_executable stage2_source_bundle stage2_llvm stage2_executable
     local lock_directory publish_directory invalid_directory
-    local function_artifact_directory function_artifact_cache function_artifact_next
+    local function_artifact_directory function_artifact_cache function_artifact_next function_artifact_source_key
     local lock_status build_status publish_status
     local range_stage2_phase_started range_stage2_build_started
 
@@ -367,7 +367,11 @@ resolve_stage2_compiler() {
     stage2_executable="$build_directory/RangeCompiler"
     if [[ "$RANGE_STAGE2_PROFILE" == "development" ]]; then
         stage2_source_bundle="$build_directory/RangeCompilerDevelopmentSourceSet.range"
-        function_artifact_directory="$RANGE_STAGE2_CACHE_ROOT/function-artifacts/$RANGE_STAGE2_PRODUCER_CAPABILITY"
+        # Artifact edges still carry positional function IDs. Keep cross-run
+        # reuse for an identical source graph, but never apply those edges to
+        # a declaration inventory whose rows may have shifted.
+        function_artifact_source_key="$(sha256 "$SOURCE_BUNDLE")"
+        function_artifact_directory="$RANGE_STAGE2_CACHE_ROOT/function-artifacts/$RANGE_STAGE2_PRODUCER_CAPABILITY/$function_artifact_source_key"
         function_artifact_cache="$function_artifact_directory/FunctionArtifacts.cache"
         function_artifact_next="$build_directory/FunctionArtifacts.next"
         /bin/mkdir -p "$function_artifact_directory"

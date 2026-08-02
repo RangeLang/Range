@@ -1134,7 +1134,10 @@ function compilerNativeSourceSetLLVMTextForLinkedTables(source: String, declarat
 function compilerNativeSourceSetLLVMText(source: String): String {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("sourceSet.begin"))
     let declarationTables: CompilerSyntaxTables(compilerSyntaxTablesCreate(source: source))
-    let captureStatus: Int(compilerTypedDeclarationsCapture(source: source, tables: declarationTables))
+    state captureStatus: Int(compilerTypedDeclarationsCapture(source: source, tables: declarationTables))
+    if captureStatus == 0 {
+        captureStatus: compilerTypedSyntaxCaptureMainRoot(source: source, tables: declarationTables)
+    }
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("declarationCapture.end"))
     state output: String("")
     if captureStatus != 0 || !compilerSyntaxTablesIsValid(tables: declarationTables) {

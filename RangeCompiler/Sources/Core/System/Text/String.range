@@ -1,31 +1,32 @@
 @builtin(.storage)
 construct String {
-    state characters: Buffer<Character>
+    state bytes: Buffer<Int<.unsigned, 8>>
 
     derived count: Int {
-        characters.count
+        stringLength(value: self)
     }
 
     function append(text: String): Int {
-        state index: Int(0)
-        while index < text.characters.count {
-            characters.append(element: text.characters.element(index: index))
-            index: index + 1
-        }
-        return 0
+        return stringAppendStorage(destination: self, text: text)
     }
 
-    function character(index: Int): Character {
-        return characters.element(index: index)
-    }
-
-    function encoded(as encoding: TextEncoding): ByteSpan {
-        return encode(characters: characters, as: encoding)
+    function byte(index: Int): Int {
+        return stringByteAt(source: self, index: index)
     }
 
     function destroy(): Int {
-        return characters.destroy()
+        return stringDestroy(value: self)
     }
 }
 
-function encode(characters: Buffer<Character>, as encoding: TextEncoding): ByteSpan
+@builtin
+function stringLength(value: String): Int
+
+@builtin
+function stringByteAt(source: String, index: Int): Int
+
+@builtin(.write)
+function stringAppendStorage(destination: String, text: String): Int
+
+@builtin(.destroy)
+function stringDestroy(value: String): Int

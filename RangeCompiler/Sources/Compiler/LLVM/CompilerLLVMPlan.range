@@ -140,7 +140,10 @@ function compilerCoreRenderLLVMEntryFunction(block: CompilerLLVMLoweredBlock): S
 
 function compilerCoreLLVMNativeProgramText(source: String): String {
     let tables: CompilerSyntaxTables(compilerSyntaxTablesCreate(source: source))
-    let captureStatus: Int(compilerTypedDeclarationsCapture(source: source, tables: tables))
+    state captureStatus: Int(compilerTypedDeclarationsCapture(source: source, tables: tables))
+    if captureStatus == 0 {
+        captureStatus: compilerTypedSyntaxCaptureMainRoot(source: source, tables: tables)
+    }
     if captureStatus != 0 || !compilerSyntaxTablesIsValid(tables: tables) {
         let diagnostic: String(compilerInvalidTypedDeclarationsDiagnostic(tables: tables))
         compilerSyntaxTablesDestroy(tables: tables)
@@ -209,7 +212,7 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
     let reachability: CompilerReachableLLVMState(compilerReachableLLVMStateCreate(context: context))
     state output: String(compilerCoreLLVMNativeEntryTextForReachability(reachability: reachability))
     if !hasRangePrefix(source: output, start: 0, prefix: String("compilerError"))
-        && compilerReachableLLVMStateWriteFunctionArtifacts(reachability: reachability) != 0 {
+        && compilerReachableLLVMStateWriteFunctionArtifacts(reachability: reachability, moduleText: output) != 0 {
         output: String("compilerError\tkind=functionArtifactWriteFailure")
     }
     compilerReachableLLVMStateDestroy(reachability: reachability)
@@ -221,18 +224,28 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
 
 function compilerCoreLLVMNativeEntryTextForReachability(reachability: CompilerReachableLLVMState): String {
     state output: String("compilerError\tkind=invalidEntryReachability")
-    let seedStatus: Int(compilerReachableLLVMStateSeedEntryRoots(reachability: reachability))
+    let seedStatus: Int(compilerReachableLLVMStateEvaluateMainBehaviorRoot(reachability: reachability))
     state buildStatus: Int(0 - 1)
+    state usedCachedModule: Bool(false)
     if seedStatus != 0 {
         compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 50000 + seedStatus)
         output: "compilerError\tkind=invalidEntryReachability\tstage=\(seedStatus)"
     } else {
         buildStatus: compilerReachableLLVMStateBuildSelected(reachability: reachability)
+        if buildStatus == 2 {
+            output: compilerFunctionArtifactCacheModuleText(cache: reachability.priorFunctionArtifacts)
+            if output == String("") {
+                buildStatus: 0 - 1
+            } else {
+                buildStatus: 0
+                usedCachedModule: true
+            }
+        }
     }
     if seedStatus == 0 && buildStatus != 0 {
         output: compilerReachableLLVMStateRender(reachability: reachability)
     }
-    if seedStatus == 0 && buildStatus == 0 {
+    if seedStatus == 0 && buildStatus == 0 && !usedCachedModule {
         state blockedSensitiveFunctionRow: Int(0)
         while buildStatus == 0 && blockedSensitiveFunctionRow < reachability.abiSensitiveFunctions.count {
             if compilerFunctionSelectionContains(selection: reachability.selection, functionRow: blockedSensitiveFunctionRow)
@@ -244,7 +257,7 @@ function compilerCoreLLVMNativeEntryTextForReachability(reachability: CompilerRe
             blockedSensitiveFunctionRow: blockedSensitiveFunctionRow + 1
         }
     }
-    if seedStatus == 0 && buildStatus == 0 {
+    if seedStatus == 0 && buildStatus == 0 && !usedCachedModule {
         let abiPlan: CompilerModuleABIPlan(compilerReachableLLVMStateABIPlan(reachability: reachability))
         let entryLowering: CompilerTypedBodyLowering(compilerCoreLLVMLowerEntryTyped(context: reachability.context, reachability: reachability, initialTemporaryIndex: 0, abiPlan: abiPlan))
         if !entryLowering.isValid {
@@ -269,7 +282,7 @@ function compilerCoreLLVMNativeEntryTextForProgram(program: CompilerProgram, dec
     let reachability: CompilerReachableLLVMState(compilerReachableLLVMStateCreate(context: context))
     state output: String(compilerCoreLLVMNativeEntryTextForReachability(reachability: reachability))
     if !hasRangePrefix(source: output, start: 0, prefix: String("compilerError"))
-        && compilerReachableLLVMStateWriteFunctionArtifacts(reachability: reachability) != 0 {
+        && compilerReachableLLVMStateWriteFunctionArtifacts(reachability: reachability, moduleText: output) != 0 {
         output: String("compilerError\tkind=functionArtifactWriteFailure")
     }
     compilerReachableLLVMStateDestroy(reachability: reachability)
@@ -721,7 +734,8 @@ function compilerReachableLLVMFunctionFailureValueNode(): Int { return 24 }
 function compilerReachableLLVMFunctionFailureValueKind(): Int { return 25 }
 function compilerReachableLLVMFunctionFailureValueStart(): Int { return 26 }
 function compilerReachableLLVMFunctionFailureValueEnd(): Int { return 27 }
-function compilerReachableLLMCounterCount(): Int { return 28 }
+function compilerReachableLLVMBehaviorGraphClosed(): Int { return 28 }
+function compilerReachableLLMCounterCount(): Int { return 29 }
 
 function compilerReachableLLVMReturnFailureDependency(): Int { return 1 }
 function compilerReachableLLVMReturnFailureProof(): Int { return 2 }
@@ -779,7 +793,7 @@ function compilerReachableFunctionInstanceReturnLeafOrdinalColumn(): Int { retur
 function compilerReachableFunctionInstanceReturnLeafSourcePathColumn(): Int { return 5 }
 function compilerReachableFunctionInstanceReturnLeafStorageKeyColumn(): Int { return 6 }
 
-function compilerFunctionArtifactColumnCount(): Int { return 17 }
+function compilerFunctionArtifactColumnCount(): Int { return 23 }
 function compilerFunctionArtifactFunctionColumn(): Int { return 0 }
 function compilerFunctionArtifactInstanceColumn(): Int { return 1 }
 function compilerFunctionArtifactIdentityFirstColumn(): Int { return 2 }
@@ -796,7 +810,13 @@ function compilerFunctionArtifactEdgeStartColumn(): Int { return 12 }
 function compilerFunctionArtifactEdgeCountColumn(): Int { return 13 }
 function compilerFunctionArtifactEdgeFingerprintFirstColumn(): Int { return 14 }
 function compilerFunctionArtifactEdgeFingerprintSecondColumn(): Int { return 15 }
-function compilerFunctionArtifactReuseColumn(): Int { return 16 }
+function compilerFunctionArtifactBehaviorInputFirstColumn(): Int { return 16 }
+function compilerFunctionArtifactBehaviorInputSecondColumn(): Int { return 17 }
+function compilerFunctionArtifactBehaviorOutputFirstColumn(): Int { return 18 }
+function compilerFunctionArtifactBehaviorOutputSecondColumn(): Int { return 19 }
+function compilerFunctionArtifactBehaviorClosureFirstColumn(): Int { return 20 }
+function compilerFunctionArtifactBehaviorClosureSecondColumn(): Int { return 21 }
+function compilerFunctionArtifactReuseColumn(): Int { return 22 }
 function compilerReachableFunctionInstanceReturnSourceLocalCreate(): Int { return 1 }
 function compilerReachableFunctionInstanceReturnSourceBoundaryAlias(): Int { return 2 }
 function compilerReachableFunctionInstanceReturnSourceBoundaryForward(): Int { return 3 }
@@ -1035,6 +1055,9 @@ function compilerReachableLLVMStateCreate(context: CompilerLLVMLoweringContext):
     let functionInstanceReturnSummaries: CompilerIntTable(compilerIntTableCreate(columnCount: compilerReachableFunctionInstanceReturnSummaryColumnCount(), estimatedRowCount: functionCount * 2 + 16))
     let functionInstanceReturnLeaves: CompilerIntTable(compilerIntTableCreate(columnCount: compilerReachableFunctionInstanceReturnLeafColumnCount(), estimatedRowCount: functionCount * 4 + 32))
     let priorFunctionArtifacts: CompilerFunctionArtifactCache(compilerFunctionArtifactCacheLoad(source: context.program.source))
+    let functionArtifactCandidates: Buffer<Int>(bufferCreateInt(capacity: functionCount * 2 + 16))
+    let functionBehaviorOutputs: Buffer<Int>(bufferCreateInt(capacity: functionCount * 4 + 32))
+    let mainBehavior: Buffer<Int>(bufferCreateInt(capacity: 6))
     let functionArtifacts: CompilerIntTable(compilerIntTableCreate(columnCount: compilerFunctionArtifactColumnCount(), estimatedRowCount: functionCount * 2 + 16))
     let functionArtifactEdges: Buffer<Int>(bufferCreateInt(capacity: functionCount * 4))
     let functionArtifactText: RawBuffer(rawBufferCreate(capacity: 1048576, stride: 1))
@@ -1065,6 +1088,9 @@ function compilerReachableLLVMStateCreate(context: CompilerLLVMLoweringContext):
         abiParticipants: abiParticipants,
         abiSensitiveFunctions: abiSensitiveFunctions,
         priorFunctionArtifacts: priorFunctionArtifacts,
+        functionArtifactCandidates: functionArtifactCandidates,
+        functionBehaviorOutputs: functionBehaviorOutputs,
+        mainBehavior: mainBehavior,
         functionArtifacts: functionArtifacts,
         functionArtifactEdges: functionArtifactEdges,
         functionArtifactText: functionArtifactText,
@@ -1578,7 +1604,11 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
     state status: Int(0)
     if !typedReady {
         state retainedFailureCode: Int(typedFailureStage)
-        if arena.failures.count > 0 { retainedFailureCode: arena.failures.element(index: 0) }
+        if arena.failures.count > 1 {
+            retainedFailureCode: arena.failures.element(index: 1)
+        } else if arena.failures.count > 0 {
+            retainedFailureCode: arena.failures.element(index: 0)
+        }
         if retainedFailureCode <= 0 { retainedFailureCode: 1 }
         if reachability.abiCapabilities.update(element: 0 - retainedFailureCode, index: functionRow) != 0 {
             status: 0 - 1
@@ -1655,6 +1685,61 @@ function compilerReachableLLVMStateFunctionArtifactDependencies(reachability: Co
     return dependencies
 }
 
+function compilerReachableLLVMStateFunctionBehaviorInput(reachability: CompilerReachableLLVMState, functionRow: Int, instanceID: Int): CompilerFingerprint {
+    let fileID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: functionRow, column: 1))
+    let bodyStart: Int(compilerSourceStoreGlobalOffset(store: reachability.context.tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: reachability.context.tables.functions, row: functionRow, column: 8)))
+    let bodyEnd: Int(compilerSourceStoreGlobalOffset(store: reachability.context.tables.sourceStore, fileID: fileID, localOffset: compilerIntTableValue(table: reachability.context.tables.functions, row: functionRow, column: 9)))
+    state input: CompilerFingerprint(compilerFingerprintInitial())
+    input: compilerFingerprintAppendInt(fingerprint: input, value: 9020)
+    input: compilerFingerprintAppendInt(fingerprint: input, value: compilerIntTableValue(table: reachability.functionInstances, row: instanceID, column: compilerReachableFunctionInstanceFingerprintFirstColumn()))
+    input: compilerFingerprintAppendInt(fingerprint: input, value: compilerIntTableValue(table: reachability.functionInstances, row: instanceID, column: compilerReachableFunctionInstanceFingerprintSecondColumn()))
+    input: compilerFingerprintAppendInt(fingerprint: input, value: compilerIntTableValue(table: reachability.functionInstances, row: instanceID, column: compilerReachableFunctionInstanceSignatureFirstColumn()))
+    input: compilerFingerprintAppendInt(fingerprint: input, value: compilerIntTableValue(table: reachability.functionInstances, row: instanceID, column: compilerReachableFunctionInstanceSignatureSecondColumn()))
+    return compilerFingerprintAppendRange(fingerprint: input, tag: 9021, source: reachability.context.tables.sourceStore.source, start: bodyStart, end: bodyEnd)
+}
+
+function compilerFunctionArtifactBehaviorOutput(input: CompilerFingerprint, identity: CompilerFingerprint, dependencies: CompilerFingerprint, edges: CompilerFingerprint): CompilerFingerprint {
+    state output: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: compilerFingerprintInitial(), value: 9022))
+    output: compilerFingerprintAppendInt(fingerprint: output, value: input.first)
+    output: compilerFingerprintAppendInt(fingerprint: output, value: input.second)
+    output: compilerFingerprintAppendInt(fingerprint: output, value: identity.first)
+    output: compilerFingerprintAppendInt(fingerprint: output, value: identity.second)
+    output: compilerFingerprintAppendInt(fingerprint: output, value: dependencies.first)
+    output: compilerFingerprintAppendInt(fingerprint: output, value: dependencies.second)
+    output: compilerFingerprintAppendInt(fingerprint: output, value: edges.first)
+    return compilerFingerprintAppendInt(fingerprint: output, value: edges.second)
+}
+
+function compilerReachableLLVMStateMainBehaviorInput(reachability: CompilerReachableLLVMState): CompilerFingerprint {
+    let maybeMain: Optional<CompilerMainBlock>(compilerSyntaxCollectedMainBlock(tables: reachability.context.tables))
+    if maybeMain == nil { return compilerFingerprintInitial() }
+    let main: CompilerMainBlock(maybeMain ?? CompilerMainBlock(attributeStart: 0, bodyStart: 0, bodyEnd: 0))
+    state input: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: compilerFingerprintInitial(), value: 9030))
+    return compilerFingerprintAppendRange(fingerprint: input, tag: 9031, source: reachability.context.tables.sourceStore.source, start: main.bodyStart, end: main.bodyEnd)
+}
+
+function compilerReachableLLVMStateMainBehaviorOutput(reachability: CompilerReachableLLVMState): CompilerFingerprint {
+    let input: CompilerFingerprint(compilerReachableLLVMStateMainBehaviorInput(reachability: reachability))
+    state output: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: compilerFingerprintInitial(), value: 9032))
+    output: compilerFingerprintAppendInt(fingerprint: output, value: input.first)
+    output: compilerFingerprintAppendInt(fingerprint: output, value: input.second)
+    state rootEdgeCount: Int(0)
+    state edgeIndex: Int(0)
+    while edgeIndex < reachability.instanceEdgeTargets.count {
+        if reachability.instanceEdgeOwners.element(index: edgeIndex) == 0 - 1 { rootEdgeCount: rootEdgeCount + 1 }
+        edgeIndex: edgeIndex + 1
+    }
+    output: compilerFingerprintAppendInt(fingerprint: output, value: rootEdgeCount)
+    edgeIndex: 0
+    while edgeIndex < reachability.instanceEdgeTargets.count {
+        if reachability.instanceEdgeOwners.element(index: edgeIndex) == 0 - 1 {
+            output: compilerFingerprintAppendInt(fingerprint: output, value: reachability.instanceEdgeTargets.element(index: edgeIndex))
+        }
+        edgeIndex: edgeIndex + 1
+    }
+    return output
+}
+
 function compilerFunctionArtifactEdgeFingerprint(edges: Buffer<Int>, edgeStart: Int, edgeCount: Int): CompilerFingerprint {
     state fingerprint: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: compilerFingerprintInitial(), value: 9011))
     fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: edgeCount)
@@ -1680,6 +1765,184 @@ function compilerReachableLLVMStatePlannedFunctionEdgeFingerprint(reachability: 
     return fingerprint
 }
 
+function compilerReachableLLVMStateFindFunctionArtifactCandidates(reachability: CompilerReachableLLVMState): Int {
+    if reachability.functionArtifactCandidates.count != 0 { return 0 - 1 }
+    state workIndex: Int(0)
+    while workIndex < reachability.worklist.count {
+        let functionRow: Int(reachability.worklist.element(index: workIndex))
+        let instanceID: Int(compilerReachableLLVMStateWorklistInstanceID(reachability: reachability, workIndex: workIndex))
+        if instanceID < 0 { return 0 - 1 }
+        let behaviorInput: CompilerFingerprint(compilerReachableLLVMStateFunctionBehaviorInput(reachability: reachability, functionRow: functionRow, instanceID: instanceID))
+        let edges: CompilerFingerprint(compilerReachableLLVMStatePlannedFunctionEdgeFingerprint(reachability: reachability, functionRow: functionRow))
+        let candidateRow: Int(compilerFunctionArtifactCacheFindBehaviorCandidate(cache: reachability.priorFunctionArtifacts, functionRow: functionRow, instanceID: instanceID, behaviorInput: behaviorInput, edges: edges))
+        if reachability.functionArtifactCandidates.append(element: candidateRow) != 0 { return 0 - 1 }
+        workIndex: workIndex + 1
+    }
+    return 0
+}
+
+function compilerReachableLLVMStateFunctionArtifactCandidateForInstance(reachability: CompilerReachableLLVMState, instanceID: Int): Int {
+    state workIndex: Int(0)
+    while workIndex < reachability.worklistInstanceIDs.count {
+        if reachability.worklistInstanceIDs.element(index: workIndex) == instanceID {
+            if workIndex >= reachability.functionArtifactCandidates.count { return 0 - 1 }
+            return reachability.functionArtifactCandidates.element(index: workIndex)
+        }
+        workIndex: workIndex + 1
+    }
+    return 0 - 1
+}
+
+function compilerReachableLLVMStateCalculateFunctionBehaviorOutput(reachability: CompilerReachableLLVMState, functionRow: Int, instanceID: Int): CompilerFingerprint {
+    let input: CompilerFingerprint(compilerReachableLLVMStateFunctionBehaviorInput(reachability: reachability, functionRow: functionRow, instanceID: instanceID))
+    let identity: CompilerFingerprint(compilerReachableLLVMStateFunctionArtifactIdentity(reachability: reachability, functionRow: functionRow, instanceID: instanceID))
+    let dependencies: CompilerFingerprint(compilerReachableLLVMStateFunctionArtifactDependencies(reachability: reachability, instanceID: instanceID))
+    let edges: CompilerFingerprint(compilerReachableLLVMStatePlannedFunctionEdgeFingerprint(reachability: reachability, functionRow: functionRow))
+    return compilerFunctionArtifactBehaviorOutput(input: input, identity: identity, dependencies: dependencies, edges: edges)
+}
+
+function compilerReachableLLVMStateBuildFunctionBehaviorOutputs(reachability: CompilerReachableLLVMState): Int {
+    if reachability.functionBehaviorOutputs.count != 0 { return 0 - 1 }
+    state workIndex: Int(0)
+    while workIndex < reachability.worklistInstanceIDs.count {
+        let functionRow: Int(reachability.worklist.element(index: workIndex))
+        let instanceID: Int(reachability.worklistInstanceIDs.element(index: workIndex))
+        let output: CompilerFingerprint(compilerReachableLLVMStateCalculateFunctionBehaviorOutput(reachability: reachability, functionRow: functionRow, instanceID: instanceID))
+        if reachability.functionBehaviorOutputs.append(element: output.first) != 0
+            || reachability.functionBehaviorOutputs.append(element: output.second) != 0 { return 0 - 1 }
+        workIndex: workIndex + 1
+    }
+    return 0
+}
+
+function compilerReachableLLVMStateFunctionBehaviorOutput(reachability: CompilerReachableLLVMState, instanceID: Int): CompilerFingerprint {
+    state workIndex: Int(0)
+    while workIndex < reachability.worklistInstanceIDs.count {
+        if reachability.worklistInstanceIDs.element(index: workIndex) == instanceID {
+            let outputIndex: Int(workIndex * 2)
+            if outputIndex + 1 >= reachability.functionBehaviorOutputs.count { return compilerFingerprintInitial() }
+            return CompilerFingerprint(first: reachability.functionBehaviorOutputs.element(index: outputIndex), second: reachability.functionBehaviorOutputs.element(index: outputIndex + 1))
+        }
+        workIndex: workIndex + 1
+    }
+    return compilerFingerprintInitial()
+}
+
+function compilerReachableLLVMStateFunctionBehaviorClosure(reachability: CompilerReachableLLVMState, instanceID: Int): CompilerFingerprint {
+    state closure: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: compilerFingerprintInitial(), value: 9023))
+    let output: CompilerFingerprint(compilerReachableLLVMStateFunctionBehaviorOutput(reachability: reachability, instanceID: instanceID))
+    closure: compilerFingerprintAppendInt(fingerprint: closure, value: output.first)
+    closure: compilerFingerprintAppendInt(fingerprint: closure, value: output.second)
+    state edgeIndex: Int(0)
+    while edgeIndex < reachability.instanceEdgeTargets.count {
+        if reachability.instanceEdgeOwners.element(index: edgeIndex) == instanceID {
+            let targetInstanceID: Int(reachability.instanceEdgeTargets.element(index: edgeIndex))
+            let targetOutput: CompilerFingerprint(compilerReachableLLVMStateFunctionBehaviorOutput(reachability: reachability, instanceID: targetInstanceID))
+            closure: compilerFingerprintAppendInt(fingerprint: closure, value: targetInstanceID)
+            closure: compilerFingerprintAppendInt(fingerprint: closure, value: targetOutput.first)
+            closure: compilerFingerprintAppendInt(fingerprint: closure, value: targetOutput.second)
+        }
+        edgeIndex: edgeIndex + 1
+    }
+    return closure
+}
+
+function compilerReachableLLVMStateCachedFunctionBehaviorClosure(reachability: CompilerReachableLLVMState, instanceID: Int, candidateRow: Int): CompilerFingerprint {
+    state closure: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: compilerFingerprintInitial(), value: 9023))
+    closure: compilerFingerprintAppendInt(fingerprint: closure, value: compilerIntTableValue(table: reachability.priorFunctionArtifacts.artifacts, row: candidateRow, column: compilerFunctionArtifactBehaviorOutputFirstColumn()))
+    closure: compilerFingerprintAppendInt(fingerprint: closure, value: compilerIntTableValue(table: reachability.priorFunctionArtifacts.artifacts, row: candidateRow, column: compilerFunctionArtifactBehaviorOutputSecondColumn()))
+    state edgeIndex: Int(0)
+    while edgeIndex < reachability.instanceEdgeTargets.count {
+        if reachability.instanceEdgeOwners.element(index: edgeIndex) == instanceID {
+            let targetInstanceID: Int(reachability.instanceEdgeTargets.element(index: edgeIndex))
+            let targetCandidateRow: Int(compilerReachableLLVMStateFunctionArtifactCandidateForInstance(reachability: reachability, instanceID: targetInstanceID))
+            if targetCandidateRow < 0 { return compilerFingerprintInitial() }
+            closure: compilerFingerprintAppendInt(fingerprint: closure, value: targetInstanceID)
+            closure: compilerFingerprintAppendInt(fingerprint: closure, value: compilerIntTableValue(table: reachability.priorFunctionArtifacts.artifacts, row: targetCandidateRow, column: compilerFunctionArtifactBehaviorOutputFirstColumn()))
+            closure: compilerFingerprintAppendInt(fingerprint: closure, value: compilerIntTableValue(table: reachability.priorFunctionArtifacts.artifacts, row: targetCandidateRow, column: compilerFunctionArtifactBehaviorOutputSecondColumn()))
+        }
+        edgeIndex: edgeIndex + 1
+    }
+    return closure
+}
+
+function compilerReachableLLVMStateMainBehaviorClosure(reachability: CompilerReachableLLVMState, output: CompilerFingerprint): CompilerFingerprint {
+    state closure: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: compilerFingerprintInitial(), value: 9033))
+    closure: compilerFingerprintAppendInt(fingerprint: closure, value: output.first)
+    closure: compilerFingerprintAppendInt(fingerprint: closure, value: output.second)
+    state edgeIndex: Int(0)
+    while edgeIndex < reachability.instanceEdgeTargets.count {
+        if reachability.instanceEdgeOwners.element(index: edgeIndex) == 0 - 1 {
+            let targetInstanceID: Int(reachability.instanceEdgeTargets.element(index: edgeIndex))
+            let targetOutput: CompilerFingerprint(compilerReachableLLVMStateFunctionBehaviorOutput(reachability: reachability, instanceID: targetInstanceID))
+            closure: compilerFingerprintAppendInt(fingerprint: closure, value: targetInstanceID)
+            closure: compilerFingerprintAppendInt(fingerprint: closure, value: targetOutput.first)
+            closure: compilerFingerprintAppendInt(fingerprint: closure, value: targetOutput.second)
+        }
+        edgeIndex: edgeIndex + 1
+    }
+    return closure
+}
+
+function compilerReachableLLVMStateCachedMainBehaviorClosure(reachability: CompilerReachableLLVMState): CompilerFingerprint {
+    if reachability.priorFunctionArtifacts.rootBehavior.count != 8 { return compilerFingerprintInitial() }
+    state closure: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: compilerFingerprintInitial(), value: 9033))
+    closure: compilerFingerprintAppendInt(fingerprint: closure, value: reachability.priorFunctionArtifacts.rootBehavior.element(index: 2))
+    closure: compilerFingerprintAppendInt(fingerprint: closure, value: reachability.priorFunctionArtifacts.rootBehavior.element(index: 3))
+    state edgeIndex: Int(0)
+    while edgeIndex < reachability.instanceEdgeTargets.count {
+        if reachability.instanceEdgeOwners.element(index: edgeIndex) == 0 - 1 {
+            let targetInstanceID: Int(reachability.instanceEdgeTargets.element(index: edgeIndex))
+            let targetCandidateRow: Int(compilerReachableLLVMStateFunctionArtifactCandidateForInstance(reachability: reachability, instanceID: targetInstanceID))
+            if targetCandidateRow < 0 { return compilerFingerprintInitial() }
+            closure: compilerFingerprintAppendInt(fingerprint: closure, value: targetInstanceID)
+            closure: compilerFingerprintAppendInt(fingerprint: closure, value: compilerIntTableValue(table: reachability.priorFunctionArtifacts.artifacts, row: targetCandidateRow, column: compilerFunctionArtifactBehaviorOutputFirstColumn()))
+            closure: compilerFingerprintAppendInt(fingerprint: closure, value: compilerIntTableValue(table: reachability.priorFunctionArtifacts.artifacts, row: targetCandidateRow, column: compilerFunctionArtifactBehaviorOutputSecondColumn()))
+        }
+        edgeIndex: edgeIndex + 1
+    }
+    return closure
+}
+
+function compilerReachableLLVMStateBuildMainBehavior(reachability: CompilerReachableLLVMState): Int {
+    if reachability.mainBehavior.count != 0 { return 0 - 1 }
+    let input: CompilerFingerprint(compilerReachableLLVMStateMainBehaviorInput(reachability: reachability))
+    let output: CompilerFingerprint(compilerReachableLLVMStateMainBehaviorOutput(reachability: reachability))
+    let closure: CompilerFingerprint(compilerReachableLLVMStateMainBehaviorClosure(reachability: reachability, output: output))
+    if reachability.mainBehavior.append(element: input.first) != 0
+        || reachability.mainBehavior.append(element: input.second) != 0
+        || reachability.mainBehavior.append(element: output.first) != 0
+        || reachability.mainBehavior.append(element: output.second) != 0
+        || reachability.mainBehavior.append(element: closure.first) != 0
+        || reachability.mainBehavior.append(element: closure.second) != 0 { return 0 - 1 }
+    return 0
+}
+
+function compilerReachableLLVMStateBehaviorCandidateGraphIsClosed(reachability: CompilerReachableLLVMState): Bool {
+    if reachability.priorFunctionArtifacts.rootBehavior.count != 8 { return false }
+    let mainInput: CompilerFingerprint(compilerReachableLLVMStateMainBehaviorInput(reachability: reachability))
+    let mainOutput: CompilerFingerprint(compilerReachableLLVMStateMainBehaviorOutput(reachability: reachability))
+    if reachability.priorFunctionArtifacts.rootBehavior.element(index: 0) != mainInput.first
+        || reachability.priorFunctionArtifacts.rootBehavior.element(index: 1) != mainInput.second
+        || reachability.priorFunctionArtifacts.rootBehavior.element(index: 2) != mainOutput.first
+        || reachability.priorFunctionArtifacts.rootBehavior.element(index: 3) != mainOutput.second { return false }
+    if reachability.functionArtifactCandidates.count != reachability.worklistInstanceIDs.count { return false }
+    state workIndex: Int(0)
+    while workIndex < reachability.functionArtifactCandidates.count {
+        let candidateRow: Int(reachability.functionArtifactCandidates.element(index: workIndex))
+        if candidateRow < 0 { return false }
+        let instanceID: Int(reachability.worklistInstanceIDs.element(index: workIndex))
+        let closure: CompilerFingerprint(compilerReachableLLVMStateCachedFunctionBehaviorClosure(reachability: reachability, instanceID: instanceID, candidateRow: candidateRow))
+        if compilerIntTableValue(table: reachability.priorFunctionArtifacts.artifacts, row: candidateRow, column: compilerFunctionArtifactBehaviorClosureFirstColumn()) != closure.first
+            || compilerIntTableValue(table: reachability.priorFunctionArtifacts.artifacts, row: candidateRow, column: compilerFunctionArtifactBehaviorClosureSecondColumn()) != closure.second { return false }
+        workIndex: workIndex + 1
+    }
+    let mainClosure: CompilerFingerprint(compilerReachableLLVMStateCachedMainBehaviorClosure(reachability: reachability))
+    if reachability.priorFunctionArtifacts.rootBehavior.element(index: 4) != mainClosure.first
+        || reachability.priorFunctionArtifacts.rootBehavior.element(index: 5) != mainClosure.second { return false }
+    return true
+}
+
 function compilerReachableLLVMStateAppendFunctionArtifact(reachability: CompilerReachableLLVMState, functionRow: Int, instanceID: Int, selected: CompilerTypedLLVMHelpers, emittedEdgeTargets: Buffer<Int>, edgeStart: Int, edgeCount: Int, reused: Bool): Int {
     let functionStart: Int(rawBufferCount(buffer: reachability.functionArtifactText))
     if rawBufferAppendText(buffer: reachability.functionArtifactText, text: selected.helpers.renderedFunctions) != 0 { return 0 - 1 }
@@ -1690,6 +1953,9 @@ function compilerReachableLLVMStateAppendFunctionArtifact(reachability: Compiler
     let identity: CompilerFingerprint(compilerReachableLLVMStateFunctionArtifactIdentity(reachability: reachability, functionRow: functionRow, instanceID: instanceID))
     let dependencies: CompilerFingerprint(compilerReachableLLVMStateFunctionArtifactDependencies(reachability: reachability, instanceID: instanceID))
     let edgeFingerprint: CompilerFingerprint(compilerFunctionArtifactEdgeFingerprint(edges: emittedEdgeTargets, edgeStart: edgeStart, edgeCount: edgeCount))
+    let behaviorInput: CompilerFingerprint(compilerReachableLLVMStateFunctionBehaviorInput(reachability: reachability, functionRow: functionRow, instanceID: instanceID))
+    let behaviorOutput: CompilerFingerprint(compilerReachableLLVMStateFunctionBehaviorOutput(reachability: reachability, instanceID: instanceID))
+    let behaviorClosure: CompilerFingerprint(compilerReachableLLVMStateFunctionBehaviorClosure(reachability: reachability, instanceID: instanceID))
     let artifactEdgeStart: Int(reachability.functionArtifactEdges.count)
     state edgeOrdinal: Int(0)
     while edgeOrdinal < edgeCount {
@@ -1714,6 +1980,12 @@ function compilerReachableLLVMStateAppendFunctionArtifact(reachability: Compiler
         || compilerIntTableAppend(table: reachability.functionArtifacts, value: edgeCount) != 0
         || compilerIntTableAppend(table: reachability.functionArtifacts, value: edgeFingerprint.first) != 0
         || compilerIntTableAppend(table: reachability.functionArtifacts, value: edgeFingerprint.second) != 0
+        || compilerIntTableAppend(table: reachability.functionArtifacts, value: behaviorInput.first) != 0
+        || compilerIntTableAppend(table: reachability.functionArtifacts, value: behaviorInput.second) != 0
+        || compilerIntTableAppend(table: reachability.functionArtifacts, value: behaviorOutput.first) != 0
+        || compilerIntTableAppend(table: reachability.functionArtifacts, value: behaviorOutput.second) != 0
+        || compilerIntTableAppend(table: reachability.functionArtifacts, value: behaviorClosure.first) != 0
+        || compilerIntTableAppend(table: reachability.functionArtifacts, value: behaviorClosure.second) != 0
         || compilerIntTableAppend(table: reachability.functionArtifacts, value: reuseValue) != 0 { return 0 - 1 }
     return 0
 }
@@ -1737,7 +2009,7 @@ function compilerReachableLLVMStateAssembleFunctionArtifacts(reachability: Compi
     return 0
 }
 
-function compilerReachableLLVMStateEmitFunction(reachability: CompilerReachableLLVMState, functionRow: Int, instanceID: Int, emissionEdgeOwners: Buffer<Int>, emissionEdgeTargets: Buffer<Int>): Int {
+function compilerReachableLLVMStateEmitFunction(reachability: CompilerReachableLLVMState, functionRow: Int, instanceID: Int, candidateArtifactRow: Int, emissionEdgeOwners: Buffer<Int>, emissionEdgeTargets: Buffer<Int>): Int {
     if reachability.counters.element(index: compilerReachableLLVMPlanFrozen()) != 1 { return 0 - 1 }
     let syntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: functionRow, column: 0))
     let declarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: syntaxID))
@@ -1749,7 +2021,10 @@ function compilerReachableLLVMStateEmitFunction(reachability: CompilerReachableL
     let artifactIdentity: CompilerFingerprint(compilerReachableLLVMStateFunctionArtifactIdentity(reachability: reachability, functionRow: functionRow, instanceID: instanceID))
     let artifactDependencies: CompilerFingerprint(compilerReachableLLVMStateFunctionArtifactDependencies(reachability: reachability, instanceID: instanceID))
     let artifactEdges: CompilerFingerprint(compilerReachableLLVMStatePlannedFunctionEdgeFingerprint(reachability: reachability, functionRow: functionRow))
-    let cachedArtifactRow: Int(compilerFunctionArtifactCacheFind(cache: reachability.priorFunctionArtifacts, functionRow: functionRow, instanceID: instanceID, identity: artifactIdentity, dependencies: artifactDependencies, edges: artifactEdges))
+    let behaviorInput: CompilerFingerprint(compilerReachableLLVMStateFunctionBehaviorInput(reachability: reachability, functionRow: functionRow, instanceID: instanceID))
+    let behaviorOutput: CompilerFingerprint(compilerReachableLLVMStateFunctionBehaviorOutput(reachability: reachability, instanceID: instanceID))
+    let behaviorClosure: CompilerFingerprint(compilerReachableLLVMStateFunctionBehaviorClosure(reachability: reachability, instanceID: instanceID))
+    let cachedArtifactRow: Int(compilerFunctionArtifactCacheFind(cache: reachability.priorFunctionArtifacts, candidateRow: candidateArtifactRow, functionRow: functionRow, instanceID: instanceID, identity: artifactIdentity, dependencies: artifactDependencies, edges: artifactEdges, behaviorInput: behaviorInput, behaviorOutput: behaviorOutput, behaviorClosure: behaviorClosure))
     let edgeStart: Int(emissionEdgeTargets.count)
     state selected: CompilerTypedLLVMHelpers(compilerFunctionArtifactEmptySelected())
     if cachedArtifactRow < 0 {
@@ -1970,11 +2245,11 @@ function compilerReachableLLVMStateBuildABIComponents(reachability: CompilerReac
     return status
 }
 
-function compilerReachableLLVMStateSeedEntryRoots(reachability: CompilerReachableLLVMState): Int {
+function compilerReachableLLVMStateEvaluateMainBehaviorRoot(reachability: CompilerReachableLLVMState): Int {
     let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreateEntry(tables: reachability.context.tables, index: reachability.context.declarationIndex)))
     state status: Int(0)
     if !compilerBodyArenaIsValid(arena: arena) {
-        let maybeMain: Optional<CompilerMainBlock>(compilerCoreParseMainBlock(source: reachability.context.tables.sourceStore.source))
+        let maybeMain: Optional<CompilerMainBlock>(compilerSyntaxCollectedMainBlock(tables: reachability.context.tables))
         if maybeMain == nil {
             status: 101
         } else {
@@ -2038,12 +2313,19 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
             if reachability.counters.update(element: workIndex + 1, index: compilerReachableLLMWorkIndex()) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
         }
         let worklistCountBeforeEntryRefresh: Int(reachability.worklist.count)
-        let entryRefreshStatus: Int(compilerReachableLLVMStateSeedEntryRoots(reachability: reachability))
+        let entryRefreshStatus: Int(compilerReachableLLVMStateEvaluateMainBehaviorRoot(reachability: reachability))
         if entryRefreshStatus != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 50000 + entryRefreshStatus) }
         entryClosureChanged: reachability.worklist.count != worklistCountBeforeEntryRefresh
         entryClosureIteration: entryClosureIteration + 1
     }
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("reachabilityDiscovery.end"))
+    if compilerReachableLLVMStateFindFunctionArtifactCandidates(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 45) }
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("functionArtifactCandidates.end"))
+    if compilerReachableLLVMStateBehaviorCandidateGraphIsClosed(reachability: reachability) {
+        if reachability.counters.update(element: 1, index: compilerReachableLLVMBehaviorGraphClosed()) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 46) }
+        return 2
+    }
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("behaviorGraphClosure.end"))
     let effectBuildStatus: Int(compilerReachableLLVMStateBuildFunctionInstanceEffects(reachability: reachability))
     if effectBuildStatus != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 0 - effectBuildStatus) }
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("functionEffects.end"))
@@ -2200,16 +2482,19 @@ function compilerReachableLLVMStateBuildSelected(reachability: CompilerReachable
     }
     stringTransientRegionReset(mark: closureTransientMark)
     if compilerReachableLLVMStateFreezeABIPlan(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
+    if compilerReachableLLVMStateBuildFunctionBehaviorOutputs(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 47) }
+    if compilerReachableLLVMStateBuildMainBehavior(reachability: reachability) != 0 { return compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 48) }
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("abiPlan.end"))
     if reachability.counters.update(element: 0, index: compilerReachableLLVMNextTemporary()) != 0 { return compilerReachableLLVMStateSetInvalid(reachability: reachability) }
     let emissionEdgeOwners: Buffer<Int>(bufferCreateInt(capacity: reachability.edgeOwners.count))
     let emissionEdgeTargets: Buffer<Int>(bufferCreateInt(capacity: reachability.edgeTargets.count))
     state emissionStatus: Int(0)
+    if reachability.functionArtifactCandidates.count != reachability.worklist.count { emissionStatus: 19 }
     while emissionStatus == 0 && reachability.counters.element(index: compilerReachableLLVMEmissionIndex()) < reachability.worklist.count {
         let emissionIndex: Int(reachability.counters.element(index: compilerReachableLLVMEmissionIndex()))
         let emissionFunctionRow: Int(reachability.worklist.element(index: emissionIndex))
         let emissionInstanceID: Int(compilerReachableLLVMStateWorklistInstanceID(reachability: reachability, workIndex: emissionIndex))
-        if compilerReachableLLVMStateEmitFunction(reachability: reachability, functionRow: emissionFunctionRow, instanceID: emissionInstanceID, emissionEdgeOwners: emissionEdgeOwners, emissionEdgeTargets: emissionEdgeTargets) != 0 { emissionStatus: 20 }
+        if compilerReachableLLVMStateEmitFunction(reachability: reachability, functionRow: emissionFunctionRow, instanceID: emissionInstanceID, candidateArtifactRow: reachability.functionArtifactCandidates.element(index: emissionIndex), emissionEdgeOwners: emissionEdgeOwners, emissionEdgeTargets: emissionEdgeTargets) != 0 { emissionStatus: 20 }
         if emissionStatus == 0 {
             if reachability.counters.update(element: emissionIndex + 1, index: compilerReachableLLVMEmissionIndex()) != 0 { emissionStatus: 21 }
         }
@@ -2284,6 +2569,9 @@ function compilerReachableLLVMStateDestroy(reachability: CompilerReachableLLVMSt
     if reachability.abiParticipants.destroy() != 0 { status: 0 - 1 }
     if reachability.abiSensitiveFunctions.destroy() != 0 { status: 0 - 1 }
     if compilerFunctionArtifactCacheDestroy(cache: reachability.priorFunctionArtifacts) != 0 { status: 0 - 1 }
+    if reachability.functionArtifactCandidates.destroy() != 0 { status: 0 - 1 }
+    if reachability.functionBehaviorOutputs.destroy() != 0 { status: 0 - 1 }
+    if reachability.mainBehavior.destroy() != 0 { status: 0 - 1 }
     if compilerIntTableDestroy(table: reachability.functionArtifacts) != 0 { status: 0 - 1 }
     if reachability.functionArtifactEdges.destroy() != 0 { status: 0 - 1 }
     if rawBufferDestroy(buffer: reachability.functionArtifactText) != 0 { status: 0 - 1 }

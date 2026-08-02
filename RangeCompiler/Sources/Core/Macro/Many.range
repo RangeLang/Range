@@ -1,4 +1,16 @@
-macro many(): Member -> RelationshipRegistration { environment in
+macro many(_ count: Int(0)): Member -> RelationshipRegistration { environment in
+    if count > 0 {
+        return RelationshipRegistration(
+            multiplicity: RelationshipMultiplicity(
+                minimum: count,
+                maximum: .finite(value: count)
+            ),
+            ordering: .ordered,
+            separator: .none,
+            enclosure: .none,
+            admission: .any
+        )
+    }
     return RelationshipRegistration(
         multiplicity: RelationshipMultiplicity(
             minimum: 0,

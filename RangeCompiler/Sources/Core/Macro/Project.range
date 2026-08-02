@@ -4,31 +4,16 @@ macro project(): Construct -> ProjectDefaults { environment in
     let members: Array<State>(
         environment.target.Declaration.members.filter(all: State)
     )
-    state integerCount: Int(0)
-    state boolCount: Int(0)
-    state memberIndex: Int(0)
-    while memberIndex < members.count {
-        let member: State(members[memberIndex])
-        let name: String(member.identifier.name)
-        if name.count == 7
-            && name.byte(index: 0) == 105
-            && name.byte(index: 1) == 110
-            && name.byte(index: 2) == 116
-            && name.byte(index: 3) == 101
-            && name.byte(index: 4) == 103
-            && name.byte(index: 5) == 101
-            && name.byte(index: 6) == 114 {
-            integerCount: integerCount + 1
-        }
-        if name.count == 4
-            && name.byte(index: 0) == 98
-            && name.byte(index: 1) == 111
-            && name.byte(index: 2) == 111
-            && name.byte(index: 3) == 108 {
-            boolCount: boolCount + 1
-        }
-        memberIndex: memberIndex + 1
-    }
+    let integerCount: Int(
+        members.filter { member in
+            return member.identifier.name == "integer"
+        }.count
+    )
+    let boolCount: Int(
+        members.filter { member in
+            return member.identifier.name == "bool"
+        }.count
+    )
 
     if integerCount == 0 && boolCount == 0 {
         #environment {

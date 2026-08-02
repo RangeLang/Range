@@ -7,14 +7,22 @@ construct CompilerV1Error {
 }
 
 construct CompilerV1ShapeArtifact {
+    let identity: CompilerFingerprint
     let snapshot: String
 }
 
-construct CompilerV1UsageArtifact {
+construct CompilerV1Behavior {
+    let input: CompilerFingerprint
+    let output: CompilerFingerprint
+}
+
+construct CompilerV1BehaviorArtifact {
+    let behavior: CompilerV1Behavior
     let snapshot: String
 }
 
 construct CompilerV1Artifact {
+    let input: CompilerFingerprint
     let output: String
 }
 
@@ -30,21 +38,35 @@ function compilerV1Shape(source: String): CompilerV1ShapeArtifact {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.shape.begin"))
     let snapshot: String(compilerTypedSyntaxSummary(source: source))
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.shape.end"))
-    return CompilerV1ShapeArtifact(snapshot: snapshot)
+    return CompilerV1ShapeArtifact(
+        identity: compilerFingerprintAppendText(fingerprint: compilerFingerprintInitial(), tag: 2, text: snapshot),
+        snapshot: snapshot
+    )
 }
 
-function compilerV1Usage(source: String): CompilerV1UsageArtifact {
-    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.usage.begin"))
+function compilerV1Behavior(shape: CompilerV1ShapeArtifact, source: String): CompilerV1BehaviorArtifact {
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.behavior.begin"))
     let snapshot: String(compilerSemanticSummary(source: source))
-    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.usage.end"))
-    return CompilerV1UsageArtifact(snapshot: snapshot)
+    let output: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: shape.identity, tag: 3, text: snapshot))
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.behavior.end"))
+    return CompilerV1BehaviorArtifact(
+        behavior: CompilerV1Behavior(input: shape.identity, output: output),
+        snapshot: snapshot
+    )
 }
 
-function compilerV1Plot(source: String): CompilerV1Artifact {
+function compilerV1Plot(shape: CompilerV1ShapeArtifact, behavior: CompilerV1BehaviorArtifact, source: String): CompilerV1Artifact {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.plot.begin"))
+    if behavior.behavior.input.first != shape.identity.first
+        || behavior.behavior.input.second != shape.identity.second {
+        return CompilerV1Artifact(
+            input: behavior.behavior.output,
+            output: String("compilerError\tkind=compilerV1BehaviorShapeMismatch\n")
+        )
+    }
     let output: String(compileRangeNativeProgramOutput(source: source))
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.plot.end"))
-    return CompilerV1Artifact(output: output)
+    return CompilerV1Artifact(input: behavior.behavior.output, output: output)
 }
 
 function compilerV1Report(error: CompilerV1Error): Int {
@@ -54,23 +76,31 @@ function compilerV1Report(error: CompilerV1Error): Int {
 
 function rangeCompilerV1CLI(compiler: CompilerV1, input: String, inspect: Bool): Int {
     let sourceDelta: CompilerV1SourceDelta(compilerV1Load(input: input))
-    if sourceDelta.value.source == String("") {
+    let source: String(sourceDelta.value.source)
+    if source == String("") {
         return compilerV1Report(error: CompilerV1Error(message: "range: unable to read non-empty input at \(sourceDelta.value.path)"))
     }
-    let shape: CompilerV1ShapeArtifact(compilerV1Shape(source: sourceDelta.value.source))
+    let shape: CompilerV1ShapeArtifact(compilerV1Shape(source: source))
     if compilerNativeOutputIsError(output: shape.snapshot) {
         return compilerV1Report(error: CompilerV1Error(message: shape.snapshot))
     }
-    let usage: CompilerV1UsageArtifact(compilerV1Usage(source: sourceDelta.value.source))
-    if compilerNativeOutputIsError(output: usage.snapshot) {
-        return compilerV1Report(error: CompilerV1Error(message: usage.snapshot))
+    let behavior: CompilerV1BehaviorArtifact(compilerV1Behavior(shape: shape, source: source))
+    if compilerNativeOutputIsError(output: behavior.snapshot) {
+        return compilerV1Report(error: CompilerV1Error(message: behavior.snapshot))
     }
-    let artifact: CompilerV1Artifact(compilerV1Plot(source: sourceDelta.value.source))
+    let artifact: CompilerV1Artifact(compilerV1Plot(shape: shape, behavior: behavior, source: source))
     if compilerNativeOutputIsError(output: artifact.output) {
         return compilerV1Report(error: CompilerV1Error(message: artifact.output))
     }
+    let sourceLength: Int(source.bytes.count)
     if inspect {
-        print(value: "compilerV1\tversion=\(compiler.version)\ncompilerV1Delta\tkind=source\tidentity=\(sourceDelta.identity.first):\(sourceDelta.identity.second)\tvalue=File\tpath=\(sourceDelta.value.path)\tbytes=\(stringLength(value: sourceDelta.value.source))\ncompilerV1Artifact\tphase=shape\n\(shape.snapshot)compilerV1Artifact\tphase=usage\n\(usage.snapshot)compilerV1Artifact\tphase=plot\n")
+        print(value: "compilerV1\tversion=\(compiler.version)\n")
+        print(value: "compilerV1Delta\tkind=source\tidentity=\(sourceDelta.identity.first):\(sourceDelta.identity.second)\tvalue=File\tpath=\(sourceDelta.value.path)\tbytes=\(sourceLength)\n")
+        print(value: "compilerV1Artifact\tphase=shape\tidentity=\(shape.identity.first):\(shape.identity.second)\n")
+        print(value: shape.snapshot)
+        print(value: "compilerV1Artifact\tphase=behavior\tinput=\(behavior.behavior.input.first):\(behavior.behavior.input.second)\toutput=\(behavior.behavior.output.first):\(behavior.behavior.output.second)\n")
+        print(value: behavior.snapshot)
+        print(value: "compilerV1Artifact\tphase=plot\tinput=\(artifact.input.first):\(artifact.input.second)\n")
     }
     print(value: artifact.output)
     return 0

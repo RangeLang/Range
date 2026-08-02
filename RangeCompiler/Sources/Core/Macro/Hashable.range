@@ -2,17 +2,11 @@ macro hashable(): Construct { environment in
     let members: Array<Let>(
         environment.target.Declaration.members.filter(all: Let)
     )
-    state idCount: Int(0)
-    state memberIndex: Int(0)
-    while memberIndex < members.count {
-        let member: Let(members[memberIndex])
-        if member.identifier.name.count == 2
-            && member.identifier.name.byte(index: 0) == 105
-            && member.identifier.name.byte(index: 1) == 100 {
-            idCount: idCount + 1
-        }
-        memberIndex: memberIndex + 1
-    }
+    let idCount: Int(
+        members.filter { member in
+            return member.identifier.name == "id"
+        }.count
+    )
     if idCount != 1 {
         environment.diagnostics.error("@hashable requires exactly one id declaration.")
     }

@@ -6,6 +6,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
 COMPILER="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/stage2/RangeCompiler"
 FIXTURE="$REPO_ROOT/Testing/Basics/Pass/ReturnInteger.range"
+LLVM_PLAN="$REPO_ROOT/RangeCompiler/Sources/Compiler/LLVM/CompilerLLVMPlan.range"
+FUNCTION_ARTIFACTS="$REPO_ROOT/RangeCompiler/Sources/Compiler/LLVM/CompilerFunctionArtifacts.range"
 WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compiler-v1.XXXXXX")"
 trap '/bin/rm -rf "$WORK_ROOT"' EXIT
 
@@ -14,6 +16,70 @@ fail() {
     exit 1
 }
 
+write_behavior_cache_fixture() {
+    local output="$1"
+    local input_artifact="$2"
+    local output_artifact="$3"
+    local main_result="$4"
+
+    /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$output"
+    if [[ -n "$input_artifact" ]]; then
+        /usr/bin/printf '// range-function-artifact-input %s\n' "$input_artifact" >> "$output"
+    fi
+    /usr/bin/printf '// range-function-artifact-output %s\n' "$output_artifact" >> "$output"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=project\tpath=BehaviorCache.range' >> "$output"
+    /usr/bin/printf '%s\n' \
+        'function cachedBehaviorValue(): Int {' \
+        '    return 7' \
+        '}' \
+        '' \
+        '@main {' \
+        "    return $main_result" \
+        '}' >> "$output"
+}
+
+/usr/bin/grep -Fq 'function compilerReachableLLVMStateFunctionBehaviorInput' "$LLVM_PLAN" \
+    || fail "function artifacts omit the pre-lowering Behavior input identity"
+/usr/bin/grep -Fq 'function compilerFunctionArtifactBehaviorOutput' "$LLVM_PLAN" \
+    || fail "function artifacts omit the proven Behavior output identity"
+/usr/bin/grep -Fq 'function compilerReachableLLVMStateFindFunctionArtifactCandidates' "$LLVM_PLAN" \
+    || fail "function artifact lookup does not begin at the pre-reconstruction Behavior boundary"
+/usr/bin/grep -Fq 'functionArtifactCandidates.end' "$LLVM_PLAN" \
+    || fail "pre-reconstruction Behavior lookup is not independently measurable"
+candidate_lookup_line="$(/usr/bin/grep -n -F 'if compilerReachableLLVMStateFindFunctionArtifactCandidates(reachability: reachability)' "$LLVM_PLAN" | /usr/bin/cut -d: -f1)"
+effect_build_line="$(/usr/bin/grep -n -F 'let effectBuildStatus: Int(compilerReachableLLVMStateBuildFunctionInstanceEffects' "$LLVM_PLAN" | /usr/bin/cut -d: -f1)"
+[[ -n "$candidate_lookup_line" && -n "$effect_build_line" && "$candidate_lookup_line" -lt "$effect_build_line" ]] \
+    || fail "Behavior candidate lookup does not precede effect reconstruction"
+/usr/bin/grep -Fq 'function compilerReachableLLVMStateBehaviorCandidateGraphIsClosed' "$LLVM_PLAN" \
+    || fail "function artifact candidates are not closed over instance dependencies"
+/usr/bin/grep -Fq 'behaviorGraphClosure.end' "$LLVM_PLAN" \
+    || fail "Behavior graph closure is not independently measurable"
+/usr/bin/grep -Fq 'compilerSyntaxCollectedMainBlock(tables: reachability.context.tables)' "$LLVM_PLAN" \
+    || fail "V1 does not collect main from the captured syntax graph"
+/usr/bin/grep -Fq 'function compilerReachableLLVMStateEvaluateMainBehaviorRoot' "$LLVM_PLAN" \
+    || fail "main is not evaluated as the first Behavior root"
+/usr/bin/grep -Fq 'function compilerReachableLLVMStateBuildMainBehavior' "$LLVM_PLAN" \
+    || fail "main Behavior input, output, and closure are not persisted"
+/usr/bin/grep -Fq 'function compilerReachableLLVMStateCachedMainBehaviorClosure' "$LLVM_PLAN" \
+    || fail "cached graph closure does not begin at main"
+if /usr/bin/grep -Fq 'compilerCoreParseMainBlock(source: reachability.context.tables.sourceStore.source)' "$LLVM_PLAN"; then
+    fail "V1 reparses source text while discovering main"
+fi
+/usr/bin/grep -Fq 'rangeFunctionArtifacts|version=5' "$FUNCTION_ARTIFACTS" \
+    || fail "function artifact schema was not advanced for Behavior mappings"
+/usr/bin/grep -Fq 'function compilerFunctionArtifactCacheModuleText' "$FUNCTION_ARTIFACTS" \
+    || fail "closed Behavior artifacts do not retain the complete emitted module"
+/usr/bin/grep -Fq 'return 2' "$LLVM_PLAN" \
+    || fail "closed Behavior graphs do not bypass reconstruction"
+for field in inputFirst inputSecond outputFirst outputSecond closureFirst closureSecond; do
+    /usr/bin/grep -Fq "${field}=" "$FUNCTION_ARTIFACTS" \
+        || fail "main Behavior serialization omits $field"
+done
+for field in behaviorInputFirst behaviorInputSecond behaviorOutputFirst behaviorOutputSecond behaviorClosureFirst behaviorClosureSecond; do
+    /usr/bin/grep -Fq "${field}=" "$FUNCTION_ARTIFACTS" \
+        || fail "function artifact serialization omits $field"
+done
+
 "$REPO_ROOT/scripts/range" check-compiler-smoke
 [[ -x "$COMPILER" ]] || fail "missing resolved Stage 2 compiler"
 
@@ -21,6 +87,39 @@ fail() {
 "$COMPILER" compile-v1 "$FIXTURE" > "$WORK_ROOT/v1.ll"
 /usr/bin/cmp -s "$WORK_ROOT/legacy.ll" "$WORK_ROOT/v1.ll" \
     || fail "V1 plot artifact differs from the legacy compiler output"
+
+behavior_cache="$WORK_ROOT/behavior.cache"
+write_behavior_cache_fixture "$WORK_ROOT/behavior-cold.range" "" "$behavior_cache" 'cachedBehaviorValue()'
+"$COMPILER" compile "$WORK_ROOT/behavior-cold.range" > "$WORK_ROOT/behavior-cold.ll"
+[[ -s "$behavior_cache" ]] || fail "cold Behavior compilation omitted its artifact"
+/usr/bin/grep -Fq 'rangeFunctionArtifacts|version=5' "$behavior_cache" \
+    || fail "cold Behavior compilation did not write schema v5"
+
+write_behavior_cache_fixture "$WORK_ROOT/behavior-hit.range" "$behavior_cache" "$WORK_ROOT/behavior-hit.cache" 'cachedBehaviorValue()'
+"$COMPILER" compile "$WORK_ROOT/behavior-hit.range" > "$WORK_ROOT/behavior-hit.ll"
+/usr/bin/cmp -s "$WORK_ROOT/behavior-cold.ll" "$WORK_ROOT/behavior-hit.ll" \
+    || fail "closed Behavior cache changed emitted LLVM"
+[[ ! -e "$WORK_ROOT/behavior-hit.cache" ]] \
+    || fail "closed Behavior graph rebuilt and rewrote its artifact"
+
+write_behavior_cache_fixture "$WORK_ROOT/behavior-main-change.range" "$behavior_cache" "$WORK_ROOT/behavior-main-change.cache" 'cachedBehaviorValue() + 1'
+"$COMPILER" compile "$WORK_ROOT/behavior-main-change.range" > "$WORK_ROOT/behavior-main-change.ll"
+[[ -s "$WORK_ROOT/behavior-main-change.cache" ]] \
+    || fail "changed main body incorrectly reused the closed Behavior module"
+
+/bin/cp "$behavior_cache" "$WORK_ROOT/behavior-root-edge-input.cache"
+/usr/bin/perl -0pi -e 's/outputFirst=([0-9]+)/"outputFirst=" . ($1 + 1)/e' "$WORK_ROOT/behavior-root-edge-input.cache"
+write_behavior_cache_fixture "$WORK_ROOT/behavior-root-edge.range" "$WORK_ROOT/behavior-root-edge-input.cache" "$WORK_ROOT/behavior-root-edge.cache" 'cachedBehaviorValue()'
+"$COMPILER" compile "$WORK_ROOT/behavior-root-edge.range" > "$WORK_ROOT/behavior-root-edge.ll"
+[[ -s "$WORK_ROOT/behavior-root-edge.cache" ]] \
+    || fail "changed root Behavior output incorrectly reused the cached module"
+
+/bin/cp "$behavior_cache" "$WORK_ROOT/behavior-callee-output-input.cache"
+/usr/bin/perl -0pi -e 's/behaviorOutputFirst=([0-9]+)/"behaviorOutputFirst=" . ($1 + 1)/e' "$WORK_ROOT/behavior-callee-output-input.cache"
+write_behavior_cache_fixture "$WORK_ROOT/behavior-callee-output.range" "$WORK_ROOT/behavior-callee-output-input.cache" "$WORK_ROOT/behavior-callee-output.cache" 'cachedBehaviorValue()'
+"$COMPILER" compile "$WORK_ROOT/behavior-callee-output.range" > "$WORK_ROOT/behavior-callee-output.ll"
+[[ -s "$WORK_ROOT/behavior-callee-output.cache" ]] \
+    || fail "changed callee Behavior output incorrectly reused the cached module"
 
 "$COMPILER" inspect-v1 "$FIXTURE" > "$WORK_ROOT/inspect.txt"
 /usr/bin/grep -Fq $'compilerV1\tversion=1' "$WORK_ROOT/inspect.txt" \
@@ -40,16 +139,24 @@ after_bytes="$(/usr/bin/sed -n 's/^compilerV1Delta.*bytes=\([0-9][0-9]*\)$/\1/p'
     || fail "V1 File identity changed when only its value changed"
 [[ -n "$before_bytes" && -n "$after_bytes" && "$before_bytes" -ne "$after_bytes" ]] \
     || fail "V1 File value did not change with its source contents"
-/usr/bin/grep -Fq $'compilerV1Artifact\tphase=shape' "$WORK_ROOT/inspect.txt" \
+/usr/bin/grep -Eq $'^compilerV1Artifact\tphase=shape\tidentity=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
     || fail "V1 inspection omitted the shape artifact"
 /usr/bin/grep -Fq $'typedSyntax\tvalid=true' "$WORK_ROOT/inspect.txt" \
     || fail "V1 shape artifact is not valid typed syntax"
-/usr/bin/grep -Fq $'compilerV1Artifact\tphase=usage' "$WORK_ROOT/inspect.txt" \
-    || fail "V1 inspection omitted the usage artifact"
+/usr/bin/grep -Eq $'^compilerV1Artifact\tphase=behavior\tinput=[0-9]+:[0-9]+\toutput=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the behavior artifact"
+shape_identity="$(/usr/bin/sed -n 's/^compilerV1Artifact[[:space:]]phase=shape[[:space:]]identity=\([^[:space:]]*\)$/\1/p' "$WORK_ROOT/inspect.txt")"
+behavior_input="$(/usr/bin/sed -n 's/^compilerV1Artifact[[:space:]]phase=behavior[[:space:]]input=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/inspect.txt")"
+behavior_output="$(/usr/bin/sed -n 's/^compilerV1Artifact[[:space:]]phase=behavior.*[[:space:]]output=\([^[:space:]]*\)$/\1/p' "$WORK_ROOT/inspect.txt")"
+[[ -n "$shape_identity" && "$shape_identity" == "$behavior_input" ]] \
+    || fail "V1 behavior does not consume the inspected shape identity"
 /usr/bin/grep -Fq $'semanticGraph\tvalid=true' "$WORK_ROOT/inspect.txt" \
-    || fail "V1 usage artifact is not a valid semantic graph"
-/usr/bin/grep -Fq $'compilerV1Artifact\tphase=plot' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 behavior artifact is not a valid semantic graph"
+/usr/bin/grep -Eq $'^compilerV1Artifact\tphase=plot\tinput=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
     || fail "V1 inspection omitted the plot artifact"
+plot_input="$(/usr/bin/sed -n 's/^compilerV1Artifact[[:space:]]phase=plot[[:space:]]input=\([^[:space:]]*\)$/\1/p' "$WORK_ROOT/inspect.txt")"
+[[ -n "$behavior_output" && "$behavior_output" == "$plot_input" ]] \
+    || fail "V1 plot does not consume the inspected behavior identity"
 
 runtime_inputs=()
 runtime_count="$(/usr/bin/plutil -extract runtimeSources raw -o - "$MANIFEST")"
@@ -72,4 +179,4 @@ missing_status=0
 /usr/bin/grep -Fq 'range: unable to read non-empty input at' "$WORK_ROOT/missing.out" \
     || fail "V1 missing-input control omitted its typed error message"
 
-echo "Compiler V1: pass (ordinary load function, stable Identity : changed FileValue Delta, inspectable shape/usage/plot artifacts, legacy-byte parity, validate/link/run exit 7, typed missing-input error)"
+echo "Compiler V1: pass (ordinary load function, stable Identity : changed FileValue Delta, inspectable shape/behavior/plot artifacts, legacy-byte parity, validate/link/run exit 7, typed missing-input error)"

@@ -5,3 +5,22 @@ construct RelationshipRegistrationTarget {
     @contents(.braces)
     let contents: Int
 }
+
+construct UnicodeScalar {
+    let value: Int
+}
+
+construct Character {
+    @many
+    let scalars: UnicodeScalar
+}
+
+construct TextModel {
+    @many
+    state characters: Character
+}
+
+construct UUID {
+    @many(16)
+    let bytes: Int<.unsigned, 8>
+}

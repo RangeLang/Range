@@ -777,6 +777,7 @@ construct CompilerLLVMHelperAudit {
 construct CompilerFunctionArtifactCache {
     let artifacts: CompilerIntTable
     let rowsByInstance: Buffer<Int>
+    let rootBehavior: Buffer<Int>
     let text: String
     let isValid: Bool
 }
@@ -806,6 +807,9 @@ construct CompilerReachableLLVMState {
     let abiParticipants: Buffer<Int>
     let abiSensitiveFunctions: Buffer<Int>
     let priorFunctionArtifacts: CompilerFunctionArtifactCache
+    let functionArtifactCandidates: Buffer<Int>
+    let functionBehaviorOutputs: Buffer<Int>
+    let mainBehavior: Buffer<Int>
     let functionArtifacts: CompilerIntTable
     let functionArtifactEdges: Buffer<Int>
     let functionArtifactText: RawBuffer

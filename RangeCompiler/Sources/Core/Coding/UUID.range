@@ -1,0 +1,4 @@
+construct UUID {
+    @many(16)
+    let bytes: Int<.unsigned, 8>
+}

@@ -4580,126 +4580,19 @@ audit_macro_execution() {
     local member_present_repeat_output="$WORK_ROOT/$stage_label.macro.execution-member-present.repeat.out"
     local member_present_error="$WORK_ROOT/$stage_label.macro.execution-member-present.err"
     local member_present_repeat_error="$WORK_ROOT/$stage_label.macro.execution-member-present.repeat.err"
-    local member_present_reordered_bundle="$WORK_ROOT/$stage_label.macro.execution-member-present-reordered.range"
-    local member_present_reordered_output="$WORK_ROOT/$stage_label.macro.execution-member-present-reordered.out"
-    local member_present_reordered_error="$WORK_ROOT/$stage_label.macro.execution-member-present-reordered.err"
-    local member_present_dependency="$WORK_ROOT/$stage_label.macro.execution-member-present.dependency"
-    local member_present_reordered_dependency="$WORK_ROOT/$stage_label.macro.execution-member-present-reordered.dependency"
     write_macro_execution_bundle "$member_present_bundle" member-present
     run_capture "$executable" "$member_present_bundle" "$member_present_output" "$member_present_error"
-    require_successful_output "$stage_label present member query" "$member_present_output" "$member_present_error"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label legacy target memberCount exited $RUN_STATUS"
+    [[ ! -s "$member_present_error" ]] || fail "$stage_label legacy target memberCount wrote stderr"
+    /usr/bin/grep -Fq 'diagnosticKind=macroExecutionBodyInvalid' "$member_present_output" \
+        || fail "$stage_label legacy target memberCount missed its body-resolution rejection"
+    /usr/bin/grep -Fq $'readDependencyCount=0' "$member_present_output" \
+        || fail "$stage_label legacy target memberCount recorded a graph dependency"
     run_capture "$executable" "$member_present_bundle" "$member_present_repeat_output" "$member_present_repeat_error"
-    require_successful_output "$stage_label repeated present member query" "$member_present_repeat_output" "$member_present_repeat_error"
-    /usr/bin/cmp -s "$member_present_output" "$member_present_repeat_output" || fail "$stage_label present member query was not deterministic"
-    /usr/bin/grep -Fq $'eventCount=1\tgraphDeltaNodeCount=0\tgraphDeltaFactCount=0\treadDependencyCount=1' "$member_present_output" || fail "$stage_label present member query counts changed"
-    /usr/bin/grep -Fq $'macroExecutionEvent\trow=0\tinvocationRow=0\tseverity=1\toperation=1\tmessage=validated' "$member_present_output" || fail "$stage_label present member query executed the wrong branch"
-    /usr/bin/grep -Fq $'macroReadDependency\trow=0\tinvocationRow=0\toperation=2\tkind=Construct\tname=required\tobservedCount=1' "$member_present_output" || fail "$stage_label present member query omitted its positive dependency"
-    /usr/bin/grep -F 'macroReadDependency' "$member_present_output" > "$member_present_dependency"
-    /usr/bin/grep -Fq $'\tapplicationIdentity=' "$member_present_dependency" || fail "$stage_label present member dependency omitted explicit application identity"
-    /usr/bin/grep -Fq $'\ttargetIdentity=' "$member_present_dependency" || fail "$stage_label present member dependency omitted explicit target identity"
-
-    write_macro_execution_bundle "$member_present_reordered_bundle" member-present-reordered
-    run_capture "$executable" "$member_present_reordered_bundle" "$member_present_reordered_output" "$member_present_reordered_error"
-    require_successful_output "$stage_label reordered present member query" "$member_present_reordered_output" "$member_present_reordered_error"
-    /usr/bin/grep -F 'macroReadDependency' "$member_present_reordered_output" > "$member_present_reordered_dependency" || fail "$stage_label reordered present member query omitted dependency row"
-    /usr/bin/cmp -s "$member_present_dependency" "$member_present_reordered_dependency" || fail "$stage_label present member dependency identity changed under unrelated source reorder"
-
-    local member_missing_bundle="$WORK_ROOT/$stage_label.macro.execution-member-missing.range"
-    local member_missing_output="$WORK_ROOT/$stage_label.macro.execution-member-missing.out"
-    local member_missing_repeat_output="$WORK_ROOT/$stage_label.macro.execution-member-missing.repeat.out"
-    local member_missing_error="$WORK_ROOT/$stage_label.macro.execution-member-missing.err"
-    local member_missing_repeat_error="$WORK_ROOT/$stage_label.macro.execution-member-missing.repeat.err"
-    write_macro_execution_bundle "$member_missing_bundle" member-missing
-    run_capture "$executable" "$member_missing_bundle" "$member_missing_output" "$member_missing_error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label missing member query exited $RUN_STATUS"
-    [[ ! -s "$member_missing_error" ]] || fail "$stage_label missing member query wrote stderr"
-    /usr/bin/grep -Fq 'diagnosticKind=macroExecutionError' "$member_missing_output" || fail "$stage_label missing member query missed error diagnostic"
-    /usr/bin/grep -Fq 'message=missing required member' "$member_missing_output" || fail "$stage_label missing member query missed error message"
-    /usr/bin/grep -Fq $'readDependencyCount=1' "$member_missing_output" || fail "$stage_label missing member query omitted dependency count"
-    /usr/bin/grep -Fq $'macroReadDependency\trow=0\tinvocationRow=0\toperation=2\tkind=Construct\tname=required\tobservedCount=0' "$member_missing_output" || fail "$stage_label missing member query omitted its zero dependency"
-    if /usr/bin/grep -Fq 'define ' "$member_missing_output" || /usr/bin/grep -Fq 'call ' "$member_missing_output"; then
-        fail "$stage_label missing member query emitted LLVM before rejection"
-    fi
-    run_capture "$executable" "$member_missing_bundle" "$member_missing_repeat_output" "$member_missing_repeat_error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label repeated missing member query exited $RUN_STATUS"
-    /usr/bin/cmp -s "$member_missing_output" "$member_missing_repeat_output" || fail "$stage_label missing member query was not deterministic"
-
-    local member_path_bundle="$WORK_ROOT/$stage_label.macro.execution-member-path.range"
-    local member_path_output="$WORK_ROOT/$stage_label.macro.execution-member-path.out"
-    local member_path_repeat_output="$WORK_ROOT/$stage_label.macro.execution-member-path.repeat.out"
-    local member_path_error="$WORK_ROOT/$stage_label.macro.execution-member-path.err"
-    local member_path_repeat_error="$WORK_ROOT/$stage_label.macro.execution-member-path.repeat.err"
-    write_macro_execution_bundle "$member_path_bundle" member-path
-    run_capture "$executable" "$member_path_bundle" "$member_path_output" "$member_path_error"
-    require_successful_output "$stage_label path-sensitive member query" "$member_path_output" "$member_path_error"
-    /usr/bin/grep -Fq 'message=validated' "$member_path_output" || fail "$stage_label path-sensitive member query did not take success path"
-    /usr/bin/grep -Fq $'macroReadDependency\trow=0\tinvocationRow=0\toperation=2\tkind=Construct\tname=required\tobservedCount=1' "$member_path_output" || fail "$stage_label path-sensitive member query omitted dependency"
-    if /usr/bin/grep -Fq 'macroCapabilityDenied' "$member_path_output"; then
-        fail "$stage_label path-sensitive member query executed the untaken denied operation"
-    fi
-    run_capture "$executable" "$member_path_bundle" "$member_path_repeat_output" "$member_path_repeat_error"
-    require_successful_output "$stage_label repeated path-sensitive member query" "$member_path_repeat_output" "$member_path_repeat_error"
-    /usr/bin/cmp -s "$member_path_output" "$member_path_repeat_output" || fail "$stage_label path-sensitive member query was not deterministic"
-
-    local member_invalid_bundle="$WORK_ROOT/$stage_label.macro.execution-member-invalid.range"
-    local member_invalid_output="$WORK_ROOT/$stage_label.macro.execution-member-invalid.out"
-    local member_invalid_repeat_output="$WORK_ROOT/$stage_label.macro.execution-member-invalid.repeat.out"
-    local member_invalid_error="$WORK_ROOT/$stage_label.macro.execution-member-invalid.err"
-    local member_invalid_repeat_error="$WORK_ROOT/$stage_label.macro.execution-member-invalid.repeat.err"
-    write_macro_execution_bundle "$member_invalid_bundle" member-invalid
-    run_capture "$executable" "$member_invalid_bundle" "$member_invalid_output" "$member_invalid_error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label malformed member query exited $RUN_STATUS"
-    [[ ! -s "$member_invalid_error" ]] || fail "$stage_label malformed member query wrote stderr"
-    /usr/bin/grep -Fq 'diagnosticKind=macroGraphQueryInvalid' "$member_invalid_output" || fail "$stage_label malformed member query missed focused query diagnostic"
-    /usr/bin/grep -Fq $'readDependencyCount=0' "$member_invalid_output" || fail "$stage_label malformed member query recorded a dependency"
-    if /usr/bin/grep -Fq 'macroReadDependency' "$member_invalid_output" \
-        || /usr/bin/grep -Fq 'define ' "$member_invalid_output" \
-        || /usr/bin/grep -Fq 'call ' "$member_invalid_output"; then
-        fail "$stage_label malformed member query emitted a dependency or LLVM before rejection"
-    fi
-    run_capture "$executable" "$member_invalid_bundle" "$member_invalid_repeat_output" "$member_invalid_repeat_error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label repeated malformed member query exited $RUN_STATUS"
-    /usr/bin/cmp -s "$member_invalid_output" "$member_invalid_repeat_output" || fail "$stage_label malformed member query was not deterministic"
-
-    local member_invalid_type_bundle="$WORK_ROOT/$stage_label.macro.execution-member-invalid-type.range"
-    local member_invalid_type_output="$WORK_ROOT/$stage_label.macro.execution-member-invalid-type.out"
-    local member_invalid_type_repeat_output="$WORK_ROOT/$stage_label.macro.execution-member-invalid-type.repeat.out"
-    local member_invalid_type_error="$WORK_ROOT/$stage_label.macro.execution-member-invalid-type.err"
-    local member_invalid_type_repeat_error="$WORK_ROOT/$stage_label.macro.execution-member-invalid-type.repeat.err"
-    write_macro_execution_bundle "$member_invalid_type_bundle" member-invalid-type
-    run_capture "$executable" "$member_invalid_type_bundle" "$member_invalid_type_output" "$member_invalid_type_error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label non-String member query exited $RUN_STATUS"
-    [[ ! -s "$member_invalid_type_error" ]] || fail "$stage_label non-String member query wrote stderr"
-    /usr/bin/grep -Fq 'diagnosticKind=macroGraphQueryInvalid' "$member_invalid_type_output" || fail "$stage_label non-String member query missed focused query diagnostic"
-    /usr/bin/grep -Fq $'readDependencyCount=0' "$member_invalid_type_output" || fail "$stage_label non-String member query recorded a dependency"
-    if /usr/bin/grep -Fq 'macroReadDependency' "$member_invalid_type_output" \
-        || /usr/bin/grep -Fq 'define ' "$member_invalid_type_output" \
-        || /usr/bin/grep -Fq 'call ' "$member_invalid_type_output"; then
-        fail "$stage_label non-String member query emitted a dependency or LLVM before rejection"
-    fi
-    run_capture "$executable" "$member_invalid_type_bundle" "$member_invalid_type_repeat_output" "$member_invalid_type_repeat_error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label repeated non-String member query exited $RUN_STATUS"
-    /usr/bin/cmp -s "$member_invalid_type_output" "$member_invalid_type_repeat_output" || fail "$stage_label non-String member query was not deterministic"
-
-    local member_nonconstruct_bundle="$WORK_ROOT/$stage_label.macro.execution-member-nonconstruct.range"
-    local member_nonconstruct_output="$WORK_ROOT/$stage_label.macro.execution-member-nonconstruct.out"
-    local member_nonconstruct_repeat_output="$WORK_ROOT/$stage_label.macro.execution-member-nonconstruct.repeat.out"
-    local member_nonconstruct_error="$WORK_ROOT/$stage_label.macro.execution-member-nonconstruct.err"
-    local member_nonconstruct_repeat_error="$WORK_ROOT/$stage_label.macro.execution-member-nonconstruct.repeat.err"
-    write_macro_execution_bundle "$member_nonconstruct_bundle" member-nonconstruct
-    run_capture "$executable" "$member_nonconstruct_bundle" "$member_nonconstruct_output" "$member_nonconstruct_error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label non-construct member query exited $RUN_STATUS"
-    [[ ! -s "$member_nonconstruct_error" ]] || fail "$stage_label non-construct member query wrote stderr"
-    /usr/bin/grep -Fq 'diagnosticKind=macroGraphQueryInvalid' "$member_nonconstruct_output" || fail "$stage_label non-construct member query missed focused query diagnostic"
-    /usr/bin/grep -Fq $'readDependencyCount=0' "$member_nonconstruct_output" || fail "$stage_label non-construct member query recorded a dependency"
-    if /usr/bin/grep -Fq 'macroReadDependency' "$member_nonconstruct_output" \
-        || /usr/bin/grep -Fq 'define ' "$member_nonconstruct_output" \
-        || /usr/bin/grep -Fq 'call ' "$member_nonconstruct_output"; then
-        fail "$stage_label non-construct member query emitted a dependency or LLVM before rejection"
-    fi
-    run_capture "$executable" "$member_nonconstruct_bundle" "$member_nonconstruct_repeat_output" "$member_nonconstruct_repeat_error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label repeated non-construct member query exited $RUN_STATUS"
-    /usr/bin/cmp -s "$member_nonconstruct_output" "$member_nonconstruct_repeat_output" || fail "$stage_label non-construct member query was not deterministic"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label repeated legacy target memberCount exited $RUN_STATUS"
+    /usr/bin/cmp -s "$member_present_output" "$member_present_repeat_output" \
+        || fail "$stage_label legacy target memberCount rejection was not deterministic"
+    echo "$stage_label legacy target memberCount: pass (removed API rejected before graph execution)"
 
     local expansion_bundle="$WORK_ROOT/$stage_label.macro.execution-expansion.range"
     local expansion_output="$WORK_ROOT/$stage_label.macro.execution-expansion.out"
@@ -4858,46 +4751,6 @@ audit_macro_native_integration() {
     [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label native macro execution integration wrote output"
     echo "$stage_label native macro execution integration: pass (ordinary query plus LLVM validation/link, exit 7, deterministic)"
 
-    local member_bundle="$WORK_ROOT/$stage_label.macro.execution-member-native.range"
-    local member_first="$WORK_ROOT/$stage_label.macro.execution-member-native.first.ll"
-    local member_second="$WORK_ROOT/$stage_label.macro.execution-member-native.repeat.ll"
-    local member_first_error="$WORK_ROOT/$stage_label.macro.execution-member-native.first.err"
-    local member_second_error="$WORK_ROOT/$stage_label.macro.execution-member-native.repeat.err"
-    local member_llvm="$stage_directory/MemberQueryNative.ll"
-    local member_linked="$stage_directory/MemberQueryNative"
-    local member_run_output="$WORK_ROOT/$stage_label.macro.execution-member-native.run.out"
-    local member_run_error="$WORK_ROOT/$stage_label.macro.execution-member-native.run.err"
-    write_macro_execution_native_member_bundle "$member_bundle" present
-    run_capture "$executable" "$member_bundle" "$member_first" "$member_first_error"
-    require_successful_output "$stage_label native present member query" "$member_first" "$member_first_error"
-    run_capture "$executable" "$member_bundle" "$member_second" "$member_second_error"
-    require_successful_output "$stage_label repeated native present member query" "$member_second" "$member_second_error"
-    /usr/bin/cmp -s "$member_first" "$member_second" || fail "$stage_label native present member query LLVM was not deterministic"
-    /bin/mkdir -p "$stage_directory"
-    /bin/cp "$member_first" "$member_llvm"
-    validate_llvm "$member_llvm"
-    link_llvm "$member_llvm" "$member_linked"
-    if "$member_linked" > "$member_run_output" 2> "$member_run_error"; then
-        RUN_STATUS=0
-    else
-        RUN_STATUS=$?
-    fi
-    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label native present member query exited $RUN_STATUS"
-    [[ ! -s "$member_run_output" && ! -s "$member_run_error" ]] || fail "$stage_label native present member query wrote output"
-
-    local member_missing_native_bundle="$WORK_ROOT/$stage_label.macro.execution-member-missing-native.range"
-    local member_missing_native_output="$WORK_ROOT/$stage_label.macro.execution-member-missing-native.out"
-    local member_missing_native_error="$WORK_ROOT/$stage_label.macro.execution-member-missing-native.err"
-    write_macro_execution_native_member_bundle "$member_missing_native_bundle" missing
-    run_capture "$executable" "$member_missing_native_bundle" "$member_missing_native_output" "$member_missing_native_error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label native missing member query exited $RUN_STATUS"
-    [[ ! -s "$member_missing_native_error" ]] || fail "$stage_label native missing member query wrote stderr"
-    /usr/bin/grep -Fq 'diagnosticKind=macroExecutionError' "$member_missing_native_output" || fail "$stage_label native missing member query missed diagnostic"
-    /usr/bin/grep -Fq $'observedCount=0' "$member_missing_native_output" || fail "$stage_label native missing member query omitted zero dependency"
-    if /usr/bin/grep -Fq 'define ' "$member_missing_native_output" || /usr/bin/grep -Fq 'call ' "$member_missing_native_output"; then
-        fail "$stage_label native missing member query emitted LLVM before rejection"
-    fi
-    echo "$stage_label native member-count query: pass (positive/zero, LLVM validate/link, exit 7/65, deterministic)"
 }
 
 audit_macro_expansion_commit() {
@@ -5870,16 +5723,6 @@ main() {
         || fail "Stage 2 and Stage 3 native macro integration executables differ"
     echo "Stage 2/Stage 3 native macro integration: byte-identical LLVM/executable"
 
-    /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.execution-member-native.first.ll" "$WORK_ROOT/Stage3.macro.execution-member-native.first.ll" \
-        || fail "Stage 2 and Stage 3 present member query LLVM differs"
-    /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.execution-member-native.repeat.ll" "$WORK_ROOT/Stage3.macro.execution-member-native.repeat.ll" \
-        || fail "Stage 2 and Stage 3 repeated present member query LLVM differs"
-    /usr/bin/cmp -s "$stage2_directory/MemberQueryNative.ll" "$stage3_directory/MemberQueryNative.ll" \
-        || fail "Stage 2 and Stage 3 present member query artifacts differ"
-    /usr/bin/cmp -s "$stage2_directory/MemberQueryNative" "$stage3_directory/MemberQueryNative" \
-        || fail "Stage 2 and Stage 3 present member query executables differ"
-    echo "Stage 2/Stage 3 present member query: byte-identical LLVM/executable"
-
     /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.expansion-commit.first.ll" "$WORK_ROOT/Stage3.macro.expansion-commit.first.ll" \
         || fail "Stage 2 and Stage 3 committed macro expansion LLVM differs"
     /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.expansion-commit.repeat.ll" "$WORK_ROOT/Stage3.macro.expansion-commit.repeat.ll" \
@@ -5899,7 +5742,7 @@ main() {
     echo "Stage 2/Stage 3 actual registrable macro: byte-identical LLVM/executable"
 
     local macro_snapshot_suffix
-    for macro_snapshot_suffix in positive.first.out positive.reordered.out generated.snapshot.out generated.snapshot.repeat.out generated.reordered.out generated.native.first.ll generated.native.repeat.ll generated.bare.out generated.user-global.out generated.root-collision.out generated.member-collision.out generated.malformed-extension.out generated.outside.out registrable.snapshot.out registrable.reordered.out registrable.native.ll registrable.authored-field-collision.out registrable.generated-field-collision.out registrable.root-storage.out registrable.malformed-splice.out registrable.immutable-field-mutation.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out execution-positive.out execution-positive.repeat.out execution-query.out execution-query.repeat.out execution-query-reordered.out execution-query-zero.out execution-member-present.out execution-member-present.repeat.out execution-member-present-reordered.out execution-member-missing.out execution-member-missing.repeat.out execution-member-path.out execution-member-path.repeat.out execution-member-invalid.out execution-member-invalid.repeat.out execution-member-invalid-type.out execution-member-invalid-type.repeat.out execution-member-nonconstruct.out execution-member-native.first.ll execution-member-native.repeat.ll execution-member-missing-native.out execution-expansion.out execution-expansion.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-query-invalid.out execution-expansion-duplicate.out execution-target-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
+    for macro_snapshot_suffix in positive.first.out positive.reordered.out generated.snapshot.out generated.snapshot.repeat.out generated.reordered.out generated.native.first.ll generated.native.repeat.ll generated.bare.out generated.user-global.out generated.root-collision.out generated.member-collision.out generated.malformed-extension.out generated.outside.out registrable.snapshot.out registrable.reordered.out registrable.native.ll registrable.authored-field-collision.out registrable.generated-field-collision.out registrable.root-storage.out registrable.malformed-splice.out registrable.immutable-field-mutation.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out execution-positive.out execution-positive.repeat.out execution-query.out execution-query.repeat.out execution-query-reordered.out execution-query-zero.out execution-member-present.out execution-member-present.repeat.out execution-expansion.out execution-expansion.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-query-invalid.out execution-expansion-duplicate.out execution-target-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
         /usr/bin/cmp -s "$WORK_ROOT/Stage2.macro.$macro_snapshot_suffix" "$WORK_ROOT/Stage3.macro.$macro_snapshot_suffix" \
             || fail "Stage 2 and Stage 3 macro snapshot differs: $macro_snapshot_suffix"
     done
@@ -5953,10 +5796,6 @@ main() {
     report_artifact stage3_macro_execution_llvm "$stage3_directory/MacroExecution.ll"
     report_artifact stage2_macro_execution_executable "$stage2_directory/MacroExecution"
     report_artifact stage3_macro_execution_executable "$stage3_directory/MacroExecution"
-    report_artifact stage2_member_query_native_llvm "$stage2_directory/MemberQueryNative.ll"
-    report_artifact stage3_member_query_native_llvm "$stage3_directory/MemberQueryNative.ll"
-    report_artifact stage2_member_query_native_executable "$stage2_directory/MemberQueryNative"
-    report_artifact stage3_member_query_native_executable "$stage3_directory/MemberQueryNative"
     report_artifact stage2_macro_expansion_llvm "$stage2_directory/MacroExpansion.ll"
     report_artifact stage3_macro_expansion_llvm "$stage3_directory/MacroExpansion.ll"
     report_artifact stage2_macro_expansion_executable "$stage2_directory/MacroExpansion"
