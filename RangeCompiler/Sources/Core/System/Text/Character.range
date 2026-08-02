@@ -1,3 +1,4 @@
 construct Character {
-    let scalars: Buffer<Int>
+    @many
+    let scalars: UnicodeScalar
 }

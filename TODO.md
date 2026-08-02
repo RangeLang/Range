@@ -77,11 +77,16 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     UTF-8 is an explicit external encoding boundary rather than String's
     identity.
   - [ ] Represent `UnicodeScalar` as a first-class code-point value and one
-    independently addressable `Character` as an ordered buffer of those
+    independently addressable `Character` as an ordered relationship of those
     scalars. Character is the public extended-grapheme value; there is no
     competing public `Grapheme` construct.
-    - The intended Core constructs exist, but active compiler String remains
-      byte-backed until aggregate relationship lowering is proven.
+    - [x] Declare `Character.scalars` as `@many UnicodeScalar`, not
+      `Buffer<Int>`.
+      - The focused Core bundle now includes the relationship declaration and
+        its isolated prerequisites; `check-value-ownership --controls` proves
+        that it compiles and registers alongside the literal-storage surface.
+      - Active compiler `String` remains byte-backed until aggregate
+        relationship lowering is proven.
   - [ ] Make `Character.scalars` and `String.characters` authored `@many`
     relationships rather than exposing Buffer as their semantic type.
   - [ ] Make authored relationship semantics available before typed member

@@ -2025,6 +2025,20 @@ check_storage_literals() {
     /usr/bin/printf '%s\n' 'macro storage(): Construct -> Void {}' >> "$core_bundle"
     /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/Macro/Literal.range' >> "$core_bundle"
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Literal.range" >> "$core_bundle"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Syntax/Program/RelationshipPrerequisites.range' \
+        'construct Identifier {}' \
+        '' \
+        'enum DelimiterPair {' \
+        '    case parentheses' \
+        '    case braces' \
+        '    case brackets' \
+        '    case angles' \
+        '}' >> "$core_bundle"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/Syntax/Program/Relationship.range' >> "$core_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Syntax/Program/Relationship.range" >> "$core_bundle"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/Macro/Many.range' >> "$core_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Many.range" >> "$core_bundle"
     /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Number/Signedness.range' >> "$core_bundle"
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Number/Signedness.range" >> "$core_bundle"
     /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Number/Int.range' >> "$core_bundle"
@@ -2040,10 +2054,10 @@ check_storage_literals() {
     /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Text/Character.range' >> "$core_bundle"
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/Character.range" >> "$core_bundle"
     "$STAGE2_EXECUTABLE" compile "$core_bundle" > "$core_output" 2> "$core_error" \
-        || fail "Range-authored storage core sources did not compile"
+        || { /bin/cat "$core_output" "$core_error" >&2; fail "Range-authored storage core sources did not compile"; }
     [[ ! -s "$core_error" ]] \
         || fail "Range-authored storage core sources wrote stderr"
-    /usr/bin/grep -Fq $'literalStorage\tvalid=true\tstorageApplicationCount=1\tliteralApplicationCount=1\tnumericTargetSyntaxID=3\tdecimalTargetSyntaxID=-1\tdecimalSeparatorByte=-1' "$core_output" \
+    /usr/bin/awk -F '\t' '$1 == "literalStorage" && $2 == "valid=true" && $3 == "storageApplicationCount=1" && $4 == "literalApplicationCount=1" && $5 ~ /^numericTargetSyntaxID=[0-9]+$/ && $6 == "decimalTargetSyntaxID=-1" && $7 == "decimalSeparatorByte=-1" { found = 1 } END { exit(found ? 0 : 1) }' "$core_output" \
         || fail "Range-authored storage core sources omitted their numeric literal facts"
     echo "Range-authored storage core sources: pass"
     check_project_defaults_fixture annotated-value-parameters \
