@@ -848,7 +848,6 @@
   let macroTransportGeneration = 0;
   let macroCloudElement: HTMLElement;
   let macroFieldElement: SVGGraphicsElement;
-  let macroBridgeElement: HTMLDivElement;
   let environmentKeyElement: SVGGraphicsElement;
   let macroAudioRoute: RangeSoundRoute | undefined;
   let macroTail: MacroTail | undefined;
@@ -868,7 +867,6 @@
   let macroGroupPulseId = 0;
   let macroChords: [MacroChord | undefined, MacroChord | undefined] = [undefined, undefined];
   let macroChordActive = $state(false);
-  let environmentDisplayReveal = $state(0);
   let environmentWindowPresence = $state(0);
   let macroTrackLastGroups = [undefined] as (number | undefined)[];
   let macroClockwiseGroupPosition = 0;
@@ -1818,7 +1816,6 @@
       const breath = 0.5 - Math.cos(phase * Math.PI * 2) * 0.5;
       const breathAmount = 0.06 + breath * 0.94;
       const effectivePresence = environmentProximity * breathAmount;
-      environmentKeyElement?.style.setProperty("--environment-breath", `${breath}`);
       if (!force && time - lastEnvironmentTreatment < 50) return;
       lastEnvironmentTreatment = time;
       soundManager?.setLayerPresence?.("environment", effectivePresence);
@@ -1869,23 +1866,6 @@
       environmentWindowPresence = viewportPresence(environmentKeyElement);
       environmentProximity = viewportCenterProximity(environmentKeyElement)
         * environmentWindowPresence;
-      const bridgeBounds = macroBridgeElement
-        ? layoutRect(macroBridgeElement)
-        : undefined;
-      const graphBounds = environmentKeyElement
-        ? layoutRect(environmentKeyElement)
-        : undefined;
-      if (bridgeBounds && graphBounds) {
-        const viewportCenter = window.innerHeight / 2;
-        const bridgeCenter = bridgeBounds.top + bridgeBounds.height / 2;
-        const graphCenter = graphBounds.top + graphBounds.height / 2;
-        const travel = Math.max(1, graphCenter - bridgeCenter);
-        const linearReveal = Math.max(
-          0,
-          Math.min(1, (viewportCenter - bridgeCenter) / travel),
-        );
-        environmentDisplayReveal = linearReveal * linearReveal * (3 - 2 * linearReveal);
-      }
       applyEnvironmentBreath(performance.now(), true);
       const shouldBeVisible = sectionIntersects || macroFieldPassed;
       if (shouldBeVisible !== visible) {
@@ -2150,7 +2130,6 @@
     </g>
     <foreignObject x="180" y="665" width="600" height="150">
       <div
-        bind:this={macroBridgeElement}
         class="macroBridge"
         xmlns="http://www.w3.org/1999/xhtml"
       >
@@ -2163,7 +2142,6 @@
       <g
         bind:this={environmentKeyElement}
         class="macroKey environmentKey"
-        style={`opacity: ${environmentDisplayReveal * environmentWindowPresence}`}
         aria-label="Environment"
       >
         <text
@@ -2439,19 +2417,12 @@
   .macroCellGlow.syntaxType { fill: oklch(0.67 0.16 190); filter: drop-shadow(0 0 5px oklch(0.55 0.16 190 / 0.5)); }
 
   .environmentKey {
-    transition: opacity 1.4s cubic-bezier(0.22, 0.61, 0.36, 1);
-    transform: scale(calc(0.985 + var(--environment-breath, 0) * 0.03));
-    transform-box: fill-box;
-    transform-origin: center;
+    opacity: 1;
   }
 
   .environmentLabel {
     fill: oklch(0.7 0.16 295);
     letter-spacing: -0.035em;
-    filter: drop-shadow(
-      0 0 calc(3px + var(--environment-breath, 0) * 8px)
-      oklch(0.7 0.16 295 / calc(0.12 + var(--environment-breath, 0) * 0.2))
-    );
   }
 
   .macroCloudText {
