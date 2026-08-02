@@ -40,7 +40,7 @@ function clamp(value: Int, min: Int, max: Int): Int {
 
 <EssayPage
   title="Intro to Range"
-  description="The basic building blocks of the graph."
+  description="The basic building blocks of the graph"
   category="Introduction"
   date="July 30, 2026"
   {heroShader}
