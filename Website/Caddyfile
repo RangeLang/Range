@@ -5,6 +5,9 @@
 {$SITE_ADDRESS:http://localhost} {
 	encode zstd gzip
 
+	@geistFonts path /fonts/geist/*
+	header @geistFonts Cache-Control "public, max-age=31536000, immutable"
+
 	reverse_proxy website:3000 {
 		health_uri /health
 		health_interval 30s
