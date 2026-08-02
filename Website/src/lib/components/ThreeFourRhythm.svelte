@@ -1230,7 +1230,35 @@
 
   onMount(() => {
     stopTransport();
-    return stopRhythm;
+    // The article is a score, so its visual clock begins with the page rather
+    // than waiting for the transport control. Audio is started immediately
+    // when autoplay is available; otherwise the first gesture anywhere on the
+    // page unlocks the already-armed score.
+    startRhythm();
+
+    let listeningForUnlock = true;
+    const stopListeningForUnlock = () => {
+      if (!listeningForUnlock) return;
+      listeningForUnlock = false;
+      window.removeEventListener("pointerdown", unlockDefaultTransport);
+      window.removeEventListener("keydown", unlockDefaultTransport);
+    };
+    const startDefaultTransport = async () => {
+      await startTransport();
+      if (transportState === "running") stopListeningForUnlock();
+    };
+    const unlockDefaultTransport = () => {
+      void startDefaultTransport();
+    };
+
+    window.addEventListener("pointerdown", unlockDefaultTransport, { passive: true });
+    window.addEventListener("keydown", unlockDefaultTransport);
+    void startDefaultTransport();
+
+    return () => {
+      stopListeningForUnlock();
+      stopRhythm();
+    };
   });
 
   onDestroy(() => {
