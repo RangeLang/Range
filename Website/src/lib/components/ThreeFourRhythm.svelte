@@ -439,6 +439,29 @@
     return Math.pow(2, introMix.transpose / 12);
   }
 
+  function identityLayerLevel() {
+    const macroSidechain = Math.max(0.28, 1 - macroLayerPresence * 0.72);
+    const environmentDissolve = Math.max(
+      0.025,
+      Math.pow(1 - environmentLayerPresence, 2.4),
+    );
+    return macroSidechain * environmentDissolve;
+  }
+
+  function updateIdentityLayer(timeConstant: number) {
+    if (!audioEnabled || !audioContext) return;
+    const identityBus = voiceBuses.get("identity");
+    if (!identityBus) return;
+    identityBus.gain.cancelScheduledValues(audioContext.currentTime);
+    identityBus.gain.setTargetAtTime(
+      mixLevel("identity")
+        * identityLayerLevel()
+        * (transportLayerLevels.get("identity") ?? 1),
+      audioContext.currentTime,
+      timeConstant,
+    );
+  }
+
   function voiceOutput(channel: IntroMixChannel) {
     const master = masterOutput();
     if (!master || !audioContext) return;
@@ -448,9 +471,7 @@
     let bus = voiceBuses.get(channel);
     if (!bus) {
       bus = audioContext.createGain();
-      const sidechainLevel = channel === "identity"
-        ? Math.max(0.28, 1 - macroLayerPresence * 0.72)
-        : 1;
+      const sidechainLevel = channel === "identity" ? identityLayerLevel() : 1;
       bus.gain.setValueAtTime(
         mixLevel(channel)
           * sidechainLevel
@@ -471,9 +492,7 @@
     const now = audioContext.currentTime;
     masterGain?.gain.setTargetAtTime(introMix.master, now, 0.025);
     for (const [channel, bus] of voiceBuses) {
-      const sidechainLevel = channel === "identity"
-        ? Math.max(0.28, 1 - macroLayerPresence * 0.72)
-        : 1;
+      const sidechainLevel = channel === "identity" ? identityLayerLevel() : 1;
       bus.gain.setTargetAtTime(
         mixLevel(channel)
           * sidechainLevel
@@ -1018,7 +1037,10 @@
     "environment",
     (presence) => {
       environmentLayerPresence = presence;
-      if (audioEnabled) setEnvironmentScoreTreatment(0.58);
+      if (audioEnabled) {
+        setEnvironmentScoreTreatment(0.9);
+        updateIdentityLayer(1.15);
+      }
     },
   ));
 
@@ -1027,17 +1049,7 @@
     (presence) => {
       const wasPresent = macroLayerPresence;
       macroLayerPresence = presence;
-      const identityBus = voiceBuses.get("identity");
-      if (!audioEnabled || !audioContext || !identityBus) return;
-      const sidechainLevel = Math.max(0.28, 1 - presence * 0.72);
-      identityBus.gain.cancelScheduledValues(audioContext.currentTime);
-      identityBus.gain.setTargetAtTime(
-        mixLevel("identity")
-          * sidechainLevel
-          * (transportLayerLevels.get("identity") ?? 1),
-        audioContext.currentTime,
-        presence > wasPresent ? 0.018 : 0.24,
-      );
+      updateIdentityLayer(presence > wasPresent ? 0.018 : 0.24);
     },
   ));
 

@@ -35,15 +35,44 @@
 
   let { children } = $props();
 
-  onMount(() => () => {
-    if (window.__rangeSoundManager === soundManager) {
-      delete window.__rangeSoundManager;
-    }
-    if (window.__rangeLayoutTracker === layoutTracker) {
-      delete window.__rangeLayoutTracker;
-    }
-    soundManager.dispose();
-    layoutTracker.dispose();
+  onMount(() => {
+    let resumeSoundOnFocus = false;
+    const leaveWindow = () => {
+      if (!soundManager.isEnabled()) return;
+      resumeSoundOnFocus = true;
+      soundManager.setEnabled(false);
+    };
+    const enterWindow = () => {
+      if (
+        !resumeSoundOnFocus
+        || document.hidden
+        || !document.hasFocus()
+      ) return;
+      resumeSoundOnFocus = false;
+      soundManager.setEnabled(true);
+    };
+    const handleVisibility = () => {
+      if (document.hidden) leaveWindow();
+      else enterWindow();
+    };
+
+    window.addEventListener("blur", leaveWindow);
+    window.addEventListener("focus", enterWindow);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("blur", leaveWindow);
+      window.removeEventListener("focus", enterWindow);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      if (window.__rangeSoundManager === soundManager) {
+        delete window.__rangeSoundManager;
+      }
+      if (window.__rangeLayoutTracker === layoutTracker) {
+        delete window.__rangeLayoutTracker;
+      }
+      soundManager.dispose();
+      layoutTracker.dispose();
+    };
   });
 </script>
 

@@ -95,21 +95,23 @@ export function createRangeSoundManager(): RangeSoundManager {
     const bounded = Math.max(0, Math.min(1, presence));
     const amount = bounded * bounded * (3 - 2 * bounded);
     const now = audioContext.currentTime;
-    const timeConstant = immediate ? 0.001 : 0.72;
+    const timeConstant = immediate ? 0.001 : 1.35;
     const setSmooth = (parameter: AudioParam, value: number) => {
       parameter.cancelScheduledValues(now);
       if (immediate) parameter.setValueAtTime(value, now);
       else parameter.setTargetAtTime(value, now, timeConstant);
     };
 
-    setSmooth(masterDry!.gain, 1 - amount * 0.86);
-    setSmooth(environmentWet!.gain, Math.max(0.0001, amount * 0.62));
+    // Environment represents distance: the foreground recedes almost entirely
+    // while a quiet, dark copy remains suspended behind the noise floor.
+    setSmooth(masterDry!.gain, 1 - amount * 0.92);
+    setSmooth(environmentWet!.gain, amount * 0.16);
     setSmooth(
       environmentFilter!.frequency,
-      18_000 * Math.pow(420 / 18_000, amount),
+      18_000 * Math.pow(280 / 18_000, amount),
     );
-    setSmooth(environmentNoiseGain!.gain, Math.max(0.0001, amount * 0.055));
-    setSmooth(environmentNoiseFilter!.frequency, 260 + amount * 340);
+    setSmooth(environmentNoiseGain!.gain, amount * 0.007);
+    setSmooth(environmentNoiseFilter!.frequency, 190 + amount * 130);
   }
 
   function createGraph() {
@@ -132,7 +134,7 @@ export function createRangeSoundManager(): RangeSoundManager {
     masterDry.gain.value = 1;
     environmentFilter.type = "lowpass";
     environmentFilter.frequency.value = 18_000;
-    environmentFilter.Q.value = 0.42;
+    environmentFilter.Q.value = 0.36;
     environmentCompressor.threshold.value = -30;
     environmentCompressor.knee.value = 18;
     environmentCompressor.ratio.value = 7;
@@ -209,7 +211,7 @@ export function createRangeSoundManager(): RangeSoundManager {
     if (audioContext && masterOutput) {
       const now = audioContext.currentTime;
       masterOutput.gain.cancelScheduledValues(now);
-      masterOutput.gain.setTargetAtTime(enabled ? 1 : 0, now, 0.12);
+      masterOutput.gain.setTargetAtTime(enabled ? 1 : 0, now, enabled ? 0.18 : 0.8);
     }
     for (const listener of enabledListeners) listener(enabled);
   }

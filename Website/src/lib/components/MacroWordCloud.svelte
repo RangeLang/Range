@@ -854,6 +854,10 @@
   let macroTail: MacroTail | undefined;
   let environmentTail: MacroTail | undefined;
   let backgroundTail: MacroTail | undefined;
+  let macroSpaceInput: GainNode | undefined;
+  let macroSpaceFilter: BiquadFilterNode | undefined;
+  let macroSpaceCompressor: DynamicsCompressorNode | undefined;
+  let macroSpaceOutput: GainNode | undefined;
   let macroRouteOpen = false;
   let macroFieldViewportPresence = 0;
   let activeMacroWords = $state<[string | undefined, string | undefined]>([undefined, undefined]);
@@ -865,6 +869,7 @@
   let macroChords: [MacroChord | undefined, MacroChord | undefined] = [undefined, undefined];
   let macroChordActive = $state(false);
   let environmentDisplayReveal = $state(0);
+  let environmentWindowPresence = $state(0);
   let macroTrackLastGroups = [undefined] as (number | undefined)[];
   let macroClockwiseGroupPosition = 0;
   const macroClockwiseDirections = [1];
@@ -902,6 +907,18 @@
         releaseLevel * Math.exp(-elapsedRelease / envelope.releaseTimeConstant),
       );
     }, 0);
+  }
+
+  function macroCellHitScale(text: string, activation: number) {
+    const latestEnvelope = [...macroVisualEnvelopes, ...backgroundVisualEnvelopes]
+      .filter((envelope): envelope is MacroVisualEnvelope => envelope?.word === text)
+      .sort((first, second) => second.attackStart - first.attackStart)[0];
+    if (!latestEnvelope || activation <= 0.001) return 1;
+
+    const elapsed = Math.max(0, macroVisualTime - latestEnvelope.attackStart);
+    const rebound = -Math.sin(Math.min(elapsed, 0.9) * 18) * 0.018
+      * Math.exp(-elapsed / 0.34);
+    return Math.max(0.925, Math.min(1.015, 1 - activation * 0.045 + rebound));
   }
 
   function macroBranchActivation(edge: MacroTreeEdge) {
@@ -988,8 +1005,26 @@
     if (!audio) return;
     if (!macroAudioRoute) {
       macroAudioRoute = manager.register("range-macros", 0.0001);
-      macroTail = createMacroTail(audio, macroAudioRoute.input);
-      environmentTail = createMacroTail(audio, macroAudioRoute.input, {
+      macroSpaceInput = audio.createGain();
+      macroSpaceFilter = audio.createBiquadFilter();
+      macroSpaceCompressor = audio.createDynamicsCompressor();
+      macroSpaceOutput = audio.createGain();
+      macroSpaceFilter.type = "lowpass";
+      macroSpaceFilter.frequency.value = 14_000;
+      macroSpaceFilter.Q.value = 0.32;
+      macroSpaceCompressor.threshold.value = -14;
+      macroSpaceCompressor.knee.value = 18;
+      macroSpaceCompressor.ratio.value = 1.4;
+      macroSpaceCompressor.attack.value = 0.035;
+      macroSpaceCompressor.release.value = 0.72;
+      macroSpaceOutput.gain.value = 1;
+      macroSpaceInput
+        .connect(macroSpaceFilter)
+        .connect(macroSpaceCompressor)
+        .connect(macroSpaceOutput)
+        .connect(macroAudioRoute.input);
+      macroTail = createMacroTail(audio, macroSpaceInput);
+      environmentTail = createMacroTail(audio, macroSpaceInput, {
         duration: 9.6,
         decay: 1.42,
         cutoff: 1_800,
@@ -997,7 +1032,7 @@
         wetLevel: 0.72,
         impulseLevel: 0.22,
       });
-      backgroundTail = createMacroTail(audio, macroAudioRoute.input, {
+      backgroundTail = createMacroTail(audio, macroSpaceInput, {
         duration: 2.2,
         decay: 3.8,
         cutoff: 9_000,
@@ -1734,6 +1769,7 @@
     let viewportFrame = 0;
     let macroFieldProximity = 0;
     let environmentProximity = 0;
+    let lastEnvironmentTreatment = -Infinity;
     const layoutRect = (element: Element) =>
       layoutTracker?.locate(element).rect ?? element.getBoundingClientRect();
     const viewportProximity = (element: SVGGraphicsElement | undefined) => {
@@ -1777,6 +1813,42 @@
       );
       return linear * linear * (3 - 2 * linear);
     };
+    const applyEnvironmentBreath = (time: number, force = false) => {
+      const phase = (time % 16_000) / 16_000;
+      const breath = 0.5 - Math.cos(phase * Math.PI * 2) * 0.5;
+      const breathAmount = 0.06 + breath * 0.94;
+      const effectivePresence = environmentProximity * breathAmount;
+      environmentKeyElement?.style.setProperty("--environment-breath", `${breath}`);
+      if (!force && time - lastEnvironmentTreatment < 50) return;
+      lastEnvironmentTreatment = time;
+      soundManager?.setLayerPresence?.("environment", effectivePresence);
+
+      if (!macroAudioRoute || !macroRouteOpen) return;
+      const now = macroAudioRoute.audioContext.currentTime;
+      const environmentAmount = effectivePresence * effectivePresence
+        * (3 - 2 * effectivePresence);
+      macroSpaceFilter?.frequency.cancelScheduledValues(now);
+      macroSpaceFilter?.frequency.setTargetAtTime(
+        14_000 * Math.pow(680 / 14_000, environmentAmount),
+        now,
+        1.1,
+      );
+      macroSpaceCompressor?.threshold.setTargetAtTime(
+        -14 - environmentAmount * 24,
+        now,
+        1.1,
+      );
+      macroSpaceCompressor?.ratio.setTargetAtTime(
+        1.4 + environmentAmount * 8.6,
+        now,
+        1.1,
+      );
+      macroSpaceOutput?.gain.setTargetAtTime(
+        1 - environmentAmount * 0.66,
+        now,
+        1.1,
+      );
+    };
     const updateViewportMix = () => {
       viewportFrame = 0;
       const fieldBounds = macroFieldElement
@@ -1794,7 +1866,9 @@
         macroFieldViewportPresence,
         macroFieldPassed ? 0.42 : 0,
       );
-      environmentProximity = viewportCenterProximity(environmentKeyElement);
+      environmentWindowPresence = viewportPresence(environmentKeyElement);
+      environmentProximity = viewportCenterProximity(environmentKeyElement)
+        * environmentWindowPresence;
       const bridgeBounds = macroBridgeElement
         ? layoutRect(macroBridgeElement)
         : undefined;
@@ -1812,7 +1886,7 @@
         );
         environmentDisplayReveal = linearReveal * linearReveal * (3 - 2 * linearReveal);
       }
-      soundManager?.setLayerPresence?.("environment", environmentProximity);
+      applyEnvironmentBreath(performance.now(), true);
       const shouldBeVisible = sectionIntersects || macroFieldPassed;
       if (shouldBeVisible !== visible) {
         visible = shouldBeVisible;
@@ -1836,6 +1910,7 @@
       viewportFrame = requestAnimationFrame(updateViewportMix);
     };
     const updateVisualEnvelope = () => {
+      applyEnvironmentBreath(performance.now());
       if (macroAudioRoute) {
         macroVisualTime = macroAudioRoute.audioContext.currentTime;
         backgroundVisualEnvelopes = backgroundVisualEnvelopes.filter(
@@ -1975,6 +2050,10 @@
     backgroundTail?.convolver.disconnect();
     backgroundTail?.dry.disconnect();
     backgroundTail?.wet.disconnect();
+    macroSpaceInput?.disconnect();
+    macroSpaceFilter?.disconnect();
+    macroSpaceCompressor?.disconnect();
+    macroSpaceOutput?.disconnect();
     macroAudioRoute?.dispose();
   });
 </script>
@@ -2037,10 +2116,11 @@
           {#each [0, 1] as copyIndex}
             {#each row.cells as cell, cellIndex (`${copyIndex}-${cell.text}`)}
               {@const activation = macroCellActivation(cell.text)}
+              {@const hitScale = macroCellHitScale(cell.text, activation)}
               {@const tone = macroTone(cell.text)}
               <g
                 class="macroKey macroFlowWord"
-                style={`--float-delay: -${(cellIndex * 1.7 + copyIndex * 0.8).toFixed(1)}s`}
+                style={`--float-delay: -${(cellIndex * 1.7 + copyIndex * 0.8).toFixed(1)}s; --macro-hit-scale: ${hitScale}`}
               >
                 <text
                   class={`macroCellLabel ${tone}`}
@@ -2083,7 +2163,7 @@
       <g
         bind:this={environmentKeyElement}
         class="macroKey environmentKey"
-        style={`opacity: ${environmentDisplayReveal}`}
+        style={`opacity: ${environmentDisplayReveal * environmentWindowPresence}`}
         aria-label="Environment"
       >
         <text
@@ -2253,6 +2333,13 @@
     transition: fill 1.4s cubic-bezier(0.22, 0.61, 0.36, 1);
   }
 
+  .macroCellLabel,
+  .macroCellGlow {
+    transform: scale(var(--macro-hit-scale, 1));
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
   .macroCellLabel.macroLilac { fill: oklch(0.82 0.09 307); }
   .macroCellLabel.macroAmber { fill: oklch(0.84 0.1 74); }
   .macroCellLabel.macroGrape { fill: oklch(0.79 0.09 315); }
@@ -2353,11 +2440,18 @@
 
   .environmentKey {
     transition: opacity 1.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+    transform: scale(calc(0.985 + var(--environment-breath, 0) * 0.03));
+    transform-box: fill-box;
+    transform-origin: center;
   }
 
   .environmentLabel {
     fill: oklch(0.7 0.16 295);
     letter-spacing: -0.035em;
+    filter: drop-shadow(
+      0 0 calc(3px + var(--environment-breath, 0) * 8px)
+      oklch(0.7 0.16 295 / calc(0.12 + var(--environment-breath, 0) * 0.2))
+    );
   }
 
   .macroCloudText {
