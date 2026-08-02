@@ -70,6 +70,12 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       as the transitional implementation behind `String` itself.
 
 - [ ] Move `String` from encoded-byte identity to authored characters.
+  - [x] Define the semantic boundary in
+    [UnicodeTextModel.md](Development/UnicodeTextModel.md): a scalar is one
+    valid Unicode code point excluding surrogates; a Character is one nonempty
+    extended-grapheme sequence of scalars; a String is ordered Characters; and
+    UTF-8 is an explicit external encoding boundary rather than String's
+    identity.
   - [ ] Represent `UnicodeScalar` as a first-class code-point value and one
     independently addressable `Character` as an ordered buffer of those
     scalars. Character is the public extended-grapheme value; there is no
