@@ -1767,7 +1767,6 @@
     let viewportFrame = 0;
     let macroFieldProximity = 0;
     let environmentProximity = 0;
-    let lastEnvironmentTreatment = -Infinity;
     const layoutRect = (element: Element) =>
       layoutTracker?.locate(element).rect ?? element.getBoundingClientRect();
     const viewportProximity = (element: SVGGraphicsElement | undefined) => {
@@ -1798,26 +1797,8 @@
       const linear = Math.min(entering, leaving);
       return linear * linear * (3 - 2 * linear);
     };
-    const viewportCenterProximity = (
-      element: SVGGraphicsElement | undefined,
-    ) => {
-      if (!element) return 0;
-      const bounds = layoutRect(element);
-      const viewportHeight = window.innerHeight;
-      const center = bounds.top + bounds.height / 2;
-      const linear = Math.max(
-        0,
-        Math.min(1, 1 - Math.abs(center - viewportHeight / 2) / (viewportHeight / 2)),
-      );
-      return linear * linear * (3 - 2 * linear);
-    };
-    const applyEnvironmentBreath = (time: number, force = false) => {
-      const phase = (time % 16_000) / 16_000;
-      const breath = 0.5 - Math.cos(phase * Math.PI * 2) * 0.5;
-      const breathAmount = 0.06 + breath * 0.94;
-      const effectivePresence = environmentProximity * breathAmount;
-      if (!force && time - lastEnvironmentTreatment < 50) return;
-      lastEnvironmentTreatment = time;
+    const applyEnvironmentPresence = () => {
+      const effectivePresence = environmentProximity;
       soundManager?.setLayerPresence?.("environment", effectivePresence);
 
       if (!macroAudioRoute || !macroRouteOpen) return;
@@ -1864,9 +1845,8 @@
         macroFieldPassed ? 0.42 : 0,
       );
       environmentWindowPresence = viewportPresence(environmentKeyElement);
-      environmentProximity = viewportCenterProximity(environmentKeyElement)
-        * environmentWindowPresence;
-      applyEnvironmentBreath(performance.now(), true);
+      environmentProximity = environmentWindowPresence;
+      applyEnvironmentPresence();
       const shouldBeVisible = sectionIntersects || macroFieldPassed;
       if (shouldBeVisible !== visible) {
         visible = shouldBeVisible;
@@ -1890,7 +1870,6 @@
       viewportFrame = requestAnimationFrame(updateViewportMix);
     };
     const updateVisualEnvelope = () => {
-      applyEnvironmentBreath(performance.now());
       if (macroAudioRoute) {
         macroVisualTime = macroAudioRoute.audioContext.currentTime;
         backgroundVisualEnvelopes = backgroundVisualEnvelopes.filter(
@@ -1985,7 +1964,9 @@
     });
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        soundManager?.setLayerPresence?.("environment", 0);
+        environmentProximity = 0;
+        environmentWindowPresence = 0;
+        applyEnvironmentPresence();
         stop(false);
       } else {
         updateViewportMix();
