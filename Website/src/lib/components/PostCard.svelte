@@ -53,7 +53,12 @@
   {#if social}
     {#if post.socialShader === "fibonacci-sphere"}
       <div class="socialSphereShader socialIntroShader">
-        <FibonacciSphereShader showSphere={false} fadeToPaper={false} vivid />
+        <FibonacciSphereShader
+          showSphere={false}
+          fadeToPaper={false}
+          starScale={1.35}
+          vivid
+        />
       </div>
     {:else if post.socialShader === "sphere-lines"}
       <div class="socialSphereShader">
@@ -153,10 +158,15 @@
 
   .socialPost:has(.socialIntroShader) .postCopy {
     inset: 0;
+    align-content: center;
     align-items: center;
     justify-content: center;
     padding: 72px;
     text-align: center;
+  }
+
+  .socialPost:has(.socialIntroShader) .postCopy small {
+    display: none;
   }
 
   .socialPost .postCopy small {

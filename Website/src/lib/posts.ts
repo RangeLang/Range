@@ -1,5 +1,5 @@
 export const siteOrigin = "https://rangelang.org";
-const socialImageVersion = "2026-08-02-1";
+const socialImageVersion = "2026-08-02-2";
 
 export type Post = {
   slug: string;
@@ -24,7 +24,7 @@ export const posts: Post[] = [
     slug: "intro-to-range",
     href: "/posts/intro-to-range",
     category: "Introduction",
-    cardTitle: "Intro to Range",
+    cardTitle: "Introduction to Range",
     cardDescription: "The basic building blocks of the graph",
     description:
       "Range begins with Identity : Value, then binding intents and the three abstraction forms.",
