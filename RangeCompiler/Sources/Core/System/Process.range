@@ -9,7 +9,7 @@ construct ProcessBatch {
 }
 
 function processArgumentRecord(value: String): String {
-    let valueLength: Int(stringLength(value: value))
+    let valueLength: Int(value.count)
     return "\(valueLength)\n\(value)"
 }
 

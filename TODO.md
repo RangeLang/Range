@@ -63,6 +63,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       helpers, including `compilerBuildPlanValidateRecord` with
       `detail=12600022`. Keep the neutral registration as the compilable bridge
       rather than restoring undeclared magic or weakening ownership globally.
+  - [x] Move Core clients onto the authored `String.count` / `String.byte`
+    surface where that lowering is already proven.
+    - `Process.processArgumentRecord` now uses `value.count`; `@hashable`
+      already uses `id.count` and `id.byte(index:)`. The raw reads remain only
+      as the transitional implementation behind `String` itself.
 
 - [ ] Move `String` from encoded-byte identity to authored characters.
   - [ ] Represent `UnicodeScalar` as a first-class code-point value and one
