@@ -27,7 +27,7 @@ export const posts: Post[] = [
     cardTitle: "Introduction to Range",
     cardDescription: "The basic building blocks of the graph",
     description:
-      "Range begins with Identity : Value, then binding intents and the three abstraction forms.",
+      "Range begins with Identity : Value, then binding intents and the three concrete substrate forms.",
     palette: 5,
     socialShader: "fibonacci-sphere",
     cardPalette: {

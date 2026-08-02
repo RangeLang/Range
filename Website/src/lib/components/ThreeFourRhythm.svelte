@@ -1332,7 +1332,7 @@
     bind:this={triangleFigure}
   >
     <div class="figureHeader">
-      <span>3 abstraction forms</span>
+      <span>3 concrete substrate forms</span>
     </div>
 
     <div class="shapeStage" bind:this={triangleStage}>

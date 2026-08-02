@@ -15,7 +15,7 @@
     }
 }`;
 
-  const abstractionForms = `construct Point {
+  const substrateForms = `construct Point {
     let x: Int
     let y: Int
 }
@@ -103,7 +103,7 @@ function clamp(value: Int, min: Int, max: Int): Int {
 
       {#snippet functionIntro()}
         <p>
-          Range keeps its abstraction vocabulary small.
+          Range keeps its concrete substrate small.
           <span class="accentTerm">Construct</span> describes composed values,
           <span class="accentTerm">Enum</span> describes alternatives, and
           <span class="accentTerm">Function</span> describes the logic between
@@ -114,9 +114,9 @@ function clamp(value: Int, min: Int, max: Int): Int {
 
       {#snippet functionCode()}
         <CodeBlock
-          source={abstractionForms}
+          source={substrateForms}
           syntax="range"
-          label="Three abstraction forms"
+          label="Three concrete substrate forms"
         />
       {/snippet}
     </ThreeFourRhythm>
