@@ -39,8 +39,9 @@ The production image uses Bun 1.3.14 for both the build and the runtime. It
 runs as the unprivileged `bun` user and exposes the SvelteKit server on port
 `3000`. Run Compose from this `Website/` directory inside the Range checkout:
 the build context includes the website and its canonical
-`RangeCompiler/Sources/Core/Macro/Codable.range` presentation source plus the
-current `Benchmarks/Speed/results/latest.json` measurement artifact.
+`RangeCompiler/Sources/Core/Macro/Codable.range` and
+`RangeCompiler/Sources/Core/Macro/CommandGroup.range` presentation sources,
+plus the current `Benchmarks/Speed/results/latest.json` measurement artifact.
 
 On the server:
 
