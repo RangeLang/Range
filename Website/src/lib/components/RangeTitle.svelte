@@ -551,7 +551,8 @@
       !outwardFramebufferB
     ) return;
 
-    const bounds = titleElement.getBoundingClientRect();
+    const bounds = layoutTracker?.query(() => titleElement)?.rect
+      ?? titleElement.getBoundingClientRect();
     const width = bounds.width;
     const height = bounds.height;
     if (width <= 0 || height <= 0) return;
@@ -783,7 +784,8 @@
       distortionVerticalCenter,
     );
     updateSoundProximity(
-      layoutTracker?.locate(canvas).rect ?? canvas.getBoundingClientRect(),
+      layoutTracker?.query(() => canvas)?.rect
+        ?? canvas.getBoundingClientRect(),
       titleLayout?.rect,
     );
     titleSound?.volume(soundProximity, soundMotionVolumeDuration / 1000);
@@ -906,10 +908,11 @@
     trackedTitleBounds?: RangeLayoutRect,
   ) => {
     const titleBounds = trackedTitleBounds
-      ?? layoutTracker?.locate(titleElement).rect
+      ?? layoutTracker?.query(() => titleElement)?.rect
       ?? titleElement.getBoundingClientRect();
     const followPixelX = titleBounds.left + distortionCenter * titleBounds.width;
-    const followPixelY = distortionVerticalCenter * window.innerHeight;
+    const followPixelY =
+      titleBounds.top + distortionVerticalCenter * titleBounds.height;
     const falloffRadiusX = canvasBounds.width * 0.5 + soundFalloffPadding;
     const falloffRadiusY = canvasBounds.height * 0.5 + soundFalloffPadding;
     const normalizedDistance = Math.hypot(
@@ -926,11 +929,14 @@
   };
 
   const trackPointer = (event: PointerEvent) => {
-    const canvasBounds = canvas.getBoundingClientRect();
+    const canvasBounds =
+      layoutTracker?.query(() => canvas)?.rect
+      ?? canvas.getBoundingClientRect();
     lastPointerClientX = event.clientX;
     lastPointerClientY = event.clientY;
     updateSoundProximity(canvasBounds);
-    const bounds = titleElement.getBoundingClientRect();
+    const bounds = layoutTracker?.query(() => titleElement)?.rect
+      ?? titleElement.getBoundingClientRect();
     if (idleTimeout !== null) {
       clearTimeout(idleTimeout);
       idleTimeout = null;
@@ -949,7 +955,7 @@
     );
     const nextY = Math.max(
       0,
-      Math.min(1, event.clientY / Math.max(1, window.innerHeight)),
+      Math.min(1, (event.clientY - bounds.top) / Math.max(1, bounds.height)),
     );
     const now = performance.now();
 
@@ -1051,7 +1057,7 @@
     window.addEventListener("pointerout", handlePointerWindowExit);
     window.addEventListener("blur", stopTrackingPointer);
     const stopTrackingTitleLayout = layoutTracker?.observe(
-      titleElement,
+      () => titleElement,
       (snapshot) => {
         if (pointerInside) updateTitleSound(snapshot);
       },
@@ -1109,6 +1115,7 @@
 
 <span
   class="rangeTitleWord"
+  data-range-layout="range-title"
   class:canvasReady
   class:hdr
   class:darkBase={base === "dark"}
@@ -1117,6 +1124,7 @@
   <span class="rangeTitleMeasure">{text}</span>
   <canvas
     class="rangeTitleCanvas"
+    data-range-layout="range-title-canvas"
     bind:this={canvas}
     aria-hidden="true"
   ></canvas>

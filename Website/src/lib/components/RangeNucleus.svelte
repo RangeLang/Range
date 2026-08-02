@@ -310,7 +310,8 @@
 
   function updateScrollFilter() {
     if (!sectionElement || typeof window === "undefined") return;
-    const bounds = sectionElement.getBoundingClientRect();
+    const bounds = layoutTracker?.query('[data-range-layout="range-nucleus"]')?.rect
+      ?? sectionElement.getBoundingClientRect();
     const viewportCenter = window.innerHeight / 2;
     const sectionCenter = bounds.top + bounds.height / 2;
     const reach = window.innerHeight * 0.92 + bounds.height * 0.12;
@@ -505,7 +506,7 @@
 
     updateScrollFilter();
     const stopTrackingLayout = layoutTracker?.observe(
-      sectionElement,
+      '[data-range-layout="range-nucleus"]',
       scheduleFilterUpdate,
     );
 
@@ -527,7 +528,12 @@
 
 </script>
 
-<section class="rangeSection" aria-label="Range sound generator" bind:this={sectionElement}>
+<section
+  class="rangeSection"
+  data-range-layout="range-nucleus"
+  aria-label="Range sound generator"
+  bind:this={sectionElement}
+>
   <div class="graphControls">
     <div class="conceptPicker" role="group" aria-label="Range concept">
       {#each conceptIDs as conceptID}

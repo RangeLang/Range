@@ -394,7 +394,8 @@
       for (let index = 0; index < cards.length; index += 1) {
         const card = cards[index];
         if (!card) continue;
-        const visibleRect = card.getBoundingClientRect();
+        const visibleRect = layoutTracker?.locate(card).rect
+          ?? card.getBoundingClientRect();
         if (
           visibleRect.bottom <= 0 ||
           visibleRect.top >= window.innerHeight ||

@@ -593,7 +593,8 @@
     const glyph = target.querySelector<HTMLElement>(
       ".identityExpression, .shapeStage, .enumStage",
     ) ?? target;
-    const rect = glyph.getBoundingClientRect();
+    const rect = layoutTracker?.locate(glyph).rect
+      ?? glyph.getBoundingClientRect();
     const distancePastCenter = window.innerHeight * 0.5 - (rect.top + rect.height * 0.5);
     const height = rect.height;
     const entryStartDistance = -(window.innerHeight + height) * 0.5;
@@ -1005,7 +1006,7 @@
   onMount(() => {
     trackFigureAudioStates();
     const stopTrackingLayout = layoutTracker?.observe(
-      rhythmElement,
+      '[data-range-layout="range-rhythm"]',
       trackFigureAudioStates,
     );
     return () => {
@@ -1128,8 +1129,10 @@
       time: number,
       density: number,
     ) => {
-      const rootRect = rhythmElement.getBoundingClientRect();
-      const targetRect = target.getBoundingClientRect();
+      const rootRect = layoutTracker?.query('[data-range-layout="range-rhythm"]')?.rect
+        ?? rhythmElement.getBoundingClientRect();
+      const targetRect = layoutTracker?.locate(target).rect
+        ?? target.getBoundingClientRect();
       const x = Math.round((targetRect.left - rootRect.left) * density);
       const y = Math.round(
         (rootRect.bottom - targetRect.bottom) * density,
@@ -1247,6 +1250,7 @@
 <div
   bind:this={rhythmElement}
   class="rhythm"
+  data-range-layout="range-rhythm"
   class:playing
   data-playing={playing}
   data-step={step}

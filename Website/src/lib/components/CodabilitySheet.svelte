@@ -574,9 +574,14 @@
       ),
     );
     if (lines.length === 0) return undefined;
-    const viewportBounds = codeViewportElement.getBoundingClientRect();
-    const firstBounds = lines[0].getBoundingClientRect();
-    const lastBounds = lines.at(-1)?.getBoundingClientRect() ?? firstBounds;
+    const viewportBounds = layoutTracker?.locate(codeViewportElement).rect
+      ?? codeViewportElement.getBoundingClientRect();
+    const firstBounds = layoutTracker?.locate(lines[0]).rect
+      ?? lines[0].getBoundingClientRect();
+    const lastLine = lines.at(-1);
+    const lastBounds = lastLine
+      ? layoutTracker?.locate(lastLine).rect ?? lastLine.getBoundingClientRect()
+      : firstBounds;
     const highlightedCenter = (firstBounds.top + lastBounds.bottom) / 2;
     const viewportCenter = viewportBounds.top + viewportBounds.height / 2;
     const maximumScroll = Math.max(
@@ -722,7 +727,8 @@
 
   function updateStageFocus(synchronizeStoryChapter = false) {
     if (!stageElement || !previewElement || typeof window === "undefined") return;
-    const stageBounds = stageElement.getBoundingClientRect();
+    const stageBounds = layoutTracker?.query('[data-range-layout="codability-stage"]')?.rect
+      ?? stageElement.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const centerOffset =
       stageBounds.top + stageBounds.height / 2 - viewportHeight / 2;
@@ -846,11 +852,11 @@
 
     updateStageFocus(true);
     const stopTrackingStage = layoutTracker?.observe(
-      stageElement,
+      '[data-range-layout="codability-stage"]',
       scheduleScrollUpdate,
     );
     const stopTrackingViewport = layoutTracker?.observe(
-      codeViewportElement,
+      '[data-range-layout="codability-code"]',
       scheduleGeometryUpdate,
     );
 
@@ -888,8 +894,12 @@
     </div>
   {/if}
 
-  <div class="codabilityStage" bind:this={stageElement}>
-  <article
+  <div
+    class="codabilityStage"
+    data-range-layout="codability-stage"
+    bind:this={stageElement}
+  >
+    <article
     class="codePreviewCard"
     class:stageFocused
     bind:this={previewElement}
@@ -924,6 +934,7 @@
     >
       <div
         class="codeViewport"
+        data-range-layout="codability-code"
         bind:this={codeViewportElement}
         id="codability-source"
         role="tabpanel"

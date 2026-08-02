@@ -29,11 +29,18 @@ export type RangeLayoutSnapshot = {
   visible: boolean;
 };
 
+export type RangeLayoutQuery = Element | string | (() => Element | null);
+
 export type RangeLayoutTracker = {
   locate: (target: Element) => RangeLayoutSnapshot;
+  query: (
+    target: RangeLayoutQuery,
+    root?: ParentNode,
+  ) => RangeLayoutSnapshot | undefined;
   observe: (
-    target: Element,
+    target: RangeLayoutQuery,
     listener: (snapshot: RangeLayoutSnapshot) => void,
+    root?: ParentNode,
   ) => () => void;
   refresh: () => void;
   dispose: () => void;
@@ -46,13 +53,18 @@ declare global {
 }
 
 export function createRangeLayoutTracker(): RangeLayoutTracker {
-  const targets = new Map<
-    Element,
-    Set<(snapshot: RangeLayoutSnapshot) => void>
-  >();
+  type Observation = {
+    target: RangeLayoutQuery;
+    root?: ParentNode;
+    element?: Element;
+    listener: (snapshot: RangeLayoutSnapshot) => void;
+  };
+
+  const observations = new Set<Observation>();
   let frame: number | undefined;
   let listening = false;
   let resizeObserver: ResizeObserver | undefined;
+  let mutationObserver: MutationObserver | undefined;
 
   const locate = (target: Element): RangeLayoutSnapshot => {
     const bounds = target.getBoundingClientRect();
@@ -99,12 +111,36 @@ export function createRangeLayoutTracker(): RangeLayoutTracker {
     };
   };
 
+  const resolve = (
+    target: RangeLayoutQuery,
+    root: ParentNode = document,
+  ): Element | null => {
+    if (typeof target === "string") return root.querySelector(target);
+    if (typeof target === "function") return target();
+    return target;
+  };
+
+  const query: RangeLayoutTracker["query"] = (target, root) => {
+    if (typeof document === "undefined") return undefined;
+    const element = resolve(target, root);
+    return element?.isConnected ? locate(element) : undefined;
+  };
+
+  const updateObservedElement = (observation: Observation) => {
+    const element = resolve(observation.target, observation.root);
+    if (element === observation.element) return element;
+    if (observation.element) resizeObserver?.unobserve(observation.element);
+    observation.element = element ?? undefined;
+    if (element) resizeObserver?.observe(element);
+    return element;
+  };
+
   const refreshNow = () => {
     frame = undefined;
-    for (const [target, listeners] of targets) {
-      if (!target.isConnected) continue;
-      const snapshot = locate(target);
-      for (const listener of listeners) listener(snapshot);
+    for (const observation of observations) {
+      const target = updateObservedElement(observation);
+      if (!target?.isConnected) continue;
+      observation.listener(locate(target));
     }
   };
 
@@ -121,6 +157,11 @@ export function createRangeLayoutTracker(): RangeLayoutTracker {
     window.visualViewport?.addEventListener("scroll", refresh, { passive: true });
     window.visualViewport?.addEventListener("resize", refresh, { passive: true });
     resizeObserver = new ResizeObserver(refresh);
+    mutationObserver = new MutationObserver(refresh);
+    mutationObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
   };
 
   const stopListening = () => {
@@ -132,24 +173,20 @@ export function createRangeLayoutTracker(): RangeLayoutTracker {
     window.visualViewport?.removeEventListener("resize", refresh);
     resizeObserver?.disconnect();
     resizeObserver = undefined;
+    mutationObserver?.disconnect();
+    mutationObserver = undefined;
   };
 
-  const observe: RangeLayoutTracker["observe"] = (target, listener) => {
-    let listeners = targets.get(target);
-    if (!listeners) {
-      listeners = new Set();
-      targets.set(target, listeners);
-      startListening();
-      resizeObserver?.observe(target);
-    }
-    listeners.add(listener);
-    listener(locate(target));
+  const observe: RangeLayoutTracker["observe"] = (target, listener, root) => {
+    const observation: Observation = { target, listener, root };
+    observations.add(observation);
+    startListening();
+    const element = updateObservedElement(observation);
+    if (element?.isConnected) listener(locate(element));
     return () => {
-      listeners?.delete(listener);
-      if (listeners?.size) return;
-      targets.delete(target);
-      resizeObserver?.unobserve(target);
-      if (targets.size === 0) stopListening();
+      observations.delete(observation);
+      if (observation.element) resizeObserver?.unobserve(observation.element);
+      if (observations.size === 0) stopListening();
     };
   };
 
@@ -158,9 +195,9 @@ export function createRangeLayoutTracker(): RangeLayoutTracker {
       window.cancelAnimationFrame(frame);
     }
     frame = undefined;
-    targets.clear();
+    observations.clear();
     stopListening();
   };
 
-  return { locate, observe, refresh, dispose };
+  return { locate, query, observe, refresh, dispose };
 }

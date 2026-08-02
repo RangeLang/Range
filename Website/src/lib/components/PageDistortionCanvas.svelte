@@ -242,7 +242,7 @@
       const resizeObserver = new ResizeObserver(resize);
       resizeObserver.observe(contentElement);
       const stopTrackingLayout = layoutTracker?.observe(
-        contentElement,
+        '[data-range-layout="page-distortion-content"]',
         scheduleRender,
       );
       resize();
@@ -270,7 +270,11 @@
     {...layoutSubtreeAttribute}
     bind:this={canvas}
   >
-    <div class="pageDistortionContent" bind:this={content}>
+    <div
+      class="pageDistortionContent"
+      data-range-layout="page-distortion-content"
+      bind:this={content}
+    >
       {@render children()}
     </div>
   </canvas>

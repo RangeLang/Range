@@ -1522,6 +1522,17 @@
       : groupWords[wordPatternIndex] ?? groupWords[0];
     const enteringNewGroup = macroTrackLastGroups[trackIndex] !== groupIndex;
     macroTrackLastGroups[trackIndex] = groupIndex;
+    if (groupIndex === 4) {
+      if (activeMacroWords[trackIndex] === "#environment") {
+        releaseMacroNote(trackIndex);
+      }
+      macroGroupNoteIndex = 0;
+      macroClockwiseGroupPosition += direction;
+      macroPatternDirection *= -1;
+      macroReleaseTick = -1;
+      macroNextNoteTick = macroSequenceTick + intervalTicks + 8;
+      return true;
+    }
     const intensity = 0.48 + Math.min(groupSize, 4) * 0.025;
     const holdSeconds = (RANGE_RHYTHM_SUBDIVISION_MS / 1_000) * intervalTicks;
     const activated = activateMacroNote(
@@ -1723,9 +1734,11 @@
     let viewportFrame = 0;
     let macroFieldProximity = 0;
     let environmentProximity = 0;
+    const layoutRect = (element: Element) =>
+      layoutTracker?.locate(element).rect ?? element.getBoundingClientRect();
     const viewportProximity = (element: SVGGraphicsElement | undefined) => {
       if (!element) return 0;
-      const bounds = element.getBoundingClientRect();
+      const bounds = layoutRect(element);
       const viewportHeight = window.innerHeight;
       const center = bounds.top + bounds.height / 2;
       const reach = viewportHeight * 0.68 + bounds.height / 2;
@@ -1737,7 +1750,7 @@
     };
     const viewportPresence = (element: SVGGraphicsElement | undefined) => {
       if (!element) return 0;
-      const bounds = element.getBoundingClientRect();
+      const bounds = layoutRect(element);
       const viewportHeight = window.innerHeight;
       const fadeDistance = Math.max(96, viewportHeight * 0.2);
       const entering = Math.max(
@@ -1755,7 +1768,7 @@
       element: SVGGraphicsElement | undefined,
     ) => {
       if (!element) return 0;
-      const bounds = element.getBoundingClientRect();
+      const bounds = layoutRect(element);
       const viewportHeight = window.innerHeight;
       const center = bounds.top + bounds.height / 2;
       const linear = Math.max(
@@ -1766,7 +1779,9 @@
     };
     const updateViewportMix = () => {
       viewportFrame = 0;
-      const fieldBounds = macroFieldElement?.getBoundingClientRect();
+      const fieldBounds = macroFieldElement
+        ? layoutRect(macroFieldElement)
+        : undefined;
       if (fieldBounds) {
         if (fieldBounds.bottom <= window.innerHeight * 0.46) {
           macroFieldPassed = true;
@@ -1779,9 +1794,13 @@
         macroFieldViewportPresence,
         macroFieldPassed ? 0.42 : 0,
       );
-      environmentProximity = viewportPresence(environmentKeyElement);
-      const bridgeBounds = macroBridgeElement?.getBoundingClientRect();
-      const graphBounds = environmentKeyElement?.getBoundingClientRect();
+      environmentProximity = viewportCenterProximity(environmentKeyElement);
+      const bridgeBounds = macroBridgeElement
+        ? layoutRect(macroBridgeElement)
+        : undefined;
+      const graphBounds = environmentKeyElement
+        ? layoutRect(environmentKeyElement)
+        : undefined;
       if (bridgeBounds && graphBounds) {
         const viewportCenter = window.innerHeight / 2;
         const bridgeCenter = bridgeBounds.top + bridgeBounds.height / 2;
@@ -1807,30 +1826,7 @@
       const now = macroAudioRoute.audioContext.currentTime;
       gain.cancelScheduledValues(now);
       gain.setTargetAtTime(target, now, target > gain.value ? 0.52 : 0.88);
-      if (
-        environmentProximity > 0.001 &&
-        activeMacroWords[0] !== "#environment"
-      ) {
-        activateMacroNote(0, "#environment", 1, 0.55, 12, now + 0.008);
-        environmentNextDyadTick = -1;
-      }
-      shiftEnvironmentResonanceBand(
-        viewportCenterProximity(environmentKeyElement),
-        now,
-      );
-      const environmentPresence = macroChords[0]?.environmentWave?.presence.gain;
-      if (environmentPresence) {
-        environmentPresence.cancelScheduledValues(now);
-        environmentPresence.setTargetAtTime(
-          Math.max(0.0001, environmentProximity),
-          now,
-          environmentProximity > environmentPresence.value ? 0.62 : 1.05,
-        );
-      }
-      if (
-        environmentProximity <= 0.001 &&
-        activeMacroWords[0] === "#environment"
-      ) {
+      if (activeMacroWords[0] === "#environment") {
         releaseMacroNote(0);
         environmentNextDyadTick = -1;
       }
@@ -1917,16 +1913,6 @@
       } else {
         macroSequenceTick = tick;
       }
-      if (activeMacroWords[0] === "#environment") {
-        if (environmentNextDyadTick < 0) {
-          environmentNextDyadTick = tick + environmentDyadTicks;
-        } else if (tick >= environmentNextDyadTick) {
-          environmentDyadIndex =
-            (environmentDyadIndex + 1) % environmentDyadCents.length;
-          selectEnvironmentDyad(environmentDyadIndex, audioTime);
-          environmentNextDyadTick = tick + environmentDyadTicks;
-        }
-      }
       if (
         macroReleaseTick >= 0 &&
         macroSequenceTick >= macroReleaseTick &&
@@ -1943,12 +1929,17 @@
       }
     });
     const handleVisibilityChange = () => {
-      if (document.hidden) stop(false);
-      else void start();
+      if (document.hidden) {
+        soundManager?.setLayerPresence?.("environment", 0);
+        stop(false);
+      } else {
+        updateViewportMix();
+        void start();
+      }
     };
     observer.observe(macroCloudElement);
     const stopTrackingLayout = layoutTracker?.observe(
-      macroCloudElement,
+      '[data-range-layout="macro-cloud"]',
       scheduleViewportMix,
     );
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -1960,6 +1951,7 @@
       unsubscribeSound?.();
       unsubscribeRhythm?.();
       stopTrackingLayout?.();
+      soundManager?.setLayerPresence?.("environment", 0);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   });
@@ -1989,6 +1981,7 @@
 
 <section
   class="macroCloud"
+  data-range-layout="macro-cloud"
   class:transportStopped={!transportRunning}
   aria-label="Macros"
   bind:this={macroCloudElement}
@@ -2087,17 +2080,14 @@
       </div>
     </foreignObject>
     {#each [environmentCell] as cell}
-      {@const activation = macroCellActivation(cell.text)}
-      {@const tone = macroTone(cell.text)}
       <g
         bind:this={environmentKeyElement}
         class="macroKey environmentKey"
-        style={`--activation: ${activation}; opacity: ${environmentDisplayReveal}`}
+        style={`opacity: ${environmentDisplayReveal}`}
         aria-label="Environment"
       >
         <text
-          class={`macroCellLabel environmentLabel ${tone}`}
-          style={`--activation: ${activation}`}
+          class="macroCellLabel environmentLabel"
           x={cell.x}
           y={cell.y}
           font-size={cell.fontSize}
@@ -2308,9 +2298,14 @@
   .macroCellLabel.syntaxType.activeMacroLabel { fill: oklch(0.67 0.16 190); }
 
   .macroCellGlow {
-    fill: var(--range);
-    opacity: calc(var(--activation) * 0.92);
-    filter: drop-shadow(0 0 5px color-mix(in oklch, var(--range), transparent 28%));
+    fill: color-mix(in oklch, var(--range) 18%, white);
+    stroke: color-mix(in oklch, var(--range) 10%, white);
+    stroke-width: calc(var(--activation) * 0.34px);
+    paint-order: stroke fill;
+    opacity: calc(var(--activation) * 0.96);
+    filter:
+      drop-shadow(0 0 3px color-mix(in oklch, white, transparent 24%))
+      drop-shadow(0 0 9px color-mix(in oklch, var(--range), transparent 56%));
   }
 
   .macroCellGlow.macroLilac {
@@ -2345,22 +2340,24 @@
   .macroCellGlow.macroPink { fill: oklch(0.77 0.23 350); filter: drop-shadow(0 0 5px oklch(0.77 0.23 350 / 0.5)); }
   .macroCellGlow.macroTeal { fill: oklch(0.79 0.17 190); filter: drop-shadow(0 0 5px oklch(0.79 0.17 190 / 0.5)); }
   .macroCellGlow.syntaxMacro {
-    fill: var(--range);
+    fill: color-mix(in oklch, var(--range) 18%, white);
     filter: drop-shadow(
-      0 0 5px color-mix(in oklch, var(--range), transparent 50%)
-    );
+        0 0 3px color-mix(in oklch, white, transparent 24%)
+      )
+      drop-shadow(
+        0 0 9px color-mix(in oklch, var(--range), transparent 56%)
+      );
   }
   .macroCellGlow.syntaxSplice { fill: oklch(0.71 0.18 290); filter: drop-shadow(0 0 5px oklch(0.62 0.18 290 / 0.5)); }
   .macroCellGlow.syntaxType { fill: oklch(0.67 0.16 190); filter: drop-shadow(0 0 5px oklch(0.55 0.16 190 / 0.5)); }
 
+  .environmentKey {
+    transition: opacity 1.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
   .environmentLabel {
-    fill: oklch(0.76 0.2 290);
+    fill: oklch(0.7 0.16 295);
     letter-spacing: -0.035em;
-    opacity: calc(0.76 + var(--activation) * 0.24);
-    filter:
-      drop-shadow(0 0 4px oklch(0.76 0.2 290 / 0.82))
-      drop-shadow(0 0 16px oklch(0.72 0.18 290 / 0.48))
-      drop-shadow(0 0 42px oklch(0.68 0.15 290 / 0.26));
   }
 
   .macroCloudText {
