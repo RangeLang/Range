@@ -27,6 +27,7 @@
   let exploreStartedAt = 0;
   let completionTimer: number | undefined;
   let motionFrame: number | undefined;
+  let unlocking = false;
   let route: RangeSoundRoute | undefined;
   let oscillator: OscillatorNode | undefined;
   let overtone: OscillatorNode | undefined;
@@ -123,11 +124,14 @@
     });
   }
 
-  async function unlock(event: MouseEvent) {
-    const pointerX = event.clientX;
-    const pointerY = event.clientY;
+  async function unlock(pointerX: number, pointerY: number) {
+    if (unlocking || phase !== "press") return;
+    unlocking = true;
     const context = await soundManager?.resume();
-    if (!context || !soundManager) return;
+    if (!context || !soundManager) {
+      unlocking = false;
+      return;
+    }
     soundManager.setEnabled(true);
     route ??= soundManager.register("sound-onboarding", 0.72);
     startVoice();
@@ -143,6 +147,17 @@
     phase = "explore";
     await tick();
     setPointerTarget(pointerX, pointerY);
+    unlocking = false;
+  }
+
+  function unlockFromPointer(event: PointerEvent) {
+    event.preventDefault();
+    void unlock(event.clientX, event.clientY);
+  }
+
+  function unlockFromKeyboard(event: MouseEvent) {
+    if (event.detail !== 0) return;
+    void unlock(window.innerWidth / 2, window.innerHeight / 2);
   }
 
   function activateSegment() {
@@ -277,7 +292,13 @@
   >
     {#if phase === "press"}
       <div class="entryPrompt">
-        <button class="entryDot" type="button" aria-label="Press here to enable sound" onclick={unlock}></button>
+        <button
+          class="entryDot"
+          type="button"
+          aria-label="Press here to enable sound"
+          onpointerdown={unlockFromPointer}
+          onclick={unlockFromKeyboard}
+        ></button>
         <small>Press here</small>
       </div>
     {:else}
@@ -350,6 +371,8 @@
     border-radius: 50%;
     background: oklch(0.09 0.01 255);
     cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
     box-shadow: 0 8px 30px oklch(0.09 0.01 255 / 0.18);
     transition: transform 380ms cubic-bezier(0.16, 1, 0.3, 1);
   }
