@@ -2,6 +2,7 @@
   import type { Post } from "$lib/posts";
   import type { PostContrastPalette } from "$lib/post-contrast";
   import PostNoiseShader from "$lib/components/PostNoiseShader.svelte";
+  import FibonacciSphereShader from "$lib/components/FibonacciSphereShader.svelte";
   import SphereLineShader from "$lib/components/SphereLineShader.svelte";
   import RelationshipDotsShader from "$lib/components/RelationshipDotsShader.svelte";
 
@@ -50,7 +51,11 @@
   onblur={() => onfocuschange?.(false)}
 >
   {#if social}
-    {#if post.socialShader === "sphere-lines"}
+    {#if post.socialShader === "fibonacci-sphere"}
+      <div class="socialSphereShader socialIntroShader">
+        <FibonacciSphereShader showSphere={false} fadeToPaper={false} vivid />
+      </div>
+    {:else if post.socialShader === "sphere-lines"}
       <div class="socialSphereShader">
         <SphereLineShader palette={post.palette} topAligned />
       </div>
@@ -114,6 +119,10 @@
     content: "";
   }
 
+  .socialIntroShader::after {
+    display: none;
+  }
+
   .socialSphereShader :global(canvas) {
     position: absolute;
     inset: 0;
@@ -134,6 +143,20 @@
   .socialPost:has(.socialSphereShader) .postCopy {
     padding: 246px 72px 72px;
     background: none;
+  }
+
+  .socialPost:has(.socialIntroShader) {
+    --post-foreground: white !important;
+    --post-foreground-muted: white !important;
+    background: oklch(0.07 0.015 255);
+  }
+
+  .socialPost:has(.socialIntroShader) .postCopy {
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    padding: 72px;
+    text-align: center;
   }
 
   .socialPost .postCopy small {

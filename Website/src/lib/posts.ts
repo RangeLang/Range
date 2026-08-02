@@ -9,7 +9,7 @@ export type Post = {
   cardDescription: string;
   description: string;
   palette: number;
-  socialShader?: "sphere-lines" | "relationship-dots";
+  socialShader?: "fibonacci-sphere" | "sphere-lines" | "relationship-dots";
   cardPalette: {
     foreground: string;
     mutedForeground: string;
@@ -23,12 +23,12 @@ export const posts: Post[] = [
     slug: "intro-to-range",
     href: "/posts/intro-to-range",
     category: "Introduction",
-    cardTitle: "Intro to Range: The Material",
-    cardDescription:
-      "Identity : Value, four binding intents, three abstraction forms.",
+    cardTitle: "Intro to Range",
+    cardDescription: "The basic building blocks of the graph",
     description:
       "Range begins with Identity : Value, then binding intents and the three abstraction forms.",
     palette: 5,
+    socialShader: "fibonacci-sphere",
     cardPalette: {
       foreground: "rgb(94 0 34)",
       mutedForeground: "rgb(101 46 60)",
