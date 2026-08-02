@@ -8,6 +8,7 @@
     measurePostContrast,
     type PostContrastPalette,
   } from "$lib/post-contrast";
+  import { hasDrawableWebGLSurface } from "$lib/rendering/webgl-lifecycle";
 
   const layoutTracker = getContext<RangeLayoutTracker | undefined>(
     RANGE_LAYOUT_TRACKER_CONTEXT,
@@ -273,6 +274,7 @@
   }
 
   onMount(() => {
+    let mounted = true;
     const context = canvas.getContext("webgl", {
       alpha: shared,
       antialias: false,
@@ -341,6 +343,7 @@
       const parent = shared ? canvas.parentElement : null;
       const cssWidth = parent?.scrollWidth ?? canvas.clientWidth;
       const cssHeight = parent?.scrollHeight ?? canvas.clientHeight;
+      if (cssWidth <= 0 || cssHeight <= 0) return 0;
       if (shared) {
         canvas.style.width = `${cssWidth}px`;
         canvas.style.height = `${cssHeight}px`;
@@ -363,6 +366,7 @@
       originX = 0,
       originY = 0,
     ) => {
+      if (!mounted || width <= 0 || height <= 0) return;
       context.bindFramebuffer(context.FRAMEBUFFER, framebuffer);
       context.viewport(0, 0, width, height);
       context.useProgram(program);
@@ -506,7 +510,12 @@
 
     const render = (now: number) => {
       frame = 0;
-      if (!intersecting || document.hidden) return;
+      if (
+        !mounted
+        || !intersecting
+        || document.hidden
+        || !hasDrawableWebGLSurface(canvas, context)
+      ) return;
 
       const shouldAnimate = !still && active && !reducedMotion.matches;
       const frameInterval = 1000 / Math.max(1, maxFps);
@@ -516,6 +525,7 @@
       }
 
       const density = resize();
+      if (density <= 0 || !hasDrawableWebGLSurface(canvas, context)) return;
       const time = still || reducedMotion.matches ? 0 : (now - start) / 1000;
       if (shared) drawSharedCards(time, density);
       else draw(canvas.width, canvas.height, time, null);
@@ -542,7 +552,7 @@
     };
 
     const scheduleRender = () => {
-      if (frame || !intersecting || document.hidden) return;
+      if (frame || !mounted || !intersecting || document.hidden) return;
       frame = window.requestAnimationFrame(render);
     };
 
@@ -571,6 +581,7 @@
     requestRender = scheduleRender;
 
     return () => {
+      mounted = false;
       cancelFrame();
       requestRender = () => {};
       resizeObserver.disconnect();

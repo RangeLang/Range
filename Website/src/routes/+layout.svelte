@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { page } from "$app/state";
+  import { beforeNavigate } from "$app/navigation";
+  import { page, updated } from "$app/state";
   import { onMount, setContext } from "svelte";
   import {
     createRangeSoundManager,
@@ -35,6 +36,12 @@
   }
 
   let { children } = $props();
+
+  beforeNavigate(({ willUnload, to }) => {
+    if (updated.current && !willUnload && to?.url) {
+      window.location.href = to.url.href;
+    }
+  });
 
   onMount(() => {
     let resumeSoundOnFocus = false;

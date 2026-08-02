@@ -14,6 +14,10 @@
     type RangeLayoutSnapshot,
     type RangeLayoutTracker,
   } from "$lib/layout/layout-tracker";
+  import {
+    hasCompleteFramebuffer,
+    hasDrawableWebGLSurface,
+  } from "$lib/rendering/webgl-lifecycle";
 
   let {
     text = "Range",
@@ -113,6 +117,8 @@
   let lastPointerX = anchorX;
   let lastPointerY = anchorY;
   let lastPointerTime = 0;
+  let rendererActive = false;
+  let contextLost = false;
 
   const vertexShaderSource = `#version 300 es
     precision highp float;
@@ -506,7 +512,9 @@
     width: number,
     height: number,
   ) => {
-    if (!gl) return;
+    if (!gl || !rendererActive || contextLost || width <= 0 || height <= 0) {
+      return false;
+    }
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -531,12 +539,7 @@
       texture,
       0,
     );
-    if (
-      gl.checkFramebufferStatus(gl.FRAMEBUFFER) !==
-      gl.FRAMEBUFFER_COMPLETE
-    ) {
-      throw new Error("Range title blur framebuffer is incomplete.");
-    }
+    return hasCompleteFramebuffer(gl, framebuffer);
   };
 
   const rebuildGlyphTexture = () => {
@@ -611,19 +614,20 @@
       gl.UNSIGNED_BYTE,
       glyphSource,
     );
-    configureRenderTarget(
+    const firstTargetReady = configureRenderTarget(
       outwardTextureA,
       outwardFramebufferA,
       canvas.width,
       canvas.height,
     );
-    configureRenderTarget(
+    const secondTargetReady = configureRenderTarget(
       outwardTextureB,
       outwardFramebufferB,
       canvas.width,
       canvas.height,
     );
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (!firstTargetReady || !secondTargetReady) return;
 
     gl.useProgram(program);
     gl.uniform1i(uniformLocations.glyph, 0);
@@ -678,7 +682,10 @@
       !outwardTextureA ||
       !outwardTextureB ||
       !outwardFramebufferA ||
-      !outwardFramebufferB
+      !outwardFramebufferB ||
+      !rendererActive ||
+      contextLost ||
+      !hasDrawableWebGLSurface(canvas, gl)
     ) return;
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0, 0, 0, 0);
@@ -748,7 +755,7 @@
   };
 
   const animateRadiation = (timestamp: number) => {
-    if (effect !== "radiate") {
+    if (!rendererActive || contextLost || effect !== "radiate") {
       radiateRenderFrame = null;
       return;
     }
@@ -758,11 +765,18 @@
       renderCanvas();
       lastRadiateFrame = timestamp;
     }
-    radiateRenderFrame = requestAnimationFrame(animateRadiation);
+    if (rendererActive && !contextLost) {
+      radiateRenderFrame = requestAnimationFrame(animateRadiation);
+    }
   };
 
   const startRadiating = () => {
-    if (radiateRenderFrame !== null || effect !== "radiate") return;
+    if (
+      !rendererActive
+      || contextLost
+      || radiateRenderFrame !== null
+      || effect !== "radiate"
+    ) return;
     radiateStartedAt = 0;
     lastRadiateFrame = -Infinity;
     radiateRenderFrame = requestAnimationFrame(animateRadiation);
@@ -789,6 +803,10 @@
   };
 
   const animatePointer = (timestamp: number) => {
+    if (!rendererActive || contextLost) {
+      pointerRenderFrame = null;
+      return;
+    }
     const elapsed = pointerAnimationTime
       ? Math.min(64, timestamp - pointerAnimationTime)
       : 16;
@@ -847,7 +865,9 @@
       ) > 0.0005;
 
     if (unsettled) {
-      pointerRenderFrame = requestAnimationFrame(animatePointer);
+      if (rendererActive && !contextLost) {
+        pointerRenderFrame = requestAnimationFrame(animatePointer);
+      }
     } else {
       distortionCenter = targetDistortionCenter;
       distortionVerticalCenter = targetDistortionVerticalCenter;
@@ -861,7 +881,7 @@
   };
 
   const startPointerAnimation = () => {
-    if (pointerRenderFrame === null) {
+    if (rendererActive && !contextLost && pointerRenderFrame === null) {
       pointerAnimationTime = 0;
       pointerRenderFrame = requestAnimationFrame(animatePointer);
     }
@@ -1016,6 +1036,8 @@
 
   onMount(() => {
     let active = true;
+    rendererActive = true;
+    contextLost = false;
     try {
       gl = canvas.getContext("webgl2", {
         alpha: true,
@@ -1051,6 +1073,7 @@
       glyphSource = document.createElement("canvas");
       cacheUniformLocations();
     } catch (error) {
+      rendererActive = false;
       console.error("Range title renderer could not initialize.", error);
       return;
     }
@@ -1065,6 +1088,15 @@
       },
     );
     titleElement.addEventListener("pointerdown", primeTitleSound);
+    const handleContextLost = () => {
+      contextLost = true;
+      canvasReady = false;
+      if (pointerRenderFrame !== null) cancelAnimationFrame(pointerRenderFrame);
+      if (radiateRenderFrame !== null) cancelAnimationFrame(radiateRenderFrame);
+      pointerRenderFrame = null;
+      radiateRenderFrame = null;
+    };
+    canvas.addEventListener("webglcontextlost", handleContextLost);
 
     let resizeObserver: ResizeObserver | undefined;
     const renderWhenReady = async () => {
@@ -1088,6 +1120,7 @@
 
     return () => {
       active = false;
+      rendererActive = false;
       resizeObserver?.disconnect();
       if (pointerRenderFrame !== null) {
         cancelAnimationFrame(pointerRenderFrame);
@@ -1102,6 +1135,7 @@
       window.removeEventListener("blur", stopTrackingPointer);
       stopTrackingTitleLayout?.();
       titleElement.removeEventListener("pointerdown", primeTitleSound);
+      canvas.removeEventListener("webglcontextlost", handleContextLost);
       titleSound?.dispose();
       titleSoundRoute?.dispose();
       titleSound = null;

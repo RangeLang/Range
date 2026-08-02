@@ -7,6 +7,9 @@ const config = {
     files: {
       assets: "public",
     },
+    version: {
+      pollInterval: 10_000,
+    },
   },
 };
 
