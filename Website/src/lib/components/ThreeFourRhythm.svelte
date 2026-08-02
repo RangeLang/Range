@@ -975,6 +975,33 @@
     stopRhythm();
   }
 
+  function playTransportReleaseTone() {
+    if (!audioContext || !audioRoute) return;
+    const now = audioContext.currentTime;
+    const oscillator = audioContext.createOscillator();
+    const overtone = audioContext.createOscillator();
+    const filter = audioContext.createBiquadFilter();
+    const gain = audioContext.createGain();
+
+    oscillator.type = "sine";
+    overtone.type = "sine";
+    oscillator.frequency.setValueAtTime(196, now);
+    overtone.frequency.setValueAtTime(294, now);
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(1_200, now);
+    filter.Q.setValueAtTime(0.45, now);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.045, now + 0.035);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.72);
+    oscillator.connect(filter);
+    overtone.connect(filter);
+    filter.connect(gain).connect(audioRoute.input);
+    oscillator.start(now);
+    overtone.start(now);
+    oscillator.stop(now + 0.74);
+    overtone.stop(now + 0.74);
+  }
+
   async function startTransport() {
     if (transportState !== "stopped") return;
     transportState = "starting";
@@ -995,6 +1022,7 @@
 
     audioEnabled = true;
     soundManager.setEnabled(true);
+    playTransportReleaseTone();
     setEnvironmentScoreTreatment(0.12);
     startRhythm();
 
@@ -1230,35 +1258,9 @@
 
   onMount(() => {
     stopTransport();
-    // The article is a score, so its visual clock begins with the page rather
-    // than waiting for the transport control. Audio is started immediately
-    // when autoplay is available; otherwise the first gesture anywhere on the
-    // page unlocks the already-armed score.
+    // Keep the visual score alive behind the explicit browser audio gate.
     startRhythm();
-
-    let listeningForUnlock = true;
-    const stopListeningForUnlock = () => {
-      if (!listeningForUnlock) return;
-      listeningForUnlock = false;
-      window.removeEventListener("pointerdown", unlockDefaultTransport);
-      window.removeEventListener("keydown", unlockDefaultTransport);
-    };
-    const startDefaultTransport = async () => {
-      await startTransport();
-      if (transportState === "running") stopListeningForUnlock();
-    };
-    const unlockDefaultTransport = () => {
-      void startDefaultTransport();
-    };
-
-    window.addEventListener("pointerdown", unlockDefaultTransport, { passive: true });
-    window.addEventListener("keydown", unlockDefaultTransport);
-    void startDefaultTransport();
-
-    return () => {
-      stopListeningForUnlock();
-      stopRhythm();
-    };
+    return stopRhythm;
   });
 
   onDestroy(() => {
@@ -1308,20 +1310,41 @@
     {@render identityIntro()}
   </div>
 
-  <div class="rhythmAudioControl">
-    <button
-      type="button"
-      class="transportButton"
-      class:transportRunning={transportState !== "stopped"}
-      aria-label={transportState === "stopped" ? "Start article sound and motion" : "Stop article sound and motion"}
-      aria-pressed={transportState !== "stopped"}
-      onclick={toggleTransport}
-      title={transportState === "stopped" ? "Start" : "Stop"}
+  {#if transportState !== "running"}
+    <div
+      class="soundGate"
+      class:releasing={transportState === "starting"}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Enable the Intro to Range sound"
     >
-      <span class="transportGlyph" aria-hidden="true"></span>
-      <span>{transportState === "stopped" ? "Start" : "Stop"}</span>
-    </button>
-  </div>
+      <button
+        type="button"
+        class="soundGateButton"
+        aria-label="Enable sound"
+        onclick={toggleTransport}
+        disabled={transportState === "starting"}
+      >
+        <span class="soundGateDot" aria-hidden="true"></span>
+        <span>{transportState === "starting" ? "Releasing" : "Start"}</span>
+      </button>
+      <p>Press to enable sound</p>
+    </div>
+  {:else}
+    <div class="rhythmAudioControl">
+      <button
+        type="button"
+        class="transportButton transportRunning"
+        aria-label="Stop article sound and motion"
+        aria-pressed="true"
+        onclick={toggleTransport}
+        title="Stop"
+      >
+        <span class="transportGlyph" aria-hidden="true"></span>
+        <span>Stop</span>
+      </button>
+    </div>
+  {/if}
 
   <figure class="lineFigure" bind:this={identityFigure}>
     <div
@@ -1558,6 +1581,107 @@
     font-size: 10px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+  }
+
+  .soundGate {
+    position: fixed;
+    z-index: 60;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 22px;
+    background: oklch(1 0 0 / 0.76);
+    backdrop-filter: blur(18px) saturate(0.72);
+  }
+
+  .soundGate p {
+    margin: 0;
+    color: color-mix(in oklch, var(--ink), transparent 34%);
+    font-family: var(--font-geist-mono), monospace;
+    font-size: 12px;
+    letter-spacing: 0.045em;
+  }
+
+  .soundGateButton {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 10px;
+    width: 124px;
+    height: 124px;
+    padding: 0;
+    border: 1px solid color-mix(in oklch, var(--range), transparent 48%);
+    border-radius: 50%;
+    background: white;
+    color: var(--range);
+    font-family: var(--font-geist-mono), monospace;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    box-shadow:
+      0 10px 40px color-mix(in oklch, var(--range), transparent 88%),
+      inset 0 0 0 1px color-mix(in oklch, white, transparent 18%);
+    transition:
+      transform 360ms cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 360ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .soundGateButton::before,
+  .soundGateButton::after {
+    position: absolute;
+    z-index: -1;
+    inset: -1px;
+    border: 1px solid color-mix(in oklch, var(--range), transparent 48%);
+    border-radius: inherit;
+    content: "";
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .soundGateButton:hover {
+    transform: scale(1.035);
+    box-shadow:
+      0 16px 54px color-mix(in oklch, var(--range), transparent 82%),
+      inset 0 0 0 1px color-mix(in oklch, white, transparent 18%);
+  }
+
+  .soundGateButton:focus-visible {
+    outline: 2px solid var(--range);
+    outline-offset: 5px;
+  }
+
+  .soundGateButton:disabled {
+    cursor: wait;
+  }
+
+  .soundGate.releasing .soundGateButton::before {
+    animation: sound-release 900ms cubic-bezier(0.12, 0.72, 0.24, 1) both;
+  }
+
+  .soundGate.releasing .soundGateButton::after {
+    animation: sound-release 900ms 110ms cubic-bezier(0.12, 0.72, 0.24, 1) both;
+  }
+
+  .soundGateDot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--range);
+    box-shadow: 0 0 18px color-mix(in oklch, var(--range), transparent 42%);
+  }
+
+  @keyframes sound-release {
+    0% {
+      opacity: 0.72;
+      transform: scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(3.8);
+    }
   }
 
   .rhythm > .rhythmAudioControl {
