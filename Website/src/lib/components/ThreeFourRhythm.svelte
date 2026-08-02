@@ -1686,20 +1686,12 @@
     display: flex;
     justify-content: center;
     gap: 0.34em;
-    color: var(--ink);
+    color: var(--range);
     font-family: var(--font-geist-mono), monospace;
     font-size: clamp(18px, 2.4vw, 24px);
     font-weight: 520;
     letter-spacing: -0.035em;
     line-height: 1;
-  }
-
-  .identityExpression span:first-child {
-    color: color-mix(in oklch, var(--ink), var(--range) 22%);
-  }
-
-  .identityExpression span:last-child {
-    color: var(--range);
   }
 
   .identityValueTrack {

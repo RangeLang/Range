@@ -62,9 +62,10 @@ function clamp(value: Int, min: Int, max: Int): Int {
 
       {#snippet identityDetail()}
         <p>
-          Lowering can represent the two sides of Identity : Value separately,
-          and that separation is where full control over the architecture comes
-          from. But the meaning never splits.
+          Lowering can represent the two sides of
+          <span class="accentTerm">Identity : Value</span> separately, and that
+          separation is where full control over the architecture comes from.
+          But the meaning never splits.
         </p>
         <blockquote class="identityQuote">
           Without identity there is only
@@ -102,10 +103,12 @@ function clamp(value: Int, min: Int, max: Int): Int {
 
       {#snippet functionIntro()}
         <p>
-          Range keeps its abstraction vocabulary small. Constructs describe
-          composed values, enums describe alternatives, and functions describe
-          the logic between them. Together they account for shape, choice, and
-          behavior without introducing a new kind for every pattern.
+          Range keeps its abstraction vocabulary small.
+          <span class="accentTerm">Construct</span> describes composed values,
+          <span class="accentTerm">Enum</span> describes alternatives, and
+          <span class="accentTerm">Function</span> describes the logic between
+          them. Together they account for shape, choice, and behavior without
+          introducing a new kind for every pattern.
         </p>
       {/snippet}
 
