@@ -127,14 +127,7 @@
   async function unlock(pointerX: number, pointerY: number) {
     if (unlocking || phase !== "press") return;
     unlocking = true;
-    const context = await soundManager?.resume();
-    if (!context || !soundManager) {
-      unlocking = false;
-      return;
-    }
-    soundManager.setEnabled(true);
-    route ??= soundManager.register("sound-onboarding", 0.72);
-    startVoice();
+    const resumed = soundManager?.resume();
     x = 0;
     y = 0;
     targetX = 0;
@@ -147,6 +140,12 @@
     phase = "explore";
     await tick();
     setPointerTarget(pointerX, pointerY);
+    const context = await resumed;
+    if (context && soundManager) {
+      soundManager.setEnabled(true);
+      route ??= soundManager.register("sound-onboarding", 0.72);
+      startVoice();
+    }
     unlocking = false;
   }
 
@@ -291,16 +290,16 @@
     class:leaving={phase === "leaving"}
   >
     {#if phase === "press"}
-      <div class="entryPrompt">
-        <button
-          class="entryDot"
-          type="button"
-          aria-label="Press here to enable sound"
-          onpointerdown={unlockFromPointer}
-          onclick={unlockFromKeyboard}
-        ></button>
+      <button
+        class="entryPrompt"
+        type="button"
+        aria-label="Press here to enable sound"
+        onpointerdown={unlockFromPointer}
+        onclick={unlockFromKeyboard}
+      >
+        <span class="entryDot" aria-hidden="true"></span>
         <small>Press here</small>
-      </div>
+      </button>
     {:else}
       <div class="lesson">
         <p>
@@ -364,20 +363,18 @@
   }
 
   .entryDot {
+    display: block;
     width: 56px;
     aspect-ratio: 1;
     padding: 0;
     border: 0;
     border-radius: 50%;
     background: oklch(0.09 0.01 255);
-    cursor: pointer;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
     box-shadow: 0 8px 30px oklch(0.09 0.01 255 / 0.18);
     transition: transform 380ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .entryDot:hover {
+  .entryPrompt:hover .entryDot {
     transform: scale(1.045);
   }
 
@@ -385,13 +382,19 @@
     display: grid;
     justify-items: center;
     gap: 13px;
+    padding: 16px 24px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
     color: color-mix(in oklch, var(--ink), transparent 42%);
     font-family: var(--font-geist-mono), monospace;
     font-size: 10px;
     letter-spacing: 0.045em;
   }
 
-  .entryDot:focus-visible,
+  .entryPrompt:focus-visible,
   .field:focus-visible {
     outline: 2px solid var(--range);
     outline-offset: 6px;

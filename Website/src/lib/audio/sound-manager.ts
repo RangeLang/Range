@@ -175,7 +175,10 @@ export function createRangeSoundManager(): RangeSoundManager {
     const context = createGraph();
     if (!context) return undefined;
     if (context.state === "suspended") await context.resume();
-    return context.state === "running" ? context : undefined;
+    // WebKit may briefly report `interrupted` after a successful user-gesture
+    // resume. The context is still valid and becomes running as the page gains
+    // audio focus, so only reject a context that has actually been closed.
+    return context.state === "closed" ? undefined : context;
   }
 
   function register(name: string, level = 1) {
