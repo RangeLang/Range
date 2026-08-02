@@ -1,9 +1,17 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { getContext, onMount } from "svelte";
+  import {
+    RANGE_LAYOUT_TRACKER_CONTEXT,
+    type RangeLayoutTracker,
+  } from "$lib/layout/layout-tracker";
   import {
     measurePostContrast,
     type PostContrastPalette,
   } from "$lib/post-contrast";
+
+  const layoutTracker = getContext<RangeLayoutTracker | undefined>(
+    RANGE_LAYOUT_TRACKER_CONTEXT,
+  );
 
   let {
     palette = 0,
@@ -554,15 +562,11 @@
       if (document.hidden) cancelFrame();
       else restart();
     };
-    const scrollContainer = shared ? canvas.parentElement : null;
-
     resizeObserver.observe(canvas);
     intersectionObserver.observe(canvas);
     reducedMotion.addEventListener("change", restart);
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    scrollContainer?.addEventListener("scroll", scheduleRender, {
-      passive: true,
-    });
+    const stopTrackingLayout = layoutTracker?.observe(canvas, scheduleRender);
     requestRender = scheduleRender;
 
     return () => {
@@ -572,7 +576,7 @@
       intersectionObserver.disconnect();
       reducedMotion.removeEventListener("change", restart);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      scrollContainer?.removeEventListener("scroll", scheduleRender);
+      stopTrackingLayout?.();
       if (shared && canvas.parentElement) {
         delete canvas.parentElement.dataset.shaderRendered;
       }

@@ -68,6 +68,19 @@ export function codabilityPlateauScrollProgress({
   );
 }
 
+export function codabilityStickyScrollProgress({
+  stageTop,
+  stageHeight,
+  viewportHeight,
+}: {
+  stageTop: number;
+  stageHeight: number;
+  viewportHeight: number;
+}) {
+  const stickyTravel = Math.max(1, stageHeight - viewportHeight);
+  return Math.max(0, Math.min(1, -stageTop / stickyTravel));
+}
+
 export function codabilityChapterIndex(
   plateauProgress: number,
   chapterCount: number,

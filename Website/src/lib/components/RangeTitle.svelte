@@ -8,6 +8,12 @@
     type RangeSoundManager,
     type RangeSoundRoute,
   } from "$lib/audio/sound-manager";
+  import {
+    RANGE_LAYOUT_TRACKER_CONTEXT,
+    type RangeLayoutRect,
+    type RangeLayoutSnapshot,
+    type RangeLayoutTracker,
+  } from "$lib/layout/layout-tracker";
 
   let {
     text = "Range",
@@ -54,6 +60,9 @@
   const soundManager = getContext<RangeSoundManager | undefined>(
     RANGE_SOUND_MANAGER_CONTEXT,
   );
+  const layoutTracker = getContext<RangeLayoutTracker | undefined>(
+    RANGE_LAYOUT_TRACKER_CONTEXT,
+  );
 
   let titleElement: HTMLSpanElement;
   let canvas: HTMLCanvasElement;
@@ -84,7 +93,6 @@
   let radiateStartedAt = 0;
   let lastRadiateFrame = -Infinity;
   let radiateTime = 0;
-  let viewportSoundFrame: number | null = null;
   let pointerAnimationTime = 0;
   let pointerInside = false;
   let soundProximity = 0;
@@ -759,7 +767,7 @@
     radiateRenderFrame = requestAnimationFrame(animateRadiation);
   };
 
-  const updateTitleSound = () => {
+  const updateTitleSound = (titleLayout?: RangeLayoutSnapshot) => {
     if (titleAudioContext?.state !== "running") return;
     const displacement = Math.min(
       1,
@@ -774,7 +782,10 @@
       shaderSpeed,
       distortionVerticalCenter,
     );
-    updateSoundProximity(canvas.getBoundingClientRect());
+    updateSoundProximity(
+      layoutTracker?.locate(canvas).rect ?? canvas.getBoundingClientRect(),
+      titleLayout?.rect,
+    );
     titleSound?.volume(soundProximity, soundMotionVolumeDuration / 1000);
     titleSound?.sustain(1);
   };
@@ -891,9 +902,12 @@
   };
 
   const updateSoundProximity = (
-    canvasBounds: DOMRect,
+    canvasBounds: RangeLayoutRect | DOMRect,
+    trackedTitleBounds?: RangeLayoutRect,
   ) => {
-    const titleBounds = titleElement.getBoundingClientRect();
+    const titleBounds = trackedTitleBounds
+      ?? layoutTracker?.locate(titleElement).rect
+      ?? titleElement.getBoundingClientRect();
     const followPixelX = titleBounds.left + distortionCenter * titleBounds.width;
     const followPixelY = distortionVerticalCenter * window.innerHeight;
     const falloffRadiusX = canvasBounds.width * 0.5 + soundFalloffPadding;
@@ -970,14 +984,6 @@
     beginIdleFade();
   };
 
-  const refreshSoundForViewportShift = () => {
-    if (viewportSoundFrame !== null) return;
-    viewportSoundFrame = requestAnimationFrame(() => {
-      viewportSoundFrame = null;
-      if (pointerInside) updateTitleSound();
-    });
-  };
-
   const handlePointerWindowExit = (event: PointerEvent) => {
     if (event.relatedTarget === null) stopTrackingPointer();
   };
@@ -1044,8 +1050,12 @@
     window.addEventListener("pointermove", trackPointer, { passive: true });
     window.addEventListener("pointerout", handlePointerWindowExit);
     window.addEventListener("blur", stopTrackingPointer);
-    window.addEventListener("scroll", refreshSoundForViewportShift, { passive: true });
-    window.addEventListener("resize", refreshSoundForViewportShift);
+    const stopTrackingTitleLayout = layoutTracker?.observe(
+      titleElement,
+      (snapshot) => {
+        if (pointerInside) updateTitleSound(snapshot);
+      },
+    );
     titleElement.addEventListener("pointerdown", primeTitleSound);
 
     const renderWhenReady = async () => {
@@ -1070,16 +1080,12 @@
       if (radiateRenderFrame !== null) {
         cancelAnimationFrame(radiateRenderFrame);
       }
-      if (viewportSoundFrame !== null) {
-        cancelAnimationFrame(viewportSoundFrame);
-      }
       if (idleTimeout !== null) clearTimeout(idleTimeout);
       if (reanchorTimeout !== null) clearTimeout(reanchorTimeout);
       window.removeEventListener("pointermove", trackPointer);
       window.removeEventListener("pointerout", handlePointerWindowExit);
       window.removeEventListener("blur", stopTrackingPointer);
-      window.removeEventListener("scroll", refreshSoundForViewportShift);
-      window.removeEventListener("resize", refreshSoundForViewportShift);
+      stopTrackingTitleLayout?.();
       titleElement.removeEventListener("pointerdown", primeTitleSound);
       titleSound?.dispose();
       titleSoundRoute?.dispose();

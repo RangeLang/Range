@@ -1,5 +1,13 @@
 <script lang="ts">
-  import { onMount, type Snippet } from "svelte";
+  import { getContext, onMount, type Snippet } from "svelte";
+  import {
+    RANGE_LAYOUT_TRACKER_CONTEXT,
+    type RangeLayoutTracker,
+  } from "$lib/layout/layout-tracker";
+
+  const layoutTracker = getContext<RangeLayoutTracker | undefined>(
+    RANGE_LAYOUT_TRACKER_CONTEXT,
+  );
 
   let { children }: { children: Snippet } = $props();
   const layoutSubtreeAttribute = {
@@ -233,14 +241,15 @@
 
       const resizeObserver = new ResizeObserver(resize);
       resizeObserver.observe(contentElement);
-      window.addEventListener("scroll", scheduleRender, { passive: true });
-      window.addEventListener("resize", resize);
+      const stopTrackingLayout = layoutTracker?.observe(
+        contentElement,
+        scheduleRender,
+      );
       resize();
 
       cleanupRenderer = () => {
         resizeObserver.disconnect();
-        window.removeEventListener("scroll", scheduleRender);
-        window.removeEventListener("resize", resize);
+        stopTrackingLayout?.();
         if (renderFrame) cancelAnimationFrame(renderFrame);
         htmlCanvas.onpaint = null;
         gl.deleteTexture(texture);

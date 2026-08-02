@@ -9,9 +9,16 @@
     type RangeSoundManager,
     type RangeSoundRoute,
   } from "$lib/audio/sound-manager";
+  import {
+    RANGE_LAYOUT_TRACKER_CONTEXT,
+    type RangeLayoutTracker,
+  } from "$lib/layout/layout-tracker";
 
   const soundManager = getContext<RangeSoundManager | undefined>(
     RANGE_SOUND_MANAGER_CONTEXT,
+  );
+  const layoutTracker = getContext<RangeLayoutTracker | undefined>(
+    RANGE_LAYOUT_TRACKER_CONTEXT,
   );
 
   type ConceptID = "shape" | "ownership" | "capability";
@@ -497,13 +504,14 @@
     };
 
     updateScrollFilter();
-    window.addEventListener("scroll", scheduleFilterUpdate, { passive: true });
-    window.addEventListener("resize", scheduleFilterUpdate);
+    const stopTrackingLayout = layoutTracker?.observe(
+      sectionElement,
+      scheduleFilterUpdate,
+    );
 
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", scheduleFilterUpdate);
-      window.removeEventListener("resize", scheduleFilterUpdate);
+      stopTrackingLayout?.();
     };
   });
 

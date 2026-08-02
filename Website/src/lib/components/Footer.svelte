@@ -6,7 +6,7 @@
 <range-site-footer>
   <footer>
     <a class="githubButton" href={githubUrl} target="_blank" rel="noreferrer" aria-label="Open the Range development branch on GitHub"><GithubIcon /><span>GitHub</span></a>
-    <div class="footerMeta">
+    <a class="footerMeta" href="/" aria-label="Range homepage">
       <span>Range</span>
       <range-scale
         class="footerScale"
@@ -22,15 +22,18 @@
         aria-label="Interactive Range scale separator"
       ></range-scale>
       <span>An applied programming language</span>
-    </div>
+    </a>
   </footer>
 </range-site-footer>
 
 <style>
   .footerMeta {
+    display: inline-flex;
     align-items: center;
     gap: 8px;
     line-height: 1;
+    color: inherit;
+    text-decoration: none;
   }
 
   .footerMeta > span {

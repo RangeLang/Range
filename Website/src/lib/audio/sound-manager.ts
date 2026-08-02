@@ -22,6 +22,11 @@ export type RangeSoundManager = {
   subscribe: (listener: (enabled: boolean) => void) => () => void;
   publishRhythmBeat: (beat: RangeRhythmBeat) => void;
   subscribeRhythmBeat: (listener: (beat: RangeRhythmBeat) => void) => () => void;
+  setLayerPresence: (name: string, presence: number) => void;
+  subscribeLayerPresence: (
+    name: string,
+    listener: (presence: number) => void,
+  ) => () => void;
   dispose: () => void;
 };
 
@@ -51,6 +56,11 @@ export function createRangeSoundManager(): RangeSoundManager {
   const routes = new Set<RangeSoundRoute>();
   const enabledListeners = new Set<(enabled: boolean) => void>();
   const rhythmBeatListeners = new Set<(beat: RangeRhythmBeat) => void>();
+  const layerPresence = new Map<string, number>();
+  const layerPresenceListeners = new Map<
+    string,
+    Set<(presence: number) => void>
+  >();
 
   function createGraph() {
     if (audioContext && masterInput) return audioContext;
@@ -129,10 +139,38 @@ export function createRangeSoundManager(): RangeSoundManager {
     return () => rhythmBeatListeners.delete(listener);
   }
 
+  function setLayerPresence(name: string, presence: number) {
+    const boundedPresence = Math.max(0, Math.min(1, presence));
+    if (layerPresence.get(name) === boundedPresence) return;
+    layerPresence.set(name, boundedPresence);
+    for (const listener of layerPresenceListeners.get(name) ?? []) {
+      listener(boundedPresence);
+    }
+  }
+
+  function subscribeLayerPresence(
+    name: string,
+    listener: (presence: number) => void,
+  ) {
+    let listeners = layerPresenceListeners.get(name);
+    if (!listeners) {
+      listeners = new Set();
+      layerPresenceListeners.set(name, listeners);
+    }
+    listeners.add(listener);
+    listener(layerPresence.get(name) ?? 0);
+    return () => {
+      listeners?.delete(listener);
+      if (listeners?.size === 0) layerPresenceListeners.delete(name);
+    };
+  }
+
   function dispose() {
     setEnabled(false);
     enabledListeners.clear();
     rhythmBeatListeners.clear();
+    layerPresence.clear();
+    layerPresenceListeners.clear();
     for (const route of [...routes]) route.dispose();
     masterInput?.disconnect();
     masterLimiter?.disconnect();
@@ -153,6 +191,8 @@ export function createRangeSoundManager(): RangeSoundManager {
     subscribe,
     publishRhythmBeat,
     subscribeRhythmBeat,
+    setLayerPresence,
+    subscribeLayerPresence,
     dispose,
   };
 }

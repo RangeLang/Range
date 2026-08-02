@@ -12,8 +12,13 @@
     type RangeSoundManager,
     type RangeSoundRoute,
   } from "$lib/audio/sound-manager";
+  import {
+    RANGE_LAYOUT_TRACKER_CONTEXT,
+    type RangeLayoutTracker,
+  } from "$lib/layout/layout-tracker";
 
   type FigureAudioPhase = "before" | "entering" | "centered" | "passed";
+  type TransportState = "stopped" | "starting" | "running";
 
   type FigureAudioState = {
     phase: FigureAudioPhase;
@@ -30,6 +35,9 @@
 
   const soundManager = getContext<RangeSoundManager | undefined>(
     RANGE_SOUND_MANAGER_CONTEXT,
+  );
+  const layoutTracker = getContext<RangeLayoutTracker | undefined>(
+    RANGE_LAYOUT_TRACKER_CONTEXT,
   );
 
   let {
@@ -52,8 +60,9 @@
 
   const subdivisionMilliseconds = RANGE_RHYTHM_SUBDIVISION_MS;
   const enumCases = ["north", "east", "south", "west"] as const;
-  let playing = $state(true);
+  let playing = $state(false);
   let audioEnabled = $state(false);
+  let transportState = $state<TransportState>("stopped");
   let step = $state(-1);
   let rhythmTick = 0;
   let triangleBeat = $state(-1);
@@ -63,6 +72,8 @@
   let introMix = $state<IntroMixSettings>({ ...DEFAULT_INTRO_MIX });
   let nextStepAt = 0;
   let rhythmClockStartedAt = 0;
+  let environmentLayerPresence = 0;
+  let macroLayerPresence = 0;
   let loopTimer: number | undefined;
   let audioContext: AudioContext | undefined;
   let audioRoute: RangeSoundRoute | undefined;
@@ -75,7 +86,10 @@
   let masterReverbWet: GainNode | undefined;
   let enumReverbSend: GainNode | undefined;
   let scoreGain: GainNode | undefined;
+  let scoreEnvironmentFilter: BiquadFilterNode | undefined;
   const voiceBuses = new Map<IntroMixChannel, GainNode>();
+  const transportLayerLevels = new Map<IntroMixChannel, number>();
+  let transportRestoreGeneration = 0;
   let rhythmElement: HTMLDivElement;
   let shaderCanvas: HTMLCanvasElement;
   let identityTrack: HTMLDivElement;
@@ -348,7 +362,8 @@
       !masterLimiter ||
       !masterReverb ||
       !masterReverbWet ||
-      !scoreGain
+      !scoreGain ||
+      !scoreEnvironmentFilter
     ) {
       masterGain = audioContext.createGain();
       masterDryGain = audioContext.createGain();
@@ -357,12 +372,22 @@
       masterReverbWet = audioContext.createGain();
       enumReverbSend = audioContext.createGain();
       scoreGain = audioContext.createGain();
+      scoreEnvironmentFilter = audioContext.createBiquadFilter();
       masterGain.gain.setValueAtTime(
         introMix.master,
         audioContext.currentTime,
       );
       scoreGain.gain.setValueAtTime(
-        audioEnabled ? 1 : 0.0001,
+        audioEnabled ? scoreLevelForEnvironment() : 0.0001,
+        audioContext.currentTime,
+      );
+      scoreEnvironmentFilter.type = "lowpass";
+      scoreEnvironmentFilter.frequency.setValueAtTime(
+        environmentEqCutoff(),
+        audioContext.currentTime,
+      );
+      scoreEnvironmentFilter.Q.setValueAtTime(
+        0.42 + environmentLayerPresence * 0.38,
         audioContext.currentTime,
       );
       masterDryGain.gain.setValueAtTime(0.96, audioContext.currentTime);
@@ -392,7 +417,7 @@
       }
       masterReverb.buffer = impulse;
 
-      scoreGain.connect(masterGain);
+      scoreGain.connect(scoreEnvironmentFilter).connect(masterGain);
       masterGain.connect(masterDryGain).connect(masterLimiter);
       masterGain
         .connect(masterReverb)
@@ -423,7 +448,15 @@
     let bus = voiceBuses.get(channel);
     if (!bus) {
       bus = audioContext.createGain();
-      bus.gain.setValueAtTime(mixLevel(channel), audioContext.currentTime);
+      const sidechainLevel = channel === "identity"
+        ? Math.max(0.28, 1 - macroLayerPresence * 0.72)
+        : 1;
+      bus.gain.setValueAtTime(
+        mixLevel(channel)
+          * sidechainLevel
+          * (transportLayerLevels.get(channel) ?? 1),
+        audioContext.currentTime,
+      );
       bus.connect(destination);
       if (channel === "enums" && enumReverbSend) {
         bus.connect(enumReverbSend);
@@ -438,13 +471,54 @@
     const now = audioContext.currentTime;
     masterGain?.gain.setTargetAtTime(introMix.master, now, 0.025);
     for (const [channel, bus] of voiceBuses) {
-      bus.gain.setTargetAtTime(mixLevel(channel), now, 0.025);
+      const sidechainLevel = channel === "identity"
+        ? Math.max(0.28, 1 - macroLayerPresence * 0.72)
+        : 1;
+      bus.gain.setTargetAtTime(
+        mixLevel(channel)
+          * sidechainLevel
+          * (transportLayerLevels.get(channel) ?? 1),
+        now,
+        0.025,
+      );
     }
   }
 
-  function setScoreGain(level: number) {
+  function setScoreGain(level: number, timeConstant = 0.012) {
     if (!audioContext || !scoreGain) return;
-    scoreGain.gain.setTargetAtTime(level, audioContext.currentTime, 0.012);
+    scoreGain.gain.setTargetAtTime(
+      level,
+      audioContext.currentTime,
+      timeConstant,
+    );
+  }
+
+  function scoreLevelForEnvironment() {
+    return Math.max(0.62, 1 - environmentLayerPresence * 0.38);
+  }
+
+  function environmentEqCutoff() {
+    const openCutoff = 16_000;
+    const closedCutoff = 620;
+    return openCutoff * Math.pow(
+      closedCutoff / openCutoff,
+      environmentLayerPresence,
+    );
+  }
+
+  function setEnvironmentScoreTreatment(timeConstant = 0.58) {
+    if (!audioContext) return;
+    setScoreGain(scoreLevelForEnvironment(), timeConstant);
+    scoreEnvironmentFilter?.frequency.setTargetAtTime(
+      environmentEqCutoff(),
+      audioContext.currentTime,
+      timeConstant,
+    );
+    scoreEnvironmentFilter?.Q.setTargetAtTime(
+      0.42 + environmentLayerPresence * 0.38,
+      audioContext.currentTime,
+      timeConstant,
+    );
   }
 
   function playTone(
@@ -567,7 +641,7 @@
 
       if (!state) {
         const initialState = {
-          phase: "before",
+          phase: phaseForFigurePosition(position),
           lastDistance: distancePastCenter,
         } satisfies FigureAudioState;
         figureAudioStates.set(target, initialState);
@@ -837,8 +911,80 @@
       window.clearTimeout(loopTimer);
     }
     loopTimer = undefined;
+    step = -1;
+    triangleBeat = -1;
+    squareBeat = -1;
+    enumPulse = -1;
+    enumCaseBeat = -1;
     clearEnumVisuals();
     stopShaderAnimation();
+  }
+
+  const figureChannels = () => [
+    [identityFigure, "identity"],
+    [triangleFigure, "forms"],
+    [enumFigure, "enums"],
+    [squareFigure, "properties"],
+  ] as const;
+
+  function setTransportLayerLevel(
+    channel: IntroMixChannel,
+    level: number,
+    timeConstant = 0.2,
+  ) {
+    transportLayerLevels.set(channel, level);
+    const bus = voiceBuses.get(channel);
+    if (!bus || !audioContext) return;
+    const sidechainLevel = channel === "identity"
+      ? Math.max(0.28, 1 - macroLayerPresence * 0.72)
+      : 1;
+    bus.gain.cancelScheduledValues(audioContext.currentTime);
+    bus.gain.setTargetAtTime(
+      mixLevel(channel) * sidechainLevel * level,
+      audioContext.currentTime,
+      timeConstant,
+    );
+  }
+
+  function stopTransport() {
+    transportRestoreGeneration += 1;
+    transportState = "stopped";
+    audioEnabled = false;
+    soundManager?.setEnabled(false);
+    setScoreGain(0.0001, 0.08);
+    stopRhythm();
+  }
+
+  async function startTransport() {
+    if (transportState !== "stopped") return;
+    transportState = "starting";
+    const generation = ++transportRestoreGeneration;
+    if (!(await ensureAudioRoute()) || !audioContext || !soundManager) {
+      if (generation === transportRestoreGeneration) transportState = "stopped";
+      return;
+    }
+    if (generation !== transportRestoreGeneration || transportState === "stopped") return;
+
+    trackFigureAudioStates();
+    const encountered = figureChannels().filter(([figure]) =>
+      figure && figureAudioStates.get(figure)?.phase !== "before"
+    );
+    for (const [, channel] of figureChannels()) {
+      setTransportLayerLevel(channel, encountered.some(([, active]) => active === channel) ? 0 : 1);
+    }
+
+    audioEnabled = true;
+    soundManager.setEnabled(true);
+    setEnvironmentScoreTreatment(0.12);
+    startRhythm();
+
+    for (const [, channel] of encountered) {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 190));
+      if (generation !== transportRestoreGeneration || !audioEnabled) return;
+      setTransportLayerLevel(channel, 1, 0.24);
+    }
+    if (generation !== transportRestoreGeneration || !audioEnabled) return;
+    transportState = "running";
   }
 
   async function ensureAudioRoute() {
@@ -851,31 +997,48 @@
     return true;
   }
 
-  async function toggleAudio() {
-    if (audioEnabled) {
-      audioEnabled = false;
-      soundManager?.setEnabled(false);
-      setScoreGain(0.0001);
-      return;
-    }
-
-    if (!(await ensureAudioRoute()) || !audioContext || !soundManager) return;
-    audioEnabled = true;
-    soundManager.setEnabled(true);
-    trackFigureAudioStates();
-    setScoreGain(1);
-    syncMixGains();
+  function toggleTransport() {
+    if (transportState === "stopped") void startTransport();
+    else stopTransport();
   }
 
   onMount(() => {
     trackFigureAudioStates();
-    window.addEventListener("scroll", trackFigureAudioStates, { passive: true });
-    window.addEventListener("resize", trackFigureAudioStates);
+    const stopTrackingLayout = layoutTracker?.observe(
+      rhythmElement,
+      trackFigureAudioStates,
+    );
     return () => {
-      window.removeEventListener("scroll", trackFigureAudioStates);
-      window.removeEventListener("resize", trackFigureAudioStates);
+      stopTrackingLayout?.();
     };
   });
+
+  onMount(() => soundManager?.subscribeLayerPresence?.(
+    "environment",
+    (presence) => {
+      environmentLayerPresence = presence;
+      if (audioEnabled) setEnvironmentScoreTreatment(0.58);
+    },
+  ));
+
+  onMount(() => soundManager?.subscribeLayerPresence?.(
+    "macros",
+    (presence) => {
+      const wasPresent = macroLayerPresence;
+      macroLayerPresence = presence;
+      const identityBus = voiceBuses.get("identity");
+      if (!audioEnabled || !audioContext || !identityBus) return;
+      const sidechainLevel = Math.max(0.28, 1 - presence * 0.72);
+      identityBus.gain.cancelScheduledValues(audioContext.currentTime);
+      identityBus.gain.setTargetAtTime(
+        mixLevel("identity")
+          * sidechainLevel
+          * (transportLayerLevels.get("identity") ?? 1),
+        audioContext.currentTime,
+        presence > wasPresent ? 0.018 : 0.24,
+      );
+    },
+  ));
 
   onMount(() => {
     if (
@@ -1051,7 +1214,7 @@
   });
 
   onMount(() => {
-    startRhythm();
+    stopTransport();
     return stopRhythm;
   });
 
@@ -1069,6 +1232,7 @@
     for (const bus of voiceBuses.values()) bus.disconnect();
     voiceBuses.clear();
     scoreGain?.disconnect();
+    scoreEnvironmentFilter?.disconnect();
     masterGain?.disconnect();
     masterDryGain?.disconnect();
     masterReverb?.disconnect();
@@ -1103,22 +1267,15 @@
   <div class="rhythmAudioControl">
     <button
       type="button"
-      class="volumeButton"
-      class:audioEnabled
-      aria-label={audioEnabled ? "Mute rhythm" : "Enable rhythm sound"}
-      aria-pressed={audioEnabled}
-      onclick={toggleAudio}
-      title={audioEnabled ? "Mute rhythm" : "Enable rhythm sound"}
+      class="transportButton"
+      class:transportRunning={transportState !== "stopped"}
+      aria-label={transportState === "stopped" ? "Start article sound and motion" : "Stop article sound and motion"}
+      aria-pressed={transportState !== "stopped"}
+      onclick={toggleTransport}
+      title={transportState === "stopped" ? "Start" : "Stop"}
     >
-      <svg class="volumeIcon" viewBox="0 0 20 20" aria-hidden="true">
-        <path d="M3 8h3l4-3v10l-4-3H3z"></path>
-        {#if audioEnabled}
-          <path class="volumeWave" d="M13 7.2c1.6 1.5 1.6 4.1 0 5.6"></path>
-          <path class="volumeWave" d="M15.4 5c2.8 2.7 2.8 7.3 0 10"></path>
-        {:else}
-          <path class="volumeWave" d="m13 8 4 4m0-4-4 4"></path>
-        {/if}
-      </svg>
+      <span class="transportGlyph" aria-hidden="true"></span>
+      <span>{transportState === "stopped" ? "Start" : "Stop"}</span>
     </button>
   </div>
 
@@ -1343,7 +1500,7 @@
 
   .enumCase.activeEnumCase {
     color: var(--range);
-    transform: translateX(0.08em);
+    transform: translateX(0.5em);
   }
 
   .figureHeader {
@@ -1360,56 +1517,93 @@
   }
 
   .rhythm > .rhythmAudioControl {
-    position: sticky;
-    z-index: 4;
+    position: fixed;
+    z-index: 30;
     top: 20px;
-    height: 0;
-    display: flex;
-    justify-content: flex-end;
-    padding-right: 20px;
+    right: 20px;
     pointer-events: none;
   }
 
-  .volumeButton {
+  .transportButton {
+    position: relative;
+    overflow: hidden;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    min-height: 32px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: color-mix(in oklch, white, var(--range) 5%);
-    color: color-mix(in oklch, var(--range), transparent 28%);
+    gap: 8px;
+    width: 82px;
+    min-height: 36px;
+    padding: 0 13px;
+    border: 1px solid color-mix(in oklch, var(--range), transparent 70%);
+    border-radius: 999px;
+    background: var(--range);
+    color: white;
+    font-family: var(--font-geist-mono), monospace;
+    font-size: 11px;
+    letter-spacing: 0.045em;
     cursor: pointer;
     pointer-events: auto;
-    box-shadow: 0 4px 18px color-mix(in oklch, var(--range), transparent 86%);
+    box-shadow: 0 4px 14px color-mix(in oklch, var(--ink), transparent 92%);
+    transition:
+      color 420ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      border-color 420ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      box-shadow 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
   }
 
-  .volumeButton:hover,
-  .volumeButton:focus-visible,
-  .volumeButton.audioEnabled {
-    background: color-mix(in oklch, white, var(--range) 12%);
-    color: var(--range);
+  .transportButton::before {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: color-mix(in oklch, white, transparent 4%);
+    content: "";
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .transportButton > span {
+    position: relative;
+    z-index: 1;
+  }
+
+  .transportButton:hover {
+    box-shadow: 0 6px 18px color-mix(in oklch, var(--ink), transparent 88%);
+  }
+
+  .transportButton:focus-visible,
+  .transportButton.transportRunning {
+    border-color: color-mix(in oklch, var(--range), transparent 62%);
     outline: none;
   }
 
-  .volumeButton:focus-visible {
-    box-shadow: 0 0 0 3px color-mix(in oklch, var(--range), transparent 76%);
+  .transportButton.transportRunning {
+    color: color-mix(in oklch, var(--ink), transparent 12%);
   }
 
-  .volumeIcon {
-    width: 17px;
-    height: 17px;
-    fill: currentColor;
+  .transportButton.transportRunning::before {
+    transform: scaleX(1);
   }
 
-  .volumeWave {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.35;
-    stroke-linecap: round;
+  .transportButton:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--ink), transparent 82%);
+  }
+
+  .transportGlyph {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 0 10px color-mix(in oklch, white, transparent 35%);
+    transition:
+      background 420ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      border-radius 420ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      box-shadow 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  .transportButton.transportRunning .transportGlyph {
+    border-radius: 1px;
+    background: var(--range);
+    box-shadow: 0 0 10px color-mix(in oklch, var(--range), transparent 35%);
   }
 
   .shapeStage {

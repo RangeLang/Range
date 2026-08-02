@@ -5,14 +5,12 @@
   import PostNoiseShader from "$lib/components/PostNoiseShader.svelte";
   import { allPosts, posts } from "$lib/posts";
 
-  const developmentPosts = allPosts.filter(
-    (post) =>
-      post.slug !== "intro-to-range" &&
-      post.slug !== "intro-to-range-2" &&
-      post.slug !== "intro-to-range-3" &&
-      post.slug !== "intro-to-range-4",
-  );
-  const visiblePosts = dev ? developmentPosts : posts;
+  const withoutIntroSeries = (post: (typeof allPosts)[number]) =>
+    !post.slug.startsWith("intro-to-range");
+  const developmentPosts = allPosts.filter(withoutIntroSeries);
+  const visiblePosts = dev
+    ? developmentPosts
+    : posts.filter(withoutIntroSeries);
 
   let hoveredPost = $state<number | null>(null);
   let focusedPost = $state<number | null>(null);

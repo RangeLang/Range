@@ -120,9 +120,10 @@ function clamp(value: Int, min: Int, max: Int): Int {
 
     <div class="macroPrelude">
       <p>
-        Those forms describe the program itself. <span class="accentTerm">Macros</span>
-        work one level earlier: they receive program structure as input and
-        return a transformed execution graph.
+        Those forms describe the source itself: its shape, alternatives, and
+        behavior. This is where the concrete vocabulary ends.
+        <span class="accentTerm">Macros</span> begin one layer above, receiving
+        source structure as input and returning a transformed execution graph.
       </p>
     </div>
     <MacroWordCloud />

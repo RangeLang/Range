@@ -2,39 +2,39 @@
   import { dev } from "$app/environment";
   import PostCard from "$lib/components/PostCard.svelte";
   import PostNoiseShader from "$lib/components/PostNoiseShader.svelte";
-  import { draftPosts } from "$lib/posts";
+  import { draftPosts, posts } from "$lib/posts";
 
-  const introPosts = [
-    draftPosts.find((post) => post.slug === "intro-to-range"),
-    draftPosts.find((post) => post.slug === "intro-to-range-2"),
-    draftPosts.find((post) => post.slug === "intro-to-range-3"),
-    draftPosts.find((post) => post.slug === "intro-to-range-4"),
-  ].filter((post) => post !== undefined);
+  const publishedIntro = posts.find((post) => post.slug === "intro-to-range");
+  const futureIntros = dev
+    ? ["intro-to-range-2", "intro-to-range-3", "intro-to-range-4"]
+      .map((slug) => draftPosts.find((post) => post.slug === slug))
+      .filter((post) => post !== undefined)
+    : [];
+  const introPosts = [publishedIntro, ...futureIntros].filter(
+    (post) => post !== undefined,
+  );
 </script>
 
-{#if dev}
-  <section class="featuredIntroSeries" aria-labelledby="intro-series-title">
-    <header>
-      <p>Introduction</p>
-      <h2 id="intro-series-title">Intro to Range</h2>
-    </header>
+<section class="featuredIntroSeries" aria-labelledby="intro-series-title">
+  <header>
+    <h2 id="intro-series-title">Introduction</h2>
+  </header>
 
-    {#each introPosts as introPost}
-      <section class="featuredIntroPost" aria-label={introPost.cardTitle}>
-        <PostNoiseShader
-          palette={introPost.palette}
-          maxFps={30}
-          densityLimit={1.25}
-          measure={false}
-        />
-        <PostCard
-          post={introPost}
-          href={introPost.previewHref ?? introPost.href}
-        />
-      </section>
-    {/each}
-  </section>
-{/if}
+  {#each introPosts as introPost}
+    <section class="featuredIntroPost" aria-label={introPost.cardTitle}>
+      <PostNoiseShader
+        palette={introPost.palette}
+        maxFps={30}
+        densityLimit={1.25}
+        measure={false}
+      />
+      <PostCard
+        post={introPost}
+        href={introPost.previewHref ?? introPost.href}
+      />
+    </section>
+  {/each}
+</section>
 
 <style>
   .featuredIntroSeries {
@@ -45,17 +45,8 @@
   .featuredIntroSeries > header {
     display: flex;
     align-items: baseline;
-    justify-content: space-between;
-    gap: 16px;
-  }
-
-  .featuredIntroSeries > header p {
-    margin: 0;
-    color: var(--range);
-    font-family: var(--font-geist-mono), monospace;
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    justify-content: flex-end;
+    text-align: right;
   }
 
   .featuredIntroSeries > header h2 {

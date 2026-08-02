@@ -5,6 +5,10 @@
     createRangeSoundManager,
     RANGE_SOUND_MANAGER_CONTEXT,
   } from "$lib/audio/sound-manager";
+  import {
+    createRangeLayoutTracker,
+    RANGE_LAYOUT_TRACKER_CONTEXT,
+  } from "$lib/layout/layout-tracker";
   import { postForPath, postImageUrl } from "$lib/posts";
   import Footer from "$lib/components/Footer.svelte";
   import "../../app/globals.css";
@@ -21,9 +25,12 @@
   );
 
   const soundManager = createRangeSoundManager();
+  const layoutTracker = createRangeLayoutTracker();
   setContext(RANGE_SOUND_MANAGER_CONTEXT, soundManager);
+  setContext(RANGE_LAYOUT_TRACKER_CONTEXT, layoutTracker);
   if (typeof window !== "undefined") {
     window.__rangeSoundManager = soundManager;
+    window.__rangeLayoutTracker = layoutTracker;
   }
 
   let { children } = $props();
@@ -32,7 +39,11 @@
     if (window.__rangeSoundManager === soundManager) {
       delete window.__rangeSoundManager;
     }
+    if (window.__rangeLayoutTracker === layoutTracker) {
+      delete window.__rangeLayoutTracker;
+    }
     soundManager.dispose();
+    layoutTracker.dispose();
   });
 </script>
 

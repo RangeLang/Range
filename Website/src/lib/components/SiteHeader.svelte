@@ -24,7 +24,12 @@
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: baseline;
     gap: 24px;
+    margin-block-end: clamp(28px, 3vw, 40px);
     padding-inline-end: var(--page-gutter, 24px);
+  }
+
+  .siteHeader.landingNav.indexed {
+    margin-block-end: 0;
   }
 
   .siteHeader .landingWordmark {
@@ -60,7 +65,12 @@
   @media (max-width: 420px) {
     .siteHeader.landingNav {
       gap: var(--page-gutter, 14px);
+      margin-block-end: 24px;
       padding-inline-end: 0;
+    }
+
+    .siteHeader.landingNav.indexed {
+      margin-block-end: 0;
     }
 
     .siteHeader range-spline-nav {

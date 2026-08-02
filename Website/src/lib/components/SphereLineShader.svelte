@@ -1,5 +1,13 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { getContext, onMount } from "svelte";
+  import {
+    RANGE_LAYOUT_TRACKER_CONTEXT,
+    type RangeLayoutTracker,
+  } from "$lib/layout/layout-tracker";
+
+  const layoutTracker = getContext<RangeLayoutTracker | undefined>(
+    RANGE_LAYOUT_TRACKER_CONTEXT,
+  );
 
   let {
     palette = 0,
@@ -352,15 +360,16 @@
     let scrollBlend = 0;
     let rotationTime = 0;
 
-    const onScroll = () => {
+    const onScroll = (scrollY = window.scrollY) => {
       const now = performance.now();
       const elapsed = Math.max(now - lastScrollSampleTime, 16);
-      const distance = Math.abs(window.scrollY - lastScrollY);
+      const distance = Math.abs(scrollY - lastScrollY);
+      if (distance < 0.01) return;
       const velocity = distance / elapsed;
       scrollImpulse = Math.min(velocity / 1.1, 1);
       lastScrollSampleTime = now;
       lastScrollInputTime = now;
-      lastScrollY = window.scrollY;
+      lastScrollY = scrollY;
     };
 
     const onWheel = (event: WheelEvent) => {
@@ -426,7 +435,10 @@
     const observer = new ResizeObserver(restart);
     observer.observe(canvas);
     reducedMotion.addEventListener("change", restart);
-    window.addEventListener("scroll", onScroll, { passive: true });
+    const stopTrackingLayout = layoutTracker?.observe(
+      canvas,
+      (snapshot) => onScroll(snapshot.scrollY),
+    );
     window.addEventListener("wheel", onWheel, { passive: true });
     frame = window.requestAnimationFrame(render);
 
@@ -434,7 +446,7 @@
       if (frame) window.cancelAnimationFrame(frame);
       observer.disconnect();
       reducedMotion.removeEventListener("change", restart);
-      window.removeEventListener("scroll", onScroll);
+      stopTrackingLayout?.();
       window.removeEventListener("wheel", onWheel);
       context.deleteBuffer(positionBuffer);
       context.deleteProgram(program);

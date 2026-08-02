@@ -20,6 +20,23 @@ export type Post = {
 
 export const posts: Post[] = [
   {
+    slug: "intro-to-range",
+    href: "/posts/intro-to-range",
+    category: "Introduction",
+    cardTitle: "Intro to Range: The Material",
+    cardDescription:
+      "Identity and value, four binding intents, three abstraction forms.",
+    description:
+      "The smallest pieces of Range: identity and value, binding intents, and the three abstraction forms.",
+    palette: 5,
+    cardPalette: {
+      foreground: "rgb(94 0 34)",
+      mutedForeground: "rgb(101 46 60)",
+      background: "rgb(255 166 184)",
+      contrast: 6.9,
+    },
+  },
+  {
     slug: "command-group-registration",
     href: "/features/macros/command-group-registration",
     category: "Macro breakdown",
@@ -123,24 +140,6 @@ export const draftPosts: Post[] = [
       mutedForeground: "rgb(53 59 68)",
       background: "rgb(246 249 252)",
       contrast: 17.2,
-    },
-  },
-  {
-    slug: "intro-to-range",
-    href: "/posts/intro-to-range",
-    previewHref: "/posts/intro-to-range?preview=range-draft",
-    category: "Introduction",
-    cardTitle: "Intro to Range: The Material",
-    cardDescription:
-      "Identity and value, four binding intents, three abstraction forms.",
-    description:
-      "The smallest pieces of Range: identity and value, binding intents, and the three abstraction forms.",
-    palette: 5,
-    cardPalette: {
-      foreground: "rgb(94 0 34)",
-      mutedForeground: "rgb(101 46 60)",
-      background: "rgb(255 166 184)",
-      contrast: 6.9,
     },
   },
   {

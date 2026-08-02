@@ -1,16 +1,24 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { getContext, onMount } from "svelte";
+  import {
+    RANGE_LAYOUT_TRACKER_CONTEXT,
+    type RangeLayoutTracker,
+  } from "$lib/layout/layout-tracker";
   import { highlightRange } from "$lib/benchmarks";
   import {
     codabilityChapterIndex,
     codabilityFocusProgress,
-    codabilityPlateauScrollProgress,
+    codabilityStickyScrollProgress,
     nextCodabilityFocusState,
     shouldSynchronizeCodabilityChapter,
     type CodabilityFocusState,
   } from "$lib/codability-focus";
   import codableSource from "../../../../RangeCompiler/Sources/Core/Macro/Codable.range?raw";
   import commandGroupSource from "../../../../RangeCompiler/Sources/Core/Macro/CommandGroup.range?raw";
+
+  const layoutTracker = getContext<RangeLayoutTracker | undefined>(
+    RANGE_LAYOUT_TRACKER_CONTEXT,
+  );
 
   let {
     variant = "codability",
@@ -21,6 +29,18 @@
   } = $props();
 
   type ChapterStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  type ChapterScrollState =
+    | { phase: "idle"; chapterIndex: number }
+    | {
+        phase: "manual";
+        chapterIndex: number;
+        selectionScrollY: number;
+        selectedAt: number;
+      };
+  type ChapterScrollEvent =
+    | { type: "select"; chapterIndex: number; scrollY: number; now: number }
+    | { type: "release-manual" }
+    | { type: "reset"; chapterIndex: number };
   type InspectionID =
     | "macro-declaration"
     | "declaration-query"
@@ -61,6 +81,29 @@
     leadingHTML?: string;
     scopeIDs: InspectionID[];
   };
+
+  function transitionChapterScroll(
+    state: ChapterScrollState,
+    event: ChapterScrollEvent,
+  ): ChapterScrollState {
+    if (event.type === "select") {
+      return {
+        phase: "manual",
+        chapterIndex: event.chapterIndex,
+        selectionScrollY: event.scrollY,
+        selectedAt: event.now,
+      };
+    }
+    if (event.type === "reset") {
+      return { phase: "idle", chapterIndex: event.chapterIndex };
+    }
+    if (event.type === "release-manual") {
+      return state.phase === "manual"
+        ? { phase: "idle", chapterIndex: state.chapterIndex }
+        : state;
+    }
+    return state;
+  }
 
   function sourceFrom(source: string, marker: string) {
     const markerIndex = source.indexOf(marker);
@@ -116,7 +159,17 @@
   }
 
   function highlightCode(value: string) {
-    return highlightRange(responsiveIndent(value));
+    const highlighted = highlightRange(responsiveIndent(value));
+    return highlighted.replace(
+      /(<[^>]+>)|([^<]+)/g,
+      (_match, tag: string | undefined, text: string | undefined) => {
+        if (tag) return tag;
+        return (text ?? "")
+          .match(/&(?:#\d+|#x[\da-f]+|[a-z]+);|[\s\S]/gi)
+          ?.map((glyph) => `<span class="waveGlyph">${glyph}</span>`)
+          .join("") ?? "";
+      },
+    );
   }
 
   const isCommandGroup = variant === "commandGroup";
@@ -442,20 +495,23 @@
   let interactionFocused = false;
   let focusState: CodabilityFocusState = "entering";
   let scrollChapterIndex = -1;
-  let manualChapterIndex: number | null = null;
-  let manualSelectionScrollY = 0;
-  let manualSelectionTimestamp = 0;
   let latestStageScrollProgress = 0;
+  let chapterScrollState: ChapterScrollState = {
+    phase: "idle",
+    chapterIndex: 0,
+  };
+  let wavedTokens: HTMLElement[] = [];
+  let visualScrollProgress = 0;
+  let targetVisualScrollProgress = 0;
+  let visualScrollFrame = 0;
+  let visualScrollLastTime = 0;
+  let visualScrollInitialized = false;
   let storyMode = $state(true);
   let stageFocused = $state(false);
   let activePane = $derived(panes[0]);
   let activeInspection = $derived(
     activeInspectionID ? inspectionByID.get(activeInspectionID) : undefined,
   );
-  let activeChapterIndex = $derived(
-    chapters.findIndex((chapter) => chapter.id === activeInspectionID),
-  );
-  let hasChapterSelection = $derived(storyMode && activeChapterIndex >= 0);
   let highlightedLines = $derived(highlightInspectableLines(activePane.source));
   let lineNumbers = $derived(activePane.source.split("\n").map((_, index) => index + 1));
 
@@ -463,11 +519,17 @@
     storyMode = true;
     activeInspectionID = chapter.id;
     scrollChapterIndex = chapters.indexOf(chapter);
-    manualChapterIndex = scrollChapterIndex;
-    manualSelectionScrollY =
-      typeof window === "undefined" ? 0 : window.scrollY;
-    manualSelectionTimestamp =
-      typeof performance === "undefined" ? 0 : performance.now();
+    chapterScrollState = transitionChapterScroll(chapterScrollState, {
+      type: "select",
+      chapterIndex: scrollChapterIndex,
+      scrollY: typeof window === "undefined" ? 0 : window.scrollY,
+      now: typeof performance === "undefined" ? 0 : performance.now(),
+    });
+    stopVisualScrollProgress();
+    visualScrollProgress = (scrollChapterIndex + 0.5) / chapters.length;
+    targetVisualScrollProgress = visualScrollProgress;
+    visualScrollInitialized = true;
+    applyVisualScrollProgress(visualScrollProgress);
     centerChapterInViewport(chapter.id);
   }
 
@@ -484,14 +546,7 @@
     );
   }
 
-  function moveChapter(direction: -1 | 1) {
-    const currentIndex = activeChapterIndex < 0 ? (direction > 0 ? -1 : 0) : activeChapterIndex;
-    const nextIndex = (currentIndex + direction + chapters.length) % chapters.length;
-    selectChapter(chapters[nextIndex]);
-  }
-
   function setStoryMode(enabled: boolean) {
-    manualChapterIndex = null;
     storyMode = enabled;
     if (enabled) {
       scrollChapterIndex = codabilityChapterIndex(
@@ -504,17 +559,21 @@
       scrollChapterIndex = -1;
       activeInspectionID = null;
     }
+    chapterScrollState = transitionChapterScroll(chapterScrollState, {
+      type: "reset",
+      chapterIndex: Math.max(0, scrollChapterIndex),
+    });
     updateStageFocus();
   }
 
-  function centerChapterInViewport(inspectionID: InspectionID) {
-    if (!codeViewportElement) return;
+  function chapterScrollPosition(inspectionID: InspectionID) {
+    if (!codeViewportElement) return undefined;
     const lines = Array.from(
       codeViewportElement.querySelectorAll<HTMLElement>(
         `[data-inspection-id="${inspectionID}"]`,
       ),
     );
-    if (lines.length === 0) return;
+    if (lines.length === 0) return undefined;
     const viewportBounds = codeViewportElement.getBoundingClientRect();
     const firstBounds = lines[0].getBoundingClientRect();
     const lastBounds = lines.at(-1)?.getBoundingClientRect() ?? firstBounds;
@@ -524,13 +583,130 @@
       0,
       codeViewportElement.scrollHeight - codeViewportElement.clientHeight,
     );
-    codeViewportElement.scrollTop = Math.max(
+    return Math.max(
       0,
       Math.min(
         maximumScroll,
         codeViewportElement.scrollTop + highlightedCenter - viewportCenter,
       ),
     );
+  }
+
+  function centerChapterInViewport(inspectionID: InspectionID) {
+    const scrollPosition = chapterScrollPosition(inspectionID);
+    if (scrollPosition !== undefined) {
+      codeViewportElement.scrollTop = scrollPosition;
+    }
+  }
+
+  function scrollCodeBetweenChapters(progress: number) {
+    if (!codeViewportElement || chapters.length === 0) return;
+    const chapterPosition = Math.max(
+      0,
+      Math.min(chapters.length - 1, progress * chapters.length - 0.5),
+    );
+    const fromIndex = Math.floor(chapterPosition);
+    const toIndex = Math.min(chapters.length - 1, fromIndex + 1);
+    const linearAmount = chapterPosition - fromIndex;
+    const amount = linearAmount * linearAmount * (3 - 2 * linearAmount);
+    const from = chapterScrollPosition(chapters[fromIndex].id);
+    const to = chapterScrollPosition(chapters[toIndex].id);
+    if (from === undefined || to === undefined) return;
+    codeViewportElement.scrollTop = from + (to - from) * amount;
+  }
+
+  function resetCodeToken(glyph: HTMLElement) {
+    glyph.style.removeProperty("--token-wave-x");
+    glyph.style.removeProperty("--token-wave-y");
+    glyph.style.removeProperty("--token-wave-z");
+    glyph.style.removeProperty("--token-wave-scale");
+    glyph.style.removeProperty("--token-wave-rotate-y");
+    glyph.style.removeProperty("--token-wave-brightness");
+    glyph.style.removeProperty("--token-wave-saturation");
+    glyph.style.removeProperty("--token-wave-shadow-alpha");
+  }
+
+  function resetCodeTokenWave() {
+    wavedTokens.forEach(resetCodeToken);
+    wavedTokens = [];
+  }
+
+  function updateCodeTokenWave(progress: number) {
+    if (!codeViewportElement || chapters.length === 0) return;
+    const chapterPosition = Math.min(
+      chapters.length - Number.EPSILON,
+      Math.max(0, progress) * chapters.length,
+    );
+    const chapterIndex = Math.floor(chapterPosition);
+    const chapterProgress = chapterPosition - chapterIndex;
+    const chapter = chapters[chapterIndex];
+    if (!chapter) return;
+    const glyphs = Array.from(
+      codeViewportElement.querySelectorAll<HTMLElement>(
+        `[data-inspection-id="${chapter.id}"] .lineCodeContent .waveGlyph`,
+      ),
+    );
+    const nextTokens = new Set(glyphs);
+    wavedTokens.filter((glyph) => !nextTokens.has(glyph)).forEach(resetCodeToken);
+    const radius = Math.max(0.115, 1.8 / Math.max(1, glyphs.length));
+    glyphs.forEach((glyph, index) => {
+      const glyphPosition = glyphs.length <= 1 ? 0.5 : index / (glyphs.length - 1);
+      const distance = Math.abs(chapterProgress - glyphPosition);
+      const wave = distance >= radius
+        ? 0
+        : 0.5 + 0.5 * Math.cos(Math.PI * distance / radius);
+      glyph.style.setProperty("--token-wave-x", `${(wave * 1.2).toFixed(3)}px`);
+      glyph.style.setProperty("--token-wave-y", `${(-wave * 1.2).toFixed(3)}px`);
+      glyph.style.setProperty("--token-wave-z", `${(wave * 6).toFixed(3)}px`);
+      glyph.style.setProperty("--token-wave-scale", (1 + wave * 0.055).toFixed(4));
+      glyph.style.setProperty("--token-wave-rotate-y", `${(wave * 5).toFixed(3)}deg`);
+      glyph.style.setProperty("--token-wave-brightness", (1 + wave * 0.2).toFixed(4));
+      glyph.style.setProperty("--token-wave-saturation", (1 + wave * 0.04).toFixed(4));
+      glyph.style.setProperty("--token-wave-shadow-alpha", (wave * 0.09).toFixed(4));
+    });
+    wavedTokens = glyphs;
+  }
+
+  function applyVisualScrollProgress(progress: number) {
+    scrollCodeBetweenChapters(progress);
+    updateCodeTokenWave(progress);
+  }
+
+  function setVisualScrollProgress(progress: number) {
+    targetVisualScrollProgress = Math.max(0, Math.min(1, progress));
+    if (!visualScrollInitialized) {
+      visualScrollInitialized = true;
+      visualScrollProgress = targetVisualScrollProgress;
+      applyVisualScrollProgress(visualScrollProgress);
+      return;
+    }
+    if (visualScrollFrame || typeof window === "undefined") return;
+    visualScrollLastTime = performance.now();
+    const render = (now: number) => {
+      const elapsed = Math.min(34, Math.max(1, now - visualScrollLastTime));
+      visualScrollLastTime = now;
+      const amount = 1 - Math.exp(-elapsed / 72);
+      visualScrollProgress += (
+        targetVisualScrollProgress - visualScrollProgress
+      ) * amount;
+      if (Math.abs(targetVisualScrollProgress - visualScrollProgress) < 0.00008) {
+        visualScrollProgress = targetVisualScrollProgress;
+      }
+      applyVisualScrollProgress(visualScrollProgress);
+      if (visualScrollProgress === targetVisualScrollProgress) {
+        visualScrollFrame = 0;
+        return;
+      }
+      visualScrollFrame = window.requestAnimationFrame(render);
+    };
+    visualScrollFrame = window.requestAnimationFrame(render);
+  }
+
+  function stopVisualScrollProgress() {
+    if (visualScrollFrame && typeof window !== "undefined") {
+      window.cancelAnimationFrame(visualScrollFrame);
+    }
+    visualScrollFrame = 0;
   }
 
   function setInteractionFocus(focused: boolean) {
@@ -569,38 +745,65 @@
     previewElement.dataset.focusState = focusState;
     previewElement.toggleAttribute("data-stage-focused", stageFocused);
 
-    const stageScrollProgress = codabilityPlateauScrollProgress({
+    const stageScrollProgress = codabilityStickyScrollProgress({
       stageTop: stageBounds.top,
       stageHeight: stageBounds.height,
       viewportHeight,
     });
     latestStageScrollProgress = stageScrollProgress;
-    const nextScrollChapterIndex = codabilityChapterIndex(
+    const rawScrollChapterIndex = codabilityChapterIndex(
       stageScrollProgress,
       chapters.length,
     );
+    const nextScrollChapterIndex = rawScrollChapterIndex;
+    const desiredVisualScrollProgress = stageScrollProgress;
+    const manualState = chapterScrollState.phase === "manual"
+      ? chapterScrollState
+      : null;
     const canSynchronizeStoryChapter =
       synchronizeStoryChapter &&
-      shouldSynchronizeCodabilityChapter({
-        manualChapterIndex,
-        selectionScrollY: manualSelectionScrollY,
-        currentScrollY: window.scrollY,
-        elapsedMilliseconds:
-          (typeof performance === "undefined" ? 0 : performance.now()) -
-          manualSelectionTimestamp,
+      (
+        manualState === null ||
+        shouldSynchronizeCodabilityChapter({
+          manualChapterIndex: manualState.chapterIndex,
+          selectionScrollY: manualState.selectionScrollY,
+          currentScrollY: window.scrollY,
+          elapsedMilliseconds:
+            (typeof performance === "undefined" ? 0 : performance.now()) -
+            manualState.selectedAt,
+        })
+      );
+    if (manualState && canSynchronizeStoryChapter) {
+      chapterScrollState = transitionChapterScroll(chapterScrollState, {
+        type: "release-manual",
       });
+    }
     if (
       storyMode &&
       canSynchronizeStoryChapter &&
       nextScrollChapterIndex !== scrollChapterIndex
     ) {
-      manualChapterIndex = null;
       scrollChapterIndex = nextScrollChapterIndex;
       activeInspectionID = chapters[nextScrollChapterIndex]?.id ?? null;
     }
+    if (
+      chapterScrollState.phase === "idle" &&
+      chapterScrollState.chapterIndex !== nextScrollChapterIndex
+    ) {
+      chapterScrollState = transitionChapterScroll(chapterScrollState, {
+        type: "reset",
+        chapterIndex: nextScrollChapterIndex,
+      });
+    }
     if (storyMode && activeInspectionID) {
-      centerChapterInViewport(activeInspectionID);
+      if (manualState !== null && !canSynchronizeStoryChapter) {
+        centerChapterInViewport(activeInspectionID);
+      } else {
+        setVisualScrollProgress(desiredVisualScrollProgress);
+      }
     } else {
+      stopVisualScrollProgress();
+      resetCodeTokenWave();
       const codeScrollDistance = Math.max(
         0,
         codeViewportElement.scrollHeight - codeViewportElement.clientHeight,
@@ -622,20 +825,45 @@
         updateStageFocus(shouldSynchronize);
       });
     };
-    const scheduleScrollUpdate = () => scheduleUpdate(true);
+    const scheduleScrollUpdate = () => {
+      const currentScrollY = window.scrollY;
+      if (chapterScrollState.phase === "manual") {
+        const releaseManualSelection = shouldSynchronizeCodabilityChapter({
+          manualChapterIndex: chapterScrollState.chapterIndex,
+          selectionScrollY: chapterScrollState.selectionScrollY,
+          currentScrollY,
+          elapsedMilliseconds: performance.now() - chapterScrollState.selectedAt,
+        });
+        if (releaseManualSelection) {
+          chapterScrollState = transitionChapterScroll(chapterScrollState, {
+            type: "release-manual",
+          });
+        }
+      }
+      scheduleUpdate(true);
+    };
     const scheduleGeometryUpdate = () => scheduleUpdate(false);
 
     updateStageFocus(true);
-    window.addEventListener("scroll", scheduleScrollUpdate, { passive: true });
-    window.addEventListener("resize", scheduleGeometryUpdate);
-    const viewportObserver = new ResizeObserver(scheduleGeometryUpdate);
-    viewportObserver.observe(codeViewportElement);
+    const stopTrackingStage = layoutTracker?.observe(
+      stageElement,
+      scheduleScrollUpdate,
+    );
+    const stopTrackingViewport = layoutTracker?.observe(
+      codeViewportElement,
+      scheduleGeometryUpdate,
+    );
 
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
-      viewportObserver.disconnect();
-      window.removeEventListener("scroll", scheduleScrollUpdate);
-      window.removeEventListener("resize", scheduleGeometryUpdate);
+      stopVisualScrollProgress();
+      resetCodeTokenWave();
+      chapterScrollState = transitionChapterScroll(chapterScrollState, {
+        type: "reset",
+        chapterIndex: Math.max(0, scrollChapterIndex),
+      });
+      stopTrackingStage?.();
+      stopTrackingViewport?.();
     };
   });
 </script>
@@ -690,40 +918,6 @@
       </div>
     </header>
 
-    {#if storyMode}
-      <nav class="chapterNav" aria-label={`${breakdown.title} chapters`}>
-        <button
-          type="button"
-          aria-label="Previous chapter"
-          onclick={() => moveChapter(-1)}
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="m4.5 10 3.5-3.5 3.5 3.5"></path>
-          </svg>
-        </button>
-        {#each chapters as chapter}
-          <button
-            type="button"
-            aria-label={`Chapter ${chapter.step}: ${chapter.title}`}
-            aria-current={activeInspectionID === chapter.id ? "step" : undefined}
-            aria-pressed={activeInspectionID === chapter.id}
-            onclick={() => selectChapter(chapter)}
-          >
-            {chapter.step}
-          </button>
-        {/each}
-        <button
-          type="button"
-          aria-label="Next chapter"
-          onclick={() => moveChapter(1)}
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="m4.5 6 3.5 3.5L11.5 6"></path>
-          </svg>
-        </button>
-      </nav>
-    {/if}
-
     <div
       class="codeWorkspace"
       class:inspectionVisible={activeInspection !== undefined}
@@ -742,7 +936,7 @@
               <li>{line}</li>
             {/each}
           </ol>
-          <pre class="rangeSource language-range"><code class:chapterFiltered={hasChapterSelection}>{#each highlightedLines as line}{#if line.inspectionID}<span
+          <pre class="rangeSource language-range"><code>{#each highlightedLines as line}{#if line.inspectionID}<span
                 class="codeLine"
                 class:chapterActive={activeInspectionID === line.inspectionID}
               data-inspection-id={line.inspectionID}
@@ -1124,6 +1318,7 @@
   :global(.codePreviewCard .inspectSection) {
     position: relative;
     cursor: pointer;
+    isolation: isolate;
     text-decoration: none;
   }
 
@@ -1143,28 +1338,41 @@
   }
 
   :global(.codePreviewCard .lineCodeContent) {
+    position: relative;
+    z-index: 1;
+    perspective: 500px;
     opacity: 1;
     filter: blur(0);
   }
 
-  :global(.codePreviewCard .chapterFiltered .lineCodeContent) {
-    opacity: 0.24;
-  }
-
-  :global(.codePreviewCard .chapterFiltered .chapterContext) {
-    opacity: 0.48;
-    filter: blur(0);
-  }
-
-  :global(.codePreviewCard .chapterFiltered .chapterActive .lineCodeContent) {
-    opacity: 1;
+  :global(.codePreviewCard .lineCodeContent .waveGlyph) {
+    display: inline-block;
+    transform:
+      translate3d(
+        var(--token-wave-x, 0px),
+        var(--token-wave-y, 0px),
+        var(--token-wave-z, 0px)
+      )
+      scale(var(--token-wave-scale, 1))
+      rotateY(var(--token-wave-rotate-y, 0deg));
+    transform-style: preserve-3d;
+    filter:
+      brightness(var(--token-wave-brightness, 1))
+      saturate(var(--token-wave-saturation, 1));
+    text-shadow:
+      1px 0 0.7px
+      oklch(0.75 0.09 305 / var(--token-wave-shadow-alpha, 0));
+    transition:
+      transform 64ms linear,
+      filter 64ms linear,
+      text-shadow 64ms linear;
   }
 
   :global(.codePreviewCard .chapterBadge) {
     position: absolute;
     top: 50%;
     left: -2.25em;
-    transform: translateY(-50%);
+    transform: translateY(-50%) scale(0.82);
     display: inline-grid;
     width: 1.45em;
     height: 1.45em;
@@ -1176,7 +1384,17 @@
     font-size: 0.68em;
     font-weight: 700;
     line-height: 1;
+    opacity: 0.2;
+    transition:
+      opacity 520ms ease,
+      transform 520ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      box-shadow 520ms ease;
+  }
+
+  :global(.codePreviewCard .chapterActive .chapterBadge) {
     opacity: 1;
+    transform: translateY(-50%) scale(1);
+    box-shadow: 0 0 0.8em color-mix(in oklch, var(--range), transparent 62%);
   }
 
   .codeInspector {
@@ -1189,62 +1407,6 @@
       oklch(0.994 0.004 300),
       oklch(0.998 0.002 255)
     );
-  }
-
-  .chapterNav {
-    position: absolute;
-    z-index: 2;
-    top: 50svh;
-    right: clamp(10px, 1.25vw, 20px);
-    display: grid;
-    gap: 3px;
-    padding: 5px;
-    border-radius: 999px;
-    background: color-mix(in oklch, white, transparent 18%);
-    box-shadow: 0 8px 28px color-mix(in oklch, var(--ink), transparent 94%);
-    transform: translateY(-50%);
-    contain: layout paint;
-  }
-
-  .chapterNav button {
-    width: 28px;
-    height: 28px;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: transparent;
-    color: color-mix(in oklch, var(--muted), transparent 10%);
-    cursor: pointer;
-    font-family: var(--font-geist-mono), monospace;
-    font-size: 10px;
-    font-weight: 560;
-    line-height: 1;
-  }
-
-  .chapterNav button:hover {
-    color: var(--ink);
-  }
-
-  .chapterNav button[aria-current="step"] {
-    background: var(--range);
-    color: white;
-  }
-
-  .chapterNav button:focus-visible {
-    outline: 2px solid var(--range);
-    outline-offset: 1px;
-  }
-
-  .chapterNav svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 1.5;
   }
 
   .inspectorBody {
