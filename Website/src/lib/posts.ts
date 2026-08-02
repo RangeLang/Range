@@ -1,4 +1,5 @@
 export const siteOrigin = "https://rangelang.org";
+const socialImageVersion = "2026-08-02-1";
 
 export type Post = {
   slug: string;
@@ -195,5 +196,5 @@ export function postImagePath(post: Post) {
 }
 
 export function postImageUrl(post: Post) {
-  return `${siteOrigin}${postImagePath(post)}`;
+  return `${siteOrigin}${postImagePath(post)}?v=${socialImageVersion}`;
 }
