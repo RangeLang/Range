@@ -25,9 +25,9 @@ export const posts: Post[] = [
     category: "Introduction",
     cardTitle: "Intro to Range: The Material",
     cardDescription:
-      "Identity and value, four binding intents, three abstraction forms.",
+      "Identity : Value, four binding intents, three abstraction forms.",
     description:
-      "The smallest pieces of Range: identity and value, binding intents, and the three abstraction forms.",
+      "Range begins with Identity : Value, then binding intents and the three abstraction forms.",
     palette: 5,
     cardPalette: {
       foreground: "rgb(94 0 34)",

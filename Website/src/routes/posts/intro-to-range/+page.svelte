@@ -54,17 +54,17 @@ function clamp(value: Int, min: Int, max: Int): Int {
     <ThreeFourRhythm>
       {#snippet identityIntro()}
         <p>
-          In Range, <span class="accentTerm">identity</span> and
-          <span class="accentTerm">value</span> form the smallest unit of
-          meaning in the program graph. Nothing smaller is tracked.
+          Range begins with one base concept:
+          <span class="accentTerm">Identity : Value</span>. It is the smallest
+          unit of meaning in the graph. Nothing smaller is tracked.
         </p>
       {/snippet}
 
       {#snippet identityDetail()}
         <p>
-          Lowering pulls them apart—identity to one representation, value to
-          another—and that separation is where full control over the
-          architecture comes from. But the meaning never splits.
+          Lowering can represent the two sides of Identity : Value separately,
+          and that separation is where full control over the architecture comes
+          from. But the meaning never splits.
         </p>
         <blockquote class="identityQuote">
           Without identity there is only

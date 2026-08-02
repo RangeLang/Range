@@ -1282,10 +1282,10 @@
   <figure class="lineFigure" bind:this={identityFigure}>
     <div
       class="identityRelation"
-      aria-label="Identity is connected to value"
+      aria-label="Identity to Value"
     >
       <div class="identityExpression">
-        <span>identity</span><span aria-hidden="true">:</span><span>value</span>
+        <span>Identity</span><span aria-hidden="true">:</span><span>Value</span>
       </div>
     </div>
     <div
