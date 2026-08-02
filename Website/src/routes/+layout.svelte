@@ -11,6 +11,7 @@
   } from "$lib/layout/layout-tracker";
   import { postForPath, postImageUrl } from "$lib/posts";
   import Footer from "$lib/components/Footer.svelte";
+  import SoundOnboarding from "$lib/components/SoundOnboarding.svelte";
   import "../../app/globals.css";
 
   const siteTitle = "Range — An Applied Programming Language";
@@ -94,6 +95,7 @@
 </svelte:head>
 
 <range-site-shell>
+  <SoundOnboarding />
   {@render children()}
   <Footer />
 </range-site-shell>
