@@ -28,6 +28,7 @@ ENV HOST=0.0.0.0 \
     PORT=3000
 
 COPY --chown=bun:bun --from=build /app/build ./build
+COPY --chown=bun:bun --from=dependencies /app/node_modules ./node_modules
 
 USER bun
 
