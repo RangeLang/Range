@@ -783,11 +783,7 @@
       shaderSpeed,
       distortionVerticalCenter,
     );
-    updateSoundProximity(
-      layoutTracker?.query(() => canvas)?.rect
-        ?? canvas.getBoundingClientRect(),
-      titleLayout?.rect,
-    );
+    updateSoundProximity(titleLayout?.rect);
     titleSound?.volume(soundProximity, soundMotionVolumeDuration / 1000);
     titleSound?.sustain(1);
   };
@@ -903,18 +899,26 @@
     }, pointerStopDelay);
   };
 
-  const updateSoundProximity = (
-    canvasBounds: RangeLayoutRect | DOMRect,
-    trackedTitleBounds?: RangeLayoutRect,
-  ) => {
+  const updateSoundProximity = (trackedTitleBounds?: RangeLayoutRect) => {
     const titleBounds = trackedTitleBounds
       ?? layoutTracker?.query(() => titleElement)?.rect
       ?? titleElement.getBoundingClientRect();
+    const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    if (
+      titleBounds.right <= 0
+      || titleBounds.bottom <= 0
+      || titleBounds.left >= viewportWidth
+      || titleBounds.top >= viewportHeight
+    ) {
+      soundProximity = 0;
+      return;
+    }
     const followPixelX = titleBounds.left + distortionCenter * titleBounds.width;
     const followPixelY =
       titleBounds.top + distortionVerticalCenter * titleBounds.height;
-    const falloffRadiusX = canvasBounds.width * 0.5 + soundFalloffPadding;
-    const falloffRadiusY = canvasBounds.height * 0.5 + soundFalloffPadding;
+    const falloffRadiusX = titleBounds.width * 0.5 + soundFalloffPadding;
+    const falloffRadiusY = titleBounds.height * 0.5 + soundFalloffPadding;
     const normalizedDistance = Math.hypot(
       (lastPointerClientX - followPixelX) / Math.max(1, falloffRadiusX),
       (lastPointerClientY - followPixelY) / Math.max(1, falloffRadiusY),
@@ -929,12 +933,9 @@
   };
 
   const trackPointer = (event: PointerEvent) => {
-    const canvasBounds =
-      layoutTracker?.query(() => canvas)?.rect
-      ?? canvas.getBoundingClientRect();
     lastPointerClientX = event.clientX;
     lastPointerClientY = event.clientY;
-    updateSoundProximity(canvasBounds);
+    updateSoundProximity();
     const bounds = layoutTracker?.query(() => titleElement)?.rect
       ?? titleElement.getBoundingClientRect();
     if (idleTimeout !== null) {
@@ -1059,27 +1060,34 @@
     const stopTrackingTitleLayout = layoutTracker?.observe(
       () => titleElement,
       (snapshot) => {
-        if (pointerInside) updateTitleSound(snapshot);
+        updateTitleSound(snapshot);
       },
     );
     titleElement.addEventListener("pointerdown", primeTitleSound);
 
+    let resizeObserver: ResizeObserver | undefined;
     const renderWhenReady = async () => {
+      await Promise.all([
+        document.fonts.load('500 1em "Geist"'),
+        document.fonts.load('500 1em "Geist Mono"'),
+      ]);
       await document.fonts.ready;
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
       if (!active) return;
       rebuildGlyphTexture();
+      resizeObserver = new ResizeObserver(rebuildGlyphTexture);
+      resizeObserver.observe(titleElement);
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         startRadiating();
       }
     };
     void renderWhenReady();
 
-    const resizeObserver = new ResizeObserver(rebuildGlyphTexture);
-    resizeObserver.observe(titleElement);
-
     return () => {
       active = false;
-      resizeObserver.disconnect();
+      resizeObserver?.disconnect();
       if (pointerRenderFrame !== null) {
         cancelAnimationFrame(pointerRenderFrame);
       }

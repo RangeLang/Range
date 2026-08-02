@@ -148,7 +148,8 @@ export function createDeepAcidWow(
   };
 
   const setVolume = (level: number, duration: number) => {
-    const target = 0.0001 + clampUnit(level) * 0.9999;
+    const normalized = clampUnit(level);
+    const target = normalized === 0 ? 0 : 0.0001 + normalized * 0.9999;
     const time = audio.currentTime;
     volumeGain.gain.cancelAndHoldAtTime(time);
     volumeGain.gain.setTargetAtTime(target, time, duration);
@@ -178,7 +179,8 @@ export function createDeepAcidWow(
       setVolume(level, duration);
     },
     idleFade(level = 1, duration = 0.18) {
-      const target = 0.0001 + clampUnit(level) * 0.9999;
+      const normalized = clampUnit(level);
+      const target = normalized === 0 ? 0 : 0.0001 + normalized * 0.9999;
       const time = audio.currentTime;
       idleGain.gain.cancelAndHoldAtTime(time);
       idleGain.gain.setTargetAtTime(target, time, duration);
