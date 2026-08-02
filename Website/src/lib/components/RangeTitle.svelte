@@ -997,10 +997,11 @@
 
   const primeTitleSound = async (event: PointerEvent) => {
     const audio = await soundManager?.resume();
-    if (!audio) return;
+    if (!audio || !soundManager) return;
+    soundManager.setEnabled(true);
     if (!titleAudioContext) {
       titleAudioContext = audio;
-      titleSoundRoute = soundManager?.register("range-title") ?? null;
+      titleSoundRoute = soundManager.register("range-title") ?? null;
       if (!titleSoundRoute) return;
       titleSound = createDeepAcidWow(audio, titleSoundRoute.input, {
         transposeSemitones: transpose,
