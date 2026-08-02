@@ -1,0 +1,77 @@
+construct CompilerV1 {
+    let version: Int
+}
+
+construct CompilerV1Error {
+    let message: String
+}
+
+construct CompilerV1ShapeArtifact {
+    let snapshot: String
+}
+
+construct CompilerV1UsageArtifact {
+    let snapshot: String
+}
+
+construct CompilerV1Artifact {
+    let output: String
+}
+
+function compilerV1Load(input: String): CompilerV1SourceDelta {
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.load.begin"))
+    let source: String(readFile(path: input))
+    let delta: CompilerV1SourceDelta(compilerV1SourceDelta(path: input, source: source))
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.load.end"))
+    return delta
+}
+
+function compilerV1Shape(source: String): CompilerV1ShapeArtifact {
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.shape.begin"))
+    let snapshot: String(compilerTypedSyntaxSummary(source: source))
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.shape.end"))
+    return CompilerV1ShapeArtifact(snapshot: snapshot)
+}
+
+function compilerV1Usage(source: String): CompilerV1UsageArtifact {
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.usage.begin"))
+    let snapshot: String(compilerSemanticSummary(source: source))
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.usage.end"))
+    return CompilerV1UsageArtifact(snapshot: snapshot)
+}
+
+function compilerV1Plot(source: String): CompilerV1Artifact {
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.plot.begin"))
+    let output: String(compileRangeNativeProgramOutput(source: source))
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.plot.end"))
+    return CompilerV1Artifact(output: output)
+}
+
+function compilerV1Report(error: CompilerV1Error): Int {
+    print(value: error.message)
+    return 65
+}
+
+function rangeCompilerV1CLI(compiler: CompilerV1, input: String, inspect: Bool): Int {
+    let sourceDelta: CompilerV1SourceDelta(compilerV1Load(input: input))
+    if sourceDelta.value.source == String("") {
+        return compilerV1Report(error: CompilerV1Error(message: "range: unable to read non-empty input at \(sourceDelta.value.path)"))
+    }
+    let shape: CompilerV1ShapeArtifact(compilerV1Shape(source: sourceDelta.value.source))
+    if compilerNativeOutputIsError(output: shape.snapshot) {
+        return compilerV1Report(error: CompilerV1Error(message: shape.snapshot))
+    }
+    let usage: CompilerV1UsageArtifact(compilerV1Usage(source: sourceDelta.value.source))
+    if compilerNativeOutputIsError(output: usage.snapshot) {
+        return compilerV1Report(error: CompilerV1Error(message: usage.snapshot))
+    }
+    let artifact: CompilerV1Artifact(compilerV1Plot(source: sourceDelta.value.source))
+    if compilerNativeOutputIsError(output: artifact.output) {
+        return compilerV1Report(error: CompilerV1Error(message: artifact.output))
+    }
+    if inspect {
+        print(value: "compilerV1\tversion=\(compiler.version)\ncompilerV1Delta\tkind=source\tidentity=\(sourceDelta.identity.first):\(sourceDelta.identity.second)\tvalue=File\tpath=\(sourceDelta.value.path)\tbytes=\(stringLength(value: sourceDelta.value.source))\ncompilerV1Artifact\tphase=shape\n\(shape.snapshot)compilerV1Artifact\tphase=usage\n\(usage.snapshot)compilerV1Artifact\tphase=plot\n")
+    }
+    print(value: artifact.output)
+    return 0
+}

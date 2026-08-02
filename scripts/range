@@ -19,8 +19,9 @@ Usage:
   range compiler profile [COMPILER-DIR]
   range compiler COMMAND [ARGS...]
   range check-build-plan
-  range check-root-value [DIR]
+  range check-value-ownership [DIR]
   range check-compiler-smoke [DIR]
+  range check-compiler-v1
   range check-compiler-candidate [DIR]
   range check-document-store
   range check-gpu-canvas
@@ -103,9 +104,9 @@ case "$command" in
         if [[ $# -ne 0 ]]; then usage; exit 1; fi
         "$REPO_ROOT/scripts/check-range-build-plan"
         ;;
-    check-root-value)
+    check-value-ownership)
         if [[ $# -gt 2 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-range-root-value" "$@"
+        "$REPO_ROOT/scripts/check-range-value-ownership" "$@"
         ;;
     check-compiler-smoke)
         if [[ $# -gt 1 ]]; then usage; exit 1; fi
@@ -114,6 +115,10 @@ case "$command" in
         else
             "$REPO_ROOT/scripts/check-range-compiler-candidate" --checkpoint stage2-plan
         fi
+        ;;
+    check-compiler-v1)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/check-range-compiler-v1"
         ;;
     check-compiler-candidate)
         if [[ $# -gt 1 ]]; then usage; exit 1; fi

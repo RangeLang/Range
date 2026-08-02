@@ -15,7 +15,7 @@ Range has a real self-hosted compiler kernel, not merely a language sketch:
 - The Range-authored compiler contains approximately 34,500 lines across its
   Driver, Syntax, Body, Graph, and LLVM phases.
 - The current Stage 2 compiler smoke gate emits, validates, and links a native
-  compiler. The build-plan gate, focused String proof, and complete RootValue
+  compiler. The build-plan gate, focused String proof, and complete value-ownership
   positive/rejection controls pass.
 - The accepted-seed manifest is not currently reproducible:
   `check-seed-integrity` stops at a stale hash for

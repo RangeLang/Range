@@ -1,5 +1,25 @@
 macro error(): Construct { environment in
-    if environment.target.memberCount("message") != 1 {
+    let members: Array<Let>(
+        environment.target.Declaration.members.filter(all: Let)
+    )
+    state messageCount: Int(0)
+    state memberIndex: Int(0)
+    while memberIndex < members.count {
+        let member: Let(members[memberIndex])
+        let name: String(member.identifier.name)
+        if name.count == 7
+            && name.byte(index: 0) == 109
+            && name.byte(index: 1) == 101
+            && name.byte(index: 2) == 115
+            && name.byte(index: 3) == 115
+            && name.byte(index: 4) == 97
+            && name.byte(index: 5) == 103
+            && name.byte(index: 6) == 101 {
+            messageCount: messageCount + 1
+        }
+        memberIndex: memberIndex + 1
+    }
+    if messageCount != 1 {
         environment.diagnostics.error("@error requires exactly one message declaration.")
     }
 }

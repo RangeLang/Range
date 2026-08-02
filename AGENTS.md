@@ -31,7 +31,7 @@
 - Run the supported validation ladder from the narrowest relevant gate toward
   the broadest required gate:
   - `scripts/range check-build-plan`
-  - `scripts/range check-root-value` (add `--controls` for its full positive
+  - `scripts/range check-value-ownership` (add `--controls` for its full positive
     and rejection set)
   - `scripts/range check-compiler-smoke`
   - `scripts/range check-compiler-candidate`

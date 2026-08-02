@@ -1,0 +1,4 @@
+@main
+function main(): Int {
+    return stringLength(value: "unregistered")
+}

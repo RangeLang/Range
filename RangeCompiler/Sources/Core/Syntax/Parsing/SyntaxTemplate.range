@@ -22,11 +22,11 @@ construct SyntaxTemplate {
 
     function matchRequired(source: @syntax): Match {
         let sourceText: String(syntaxText(source: source))
-        let captureValueEnd: Int(sourceText.count - self.suffixCount)
+        let captureValueEnd: Int(sourceText.count - suffixCount)
         let capture: @syntax(
             syntaxSlice(
                 source: source,
-                start: self.prefixCount,
+                start: prefixCount,
                 end: captureValueEnd
             )
         )
@@ -34,7 +34,7 @@ construct SyntaxTemplate {
             template: self,
             source: source,
             capture: Capture(
-                member: self.captureMember,
+                member: captureMember,
                 values: [capture]
             )
         )
@@ -46,20 +46,20 @@ construct SyntaxTemplate {
         state captureEnd: Int(0 - 1)
         state recipeIndex: Int(0)
         state hasMultipleCaptures: Bool(false)
-        while recipeIndex < self.source.count {
-            if self.source.byte(index: recipeIndex) == 36
-                && recipeIndex + 1 < self.source.count
+        while recipeIndex < source.count {
+            if source.byte(index: recipeIndex) == 36
+                && recipeIndex + 1 < source.count
                 && syntaxTemplateIdentifierByte(
-                    byte: self.source.byte(index: recipeIndex + 1)
+                    byte: source.byte(index: recipeIndex + 1)
                 ) {
                 if captureStart >= 0 {
                     hasMultipleCaptures: true
                 } else {
                     captureStart: recipeIndex + 1
                     recipeIndex: captureStart + 1
-                    while recipeIndex < self.source.count
+                    while recipeIndex < source.count
                         && syntaxTemplateIdentifierByte(
-                            byte: self.source.byte(index: recipeIndex)
+                            byte: source.byte(index: recipeIndex)
                         ) {
                         recipeIndex: recipeIndex + 1
                     }
@@ -86,7 +86,7 @@ construct SyntaxTemplate {
             )
         }
         let prefixCount: Int(captureStart - 1)
-        let suffixCount: Int(self.source.count - captureEnd)
+        let suffixCount: Int(source.count - captureEnd)
         if sourceText.count < prefixCount + suffixCount {
             return Parsed(
                 value: nil,
@@ -103,7 +103,7 @@ construct SyntaxTemplate {
         state literalsMatch: Bool(true)
         state literalIndex: Int(0)
         while literalIndex < prefixCount && literalsMatch {
-            if self.source.byte(index: literalIndex)
+            if source.byte(index: literalIndex)
                 != sourceText.byte(index: literalIndex) {
                 literalsMatch: false
             }
@@ -111,7 +111,7 @@ construct SyntaxTemplate {
         }
         literalIndex: 0
         while literalIndex < suffixCount && literalsMatch {
-            if self.source.byte(index: captureEnd + literalIndex)
+            if source.byte(index: captureEnd + literalIndex)
                 != sourceText.byte(index: captureValueEnd + literalIndex) {
                 literalsMatch: false
             }
@@ -128,7 +128,7 @@ construct SyntaxTemplate {
                 template: self,
                 source: source,
                 capture: Capture(
-                    member: self.captureMember,
+                    member: captureMember,
                     values: [
                         syntaxSlice(
                             source: source,

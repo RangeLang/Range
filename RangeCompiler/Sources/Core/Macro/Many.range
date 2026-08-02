@@ -1,6 +1,5 @@
-macro many(): Member { environment in
-    #environment {
-      RelationshipRegistration(
+macro many(): Member -> RelationshipRegistration { environment in
+    return RelationshipRegistration(
         multiplicity: RelationshipMultiplicity(
             minimum: 0,
             maximum: .unbounded
@@ -10,5 +9,4 @@ macro many(): Member { environment in
         enclosure: .none,
         admission: .any
     )
-    }
 }

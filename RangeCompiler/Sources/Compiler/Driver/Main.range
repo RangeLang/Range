@@ -12,6 +12,12 @@
         if command == String("check") {
             return rangeCompilerCLICompile(input: input, printOutput: false)
         }
+        if command == String("compile-v1") {
+            return rangeCompilerV1CLI(compiler: CompilerV1(version: 1), input: input, inspect: false)
+        }
+        if command == String("inspect-v1") {
+            return rangeCompilerV1CLI(compiler: CompilerV1(version: 1), input: input, inspect: true)
+        }
     }
     if argumentCount == 3 {
         let command: String(commandLineArgument(index: 0))
@@ -55,7 +61,7 @@
 }
 
 function rangeCompilerCLIUsage(): String {
-    return "usage:\n  range compile <input.range>\n  range check <input.range>\n  range emit-llvm <input.range> <output.ll>\n  range load-plan-sources <plan.tsv> <repo-root> <candidate-root> <output.range>\n  range link <input.ll> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>\n  range build <input.range> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>"
+    return "usage:\n  range compile <input.range>\n  range check <input.range>\n  range compile-v1 <input.range>\n  range inspect-v1 <input.range>\n  range emit-llvm <input.range> <output.ll>\n  range load-plan-sources <plan.tsv> <repo-root> <candidate-root> <output.range>\n  range link <input.ll> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>\n  range build <input.range> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>"
 }
 
 function rangeCompilerCLILoadPlanSources(plan: String, repoRoot: String, candidateRoot: String, outputPath: String): Int {

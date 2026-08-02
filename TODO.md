@@ -3,6 +3,38 @@
 Priority and dependency order live in [MILESTONES.md](MILESTONES.md). This file
 owns the actionable checkboxes for the active and deliberately deferred work.
 
+- [ ] Finish declaration-gating the String read ABI.
+  - [x] Declare `stringLength` and `stringByteAt` explicitly as
+    `@builtin(.read)` Core functions and reject their undeclared-name fallback.
+  - [ ] Repair the owned-return summary collision exposed by registered String
+    reads. `scripts/range check-build-plan` reaches
+    `compilerBuildPlanLoadSourceBundle` and rejects with
+    `invalidFunctionReachability`, `detail=802`; weakening the declarations to
+    bare `@builtin` passes but incorrectly omits their shared-read effects.
+
+- [ ] Move `String` from encoded-byte identity to authored characters.
+  - [x] Represent one independently addressable `Character` as an ordered
+    buffer of Unicode scalar values.
+  - [x] Make the active Core model explicit: `String` stores ordered
+    `Character` values, authored count/index/append operate on that collection,
+    and encoded bytes exist only through `TextEncoding` and `ByteSpan`.
+  - [x] Keep construct members directly in lexical scope; the new String model
+    does not introduce or require a `self` receiver spelling.
+  - [x] Remove the remaining `self.` receiver spelling from authored Core;
+    implicit member binding is now the required compiler behavior.
+  - [ ] Add permanent aggregate-element creation, indexing, mutation, and
+    ownership lowering for `Buffer<Character>`.
+    - The current concrete Buffer ABI only creates `Buffer<Int>` and
+      `Buffer<Int<.unsigned, 8>>`; changing active String storage before this
+      would make the C string shim interpret aggregate character records as
+      UTF-8 bytes.
+  - [x] Remove `stringLength`, `stringByteAt`, `stringAppendStorage`, and
+    `stringDestroy` from the authored String model.
+  - [ ] Make UTF-8 an explicit `TextEncoding` boundary for files, processes,
+    hashing, and other byte-oriented platform APIs.
+  - [ ] Delete the superseded String byte builtins and C implementations after
+    the compiler compiles and reproduces itself through the character model.
+
 - [ ] Migrate compiler failures to typed `@error` values at phase boundaries.
   - [x] Add the validation-only construct-level `@error` macro, require exactly
     one member named `message`, and provide the general concrete
@@ -65,7 +97,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - Macro syntax identifiers now materialize their names as byte-backed
         `String` values instead of hash-only placeholders, so Range-authored
         matching can use ordinary `String` reads.
-      - The focused root-value proof covers both a two-capture recipe and the
+      - The focused value-ownership proof covers both a two-capture recipe and the
         exact unknown-capture rejection boundary.
     - [x] Populate a single-capture `SyntaxTemplate.Match.capture` from an input
       `@syntax`
@@ -155,7 +187,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     changing its nominal type to the selected nested representation.
   - `Testing/Macros/Fail/LowercaseInlineConstructProjection.range` and the
     updated canonical-target fixture are wired into
-    `check-range-root-value`, but neither proof has completed.
+    `check-range-value-ownership`, but neither proof has completed.
 - [x] Restore a bounded native producer run before continuing semantics work.
   - The first attempt failed quickly with
     `representationSensitiveABICapabilityBlocked` for
@@ -170,18 +202,18 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     local body lookup draft was interrupted at the user's request and remains
     unverified.
   - Run `scripts/range check-build-plan`, then
-    `scripts/range check-root-value`; do not infer later-gate success from the
+    `scripts/range check-value-ownership`; do not infer later-gate success from the
     build-plan result.
   - The uninterrupted recovery run completed the development Stage 2 producer
     in 583 seconds (`llvm-emission=580`, `llvm-validation=2`,
     `stage2-link=1`; 17 artifacts reused and 2,639 rebuilt).
-  - `check-root-value` then reached the inline-projection proofs: the uppercase
+  - `check-value-ownership` then reached the inline-projection proofs: the uppercase
     canonical-target fixture passed, and the lowercase fixture correctly
     exited 65 with empty stderr and
     `diagnosticKind=macroExecutionBodyInvalid`.
   - [x] Correct the harness's stale `diagnosticKind=bodyInvalid` expectation to
     the canonical `macroExecutionBodyInvalid` spelling, then rerun
-    `scripts/range check-root-value`.
+    `scripts/range check-value-ownership`.
   - [x] Keep expansion authority on `Macro.Environment` by removing
     `expand` from `Construct.Declaration` and `Enum.Declaration`, then delete
     the unused `SyntaxExpandable` wrapper.
@@ -202,7 +234,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     and reject the legacy callable spelling.
   - The focused rerun now passes canonical target members, typed collection
     closures, inline mapped syntax, stored defaults, the actual Core Codable
-    surface, composite rollback, and typed parameter defaults. Root-value next
+    surface, composite rollback, and typed parameter defaults. value-ownership next
     stops in the separate graph-capability draft with
     `macroMissingTarget`; do not fold that graph work into this cleanup.
 - [ ] Complete generated project configuration as a value/artifact.
@@ -227,7 +259,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     performs role validation; `addNode` is not yet a supported ordinary graph
     capability operation.
 - [x] Delete `RangeCompiler/Sources/Core/Macro/Storage.range` and remove the
-  root-value script's direct attempt to concatenate that deleted file.
+  value-ownership script's direct attempt to concatenate that deleted file.
   - Storage descriptor fixtures still declare their own focused legacy macro,
     and `Int.range` still carries `@storage`; decide that remaining semantic
     migration separately rather than treating file deletion as proof that the
@@ -238,7 +270,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     files before editing.
   - Last completed validation in this run was `scripts/range
     check-build-plan`; it passed before the latest overlapping edits.
-    `scripts/range check-root-value` has not passed.
+    `scripts/range check-value-ownership` has not passed.
 
 ## Concurrency
 
@@ -781,7 +813,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - Core and compiler fixtures use explicit declaration initializers such
         as `Array<Int>([1, 2, 3])`; brackets remain the value payload and index
         operators, not a competing type or inferred declaration form.
-      - Verification: `scripts/range check-root-value` passes the canonical
+      - Verification: `scripts/range check-value-ownership` passes the canonical
         nested-generic, macro-family, recipe-cardinality, indexing, and focused
         legacy-rejection proofs.
     - [x] Prove one macro-family representation retains mixed authored
@@ -847,7 +879,10 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - [x] Materialize Bool, String, and optional String macro arguments and
         defaults through the generic macro-value boundary.
         - Canonical parameter defaults use typed value syntax:
-          `key: String?(nil)` and `exclude: Bool(false)`.
+          `key: String?` implicitly defaults to `nil`, while non-optional
+          typed defaults remain explicit, such as `exclude: Bool(false)`.
+        - The redundant `String?(nil)` spelling is rejected as a malformed
+          macro declaration instead of allocating a second default-value slot.
         - `Testing/Macros/Pass/TypedParameterDefaults.range` keeps this proof
           independent from Codable now that construct-attached Codable does
           not require per-field discovery.
@@ -1068,8 +1103,19 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           metadata without duplicating either fact in `Identifier`.
       - [ ] Derive stable `Identifier` hashing through `@hashable` without
         making the hash the semantic identity.
-        - [ ] Hash the canonical ID and parent chain deterministically, then
-          confirm structural equality after every hash-index match.
+        - [x] Make `@hashable` synthesize a target-owned `hash() -> Int`
+          directly from the canonical `id` declaration instead of emitting an
+          inert `HashableRegistration` value.
+          - `@hashable` discovers `id` through the target's typed
+            `Declaration.members` rather than the legacy
+            `environment.target.memberCount(name)` shortcut.
+          - The focused positive proof observes exactly one generated `hash`
+            function returning `Int`; the negative proof rejects a target
+            without exactly one `id` declaration. The broader value-ownership
+            gate passes this slice and later stops at the independent
+            construct-attached Codable collection boundary.
+        - [ ] Include the parent chain deterministically, then confirm
+          structural equality after every hash-index match.
         - [ ] Make graph insertion idempotent for the same identity and value,
           reject the same identity with a different value, and allow equal
           names under different identities.
@@ -1164,6 +1210,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
                 identities.
                 - `@value`, `@many`, and `@contents` now reach the same
                   projection without a macro-name branch.
+                - `@many` and `@contents` return their registrations directly;
+                  they do not emit syntax through `#environment` or create
+                  `macroContribution` rows merely to expose typed metadata.
                 - [x] Let an authored `@block` registration select a
                   member-owned `contents` relationship and materialize it onto
                   the physical `{}` source slot.
@@ -1252,7 +1301,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
                   - The semantic syntax-node/fact projection remains a lowering
                     adapter for now, so macro identities cannot be misread as
                     runtime syntax by MIR or memory analysis.
-                  - Root-value graph proofs cover resolved, missing,
+                  - value-ownership graph proofs cover resolved, missing,
                     target-mismatched, and ambiguous macro applications, plus an
                     ordered many member relationship.
               - [ ] Move every containment relationship onto named slots before
@@ -1269,7 +1318,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
                     filter a cache lookup without changing the registration API.
                   - `Testing/Graph/Pass/SlotRegistration.range` now proves the
                     slot identities and owner-to-slot-to-occurrence projection;
-                    `scripts/range check-root-value` passes it alongside the
+                    `scripts/range check-value-ownership` passes it alongside the
                     declaration-envelope graph.
                 - [x] Move `Block → contents` and its source-layout gaps from
                   block-owned tables to one enclosed containment slot.
@@ -1345,7 +1394,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
               syntax children and nested control-flow bodies using the same
               block kind.
               - The typed-body replay now requires two `block` nodes and two
-                role-31 `body` edges; RootValue validates, links, and executes
+                role-31 `body` edges; value ownership validates, links, and executes
                 the resulting compiler output.
             - [x] Preserve authored source spans and generated
               macro-application provenance independently from containment.
@@ -1455,7 +1504,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         encode/decode bodies through supported fixtures before adding the
         source to the accepted compiler manifest.
         - `Testing/Macros/Pass/InlineCodable.range` is combined with the
-          actual `Core/Macro/Codable.range` source by `check-root-value`; one
+          actual `Core/Macro/Codable.range` source by `check-value-ownership`; one
           macro invocation generates exactly `encode` and `decode` without
           nested helper macros.
         - Treat field key overrides and exclusion as separate future coding
@@ -1512,24 +1561,24 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 - [ ] Run the complete validation ladder and promote one reproducible accepted
   seed after the manifest is repaired.
   - [x] `scripts/range check-build-plan`
-  - [x] `scripts/range check-root-value --controls`
+  - [x] `scripts/range check-value-ownership --controls`
   - [x] `scripts/range check-compiler-smoke`
   - [x] `scripts/range check-compiler-candidate`
   - [x] `scripts/range check-stage2-compiler`
   - [x] `scripts/range compiler progression`
 - [x] Resolve accepted-seed Stage 2 once per compiler-source change.
-  - [x] Share one content-addressed resolver between root-value, smoke, and the
+  - [x] Share one content-addressed resolver between value-ownership, smoke, and the
     ordinary compiler-candidate path; keep bootstrap-bridge production
     separate because it has a different producer.
   - [x] Key the immutable artifact by the accepted seed, ordered runtime set,
     compiler source bundle and inventory, target/toolchain identity, and exact
     Clang invocation flags.
-  - [x] Keep root-value and smoke proofs independent while reusing the same
+  - [x] Keep value-ownership and smoke proofs independent while reusing the same
     Stage 2 executable and cache key.
-    - The final verified shared-cache reuse completed root-value in 3.49
+    - The final verified shared-cache reuse completed value-ownership in 3.49
       seconds and smoke in 3.72 seconds with cache key
       `22ef98c2c4267c598b7677af4ff9725b46e831fbe705632aeda60b2f25586660`.
-  - [x] Add a profile-sensitive development Stage 2 for root-value and smoke.
+  - [x] Add a profile-sensitive development Stage 2 for value-ownership and smoke.
     - Keep the accepted-seed producer optimized, but validate and link the
       disposable Stage 2 with `-O0` and no LTO. Candidate, fixed-point, and
       promotion paths retain `-O2` plus ThinLTO.
@@ -1588,11 +1637,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       compiler-source cache miss; preserve full candidate/fixed-point proofs.
     - The `@stored` selector proof measured 916 seconds emitting LLVM, 2
       seconds validating it, and 2 seconds linking Stage 2. The identical
-      follow-up root-value run reused the immutable artifact and completed in
+      follow-up value-ownership run reused the immutable artifact and completed in
       about 4 seconds.
     - [x] Add a validated rolling development producer and skip the duplicate
       ownership/effect reconstruction only for marked development source sets.
-      - Root-value publishes a development compiler as a future producer only
+      - value-ownership publishes a development compiler as a future producer only
         after all focused proofs pass. Optimized candidate, fixed-point, and
         promotion gates continue from the accepted seed and retain the full
         independent effect-validation pass.
@@ -1602,7 +1651,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [x] Measure a marker-aware cache miss and record the new phase timings.
       - The strict bootstrap miss emitted LLVM in 777 seconds. The validated
         marker-aware forced miss emitted LLVM in 650 seconds, validated in 1
-        second, linked in 2 seconds, and passed the focused RootValue suite.
+        second, linked in 2 seconds, and passed the focused value ownership suite.
         This proves the duplicate effects pass was removed but is only a 16%
         improvement; do not describe it as the feedback-loop fix.
     - [ ] Cache immutable LLVM fragments per specialized function and reuse
@@ -1764,25 +1813,25 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         `CompilerLLVMPlan`, `CompilerFrontend`, `CompilerParsing`, and
         `Lexer`; all manifested Core and runtime inputs still match.
     - [ ] Resolve the current source capability blocker through the narrowest
-      relevant root-value proof, including its exact rejection controls.
+      relevant value-ownership proof, including its exact rejection controls.
       - The current development Stage 2 now treats undeclared built-in target
         category markers as scalar syntax metadata rather than macro-family
         storage, and ownership construction ignores compile-time projection
         values before requiring runtime tracked-storage metadata.
-      - The focused root-value run passes the uppercase/lowercase inline
+      - The focused value-ownership run passes the uppercase/lowercase inline
         projection pair, typed collection closures, Codable, rollback, and
         typed macro parameter defaults. The unimplemented `@shared`
         macro-on-macro marker was removed from the graph capability fixture
         and Core surface so graph validation can proceed without inventing a
         macro-declaration target model.
-      - Graph capabilities and both missing-role controls now pass. Root-value
+      - Graph capabilities and both missing-role controls now pass. value-ownership
         next stops at the existing Range-native project macro boundary with
         `diagnosticKind=macroExecutionBodyInvalid`, `pipelineStatus=1`, and
         `pipelineFailureCode=1`; generated project configuration remains the
         next independent capability slice.
-      - Keep the proof boundary explicit: root-value and its controls must pass
+      - Keep the proof boundary explicit: value-ownership and its controls must pass
         before advancing to smoke, candidate, Stage 2, or progression gates.
-    - [ ] Run the supported ladder in order: build plan, root value with
+    - [ ] Run the supported ladder in order: build plan, ordinary value with
       controls, compiler smoke, compiler candidate, Stage 2, and compiler
       progression.
     - [ ] Confirm Stage 2 and Stage 3 LLVM and executable identity, then
@@ -1867,6 +1916,96 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 
 ## Compiler Storage
 
+- [x] Add the first Range-authored compiler-description values.
+  - Core now defines `PhaseRegistration` and `CompilerRegistration` as
+    ordinary typed macro results. `@phase` returns its function target without
+    emitting syntax, while `@compiler` collects the construct's ordered
+    `Array<@phase>` and rejects a compiler with no phases.
+  - The focused proof registers `shape` and `usage` in source order, excludes
+    an unannotated helper, observes both phase result values, and checks the
+    exact missing-phase diagnostic.
+  - [ ] Add explicit phase dependencies and derive a schedule as another
+    graph value; do not hardcode the five illustrative compiler phases.
+  - [ ] Let a compiler registration select its source/project inputs and
+    invoke the described pipeline before synthesizing command-line behavior.
+  - [ ] Route scheduled graph domains into typed dense storage partitions
+    only after profiling identifies their producers, consumers, and costs;
+    dense buffers remain physical storage, not the semantic compiler model.
+  - [x] Carry the description through one executable Compiler V1 slice.
+    - `@main` now exposes `compile-v1` and `inspect-v1`. The V1 runner loads an
+      explicit input file as a stable `Identity : FileValue` source Delta,
+      produces inspectable typed-syntax and semantic artifacts through named
+      shape and usage functions, then delegates plotting to the current native
+      compiler path.
+    - `scripts/range check-compiler-v1` proves the V1 plot artifact is
+      byte-identical to the legacy output for an ordinary Range program,
+      validates and links that LLVM, executes it with exit `7`, inspects the
+      shape/usage/plot artifacts, and checks the typed missing-input error.
+    - [x] Prove the first input boundary as an ordinary Range function returning a
+      source Delta.
+      - `compilerV1Load(input:) -> CompilerV1SourceDelta` now owns the explicit
+        file read. The Delta pairs one path-derived canonical
+        `CompilerFingerprint` with one `FileValue(path:source:)`; the duplicate
+        V1 identity type and copied hash implementation have been removed.
+      - The existing `CompilerMemoryGraph.runtimeValues` rows are specialized
+        for macro-family applications and are found by table scans. Do not call
+        this source Delta a MemoryGraph insertion or random-access value until
+        the identity/value storage boundary is generalized without a File-name
+        special case or a second graph.
+      - Prove the source Delta inspection, legacy LLVM byte parity, linked
+        execution, and missing-input error through `scripts/check-range-compiler-v1`.
+      - The focused V1 gate passed after a development Stage 2 cache miss:
+        LLVM emission took 711 seconds, validation 1 second, and linking 2
+        seconds; 12 function artifacts were reused and 2,913 rebuilt. The V1
+        LLVM was byte-identical to the legacy path, linked, and ran with exit
+        `7`; changing only File contents preserved its path-derived identity.
+    - [ ] Generalize the existing MemoryGraph identity/value storage boundary.
+      - Remove macro-application rows and syntax IDs from the minimum runtime
+        value identity contract, then layer macro-family provenance on top.
+      - Add identity lookup and replacement without introducing another graph,
+        copied fingerprint implementation, or File-named compiler special case.
+    - [ ] Replace the handwritten V1 command branch only after the direct
+      loader function is green.
+      - The candidate surface is `@commands(.global)`: on a function it
+        registers that function; on a construct it collects eligible member
+        functions. Keep this as a graph-registration design choice until one
+        target shape and generated argv dispatch have focused proofs.
+    - The verified follow-up compiler build emitted in 663 seconds, reused
+      1,617 function artifacts, rebuilt 1,306, validated in 1 second, linked
+      in 2 seconds, and completed in 666 seconds. Reuse is still too late to
+      avoid semantic reconstruction.
+    - [ ] Make `@compiler` and `@phase(after:)` registrations drive the V1
+      runner instead of retaining a manually ordered entry adapter.
+    - [ ] Replace the three independent source rebuilds with one persistent
+      project graph whose shape and usage deltas flow between phases.
+    - [ ] Support moving an owned construct extracted from a success enum
+      payload into the next function. The first direct `Result`-shaped V1
+      runner rejected at `compilerV1Run` with
+      `invalidFunctionReachability`, `detail=811`; the vertical adapter keeps
+      nominal artifacts and converts legacy string diagnostics into
+      `CompilerV1Error` until that general ownership boundary is proven.
+    - [ ] Locate the nearest `Project.range`, gather its complete source set,
+      and represent project/file locations as graph values rather than
+      limiting V1 to one explicit input file.
+
+- [x] Collapse the accidental `RootValue` taxonomy into ordinary value
+  ownership.
+  - Ownership paths now distinguish binding roots from evaluation roots
+    without introducing a separate language value category.
+  - Expansion parsing names an ordinary emitted expansion value, and the
+    focused proof surface is `scripts/range check-value-ownership`.
+  - The cutover deliberately preserves ownership, LLVM, runtime, and
+    deterministic-rejection behavior; it changes representation vocabulary,
+    not accepted value semantics.
+  - The changed Range-authored compiler emitted in 363 seconds, validated in
+    2 seconds, linked in 2 seconds, and completed its development Stage 2
+    build in 367 seconds while reusing 2,895 of 2,917 function artifacts.
+  - [ ] Re-run the complete value-ownership fixture set after the independent
+    construct-attached Codable collection accepts its retained `Array<@stored>`
+    child-macro argument; the gate now passes Core `@many`/`@contents`, block
+    relationship reification, collection closures, inline syntax, stored
+    defaults, and the Core coding surface before stopping with
+    `macroExecutionBodyInvalid`, `pipelineStatus=2`, `pipelineFailureCode=1`.
 - [ ] Replace the compiler's direct RawBuffer dependency incrementally.
   - [x] Add `Buffer.range` to the compiler's manifested Core source set.
   - [x] Migrate `CompilerIntTable.values` from `RawBuffer` to `Buffer<Int>` as
@@ -1898,7 +2037,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - [x] Forward write and destroy effects through authored transparent
           `String` methods, including automatic owned storage for
           `state value: String("Hello")`.
-        - [x] Restore the broader `check-root-value` gate and its complete
+        - [x] Restore the broader `check-value-ownership` gate and its complete
           positive/rejection control set.
         - [ ] Insert deterministic automatic destruction for owned String
           storage at every valid scope exit.
@@ -1945,7 +2084,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           relationship; box at construction and state replacement, then use
           direct typed loads for reads and nested mutation.
         - [x] Reject the legacy name-keyed `rangeConstructGet*` lookup path and
-          prove nested RootValue and Array mutation use the direct link.
+          prove nested value ownership and Array mutation use the direct link.
         - [x] Promote and independently verify a byte-identical Stage 2/Stage 3
           fixed point.
         - [x] Make mutation target the final stored cell rather than requiring
@@ -2034,7 +2173,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 - [ ] Add a native typed GPU/runtime consumer only after its shader values,
   resource ownership, effects, and Graph 0 scheduling boundary are explicit.
 - [ ] Complete compiler-owned `@commandGroup` dispatch after the generated-declaration checkpoint.
-  - [x] Prove a target-owned generated `Command` enum, generated callable `runCommandLine()` fallback, linked execution, and exact empty-group rejection through `scripts/range check-root-value`.
+  - [x] Prove a target-owned generated `Command` enum, generated callable `runCommandLine()` fallback, linked execution, and exact empty-group rejection through `scripts/range check-value-ownership`.
   - [x] Stop RangeView from participating in this compiler checkpoint; RangeView remains idealized example code, not validation input.
   - [ ] Support statement arrays produced by `#commands.map` inside generated function bodies without aborting native compilation, then prove argv key comparison and `self.<command>()` dispatch.
   - [ ] Support fieldless construct values as method receivers so a command group does not need a stored control field solely to make `CLI()` representable.

@@ -1,0 +1,20 @@
+construct CompilerV1FileValue {
+    let path: String
+    let source: String
+}
+
+construct CompilerV1SourceDelta {
+    let identity: CompilerFingerprint
+    let value: CompilerV1FileValue
+}
+
+function compilerV1IdentityForFile(path: String): CompilerFingerprint {
+    return compilerFingerprintAppendText(fingerprint: compilerFingerprintInitial(), tag: 1, text: path)
+}
+
+function compilerV1SourceDelta(path: String, source: String): CompilerV1SourceDelta {
+    return CompilerV1SourceDelta(
+        identity: compilerV1IdentityForFile(path: path),
+        value: CompilerV1FileValue(path: "\(path)", source: "\(source)")
+    )
+}

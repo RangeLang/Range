@@ -1,0 +1,16 @@
+@compiler
+construct NativeCompiler {
+    @phase
+    function shape(): Int {
+        return 1
+    }
+
+    function helper(): Int {
+        return 2
+    }
+
+    @phase
+    function usage(): Int {
+        return 3
+    }
+}

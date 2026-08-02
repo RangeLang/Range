@@ -640,7 +640,6 @@ function compilerMacroGraphOperationForName(name: String): Int {
 
 function compilerMacroTargetOperationForName(name: String): Int {
     if name == String("omit") { return compilerMacroTargetOperationOmit() }
-    if name == String("memberCount") { return compilerMacroTargetOperationMemberCount() }
     return 0
 }
 
@@ -3031,7 +3030,6 @@ function compilerBodyArenaExpressionUsesMacroCapability(arena: CompilerBodyArena
         || operationName == String("diagnostics")
         || operationName == String("graph")
         || operationName == String("omit")
-        || operationName == String("memberCount")
         || compilerMacroDiagnosticsOperationForName(name: operationName) > 0
         || compilerMacroGraphOperationForName(name: operationName) > 0
 }
@@ -3100,9 +3098,7 @@ function compilerBodyArenaResolveCapabilityExpression(arena: CompilerBodyArena, 
         }
         let targetOperation: Int(compilerMacroTargetOperationForName(name: memberName))
         if memberCapabilityKind == compilerMacroCapabilityTarget() && targetOperation > 0 {
-            state targetTypeKind: Int(compilerBodyTypeVoid())
-            if targetOperation == compilerMacroTargetOperationMemberCount() { targetTypeKind: compilerBodyTypeInt() }
-            return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: nodeID, targetKind: compilerBodyResolutionMacroTargetOperation(), targetID: targetOperation, typeKind: targetTypeKind, typeID: 0 - 1, regionNodeID: regionNodeID)
+            return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: nodeID, targetKind: compilerBodyResolutionMacroTargetOperation(), targetID: targetOperation, typeKind: compilerBodyTypeVoid(), typeID: 0 - 1, regionNodeID: regionNodeID)
         }
         let graphOperation: Int(compilerMacroGraphOperationForName(name: memberName))
         if graphOperation > 0 {
@@ -3156,7 +3152,6 @@ function compilerBodyArenaResolveCapabilityExpression(arena: CompilerBodyArena, 
         state targetKind: Int(compilerBodyResolutionMacroCapabilityDenied())
         state targetID: Int(0)
         state resultTypeKind: Int(compilerBodyTypeVoid())
-        state invalidTargetQuery: Bool(false)
         if applicationOperation > 0 {
             targetKind: compilerBodyResolutionMacroCapability()
             targetID: applicationOperation
@@ -3166,10 +3161,6 @@ function compilerBodyArenaResolveCapabilityExpression(arena: CompilerBodyArena, 
             targetID: applicationTargetOperation
             if applicationTargetOperation == compilerMacroTargetOperationOmit()
                 && compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 0 { return 0 - 1 }
-            if applicationTargetOperation == compilerMacroTargetOperationMemberCount() {
-                resultTypeKind: compilerBodyTypeInt()
-                if compilerBodyArenaApplicationArgumentCount(arena: arena, applicationNodeID: nodeID) != 1 { invalidTargetQuery: true }
-            }
         } else if applicationGraphOperation > 0 {
             targetKind: compilerBodyResolutionMacroGraphQuery()
             targetID: applicationGraphOperation
@@ -3184,11 +3175,8 @@ function compilerBodyArenaResolveCapabilityExpression(arena: CompilerBodyArena, 
             if argumentNodeID < 0 || valueNodeID < 0 || compilerBodyArenaResolveExpression(arena: arena, index: index, nodeID: valueNodeID, regionNodeID: regionNodeID) != 0 { return 0 - 1 }
             if (targetKind == compilerBodyResolutionMacroCapability() || targetKind == compilerBodyResolutionMacroGraphQuery())
                 && compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID) != compilerBodyTypeString() { return 0 - 1 }
-            if applicationTargetOperation == compilerMacroTargetOperationMemberCount()
-                && compilerBodyArenaExpressionTypeKind(arena: arena, nodeID: valueNodeID) != compilerBodyTypeString() { invalidTargetQuery: true }
             argumentOrdinal: argumentOrdinal + 1
         }
-        if invalidTargetQuery { targetKind: compilerBodyResolutionMacroTargetQueryInvalid() }
         return compilerBodyArenaAppendResolution(arena: arena, sourceNodeID: calleeNodeID, targetKind: targetKind, targetID: targetID, typeKind: resultTypeKind, typeID: 0 - 1, regionNodeID: regionNodeID)
     }
     return 0 - 1
@@ -3694,6 +3682,8 @@ function compilerBodyArenaResolveExpression(arena: CompilerBodyArena, index: Com
                         if returnTypeID < 0 || compilerBodyArenaEnumSyntaxIDForTypeID(arena: arena, typeID: returnTypeID) != targetID { return 0 - 1 }
                     } else {
                         let builtinID: Int(compilerBodyRuntimeBuiltinID(name: calleeName))
+                        if builtinID == compilerBodyRuntimeBuiltinStringLength()
+                            || builtinID == compilerBodyRuntimeBuiltinStringByteAt() { return 0 - 1 }
                         let builtinReturnType: String(compilerBodyRuntimeBuiltinReturnType(id: builtinID))
                         if builtinReturnType == String("") { return 0 - 1 }
                         targetKind: compilerBodyResolutionRuntimeBuiltin()

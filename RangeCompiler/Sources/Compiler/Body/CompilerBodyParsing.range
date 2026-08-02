@@ -1122,12 +1122,12 @@ function compilerBodyArenaAppendExpandStatement(arena: CompilerBodyArena, statem
             cursor: boundary.next
         } else if boundaryOrdinal == 0 && enclosureDepth == 0 && token.kind == .identifier {
             let maybeFollowing: Optional<RangeLexedToken>(lexNextRangeToken(source: arena.tables.sourceStore.source, start: token.end))
-            state parsesRootValue: Bool(false)
+            state parsesExpansionValue: Bool(false)
             if maybeFollowing != nil {
                 let following: RangeLexedToken(maybeFollowing ?? compilerFallbackTokenAt(index: token.end))
-                if following.kind == .leftParen { parsesRootValue: true }
+                if following.kind == .leftParen { parsesExpansionValue: true }
             }
-            if parsesRootValue {
+            if parsesExpansionValue {
                 let value: CompilerBodyParseResult(compilerBodyArenaParseExpressionAtPrecedence(arena: arena, start: token.start, limit: expansion.end, minimumPrecedence: 0))
                 if !value.isValid || compilerCoreFirstNonWhitespaceIndex(source: arena.tables.sourceStore.source, start: value.nextIndex, end: expansion.end) < expansion.end
                     || compilerBodyArenaAppendEdge(arena: arena, ownerNodeID: applicationNodeID, childNodeID: value.nodeID, role: compilerSyntaxRoleExpansionValue(), ordinal: boundaryOrdinal) != 0 {

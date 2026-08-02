@@ -98,7 +98,7 @@ Routes own paths; `@page` only marks declarations that can occupy a route:
 ```range
 construct Route {
     let _ path: String
-    binding _ page: @page?(nil)
+    binding _ page: @page?
     binding _ children: () -> [Route]
 }
 ```

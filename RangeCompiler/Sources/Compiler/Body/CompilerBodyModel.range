@@ -46,7 +46,6 @@ function compilerBodyResolutionMacroCapability(): Int { return 9 }
 function compilerBodyResolutionMacroCapabilityDenied(): Int { return 10 }
 function compilerBodyResolutionMacroGraphQuery(): Int { return 11 }
 function compilerBodyResolutionMacroTargetOperation(): Int { return 12 }
-function compilerBodyResolutionMacroTargetQueryInvalid(): Int { return 13 }
 function compilerBodyResolutionEnumCase(): Int { return 14 }
 function compilerBodyResolutionEnum(): Int { return 15 }
 function compilerBodyResolutionArrayLiteral(): Int { return 16 }
@@ -1076,7 +1075,7 @@ function compilerBodyOwnedPathMemberColumn(): Int { return 4 }
 function compilerBodyOwnedPathTypeColumn(): Int { return 5 }
 function compilerBodyOwnedPathPolicyColumn(): Int { return 6 }
 function compilerBodyOwnedPathRootSymbol(): Int { return 1 }
-function compilerBodyOwnedPathRootValue(): Int { return 2 }
+function compilerBodyOwnedPathRootEvaluation(): Int { return 2 }
 function compilerBodyOwnedPathPolicyOwned(): Int { return 1 }
 function compilerBodyOwnedPathPolicyBorrowed(): Int { return 2 }
 function compilerBodyOwnedPathPolicyAlias(): Int { return 3 }
@@ -1253,7 +1252,6 @@ function compilerBodyMIROperationMacroDiagnostic(): Int { return 35 }
 function compilerBodyMIROperationMacroCapabilityDenied(): Int { return 36 }
 function compilerBodyMIROperationMacroGraphQuery(): Int { return 37 }
 function compilerBodyMIROperationMacroTargetExpansion(): Int { return 38 }
-function compilerBodyMIROperationMacroTargetQuery(): Int { return 39 }
 function compilerBodyMIROperationMemberAssign(): Int { return 40 }
 function compilerBodyMIROperationEnumConstruct(): Int { return 41 }
 function compilerBodyMIROperationEnumTag(): Int { return 42 }

@@ -1,9 +1,32 @@
 compilerMacroSnapshot
+@builtin
+construct Array<Element> {}
+
+macro member(): Declaration | Member -> Void {}
+
+construct Identifier {
+    let name: String
+}
+
+@member
+construct State {
+    let identifier: Identifier
+}
+
+construct Construct {
+    construct Declaration {
+        let identifier: Identifier
+        let members: Array<@member>
+    }
+}
+
 construct JoinedResult {}
 
 macro joined(): Construct -> JoinedResult { environment in
-    let memberCount: Int(environment.target.memberCount("generated"))
-    if memberCount == 0 {
+    let members: Array<State>(
+        environment.target.Declaration.members.filter(all: State)
+    )
+    if members.count == 0 {
         #environment {
             extension #environment.target.Declaration.identifier {
                 state generated: Int

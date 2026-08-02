@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+COMPILER="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/stage2/RangeCompiler"
+FIXTURE="$REPO_ROOT/Testing/Basics/Pass/ReturnInteger.range"
+WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compiler-v1.XXXXXX")"
+trap '/bin/rm -rf "$WORK_ROOT"' EXIT
+
+fail() {
+    echo "Range Compiler V1 check failed: $*" >&2
+    exit 1
+}
+
+"$REPO_ROOT/scripts/range" check-compiler-smoke
+[[ -x "$COMPILER" ]] || fail "missing resolved Stage 2 compiler"
+
+"$COMPILER" compile "$FIXTURE" > "$WORK_ROOT/legacy.ll"
+"$COMPILER" compile-v1 "$FIXTURE" > "$WORK_ROOT/v1.ll"
+/usr/bin/cmp -s "$WORK_ROOT/legacy.ll" "$WORK_ROOT/v1.ll" \
+    || fail "V1 plot artifact differs from the legacy compiler output"
+
+"$COMPILER" inspect-v1 "$FIXTURE" > "$WORK_ROOT/inspect.txt"
+/usr/bin/grep -Fq $'compilerV1\tversion=1' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the compiler identity"
+/usr/bin/grep -Eq $'^compilerV1Delta\tkind=source\tidentity=[0-9]+:[0-9]+\tvalue=File\tpath=.+\tbytes=[1-9][0-9]*$' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the loaded Identity : FileValue Delta"
+
+/bin/cp "$FIXTURE" "$WORK_ROOT/IdentityValue.range"
+"$COMPILER" inspect-v1 "$WORK_ROOT/IdentityValue.range" > "$WORK_ROOT/identity-before.txt"
+/usr/bin/printf '\n' >> "$WORK_ROOT/IdentityValue.range"
+"$COMPILER" inspect-v1 "$WORK_ROOT/IdentityValue.range" > "$WORK_ROOT/identity-after.txt"
+before_identity="$(/usr/bin/sed -n 's/^compilerV1Delta.*identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
+after_identity="$(/usr/bin/sed -n 's/^compilerV1Delta.*identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
+before_bytes="$(/usr/bin/sed -n 's/^compilerV1Delta.*bytes=\([0-9][0-9]*\)$/\1/p' "$WORK_ROOT/identity-before.txt")"
+after_bytes="$(/usr/bin/sed -n 's/^compilerV1Delta.*bytes=\([0-9][0-9]*\)$/\1/p' "$WORK_ROOT/identity-after.txt")"
+[[ -n "$before_identity" && "$before_identity" == "$after_identity" ]] \
+    || fail "V1 File identity changed when only its value changed"
+[[ -n "$before_bytes" && -n "$after_bytes" && "$before_bytes" -ne "$after_bytes" ]] \
+    || fail "V1 File value did not change with its source contents"
+/usr/bin/grep -Fq $'compilerV1Artifact\tphase=shape' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the shape artifact"
+/usr/bin/grep -Fq $'typedSyntax\tvalid=true' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 shape artifact is not valid typed syntax"
+/usr/bin/grep -Fq $'compilerV1Artifact\tphase=usage' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the usage artifact"
+/usr/bin/grep -Fq $'semanticGraph\tvalid=true' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 usage artifact is not a valid semantic graph"
+/usr/bin/grep -Fq $'compilerV1Artifact\tphase=plot' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the plot artifact"
+
+runtime_inputs=()
+runtime_count="$(/usr/bin/plutil -extract runtimeSources raw -o - "$MANIFEST")"
+for ((index = 0; index < runtime_count; index += 1)); do
+    runtime_relative="$(/usr/bin/plutil -extract "runtimeSources.$index.path" raw -o - "$MANIFEST")"
+    runtime_inputs+=("$REPO_ROOT/$runtime_relative")
+done
+clang -O0 -fno-lto -Wno-override-module \
+    "$WORK_ROOT/v1.ll" "${runtime_inputs[@]}" -o "$WORK_ROOT/program"
+actual_status=0
+"$WORK_ROOT/program" || actual_status=$?
+[[ "$actual_status" -eq 7 ]] \
+    || fail "V1-linked ordinary program exited $actual_status instead of 7"
+
+missing_status=0
+"$COMPILER" compile-v1 "$WORK_ROOT/Missing.range" > "$WORK_ROOT/missing.out" \
+    || missing_status=$?
+[[ "$missing_status" -eq 65 ]] \
+    || fail "V1 missing-input control exited $missing_status instead of 65"
+/usr/bin/grep -Fq 'range: unable to read non-empty input at' "$WORK_ROOT/missing.out" \
+    || fail "V1 missing-input control omitted its typed error message"
+
+echo "Compiler V1: pass (ordinary load function, stable Identity : changed FileValue Delta, inspectable shape/usage/plot artifacts, legacy-byte parity, validate/link/run exit 7, typed missing-input error)"

@@ -11,7 +11,7 @@
 #   validate_llvm, link_llvm, fail
 #
 # resolve_stage2_compiler 0 may reuse the executable-only cache written by the
-# former root-value-local resolver. resolve_stage2_compiler 1 requires the
+# former value-ownership-local resolver. resolve_stage2_compiler 1 requires the
 # current shared entry containing both immutable LLVM and executable artifacts.
 
 RANGE_STAGE2_CACHE_SCHEMA=2

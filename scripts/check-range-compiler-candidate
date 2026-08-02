@@ -1904,7 +1904,7 @@ RANGE
     esac
 }
 
-write_root_value_bundle() {
+write_value_ownership_bundle() {
     local output="$1"
     local kind="$2"
 
@@ -1913,7 +1913,7 @@ write_root_value_bundle() {
     if [[ -n "$(/usr/bin/tail -c 1 "$CORE_SOURCE_PATH")" ]]; then
         /usr/bin/printf '\n' >> "$output"
     fi
-    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=project\tpath=RootValue.range' >> "$output"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=project\tpath=ValueOwnership.range' >> "$output"
 
     case "$kind" in
         opaque-return)
@@ -2589,7 +2589,7 @@ function rejectOwnershipChangingBackedge(): RawBuffer {
 RANGE
             ;;
         *)
-            fail "unknown RootValue fixture: $kind"
+            fail "unknown value ownership fixture: $kind"
             ;;
     esac
 }
@@ -3037,7 +3037,7 @@ compare_binding_reference_stages() {
     echo "$left_label/$right_label binding references: byte-identical LLVM/executables/diagnostics"
 }
 
-audit_root_value_positive() {
+audit_value_ownership_positive() {
     local stage_label="$1"
     local executable="$2"
     local stage_directory="$3"
@@ -3046,146 +3046,146 @@ audit_root_value_positive() {
 
     case "$kind" in
         opaque-return)
-            artifact=RootValueOpaqueReturn
+            artifact=ValueOwnershipOpaqueReturn
             definition_marker='define ptr @makeRootBuffer()'
             call_marker='call ptr @makeRootBuffer()'
             expected_create_count=1
             expected_destroy_count=1
             ;;
         boundary-forward-direct)
-            artifact=RootValueBoundaryForwardDirect
+            artifact=ValueOwnershipBoundaryForwardDirect
             definition_marker='define ptr @forwardRootBuffer(ptr'
             call_marker='call ptr @forwardRootBuffer(ptr'
             expected_create_count=1
             expected_destroy_count=1
             ;;
         boundary-forward-transitive)
-            artifact=RootValueBoundaryForwardTransitive
+            artifact=ValueOwnershipBoundaryForwardTransitive
             definition_marker='define ptr @forwardRootBufferTransitively(ptr'
             call_marker='call ptr @forwardRootBufferTransitively(ptr'
             expected_create_count=1
             expected_destroy_count=1
             ;;
         boundary-forward-two-owned-inputs)
-            artifact=RootValueBoundaryForwardPair
+            artifact=ValueOwnershipBoundaryForwardPair
             definition_marker='define void @forwardRootBufferPair(ptr %returnDestination'
             call_marker='call void @forwardRootBufferPair('
             expected_create_count=2
             expected_destroy_count=2
             ;;
         boundary-forward-mixed)
-            artifact=RootValueBoundaryForwardMixed
+            artifact=ValueOwnershipBoundaryForwardMixed
             definition_marker='define void @makeRootBoundaryForwardMixedResult(ptr %returnDestination'
             call_marker='call void @makeRootBoundaryForwardMixedResult('
             expected_create_count=3
             expected_destroy_count=3
             ;;
         direct-holder)
-            artifact=RootValueDirectHolder
+            artifact=ValueOwnershipDirectHolder
             definition_marker='define void @makeRootDirectHolder(ptr %returnDestination'
             call_marker='call void @makeRootDirectHolder('
             expected_create_count=1
             expected_destroy_count=1
             ;;
         nested-inline)
-            artifact=RootValueNestedInline
+            artifact=ValueOwnershipNestedInline
             definition_marker='define void @makeRootNestedOuter(ptr %returnDestination'
             call_marker='call void @makeRootNestedOuter('
             expected_create_count=1
             expected_destroy_count=1
             ;;
         inline-local-return)
-            artifact=RootValueInlineLocalReturn
+            artifact=ValueOwnershipInlineLocalReturn
             definition_marker='define void @makeRootLocalHolder(ptr %returnDestination'
             call_marker='call void @makeRootLocalHolder('
             expected_create_count=1
             expected_destroy_count=1
             ;;
         two-owned-leaves)
-            artifact=RootValueTwoOwnedLeaves
+            artifact=ValueOwnershipTwoOwnedLeaves
             definition_marker='define void @makeRootTwinHolder(ptr %returnDestination'
             call_marker='call void @makeRootTwinHolder('
             expected_create_count=2
             expected_destroy_count=2
             ;;
         partial-sibling)
-            artifact=RootValuePartialSibling
+            artifact=ValueOwnershipPartialSibling
             definition_marker='define i32 @main()'
             call_marker='call i32 @rawBufferAppendInt('
             expected_create_count=2
             expected_destroy_count=2
             ;;
         loop-invariant)
-            artifact=RootValueLoopInvariant
+            artifact=ValueOwnershipLoopInvariant
             definition_marker='define i32 @main()'
             call_marker='call i32 @rawBufferAppendInt('
             expected_create_count=1
             expected_destroy_count=1
             ;;
         absent-early-return)
-            artifact=RootValueAbsentEarlyReturn
+            artifact=ValueOwnershipAbsentEarlyReturn
             definition_marker='define i32 @absentEarlyReturn(i1'
             call_marker='call i32 @absentEarlyReturn(i1'
             expected_create_count=1
             expected_destroy_count=1
             ;;
         absent-branch-scope)
-            artifact=RootValueAbsentBranchScope
+            artifact=ValueOwnershipAbsentBranchScope
             definition_marker='define i32 @absentBranchScope(ptr'
             call_marker='call i32 @absentBranchScope(ptr'
             expected_create_count=2
             expected_destroy_count=2
             ;;
         absent-loop-reevaluation)
-            artifact=RootValueAbsentLoopReevaluation
+            artifact=ValueOwnershipAbsentLoopReevaluation
             definition_marker='define i32 @absentLoopReevaluation()'
             call_marker='call i32 @absentLoopReevaluation()'
             expected_create_count=1
             expected_destroy_count=1
             ;;
         absent-returned-alias)
-            artifact=RootValueAbsentReturnedAlias
+            artifact=ValueOwnershipAbsentReturnedAlias
             definition_marker='define void @absentForwardAlias(ptr %returnDestination'
             call_marker='call void @absentForwardAlias('
             expected_create_count=1
             expected_destroy_count=1
             ;;
         boundary-consume)
-            artifact=RootValueBoundaryConsume
+            artifact=ValueOwnershipBoundaryConsume
             definition_marker='define i32 @destroyRootBufferInCallee(ptr'
             call_marker='call i32 @destroyRootBufferInCallee(ptr'
             expected_create_count=1
             expected_destroy_count=1
             ;;
         *)
-            fail "unknown positive RootValue audit: $kind"
+            fail "unknown positive value ownership audit: $kind"
             ;;
     esac
 
-    local bundle="$WORK_ROOT/$stage_label.root-value.$kind.range"
-    local first="$WORK_ROOT/$stage_label.root-value.$kind.first.ll"
-    local second="$WORK_ROOT/$stage_label.root-value.$kind.repeat.ll"
-    local first_error="$WORK_ROOT/$stage_label.root-value.$kind.first.err"
-    local second_error="$WORK_ROOT/$stage_label.root-value.$kind.repeat.err"
+    local bundle="$WORK_ROOT/$stage_label.value-ownership.$kind.range"
+    local first="$WORK_ROOT/$stage_label.value-ownership.$kind.first.ll"
+    local second="$WORK_ROOT/$stage_label.value-ownership.$kind.repeat.ll"
+    local first_error="$WORK_ROOT/$stage_label.value-ownership.$kind.first.err"
+    local second_error="$WORK_ROOT/$stage_label.value-ownership.$kind.repeat.err"
     local llvm="$stage_directory/$artifact.ll"
     local linked="$stage_directory/$artifact"
-    local run_output="$WORK_ROOT/$stage_label.root-value.$kind.run.out"
-    local run_error="$WORK_ROOT/$stage_label.root-value.$kind.run.err"
+    local run_output="$WORK_ROOT/$stage_label.value-ownership.$kind.run.out"
+    local run_error="$WORK_ROOT/$stage_label.value-ownership.$kind.run.err"
 
-    write_root_value_bundle "$bundle" "$kind"
+    write_value_ownership_bundle "$bundle" "$kind"
     run_capture "$executable" "$bundle" "$first" "$first_error"
-    require_successful_output "$stage_label RootValue $kind" "$first" "$first_error"
+    require_successful_output "$stage_label value ownership $kind" "$first" "$first_error"
     run_capture "$executable" "$bundle" "$second" "$second_error"
-    require_successful_output "$stage_label repeated RootValue $kind" "$second" "$second_error"
-    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label RootValue $kind LLVM was not deterministic"
+    require_successful_output "$stage_label repeated value ownership $kind" "$second" "$second_error"
+    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label value ownership $kind LLVM was not deterministic"
 
     /usr/bin/grep -Fq "$definition_marker" "$first" \
-        || fail "$stage_label RootValue $kind omitted native definition: $definition_marker"
+        || fail "$stage_label value ownership $kind omitted native definition: $definition_marker"
     /usr/bin/grep -Fq "$call_marker" "$first" \
-        || fail "$stage_label RootValue $kind omitted native call: $call_marker"
+        || fail "$stage_label value ownership $kind omitted native call: $call_marker"
     if [[ "$kind" == loop-invariant ]]; then
         /usr/bin/grep -Fq 'call i32 @rawBufferCount(ptr' "$first" \
-            || fail "$stage_label RootValue loop invariant omitted its shared read"
+            || fail "$stage_label value ownership loop invariant omitted its shared read"
     fi
     if [[ "$kind" == absent-branch-scope ]]; then
         /usr/bin/grep -Fq '%Range.AbsentBranchAliasView = type { ptr }' "$first" \
@@ -3210,37 +3210,37 @@ audit_root_value_positive() {
         consume_definition_count="$(/usr/bin/grep -F -c 'define i32 @destroyRootBufferInCallee(ptr' "$first" || true)"
         consume_call_count="$(/usr/bin/grep -F -c 'call i32 @destroyRootBufferInCallee(ptr' "$first" || true)"
         [[ "$consume_definition_count" -eq 1 ]] \
-            || fail "$stage_label RootValue boundary consume emitted $consume_definition_count helper definitions; expected 1"
+            || fail "$stage_label value ownership boundary consume emitted $consume_definition_count helper definitions; expected 1"
         [[ "$consume_call_count" -eq 1 ]] \
-            || fail "$stage_label RootValue boundary consume emitted $consume_call_count helper calls; expected 1"
+            || fail "$stage_label value ownership boundary consume emitted $consume_call_count helper calls; expected 1"
     fi
     local actual_create_count actual_destroy_count
     actual_create_count="$(/usr/bin/grep -F -c 'call ptr @rawBufferCreate(' "$first" || true)"
     actual_destroy_count="$(/usr/bin/grep -F -c 'call i32 @rawBufferDestroy(ptr' "$first" || true)"
     [[ "$actual_create_count" -eq "$expected_create_count" ]] \
-        || fail "$stage_label RootValue $kind emitted $actual_create_count creates; expected $expected_create_count"
+        || fail "$stage_label value ownership $kind emitted $actual_create_count creates; expected $expected_create_count"
     [[ "$actual_destroy_count" -eq "$expected_destroy_count" ]] \
-        || fail "$stage_label RootValue $kind emitted $actual_destroy_count destructions; expected $expected_destroy_count"
+        || fail "$stage_label value ownership $kind emitted $actual_destroy_count destructions; expected $expected_destroy_count"
 
     if [[ "$kind" == direct-holder ]]; then
         /usr/bin/grep -Fq '%Range.RootDirectHolder = type { ptr }' "$first" \
-            || fail "$stage_label direct RootValue holder omitted its pointer layout"
+            || fail "$stage_label direct value ownership holder omitted its pointer layout"
     fi
     if [[ "$kind" == nested-inline ]]; then
         /usr/bin/grep -Fq '%Range.RootNestedInner = type { ptr }' "$first" \
-            || fail "$stage_label nested RootValue omitted its inner layout"
+            || fail "$stage_label nested value ownership omitted its inner layout"
         /usr/bin/grep -Fq '%Range.RootNestedOuter = type { ptr }' "$first" \
-            || fail "$stage_label nested RootValue omitted its direct identity-link layout"
+            || fail "$stage_label nested value ownership omitted its direct identity-link layout"
         /usr/bin/grep -Fq 'call ptr @rangeConstructIdentityCreate(i64 ' "$first" \
-            || fail "$stage_label nested RootValue omitted identity-link allocation"
+            || fail "$stage_label nested value ownership omitted identity-link allocation"
     fi
     if [[ "$kind" == inline-local-return ]]; then
         /usr/bin/grep -Fq '%Range.RootLocalHolder = type { ptr }' "$first" \
-            || fail "$stage_label local RootValue return omitted its pointer layout"
+            || fail "$stage_label local value ownership return omitted its pointer layout"
     fi
     if [[ "$kind" == two-owned-leaves ]]; then
         /usr/bin/grep -Fq '%Range.RootTwinHolder = type { ptr, ptr }' "$first" \
-            || fail "$stage_label two-leaf RootValue return omitted its exact layout"
+            || fail "$stage_label two-leaf value ownership return omitted its exact layout"
     fi
     if [[ "$kind" == partial-sibling ]]; then
         /usr/bin/grep -Fq '%Range.RootPartialOwner = type { ptr, ptr }' "$first" \
@@ -3257,16 +3257,16 @@ audit_root_value_positive() {
     local forbidden forbidden_construct_symbol
     for forbidden in malloc calloc realloc free; do
         if /usr/bin/grep -Fq "$forbidden" "$first"; then
-            fail "$stage_label RootValue $kind emitted forbidden dynamic/allocator symbol: $forbidden"
+            fail "$stage_label value ownership $kind emitted forbidden dynamic/allocator symbol: $forbidden"
         fi
     done
     for forbidden_construct_symbol in rangeConstructCreate rangeConstructGet rangeConstructSet; do
         if /usr/bin/grep -Fq "$forbidden_construct_symbol" "$first"; then
-            fail "$stage_label RootValue $kind emitted forbidden name-keyed construct symbol: $forbidden_construct_symbol"
+            fail "$stage_label value ownership $kind emitted forbidden name-keyed construct symbol: $forbidden_construct_symbol"
         fi
     done
     if [[ "$kind" != nested-inline ]] && /usr/bin/grep -Fq 'rangeConstructIdentityCreate' "$first"; then
-        fail "$stage_label RootValue $kind emitted an unexpected identity allocation"
+        fail "$stage_label value ownership $kind emitted an unexpected identity allocation"
     fi
 
     /bin/mkdir -p "$stage_directory"
@@ -3278,118 +3278,118 @@ audit_root_value_positive() {
     else
         RUN_STATUS=$?
     fi
-    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label RootValue $kind executable exited $RUN_STATUS"
-    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label RootValue $kind executable wrote output"
-    echo "$stage_label RootValue $kind: pass (deterministic native ownership, validate/link, exit 7)"
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "$stage_label value ownership $kind executable exited $RUN_STATUS"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "$stage_label value ownership $kind executable wrote output"
+    echo "$stage_label value ownership $kind: pass (deterministic native ownership, validate/link, exit 7)"
 }
 
-audit_root_value_negative() {
+audit_value_ownership_negative() {
     local stage_label="$1"
     local executable="$2"
     local kind="$3"
-    local bundle="$WORK_ROOT/$stage_label.root-value.$kind.range"
-    local first="$WORK_ROOT/$stage_label.root-value.$kind.first.out"
-    local second="$WORK_ROOT/$stage_label.root-value.$kind.repeat.out"
-    local first_error="$WORK_ROOT/$stage_label.root-value.$kind.first.err"
-    local second_error="$WORK_ROOT/$stage_label.root-value.$kind.repeat.err"
+    local bundle="$WORK_ROOT/$stage_label.value-ownership.$kind.range"
+    local first="$WORK_ROOT/$stage_label.value-ownership.$kind.first.out"
+    local second="$WORK_ROOT/$stage_label.value-ownership.$kind.repeat.out"
+    local first_error="$WORK_ROOT/$stage_label.value-ownership.$kind.first.err"
+    local second_error="$WORK_ROOT/$stage_label.value-ownership.$kind.repeat.err"
 
-    write_root_value_bundle "$bundle" "$kind"
+    write_value_ownership_bundle "$bundle" "$kind"
     run_capture "$executable" "$bundle" "$first" "$first_error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label RootValue $kind exited $RUN_STATUS"
-    [[ ! -s "$first_error" ]] || fail "$stage_label RootValue $kind wrote stderr"
-    /usr/bin/grep -Fq $'compilerError\t' "$first" || fail "$stage_label RootValue $kind omitted compilerError"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label value ownership $kind exited $RUN_STATUS"
+    [[ ! -s "$first_error" ]] || fail "$stage_label value ownership $kind wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\t' "$first" || fail "$stage_label value ownership $kind omitted compilerError"
     if [[ "$kind" == loop-ownership-change ]]; then
         /usr/bin/grep -Fq 'kind=invalidOwnedReturnSummary' "$first" \
-            || fail "$stage_label RootValue ownership-changing loop omitted invalidOwnedReturnSummary"
+            || fail "$stage_label value ownership ownership-changing loop omitted invalidOwnedReturnSummary"
         /usr/bin/grep -Fq 'failureKind=proof' "$first" \
-            || fail "$stage_label RootValue ownership-changing loop was not rejected by ownership proof"
+            || fail "$stage_label value ownership ownership-changing loop was not rejected by ownership proof"
         /usr/bin/grep -Fq 'detail=6' "$first" \
-            || fail "$stage_label RootValue ownership-changing loop omitted proof detail 6"
+            || fail "$stage_label value ownership ownership-changing loop omitted proof detail 6"
     fi
     if [[ "$kind" == absent-branch-live-exit ]]; then
         /usr/bin/grep -Fq 'kind=invalidEntryOwnedPaths' "$first" \
-            || fail "$stage_label RootValue $kind omitted its entry ownership diagnostic"
+            || fail "$stage_label value ownership $kind omitted its entry ownership diagnostic"
         /usr/bin/grep -Fq 'detail=6011' "$first" \
-            || fail "$stage_label RootValue $kind omitted entry edge-projection detail 6011"
+            || fail "$stage_label value ownership $kind omitted entry edge-projection detail 6011"
     fi
     if [[ "$kind" == absent-conditional-live ]]; then
         /usr/bin/grep -Fq 'kind=invalidFunctionReachability' "$first" \
-            || fail "$stage_label RootValue $kind omitted its function ownership diagnostic"
+            || fail "$stage_label value ownership $kind omitted its function ownership diagnostic"
         /usr/bin/grep -Fq 'function=rejectAbsentOrLiveTerminal' "$first" \
-            || fail "$stage_label RootValue $kind omitted its failing function identity"
+            || fail "$stage_label value ownership $kind omitted its failing function identity"
         /usr/bin/grep -Fq 'ownedPathStage=14' "$first" \
-            || fail "$stage_label RootValue $kind omitted terminal ownership stage 14"
+            || fail "$stage_label value ownership $kind omitted terminal ownership stage 14"
     fi
     if [[ "$kind" == absent-loop-live ]]; then
         /usr/bin/grep -Fq 'kind=invalidEntryOwnedPaths' "$first" \
-            || fail "$stage_label RootValue $kind omitted its entry ownership diagnostic"
+            || fail "$stage_label value ownership $kind omitted its entry ownership diagnostic"
         /usr/bin/grep -Fq 'detail=6016' "$first" \
-            || fail "$stage_label RootValue $kind omitted backedge ownership detail 6016"
+            || fail "$stage_label value ownership $kind omitted backedge ownership detail 6016"
     fi
     if /usr/bin/grep -Fq 'define ' "$first" || /usr/bin/grep -Fq 'call ' "$first"; then
-        fail "$stage_label RootValue $kind emitted LLVM before rejection"
+        fail "$stage_label value ownership $kind emitted LLVM before rejection"
     fi
 
     run_capture "$executable" "$bundle" "$second" "$second_error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label repeated RootValue $kind exited $RUN_STATUS"
-    [[ ! -s "$second_error" ]] || fail "$stage_label repeated RootValue $kind wrote stderr"
-    /usr/bin/grep -Fq $'compilerError\t' "$second" || fail "$stage_label repeated RootValue $kind omitted compilerError"
+    [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label repeated value ownership $kind exited $RUN_STATUS"
+    [[ ! -s "$second_error" ]] || fail "$stage_label repeated value ownership $kind wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\t' "$second" || fail "$stage_label repeated value ownership $kind omitted compilerError"
     if [[ "$kind" == loop-ownership-change ]]; then
         /usr/bin/grep -Fq 'kind=invalidOwnedReturnSummary' "$second" \
-            || fail "$stage_label repeated RootValue ownership-changing loop omitted invalidOwnedReturnSummary"
+            || fail "$stage_label repeated value ownership ownership-changing loop omitted invalidOwnedReturnSummary"
         /usr/bin/grep -Fq 'failureKind=proof' "$second" \
-            || fail "$stage_label repeated RootValue ownership-changing loop was not rejected by ownership proof"
+            || fail "$stage_label repeated value ownership ownership-changing loop was not rejected by ownership proof"
         /usr/bin/grep -Fq 'detail=6' "$second" \
-            || fail "$stage_label repeated RootValue ownership-changing loop omitted proof detail 6"
+            || fail "$stage_label repeated value ownership ownership-changing loop omitted proof detail 6"
     fi
     if [[ "$kind" == absent-branch-live-exit ]]; then
         /usr/bin/grep -Fq 'kind=invalidEntryOwnedPaths' "$second" \
-            || fail "$stage_label repeated RootValue $kind omitted its entry ownership diagnostic"
+            || fail "$stage_label repeated value ownership $kind omitted its entry ownership diagnostic"
         /usr/bin/grep -Fq 'detail=6011' "$second" \
-            || fail "$stage_label repeated RootValue $kind omitted entry edge-projection detail 6011"
+            || fail "$stage_label repeated value ownership $kind omitted entry edge-projection detail 6011"
     fi
     if [[ "$kind" == absent-conditional-live ]]; then
         /usr/bin/grep -Fq 'kind=invalidFunctionReachability' "$second" \
-            || fail "$stage_label repeated RootValue $kind omitted its function ownership diagnostic"
+            || fail "$stage_label repeated value ownership $kind omitted its function ownership diagnostic"
         /usr/bin/grep -Fq 'function=rejectAbsentOrLiveTerminal' "$second" \
-            || fail "$stage_label repeated RootValue $kind omitted its failing function identity"
+            || fail "$stage_label repeated value ownership $kind omitted its failing function identity"
         /usr/bin/grep -Fq 'ownedPathStage=14' "$second" \
-            || fail "$stage_label repeated RootValue $kind omitted terminal ownership stage 14"
+            || fail "$stage_label repeated value ownership $kind omitted terminal ownership stage 14"
     fi
     if [[ "$kind" == absent-loop-live ]]; then
         /usr/bin/grep -Fq 'kind=invalidEntryOwnedPaths' "$second" \
-            || fail "$stage_label repeated RootValue $kind omitted its entry ownership diagnostic"
+            || fail "$stage_label repeated value ownership $kind omitted its entry ownership diagnostic"
         /usr/bin/grep -Fq 'detail=6016' "$second" \
-            || fail "$stage_label repeated RootValue $kind omitted backedge ownership detail 6016"
+            || fail "$stage_label repeated value ownership $kind omitted backedge ownership detail 6016"
     fi
     if /usr/bin/grep -Fq 'define ' "$second" || /usr/bin/grep -Fq 'call ' "$second"; then
-        fail "$stage_label repeated RootValue $kind emitted LLVM before rejection"
+        fail "$stage_label repeated value ownership $kind emitted LLVM before rejection"
     fi
-    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label RootValue $kind diagnostic was not deterministic"
-    echo "$stage_label RootValue $kind: pass (deterministic pre-emission rejection)"
+    /usr/bin/cmp -s "$first" "$second" || fail "$stage_label value ownership $kind diagnostic was not deterministic"
+    echo "$stage_label value ownership $kind: pass (deterministic pre-emission rejection)"
 }
 
-audit_root_values() {
+audit_value_ownership() {
     local stage_label="$1"
     local executable="$2"
     local stage_directory="$3"
 
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" opaque-return
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" boundary-forward-direct
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" boundary-forward-transitive
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" boundary-forward-two-owned-inputs
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" boundary-forward-mixed
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" direct-holder
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" nested-inline
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" inline-local-return
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" two-owned-leaves
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" partial-sibling
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" loop-invariant
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" absent-early-return
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" absent-branch-scope
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" absent-loop-reevaluation
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" absent-returned-alias
-    audit_root_value_positive "$stage_label" "$executable" "$stage_directory" boundary-consume
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" opaque-return
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" boundary-forward-direct
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" boundary-forward-transitive
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" boundary-forward-two-owned-inputs
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" boundary-forward-mixed
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" direct-holder
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" nested-inline
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" inline-local-return
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" two-owned-leaves
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" partial-sibling
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" loop-invariant
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" absent-early-return
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" absent-branch-scope
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" absent-loop-reevaluation
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" absent-returned-alias
+    audit_value_ownership_positive "$stage_label" "$executable" "$stage_directory" boundary-consume
     # Lexical scope makes a projected-Absent symbol unnameable. Legal loop
     # reactivation and live loop re-entry therefore cover activation exactness;
     # duplicate-move and partial-double-destroy cover the spellable repeated
@@ -3398,31 +3398,31 @@ audit_root_values() {
     # ordinary source surface cannot yet supply a reachable Optional-owned
     # boundary value without failing earlier at nil/injection ownership. Do not
     # disguise that gap with a retyped builtin, special root, or proof directive.
-    audit_root_value_negative "$stage_label" "$executable" discarded-create
-    audit_root_value_negative "$stage_label" "$executable" duplicate-move
-    audit_root_value_negative "$stage_label" "$executable" missing-destroy
-    audit_root_value_negative "$stage_label" "$executable" use-after-move
-    audit_root_value_negative "$stage_label" "$executable" binding-as-ownership
-    audit_root_value_negative "$stage_label" "$executable" partial-whole-move
-    audit_root_value_negative "$stage_label" "$executable" partial-double-destroy
-    audit_root_value_negative "$stage_label" "$executable" partial-use-after-destroy
-    audit_root_value_negative "$stage_label" "$executable" absent-branch-live-exit
-    audit_root_value_negative "$stage_label" "$executable" absent-conditional-live
-    audit_root_value_negative "$stage_label" "$executable" absent-loop-live
-    audit_root_value_negative "$stage_label" "$executable" loop-ownership-change
-    audit_root_value_negative "$stage_label" "$executable" boundary-consume-source-destroy
-    audit_root_value_negative "$stage_label" "$executable" boundary-forward-direct-source-use
-    audit_root_value_negative "$stage_label" "$executable" boundary-forward-transitive-source-use
-    audit_root_value_negative "$stage_label" "$executable" boundary-forward-destroy
-    audit_root_value_negative "$stage_label" "$executable" boundary-forward-alias-actual
-    audit_root_value_negative "$stage_label" "$executable" boundary-forward-branch-ordinal
-    audit_root_value_negative "$stage_label" "$executable" boundary-forward-branch-mode
-    audit_root_value_negative "$stage_label" "$executable" boundary-forward-duplicate
-    audit_root_value_negative "$stage_label" "$executable" boundary-forward-alias-conflict
-    echo "$stage_label RootValue ownership: pass (opaque/direct/nested/local/forwarded/mixed returns, boundary consume, partial siblings, explicit Absent activation/scope/re-evaluation, branch provenance, loop invariance, fail-closed lifecycle)"
+    audit_value_ownership_negative "$stage_label" "$executable" discarded-create
+    audit_value_ownership_negative "$stage_label" "$executable" duplicate-move
+    audit_value_ownership_negative "$stage_label" "$executable" missing-destroy
+    audit_value_ownership_negative "$stage_label" "$executable" use-after-move
+    audit_value_ownership_negative "$stage_label" "$executable" binding-as-ownership
+    audit_value_ownership_negative "$stage_label" "$executable" partial-whole-move
+    audit_value_ownership_negative "$stage_label" "$executable" partial-double-destroy
+    audit_value_ownership_negative "$stage_label" "$executable" partial-use-after-destroy
+    audit_value_ownership_negative "$stage_label" "$executable" absent-branch-live-exit
+    audit_value_ownership_negative "$stage_label" "$executable" absent-conditional-live
+    audit_value_ownership_negative "$stage_label" "$executable" absent-loop-live
+    audit_value_ownership_negative "$stage_label" "$executable" loop-ownership-change
+    audit_value_ownership_negative "$stage_label" "$executable" boundary-consume-source-destroy
+    audit_value_ownership_negative "$stage_label" "$executable" boundary-forward-direct-source-use
+    audit_value_ownership_negative "$stage_label" "$executable" boundary-forward-transitive-source-use
+    audit_value_ownership_negative "$stage_label" "$executable" boundary-forward-destroy
+    audit_value_ownership_negative "$stage_label" "$executable" boundary-forward-alias-actual
+    audit_value_ownership_negative "$stage_label" "$executable" boundary-forward-branch-ordinal
+    audit_value_ownership_negative "$stage_label" "$executable" boundary-forward-branch-mode
+    audit_value_ownership_negative "$stage_label" "$executable" boundary-forward-duplicate
+    audit_value_ownership_negative "$stage_label" "$executable" boundary-forward-alias-conflict
+    echo "$stage_label value ownership ownership: pass (opaque/direct/nested/local/forwarded/mixed returns, boundary consume, partial siblings, explicit Absent activation/scope/re-evaluation, branch provenance, loop invariance, fail-closed lifecycle)"
 }
 
-compare_root_value_stages() {
+compare_value_ownership_stages() {
     local left_label="$1"
     local left_directory="$2"
     local right_label="$3"
@@ -3430,32 +3430,32 @@ compare_root_value_stages() {
     local specification kind artifact
 
     for specification in \
-        opaque-return:RootValueOpaqueReturn \
-        boundary-forward-direct:RootValueBoundaryForwardDirect \
-        boundary-forward-transitive:RootValueBoundaryForwardTransitive \
-        boundary-forward-two-owned-inputs:RootValueBoundaryForwardPair \
-        boundary-forward-mixed:RootValueBoundaryForwardMixed \
-        direct-holder:RootValueDirectHolder \
-        nested-inline:RootValueNestedInline \
-        inline-local-return:RootValueInlineLocalReturn \
-        two-owned-leaves:RootValueTwoOwnedLeaves \
-        partial-sibling:RootValuePartialSibling \
-        loop-invariant:RootValueLoopInvariant \
-        absent-early-return:RootValueAbsentEarlyReturn \
-        absent-branch-scope:RootValueAbsentBranchScope \
-        absent-loop-reevaluation:RootValueAbsentLoopReevaluation \
-        absent-returned-alias:RootValueAbsentReturnedAlias \
-        boundary-consume:RootValueBoundaryConsume; do
+        opaque-return:ValueOwnershipOpaqueReturn \
+        boundary-forward-direct:ValueOwnershipBoundaryForwardDirect \
+        boundary-forward-transitive:ValueOwnershipBoundaryForwardTransitive \
+        boundary-forward-two-owned-inputs:ValueOwnershipBoundaryForwardPair \
+        boundary-forward-mixed:ValueOwnershipBoundaryForwardMixed \
+        direct-holder:ValueOwnershipDirectHolder \
+        nested-inline:ValueOwnershipNestedInline \
+        inline-local-return:ValueOwnershipInlineLocalReturn \
+        two-owned-leaves:ValueOwnershipTwoOwnedLeaves \
+        partial-sibling:ValueOwnershipPartialSibling \
+        loop-invariant:ValueOwnershipLoopInvariant \
+        absent-early-return:ValueOwnershipAbsentEarlyReturn \
+        absent-branch-scope:ValueOwnershipAbsentBranchScope \
+        absent-loop-reevaluation:ValueOwnershipAbsentLoopReevaluation \
+        absent-returned-alias:ValueOwnershipAbsentReturnedAlias \
+        boundary-consume:ValueOwnershipBoundaryConsume; do
         kind="${specification%%:*}"
         artifact="${specification#*:}"
-        /usr/bin/cmp -s "$WORK_ROOT/$left_label.root-value.$kind.first.ll" "$WORK_ROOT/$right_label.root-value.$kind.first.ll" \
-            || fail "$left_label and $right_label RootValue $kind LLVM differs"
-        /usr/bin/cmp -s "$WORK_ROOT/$left_label.root-value.$kind.repeat.ll" "$WORK_ROOT/$right_label.root-value.$kind.repeat.ll" \
-            || fail "$left_label and $right_label repeated RootValue $kind LLVM differs"
+        /usr/bin/cmp -s "$WORK_ROOT/$left_label.value-ownership.$kind.first.ll" "$WORK_ROOT/$right_label.value-ownership.$kind.first.ll" \
+            || fail "$left_label and $right_label value ownership $kind LLVM differs"
+        /usr/bin/cmp -s "$WORK_ROOT/$left_label.value-ownership.$kind.repeat.ll" "$WORK_ROOT/$right_label.value-ownership.$kind.repeat.ll" \
+            || fail "$left_label and $right_label repeated value ownership $kind LLVM differs"
         /usr/bin/cmp -s "$left_directory/$artifact.ll" "$right_directory/$artifact.ll" \
-            || fail "$left_label and $right_label RootValue $kind artifacts differ"
+            || fail "$left_label and $right_label value ownership $kind artifacts differ"
         /usr/bin/cmp -s "$left_directory/$artifact" "$right_directory/$artifact" \
-            || fail "$left_label and $right_label RootValue $kind executables differ"
+            || fail "$left_label and $right_label value ownership $kind executables differ"
     done
 
     for kind in \
@@ -3480,12 +3480,12 @@ compare_root_value_stages() {
         boundary-forward-branch-mode \
         boundary-forward-duplicate \
         boundary-forward-alias-conflict; do
-        /usr/bin/cmp -s "$WORK_ROOT/$left_label.root-value.$kind.first.out" "$WORK_ROOT/$right_label.root-value.$kind.first.out" \
-            || fail "$left_label and $right_label RootValue $kind diagnostics differ"
-        /usr/bin/cmp -s "$WORK_ROOT/$left_label.root-value.$kind.repeat.out" "$WORK_ROOT/$right_label.root-value.$kind.repeat.out" \
-            || fail "$left_label and $right_label repeated RootValue $kind diagnostics differ"
+        /usr/bin/cmp -s "$WORK_ROOT/$left_label.value-ownership.$kind.first.out" "$WORK_ROOT/$right_label.value-ownership.$kind.first.out" \
+            || fail "$left_label and $right_label value ownership $kind diagnostics differ"
+        /usr/bin/cmp -s "$WORK_ROOT/$left_label.value-ownership.$kind.repeat.out" "$WORK_ROOT/$right_label.value-ownership.$kind.repeat.out" \
+            || fail "$left_label and $right_label repeated value ownership $kind diagnostics differ"
     done
-    echo "$left_label/$right_label RootValue ownership: byte-identical LLVM/executables/diagnostics"
+    echo "$left_label/$right_label value ownership ownership: byte-identical LLVM/executables/diagnostics"
 }
 
 write_macro_positive_bundle() {
@@ -4186,7 +4186,7 @@ write_macro_registrable_root_storage_bundle() {
         'compilerSourceFile\trole=core\tpath=Core/RootStorage.range' \
         'macro rootStorage(): Construct { environment in' \
         '    #environment {' \
-        '        let rootValue: Int' \
+        '        let value: Int' \
         '    }' \
         '}' \
         'compilerSourceFile\trole=project\tpath=Project/RootStorageUse.range' \
@@ -5174,7 +5174,7 @@ audit_stage() {
     audit_driver_source_graph "$stage_label" "$executable"
     audit_canonical_core "$stage_label" "$executable" "$stage_directory"
     audit_binding_references "$stage_label" "$executable" "$stage_directory"
-    audit_root_values "$stage_label" "$executable" "$stage_directory"
+    audit_value_ownership "$stage_label" "$executable" "$stage_directory"
     audit_builtin_marker "$stage_label" "$executable"
     audit_macro_linking "$stage_label" "$executable"
     audit_macro_execution "$stage_label" "$executable"
@@ -5771,9 +5771,9 @@ main() {
         echo "bootstrap bridge deterministic validate/link: pass"
 
         audit_binding_references BootstrapBridge "$bootstrap_bridge_executable" "$bootstrap_bridge_artifact_directory"
-        audit_root_values BootstrapBridge "$bootstrap_bridge_executable" "$bootstrap_bridge_artifact_directory"
+        audit_value_ownership BootstrapBridge "$bootstrap_bridge_executable" "$bootstrap_bridge_artifact_directory"
         audit_placement_symbol_guard BootstrapBridge "$bootstrap_bridge_executable" "$bootstrap_bridge_artifact_directory"
-        echo "bootstrap bridge ownership capability: pass (binding aliases, RootValue, placement guard, one-shot producer only)"
+        echo "bootstrap bridge ownership capability: pass (binding aliases, value ownership, placement guard, one-shot producer only)"
 
         emit_candidate_llvm "$bootstrap_bridge_executable" "$SOURCE_BUNDLE" "$stage2_llvm" stage2
         echo "checkpoint compiler-candidate:stage2-emitted: pass"
@@ -5851,12 +5851,12 @@ main() {
     assert_candidate_build_plan_unchanged
 
     compare_binding_reference_stages Stage2 "$stage2_directory" Stage3 "$stage3_directory"
-    compare_root_value_stages Stage2 "$stage2_directory" Stage3 "$stage3_directory"
+    compare_value_ownership_stages Stage2 "$stage2_directory" Stage3 "$stage3_directory"
     compare_body_syntax_split_stages Stage2 "$stage2_directory" Stage3 "$stage3_directory"
     compare_placement_symbol_guard_stages Stage2 "$stage2_directory" Stage3 "$stage3_directory"
     if [[ -n "$bootstrap_bridge_source_directory" ]]; then
         compare_binding_reference_stages BootstrapBridge "$bootstrap_bridge_artifact_directory" Stage2 "$stage2_directory"
-        compare_root_value_stages BootstrapBridge "$bootstrap_bridge_artifact_directory" Stage2 "$stage2_directory"
+        compare_value_ownership_stages BootstrapBridge "$bootstrap_bridge_artifact_directory" Stage2 "$stage2_directory"
         compare_placement_symbol_guard_stages BootstrapBridge "$bootstrap_bridge_artifact_directory" Stage2 "$stage2_directory"
     fi
 

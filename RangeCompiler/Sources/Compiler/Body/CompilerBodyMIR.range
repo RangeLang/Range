@@ -598,8 +598,7 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         if resolutionTargetKind == compilerBodyResolutionMacroCapability()
             || resolutionTargetKind == compilerBodyResolutionMacroCapabilityDenied()
             || resolutionTargetKind == compilerBodyResolutionMacroGraphQuery()
-            || resolutionTargetKind == compilerBodyResolutionMacroTargetOperation()
-            || resolutionTargetKind == compilerBodyResolutionMacroTargetQueryInvalid() { callTargetKind: compilerBodyMIROperationTargetNone() }
+            || resolutionTargetKind == compilerBodyResolutionMacroTargetOperation() { callTargetKind: compilerBodyMIROperationTargetNone() }
         let callTypeKind: Int(compilerIntTableValue(table: arena.resolutions, row: callResolutionRow, column: compilerBodyResolutionTypeKindColumn()))
         let callTypeID: Int(compilerIntTableValue(table: arena.resolutions, row: callResolutionRow, column: compilerBodyResolutionTypeIDColumn()))
         let callValueID: Int(compilerBodyMIRAppendValue(arena: arena, kind: compilerBodyMIRValueCall(), typeKind: callTypeKind, typeID: compilerBodyMIRNominalTypeID(typeKind: callTypeKind, typeID: callTypeID), sourceNodeID: nodeID, provenanceKind: compilerBodyMemorySubjectNode(), provenanceID: nodeID))
@@ -618,22 +617,19 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
             || resolutionTargetKind == compilerBodyResolutionMacroCapability()
             || resolutionTargetKind == compilerBodyResolutionMacroCapabilityDenied()
             || resolutionTargetKind == compilerBodyResolutionMacroGraphQuery()
-            || (resolutionTargetKind == compilerBodyResolutionMacroTargetOperation() && targetID != compilerMacroTargetOperationExpand())
-            || resolutionTargetKind == compilerBodyResolutionMacroTargetQueryInvalid() { callOperandCount: callOperandCount + 1 }
+            || (resolutionTargetKind == compilerBodyResolutionMacroTargetOperation() && targetID != compilerMacroTargetOperationExpand()) { callOperandCount: callOperandCount + 1 }
         let argumentValues: Buffer<Int>(bufferCreateInt(capacity: callOperandCount))
         if ordinaryMemberFunctionCall
             || resolutionTargetKind == compilerBodyResolutionMemberRuntimeBuiltin()
             || resolutionTargetKind == compilerBodyResolutionMacroCapability()
             || resolutionTargetKind == compilerBodyResolutionMacroCapabilityDenied()
             || resolutionTargetKind == compilerBodyResolutionMacroGraphQuery()
-            || (resolutionTargetKind == compilerBodyResolutionMacroTargetOperation() && targetID != compilerMacroTargetOperationExpand())
-            || resolutionTargetKind == compilerBodyResolutionMacroTargetQueryInvalid() {
+            || (resolutionTargetKind == compilerBodyResolutionMacroTargetOperation() && targetID != compilerMacroTargetOperationExpand()) {
             state memberCallReceiverNodeID: Int(compilerBodyArenaChild(arena: arena, ownerNodeID: calleeNodeID, role: compilerSyntaxRoleReceiver(), ordinal: 0))
             if resolutionTargetKind == compilerBodyResolutionMacroCapability()
                 || resolutionTargetKind == compilerBodyResolutionMacroCapabilityDenied()
                 || resolutionTargetKind == compilerBodyResolutionMacroGraphQuery()
-                || resolutionTargetKind == compilerBodyResolutionMacroTargetOperation()
-                || resolutionTargetKind == compilerBodyResolutionMacroTargetQueryInvalid() {
+                || resolutionTargetKind == compilerBodyResolutionMacroTargetOperation() {
                 memberCallReceiverNodeID: compilerBodyArenaMacroCapabilityRootNode(arena: arena, nodeID: nodeID)
             }
             if memberCallReceiverNodeID < 0 {
@@ -722,10 +718,8 @@ function compilerBodyMIRBuildExpression(arena: CompilerBodyArena, nodeID: Int, b
         if resolutionTargetKind == compilerBodyResolutionMacroCapability() { callOperationKind: compilerBodyMIROperationMacroDiagnostic() }
         if resolutionTargetKind == compilerBodyResolutionMacroCapabilityDenied() { callOperationKind: compilerBodyMIROperationMacroCapabilityDenied() }
         if resolutionTargetKind == compilerBodyResolutionMacroGraphQuery() { callOperationKind: compilerBodyMIROperationMacroGraphQuery() }
-        if resolutionTargetKind == compilerBodyResolutionMacroTargetOperation()
-            || resolutionTargetKind == compilerBodyResolutionMacroTargetQueryInvalid() {
+        if resolutionTargetKind == compilerBodyResolutionMacroTargetOperation() {
             callOperationKind: compilerBodyMIROperationMacroTargetExpansion()
-            if targetID == compilerMacroTargetOperationMemberCount() { callOperationKind: compilerBodyMIROperationMacroTargetQuery() }
         }
         state callInstanceID: Int(0 - 1)
         if resolutionTargetKind == compilerBodyResolutionFunction() {
@@ -1084,7 +1078,7 @@ function compilerBodyMIRValueForOwnedSymbolPathAtBlock(arena: CompilerBodyArena,
     state valueID: Int(0 - 1)
     if rootKind == compilerBodyOwnedPathRootSymbol() {
         valueID: compilerBodyMIRValueForSymbolAtBlock(arena: arena, symbolID: rootID, blockID: blockID)
-    } else if rootKind == compilerBodyOwnedPathRootValue() {
+    } else if rootKind == compilerBodyOwnedPathRootEvaluation() {
         valueID: compilerBodyMIRExpressionValue(arena: arena, nodeID: rootID, action: compilerBodyCFGScheduleEvaluateNode())
         if valueID < 0 { valueID: compilerBodyMIRExpressionValue(arena: arena, nodeID: rootID, action: compilerBodyCFGScheduleOptionalJoin()) }
     }
@@ -1624,8 +1618,6 @@ function compilerBodyMIRBuildWithScheduleIndex(arena: CompilerBodyArena, schedul
     return compilerBodyGraphZeroFreezeMIR(arena: arena)
 }
 
-function compilerBodyMIRValidationMacroTargetQueryInvalidBase(): Int { return 320600 }
-
 function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: CompilerModuleABIPlan): Int {
     if !compilerBodyMemoryIsFrozenAndValid(arena: arena) { return 1 }
     if !compilerBodyGraphZeroMIRIsValid(arena: arena) { return 1 }
@@ -1746,8 +1738,7 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
         if operationKind == compilerBodyMIROperationMacroDiagnostic()
             || operationKind == compilerBodyMIROperationMacroCapabilityDenied()
             || operationKind == compilerBodyMIROperationMacroGraphQuery()
-            || operationKind == compilerBodyMIROperationMacroTargetExpansion()
-            || operationKind == compilerBodyMIROperationMacroTargetQuery() {
+            || operationKind == compilerBodyMIROperationMacroTargetExpansion() {
             let macroOperandCount: Int(compilerIntTableValue(table: arena.mirOperations, row: operationRow, column: compilerBodyMIROperationOperandCountColumn()))
             let macroReceiverValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 0))
             state macroRequiresReceiver: Bool(true)
@@ -1786,15 +1777,6 @@ function compilerBodyMIRValidationCode(arena: CompilerBodyArena, abiPlan: Compil
                     || queryNameValueID < 0 || queryNameValueID >= valueCount
                     || compilerIntTableValue(table: arena.mirValues, row: queryKindValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString()
                     || compilerIntTableValue(table: arena.mirValues, row: queryNameValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString() { return 320400 + operationRow }
-            } else {
-                let targetQueryNameValueID: Int(compilerBodyMIROperationOperandValue(arena: arena, operationID: operationRow, ordinal: 1))
-                if validationTargetID != compilerMacroTargetOperationMemberCount()
-                    || macroOperandCount != 2
-                    || compilerIntTableValue(table: arena.mirValues, row: resultValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeInt()
-                    || (compilerIntTableValue(table: arena.mirValues, row: macroReceiverValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeMacroTarget()
-                        && compilerIntTableValue(table: arena.mirValues, row: macroReceiverValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeConstruct())
-                    || targetQueryNameValueID < 0 || targetQueryNameValueID >= valueCount
-                    || compilerIntTableValue(table: arena.mirValues, row: targetQueryNameValueID, column: compilerBodyMIRValueTypeColumn()) != compilerBodyTypeString() { return compilerBodyMIRValidationMacroTargetQueryInvalidBase() + operationRow }
             }
         }
         if operationKind == compilerBodyMIROperationMacroEnvironmentProjection() {

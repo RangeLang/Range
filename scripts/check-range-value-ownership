@@ -3,11 +3,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Source the candidate harness so this checkpoint uses its canonical source
-# discovery, RootValue fixture writer, compiler invocation, and LLVM helpers.
+# discovery, value ownership fixture writer, compiler invocation, and LLVM helpers.
 source "$SCRIPT_DIR/check-range-compiler-candidate"
 source "$SCRIPT_DIR/resolve-range-stage2-compiler"
 
-# Root-value is the tight compiler-development loop. Its Stage 2 artifact is
+# Value ownership is the tight compiler-development loop. Its Stage 2 artifact is
 # deliberately disposable and fast to link; optimized/LTO artifacts remain the
 # responsibility of smoke, candidate, fixed-point, and promotion gates.
 RANGE_STAGE2_PROFILE="development"
@@ -19,16 +19,16 @@ COMPILER_LTO="-fno-lto"
 usage() {
     cat <<'USAGE'
 Usage:
-  scripts/check-range-root-value [DIR]
-  scripts/check-range-root-value --controls [DIR]
-  scripts/check-range-root-value --help
+  scripts/check-range-value-ownership [DIR]
+  scripts/check-range-value-ownership --controls [DIR]
+  scripts/check-range-value-ownership --help
 
 DIR defaults to RangeCompiler/Sources/Compiler. The command resolves a
 content-addressed development Stage 2 compiler (-O0, no LTO) for the current
-accepted seed, runtime, and compiler sources, then validates only RootValue
-boundary-forward-mixed.
-The controls mode runs the complete neighboring RootValue positive and negative
-fixture set against the same cached Stage 2 compiler. Both modes first verify
+accepted seed, runtime, and compiler sources, then validates only the ordinary
+value-ownership boundary-forward-mixed case.
+The controls mode runs the complete neighboring value-ownership positive and
+negative fixture set against the same cached Stage 2 compiler. Both modes first verify
 the focused @project scalar-default and @storage/@literal fixtures against
 that compiler.
 USAGE
@@ -94,6 +94,25 @@ check_target_pointer_bits_runtime() {
     [[ "$actual_status" -eq 64 ]] \
         || fail "ProjectDefaults target-pointer-bits-runtime returned $actual_status, expected 64"
     echo "ProjectDefaults target-pointer-bits-runtime: pass"
+}
+
+check_unregistered_string_reads_rejected() {
+    local relative fixture output error actual_status
+    for relative in \
+        Testing/Storage/Fail/UnregisteredStringReadBuiltin.range \
+        Testing/Storage/Fail/UnregisteredStringByteReadBuiltin.range; do
+        fixture="$REPO_ROOT/$relative"
+        output="$WORK_ROOT/$(/usr/bin/basename "$relative").out"
+        error="$WORK_ROOT/$(/usr/bin/basename "$relative").err"
+        actual_status=0
+        "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+            || actual_status=$?
+        [[ "$actual_status" -eq 65 && ! -s "$error" ]] \
+            || fail "$relative rejected at the wrong boundary"
+        /usr/bin/grep -Fq $'compilerError\tkind=invalidTypedDeclarations' "$output" \
+            || fail "$relative omitted its typed-declaration rejection"
+    done
+    echo "Storage unregistered string read builtin: pass"
 }
 
 check_range_native_project_macro() {
@@ -367,7 +386,7 @@ check_macro_generic_boundary_materialization() {
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1' "$output" \
         || fail "generic compile-time boundary materialization did not execute through the macro environment"
     [[ "$(/usr/bin/grep -F -c $'childApplicationRow=-1' "$output" || true)" -eq 5 ]] \
-        || fail "generic compile-time boundary materialization did not persist three root values and two array children"
+        || fail "generic compile-time boundary materialization did not persist three ordinary values and two array children"
     /usr/bin/grep -Eq $'macroGraphGeneratedFunction\trow=0\tkind=function.*\tname=generatedCount\treturnType=Int' "$output" \
         && /usr/bin/grep -Eq $'macroGraphGeneratedFunction\trow=1\tkind=function.*\tname=generatedValues\treturnType=Array<Int>' "$output" \
         && /usr/bin/grep -Eq $'macroGraphGeneratedFunction\trow=2\tkind=function.*\tname=generatedEnabled\treturnType=Bool' "$output" \
@@ -548,6 +567,160 @@ check_error_capability_registration() {
     echo "Errors validation-only Core @error: pass"
 }
 
+write_compiler_registration_bundle() {
+    local output="$1"
+    local fixture="$2"
+    local compiler_source="$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Compiler.range"
+
+    /usr/bin/printf '%s\n' \
+        'compilerMacroSnapshot' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro/CompilerReflection.range' \
+        '@builtin' \
+        'construct Array<Element> {}' \
+        '' \
+        'macro member(): Declaration | Member -> Void {}' \
+        'macro syntax(): Declaration -> Void {}' \
+        '' \
+        'construct Identifier {' \
+        '    let name: String' \
+        '}' \
+        '' \
+        'construct Construct {' \
+        '    @member' \
+        '    construct Declaration {' \
+        '        let identifier: Identifier' \
+        '        let members: Array<@member>' \
+        '    }' \
+        '}' \
+        '' \
+        'construct Function {' \
+        '    @syntax' \
+        '    @member' \
+        '    construct Declaration {' \
+        '        let identifier: Identifier' \
+        '    }' \
+        '}' > "$output"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Compiler.range' >> "$output"
+    /bin/cat "$compiler_source" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "${fixture#"$REPO_ROOT/"}" >> "$output"
+    /bin/cat "$fixture" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+}
+
+check_compiler_registration() {
+    local pass_fixture="$REPO_ROOT/Testing/Macros/Pass/CompilerRegistration.range"
+    local missing_fixture="$REPO_ROOT/Testing/Macros/Fail/CompilerRequiresPhase.range"
+    local pass_bundle="$WORK_ROOT/compiler-registration.pass.range"
+    local missing_bundle="$WORK_ROOT/compiler-registration.missing.range"
+    local pass_output="$WORK_ROOT/compiler-registration.pass.out"
+    local missing_output="$WORK_ROOT/compiler-registration.missing.out"
+    local pass_error="$WORK_ROOT/compiler-registration.pass.err"
+    local missing_error="$WORK_ROOT/compiler-registration.missing.err"
+    local actual_status
+
+    write_compiler_registration_bundle "$pass_bundle" "$pass_fixture"
+    write_compiler_registration_bundle "$missing_bundle" "$missing_fixture"
+
+    "$STAGE2_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
+        || fail "Core compiler registration did not compile: $(/usr/bin/head -n 1 "$pass_output")"
+    [[ ! -s "$pass_error" ]] || fail "Core compiler registration wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=3' "$pass_output" \
+        || fail "@compiler and its two @phase applications did not execute"
+    /usr/bin/grep -Fq $'macroResult\trow=2\tinvocationRow=0\tapplicationRow=3\tkind=2\ttypeKind=4\tnominalSyntaxID=0\tscalar=15\tchildCount=2\tparentRow=0\tordinal=1\trelationshipRow=-1' "$pass_output" \
+        || fail "@compiler did not retain exactly two ordered phase handles"
+    /usr/bin/grep -Fq $'macroResult\trow=3\tinvocationRow=0\tapplicationRow=3\tkind=5\ttypeKind=6\tnominalSyntaxID=-1\tscalar=16\tchildCount=0\tparentRow=2\tordinal=0\trelationshipRow=12' "$pass_output" \
+        || fail "@compiler did not retain shape as its first phase"
+    /usr/bin/grep -Fq $'macroResult\trow=4\tinvocationRow=0\tapplicationRow=3\tkind=5\ttypeKind=6\tnominalSyntaxID=-1\tscalar=18\tchildCount=0\tparentRow=2\tordinal=1\trelationshipRow=15' "$pass_output" \
+        || fail "@compiler did not retain usage as its second phase"
+    if /usr/bin/grep -Eq $'^macroResult\t.*scalar=17(\t|$)' "$pass_output"; then
+        fail "@compiler incorrectly registered the unannotated helper as a phase"
+    fi
+    /usr/bin/grep -Fq $'macroResult\trow=6\tinvocationRow=1\tapplicationRow=4\tkind=5\ttypeKind=6\tnominalSyntaxID=-1\tscalar=16\tchildCount=0\tparentRow=5\tordinal=0\trelationshipRow=-1' "$pass_output" \
+        || fail "@phase did not return a registration containing its shape function target"
+    /usr/bin/grep -Fq $'macroResult\trow=8\tinvocationRow=2\tapplicationRow=5\tkind=5\ttypeKind=6\tnominalSyntaxID=-1\tscalar=18\tchildCount=0\tparentRow=7\tordinal=0\trelationshipRow=-1' "$pass_output" \
+        || fail "@phase did not return a registration containing its usage function target"
+
+    actual_status=0
+    "$STAGE2_EXECUTABLE" compile "$missing_bundle" > "$missing_output" 2> "$missing_error" \
+        || actual_status=$?
+    [[ "$actual_status" -eq 65 && ! -s "$missing_error" ]] \
+        || fail "@compiler missing-phase control rejected at the wrong boundary"
+    /usr/bin/grep -Fq '@compiler requires at least one @phase function.' "$missing_output" \
+        || fail "@compiler missing-phase control omitted its diagnostic"
+
+    echo "Macros Core compiler registration: pass"
+}
+
+write_hashable_bundle() {
+    local output="$1"
+    local fixture="$2"
+    /usr/bin/printf '%s\n' \
+        'compilerMacroSnapshot' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro/HashableReflection.range' \
+        '@builtin' \
+        'construct Array<Element> {}' \
+        '' \
+        'macro member(): Declaration | Member -> Void {}' \
+        '' \
+        'construct Identifier {' \
+        '    let name: String' \
+        '}' \
+        '' \
+        '@member' \
+        'construct Let {' \
+        '    let identifier: Identifier' \
+        '}' \
+        '' \
+        'construct Construct {' \
+        '    construct Declaration {' \
+        '        let identifier: Identifier' \
+        '        let members: Array<@member>' \
+        '    }' \
+        '}' > "$output"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Hashable.range' >> "$output"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Hashable.range" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "${fixture#"$REPO_ROOT/"}" >> "$output"
+    /bin/cat "$fixture" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+}
+
+check_hashable_function_synthesis() {
+    local pass_fixture="$REPO_ROOT/Testing/Macros/Pass/HashableFunctionSynthesis.range"
+    local missing_fixture="$REPO_ROOT/Testing/Macros/Fail/HashableRequiresIdentity.range"
+    local pass_bundle="$WORK_ROOT/hashable-function.pass.range"
+    local missing_bundle="$WORK_ROOT/hashable-function.missing.range"
+    local pass_output="$WORK_ROOT/hashable-function.pass.out"
+    local missing_output="$WORK_ROOT/hashable-function.missing.out"
+    local pass_error="$WORK_ROOT/hashable-function.pass.err"
+    local missing_error="$WORK_ROOT/hashable-function.missing.err"
+    local actual_status
+
+    write_hashable_bundle "$pass_bundle" "$pass_fixture"
+    write_hashable_bundle "$missing_bundle" "$missing_fixture"
+
+    "$STAGE2_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
+        || fail "Core @hashable function synthesis did not compile: $(/usr/bin/head -n 1 "$pass_output")"
+    [[ ! -s "$pass_error" ]] || fail "Core @hashable function synthesis wrote stderr"
+    /usr/bin/grep -Eq $'macroGraphGeneratedFunction\trow=0\tkind=function\townerSyntaxID=[0-9]+\tplacement=1.*\tname=hash\treturnType=Int' "$pass_output" \
+        || fail "@hashable did not synthesize its target-owned hash function"
+    [[ "$(/usr/bin/grep -F -c 'macroGraphGeneratedFunction' "$pass_output" || true)" -eq 1 ]] \
+        || fail "@hashable generated declarations other than hash"
+
+    actual_status=0
+    "$STAGE2_EXECUTABLE" compile "$missing_bundle" > "$missing_output" 2> "$missing_error" \
+        || actual_status=$?
+    [[ "$actual_status" -eq 65 && ! -s "$missing_error" ]] \
+        || fail "@hashable missing-id control rejected at the wrong boundary"
+    /usr/bin/grep -Fq '@hashable requires exactly one id declaration.' "$missing_output" \
+        || fail "@hashable missing-id control omitted its diagnostic"
+
+    echo "Macros Core @hashable function synthesis: pass"
+}
+
 check_many_relationship_registration() {
     local fixture="$REPO_ROOT/Testing/Macros/Pass/ManyRelationshipRegistration.range"
     local bundle="$WORK_ROOT/macro-many-relationship-registration.range"
@@ -630,12 +803,8 @@ check_many_relationship_registration() {
     [[ ! -s "$error" ]] || fail "Core many and contents registrations wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true' "$output" \
         || fail "Core many and contents registrations did not execute"
-    [[ "$(/usr/bin/grep -Ec '^macroContribution\t' "$output")" -eq 2 ]] \
-        || fail "Core many and contents did not persist exactly two typed graph contributions"
-    /usr/bin/grep -Eq $'^macroContribution\trow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\ttargetSyntaxID=[0-9]+\ttargetName=values\tresultRow=[0-9]+\tnominalSyntaxID=[1-9][0-9]*\tnominalName=RelationshipRegistration\tordinal=0\tstableIdentity=[^:]+:[^:]+$' "$output" \
-        || fail "Core many did not persist its typed RelationshipRegistration contribution"
-    /usr/bin/grep -Eq $'^macroContribution\trow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\ttargetSyntaxID=[0-9]+\ttargetName=contents\tresultRow=[0-9]+\tnominalSyntaxID=[1-9][0-9]*\tnominalName=RelationshipRegistration\tordinal=0\tstableIdentity=[^:]+:[^:]+$' "$output" \
-        || fail "Core contents did not persist its typed RelationshipRegistration contribution"
+    [[ "$(/usr/bin/grep -Ec '^macroContribution\t' "$output")" -eq 0 ]] \
+        || fail "Core relationship values unexpectedly used the syntax-emission contribution path"
     /usr/bin/grep -Eq $'^macroResult\trow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\tkind=3\ttypeKind=4\t.*\tchildCount=5\tparentRow=-1\tordinal=0\trelationshipRow=-1$' "$output" \
         || fail "Core many registration did not retain all relationship dimensions"
     /usr/bin/grep -Eq $'^macroResult\trow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\tkind=4\ttypeKind=9\tnominalSyntaxID=[1-9][0-9]*\tscalar=1\tchildCount=1\tparentRow=[0-9]+\tordinal=3\trelationshipRow=-1$' "$output" \
@@ -927,8 +1096,12 @@ check_codable_composite_atomic_rollback() {
 
 check_typed_parameter_defaults() {
     local fixture="$REPO_ROOT/Testing/Macros/Pass/TypedParameterDefaults.range"
+    local legacy_fixture="$REPO_ROOT/Testing/Macros/Fail/ExplicitOptionalNilDefault.range"
     local output="$WORK_ROOT/macro-typed-parameter-defaults.out"
     local error="$WORK_ROOT/macro-typed-parameter-defaults.err"
+    local legacy_output="$WORK_ROOT/macro-explicit-optional-nil-default.out"
+    local legacy_error="$WORK_ROOT/macro-explicit-optional-nil-default.err"
+    local legacy_status
 
     "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "typed macro parameter defaults did not compile"
@@ -937,7 +1110,17 @@ check_typed_parameter_defaults() {
         || fail "typed macro parameter defaults did not execute through ordinary macro values"
     /usr/bin/grep -Fq $'name=typedParameterDefaultsWorked\tmemberKind=let\ttype=Int' "$output" \
         || fail "typed macro parameter defaults did not preserve optional String and Bool values"
-    echo "Macros typed-parameter-defaults: pass"
+
+    legacy_status=0
+    "$STAGE2_EXECUTABLE" compile "$legacy_fixture" > "$legacy_output" 2> "$legacy_error" \
+        || legacy_status=$?
+    [[ "$legacy_status" -eq 65 ]] \
+        || fail "explicit optional nil default exited $legacy_status instead of 65"
+    [[ ! -s "$legacy_error" ]] \
+        || fail "explicit optional nil default wrote stderr"
+    /usr/bin/grep -Fq 'diagnosticKind=malformedMacroDeclaration' "$legacy_output" \
+        || fail "explicit optional nil default missed malformed macro declaration diagnostic"
+    echo "Macros typed-parameter-defaults: pass (implicit optional nil, explicit ?(nil) rejection)"
 }
 
 check_graph_capabilities() {
@@ -1495,7 +1678,6 @@ check_canonical_declaration_envelopes() {
         'Identifier.range|id'
         'Identifier.range|parent'
         'Identifier.range|source'
-        'Hashable.range|target'
         'SyntaxForm.range|introducer'
         'SyntaxForm.range|identifier'
         'SyntaxForm.range|role'
@@ -1795,7 +1977,7 @@ check_project_defaults() {
     check_canonical_member_family
     check_missing_nominal_graph_warning
     check_slot_graph_projection
-    echo "checkpoint root-value:project-defaults-complete: pass"
+    echo "checkpoint value-ownership:project-defaults-complete: pass"
 }
 
 check_storage_literals() {
@@ -1921,7 +2103,7 @@ check_storage_literals() {
     [[ ! -s "$unsigned_negation_llvm" ]] \
         || fail "Storage unsigned unary negation emitted an LLVM artifact"
     echo "Storage unsigned unary negation: pass"
-    echo "checkpoint root-value:storage-literals-complete: pass"
+    echo "checkpoint value-ownership:storage-literals-complete: pass"
 }
 
 check_defaulted_generic_optional() {
@@ -1960,7 +2142,7 @@ check_defaulted_generic_optional() {
     /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$rejection" \
         || fail "missing required generic argument omitted its exact rejection"
     echo "Generic Optional missing-required-argument: pass"
-    echo "checkpoint root-value:generic-optional-complete: pass"
+    echo "checkpoint value-ownership:generic-optional-complete: pass"
 }
 
 check_boundary_forward_mixed() {
@@ -1969,57 +2151,57 @@ check_boundary_forward_mixed() {
     local second="$WORK_ROOT/boundary-forward-mixed.repeat.ll"
     local first_error="$WORK_ROOT/boundary-forward-mixed.first.err"
     local second_error="$WORK_ROOT/boundary-forward-mixed.repeat.err"
-    local linked="$WORK_ROOT/RootValueBoundaryForwardMixed"
+    local linked="$WORK_ROOT/ValueOwnershipBoundaryForwardMixed"
     local run_output="$WORK_ROOT/boundary-forward-mixed.run.out"
     local run_error="$WORK_ROOT/boundary-forward-mixed.run.err"
     local actual_create_count actual_destroy_count forbidden
 
-    write_root_value_bundle "$bundle" boundary-forward-mixed
-    echo "checkpoint root-value:fixture-authored: pass"
+    write_value_ownership_bundle "$bundle" boundary-forward-mixed
+    echo "checkpoint value-ownership:fixture-authored: pass"
     run_capture "$STAGE2_EXECUTABLE" "$bundle" "$first" "$first_error"
-    require_successful_output "focused RootValue boundary-forward-mixed" "$first" "$first_error"
-    echo "checkpoint root-value:first-emitted: pass"
+    require_successful_output "focused value ownership boundary-forward-mixed" "$first" "$first_error"
+    echo "checkpoint value-ownership:first-emitted: pass"
     run_capture "$STAGE2_EXECUTABLE" "$bundle" "$second" "$second_error"
-    require_successful_output "focused repeated RootValue boundary-forward-mixed" "$second" "$second_error"
-    echo "checkpoint root-value:repeat-emitted: pass"
+    require_successful_output "focused repeated value ownership boundary-forward-mixed" "$second" "$second_error"
+    echo "checkpoint value-ownership:repeat-emitted: pass"
     /usr/bin/cmp -s "$first" "$second" \
-        || fail "focused RootValue boundary-forward-mixed LLVM was not deterministic"
-    echo "checkpoint root-value:deterministic: pass"
+        || fail "focused value ownership boundary-forward-mixed LLVM was not deterministic"
+    echo "checkpoint value-ownership:deterministic: pass"
 
     /usr/bin/grep -Fq 'define void @makeRootBoundaryForwardMixedResult(ptr %returnDestination' "$first" \
-        || fail "focused RootValue omitted the mixed-result definition"
+        || fail "focused value ownership omitted the mixed-result definition"
     /usr/bin/grep -Fq 'call void @makeRootBoundaryForwardMixedResult(' "$first" \
-        || fail "focused RootValue omitted the mixed-result call"
+        || fail "focused value ownership omitted the mixed-result call"
     /usr/bin/grep -Fq '%Range.RootBoundaryForwardMixedResult = type { ptr, ptr, ptr }' "$first" \
-        || fail "focused RootValue omitted the forward/alias/local layout"
+        || fail "focused value ownership omitted the forward/alias/local layout"
     actual_create_count="$(/usr/bin/grep -F -c 'call ptr @rawBufferCreate(' "$first" || true)"
     actual_destroy_count="$(/usr/bin/grep -F -c 'call i32 @rawBufferDestroy(ptr' "$first" || true)"
-    [[ "$actual_create_count" -eq 3 ]] || fail "focused RootValue emitted $actual_create_count creates; expected 3"
-    [[ "$actual_destroy_count" -eq 3 ]] || fail "focused RootValue emitted $actual_destroy_count destructions; expected 3"
+    [[ "$actual_create_count" -eq 3 ]] || fail "focused value ownership emitted $actual_create_count creates; expected 3"
+    [[ "$actual_destroy_count" -eq 3 ]] || fail "focused value ownership emitted $actual_destroy_count destructions; expected 3"
     for forbidden in rangeConstruct malloc calloc realloc free; do
         ! /usr/bin/grep -Fq "$forbidden" "$first" \
-            || fail "focused RootValue emitted forbidden dynamic/allocator symbol: $forbidden"
+            || fail "focused value ownership emitted forbidden dynamic/allocator symbol: $forbidden"
     done
-    echo "checkpoint root-value:shape-audited: pass"
+    echo "checkpoint value-ownership:shape-audited: pass"
 
     validate_llvm "$first"
-    echo "checkpoint root-value:llvm-validated: pass"
+    echo "checkpoint value-ownership:llvm-validated: pass"
     link_llvm "$first" "$linked"
-    echo "checkpoint root-value:linked: pass"
+    echo "checkpoint value-ownership:linked: pass"
     if "$linked" > "$run_output" 2> "$run_error"; then
         RUN_STATUS=0
     else
         RUN_STATUS=$?
     fi
-    [[ "$RUN_STATUS" -eq 7 ]] || fail "focused RootValue executable exited $RUN_STATUS"
-    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "focused RootValue executable wrote output"
-    echo "checkpoint root-value:executed-exit-7: pass"
-    echo "checkpoint root-value:complete: pass"
-    echo "Focused RootValue boundary-forward-mixed check succeeded."
+    [[ "$RUN_STATUS" -eq 7 ]] || fail "focused value ownership executable exited $RUN_STATUS"
+    [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "focused value ownership executable wrote output"
+    echo "checkpoint value-ownership:executed-exit-7: pass"
+    echo "checkpoint value-ownership:complete: pass"
+    echo "Focused value ownership boundary-forward-mixed check succeeded."
     printf 'stage2_cache_key=%s\n' "$STAGE2_CACHE_KEY"
 }
 
-main_root_value() {
+main_value_ownership() {
     local compiler_input="$DEFAULT_COMPILER_DIR"
     local compiler_directory canonical_core_source_path
     local controls=0
@@ -2045,10 +2227,10 @@ main_root_value() {
     compiler_directory="$(cd "$compiler_input" && pwd)"
 
     verify_manifest
-    echo "checkpoint root-value:manifest: pass"
-    WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-root-value.XXXXXX")"
-    if [[ "${RANGE_KEEP_ROOT_VALUE_WORK_ROOT:-0}" == "1" ]]; then
-        echo "root-value work root: $WORK_ROOT"
+    echo "checkpoint value-ownership:manifest: pass"
+    WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-value-ownership.XXXXXX")"
+    if [[ "${RANGE_KEEP_VALUE_OWNERSHIP_WORK_ROOT:-0}" == "1" ]]; then
+        echo "value-ownership work root: $WORK_ROOT"
     else
         trap '/bin/rm -rf "$WORK_ROOT"' EXIT
     fi
@@ -2066,11 +2248,12 @@ main_root_value() {
     discover_sources "$compiler_directory" "$WORK_ROOT"
     SOURCE_BUNDLE="$WORK_ROOT/RangeCompilerSourceSet.range"
     write_source_bundle "$SOURCE_BUNDLE"
-    echo "checkpoint root-value:source-snapshot: pass"
+    echo "checkpoint value-ownership:source-snapshot: pass"
     resolve_stage2_compiler 0
-    echo "checkpoint root-value:stage2-cache-$STAGE2_CACHE_STATUS: pass"
-    echo "checkpoint root-value:stage2-resolved: pass"
+    echo "checkpoint value-ownership:stage2-cache-$STAGE2_CACHE_STATUS: pass"
+    echo "checkpoint value-ownership:stage2-resolved: pass"
     check_removed_for_statement_rejected
+    check_unregistered_string_reads_rejected
     check_macro_environment
     check_error_capability_registration
     check_non_generic_stored_assignment
@@ -2086,6 +2269,8 @@ main_root_value() {
     check_value_relationship_selection
     check_value_relationship_registration
     check_canonical_declaration_envelopes
+    check_hashable_function_synthesis
+    check_compiler_registration
     check_many_relationship_registration
     check_enum_parameter_materialization
     check_block_relationship_reification
@@ -2108,14 +2293,14 @@ main_root_value() {
     check_storage_literals
     check_defaulted_generic_optional
     if [[ "$controls" -eq 1 ]]; then
-        audit_root_values Controls "$STAGE2_EXECUTABLE" "$WORK_ROOT/controls"
-        echo "checkpoint root-value:controls-complete: pass"
+        audit_value_ownership Controls "$STAGE2_EXECUTABLE" "$WORK_ROOT/controls"
+        echo "checkpoint value-ownership:controls-complete: pass"
     else
         check_boundary_forward_mixed
     fi
     range_stage2_mark_development_producer_validated \
         || fail "could not publish the validated development compiler producer"
-    echo "checkpoint root-value:development-producer-validated: pass"
+    echo "checkpoint value-ownership:development-producer-validated: pass"
 }
 
-main_root_value "$@"
+main_value_ownership "$@"

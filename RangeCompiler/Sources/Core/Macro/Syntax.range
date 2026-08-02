@@ -48,17 +48,12 @@ macro syntax(@capture template: String): Construct -> SyntaxTemplate { environme
             state resolved: Bool(false)
             while memberIndex < members.count && resolved == false {
                 let member: Let(members[memberIndex])
-                let memberNameCount: Int(
-                    stringLength(value: member.identifier.name)
-                )
+                let memberNameCount: Int(member.identifier.name.count)
                 if memberNameCount == captureEnd - captureStart {
                     state nameIndex: Int(0)
                     state same: Bool(true)
                     while nameIndex < memberNameCount && same {
-                        if stringByteAt(
-                            source: member.identifier.name,
-                            index: nameIndex
-                        )
+                        if member.identifier.name.byte(index: nameIndex)
                             != template.byte(index: captureStart + nameIndex) {
                             same: false
                         }

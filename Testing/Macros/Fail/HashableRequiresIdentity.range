@@ -1,0 +1,4 @@
+@hashable
+construct MissingIdentity {
+    let name: String
+}

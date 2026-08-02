@@ -694,10 +694,7 @@ function compilerBodyArenaSymbolsAndResolutionsAreValid(arena: CompilerBodyArena
         if targetKind == compilerBodyResolutionMacroGraphQuery() && targetID != compilerMacroGraphOperationDeclarationCount() { return false }
         if targetKind == compilerBodyResolutionMacroTargetOperation()
             && targetID != compilerMacroTargetOperationOmit()
-            && targetID != compilerMacroTargetOperationMemberCount()
             && targetID != compilerMacroTargetOperationExpand() { return false }
-        if targetKind == compilerBodyResolutionMacroTargetQueryInvalid()
-            && targetID != compilerMacroTargetOperationMemberCount() { return false }
         if targetKind == compilerBodyResolutionConstruct() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.syntaxIndex)
             || compilerIntTableValue(table: arena.tables.syntaxIndex, row: targetID, column: 0) != compilerSyntaxKindConstruct()) { return false }
         if targetKind == compilerBodyResolutionEnumCase() && (targetID < 0 || targetID >= compilerIntTableRowCount(table: arena.tables.members)

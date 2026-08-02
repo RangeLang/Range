@@ -6,8 +6,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
 READER="$REPO_ROOT/RangeCompiler/Sources/Compiler/Driver/CompilerBuildPlan.range"
 CORE_BUFFER="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/Buffer.range"
+CORE_BYTE_SPAN="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/ByteSpan.range"
+CORE_CHARACTER="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/Character.range"
 CORE_STRING="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/String.range"
-SCHEMA_VERSION="focused-build-plan-harness-v3"
+CORE_TEXT_ENCODING="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/TextEncoding.range"
+SCHEMA_VERSION="focused-build-plan-harness-v4"
 CACHE_ROOT="${RANGE_BUILD_PLAN_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Library/Caches}/Range/build-plan}"
 
 fail() {
@@ -60,7 +63,10 @@ verify_manifest() {
     done
     [[ -f "$READER" ]] || fail "missing build-plan reader"
     [[ -f "$CORE_BUFFER" ]] || fail "missing Buffer storage witness"
+    [[ -f "$CORE_BYTE_SPAN" ]] || fail "missing ByteSpan model"
+    [[ -f "$CORE_CHARACTER" ]] || fail "missing Character model"
     [[ -f "$CORE_STRING" ]] || fail "missing String storage witness"
+    [[ -f "$CORE_TEXT_ENCODING" ]] || fail "missing TextEncoding model"
 }
 
 write_harness() {
@@ -124,6 +130,15 @@ write_bundle() {
     /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/System/Memory/Buffer.range\n' >> "$output"
     /bin/cat "$CORE_BUFFER" >> "$output"
     [[ -z "$(/usr/bin/tail -c 1 "$CORE_BUFFER")" ]] || /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/System/Memory/ByteSpan.range\n' >> "$output"
+    /bin/cat "$CORE_BYTE_SPAN" >> "$output"
+    [[ -z "$(/usr/bin/tail -c 1 "$CORE_BYTE_SPAN")" ]] || /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/System/Text/Character.range\n' >> "$output"
+    /bin/cat "$CORE_CHARACTER" >> "$output"
+    [[ -z "$(/usr/bin/tail -c 1 "$CORE_CHARACTER")" ]] || /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/System/Text/TextEncoding.range\n' >> "$output"
+    /bin/cat "$CORE_TEXT_ENCODING" >> "$output"
+    [[ -z "$(/usr/bin/tail -c 1 "$CORE_TEXT_ENCODING")" ]] || /usr/bin/printf '\n' >> "$output"
     /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/System/Text/String.range\n' >> "$output"
     /bin/cat "$CORE_STRING" >> "$output"
     [[ -z "$(/usr/bin/tail -c 1 "$CORE_STRING")" ]] || /usr/bin/printf '\n' >> "$output"

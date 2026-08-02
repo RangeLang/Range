@@ -47,7 +47,7 @@ construct Let {
     let macros: Array<Macro.Application>
 }
 
-macro metadata(_ key: String?(nil), enabled: Bool(false)): Let -> Metadata { environment in
+macro metadata(_ key: String?, enabled: Bool(false)): Let -> Metadata { environment in
     return Metadata(key: key, enabled: enabled)
 }
 

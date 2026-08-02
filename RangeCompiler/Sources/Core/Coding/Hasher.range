@@ -1,0 +1,4 @@
+construct Hasher {
+    function update(bytes: ByteSpan)
+    function finalize(): Hash
+}
