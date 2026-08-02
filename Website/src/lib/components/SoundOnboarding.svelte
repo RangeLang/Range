@@ -452,10 +452,12 @@
     height: 100%;
     overflow: visible;
     pointer-events: none;
+    transform: scale(0.1556);
+    transform-origin: center;
+    animation: expand-torus 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .torus circle {
-    r: 47px;
     fill: none;
     stroke: oklch(0.34 0.012 255);
     stroke-width: 1.35;
@@ -464,12 +466,10 @@
     transition:
       stroke 320ms cubic-bezier(0.22, 0.61, 0.36, 1),
       stroke-width 320ms cubic-bezier(0.22, 0.61, 0.36, 1),
-      r 420ms cubic-bezier(0.16, 1, 0.3, 1),
       filter 320ms cubic-bezier(0.22, 0.61, 0.36, 1);
   }
 
   .torus circle.active {
-    r: 49px;
     stroke: var(--range);
     stroke-width: 1.8;
     filter: drop-shadow(0 0 2px color-mix(in oklch, var(--range), transparent 30%));
@@ -522,6 +522,11 @@
       background: oklch(0.09 0.01 255);
       transform: scale(1);
     }
+  }
+
+  @keyframes expand-torus {
+    from { transform: scale(0.1556); }
+    to { transform: scale(1); }
   }
 
   @keyframes reveal-handle {
