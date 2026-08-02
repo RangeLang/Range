@@ -25,6 +25,15 @@
             return rangeCompilerCLIEmitLLVM(input: commandLineArgument(index: 1), outputPath: commandLineArgument(index: 2))
         }
     }
+    if argumentCount == 4 {
+        let command: String(commandLineArgument(index: 0))
+        if command == String("resume-v1") {
+            return rangeCompilerV1ResumeCLI(
+                executionPath: commandLineArgument(index: 1),
+                input: commandLineArgument(index: 2),
+                outputPath: commandLineArgument(index: 3))
+        }
+    }
     if argumentCount == 5 {
         let command: String(commandLineArgument(index: 0))
         if command == String("load-plan-sources") {
@@ -61,7 +70,7 @@
 }
 
 function rangeCompilerCLIUsage(): String {
-    return "usage:\n  range compile <input.range>\n  range check <input.range>\n  range compile-v1 <input.range>\n  range inspect-v1 <input.range>\n  range emit-llvm <input.range> <output.ll>\n  range load-plan-sources <plan.tsv> <repo-root> <candidate-root> <output.range>\n  range link <input.ll> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>\n  range build <input.range> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>"
+    return "usage:\n  range compile <input.range>\n  range check <input.range>\n  range compile-v1 <input.range>\n  range inspect-v1 <input.range>\n  range emit-llvm <input.range> <output.ll>\n  range resume-v1 <execution.tsv> <input.range> <output.ll>\n  range load-plan-sources <plan.tsv> <repo-root> <candidate-root> <output.range>\n  range link <input.ll> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>\n  range build <input.range> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>"
 }
 
 function rangeCompilerCLILoadPlanSources(plan: String, repoRoot: String, candidateRoot: String, outputPath: String): Int {

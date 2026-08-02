@@ -38,6 +38,21 @@ write_behavior_cache_fixture() {
         '}' >> "$output"
 }
 
+write_profile_behavior_fixture() {
+    local output="$1"
+
+    /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$output"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=project\tpath=BehaviorProfile.range' >> "$output"
+    /usr/bin/printf '%s\n' \
+        'function cachedBehaviorValue(): Int {' \
+        '    return 7' \
+        '}' \
+        '' \
+        '@main {' \
+        '    return cachedBehaviorValue()' \
+        '}' >> "$output"
+}
+
 /usr/bin/grep -Fq 'function compilerReachableLLVMStateFunctionBehaviorInput' "$LLVM_PLAN" \
     || fail "function artifacts omit the pre-lowering Behavior input identity"
 /usr/bin/grep -Fq 'function compilerFunctionArtifactBehaviorOutput' "$LLVM_PLAN" \
@@ -46,6 +61,13 @@ write_behavior_cache_fixture() {
     || fail "function artifact lookup does not begin at the pre-reconstruction Behavior boundary"
 /usr/bin/grep -Fq 'functionArtifactCandidates.end' "$LLVM_PLAN" \
     || fail "pre-reconstruction Behavior lookup is not independently measurable"
+/usr/bin/grep -Fq 'function compilerReachableLLVMStateCollectDirectEffectProductForArena' "$REPO_ROOT/RangeCompiler/Sources/Compiler/Body/CompilerBodyOwnership.range" \
+    || fail "direct effect product is not owned by the typed discovery arena"
+/usr/bin/grep -Fq 'compilerReachableLLVMStateCollectDirectEffectProductForArena(reachability: reachability, arena: arena, instanceID: instanceID)' "$LLVM_PLAN" \
+    || fail "discovery does not retain its direct effect product"
+if /usr/bin/grep -Fq 'function compilerReachableLLVMStateClassifyReturnAndCollectDirectEffectsForWorkItem' "$REPO_ROOT/RangeCompiler/Sources/Compiler/Body/CompilerBodyOwnership.range"; then
+    fail "effect construction still reparses each discovered function"
+fi
 candidate_lookup_line="$(/usr/bin/grep -n -F 'if compilerReachableLLVMStateFindFunctionArtifactCandidates(reachability: reachability)' "$LLVM_PLAN" | /usr/bin/cut -d: -f1)"
 effect_build_line="$(/usr/bin/grep -n -F 'let effectBuildStatus: Int(compilerReachableLLVMStateBuildFunctionInstanceEffects' "$LLVM_PLAN" | /usr/bin/cut -d: -f1)"
 [[ -n "$candidate_lookup_line" && -n "$effect_build_line" && "$candidate_lookup_line" -lt "$effect_build_line" ]] \
@@ -88,19 +110,122 @@ done
 /usr/bin/cmp -s "$WORK_ROOT/legacy.ll" "$WORK_ROOT/v1.ll" \
     || fail "V1 plot artifact differs from the legacy compiler output"
 
+/bin/cp "$FIXTURE" "$WORK_ROOT/Persistent.range"
+"$COMPILER" resume-v1 "$WORK_ROOT/execution.tsv" "$WORK_ROOT/Persistent.range" "$WORK_ROOT/persistent.ll" > "$WORK_ROOT/persistent-cold.out"
+/usr/bin/grep -Eq $'^compilerV1Execution\tstatus=cold\tchanged=1\tsourceBefore=0:0\tsourceAfter=[0-9]+:[0-9]+\tshapeBefore=0:0\tshapeAfter=[0-9]+:[0-9]+\tbehaviorBefore=0:0\tbehaviorAfter=[0-9]+:[0-9]+\tcompiledBefore=0:0\tcompiledAfter=[0-9]+:[0-9]+$' "$WORK_ROOT/persistent-cold.out" \
+    || fail "cold persistent execution did not insert every phase value"
+/usr/bin/grep -Eq $'^compilerV1Execution\tversion=1\tfileFirst=[0-9]+\tfileSecond=[0-9]+\tsourceFirst=[0-9]+\tsourceSecond=[0-9]+\tshapeFirst=[0-9]+\tshapeSecond=[0-9]+\tbehaviorFirst=[0-9]+\tbehaviorSecond=[0-9]+\tcompiledFirst=[0-9]+\tcompiledSecond=[0-9]+$' "$WORK_ROOT/execution.tsv" \
+    || fail "cold persistent execution omitted its Range-owned state"
+/bin/cp "$WORK_ROOT/persistent.ll" "$WORK_ROOT/persistent-stdout.ll"
+/usr/bin/printf '\n' >> "$WORK_ROOT/persistent-stdout.ll"
+/usr/bin/cmp -s "$WORK_ROOT/v1.ll" "$WORK_ROOT/persistent-stdout.ll" \
+    || fail "cold persistent execution changed V1 LLVM beyond the CLI print newline"
+cold_execution_hash="$(/usr/bin/shasum -a 256 "$WORK_ROOT/execution.tsv" | /usr/bin/awk '{print $1}')"
+cold_llvm_hash="$(/usr/bin/shasum -a 256 "$WORK_ROOT/persistent.ll" | /usr/bin/awk '{print $1}')"
+cold_source_after="$(/usr/bin/sed -n 's/^compilerV1Execution.*sourceAfter=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/persistent-cold.out")"
+cold_shape_after="$(/usr/bin/sed -n 's/^compilerV1Execution.*shapeAfter=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/persistent-cold.out")"
+cold_behavior_after="$(/usr/bin/sed -n 's/^compilerV1Execution.*behaviorAfter=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/persistent-cold.out")"
+cold_compiled_after="$(/usr/bin/sed -n 's/^compilerV1Execution.*compiledAfter=\([^[:space:]]*\)$/\1/p' "$WORK_ROOT/persistent-cold.out")"
+
+"$COMPILER" resume-v1 "$WORK_ROOT/execution.tsv" "$WORK_ROOT/Persistent.range" "$WORK_ROOT/persistent.ll" > "$WORK_ROOT/persistent-unchanged.out"
+/usr/bin/grep -Fqx $'compilerV1Execution\tstatus=reused\tchanged=0' "$WORK_ROOT/persistent-unchanged.out" \
+    || fail "unchanged persistent execution did not reuse its compiled value"
+[[ "$cold_execution_hash" == "$(/usr/bin/shasum -a 256 "$WORK_ROOT/execution.tsv" | /usr/bin/awk '{print $1}')" ]] \
+    || fail "unchanged persistent execution rewrote its state"
+[[ "$cold_llvm_hash" == "$(/usr/bin/shasum -a 256 "$WORK_ROOT/persistent.ll" | /usr/bin/awk '{print $1}')" ]] \
+    || fail "unchanged persistent execution rewrote its LLVM"
+
+/usr/bin/perl -0pi -e 's/return 7/return 8/' "$WORK_ROOT/Persistent.range"
+"$COMPILER" resume-v1 "$WORK_ROOT/execution.tsv" "$WORK_ROOT/Persistent.range" "$WORK_ROOT/persistent.ll" > "$WORK_ROOT/persistent-updated.out"
+/usr/bin/grep -Eq $'^compilerV1Execution\tstatus=updated\tchanged=1\tsourceBefore=[0-9]+:[0-9]+\tsourceAfter=[0-9]+:[0-9]+\tshapeBefore=[0-9]+:[0-9]+\tshapeAfter=[0-9]+:[0-9]+\tbehaviorBefore=[0-9]+:[0-9]+\tbehaviorAfter=[0-9]+:[0-9]+\tcompiledBefore=[0-9]+:[0-9]+\tcompiledAfter=[0-9]+:[0-9]+$' "$WORK_ROOT/persistent-updated.out" \
+    || fail "updated persistent execution did not carry phase value replacements"
+updated_source_before="$(/usr/bin/sed -n 's/^compilerV1Execution.*sourceBefore=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/persistent-updated.out")"
+updated_shape_before="$(/usr/bin/sed -n 's/^compilerV1Execution.*shapeBefore=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/persistent-updated.out")"
+updated_behavior_before="$(/usr/bin/sed -n 's/^compilerV1Execution.*behaviorBefore=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/persistent-updated.out")"
+updated_compiled_before="$(/usr/bin/sed -n 's/^compilerV1Execution.*compiledBefore=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/persistent-updated.out")"
+[[ "$updated_source_before" == "$cold_source_after" \
+    && "$updated_shape_before" == "$cold_shape_after" \
+    && "$updated_behavior_before" == "$cold_behavior_after" \
+    && "$updated_compiled_before" == "$cold_compiled_after" ]] \
+    || fail "updated persistent execution did not load exact prior phase values"
+if /usr/bin/cmp -s "$WORK_ROOT/v1.ll" "$WORK_ROOT/persistent.ll"; then
+    fail "updated persistent execution reused stale LLVM"
+fi
+
+/bin/cp "$WORK_ROOT/execution.tsv" "$WORK_ROOT/other-execution.tsv"
+/bin/cp "$WORK_ROOT/Persistent.range" "$WORK_ROOT/OtherIdentity.range"
+other_identity_status=0
+"$COMPILER" resume-v1 "$WORK_ROOT/other-execution.tsv" "$WORK_ROOT/OtherIdentity.range" "$WORK_ROOT/other.ll" > "$WORK_ROOT/other-identity.out" \
+    || other_identity_status=$?
+[[ "$other_identity_status" -eq 65 ]] \
+    || fail "persistent execution accepted a different File identity"
+/usr/bin/grep -Fq 'Compiler V1 execution belongs to a different File identity' "$WORK_ROOT/other-identity.out" \
+    || fail "persistent execution identity rejection omitted its typed error"
+
+/usr/bin/printf '%s\n' 'not-an-execution' > "$WORK_ROOT/invalid-execution.tsv"
+"$COMPILER" resume-v1 "$WORK_ROOT/invalid-execution.tsv" "$WORK_ROOT/Persistent.range" "$WORK_ROOT/invalid.ll" > "$WORK_ROOT/invalid-execution.out"
+/usr/bin/grep -Eq $'^compilerV1Execution\tstatus=cold\tchanged=1\t' "$WORK_ROOT/invalid-execution.out" \
+    || fail "malformed stored state was not treated as an absent cache value"
+/usr/bin/grep -Eq $'^compilerV1Execution\tversion=1\tfileFirst=[0-9]+\tfileSecond=[0-9]+\t' "$WORK_ROOT/invalid-execution.tsv" \
+    || fail "malformed stored state was not replaced with valid Range-owned state"
+
 behavior_cache="$WORK_ROOT/behavior.cache"
 write_behavior_cache_fixture "$WORK_ROOT/behavior-cold.range" "" "$behavior_cache" 'cachedBehaviorValue()'
-"$COMPILER" compile "$WORK_ROOT/behavior-cold.range" > "$WORK_ROOT/behavior-cold.ll"
+RANGE_COMPILER_PHASE_TRACE=1 RANGE_COMPILER_FUNCTION_TRACE=1 \
+    "$COMPILER" compile "$WORK_ROOT/behavior-cold.range" > "$WORK_ROOT/behavior-cold.ll" 2> "$WORK_ROOT/behavior-cold.trace"
 [[ -s "$behavior_cache" ]] || fail "cold Behavior compilation omitted its artifact"
 /usr/bin/grep -Fq 'rangeFunctionArtifacts|version=5' "$behavior_cache" \
     || fail "cold Behavior compilation did not write schema v5"
+/usr/bin/grep -Fq $'compilerPhase\tname=functionEffects.end' "$WORK_ROOT/behavior-cold.trace" \
+    || fail "cold Behavior compilation skipped effect reconstruction unexpectedly"
+/usr/bin/grep -Fq $'compilerPhase\tname=abiComponents.end' "$WORK_ROOT/behavior-cold.trace" \
+    || fail "cold Behavior compilation skipped ABI construction unexpectedly"
+/usr/bin/grep -Fq $'compilerPhase\tname=functionEmission.end' "$WORK_ROOT/behavior-cold.trace" \
+    || fail "cold Behavior compilation skipped LLVM function emission unexpectedly"
+/usr/bin/grep -Fq 'name=bodyProduct.directEffects' "$WORK_ROOT/behavior-cold.trace" \
+    || fail "cold Behavior compilation did not retain the direct effect product on its discovery arena"
 
 write_behavior_cache_fixture "$WORK_ROOT/behavior-hit.range" "$behavior_cache" "$WORK_ROOT/behavior-hit.cache" 'cachedBehaviorValue()'
-"$COMPILER" compile "$WORK_ROOT/behavior-hit.range" > "$WORK_ROOT/behavior-hit.ll"
+RANGE_COMPILER_PHASE_TRACE=1 \
+    "$COMPILER" compile "$WORK_ROOT/behavior-hit.range" > "$WORK_ROOT/behavior-hit.ll" 2> "$WORK_ROOT/behavior-hit.trace"
 /usr/bin/cmp -s "$WORK_ROOT/behavior-cold.ll" "$WORK_ROOT/behavior-hit.ll" \
     || fail "closed Behavior cache changed emitted LLVM"
 [[ ! -e "$WORK_ROOT/behavior-hit.cache" ]] \
     || fail "closed Behavior graph rebuilt and rewrote its artifact"
+/usr/bin/grep -Fq $'compilerPhase\tname=functionArtifactCandidates.end' "$WORK_ROOT/behavior-hit.trace" \
+    || fail "closed Behavior compilation did not inspect its artifact candidates"
+if /usr/bin/grep -Fq $'compilerPhase\tname=functionEffects.end' "$WORK_ROOT/behavior-hit.trace" \
+    || /usr/bin/grep -Fq $'compilerPhase\tname=abiComponents.end' "$WORK_ROOT/behavior-hit.trace" \
+    || /usr/bin/grep -Fq $'compilerPhase\tname=functionEmission.end' "$WORK_ROOT/behavior-hit.trace"; then
+    fail "closed Behavior cache did not bypass effect, ABI, and LLVM emission work"
+fi
+
+profile_source="$WORK_ROOT/behavior-profile.range"
+profile_artifact="$WORK_ROOT/behavior-profile.artifact"
+profile_next_artifact="$WORK_ROOT/behavior-profile.next.artifact"
+write_profile_behavior_fixture "$profile_source"
+RANGE_COMPILER_PROFILE_SOURCE_BUNDLE="$profile_source" \
+    RANGE_COMPILER_PROFILE_LLVM="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/stage2/RangeCompiler.ll" \
+    RANGE_COMPILER_PROFILE_ARTIFACT_OUTPUT="$profile_artifact" \
+    "$REPO_ROOT/scripts/profile-range-compiler" > "$WORK_ROOT/behavior-profile-cold.out"
+[[ -s "$profile_artifact" ]] || fail "profiled cold Behavior compilation omitted its artifact"
+/usr/bin/grep -Fq $'compilerArtifact\tstatus=written' "$WORK_ROOT/behavior-profile-cold.out" \
+    || fail "profiled cold Behavior compilation did not report its artifact"
+/usr/bin/grep -Fq $'compilerPhase\tname=functionEmission.end' "$WORK_ROOT/behavior-profile-cold.out" \
+    || fail "profiled cold Behavior compilation did not report LLVM emission"
+RANGE_COMPILER_PROFILE_SOURCE_BUNDLE="$profile_source" \
+    RANGE_COMPILER_PROFILE_LLVM="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/stage2/RangeCompiler.ll" \
+    RANGE_COMPILER_PROFILE_ARTIFACT_INPUT="$profile_artifact" \
+    RANGE_COMPILER_PROFILE_ARTIFACT_OUTPUT="$profile_next_artifact" \
+    "$REPO_ROOT/scripts/profile-range-compiler" > "$WORK_ROOT/behavior-profile-hit.out"
+[[ ! -e "$profile_next_artifact" ]] || fail "profiled closed Behavior graph rewrote an artifact"
+/usr/bin/grep -Fq $'compilerArtifact\tstatus=reused' "$WORK_ROOT/behavior-profile-hit.out" \
+    || fail "profiled closed Behavior compilation did not report artifact reuse"
+if /usr/bin/grep -Fq $'compilerPhase\tname=functionEffects.end' "$WORK_ROOT/behavior-profile-hit.out" \
+    || /usr/bin/grep -Fq $'compilerPhase\tname=abiComponents.end' "$WORK_ROOT/behavior-profile-hit.out" \
+    || /usr/bin/grep -Fq $'compilerPhase\tname=functionEmission.end' "$WORK_ROOT/behavior-profile-hit.out"; then
+    fail "profiled closed Behavior cache did not bypass effect, ABI, and LLVM emission work"
+fi
 
 write_behavior_cache_fixture "$WORK_ROOT/behavior-main-change.range" "$behavior_cache" "$WORK_ROOT/behavior-main-change.cache" 'cachedBehaviorValue() + 1'
 "$COMPILER" compile "$WORK_ROOT/behavior-main-change.range" > "$WORK_ROOT/behavior-main-change.ll"
@@ -124,39 +249,43 @@ write_behavior_cache_fixture "$WORK_ROOT/behavior-callee-output.range" "$WORK_RO
 "$COMPILER" inspect-v1 "$FIXTURE" > "$WORK_ROOT/inspect.txt"
 /usr/bin/grep -Fq $'compilerV1\tversion=1' "$WORK_ROOT/inspect.txt" \
     || fail "V1 inspection omitted the compiler identity"
-/usr/bin/grep -Eq $'^compilerV1Delta\tkind=source\tidentity=[0-9]+:[0-9]+\tvalue=File\tpath=.+\tbytes=[1-9][0-9]*$' "$WORK_ROOT/inspect.txt" \
+/usr/bin/grep -Eq $'^compilerV1Delta\tphase=source\tidentity=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+\tvalue=File\tpath=.+\tbytes=[1-9][0-9]*$' "$WORK_ROOT/inspect.txt" \
     || fail "V1 inspection omitted the loaded Identity : FileValue Delta"
 
 /bin/cp "$FIXTURE" "$WORK_ROOT/IdentityValue.range"
 "$COMPILER" inspect-v1 "$WORK_ROOT/IdentityValue.range" > "$WORK_ROOT/identity-before.txt"
 /usr/bin/printf '\n' >> "$WORK_ROOT/IdentityValue.range"
 "$COMPILER" inspect-v1 "$WORK_ROOT/IdentityValue.range" > "$WORK_ROOT/identity-after.txt"
-before_identity="$(/usr/bin/sed -n 's/^compilerV1Delta.*identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
-after_identity="$(/usr/bin/sed -n 's/^compilerV1Delta.*identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
+before_identity="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=source[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
+after_identity="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=source[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
+before_value="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=source.*[[:space:]]after=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
+after_value="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=source.*[[:space:]]after=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
 before_bytes="$(/usr/bin/sed -n 's/^compilerV1Delta.*bytes=\([0-9][0-9]*\)$/\1/p' "$WORK_ROOT/identity-before.txt")"
 after_bytes="$(/usr/bin/sed -n 's/^compilerV1Delta.*bytes=\([0-9][0-9]*\)$/\1/p' "$WORK_ROOT/identity-after.txt")"
 [[ -n "$before_identity" && "$before_identity" == "$after_identity" ]] \
     || fail "V1 File identity changed when only its value changed"
+[[ -n "$before_value" && -n "$after_value" && "$before_value" != "$after_value" ]] \
+    || fail "V1 File Delta did not change its value fingerprint"
 [[ -n "$before_bytes" && -n "$after_bytes" && "$before_bytes" -ne "$after_bytes" ]] \
     || fail "V1 File value did not change with its source contents"
-/usr/bin/grep -Eq $'^compilerV1Artifact\tphase=shape\tidentity=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
-    || fail "V1 inspection omitted the shape artifact"
+/usr/bin/grep -Eq $'^compilerV1Delta\tphase=shape\tidentity=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the Shape Delta"
 /usr/bin/grep -Fq $'typedSyntax\tvalid=true' "$WORK_ROOT/inspect.txt" \
     || fail "V1 shape artifact is not valid typed syntax"
-/usr/bin/grep -Eq $'^compilerV1Artifact\tphase=behavior\tinput=[0-9]+:[0-9]+\toutput=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
-    || fail "V1 inspection omitted the behavior artifact"
-shape_identity="$(/usr/bin/sed -n 's/^compilerV1Artifact[[:space:]]phase=shape[[:space:]]identity=\([^[:space:]]*\)$/\1/p' "$WORK_ROOT/inspect.txt")"
-behavior_input="$(/usr/bin/sed -n 's/^compilerV1Artifact[[:space:]]phase=behavior[[:space:]]input=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/inspect.txt")"
-behavior_output="$(/usr/bin/sed -n 's/^compilerV1Artifact[[:space:]]phase=behavior.*[[:space:]]output=\([^[:space:]]*\)$/\1/p' "$WORK_ROOT/inspect.txt")"
-[[ -n "$shape_identity" && "$shape_identity" == "$behavior_input" ]] \
-    || fail "V1 behavior does not consume the inspected shape identity"
+/usr/bin/grep -Eq $'^compilerV1Delta\tphase=behavior\tidentity=[0-9]+:[0-9]+\tinput=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the Behavior Delta"
+shape_output="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=shape.*[[:space:]]after=\([^[:space:]]*\)$/\1/p' "$WORK_ROOT/inspect.txt")"
+behavior_input="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=behavior.*[[:space:]]input=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/inspect.txt")"
+behavior_output="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=behavior.*[[:space:]]after=\([^[:space:]]*\)$/\1/p' "$WORK_ROOT/inspect.txt")"
+[[ -n "$shape_output" && "$shape_output" == "$behavior_input" ]] \
+    || fail "V1 Behavior Delta does not consume the Shape value fingerprint"
 /usr/bin/grep -Fq $'semanticGraph\tvalid=true' "$WORK_ROOT/inspect.txt" \
     || fail "V1 behavior artifact is not a valid semantic graph"
-/usr/bin/grep -Eq $'^compilerV1Artifact\tphase=plot\tinput=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
-    || fail "V1 inspection omitted the plot artifact"
-plot_input="$(/usr/bin/sed -n 's/^compilerV1Artifact[[:space:]]phase=plot[[:space:]]input=\([^[:space:]]*\)$/\1/p' "$WORK_ROOT/inspect.txt")"
-[[ -n "$behavior_output" && "$behavior_output" == "$plot_input" ]] \
-    || fail "V1 plot does not consume the inspected behavior identity"
+/usr/bin/grep -Eq $'^compilerV1Delta\tphase=compile\tidentity=[0-9]+:[0-9]+\tinput=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the Compiled Delta"
+compile_input="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=compile.*[[:space:]]input=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/inspect.txt")"
+[[ -n "$behavior_output" && "$behavior_output" == "$compile_input" ]] \
+    || fail "V1 Compiled Delta does not consume the Behavior value fingerprint"
 
 runtime_inputs=()
 runtime_count="$(/usr/bin/plutil -extract runtimeSources raw -o - "$MANIFEST")"
@@ -171,6 +300,13 @@ actual_status=0
 [[ "$actual_status" -eq 7 ]] \
     || fail "V1-linked ordinary program exited $actual_status instead of 7"
 
+clang -O0 -fno-lto -Wno-override-module \
+    "$WORK_ROOT/persistent.ll" "${runtime_inputs[@]}" -o "$WORK_ROOT/persistent-program"
+persistent_status=0
+"$WORK_ROOT/persistent-program" || persistent_status=$?
+[[ "$persistent_status" -eq 8 ]] \
+    || fail "updated persistent execution exited $persistent_status instead of 8"
+
 missing_status=0
 "$COMPILER" compile-v1 "$WORK_ROOT/Missing.range" > "$WORK_ROOT/missing.out" \
     || missing_status=$?
@@ -179,4 +315,4 @@ missing_status=0
 /usr/bin/grep -Fq 'range: unable to read non-empty input at' "$WORK_ROOT/missing.out" \
     || fail "V1 missing-input control omitted its typed error message"
 
-echo "Compiler V1: pass (ordinary load function, stable Identity : changed FileValue Delta, inspectable shape/behavior/plot artifacts, legacy-byte parity, validate/link/run exit 7, typed missing-input error)"
+echo "Compiler V1: pass (persistent Range-owned execution, cold insert, unchanged LLVM reuse, exact prior phase values on update, File-identity rejection, malformed-cache repair, linked exits 7/8)"

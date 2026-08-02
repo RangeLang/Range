@@ -5,16 +5,135 @@ construct CompilerV1FileValue {
 
 construct CompilerV1SourceDelta {
     let identity: CompilerFingerprint
+    let before: CompilerFingerprint
+    let after: CompilerFingerprint
     let value: CompilerV1FileValue
+}
+
+construct CompilerV1Execution {
+    let isValid: Bool
+    let file: CompilerFingerprint
+    let source: CompilerFingerprint
+    let shape: CompilerFingerprint
+    let behavior: CompilerFingerprint
+    let compiled: CompilerFingerprint
+}
+
+function compilerV1AbsentValue(): CompilerFingerprint {
+    return CompilerFingerprint(first: 0, second: 0)
+}
+
+function compilerV1FingerprintEqual(left: CompilerFingerprint, right: CompilerFingerprint): Bool {
+    return left.first == right.first && left.second == right.second
+}
+
+function compilerV1ExecutionEmpty(): CompilerV1Execution {
+    let absent: CompilerFingerprint(compilerV1AbsentValue())
+    return CompilerV1Execution(
+        isValid: true,
+        file: absent,
+        source: absent,
+        shape: absent,
+        behavior: absent,
+        compiled: absent
+    )
+}
+
+function compilerV1ExecutionInvalid(): CompilerV1Execution {
+    let absent: CompilerFingerprint(compilerV1AbsentValue())
+    return CompilerV1Execution(
+        isValid: false,
+        file: absent,
+        source: absent,
+        shape: absent,
+        behavior: absent,
+        compiled: absent
+    )
+}
+
+function compilerV1ExecutionFieldIsDecimal(source: String, end: Int, ordinal: Int): Bool {
+    return compilerBuildPlanIsDecimal(
+        value: compilerBuildPlanFieldValue(source: source, start: 0, end: end, ordinal: ordinal)
+    )
+}
+
+function compilerV1ExecutionFieldInt(source: String, end: Int, ordinal: Int): Int {
+    return compilerCoreParseDecimalInt(
+        value: compilerBuildPlanFieldValue(source: source, start: 0, end: end, ordinal: ordinal)
+    )
+}
+
+function compilerV1ExecutionSourceIsValid(source: String): Bool {
+    let count: Int(source.bytes.count)
+    if count == 0 { return true }
+    if source.byte(index: count - 1) != 10 { return false }
+    let end: Int(count - 1)
+    if compilerBuildPlanFieldCount(source: source, start: 0, end: end) != 12
+        || compilerBuildPlanFieldText(source: source, start: 0, end: end, ordinal: 0) != String("compilerV1Execution")
+        || compilerBuildPlanFieldValue(source: source, start: 0, end: end, ordinal: 1) != String("1") { return false }
+    state ordinal: Int(2)
+    while ordinal < 12 {
+        if !compilerV1ExecutionFieldIsDecimal(source: source, end: end, ordinal: ordinal) { return false }
+        ordinal: ordinal + 1
+    }
+    return true
+}
+
+function compilerV1ExecutionDecode(source: String): CompilerV1Execution {
+    let count: Int(source.bytes.count)
+    if !compilerV1ExecutionSourceIsValid(source: source) { return compilerV1ExecutionInvalid() }
+    if count == 0 { return compilerV1ExecutionEmpty() }
+    let end: Int(count - 1)
+    return CompilerV1Execution(
+        isValid: true,
+        file: CompilerFingerprint(
+            first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 2),
+            second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 3)
+        ),
+        source: CompilerFingerprint(
+            first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 4),
+            second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 5)
+        ),
+        shape: CompilerFingerprint(
+            first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 6),
+            second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 7)
+        ),
+        behavior: CompilerFingerprint(
+            first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 8),
+            second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 9)
+        ),
+        compiled: CompilerFingerprint(
+            first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 10),
+            second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 11)
+        )
+    )
+}
+
+function compilerV1ExecutionEncode(execution: CompilerV1Execution): String {
+    return "compilerV1Execution\tversion=1\tfileFirst=\(execution.file.first)\tfileSecond=\(execution.file.second)\tsourceFirst=\(execution.source.first)\tsourceSecond=\(execution.source.second)\tshapeFirst=\(execution.shape.first)\tshapeSecond=\(execution.shape.second)\tbehaviorFirst=\(execution.behavior.first)\tbehaviorSecond=\(execution.behavior.second)\tcompiledFirst=\(execution.compiled.first)\tcompiledSecond=\(execution.compiled.second)\n"
+}
+
+function compilerV1ExecutionFromDeltas(source: CompilerV1SourceDelta, shape: CompilerV1ShapeDelta, behavior: CompilerV1BehaviorDelta, compiled: CompilerV1CompiledDelta): CompilerV1Execution {
+    return CompilerV1Execution(
+        isValid: true,
+        file: source.identity,
+        source: source.after,
+        shape: shape.after,
+        behavior: behavior.after,
+        compiled: compiled.after
+    )
 }
 
 function compilerV1IdentityForFile(path: String): CompilerFingerprint {
     return compilerFingerprintAppendText(fingerprint: compilerFingerprintInitial(), tag: 1, text: path)
 }
 
-function compilerV1SourceDelta(path: String, source: String): CompilerV1SourceDelta {
+function compilerV1SourceDelta(path: String, source: String, before: CompilerFingerprint): CompilerV1SourceDelta {
+    let identity: CompilerFingerprint(compilerV1IdentityForFile(path: path))
     return CompilerV1SourceDelta(
-        identity: compilerV1IdentityForFile(path: path),
+        identity: identity,
+        before: before,
+        after: compilerFingerprintAppendText(fingerprint: identity, tag: 11, text: source),
         value: CompilerV1FileValue(path: "\(path)", source: "\(source)")
     )
 }

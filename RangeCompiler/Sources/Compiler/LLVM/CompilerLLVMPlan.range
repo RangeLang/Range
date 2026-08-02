@@ -453,12 +453,22 @@ function compilerReachableLLVMStateRenderModule(reachability: CompilerReachableL
     let audit: CompilerLLVMHelperAudit(compilerCoreLLVMSelectedHelperAuditTyped(tables: reachability.context.tables, selection: reachability.selection))
     if audit.excludedCount > 0 { return compilerCoreLLVMHelperAuditFailure(audit: audit) }
     let typedSelected: CompilerTypedLLVMHelpers(compilerReachableLLVMStateHelpers(reachability: reachability))
-    if !compilerBodyTelemetryIsTypedOnly(telemetry: typedSelected.telemetry) {
-        return compilerBodyTelemetryTypedOnlyFailure(telemetry: typedSelected.telemetry, scope: String("reachableFunctions"))
-    }
     let selected: CompilerLLVMHelperFunctions(compilerTypedLLVMHelpersValue(value: typedSelected))
     let placeholderCount: Int(compilerCoreLLVMPlaceholderCount(text: selected.renderedFunctions))
     if placeholderCount > 0 { return compilerCoreLLVMPlaceholderFailure(placeholderCount: placeholderCount, renderedText: selected.renderedFunctions) }
+    if !compilerBodyTelemetryIsTypedOnly(telemetry: typedSelected.telemetry) {
+        let failureFunctionRow: Int(reachability.counters.element(index: compilerReachableLLVMFunctionFailureFunction()))
+        if failureFunctionRow >= 0 && failureFunctionRow < compilerIntTableRowCount(table: reachability.context.tables.functions) {
+            let failureSyntaxID: Int(compilerIntTableValue(table: reachability.context.tables.functions, row: failureFunctionRow, column: 0))
+            let failureDeclarationRow: Int(compilerSyntaxDeclarationRowForSyntaxID(tables: reachability.context.tables, syntaxID: failureSyntaxID))
+            if failureDeclarationRow >= 0 {
+                let failureFileID: Int(compilerIntTableValue(table: reachability.context.tables.declarations, row: failureDeclarationRow, column: 1))
+                let failureFunctionName: String(compilerTypedSyntaxLocalText(tables: reachability.context.tables, fileID: failureFileID, localStart: compilerIntTableValue(table: reachability.context.tables.declarations, row: failureDeclarationRow, column: 7), localEnd: compilerIntTableValue(table: reachability.context.tables.declarations, row: failureDeclarationRow, column: 8)))
+                return "compilerError\tkind=nonTypedLowering\tscope=reachableFunctions\tfunctionRow=\(failureFunctionRow)\tfunction=\(failureFunctionName)\ttypedParseAttempts=\(typedSelected.telemetry.typedParseAttempts)\ttypedParseSuccesses=\(typedSelected.telemetry.typedParseSuccesses)\tcommittedFailures=\(typedSelected.telemetry.committedFailures)"
+            }
+        }
+        return compilerBodyTelemetryTypedOnlyFailure(telemetry: typedSelected.telemetry, scope: String("reachableFunctions"))
+    }
     if reachability.counters.element(index: compilerReachableLLMCommittedFailures()) != 0 { return String("compilerError\tkind=invalidFunctionReachability") }
     state runtimeRequirements: Int(0)
     runtimeRequirements: typedSelected.runtimeRequirements
@@ -1596,6 +1606,27 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
         }
     }
     if typedReady {
+        if compilerBodyArenaBuildCFG(arena: arena) != 0 {
+            typedFailureStage: 13
+            typedReady: false
+        }
+    }
+    if typedReady {
+        if compilerBodyArenaBuildOwnedPathTables(arena: arena) != 0 {
+            typedFailureStage: 14
+            typedReady: false
+        }
+    }
+    if typedReady {
+        compilerMetricsFunctionBegin(functionID: functionRow, name: String("bodyProduct.directEffects"))
+        let directEffectStatus: Int(compilerReachableLLVMStateCollectDirectEffectProductForArena(reachability: reachability, arena: arena, instanceID: instanceID))
+        compilerMetricsFunctionEnd(legacyParses: 0, recordBytes: 0)
+        if directEffectStatus != 0 {
+            typedFailureStage: 15000 + (0 - directEffectStatus)
+            typedReady: false
+        }
+    }
+    if typedReady {
         if compilerBodyArenaMarkRepresentationSensitiveTargets(arena: arena, sensitiveFunctions: reachability.abiSensitiveFunctions) != 0 {
             typedFailureStage: 10
             typedReady: false
@@ -2041,6 +2072,13 @@ function compilerReachableLLVMStateEmitFunction(reachability: CompilerReachableL
                 }
             }
             plannedEdge: plannedEdge + 1
+        }
+    }
+    if selected.telemetry.committedFailures != 0 {
+        if reachability.counters.update(element: functionRow, index: compilerReachableLLVMFunctionFailureFunction()) != 0
+            || reachability.counters.update(element: instanceID, index: compilerReachableLLVMFunctionFailureInstance()) != 0 {
+            stringTransientRegionReset(mark: transientMark)
+            return 0 - 1
         }
     }
     compilerMetricsFunctionEnd(legacyParses: selected.telemetry.legacyParses, recordBytes: selected.telemetry.recordBytes)

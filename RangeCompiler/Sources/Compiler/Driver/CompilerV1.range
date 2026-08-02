@@ -6,67 +6,86 @@ construct CompilerV1Error {
     let message: String
 }
 
-construct CompilerV1ShapeArtifact {
+construct CompilerV1ShapeDelta {
     let identity: CompilerFingerprint
+    let before: CompilerFingerprint
+    let after: CompilerFingerprint
     let snapshot: String
 }
 
-construct CompilerV1Behavior {
+construct CompilerV1BehaviorDelta {
+    let identity: CompilerFingerprint
     let input: CompilerFingerprint
-    let output: CompilerFingerprint
-}
-
-construct CompilerV1BehaviorArtifact {
-    let behavior: CompilerV1Behavior
+    let before: CompilerFingerprint
+    let after: CompilerFingerprint
     let snapshot: String
 }
 
-construct CompilerV1Artifact {
+construct CompilerV1CompiledDelta {
+    let identity: CompilerFingerprint
     let input: CompilerFingerprint
+    let before: CompilerFingerprint
+    let after: CompilerFingerprint
     let output: String
 }
 
-function compilerV1Load(input: String): CompilerV1SourceDelta {
+function compilerV1Load(input: String, before: CompilerFingerprint): CompilerV1SourceDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.load.begin"))
     let source: String(readFile(path: input))
-    let delta: CompilerV1SourceDelta(compilerV1SourceDelta(path: input, source: source))
+    let delta: CompilerV1SourceDelta(compilerV1SourceDelta(path: input, source: source, before: before))
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.load.end"))
     return delta
 }
 
-function compilerV1Shape(source: String): CompilerV1ShapeArtifact {
+function compilerV1Shape(source: CompilerV1SourceDelta, before: CompilerFingerprint): CompilerV1ShapeDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.shape.begin"))
-    let snapshot: String(compilerTypedSyntaxSummary(source: source))
+    let snapshot: String(compilerTypedSyntaxSummary(source: source.value.source))
+    let identity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: source.identity, value: 2))
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.shape.end"))
-    return CompilerV1ShapeArtifact(
-        identity: compilerFingerprintAppendText(fingerprint: compilerFingerprintInitial(), tag: 2, text: snapshot),
+    return CompilerV1ShapeDelta(
+        identity: identity,
+        before: before,
+        after: compilerFingerprintAppendText(fingerprint: identity, tag: 12, text: snapshot),
         snapshot: snapshot
     )
 }
 
-function compilerV1Behavior(shape: CompilerV1ShapeArtifact, source: String): CompilerV1BehaviorArtifact {
+function compilerV1Behavior(shape: CompilerV1ShapeDelta, source: String, before: CompilerFingerprint): CompilerV1BehaviorDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.behavior.begin"))
     let snapshot: String(compilerSemanticSummary(source: source))
-    let output: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: shape.identity, tag: 3, text: snapshot))
+    let identity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: shape.identity, value: 3))
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.behavior.end"))
-    return CompilerV1BehaviorArtifact(
-        behavior: CompilerV1Behavior(input: shape.identity, output: output),
+    return CompilerV1BehaviorDelta(
+        identity: identity,
+        input: shape.after,
+        before: before,
+        after: compilerFingerprintAppendText(fingerprint: identity, tag: 13, text: snapshot),
         snapshot: snapshot
     )
 }
 
-function compilerV1Plot(shape: CompilerV1ShapeArtifact, behavior: CompilerV1BehaviorArtifact, source: String): CompilerV1Artifact {
-    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.plot.begin"))
-    if behavior.behavior.input.first != shape.identity.first
-        || behavior.behavior.input.second != shape.identity.second {
-        return CompilerV1Artifact(
-            input: behavior.behavior.output,
+function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1BehaviorDelta, source: String, before: CompilerFingerprint): CompilerV1CompiledDelta {
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.compile.begin"))
+    let identity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: behavior.identity, value: 4))
+    if behavior.input.first != shape.after.first
+        || behavior.input.second != shape.after.second {
+        return CompilerV1CompiledDelta(
+            identity: identity,
+            input: behavior.after,
+            before: before,
+            after: compilerV1AbsentValue(),
             output: String("compilerError\tkind=compilerV1BehaviorShapeMismatch\n")
         )
     }
     let output: String(compileRangeNativeProgramOutput(source: source))
-    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.plot.end"))
-    return CompilerV1Artifact(input: behavior.behavior.output, output: output)
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.compile.end"))
+    return CompilerV1CompiledDelta(
+        identity: identity,
+        input: behavior.after,
+        before: before,
+        after: compilerFingerprintAppendText(fingerprint: identity, tag: 14, text: output),
+        output: output
+    )
 }
 
 function compilerV1Report(error: CompilerV1Error): Int {
@@ -74,33 +93,177 @@ function compilerV1Report(error: CompilerV1Error): Int {
     return 65
 }
 
+function compilerV1CompiledIdentityForFile(file: CompilerFingerprint): CompilerFingerprint {
+    let shape: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: file, value: 2))
+    let behavior: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: shape, value: 3))
+    return compilerFingerprintAppendInt(fingerprint: behavior, value: 4)
+}
+
+function compilerV1CompiledValueMatches(input: String, expectedFirst: Int, expectedSecond: Int, outputPath: String): Int {
+    let cachedOutput: String(readFile(path: outputPath))
+    let file: CompilerFingerprint(compilerV1IdentityForFile(path: input))
+    let compiledIdentity: CompilerFingerprint(compilerV1CompiledIdentityForFile(file: file))
+    let cachedCompiled: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: compiledIdentity, tag: 14, text: cachedOutput))
+    state matches: Int(0)
+    if cachedCompiled.first == expectedFirst && cachedCompiled.second == expectedSecond {
+        matches: 1
+    }
+    return matches
+}
+
+function compilerV1SourceValueMatches(input: String, expectedFirst: Int, expectedSecond: Int): Int {
+    let source: String(readFile(path: input))
+    let file: CompilerFingerprint(compilerV1IdentityForFile(path: input))
+    let current: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: file, tag: 11, text: source))
+    state matches: Int(0)
+    if current.first == expectedFirst && current.second == expectedSecond {
+        matches: 1
+    }
+    return matches
+}
+
+function compilerV1SourceIsEmpty(input: String): Int {
+    let source: String(readFile(path: input))
+    state isEmpty: Int(0)
+    if source == String("") {
+        isEmpty: 1
+    }
+    return isEmpty
+}
+
+function compilerV1FileIdentityPart(input: String, part: Int): Int {
+    let identity: CompilerFingerprint(compilerV1IdentityForFile(path: input))
+    state value: Int(identity.first)
+    if part == 1 {
+        value: identity.second
+    }
+    return value
+}
+
+function compilerV1ExecutionFileMatches(executionPath: String, input: String): Int {
+    let fileFirst: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 2))
+    let fileSecond: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 3))
+    let expectedFileFirst: Int(compilerV1FileIdentityPart(input: input, part: 0))
+    let expectedFileSecond: Int(compilerV1FileIdentityPart(input: input, part: 1))
+    state matches: Int(1)
+    if (fileFirst != 0 || fileSecond != 0)
+        && (fileFirst != expectedFileFirst || fileSecond != expectedFileSecond) {
+        matches: 0
+    }
+    return matches
+}
+
+function compilerV1ExecutionSourceMatches(executionPath: String, input: String): Int {
+    return compilerV1SourceValueMatches(
+        input: input,
+        expectedFirst: compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 4),
+        expectedSecond: compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 5))
+}
+
+function compilerV1ExecutionFieldAtPath(executionPath: String, ordinal: Int): Int {
+    let stored: String(readFile(path: executionPath))
+    let count: Int(stored.bytes.count)
+    state value: Int(0)
+    if count != 0 {
+        value: compilerV1ExecutionFieldInt(source: stored, end: count - 1, ordinal: ordinal)
+    }
+    return value
+}
+
+function compilerV1ExecutionFingerprintAtPath(executionPath: String, firstOrdinal: Int, secondOrdinal: Int): CompilerFingerprint {
+    let first: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: firstOrdinal))
+    let second: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: secondOrdinal))
+    return CompilerFingerprint(first: first, second: second)
+}
+
+function compilerV1ExecutionCompiledMatches(executionPath: String, input: String, outputPath: String): Int {
+    return compilerV1CompiledValueMatches(
+        input: input,
+        expectedFirst: compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 10),
+        expectedSecond: compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 11),
+        outputPath: outputPath)
+}
+
+function compilerV1ExecutionUpdate(input: String, executionPath: String, outputPath: String): Int {
+    let priorFileFirst: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 2))
+    let priorFileSecond: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 3))
+    let sourceBefore: CompilerFingerprint(compilerV1ExecutionFingerprintAtPath(executionPath: executionPath, firstOrdinal: 4, secondOrdinal: 5))
+    let shapeBefore: CompilerFingerprint(compilerV1ExecutionFingerprintAtPath(executionPath: executionPath, firstOrdinal: 6, secondOrdinal: 7))
+    let behaviorBefore: CompilerFingerprint(compilerV1ExecutionFingerprintAtPath(executionPath: executionPath, firstOrdinal: 8, secondOrdinal: 9))
+    let compiledBefore: CompilerFingerprint(compilerV1ExecutionFingerprintAtPath(executionPath: executionPath, firstOrdinal: 10, secondOrdinal: 11))
+    let sourceDelta: CompilerV1SourceDelta(compilerV1Load(input: input, before: sourceBefore))
+    let source: String(sourceDelta.value.source)
+    let shape: CompilerV1ShapeDelta(compilerV1Shape(source: sourceDelta, before: shapeBefore))
+    if compilerNativeOutputIsError(output: shape.snapshot) {
+        return compilerV1Report(error: CompilerV1Error(message: shape.snapshot))
+    }
+    let behavior: CompilerV1BehaviorDelta(compilerV1Behavior(shape: shape, source: source, before: behaviorBefore))
+    if compilerNativeOutputIsError(output: behavior.snapshot) {
+        return compilerV1Report(error: CompilerV1Error(message: behavior.snapshot))
+    }
+    let compiled: CompilerV1CompiledDelta(compilerV1Compile(shape: shape, behavior: behavior, source: source, before: compiledBefore))
+    if compilerNativeOutputIsError(output: compiled.output) {
+        return compilerV1Report(error: CompilerV1Error(message: compiled.output))
+    }
+    let outputStatus: Int(writeFile(path: outputPath, text: compiled.output))
+    if outputStatus != 0 {
+        return compilerV1Report(error: CompilerV1Error(message: "range: unable to persist Compiler V1 output at \(outputPath)"))
+    }
+    let next: CompilerV1Execution(compilerV1ExecutionFromDeltas(source: sourceDelta, shape: shape, behavior: behavior, compiled: compiled))
+    let executionStatus: Int(writeFile(path: executionPath, text: compilerV1ExecutionEncode(execution: next)))
+    if executionStatus != 0 {
+        return compilerV1Report(error: CompilerV1Error(message: "range: unable to persist Compiler V1 execution at \(executionPath)"))
+    }
+    if priorFileFirst == 0 && priorFileSecond == 0 {
+        print(value: "compilerV1Execution\tstatus=cold\tchanged=1\tsourceBefore=\(sourceDelta.before.first):\(sourceDelta.before.second)\tsourceAfter=\(sourceDelta.after.first):\(sourceDelta.after.second)\tshapeBefore=\(shape.before.first):\(shape.before.second)\tshapeAfter=\(shape.after.first):\(shape.after.second)\tbehaviorBefore=\(behavior.before.first):\(behavior.before.second)\tbehaviorAfter=\(behavior.after.first):\(behavior.after.second)\tcompiledBefore=\(compiled.before.first):\(compiled.before.second)\tcompiledAfter=\(compiled.after.first):\(compiled.after.second)\n")
+    } else {
+        print(value: "compilerV1Execution\tstatus=updated\tchanged=1\tsourceBefore=\(sourceDelta.before.first):\(sourceDelta.before.second)\tsourceAfter=\(sourceDelta.after.first):\(sourceDelta.after.second)\tshapeBefore=\(shape.before.first):\(shape.before.second)\tshapeAfter=\(shape.after.first):\(shape.after.second)\tbehaviorBefore=\(behavior.before.first):\(behavior.before.second)\tbehaviorAfter=\(behavior.after.first):\(behavior.after.second)\tcompiledBefore=\(compiled.before.first):\(compiled.before.second)\tcompiledAfter=\(compiled.after.first):\(compiled.after.second)\n")
+    }
+    return 0
+}
+
+function rangeCompilerV1ResumeCLI(executionPath: String, input: String, outputPath: String): Int {
+    if compilerV1SourceIsEmpty(input: input) == 1 {
+        return compilerV1Report(error: CompilerV1Error(message: "range: unable to read non-empty input at \(input)"))
+    }
+    if compilerV1ExecutionFileMatches(executionPath: executionPath, input: input) == 0 {
+        return compilerV1Report(error: CompilerV1Error(message: "range: Compiler V1 execution belongs to a different File identity"))
+    }
+    if compilerV1ExecutionSourceMatches(executionPath: executionPath, input: input) == 1
+        && compilerV1ExecutionCompiledMatches(executionPath: executionPath, input: input, outputPath: outputPath) == 1 {
+        print(value: "compilerV1Execution\tstatus=reused\tchanged=0\n")
+        return 0
+    }
+    return compilerV1ExecutionUpdate(input: input, executionPath: executionPath, outputPath: outputPath)
+}
+
 function rangeCompilerV1CLI(compiler: CompilerV1, input: String, inspect: Bool): Int {
-    let sourceDelta: CompilerV1SourceDelta(compilerV1Load(input: input))
+    let sourceDelta: CompilerV1SourceDelta(compilerV1Load(input: input, before: compilerV1AbsentValue()))
     let source: String(sourceDelta.value.source)
     if source == String("") {
         return compilerV1Report(error: CompilerV1Error(message: "range: unable to read non-empty input at \(sourceDelta.value.path)"))
     }
-    let shape: CompilerV1ShapeArtifact(compilerV1Shape(source: source))
+    let shape: CompilerV1ShapeDelta(compilerV1Shape(source: sourceDelta, before: compilerV1AbsentValue()))
     if compilerNativeOutputIsError(output: shape.snapshot) {
         return compilerV1Report(error: CompilerV1Error(message: shape.snapshot))
     }
-    let behavior: CompilerV1BehaviorArtifact(compilerV1Behavior(shape: shape, source: source))
+    let behavior: CompilerV1BehaviorDelta(compilerV1Behavior(shape: shape, source: source, before: compilerV1AbsentValue()))
     if compilerNativeOutputIsError(output: behavior.snapshot) {
         return compilerV1Report(error: CompilerV1Error(message: behavior.snapshot))
     }
-    let artifact: CompilerV1Artifact(compilerV1Plot(shape: shape, behavior: behavior, source: source))
+    let artifact: CompilerV1CompiledDelta(compilerV1Compile(shape: shape, behavior: behavior, source: source, before: compilerV1AbsentValue()))
     if compilerNativeOutputIsError(output: artifact.output) {
         return compilerV1Report(error: CompilerV1Error(message: artifact.output))
     }
     let sourceLength: Int(source.bytes.count)
     if inspect {
         print(value: "compilerV1\tversion=\(compiler.version)\n")
-        print(value: "compilerV1Delta\tkind=source\tidentity=\(sourceDelta.identity.first):\(sourceDelta.identity.second)\tvalue=File\tpath=\(sourceDelta.value.path)\tbytes=\(sourceLength)\n")
-        print(value: "compilerV1Artifact\tphase=shape\tidentity=\(shape.identity.first):\(shape.identity.second)\n")
+        print(value: "compilerV1Delta\tphase=source\tidentity=\(sourceDelta.identity.first):\(sourceDelta.identity.second)\tbefore=\(sourceDelta.before.first):\(sourceDelta.before.second)\tafter=\(sourceDelta.after.first):\(sourceDelta.after.second)\tvalue=File\tpath=\(sourceDelta.value.path)\tbytes=\(sourceLength)\n")
+        print(value: "compilerV1Delta\tphase=shape\tidentity=\(shape.identity.first):\(shape.identity.second)\tbefore=\(shape.before.first):\(shape.before.second)\tafter=\(shape.after.first):\(shape.after.second)\n")
         print(value: shape.snapshot)
-        print(value: "compilerV1Artifact\tphase=behavior\tinput=\(behavior.behavior.input.first):\(behavior.behavior.input.second)\toutput=\(behavior.behavior.output.first):\(behavior.behavior.output.second)\n")
+        print(value: "compilerV1Delta\tphase=behavior\tidentity=\(behavior.identity.first):\(behavior.identity.second)\tinput=\(behavior.input.first):\(behavior.input.second)\tbefore=\(behavior.before.first):\(behavior.before.second)\tafter=\(behavior.after.first):\(behavior.after.second)\n")
         print(value: behavior.snapshot)
-        print(value: "compilerV1Artifact\tphase=plot\tinput=\(artifact.input.first):\(artifact.input.second)\n")
+        print(value: "compilerV1Delta\tphase=compile\tidentity=\(artifact.identity.first):\(artifact.identity.second)\tinput=\(artifact.input.first):\(artifact.input.second)\tbefore=\(artifact.before.first):\(artifact.before.second)\tafter=\(artifact.after.first):\(artifact.after.second)\n")
     }
     print(value: artifact.output)
     return 0

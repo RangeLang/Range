@@ -4974,20 +4974,10 @@ function compilerReachableLLVMStateAppendReachableEffectCandidatesAndCallsForAre
     return 0
 }
 
-function compilerReachableLLVMStateClassifyReturnAndCollectDirectEffectsForWorkItem(reachability: CompilerReachableLLVMState, workIndex: Int): Int {
-    if workIndex < 0 || workIndex >= reachability.worklist.count { return 0 - 1 }
-    let functionRow: Int(reachability.worklist.element(index: workIndex))
-    let instanceID: Int(compilerReachableLLVMStateWorklistInstanceID(reachability: reachability, workIndex: workIndex))
-    if functionRow < 0 || instanceID < 0
+function compilerReachableLLVMStateCollectDirectEffectProductForArena(reachability: CompilerReachableLLVMState, arena: CompilerBodyArena, instanceID: Int): Int {
+    if instanceID < 0
         || compilerReachableLLVMStateReturnSummaryStatus(reachability: reachability, instanceID: instanceID) != compilerReachableFunctionInstanceReturnSummaryUnknown() { return 0 - 1 }
-    let transientMark: Int(stringTransientRegionMark())
-    let arena: CompilerBodyArena(compilerBodyArenaParseFunction(arena: compilerBodyArenaCreateForFunctionInstance(tables: reachability.context.tables, index: reachability.context.declarationIndex, functionRow: functionRow, functionInstanceID: instanceID, receiverTypeKeyID: compilerReachableLLVMStateFunctionInstanceReceiverKey(reachability: reachability, instanceID: instanceID), typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments)))
     state status: Int(0)
-    if !compilerBodyArenaIsValid(arena: arena) { status: 1 }
-    if status == 0 && compilerBodyArenaBuildSymbolsAndResolutions(arena: arena, index: reachability.context.declarationIndex) != 0 { status: 2 }
-    if status == 0 && compilerReachableLLVMStateBindPlannedFunctionInstancesForArena(typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments, functionInstances: reachability.functionInstances, functionInstanceSignatures: reachability.functionInstanceSignatures, arena: arena) != 0 { status: 3 }
-    if status == 0 && compilerBodyArenaBuildCFG(arena: arena) != 0 { status: 4 }
-    if status == 0 && compilerBodyArenaBuildOwnedPathTables(arena: arena) != 0 { status: 5 }
     let returnTypeID: Int(compilerReachableLLVMStateReturnTypeIDForArena(arena: arena))
     let returnTypeKind: Int(compilerBodyArenaTypeKindForTypeID(arena: arena, typeID: returnTypeID))
     let returnTypeKeyID: Int(compilerReachableTypeKeyInternFromArena(typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments, arena: arena, typeID: returnTypeID))
@@ -5011,9 +5001,6 @@ function compilerReachableLLVMStateClassifyReturnAndCollectDirectEffectsForWorkI
             if compilerReachableLLVMStateSetReturnSummary(reachability: reachability, instanceID: instanceID, status: summaryStatus, typeKeyID: returnTypeKeyID, typeKind: returnTypeKind, firstLeaf: 0 - 1, leafCount: 0) != 0 { status: 9 }
         }
     }
-    let destroyStatus: Int(compilerBodyArenaDestroy(arena: arena))
-    if status == 0 && destroyStatus != 0 { status: 10 }
-    stringTransientRegionReset(mark: transientMark)
     if status != 0 { return 0 - status }
     return 0
 }
@@ -5446,23 +5433,7 @@ function compilerReachableLLVMStateValidateFunctionInstanceEffects(reachability:
 }
 
 function compilerReachableLLVMStateBuildFunctionInstanceEffects(reachability: CompilerReachableLLVMState): Int {
-    if compilerIntTableRowCount(table: reachability.functionInstanceEffects) != 0
-        || compilerIntTableRowCount(table: reachability.functionInstanceEffectPaths) != 0
-        || compilerIntTableRowCount(table: reachability.functionInstanceEffectCalls) != 0
-        || compilerIntTableRowCount(table: reachability.functionInstanceReturnLeaves) != 0 { return 0 - 1 }
-    state workIndex: Int(0)
-    while workIndex < reachability.worklist.count {
-        let classificationStatus: Int(compilerReachableLLVMStateClassifyReturnAndCollectDirectEffectsForWorkItem(reachability: reachability, workIndex: workIndex))
-        if classificationStatus != 0 {
-            let failureFunctionRow: Int(reachability.worklist.element(index: workIndex))
-            let failureInstanceID: Int(compilerReachableLLVMStateWorklistInstanceID(reachability: reachability, workIndex: workIndex))
-            if reachability.counters.update(element: failureFunctionRow, index: compilerReachableLLVMFunctionFailureFunction()) != 0
-                || reachability.counters.update(element: failureInstanceID, index: compilerReachableLLVMFunctionFailureInstance()) != 0
-                || reachability.counters.update(element: 0 - classificationStatus, index: compilerReachableLLVMFunctionFailureDetail()) != 0 { return 0 - 1 }
-            return 0 - 2
-        }
-        workIndex: workIndex + 1
-    }
+    if compilerIntTableRowCount(table: reachability.functionInstanceReturnLeaves) != 0 { return 0 - 1 }
     if compilerReachableLLVMStateCloseFunctionInstanceEffects(reachability: reachability, effects: reachability.functionInstanceEffects) != 0 { return 0 - 3 }
     let ownedReturnStatus: Int(compilerReachableLLVMStateBuildOwnedReturnSummaries(reachability: reachability))
     if ownedReturnStatus != 0 { return 0 - 4 }

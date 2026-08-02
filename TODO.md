@@ -380,6 +380,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 
 ## Website
 
+  - [x] Redesign the sound opening sheet around hover discovery.
+    - [x] Activate mouse entry on hover and snap the exploration point to the
+      pointer while retaining touch and keyboard entry.
+    - [x] Reveal a glitter-surface shader sphere whose surface becomes more
+      concrete as the pointer visits each exploration segment.
   - [x] Add a source-first Command Group macro breakdown at
     `/features/macros/command-group-registration`.
     - Show the complete live Core macro, a representative annotated command
@@ -1698,6 +1703,21 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           invalidation. It does not recreate resolved bodies, CFG, ownership,
           MIR, ABI proofs, or LLVM. Retain those typed products explicitly and
           make later phases consume them.
+        - [x] Build the direct effect/return product on the resolved discovery
+          arena instead of reparsing the same function during the later
+          effects phase.
+          - Discovery now resolves, assigns instances, builds CFG/owned paths,
+            and records direct effects plus the non-tracked return summary
+            before it destroys that arena. The later effects phase only closes
+            and validates the accumulated product before owned-return summary
+            construction.
+          - `scripts/range check-value-ownership --controls` passed after a
+            development self-emission of 663 seconds (666 seconds total), and
+            `scripts/check-range-compiler-v1` passed in 47.37 seconds with a
+            cold `bodyProduct.directEffects` trace assertion. This removes one
+            parse/resolve/CFG/owned-path reconstruction per reachable function;
+            it does not yet retain ABI-dependent ownership/MIR products across
+            ABI probes.
       - [ ] Represent compiler errors as typed, retainable phase products.
         - [ ] Introduce stable error identity, nominal kind, phase/operation,
           subject identity, source witness, expected/observed fields, optional
@@ -2073,8 +2093,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] Carry the description through one executable Compiler V1 slice.
     - `@main` now exposes `compile-v1` and `inspect-v1`. The V1 runner loads an
       explicit input file as a stable `Identity : FileValue` source Delta,
-      produces inspectable typed-syntax and semantic artifacts through named
-      shape and behavior functions, then delegates plotting to the current native
+      produces inspectable Source, Shape, Behavior, and Compiled Deltas through
+      named phase functions, then delegates LLVM emission to the current native
       compiler path.
     - `scripts/range check-compiler-v1` proves the V1 plot artifact is
       byte-identical to the legacy output for an ordinary Range program,
@@ -2097,6 +2117,44 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         file read. The Delta pairs one path-derived canonical
         `CompilerFingerprint` with one `FileValue(path:source:)`; the duplicate
         V1 identity type and copied hash implementation have been removed.
+      - [x] Separate stable phase identity from changing phase value identity.
+        - Source, Shape, Behavior, and Compiled Deltas retain a stable identity
+          derived from their owning File and phase, carry explicit `before` and
+          `after` value fingerprints, and connect each phase input to the prior
+          phase's `after` fingerprint.
+        - Changing File contents preserves the File identity while changing its
+          value fingerprint. Shape and later phases are now capable of update
+          semantics instead of treating each changed value as a new graph node.
+        - The development Stage 2 rebuilt all 2,952 function artifacts and
+          passed the complete value-ownership gate in 654 seconds: 651 seconds
+          Range LLVM emission, 2 seconds validation, and 1 second linking.
+          `scripts/check-range-compiler-v1` then passed stable phase identities,
+          exact Source -> Shape -> Behavior -> Compiled value-fingerprint
+          chaining, legacy LLVM byte parity, validation, linking, execution
+          with exit `7`, and the typed missing-input error.
+      - [x] Load each prior value fingerprint from persistent execution state so
+        an update carries its real `before` value instead of the cold-start
+        `0:0` absence marker.
+        - `resume-v1 <execution.tsv> <input.range> <output.ll>` stores the File,
+          Source, Shape, Behavior, and Compiled fingerprints in one Range-owned
+          versioned record. A cold execution inserts every value; an unchanged
+          execution verifies both the current source and cached LLVM fingerprints
+          without rewriting either file; an edited execution loads the exact
+          prior phase values before replacing them.
+        - State for another File identity rejects. Malformed state is an invalid
+          cache value: it is rebuilt and replaced rather than becoming a program
+          error. Output and state writes are independently atomic; add a shared
+          transaction boundary before treating the pair as one durable commit.
+        - The complete value-ownership gate passed after rebuilding 2,967
+          function artifacts in 667.06 seconds: LLVM emission consumed 652
+          seconds, validation 1 second, and linking 2 seconds. The focused V1
+          gate then passed in 4.46 seconds, including cold insertion, unchanged
+          no-rewrite reuse, exact prior-value update, File-identity rejection,
+          malformed-cache repair, LLVM validation/linking, and exits `7`/`8`.
+        - The current command reads the one state record repeatedly through
+          scalar helpers because aggregate ownership joins remain unsupported.
+          Replace that workaround with one loaded persistent project graph after
+          the ownership boundary can carry the decoded aggregate safely.
       - The existing `CompilerMemoryGraph.runtimeValues` rows are specialized
         for macro-family applications and are found by table scans. Do not call
         this source Delta a MemoryGraph insertion or random-access value until
@@ -2193,6 +2251,29 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           seconds linking. The next performance slice must skip module-wide
           reconstruction across compiler-source cache keys, not merely raise
           the late function-reuse count.
+        - [ ] Re-prove a warm artifact hit on the complete compiler source set
+          after the module-wide producer is separated from the development
+          path. A direct `range-function-artifact-input` experiment was
+          bounded at 1,373.49 seconds in `compilerBodyLLVMEmit`, emitted zero
+          LLVM bytes, and wrote no artifact before interruption; the supported
+          V1 gate's small closed-Behavior fixture remains the valid cache-hit
+          proof.
+          - `scripts/range compiler profile` now always requests an artifact
+            output and can persist it with `RANGE_COMPILER_PROFILE_ARTIFACT_OUTPUT`.
+            Its next run can consume that exact file through
+            `RANGE_COMPILER_PROFILE_ARTIFACT_INPUT`; a successful closed hit is
+            reported as `compilerArtifact status=reused` and retains the full
+            authored phase/function trace for comparison.
+          - `scripts/check-range-compiler-v1` proves the profiler path with a
+            cold artifact write followed by a warm artifact reuse. The cold
+            trace reaches effects, ABI components, and function emission; the
+            closed warm trace reaches artifact candidates but contains none of
+            those three stages. The focused proof completed in 52.09 seconds.
+          - A live complete-source profile was bounded after 16:28 at roughly
+            9 GB RSS, before it could write its cold artifact. Its trace reached
+            repeated ABI ownership/MIR work and
+            `compilerBodyLLVMEmitterProcessOperation`; retain frozen typed body
+            and ABI products before attempting another full cold-to-warm run.
         - A subsequent one-function parser change reused 2,948 of 2,949
           artifacts and still spent 350 seconds emitting LLVM, versus 1 second
           validating and 2 seconds linking. This independently reproduces the
@@ -2423,3 +2504,18 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [ ] Support statement arrays produced by `#commands.map` inside generated function bodies without aborting native compilation, then prove argv key comparison and `self.<command>()` dispatch.
   - [ ] Support fieldless construct values as method receivers so a command group does not need a stored control field solely to make `CLI()` representable.
   - [ ] Replace the focused harness reflection prelude with canonical Core declaration envelopes only after their wider dependencies compile in the supported bundle.
+
+## Compiler Observability
+
+- [ ] Grow the local Compiler Scope from a live instrument into a historical
+  regression tracker.
+  - [x] Stream the supported compiler profiler's process-tree CPU and resident
+    memory measurements into a moving localhost graph, compare the heaviest
+    neighboring task, and expose an explicit bounded stop operation.
+  - [ ] Persist completed run summaries by source revision and machine so the
+    dashboard can compare like-for-like compiler trends without presenting
+    unlike hosts as a regression.
+  - [ ] Add focused compiler-stage presets only when each preset maps to a
+    supported proof command and labels the exact boundary it measures.
+  - [ ] Consider a native macOS shell after the localhost workflow and stored
+    history establish which always-on process metrics are useful.
