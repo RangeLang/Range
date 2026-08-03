@@ -1174,12 +1174,6 @@ function compilerNativeOutputExitCode(output: String): Int {
     return 0
 }
 
-function parseCompilerProgramForLLVMNamedBodies(source: String, bodyFunctionNames: String): CompilerProgram {
-    let maybeMainBlock: Optional<CompilerMainBlock>(compilerCoreParseMainBlock(source: source))
-    let parsedDeclarations: CompilerParsedDeclarations(parseCompilerTopLevelDeclarationsForLLVMNamedBodies(source: source, bodyFunctionNames: bodyFunctionNames))
-    return compilerCoreProgramFromParsedParts(source: source, maybeMainBlock: maybeMainBlock, parsedDeclarations: parsedDeclarations)
-}
-
 function compilerCoreProgramWithoutMain(source: String, parsedDeclarations: CompilerParsedDeclarations): CompilerProgram {
     let blockFallback: CompilerBlock(start: 0, end: 0)
     return CompilerProgram(

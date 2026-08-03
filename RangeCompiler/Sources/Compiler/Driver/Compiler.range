@@ -40,6 +40,10 @@ function compileRangeNativeSourceDirectiveOutput(source: String): String {
         return compilerMacroSummary(source: source)
     }
 
+    if compilerSourceRequestsMacroGraph(source: source) {
+        return compilerMacroGraphSummary(source: source)
+    }
+
     if compilerSourceRequestsPlotter(source: source) {
         return compilerPlotterSummary(source: source)
     }

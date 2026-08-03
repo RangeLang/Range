@@ -1,8 +1,3 @@
-function compilerCoreLLVM(source: String): String {
-    let program: CompilerProgram(parseCompilerProgramWithFunctionBodies(source: source))
-    return compilerCoreLLVMForProgram(program: program)
-}
-
 function compilerCoreLLVMSelectedHelperAuditTyped(tables: CompilerSyntaxTables, selection: CompilerFunctionSelection): CompilerLLVMHelperAudit {
     state audit: CompilerLLVMHelperAudit(selectedCount: 0, lowerableCount: 0, excludedCount: 0, maxBodyLength: 0, maxBodyName: String(""), details: String(""))
     state declarationRow: Int(0)
@@ -224,21 +219,34 @@ function compilerCoreLLVMNativeProgramText(source: String): String {
 
 function compilerCoreLLVMNativeEntryTextForReachability(reachability: CompilerReachableLLVMState): String {
     state output: String("compilerError\tkind=invalidEntryReachability")
-    let seedStatus: Int(compilerReachableLLVMStateEvaluateMainBehaviorRoot(reachability: reachability))
+    state seedStatus: Int(0)
     state buildStatus: Int(0 - 1)
     state usedCachedModule: Bool(false)
-    if seedStatus != 0 {
-        compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 50000 + seedStatus)
-        output: "compilerError\tkind=invalidEntryReachability\tstage=\(seedStatus)"
+    let cachedModule: String(compilerFunctionArtifactCacheModuleText(cache: reachability.priorFunctionArtifacts))
+    if compilerFunctionArtifactCacheSourceMatches(cache: reachability.priorFunctionArtifacts, source: reachability.context.program.source)
+        && cachedModule != String("") {
+        if reachability.counters.update(element: 1, index: compilerReachableLLVMBehaviorGraphClosed()) != 0 {
+            buildStatus: 0 - 1
+        } else {
+            output: cachedModule
+            buildStatus: 0
+            usedCachedModule: true
+        }
     } else {
-        buildStatus: compilerReachableLLVMStateBuildSelected(reachability: reachability)
-        if buildStatus == 2 {
-            output: compilerFunctionArtifactCacheModuleText(cache: reachability.priorFunctionArtifacts)
-            if output == String("") {
-                buildStatus: 0 - 1
-            } else {
-                buildStatus: 0
-                usedCachedModule: true
+        seedStatus: compilerReachableLLVMStateEvaluateMainBehaviorRoot(reachability: reachability)
+        if seedStatus != 0 {
+            compilerReachableLLVMStateSetInvalidAt(reachability: reachability, stage: 50000 + seedStatus)
+            output: "compilerError\tkind=invalidEntryReachability\tstage=\(seedStatus)"
+        } else {
+            buildStatus: compilerReachableLLVMStateBuildSelected(reachability: reachability)
+            if buildStatus == 2 {
+                output: compilerFunctionArtifactCacheModuleText(cache: reachability.priorFunctionArtifacts)
+                if output == String("") {
+                    buildStatus: 0 - 1
+                } else {
+                    buildStatus: 0
+                    usedCachedModule: true
+                }
             }
         }
     }
@@ -1511,15 +1519,6 @@ function compilerReachableLLVMStateProbeCandidateFunction(reachability: Compiler
         }
         compilerMetricsFunctionEnd(legacyParses: 0, recordBytes: 0)
     }
-    if capable && !discoveredSensitiveTarget {
-        compilerMetricsFunctionBegin(functionID: functionRow, name: String("abi.emit"))
-        let capabilityEmission: CompilerBodyLLVMEmissionResult(compilerBodyLLVMEmit(arena: arena, initialTemporary: 0, initialBranch: 0, abiPlan: candidatePlan, typeKeys: reachability.typeKeys, typeKeyArguments: reachability.typeKeyArguments, functionInstances: reachability.functionInstances, functionInstanceSignatures: reachability.functionInstanceSignatures, functionInstanceSignatureParameters: reachability.functionInstanceSignatureParameters))
-        if !capabilityEmission.isValid {
-            failureStage: 900000 + capabilityEmission.runtimeRequirements
-            capable: false
-        }
-        compilerMetricsFunctionEnd(legacyParses: 0, recordBytes: 0)
-    }
     stringTransientRegionReset(mark: transientMark)
     transientMark: stringTransientRegionMark()
     state capabilityValue: Int(1)
@@ -1629,6 +1628,12 @@ function compilerReachableLLVMStateDiscoverFunction(reachability: CompilerReacha
     if typedReady {
         if compilerBodyArenaMarkRepresentationSensitiveTargets(arena: arena, sensitiveFunctions: reachability.abiSensitiveFunctions) != 0 {
             typedFailureStage: 10
+            typedReady: false
+        }
+    }
+    if typedReady {
+        if reachability.abiCapabilities.update(element: 1, index: functionRow) != 0 {
+            typedFailureStage: 15
             typedReady: false
         }
     }
@@ -1916,7 +1921,7 @@ function compilerReachableLLVMStateMainBehaviorClosure(reachability: CompilerRea
 }
 
 function compilerReachableLLVMStateCachedMainBehaviorClosure(reachability: CompilerReachableLLVMState): CompilerFingerprint {
-    if reachability.priorFunctionArtifacts.rootBehavior.count != 8 { return compilerFingerprintInitial() }
+    if reachability.priorFunctionArtifacts.rootBehavior.count < 8 { return compilerFingerprintInitial() }
     state closure: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: compilerFingerprintInitial(), value: 9033))
     closure: compilerFingerprintAppendInt(fingerprint: closure, value: reachability.priorFunctionArtifacts.rootBehavior.element(index: 2))
     closure: compilerFingerprintAppendInt(fingerprint: closure, value: reachability.priorFunctionArtifacts.rootBehavior.element(index: 3))
@@ -1950,7 +1955,7 @@ function compilerReachableLLVMStateBuildMainBehavior(reachability: CompilerReach
 }
 
 function compilerReachableLLVMStateBehaviorCandidateGraphIsClosed(reachability: CompilerReachableLLVMState): Bool {
-    if reachability.priorFunctionArtifacts.rootBehavior.count != 8 { return false }
+    if reachability.priorFunctionArtifacts.rootBehavior.count < 8 { return false }
     let mainInput: CompilerFingerprint(compilerReachableLLVMStateMainBehaviorInput(reachability: reachability))
     let mainOutput: CompilerFingerprint(compilerReachableLLVMStateMainBehaviorOutput(reachability: reachability))
     if reachability.priorFunctionArtifacts.rootBehavior.element(index: 0) != mainInput.first
@@ -2241,12 +2246,6 @@ function compilerReachableLLVMStateBuildABIComponents(reachability: CompilerReac
             state componentProbe: Int(componentEnd - 1)
             while !componentBlocked && !componentRequiresRestart && componentProbe >= componentStart && status == 0 {
                 let probeMember: Int(componentQueue.element(index: componentProbe))
-                if reachability.abiCapabilities.element(index: probeMember) == 0 {
-                    let sensitiveCountBeforeProbe: Int(compilerReachableLLVMStateSensitiveCount(reachability: reachability))
-                    let probeStatus: Int(compilerReachableLLVMStateProbeReachableInstancesForFunction(reachability: reachability, functionRow: probeMember))
-                    if probeStatus != 0 { status: 0 - 1 }
-                    if compilerReachableLLVMStateSensitiveCount(reachability: reachability) != sensitiveCountBeforeProbe { componentRequiresRestart: true }
-                }
                 if status == 0 && !componentRequiresRestart && reachability.abiCapabilities.element(index: probeMember) != 1 {
                     componentBlocked: true
                     if firstBlockedFunction < 0 { firstBlockedFunction: probeMember }

@@ -9,11 +9,90 @@ function compilerFunctionArtifactDirectivePath(source: String, name: String): St
     return source.substring(start: valueStart, end: valueEnd)
 }
 
+function compilerFunctionArtifactSourceIdentityPart(source: String, part: Int): Int {
+    state identity: CompilerFingerprint(compilerFingerprintInitial())
+    let sourceLength: Int(stringLength(value: source))
+    state lineStart: Int(0)
+    while lineStart < sourceLength {
+        state lineEnd: Int(stringIndexOf(source: source, needle: String("\n"), start: lineStart))
+        if lineEnd < lineStart { lineEnd: sourceLength }
+        let line: String(source.substring(start: lineStart, end: lineEnd))
+        let isDirective: Bool(
+            stringHasPrefix(source: line, start: 0, prefix: String("// range-function-artifact-input "))
+                || stringHasPrefix(source: line, start: 0, prefix: String("// range-function-artifact-output "))
+        )
+        if !isDirective {
+            identity: compilerFingerprintAppendRange(fingerprint: identity, tag: 9100, source: source, start: lineStart, end: lineEnd)
+            identity: compilerFingerprintAppendInt(fingerprint: identity, value: 10)
+        }
+        if lineEnd >= sourceLength {
+            lineStart: sourceLength
+        } else {
+            lineStart: lineEnd + 1
+        }
+    }
+    if part == 0 { return identity.first }
+    return identity.second
+}
+
+function compilerFunctionArtifactRootIntegrityPart(inputFirst: Int, inputSecond: Int, outputFirst: Int, outputSecond: Int, closureFirst: Int, closureSecond: Int, moduleText: String, part: Int): Int {
+    state integrity: CompilerFingerprint(compilerFingerprintInitial())
+    integrity: compilerFingerprintAppendInt(fingerprint: integrity, value: 9201)
+    integrity: compilerFingerprintAppendInt(fingerprint: integrity, value: inputFirst)
+    integrity: compilerFingerprintAppendInt(fingerprint: integrity, value: inputSecond)
+    integrity: compilerFingerprintAppendInt(fingerprint: integrity, value: outputFirst)
+    integrity: compilerFingerprintAppendInt(fingerprint: integrity, value: outputSecond)
+    integrity: compilerFingerprintAppendInt(fingerprint: integrity, value: closureFirst)
+    integrity: compilerFingerprintAppendInt(fingerprint: integrity, value: closureSecond)
+    integrity: compilerFingerprintAppendText(fingerprint: integrity, tag: 9202, text: moduleText)
+    if part == 0 { return integrity.first }
+    return integrity.second
+}
+
+function compilerFunctionArtifactRecordsIntegrityPart(artifacts: CompilerIntTable, artifactText: String, part: Int): Int {
+    state integrity: CompilerFingerprint(compilerFingerprintInitial())
+    integrity: compilerFingerprintAppendInt(fingerprint: integrity, value: 9301)
+    let rowCount: Int(compilerIntTableRowCount(table: artifacts))
+    let columnCount: Int(artifacts.columnCount)
+    state row: Int(0)
+    while row < rowCount {
+        integrity: compilerFingerprintAppendInt(fingerprint: integrity, value: row)
+        state column: Int(0)
+        while column < columnCount {
+            state value: Int(compilerIntTableValue(table: artifacts, row: row, column: column))
+            if column == compilerFunctionArtifactFunctionStartColumn()
+                || column == compilerFunctionArtifactGlobalsStartColumn()
+                || column == compilerFunctionArtifactEdgeStartColumn()
+                || column == compilerFunctionArtifactEdgeCountColumn()
+                || column == compilerFunctionArtifactReuseColumn() { value: 0 }
+            integrity: compilerFingerprintAppendInt(fingerprint: integrity, value: value)
+            column: column + 1
+        }
+        let functionStart: Int(compilerIntTableValue(table: artifacts, row: row, column: compilerFunctionArtifactFunctionStartColumn()))
+        let functionLength: Int(compilerIntTableValue(table: artifacts, row: row, column: compilerFunctionArtifactFunctionLengthColumn()))
+        let globalsStart: Int(compilerIntTableValue(table: artifacts, row: row, column: compilerFunctionArtifactGlobalsStartColumn()))
+        let globalsLength: Int(compilerIntTableValue(table: artifacts, row: row, column: compilerFunctionArtifactGlobalsLengthColumn()))
+        if functionStart >= 0 && functionLength >= 0 && functionStart + functionLength <= stringLength(value: artifactText) {
+            integrity: compilerFingerprintAppendRange(fingerprint: integrity, tag: 9302, source: artifactText, start: functionStart, end: functionStart + functionLength)
+        } else {
+            integrity: compilerFingerprintAppendInt(fingerprint: integrity, value: 0 - 1)
+        }
+        if globalsStart >= 0 && globalsLength >= 0 && globalsStart + globalsLength <= stringLength(value: artifactText) {
+            integrity: compilerFingerprintAppendRange(fingerprint: integrity, tag: 9303, source: artifactText, start: globalsStart, end: globalsStart + globalsLength)
+        } else {
+            integrity: compilerFingerprintAppendInt(fingerprint: integrity, value: 0 - 1)
+        }
+        row: row + 1
+    }
+    if part == 0 { return integrity.first }
+    return integrity.second
+}
+
 function compilerFunctionArtifactCacheEmpty(valid: Bool): CompilerFunctionArtifactCache {
     return CompilerFunctionArtifactCache(
         artifacts: compilerIntTableCreate(columnCount: compilerFunctionArtifactColumnCount(), estimatedRowCount: 16),
         rowsByInstance: bufferCreateInt(capacity: 16),
-        rootBehavior: bufferCreateInt(capacity: 8),
+        rootBehavior: bufferCreateInt(capacity: 14),
         text: String(""),
         isValid: valid
     )
@@ -75,7 +154,7 @@ function compilerFunctionArtifactCacheAppendRecord(artifacts: CompilerIntTable, 
     return 0
 }
 
-function compilerFunctionArtifactCacheAppendRootBehavior(rootBehavior: Buffer<Int>, record: String, moduleStart: Int, moduleLength: Int): Int {
+function compilerFunctionArtifactCacheAppendRootBehavior(rootBehavior: Buffer<Int>, record: String, cacheText: String, moduleStart: Int, moduleLength: Int, includeSourceIdentity: Bool, includeIntegrity: Bool, includeArtifactIntegrity: Bool): Int {
     if rootBehavior.count != 0
         || compilerCoreRecordField(record: record, prefix: String("inputFirst=")) == String("")
         || compilerCoreRecordField(record: record, prefix: String("inputSecond=")) == String("")
@@ -92,10 +171,44 @@ function compilerFunctionArtifactCacheAppendRootBehavior(rootBehavior: Buffer<In
         || rootBehavior.append(element: compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("closureSecond=")))) != 0
         || rootBehavior.append(element: moduleStart) != 0
         || rootBehavior.append(element: moduleLength) != 0 { return 0 - 1 }
+    if includeSourceIdentity {
+        if compilerCoreRecordField(record: record, prefix: String("sourceFirst=")) == String("")
+            || compilerCoreRecordField(record: record, prefix: String("sourceSecond=")) == String("")
+            || rootBehavior.append(element: compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("sourceFirst=")))) != 0
+            || rootBehavior.append(element: compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("sourceSecond=")))) != 0 { return 0 - 1 }
+    }
+    if includeIntegrity {
+        let inputFirst: Int(compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("inputFirst="))))
+        let inputSecond: Int(compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("inputSecond="))))
+        let outputFirst: Int(compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("outputFirst="))))
+        let outputSecond: Int(compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("outputSecond="))))
+        let closureFirst: Int(compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("closureFirst="))))
+        let closureSecond: Int(compilerCoreParseDecimalInt(value: compilerCoreRecordField(record: record, prefix: String("closureSecond="))))
+        let moduleText: String(stringSliceUnchecked(source: cacheText, start: moduleStart, end: moduleStart + moduleLength))
+        let expectedFirst: Int(compilerFunctionArtifactRootIntegrityPart(inputFirst: inputFirst, inputSecond: inputSecond, outputFirst: outputFirst, outputSecond: outputSecond, closureFirst: closureFirst, closureSecond: closureSecond, moduleText: moduleText, part: 0))
+        let expectedSecond: Int(compilerFunctionArtifactRootIntegrityPart(inputFirst: inputFirst, inputSecond: inputSecond, outputFirst: outputFirst, outputSecond: outputSecond, closureFirst: closureFirst, closureSecond: closureSecond, moduleText: moduleText, part: 1))
+        let integrityFirstText: String(compilerCoreRecordField(record: record, prefix: String("integrityFirst=")))
+        let integritySecondText: String(compilerCoreRecordField(record: record, prefix: String("integritySecond=")))
+        if integrityFirstText == String("") || integritySecondText == String("")
+            || compilerCoreParseDecimalInt(value: integrityFirstText) != expectedFirst
+            || compilerCoreParseDecimalInt(value: integritySecondText) != expectedSecond
+            || rootBehavior.append(element: expectedFirst) != 0
+            || rootBehavior.append(element: expectedSecond) != 0 { return 0 - 1 }
+    }
+    if includeArtifactIntegrity {
+        let recordsFirstText: String(compilerCoreRecordField(record: record, prefix: String("recordsFirst=")))
+        let recordsSecondText: String(compilerCoreRecordField(record: record, prefix: String("recordsSecond=")))
+        if recordsFirstText == String("") || recordsSecondText == String("")
+            || rootBehavior.append(element: compilerCoreParseDecimalInt(value: recordsFirstText)) != 0
+            || rootBehavior.append(element: compilerCoreParseDecimalInt(value: recordsSecondText)) != 0 { return 0 - 1 }
+    }
     return 0
 }
 
 function compilerFunctionArtifactCacheParseInto(text: String, artifacts: CompilerIntTable, rowsByInstance: Buffer<Int>, rootBehavior: Buffer<Int>): Bool {
+    let currentHeader: String("rangeFunctionArtifacts|version=8\n")
+    let rootIntegrityHeader: String("rangeFunctionArtifacts|version=7\n")
+    let sourceIdentityHeader: String("rangeFunctionArtifacts|version=6\n")
     let header: String("rangeFunctionArtifacts|version=5\n")
     let legacyHeaderV4: String("rangeFunctionArtifacts|version=4\n")
     let legacyHeaderV3: String("rangeFunctionArtifacts|version=3\n")
@@ -106,8 +219,27 @@ function compilerFunctionArtifactCacheParseInto(text: String, artifacts: Compile
         || stringHasPrefix(source: text, start: 0, prefix: legacyHeaderV3)
         || stringHasPrefix(source: text, start: 0, prefix: legacyHeaderV2)
         || stringHasPrefix(source: text, start: 0, prefix: legacyHeaderV1) { return true }
-    if !stringHasPrefix(source: text, start: 0, prefix: header) { return false }
-    state cursor: Int(stringLength(value: header))
+    state includeSourceIdentity: Bool(false)
+    state includeIntegrity: Bool(false)
+    state includeArtifactIntegrity: Bool(false)
+    state cursor: Int(0)
+    if stringHasPrefix(source: text, start: 0, prefix: currentHeader) {
+        includeSourceIdentity: true
+        includeIntegrity: true
+        includeArtifactIntegrity: true
+        cursor: stringLength(value: currentHeader)
+    } else if stringHasPrefix(source: text, start: 0, prefix: rootIntegrityHeader) {
+        includeSourceIdentity: true
+        includeIntegrity: true
+        cursor: stringLength(value: rootIntegrityHeader)
+    } else if stringHasPrefix(source: text, start: 0, prefix: sourceIdentityHeader) {
+        includeSourceIdentity: true
+        cursor: stringLength(value: sourceIdentityHeader)
+    } else if stringHasPrefix(source: text, start: 0, prefix: header) {
+        cursor: stringLength(value: header)
+    } else {
+        return false
+    }
     state valid: Bool(true)
     let rootLineEnd: Int(stringIndexOf(source: text, needle: String("\n"), start: cursor))
     if rootLineEnd < cursor {
@@ -121,7 +253,7 @@ function compilerFunctionArtifactCacheParseInto(text: String, artifacts: Compile
         if !stringHasPrefix(source: rootRecord, start: 0, prefix: String("root|"))
             || moduleLengthText == String("") || moduleLength < 0 || moduleEnd >= stringLength(value: text)
             || text.substring(start: moduleEnd, end: moduleEnd + 1) != String("\n")
-            || compilerFunctionArtifactCacheAppendRootBehavior(rootBehavior: rootBehavior, record: rootRecord, moduleStart: moduleStart, moduleLength: moduleLength) != 0 {
+            || compilerFunctionArtifactCacheAppendRootBehavior(rootBehavior: rootBehavior, record: rootRecord, cacheText: text, moduleStart: moduleStart, moduleLength: moduleLength, includeSourceIdentity: includeSourceIdentity, includeIntegrity: includeIntegrity, includeArtifactIntegrity: includeArtifactIntegrity) != 0 {
             valid: false
         } else {
             cursor: moduleEnd + 1
@@ -157,7 +289,18 @@ function compilerFunctionArtifactCacheParseInto(text: String, artifacts: Compile
             }
         }
     }
-    return valid && rootBehavior.count == 8 && compilerIntTableIsComplete(table: artifacts)
+    state artifactIntegrityValid: Bool(true)
+    if valid && includeArtifactIntegrity {
+        let expectedFirst: Int(compilerFunctionArtifactRecordsIntegrityPart(artifacts: artifacts, artifactText: text, part: 0))
+        let expectedSecond: Int(compilerFunctionArtifactRecordsIntegrityPart(artifacts: artifacts, artifactText: text, part: 1))
+        artifactIntegrityValid: rootBehavior.count == 14
+            && rootBehavior.element(index: 12) == expectedFirst
+            && rootBehavior.element(index: 13) == expectedSecond
+    }
+    return valid
+        && ((includeArtifactIntegrity && rootBehavior.count == 14) || (includeIntegrity && !includeArtifactIntegrity && rootBehavior.count == 12) || (includeSourceIdentity && !includeIntegrity && rootBehavior.count == 10) || (!includeSourceIdentity && rootBehavior.count == 8))
+        && artifactIntegrityValid
+        && compilerIntTableIsComplete(table: artifacts)
 }
 
 function compilerFunctionArtifactCacheLoad(source: String): CompilerFunctionArtifactCache {
@@ -166,8 +309,14 @@ function compilerFunctionArtifactCacheLoad(source: String): CompilerFunctionArti
     let text: String(readFile(path: path))
     let artifacts: CompilerIntTable(compilerIntTableCreate(columnCount: compilerFunctionArtifactColumnCount(), estimatedRowCount: 1029))
     let rowsByInstance: Buffer<Int>(bufferCreateInt(capacity: 4096))
-    let rootBehavior: Buffer<Int>(bufferCreateInt(capacity: 8))
+    let rootBehavior: Buffer<Int>(bufferCreateInt(capacity: 14))
     let isValid: Bool(compilerFunctionArtifactCacheParseInto(text: text, artifacts: artifacts, rowsByInstance: rowsByInstance, rootBehavior: rootBehavior))
+    if !isValid {
+        compilerIntTableDestroy(table: artifacts)
+        rowsByInstance.destroy()
+        rootBehavior.destroy()
+        return compilerFunctionArtifactCacheEmpty(valid: true)
+    }
     return CompilerFunctionArtifactCache(artifacts: artifacts, rowsByInstance: rowsByInstance, rootBehavior: rootBehavior, text: text, isValid: isValid)
 }
 
@@ -231,19 +380,39 @@ function compilerFunctionArtifactCacheSelected(cache: CompilerFunctionArtifactCa
 }
 
 function compilerFunctionArtifactCacheModuleText(cache: CompilerFunctionArtifactCache): String {
-    if !cache.isValid || cache.rootBehavior.count != 8 { return String("") }
+    if !cache.isValid || cache.rootBehavior.count < 8 { return String("") }
     let moduleStart: Int(cache.rootBehavior.element(index: 6))
     let moduleLength: Int(cache.rootBehavior.element(index: 7))
     if moduleStart < 0 || moduleLength <= 0 || moduleStart + moduleLength > stringLength(value: cache.text) { return String("") }
     return stringSliceUnchecked(source: cache.text, start: moduleStart, end: moduleStart + moduleLength)
 }
 
+function compilerFunctionArtifactCacheSourceMatches(cache: CompilerFunctionArtifactCache, source: String): Bool {
+    if !cache.isValid || cache.rootBehavior.count != 14 { return false }
+    let currentFirst: Int(compilerFunctionArtifactSourceIdentityPart(source: source, part: 0))
+    let currentSecond: Int(compilerFunctionArtifactSourceIdentityPart(source: source, part: 1))
+    return cache.rootBehavior.element(index: 8) == currentFirst
+        && cache.rootBehavior.element(index: 9) == currentSecond
+}
+
 function compilerReachableLLVMStateSerializeFunctionArtifacts(reachability: CompilerReachableLLVMState, moduleText: String): String {
     let text: String(rawBufferMaterializeText(buffer: reachability.functionArtifactText))
     let output: RawBuffer(rawBufferCreate(capacity: stringLength(value: text) + 65536, stride: 1))
-    rawBufferAppendText(buffer: output, text: String("rangeFunctionArtifacts|version=5\n"))
+    rawBufferAppendText(buffer: output, text: String("rangeFunctionArtifacts|version=8\n"))
     if reachability.mainBehavior.count == 6 {
-        rawBufferAppendText(buffer: output, text: "root|inputFirst=\(reachability.mainBehavior.element(index: 0))|inputSecond=\(reachability.mainBehavior.element(index: 1))|outputFirst=\(reachability.mainBehavior.element(index: 2))|outputSecond=\(reachability.mainBehavior.element(index: 3))|closureFirst=\(reachability.mainBehavior.element(index: 4))|closureSecond=\(reachability.mainBehavior.element(index: 5))|moduleLength=\(stringLength(value: moduleText))\n")
+        let inputFirst: Int(reachability.mainBehavior.element(index: 0))
+        let inputSecond: Int(reachability.mainBehavior.element(index: 1))
+        let outputFirst: Int(reachability.mainBehavior.element(index: 2))
+        let outputSecond: Int(reachability.mainBehavior.element(index: 3))
+        let closureFirst: Int(reachability.mainBehavior.element(index: 4))
+        let closureSecond: Int(reachability.mainBehavior.element(index: 5))
+        let sourceFirst: Int(compilerFunctionArtifactSourceIdentityPart(source: reachability.context.program.source, part: 0))
+        let sourceSecond: Int(compilerFunctionArtifactSourceIdentityPart(source: reachability.context.program.source, part: 1))
+        let integrityFirst: Int(compilerFunctionArtifactRootIntegrityPart(inputFirst: inputFirst, inputSecond: inputSecond, outputFirst: outputFirst, outputSecond: outputSecond, closureFirst: closureFirst, closureSecond: closureSecond, moduleText: moduleText, part: 0))
+        let integritySecond: Int(compilerFunctionArtifactRootIntegrityPart(inputFirst: inputFirst, inputSecond: inputSecond, outputFirst: outputFirst, outputSecond: outputSecond, closureFirst: closureFirst, closureSecond: closureSecond, moduleText: moduleText, part: 1))
+        let recordsFirst: Int(compilerFunctionArtifactRecordsIntegrityPart(artifacts: reachability.functionArtifacts, artifactText: text, part: 0))
+        let recordsSecond: Int(compilerFunctionArtifactRecordsIntegrityPart(artifacts: reachability.functionArtifacts, artifactText: text, part: 1))
+        rawBufferAppendText(buffer: output, text: "root|inputFirst=\(inputFirst)|inputSecond=\(inputSecond)|outputFirst=\(outputFirst)|outputSecond=\(outputSecond)|closureFirst=\(closureFirst)|closureSecond=\(closureSecond)|sourceFirst=\(sourceFirst)|sourceSecond=\(sourceSecond)|integrityFirst=\(integrityFirst)|integritySecond=\(integritySecond)|recordsFirst=\(recordsFirst)|recordsSecond=\(recordsSecond)|moduleLength=\(stringLength(value: moduleText))\n")
         rawBufferAppendText(buffer: output, text: moduleText)
         rawBufferAppendText(buffer: output, text: String("\n"))
     }

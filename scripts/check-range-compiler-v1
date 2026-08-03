@@ -8,6 +8,7 @@ COMPILER="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/stage2/RangeCom
 FIXTURE="$REPO_ROOT/Testing/Basics/Pass/ReturnInteger.range"
 LLVM_PLAN="$REPO_ROOT/RangeCompiler/Sources/Compiler/LLVM/CompilerLLVMPlan.range"
 FUNCTION_ARTIFACTS="$REPO_ROOT/RangeCompiler/Sources/Compiler/LLVM/CompilerFunctionArtifacts.range"
+COMPILER_V1="$REPO_ROOT/RangeCompiler/Sources/Compiler/Driver/CompilerV1.range"
 WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compiler-v1.XXXXXX")"
 trap '/bin/rm -rf "$WORK_ROOT"' EXIT
 
@@ -15,6 +16,44 @@ fail() {
     echo "Range Compiler V1 check failed: $*" >&2
     exit 1
 }
+
+/usr/bin/grep -Fq 'compilerTypedDeclarationsCapture(source: source.value.source, tables: tables)' "$COMPILER_V1" \
+    || fail "V1 Shape does not own declaration capture"
+/usr/bin/grep -Fq 'compilerTypedSyntaxCaptureMainRoot(source: source.value.source, tables: tables)' "$COMPILER_V1" \
+    || fail "V1 Shape does not retain main in its declaration graph"
+if /usr/bin/grep -Fq 'compilerTypedSyntaxCapture(source: source.value.source, tables: tables)' "$COMPILER_V1"; then
+    fail "V1 Shape still eagerly captures every function body"
+fi
+/usr/bin/grep -Fq 'behaviorSnapshot: compilerV1NativeBehaviorSnapshot(identity: source.identity, output: compiledOutput)' "$COMPILER_V1" \
+    || fail "V1 Behavior is not derived from successful reachable lowering"
+if /usr/bin/grep -Fq 'compilerSemanticBuild(tables: tables, delta: delta, semantics: semantics)' "$COMPILER_V1"; then
+    fail "V1 still treats the incomplete whole-program SemanticGraph as Behavior authority"
+fi
+if /usr/bin/grep -Fq 'compilerTypedSyntaxSummary(source: source.value.source)' "$COMPILER_V1" \
+    || /usr/bin/grep -Fq 'compilerSemanticSummary(source: source)' "$COMPILER_V1"; then
+    fail "V1 still rebuilds Shape or Behavior through independent source summaries"
+fi
+/usr/bin/grep -Fq 'function compilerV1Behavior(shape: CompilerV1ShapeDelta, before: CompilerFingerprint)' "$COMPILER_V1" \
+    || fail "V1 Behavior still accepts source instead of the frozen Shape artifact"
+/usr/bin/grep -Fq 'let snapshot: String("\(shape.behaviorSnapshot)")' "$COMPILER_V1" \
+    || fail "V1 Behavior does not consume the Shape-owned behavior snapshot"
+/usr/bin/grep -Fq 'compiledOutput: compilerNativeSourceSetLLVMTextForLinkedTables(source: source.value.source, declarationTables: tables)' "$COMPILER_V1" \
+    || fail "V1 does not lower from Shape's retained captured tables"
+/usr/bin/grep -Fq 'function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1BehaviorDelta, before: CompilerFingerprint)' "$COMPILER_V1" \
+    || fail "V1 Compiled still accepts source instead of frozen Shape and Behavior products"
+/usr/bin/grep -Fq 'let output: String("\(shape.compiledOutput)")' "$COMPILER_V1" \
+    || fail "V1 Compiled does not consume Shape's retained lowering product"
+if /usr/bin/grep -Fq 'compileRangeNativeProgramOutput(source: source)' "$COMPILER_V1"; then
+    fail "V1 Compiled still invokes the source-based native program entry"
+fi
+if /usr/bin/grep -Fq 'name: String("abi.emit")' "$LLVM_PLAN"; then
+    fail "the ABI capability probe still emits a disposable LLVM function"
+fi
+/usr/bin/grep -Fq 'reachability.abiCapabilities.update(element: 1, index: functionRow)' "$LLVM_PLAN" \
+    || fail "function discovery does not publish its Shape-derived ABI capability"
+if /usr/bin/grep -Fq 'compilerReachableLLVMStateProbeReachableInstancesForFunction(reachability: reachability' "$LLVM_PLAN"; then
+    fail "ABI component planning still reconstructs a discovered function body"
+fi
 
 write_behavior_cache_fixture() {
     local output="$1"
@@ -87,8 +126,8 @@ effect_build_line="$(/usr/bin/grep -n -F 'let effectBuildStatus: Int(compilerRea
 if /usr/bin/grep -Fq 'compilerCoreParseMainBlock(source: reachability.context.tables.sourceStore.source)' "$LLVM_PLAN"; then
     fail "V1 reparses source text while discovering main"
 fi
-/usr/bin/grep -Fq 'rangeFunctionArtifacts|version=5' "$FUNCTION_ARTIFACTS" \
-    || fail "function artifact schema was not advanced for Behavior mappings"
+/usr/bin/grep -Fq 'rangeFunctionArtifacts|version=8' "$FUNCTION_ARTIFACTS" \
+    || fail "function artifact schema was not advanced for complete module integrity"
 /usr/bin/grep -Fq 'function compilerFunctionArtifactCacheModuleText' "$FUNCTION_ARTIFACTS" \
     || fail "closed Behavior artifacts do not retain the complete emitted module"
 /usr/bin/grep -Fq 'return 2' "$LLVM_PLAN" \
@@ -100,6 +139,18 @@ done
 for field in behaviorInputFirst behaviorInputSecond behaviorOutputFirst behaviorOutputSecond behaviorClosureFirst behaviorClosureSecond; do
     /usr/bin/grep -Fq "${field}=" "$FUNCTION_ARTIFACTS" \
         || fail "function artifact serialization omits $field"
+done
+/usr/bin/grep -Fq 'sourceFirst=' "$FUNCTION_ARTIFACTS" \
+    || fail "closed module artifact omits sourceFirst"
+/usr/bin/grep -Fq 'sourceSecond=' "$FUNCTION_ARTIFACTS" \
+    || fail "closed module artifact omits sourceSecond"
+for field in integrityFirst integritySecond; do
+    /usr/bin/grep -Fq "${field}=" "$FUNCTION_ARTIFACTS" \
+        || fail "closed module artifact omits $field"
+done
+for field in recordsFirst recordsSecond; do
+    /usr/bin/grep -Fq "${field}=" "$FUNCTION_ARTIFACTS" \
+        || fail "closed module artifact omits $field"
 done
 
 "$REPO_ROOT/scripts/range" check-compiler-smoke
@@ -134,6 +185,20 @@ cold_compiled_after="$(/usr/bin/sed -n 's/^compilerV1Execution.*compiledAfter=\(
     || fail "unchanged persistent execution rewrote its state"
 [[ "$cold_llvm_hash" == "$(/usr/bin/shasum -a 256 "$WORK_ROOT/persistent.ll" | /usr/bin/awk '{print $1}')" ]] \
     || fail "unchanged persistent execution rewrote its LLVM"
+
+/usr/bin/perl -0pi -e 's/return 7/return missingValue/' "$WORK_ROOT/Persistent.range"
+failed_candidate_status=0
+"$COMPILER" resume-v1 "$WORK_ROOT/execution.tsv" "$WORK_ROOT/Persistent.range" "$WORK_ROOT/persistent.ll" > "$WORK_ROOT/persistent-failed-candidate.out" \
+    || failed_candidate_status=$?
+[[ "$failed_candidate_status" -eq 65 ]] \
+    || fail "failed persistent candidate exited $failed_candidate_status instead of 65"
+/usr/bin/grep -Fq $'compilerError\t' "$WORK_ROOT/persistent-failed-candidate.out" \
+    || fail "failed persistent candidate omitted its typed compiler error"
+[[ "$cold_execution_hash" == "$(/usr/bin/shasum -a 256 "$WORK_ROOT/execution.tsv" | /usr/bin/awk '{print $1}')" ]] \
+    || fail "failed persistent candidate mutated the accepted execution graph"
+[[ "$cold_llvm_hash" == "$(/usr/bin/shasum -a 256 "$WORK_ROOT/persistent.ll" | /usr/bin/awk '{print $1}')" ]] \
+    || fail "failed persistent candidate mutated the last-known-good LLVM"
+/usr/bin/perl -0pi -e 's/return missingValue/return 7/' "$WORK_ROOT/Persistent.range"
 
 /usr/bin/perl -0pi -e 's/return 7/return 8/' "$WORK_ROOT/Persistent.range"
 "$COMPILER" resume-v1 "$WORK_ROOT/execution.tsv" "$WORK_ROOT/Persistent.range" "$WORK_ROOT/persistent.ll" > "$WORK_ROOT/persistent-updated.out"
@@ -174,8 +239,8 @@ write_behavior_cache_fixture "$WORK_ROOT/behavior-cold.range" "" "$behavior_cach
 RANGE_COMPILER_PHASE_TRACE=1 RANGE_COMPILER_FUNCTION_TRACE=1 \
     "$COMPILER" compile "$WORK_ROOT/behavior-cold.range" > "$WORK_ROOT/behavior-cold.ll" 2> "$WORK_ROOT/behavior-cold.trace"
 [[ -s "$behavior_cache" ]] || fail "cold Behavior compilation omitted its artifact"
-/usr/bin/grep -Fq 'rangeFunctionArtifacts|version=5' "$behavior_cache" \
-    || fail "cold Behavior compilation did not write schema v5"
+/usr/bin/grep -Fq 'rangeFunctionArtifacts|version=8' "$behavior_cache" \
+    || fail "cold Behavior compilation did not write schema v8"
 /usr/bin/grep -Fq $'compilerPhase\tname=functionEffects.end' "$WORK_ROOT/behavior-cold.trace" \
     || fail "cold Behavior compilation skipped effect reconstruction unexpectedly"
 /usr/bin/grep -Fq $'compilerPhase\tname=abiComponents.end' "$WORK_ROOT/behavior-cold.trace" \
@@ -192,12 +257,16 @@ RANGE_COMPILER_PHASE_TRACE=1 \
     || fail "closed Behavior cache changed emitted LLVM"
 [[ ! -e "$WORK_ROOT/behavior-hit.cache" ]] \
     || fail "closed Behavior graph rebuilt and rewrote its artifact"
-/usr/bin/grep -Fq $'compilerPhase\tname=functionArtifactCandidates.end' "$WORK_ROOT/behavior-hit.trace" \
-    || fail "closed Behavior compilation did not inspect its artifact candidates"
-if /usr/bin/grep -Fq $'compilerPhase\tname=functionEffects.end' "$WORK_ROOT/behavior-hit.trace" \
+if /usr/bin/grep -Fq 'rangeFunctionArtifacts|version=5' "$behavior_cache"; then
+    /usr/bin/grep -Fq $'compilerPhase\tname=functionArtifactCandidates.end' "$WORK_ROOT/behavior-hit.trace" \
+        || fail "v5 closed Behavior compilation did not inspect its artifact candidates"
+fi
+if /usr/bin/grep -Fq $'compilerPhase\tname=reachabilityDiscovery.end' "$WORK_ROOT/behavior-hit.trace" \
+    || /usr/bin/grep -Fq $'compilerPhase\tname=functionArtifactCandidates.end' "$WORK_ROOT/behavior-hit.trace" \
+    || /usr/bin/grep -Fq $'compilerPhase\tname=functionEffects.end' "$WORK_ROOT/behavior-hit.trace" \
     || /usr/bin/grep -Fq $'compilerPhase\tname=abiComponents.end' "$WORK_ROOT/behavior-hit.trace" \
     || /usr/bin/grep -Fq $'compilerPhase\tname=functionEmission.end' "$WORK_ROOT/behavior-hit.trace"; then
-    fail "closed Behavior cache did not bypass effect, ABI, and LLVM emission work"
+    fail "closed Behavior module cache did not bypass discovery, candidates, effects, ABI, and LLVM emission work"
 fi
 
 profile_source="$WORK_ROOT/behavior-profile.range"
@@ -225,6 +294,9 @@ if /usr/bin/grep -Fq $'compilerPhase\tname=functionEffects.end' "$WORK_ROOT/beha
     || /usr/bin/grep -Fq $'compilerPhase\tname=abiComponents.end' "$WORK_ROOT/behavior-profile-hit.out" \
     || /usr/bin/grep -Fq $'compilerPhase\tname=functionEmission.end' "$WORK_ROOT/behavior-profile-hit.out"; then
     fail "profiled closed Behavior cache did not bypass effect, ABI, and LLVM emission work"
+fi
+if /usr/bin/grep -Fq $'compilerPhase\tname=reachabilityDiscovery.end' "$WORK_ROOT/behavior-profile-hit.out"; then
+    fail "source-identity module cache still reconstructed reachable function bodies"
 fi
 
 write_behavior_cache_fixture "$WORK_ROOT/behavior-main-change.range" "$behavior_cache" "$WORK_ROOT/behavior-main-change.cache" 'cachedBehaviorValue() + 1'
@@ -279,8 +351,8 @@ behavior_input="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=behavior.*
 behavior_output="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=behavior.*[[:space:]]after=\([^[:space:]]*\)$/\1/p' "$WORK_ROOT/inspect.txt")"
 [[ -n "$shape_output" && "$shape_output" == "$behavior_input" ]] \
     || fail "V1 Behavior Delta does not consume the Shape value fingerprint"
-/usr/bin/grep -Fq $'semanticGraph\tvalid=true' "$WORK_ROOT/inspect.txt" \
-    || fail "V1 behavior artifact is not a valid semantic graph"
+/usr/bin/grep -Eq $'^compilerV1Behavior\tvalid=true\tproduct=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 behavior artifact is not tied to successful reachable lowering"
 /usr/bin/grep -Eq $'^compilerV1Delta\tphase=compile\tidentity=[0-9]+:[0-9]+\tinput=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
     || fail "V1 inspection omitted the Compiled Delta"
 compile_input="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=compile.*[[:space:]]input=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/inspect.txt")"
@@ -315,4 +387,4 @@ missing_status=0
 /usr/bin/grep -Fq 'range: unable to read non-empty input at' "$WORK_ROOT/missing.out" \
     || fail "V1 missing-input control omitted its typed error message"
 
-echo "Compiler V1: pass (persistent Range-owned execution, cold insert, unchanged LLVM reuse, exact prior phase values on update, File-identity rejection, malformed-cache repair, linked exits 7/8)"
+echo "Compiler V1: pass (persistent Range-owned execution, cold insert, unchanged LLVM reuse, failed-candidate isolation, exact prior phase values on update, File-identity rejection, malformed-cache repair, linked exits 7/8)"

@@ -1,0 +1,216 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+COMPILER_ROOT="$REPO_ROOT/RangeCompiler/Sources/Compiler"
+PRODUCER="$COMPILER_ROOT/.range/Build/stage2/RangeCompiler"
+PRODUCER_LLVM="$COMPILER_ROOT/.range/Build/stage2/RangeCompiler.ll"
+BUILD_PLAN="$COMPILER_ROOT/.range/Build/RangeCompiler.build-plan.tsv"
+FIXTURE="$REPO_ROOT/Testing/Basics/Pass/ReturnInteger.range"
+SCHEMA_VERSION="compiler-v1-generation-v2"
+COMPILER_OPTIMIZATION="-O0"
+COMPILER_LTO="-fno-lto"
+
+fail() {
+    echo "Range Compiler V1 generation check failed: $*" >&2
+    exit 1
+}
+
+manifest_value() {
+    /usr/bin/plutil -extract "$1" raw -o - "$MANIFEST"
+}
+
+sha256() {
+    /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'
+}
+
+bytes() {
+    /usr/bin/stat -f %z "$1"
+}
+
+runtime_inputs() {
+    local index runtime_count
+    runtime_count="$(manifest_value runtimeSources)"
+    for ((index = 0; index < runtime_count; index += 1)); do
+        /usr/bin/printf '%s\n' "$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")"
+    done
+}
+
+emit_v1_generation() {
+    local compiler="$1"
+    local bundle="$2"
+    local llvm="$3"
+    local diagnostic="$4"
+    local label="$5"
+    local started finished status
+    started="$(date +%s)"
+    status=0
+    "$compiler" compile-v1 "$bundle" > "$llvm" 2> "$diagnostic" || status=$?
+    finished="$(date +%s)"
+    [[ "$status" -eq 0 ]] || {
+        [[ ! -s "$diagnostic" ]] || /bin/cat "$diagnostic" >&2
+        [[ ! -s "$llvm" ]] || /bin/cat "$llvm" >&2
+        fail "$label exited $status"
+    }
+    [[ ! -s "$diagnostic" ]] || {
+        /bin/cat "$diagnostic" >&2
+        fail "$label wrote unexpected diagnostics"
+    }
+    /usr/bin/grep -Fq 'define i32 @main' "$llvm" || fail "$label did not emit compiler LLVM"
+    clang -Wno-override-module -x ir -c "$llvm" -o /dev/null || fail "$label LLVM did not validate"
+    /usr/bin/printf '%sSeconds=%d\n' "$label" "$((finished - started))"
+}
+
+link_compiler() {
+    local llvm="$1"
+    local executable="$2"
+    shift 2
+    local temporary="$executable.tmp"
+    /bin/mkdir -p "$(dirname "$executable")"
+    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module \
+        "$llvm" "$@" -o "$temporary"
+    /bin/mv "$temporary" "$executable"
+}
+
+prove_compiler_runs() {
+    local compiler="$1"
+    local label="$2"
+    local root="$3"
+    shift 3
+    local llvm="$root/$label.ReturnInteger.ll"
+    local executable="$root/$label.ReturnInteger"
+    local diagnostic="$root/$label.ReturnInteger.err"
+    local status=0
+    "$compiler" compile-v1 "$FIXTURE" > "$llvm" 2> "$diagnostic" || status=$?
+    [[ "$status" -eq 0 && ! -s "$diagnostic" ]] || fail "$label could not compile the runtime fixture"
+    clang -O0 -fno-lto -Wno-override-module "$llvm" "$@" -o "$executable"
+    status=0
+    "$executable" || status=$?
+    [[ "$status" -eq 7 ]] || fail "$label runtime fixture exited $status instead of 7"
+}
+
+[[ -f "$MANIFEST" ]] || fail "missing seed manifest"
+[[ -x "$PRODUCER" ]] || fail "missing current V1 producer; run scripts/range check-compiler-smoke first"
+[[ -f "$PRODUCER_LLVM" ]] || fail "missing current V1 producer LLVM; run scripts/range check-compiler-smoke first"
+[[ -f "$BUILD_PLAN" ]] || fail "missing canonical compiler build plan; run scripts/range check-build-plan first"
+[[ -f "$FIXTURE" ]] || fail "missing ordinary runtime fixture"
+
+runtimes=()
+while IFS= read -r runtime; do
+    [[ -f "$runtime" ]] || fail "missing runtime input: ${runtime#"$REPO_ROOT/"}"
+    runtimes+=("$runtime")
+done < <(runtime_inputs)
+
+work_root="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compiler-v1-generation.XXXXXX")"
+temporary=""
+cleanup() {
+    /bin/rm -rf "$work_root"
+    if [[ -n "$temporary" && -d "$temporary" ]]; then
+        /bin/rm -rf "$temporary"
+    fi
+}
+trap cleanup EXIT
+bundle="$work_root/CompilerSourceSet.range"
+execution_bundle="$work_root/CompilerV1GenerationSourceSet.range"
+bundle_diagnostic="$work_root/load-plan.err"
+load_status=0
+"$PRODUCER" load-plan-sources "$BUILD_PLAN" "$REPO_ROOT" "$COMPILER_ROOT" "$bundle" \
+    > /dev/null 2> "$bundle_diagnostic" || load_status=$?
+[[ "$load_status" -eq 0 && ! -s "$bundle_diagnostic" && -s "$bundle" ]] || {
+    [[ ! -s "$bundle_diagnostic" ]] || /bin/cat "$bundle_diagnostic" >&2
+    fail "the current V1 producer could not materialize the canonical compiler source bundle"
+}
+
+source_key="$(/usr/bin/sed -n 's/^sourceSet.*sha256=\([^[:space:]]*\).*$/\1/p' "$BUILD_PLAN")"
+artifact_root="${RANGE_STAGE2_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Library/Caches}/Range/stage2-compiler}/function-artifacts/per-function-artifacts-v1"
+artifact_input="$artifact_root/$source_key/FunctionArtifacts.cache"
+{
+    /usr/bin/head -n 1 "$bundle"
+    /usr/bin/printf '%s\n' '// range-development-compiler'
+    if [[ -f "$artifact_input" ]]; then
+        /usr/bin/printf '// range-function-artifact-input %s\n' "$artifact_input"
+    fi
+    /usr/bin/tail -n +2 "$bundle"
+} > "$execution_bundle"
+
+cache_key="$({
+    /usr/bin/printf 'schema=%s\n' "$SCHEMA_VERSION"
+    /usr/bin/printf 'producer=%s\n' "$(sha256 "$PRODUCER")"
+    /usr/bin/printf 'bundle=%s\n' "$(sha256 "$bundle")"
+    if [[ -f "$artifact_input" ]]; then
+        /usr/bin/printf 'artifactInput=%s\n' "$(sha256 "$artifact_input")"
+    fi
+    for runtime in "${runtimes[@]}"; do
+        /usr/bin/printf 'runtime=%s\n' "$(sha256 "$runtime")"
+    done
+    /usr/bin/printf 'optimization=%s\n' "$COMPILER_OPTIMIZATION"
+    /usr/bin/printf 'lto=%s\n' "$COMPILER_LTO"
+    clang --version | /usr/bin/head -1
+} | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
+cache_root="$REPO_ROOT/.range/Compiler/V1Generation/$cache_key"
+metadata="$cache_root/Generation.txt"
+v2_llvm="$cache_root/CompilerV2.ll"
+v2_executable="$cache_root/V2/RangeCompiler"
+
+if [[ -f "$metadata" && -f "$v2_llvm" && -x "$v2_executable"
+    && "$(/usr/bin/sed -n 's/^key=//p' "$metadata")" == "$cache_key"
+    && "$(/usr/bin/sed -n 's/^v2LLVMHash=//p' "$metadata")" == "$(sha256 "$v2_llvm")"
+    && "$(/usr/bin/sed -n 's/^v2ExecutableHash=//p' "$metadata")" == "$(sha256 "$v2_executable")" ]] \
+    && /usr/bin/cmp -s "$PRODUCER_LLVM" "$v2_llvm" \
+    && /usr/bin/cmp -s "$PRODUCER" "$v2_executable"; then
+    /bin/cat "$metadata"
+    echo "Compiler V1 generation: pass (cached V1 -> V2 byte-identical LLVM/executable fixed point)"
+    exit 0
+fi
+
+temporary="$cache_root/.build.$$"
+/bin/mkdir -p "$temporary"
+v2_seconds="$(emit_v1_generation "$PRODUCER" "$execution_bundle" "$temporary/CompilerV2.ll" "$temporary/CompilerV2.err" v2Emission)"
+link_compiler "$temporary/CompilerV2.ll" "$temporary/V2/RangeCompiler" "${runtimes[@]}"
+
+/usr/bin/cmp -s "$PRODUCER_LLVM" "$temporary/CompilerV2.ll" \
+    || fail "V1 and V2 LLVM are not byte-identical"
+/usr/bin/cmp -s "$PRODUCER" "$temporary/V2/RangeCompiler" \
+    || fail "V1 and V2 executables are not byte-identical"
+
+prove_compiler_runs "$PRODUCER" v1 "$temporary" "${runtimes[@]}"
+prove_compiler_runs "$temporary/V2/RangeCompiler" v2 "$temporary" "${runtimes[@]}"
+/usr/bin/cmp -s "$temporary/v1.ReturnInteger.ll" "$temporary/v2.ReturnInteger.ll" \
+    || fail "V1 and V2 ordinary program LLVM differ"
+
+{
+    /usr/bin/printf 'test=compiler-v1-generation\n'
+    /usr/bin/printf 'key=%s\n' "$cache_key"
+    /usr/bin/printf 'producer=%s\n' "$PRODUCER"
+    /usr/bin/printf 'producerHash=%s\n' "$(sha256 "$PRODUCER")"
+    /usr/bin/printf 'v1LLVMHash=%s\n' "$(sha256 "$PRODUCER_LLVM")"
+    /usr/bin/printf 'v1ExecutableHash=%s\n' "$(sha256 "$PRODUCER")"
+    /usr/bin/printf 'bundleHash=%s\n' "$(sha256 "$bundle")"
+    if [[ -f "$artifact_input" ]]; then
+        /usr/bin/printf 'artifactInput=%s\n' "$artifact_input"
+        /usr/bin/printf 'artifactInputHash=%s\n' "$(sha256 "$artifact_input")"
+    fi
+    /usr/bin/printf 'v2LLVMHash=%s\n' "$(sha256 "$temporary/CompilerV2.ll")"
+    /usr/bin/printf 'v2LLVMBytes=%s\n' "$(bytes "$temporary/CompilerV2.ll")"
+    /usr/bin/printf 'v2ExecutableHash=%s\n' "$(sha256 "$temporary/V2/RangeCompiler")"
+    /usr/bin/printf '%s\n' "$v2_seconds"
+    /usr/bin/printf 'llvmFixedPoint=true\n'
+    /usr/bin/printf 'executableFixedPoint=true\n'
+    /usr/bin/printf 'runtimeFixtureExit=7\n'
+} > "$temporary/Generation.txt"
+
+/bin/mv "$temporary/CompilerV2.ll" "$v2_llvm"
+/bin/mkdir -p "$(dirname "$v2_executable")"
+/bin/mv "$temporary/V2/RangeCompiler" "$v2_executable"
+/bin/rmdir "$temporary/V2"
+/bin/mv "$temporary/Generation.txt" "$metadata"
+/bin/rm -f "$temporary/CompilerV2.err" \
+    "$temporary/v1.ReturnInteger.ll" "$temporary/v1.ReturnInteger" "$temporary/v1.ReturnInteger.err" \
+    "$temporary/v2.ReturnInteger.ll" "$temporary/v2.ReturnInteger" "$temporary/v2.ReturnInteger.err"
+/bin/rmdir "$temporary"
+temporary=""
+
+/bin/cat "$metadata"
+echo "Compiler V1 generation: pass (V1 -> V2 byte-identical LLVM/executable fixed point, linked runtime exits 7)"

@@ -1,0 +1,13 @@
+construct ABIPair {
+    let first: Int
+    let second: Int
+}
+
+function brokenPair(): ABIPair {
+    return 1
+}
+
+@main {
+    let value: ABIPair(brokenPair())
+    return value.first
+}

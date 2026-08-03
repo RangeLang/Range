@@ -725,6 +725,8 @@ check_many_relationship_registration() {
     local bundle="$WORK_ROOT/macro-many-relationship-registration.range"
     local output="$WORK_ROOT/macro-many-relationship-registration.out"
     local repeat_output="$WORK_ROOT/macro-many-relationship-registration.repeat.out"
+    local plotter_bundle="$WORK_ROOT/macro-many-relationship-registration.plotter.range"
+    local plotter_output="$WORK_ROOT/macro-many-relationship-registration.plotter.out"
     local error="$WORK_ROOT/macro-many-relationship-registration.err"
     local repeat_error="$WORK_ROOT/macro-many-relationship-registration.repeat.err"
     local registration_identity="$WORK_ROOT/macro-many-relationship-registration.uuid"
@@ -807,6 +809,10 @@ check_many_relationship_registration() {
     "$STAGE2_EXECUTABLE" compile "$bundle" > "$repeat_output" 2> "$repeat_error" \
         || fail "repeated Core many and contents registrations did not compile: $(/usr/bin/head -n 1 "$repeat_output")"
     [[ ! -s "$repeat_error" ]] || fail "repeated Core many and contents registrations wrote stderr"
+    /usr/bin/sed '1s/compilerMacroSnapshot/compilerMacroGraph/' "$bundle" > "$plotter_bundle"
+    "$STAGE2_EXECUTABLE" compile "$plotter_bundle" > "$plotter_output" 2> "$error" \
+        || fail "Core relationship registrations did not project into the macro graph: $(/usr/bin/head -n 1 "$plotter_output")"
+    [[ ! -s "$error" ]] || fail "Core relationship macro graph wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true' "$output" \
         || fail "Core many and contents registrations did not execute"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true' "$repeat_output" \
@@ -836,6 +842,15 @@ check_many_relationship_registration() {
     /usr/bin/cmp -s "$registration_identity" "$repeat_registration_identity" \
         || fail "Core @many(16) UUID.bytes relationship identity changed across repeated evaluation"
     echo "Macros Core @many(16) deterministic relationship registration: pass"
+    /usr/bin/grep -Fq $'macroGraphExecution\tvalid=true\tslotRegistrationStatus=0\ttablesValid=true\t' "$plotter_output" \
+        || fail "Core relationship macro graph did not execute and register its slot model"
+    [[ "$(/usr/bin/grep -Ec $'^macroGraphRelationshipSlot\\t' "$plotter_output" || true)" -eq 4 ]] \
+        || fail "Core relationship registrations did not create one reusable relationship-values slot per annotated member"
+    /usr/bin/grep -Eq $'^macroGraphRelationshipSlot\\trow=[0-9]+\\ttargetMemberSyntaxID=[0-9]+\\tminimum=16\\tmaximumKind=1\\tmaximum=16\\tordering=1\\tseparatorKind=0\\tenclosureKind=0\\tadmission=0$' "$plotter_output" \
+        || fail "Core @many(16) UUID.bytes did not retain its finite cardinality on a graph relationship-values slot"
+    [[ "$(/usr/bin/grep -Ec $'^macroGraphRelationshipSlot\\t.*\\tminimum=0\\tmaximumKind=2\\tmaximum=-1\\tordering=1\\tseparatorKind=0\\tenclosureKind=0\\tadmission=0$' "$plotter_output" || true)" -ge 3 ]] \
+        || fail "Core ordered-many registrations did not retain their graph slot cardinality"
+    echo "Macros Core relationship registration slots: pass"
     /usr/bin/grep -Eq $'^relationshipRegistration\trow=[0-9]+\tresultRow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\ttargetMemberSyntaxID=[0-9]+\ttargetName=contents\townerSyntaxID=[0-9]+\townerName=RelationshipRegistrationTarget\tminimum=0\tmaximumKind=2\tmaximum=-1\tordering=1\tseparatorKind=0\tseparatorValueResultRow=-1\tenclosureKind=1\tdelimiterPair=1\tadmission=1$' "$output" \
         || fail "the compiler did not decode the authored @contents registration onto its target member"
     /usr/bin/grep -Eq $'^relationshipRegistration\trow=[0-9]+\tresultRow=[0-9]+\tinvocationRow=[0-9]+\tapplicationRow=[0-9]+\ttargetMemberSyntaxID=[0-9]+\ttargetName=contents\townerSyntaxID=[0-9]+\townerName=Block\tminimum=0\tmaximumKind=2\tmaximum=-1\tordering=1\tseparatorKind=0\tseparatorValueResultRow=-1\tenclosureKind=1\tdelimiterPair=1\tadmission=1$' "$output" \

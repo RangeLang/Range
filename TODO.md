@@ -21,6 +21,15 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] Model `UUID.bytes` as an exact `@many(16)` relationship of
     `Int<.unsigned, 8>` values, and make `Identifier.id` carry `UUID` rather
     than exposing Buffer or String as its semantic identity.
+  - [x] Execute Core relationship macros before the dedicated macro-graph
+    snapshot and project every `admission:any` registration into one typed
+    relationship-values slot on its target member.
+    - `@contents` remains represented by the established block-contents slot;
+      it is not duplicated as a generic relationship-values slot.
+    - The focused value-ownership gate proved four deterministic slots,
+      including UUID's ordered exact cardinality of sixteen, and completed in
+      673 seconds: 669 seconds emitting LLVM, 2 seconds validating, and 2
+      seconds linking.
   - [ ] Add an authored UUID creation operation backed by one private random
     byte capability; remove UUID generation from public `RawBuffer` APIs.
   - [x] Materialize macro-visible `Identifier.id` values as a nested UUID with
@@ -410,6 +419,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - Keep its sound generator and graph, with one black/accent start-stop
       toggle.
   - [x] Set the homepage description in the site monospace face.
+  - [x] Preserve the homepage optical-alignment contract through the Sveltely
+    stack refactor by targeting its rendered semantic page attribute.
   - [x] Keep “Range Has a Dual Shape” hidden from the public Website.
     - Remove its homepage card and make its former route return 404.
   - [x] Render the benchmark run procedure as a minimal top-down tree, with
@@ -2020,6 +2031,16 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       `compilerCoreASTSummary`, the symbol/type/declaration summaries,
       `compilerCoreLLVM`, `parseCompilerProgramForLLVMNamedBodies`,
       `parseCompilerStatementLegacy`, and the old TypedIR LLVM helper.
+      - [x] Delete the four independently unreachable leaf entry points
+        `compilerCoreASTSummary`, `compilerCoreLLVM`,
+        `parseCompilerProgramForLLVMNamedBodies`, and
+        `parseCompilerStatementLegacy` after a repository-wide reference audit
+        found no callers.
+        - The slice removed 172 Range lines and no direct RawBuffer calls.
+          Native compiler smoke rebuilt in 672 seconds (668 emission, 2 LLVM
+          validation, 2 linking), and the linked Stage 2 executable remained
+          byte-identical at SHA-256
+          `1ebc06443ced5d0349ee76a2e4210fc5d7f6f243bd005c49101ad91fee77e427`.
     - [ ] Remove only a complete unreachable chain: its record
       encoders/decoders, parser/lowering functions, fields, column helpers,
       and RawBuffer builders must leave together.
@@ -2161,6 +2182,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           cache value: it is rebuilt and replaced rather than becoming a program
           error. Output and state writes are independently atomic; add a shared
           transaction boundary before treating the pair as one durable commit.
+        - [x] Preserve the last-known-good execution across a failed candidate.
+          - The focused V1 gate inserts a valid generation, attempts an edited
+            source that fails with a typed compiler error, proves both the
+            accepted execution record and LLVM artifact remain byte-unchanged,
+            then advances them with the next valid source generation.
         - The complete value-ownership gate passed after rebuilding 2,967
           function artifacts in 667.06 seconds: LLVM emission consumed 652
           seconds, validation 1 second, and linking 2 seconds. The focused V1
@@ -2200,8 +2226,108 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       avoid semantic reconstruction.
     - [ ] Make `@compiler` and `@phase(after:)` registrations drive the V1
       runner instead of retaining a manually ordered entry adapter.
-    - [ ] Replace the three independent source rebuilds with one persistent
+    - [ ] Ratchet Compiler V1 into authority one artifact domain at a time.
+      - Keep the current compiler as the accepted oracle while a V1 phase runs
+        in comparison mode over the same input identity.
+      - Promote a V1 phase only after its accepted and failed-candidate paths
+        are durable; then delete the superseded legacy producer in that same
+        checkpoint instead of retaining two semantic authorities.
+      - A failed candidate records diagnostics without replacing the accepted
+        graph. A valid candidate commits one new generation atomically and
+        becomes the input identity for the next phase.
+      - [x] Prove a complete V1 compiler generation reaches its own fixed point.
+        - `scripts/range check-compiler-v1-generation` materializes the
+          canonical compiler source bundle, has the current V1 producer emit
+          and link Compiler V2, requires byte-identical V1/V2 LLVM and
+          executables, and runs the ordinary exit-7 fixture through both
+          generations. Because V1 was built from the same canonical source,
+          reproducing itself is the fixed-point check; a redundant V3 would
+          repeat the same cold proof. The expensive result is
+          content-addressed so an unchanged proof can be reused.
+        - The first full-bundle attempt exposed V1 Shape eagerly capturing
+          every function body and aborting inside statement parsing before
+          LLVM emission. V1 now follows the normal retained-graph boundary:
+          capture declarations and main once, then let reachable lowering
+          discover bodies from that same table instead of forcing all bodies
+          into Shape.
+        - Declaration-first capture completed reachable LLVM lowering, but V1
+          then rejected the product because its separate whole-program
+          `CompilerSemanticGraph` cannot represent the compiler. That legacy
+          graph is no longer V1 Behavior authority: successful reachable
+          lowering produces a stable Behavior-product fingerprint, including
+          body-only changes, while failed lowering remains a typed error. The
+          fingerprint is transitional until the persisted per-function
+          Behavior graph becomes the directly retained product.
+        - The next cold V1 self-emission completed in 2,580 seconds and
+          reproduced byte-identical V2 LLVM. Its first gate revision then
+          rejected executable bytes because it linked under the basename
+          `CompilerV2`; the repository links as `RangeCompiler.tmp` and moves
+          that file, and Mach-O UUID/ad-hoc signing includes that identifier.
+          The corrected gate reproduces the repository link contract and may
+          consume the validated development function-artifact graph; the cold
+          LLVM identity result is not discarded or mislabeled as a cache hit.
+        - The corrected proof passed: V1 emitted V2 in 2,116 seconds, and both
+          LLVM artifacts were byte-identical at 8,630,963 bytes with SHA-256
+          `872d36b31f76bb7ba0d8a64ce6b1e9f0a1631f5ea9e5d217549bd0e7ba984ab4`.
+          The linked V1/V2 executables were byte-identical at SHA-256
+          `5fbb05e0084d0ed2c1950c6ab180598a176b6bb4c9df460df23e330cc225a8ca`,
+          and each compiled, linked, and ran the ordinary fixture with exit 7.
+          The function-artifact input reduced the repeat from the observed
+          2,580-second cold emission to 2,116 seconds, but did not provide a
+          closed-module short circuit; most reconstruction still ran.
+        - [ ] Move the validated module cache ahead of reachable-body discovery.
+          - [x] Version 8 records a canonical source identity (ignoring only
+            input/output cache-directive paths), root Behavior integrity, and
+            the complete persisted artifact-record/text integrity. An exact
+            module match returns before reachable-body discovery; malformed,
+            stale-root, stale-callee, and source-mismatched caches fall back to
+            the existing checked path.
+            - The focused Compiler V1 gate passed in 51.62 seconds and proved
+              cold insertion, closed-module reuse without discovery/candidate/
+              effects/ABI/emission phases, root and callee tamper rejection,
+              malformed-cache repair, and legacy LLVM/runtime parity.
+            - The native Stage 2 cold build emitted LLVM in 656 seconds and
+              completed in 659 seconds (`2,981` artifacts rebuilt). The
+              unchanged warm invocation was a cache hit in 3.94 seconds with
+              identical LLVM hash `2c2783799b1524d7d9423a2a9caac430eb9a168878d2307ad018cf365174603e`
+              and executable hash
+              `929a33f21ec6c05595c366300b53854dafc20020dd743f34792bddb66e60b424`.
+          - [ ] Run the full candidate/progression ladder before promoting the
+            new cache schema or seed.
+          - The first post-edit native smoke probe reached the normal LLVM
+            producer at roughly 10.7 GB resident memory after 3:37 and was
+            stopped before completion; the completed v8 run stayed within the
+            observed safe resource envelope.
+    - [x] Replace the three independent source rebuilds with one persistent
       project graph whose shape and behavior deltas flow between phases.
+      - [x] Make V1 Shape own one typed-syntax capture and derive both the
+        inspectable Shape snapshot and Behavior snapshot from its live tables.
+        - `compilerV1Behavior` no longer accepts source or invokes an
+          independent semantic summary; it consumes only the frozen
+          Shape-owned Behavior snapshot. The focused V1 gate enforces this
+          source boundary, preserves legacy LLVM parity and failed-candidate
+          isolation, and validates, links, and runs exits 7/8.
+        - Native smoke rebuilt the changed compiler in 663 seconds: 659
+          seconds emitting LLVM, 2 seconds validating, and 2 seconds linking.
+      - [x] Make the Compiled phase consume retained Shape and Behavior
+        products directly.
+        - Shape now invokes the linked-table native LLVM boundary while its
+          single captured syntax graph is alive and freezes that output beside
+          its Shape and Behavior snapshots. Compiled accepts no source value
+          and only commits the retained output after verifying that Behavior
+          consumes the exact Shape generation.
+        - Raw source remains the backing storage for body spans during this
+          lowering; declarations and syntax are not captured a second time.
+          Persistence across process runs still stores fingerprints and LLVM,
+          not the live typed graph, so changed input performs one complete
+          capture on its next execution.
+        - The focused V1 gate preserves legacy LLVM parity, failed-candidate
+          isolation, exact prior phase values, malformed-cache repair, and
+          linked exits `7`/`8`. Producing the changed development compiler
+          still took 830 seconds: 827 seconds emitting LLVM, 1 second
+          validating it, and 2 seconds linking, with 0 of 2,977 function
+          artifacts reused. The retained phase cutover removes duplicated V1
+          capture but does not yet solve whole-compiler reconstruction.
     - [ ] Delete ABI and effect-summary phases from Compiler V1.
       - Shape owns physical value representation and carried identity.
         Behavior is the composable graph mapping from input shapes to output
@@ -2213,6 +2339,46 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - Keep the current compiler's ABI/effect machinery only as the parity
         oracle until V1 shape/behavior plotting passes the same focused native
         controls; then delete the superseded reconstruction path.
+      - [x] Remove disposable LLVM emission from the ABI capability probe.
+        - The probe now stops after its graph-producing work and MIR
+          validation. Authoritative entry/helper lowering owns the only two
+          remaining `compilerBodyLLVMEmit` call sites; the focused V1 gate
+          rejects any return of the `abi.emit` probe.
+        - Removing the dead source reduced the immediately adjacent bootstrap-
+          producer miss from 827 seconds to 668 seconds, with validation and
+          linking taking 2 seconds each. That measures the accepted producer
+          compiling a smaller next compiler; it is not the new compiler's own
+          runtime improvement.
+        - At this intermediate checkpoint the persisted V1 execution suite
+          passed, and the dedicated mixed aggregate-return fixture still
+          rejected before LLVM output with
+          `representationSensitiveABICapabilityBlocked` at capability stage
+          `52001`; the subsequent Shape-authority cut below moves that body
+          failure out of ABI planning.
+      - [x] Make captured function discovery the ABI capability authority and
+        remove ABI component planning's second body reconstruction.
+        - Discovery publishes capability only after the function's captured
+          body, signature, call edges, CFG, owned paths, direct Behavior, and
+          representation-sensitive targets are valid. ABI component planning
+          consumes that Shape result instead of reparsing and rebuilding
+          ownership/MIR merely to decide participation.
+        - A full cold profile executed by the newly built compiler completed
+          the current compiler source set successfully in 496,221 ms and
+          emitted 8,630,832 LLVM bytes. Every `abi.parse`, `abi.resolve`,
+          `abi.cfg`, `abi.ownership`, `abi.mir`, `abi.validate`, `abi.emit`, and
+          `abi.cleanup` counter was exactly zero.
+        - The profile used 11,680,858,112 maximum resident bytes and reported a
+          15,090,461,784-byte peak footprint. The newly exposed dominant work
+          is function-effect construction at 140,391 ms followed by roughly
+          317 seconds between the frozen ABI plan and completed function
+          emission/module assembly. The largest observed function totals were
+          49,317 ms in `compilerBodyLLVMEmitterProcessOperation` and 38,951 ms
+          in `compilerBodyMIRValidationCode`.
+        - Invalid aggregate-return bodies now remain out of ABI shape planning
+          and reject at authoritative typed-body lowering with
+          `unsupportedReachableLowering`, `function=brokenPair`, and
+          `typedBodyPipelineFailure stage=52001`, before any LLVM definition or
+          call is returned.
       - [x] Make V1 Plot accept the frozen Shape and Behavior artifacts,
         reject a mismatched Shape-to-Behavior identity chain, and expose the
         Behavior identity consumed by Plot for inspection and future cache

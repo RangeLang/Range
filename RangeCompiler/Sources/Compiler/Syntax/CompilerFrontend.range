@@ -267,6 +267,9 @@ function compilerSyntaxSlotMembers(): Int { return 1 }
 function compilerSyntaxSlotParameters(): Int { return 2 }
 function compilerSyntaxSlotContents(): Int { return 3 }
 function compilerSyntaxSlotPayloads(): Int { return 4 }
+// A relationship-values slot is the declared place where runtime or syntax
+// occurrences may later appear. Its registration is not itself an occurrence.
+function compilerSyntaxSlotRelationshipValues(): Int { return 5 }
 
 // A slot declares the environment in which its occurrences are admitted. The
 // occurrence's syntax kind declares whether it can inhabit that environment.
@@ -283,6 +286,7 @@ function compilerSyntaxSlotKindIsKnown(kind: Int): Bool {
         || kind == compilerSyntaxSlotParameters()
         || kind == compilerSyntaxSlotContents()
         || kind == compilerSyntaxSlotPayloads()
+        || kind == compilerSyntaxSlotRelationshipValues()
 }
 
 function compilerSyntaxSlotName(kind: Int): String {
@@ -290,6 +294,7 @@ function compilerSyntaxSlotName(kind: Int): String {
     if kind == compilerSyntaxSlotParameters() { return String("parameters") }
     if kind == compilerSyntaxSlotContents() { return String("contents") }
     if kind == compilerSyntaxSlotPayloads() { return String("payloads") }
+    if kind == compilerSyntaxSlotRelationshipValues() { return String("relationshipValues") }
     return String("")
 }
 
@@ -6054,7 +6059,8 @@ function compilerSyntaxSlotRowIsStructurallyValid(tables: CompilerSyntaxTables, 
         || (separatorKind == compilerGraphSeparatorNone() && separatorID != 0 - 1)
         || (separatorKind != compilerGraphSeparatorNone() && separatorID != ownerSyntaxID)
         || !compilerGraphEnclosureKindIsValid(kind: enclosureKind)
-        || enclosureID != ownerSyntaxID
+        || (enclosureKind == compilerGraphEnclosureNone() && enclosureID != 0 - 1)
+        || (enclosureKind != compilerGraphEnclosureNone() && enclosureID != ownerSyntaxID)
         || !compilerSyntaxEnvironmentIsKnown(kind: admissionEnvironment) { return false }
     let ownerKind: Int(compilerIntTableValue(table: tables.syntaxIndex, row: ownerSyntaxID, column: 0))
     if name == compilerSyntaxSlotMembers() {
@@ -6093,6 +6099,11 @@ function compilerSyntaxSlotRowIsStructurallyValid(tables: CompilerSyntaxTables, 
             && enclosureKind == compilerGraphEnclosureParentheses()
             && allowedTargetKind == compilerSyntaxKindMember()
             && admissionEnvironment == compilerSyntaxEnvironmentAny()
+    }
+    if name == compilerSyntaxSlotRelationshipValues() {
+        let relationshipRow: Int(compilerRelationshipRegistrationRowForTargetMember(tables: tables, targetMemberSyntaxID: ownerSyntaxID))
+        return relationshipRow >= 0
+            && compilerSyntaxRelationshipSlotMatchesRegistration(tables: tables, slotID: slotID, relationshipRow: relationshipRow)
     }
     if name == compilerSyntaxSlotContents() {
         let delimiterPairKind: Int(compilerSyntaxBlockDelimiterPairKind(tables: tables, blockSyntaxID: ownerSyntaxID))
@@ -7253,6 +7264,17 @@ function compilerGraphRegisterContentsSlots(tables: CompilerSyntaxTables): Int {
     return 0
 }
 
+function compilerGraphRegisterRelationshipSlots(tables: CompilerSyntaxTables): Int {
+    state relationshipRow: Int(0)
+    while relationshipRow < compilerIntTableRowCount(table: tables.relationshipRegistrations) {
+        if compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationAdmissionColumn()) == compilerRelationshipRegistrationAdmissionAny() {
+            if compilerSyntaxEnsureRelationshipSlot(tables: tables, relationshipRow: relationshipRow) < 0 { return 0 - 1 }
+        }
+        relationshipRow: relationshipRow + 1
+    }
+    return 0
+}
+
 function compilerGraphProjectLegacySlotRelationship(tables: CompilerSyntaxTables, slotID: Int, targetSyntaxID: Int, occurrenceOrdinal: Int): Int {
     let slotKind: Int(compilerIntTableValue(table: tables.slots, row: slotID, column: 3))
     state role: Int(0)
@@ -7299,6 +7321,7 @@ function compilerGraphRegisterSlotRelationships(tables: CompilerSyntaxTables): I
     if compilerGraphRegisterMemberSlots(tables: tables) != 0 { return 0 - 1 }
     if compilerGraphRegisterParameterSlots(tables: tables) != 0 { return 0 - 1 }
     if compilerGraphRegisterContentsSlots(tables: tables) != 0 { return 0 - 1 }
+    if compilerGraphRegisterRelationshipSlots(tables: tables) != 0 { return 0 - 1 }
     return compilerGraphProjectLegacySlotRelationships(tables: tables)
 }
 
@@ -8401,6 +8424,19 @@ function compilerRelationshipRegistrationRowForResult(tables: CompilerSyntaxTabl
     return 0 - 1
 }
 
+function compilerRelationshipRegistrationRowForTargetMember(tables: CompilerSyntaxTables, targetMemberSyntaxID: Int): Int {
+    state matchingRow: Int(0 - 1)
+    state row: Int(0)
+    while row < compilerIntTableRowCount(table: tables.relationshipRegistrations) {
+        if compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationTargetMemberColumn()) == targetMemberSyntaxID {
+            if matchingRow >= 0 { return 0 - 2 }
+            matchingRow: row
+        }
+        row: row + 1
+    }
+    return matchingRow
+}
+
 function compilerRelationshipRegistrationRowMatchesValues(
     tables: CompilerSyntaxTables,
     row: Int,
@@ -8605,7 +8641,9 @@ function compilerRelationshipRegistrationsAreStructurallyValid(tables: CompilerS
         if compilerRelationshipRegistrationAppendFromResult(tables: tables, resultRow: resultRow) != row { return false }
         state prior: Int(0)
         while prior < row {
-            if compilerIntTableValue(table: tables.relationshipRegistrations, row: prior, column: compilerRelationshipRegistrationSourceResultColumn()) == resultRow {
+            if compilerIntTableValue(table: tables.relationshipRegistrations, row: prior, column: compilerRelationshipRegistrationSourceResultColumn()) == resultRow
+                || compilerIntTableValue(table: tables.relationshipRegistrations, row: prior, column: compilerRelationshipRegistrationTargetMemberColumn())
+                    == compilerIntTableValue(table: tables.relationshipRegistrations, row: row, column: compilerRelationshipRegistrationTargetMemberColumn()) {
                 return false
             }
             prior: prior + 1
@@ -8633,6 +8671,76 @@ function compilerRelationshipRegistrationProject(tables: CompilerSyntaxTables): 
     }
     if !compilerRelationshipRegistrationsAreStructurallyValid(tables: tables) { return 0 - 1 }
     return 0
+}
+
+function compilerSyntaxRelationshipAdmissionEnvironment(admission: Int): Int {
+    if admission == compilerRelationshipRegistrationAdmissionAny() { return compilerSyntaxEnvironmentAny() }
+    if admission == compilerRelationshipRegistrationAdmissionBlock() { return compilerSyntaxEnvironmentBlock() }
+    return 0 - 1
+}
+
+function compilerSyntaxRelationshipSlotMatchesRegistration(tables: CompilerSyntaxTables, slotID: Int, relationshipRow: Int): Bool {
+    if slotID < 0 || slotID >= compilerIntTableRowCount(table: tables.slots)
+        || relationshipRow < 0 || relationshipRow >= compilerIntTableRowCount(table: tables.relationshipRegistrations) { return false }
+    let targetMemberSyntaxID: Int(compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationTargetMemberColumn()))
+    let separatorKind: Int(compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationSeparatorKindColumn()))
+    let enclosureKind: Int(compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationEnclosureKindColumn()))
+    let admissionEnvironment: Int(compilerSyntaxRelationshipAdmissionEnvironment(admission: compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationAdmissionColumn())))
+    if separatorKind != compilerRelationshipRegistrationSeparatorNone() || admissionEnvironment < 0 { return false }
+    state slotEnclosureKind: Int(compilerGraphEnclosureNone())
+    state slotEnclosureID: Int(0 - 1)
+    if enclosureKind == compilerRelationshipRegistrationEnclosureDelimited() {
+        slotEnclosureKind: compilerGraphEnclosureForDelimiterPairKind(delimiterPairKind: compilerRelationshipRegistrationDelimiterPairSourceKind(delimiterPair: compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationDelimiterPairColumn())))
+        slotEnclosureID: targetMemberSyntaxID
+    } else if enclosureKind != compilerRelationshipRegistrationEnclosureNone() { return false }
+    return compilerIntTableValue(table: tables.slots, row: slotID, column: 1) == compilerGraphIdentitySyntax()
+        && compilerIntTableValue(table: tables.slots, row: slotID, column: 2) == targetMemberSyntaxID
+        && compilerIntTableValue(table: tables.slots, row: slotID, column: 3) == compilerSyntaxSlotRelationshipValues()
+        && compilerIntTableValue(table: tables.slots, row: slotID, column: 4) == 0
+        && compilerIntTableValue(table: tables.slots, row: slotID, column: 5) == compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationMinimumColumn())
+        && compilerIntTableValue(table: tables.slots, row: slotID, column: 6) == compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationMaximumKindColumn())
+        && compilerIntTableValue(table: tables.slots, row: slotID, column: 7) == compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationMaximumColumn())
+        && compilerIntTableValue(table: tables.slots, row: slotID, column: 8) == compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationOrderingColumn())
+        && compilerIntTableValue(table: tables.slots, row: slotID, column: 9) == compilerGraphSeparatorNone()
+        && compilerIntTableValue(table: tables.slots, row: slotID, column: 10) == 0 - 1
+        && compilerIntTableValue(table: tables.slots, row: slotID, column: 11) == slotEnclosureKind
+        && compilerIntTableValue(table: tables.slots, row: slotID, column: 12) == slotEnclosureID
+        && compilerIntTableValue(table: tables.slots, row: slotID, column: compilerSyntaxSlotAllowedTargetKindColumn()) == 0
+        && compilerIntTableValue(table: tables.slots, row: slotID, column: compilerSyntaxSlotAdmissionEnvironmentColumn()) == admissionEnvironment
+}
+
+function compilerSyntaxEnsureRelationshipSlot(tables: CompilerSyntaxTables, relationshipRow: Int): Int {
+    if relationshipRow < 0 || relationshipRow >= compilerIntTableRowCount(table: tables.relationshipRegistrations) { return 0 - 1 }
+    let targetMemberSyntaxID: Int(compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationTargetMemberColumn()))
+    let admissionEnvironment: Int(compilerSyntaxRelationshipAdmissionEnvironment(admission: compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationAdmissionColumn())))
+    let enclosureKind: Int(compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationEnclosureKindColumn()))
+    if targetMemberSyntaxID < 0 || targetMemberSyntaxID >= compilerIntTableRowCount(table: tables.syntaxIndex)
+        || compilerIntTableValue(table: tables.syntaxIndex, row: targetMemberSyntaxID, column: 0) != compilerSyntaxKindMember()
+        || compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationSeparatorKindColumn()) != compilerRelationshipRegistrationSeparatorNone()
+        || admissionEnvironment < 0 { return 0 - 1 }
+    state slotEnclosureKind: Int(compilerGraphEnclosureNone())
+    state slotEnclosureID: Int(0 - 1)
+    if enclosureKind == compilerRelationshipRegistrationEnclosureDelimited() {
+        slotEnclosureKind: compilerGraphEnclosureForDelimiterPairKind(delimiterPairKind: compilerRelationshipRegistrationDelimiterPairSourceKind(delimiterPair: compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationDelimiterPairColumn())))
+        slotEnclosureID: targetMemberSyntaxID
+    } else if enclosureKind != compilerRelationshipRegistrationEnclosureNone() { return 0 - 1 }
+    return compilerSyntaxSlotEnsure(
+        tables: tables,
+        ownerKind: compilerGraphIdentitySyntax(),
+        ownerID: targetMemberSyntaxID,
+        name: compilerSyntaxSlotRelationshipValues(),
+        ordinal: 0,
+        minimum: compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationMinimumColumn()),
+        maximumKind: compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationMaximumKindColumn()),
+        maximum: compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationMaximumColumn()),
+        ordering: compilerIntTableValue(table: tables.relationshipRegistrations, row: relationshipRow, column: compilerRelationshipRegistrationOrderingColumn()),
+        separatorKind: compilerGraphSeparatorNone(),
+        separatorID: 0 - 1,
+        enclosureKind: slotEnclosureKind,
+        enclosureID: slotEnclosureID,
+        allowedTargetKind: 0,
+        admissionEnvironment: admissionEnvironment
+    )
 }
 
 function compilerMacroExecutionMaterializeIdentifier(

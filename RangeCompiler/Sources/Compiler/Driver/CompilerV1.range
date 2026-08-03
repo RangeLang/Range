@@ -11,6 +11,8 @@ construct CompilerV1ShapeDelta {
     let before: CompilerFingerprint
     let after: CompilerFingerprint
     let snapshot: String
+    let behaviorSnapshot: String
+    let compiledOutput: String
 }
 
 construct CompilerV1BehaviorDelta {
@@ -37,22 +39,60 @@ function compilerV1Load(input: String, before: CompilerFingerprint): CompilerV1S
     return delta
 }
 
+function compilerV1NativeBehaviorSnapshot(identity: CompilerFingerprint, output: String): String {
+    let product: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: identity, tag: 13, text: output))
+    return "compilerV1Behavior\tvalid=true\tproduct=\(product.first):\(product.second)\n"
+}
+
 function compilerV1Shape(source: CompilerV1SourceDelta, before: CompilerFingerprint): CompilerV1ShapeDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.shape.begin"))
-    let snapshot: String(compilerTypedSyntaxSummary(source: source.value.source))
+    let tables: CompilerSyntaxTables(compilerSyntaxTablesCreate(source: source.value.source))
+    state captureStatus: Int(compilerTypedDeclarationsCapture(source: source.value.source, tables: tables))
+    if captureStatus == 0 {
+        captureStatus: compilerTypedSyntaxCaptureMainRoot(source: source.value.source, tables: tables)
+    }
+    state snapshot: String("")
+    state behaviorSnapshot: String("")
+    state compiledOutput: String("")
+    if captureStatus != 0 || !compilerSyntaxTablesIsValid(tables: tables) {
+        snapshot: String("compilerError\tkind=invalidTypedSyntaxSnapshot\n")
+        behaviorSnapshot: snapshot
+        compiledOutput: snapshot
+    } else {
+        snapshot: compilerTypedSyntaxRenderSnapshot(tables: tables)
+        let macroLinkStatus: Int(compilerMacroLink(tables: tables))
+        if macroLinkStatus != 0 || compilerIntTableRowCount(table: tables.macroDiagnostics) != 0 {
+            compiledOutput: compilerMacroRenderDiagnostics(tables: tables)
+        } else {
+            compiledOutput: compilerNativeSourceSetLLVMTextForLinkedTables(source: source.value.source, declarationTables: tables)
+        }
+        if compilerNativeOutputIsError(output: compiledOutput) {
+            behaviorSnapshot: compiledOutput
+        } else {
+            behaviorSnapshot: compilerV1NativeBehaviorSnapshot(identity: source.identity, output: compiledOutput)
+        }
+    }
+    let tablesDestroyStatus: Int(compilerSyntaxTablesDestroy(tables: tables))
+    if tablesDestroyStatus != 0 {
+        snapshot: String("compilerError\tkind=compilerV1ShapeOwnershipFailure\n")
+        behaviorSnapshot: snapshot
+        compiledOutput: snapshot
+    }
     let identity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: source.identity, value: 2))
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.shape.end"))
     return CompilerV1ShapeDelta(
         identity: identity,
         before: before,
         after: compilerFingerprintAppendText(fingerprint: identity, tag: 12, text: snapshot),
-        snapshot: snapshot
+        snapshot: snapshot,
+        behaviorSnapshot: behaviorSnapshot,
+        compiledOutput: compiledOutput
     )
 }
 
-function compilerV1Behavior(shape: CompilerV1ShapeDelta, source: String, before: CompilerFingerprint): CompilerV1BehaviorDelta {
+function compilerV1Behavior(shape: CompilerV1ShapeDelta, before: CompilerFingerprint): CompilerV1BehaviorDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.behavior.begin"))
-    let snapshot: String(compilerSemanticSummary(source: source))
+    let snapshot: String("\(shape.behaviorSnapshot)")
     let identity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: shape.identity, value: 3))
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.behavior.end"))
     return CompilerV1BehaviorDelta(
@@ -64,7 +104,7 @@ function compilerV1Behavior(shape: CompilerV1ShapeDelta, source: String, before:
     )
 }
 
-function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1BehaviorDelta, source: String, before: CompilerFingerprint): CompilerV1CompiledDelta {
+function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1BehaviorDelta, before: CompilerFingerprint): CompilerV1CompiledDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.compile.begin"))
     let identity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: behavior.identity, value: 4))
     if behavior.input.first != shape.after.first
@@ -77,7 +117,7 @@ function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1Beha
             output: String("compilerError\tkind=compilerV1BehaviorShapeMismatch\n")
         )
     }
-    let output: String(compileRangeNativeProgramOutput(source: source))
+    let output: String("\(shape.compiledOutput)")
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.compile.end"))
     return CompilerV1CompiledDelta(
         identity: identity,
@@ -197,11 +237,11 @@ function compilerV1ExecutionUpdate(input: String, executionPath: String, outputP
     if compilerNativeOutputIsError(output: shape.snapshot) {
         return compilerV1Report(error: CompilerV1Error(message: shape.snapshot))
     }
-    let behavior: CompilerV1BehaviorDelta(compilerV1Behavior(shape: shape, source: source, before: behaviorBefore))
+    let behavior: CompilerV1BehaviorDelta(compilerV1Behavior(shape: shape, before: behaviorBefore))
     if compilerNativeOutputIsError(output: behavior.snapshot) {
         return compilerV1Report(error: CompilerV1Error(message: behavior.snapshot))
     }
-    let compiled: CompilerV1CompiledDelta(compilerV1Compile(shape: shape, behavior: behavior, source: source, before: compiledBefore))
+    let compiled: CompilerV1CompiledDelta(compilerV1Compile(shape: shape, behavior: behavior, before: compiledBefore))
     if compilerNativeOutputIsError(output: compiled.output) {
         return compilerV1Report(error: CompilerV1Error(message: compiled.output))
     }
@@ -247,11 +287,11 @@ function rangeCompilerV1CLI(compiler: CompilerV1, input: String, inspect: Bool):
     if compilerNativeOutputIsError(output: shape.snapshot) {
         return compilerV1Report(error: CompilerV1Error(message: shape.snapshot))
     }
-    let behavior: CompilerV1BehaviorDelta(compilerV1Behavior(shape: shape, source: source, before: compilerV1AbsentValue()))
+    let behavior: CompilerV1BehaviorDelta(compilerV1Behavior(shape: shape, before: compilerV1AbsentValue()))
     if compilerNativeOutputIsError(output: behavior.snapshot) {
         return compilerV1Report(error: CompilerV1Error(message: behavior.snapshot))
     }
-    let artifact: CompilerV1CompiledDelta(compilerV1Compile(shape: shape, behavior: behavior, source: source, before: compilerV1AbsentValue()))
+    let artifact: CompilerV1CompiledDelta(compilerV1Compile(shape: shape, behavior: behavior, before: compilerV1AbsentValue()))
     if compilerNativeOutputIsError(output: artifact.output) {
         return compilerV1Report(error: CompilerV1Error(message: artifact.output))
     }

@@ -869,11 +869,6 @@ construct CompilerLLVMBasicBlock {
     let terminal: CompilerLLVMTerminator
 }
 
-function compilerCoreASTSummary(source: String): String {
-    let program: CompilerProgram(parseCompilerProgram(source: source))
-    return compilerCoreASTSummaryForProgram(program: program)
-}
-
 function compilerIntTableCreate(columnCount: Int, estimatedRowCount: Int): CompilerIntTable {
     state capacity: Int(0)
     if columnCount > 0 && estimatedRowCount > 0 {

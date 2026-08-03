@@ -22,6 +22,7 @@ Usage:
   range check-value-ownership [DIR]
   range check-compiler-smoke [DIR]
   range check-compiler-v1
+  range check-compiler-v1-generation
   range check-compiler-candidate [DIR]
   range check-document-store
   range check-gpu-canvas
@@ -119,6 +120,10 @@ case "$command" in
     check-compiler-v1)
         if [[ $# -ne 0 ]]; then usage; exit 1; fi
         "$REPO_ROOT/scripts/check-range-compiler-v1"
+        ;;
+    check-compiler-v1-generation)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/check-range-compiler-v1-generation"
         ;;
     check-compiler-candidate)
         if [[ $# -gt 1 ]]; then usage; exit 1; fi

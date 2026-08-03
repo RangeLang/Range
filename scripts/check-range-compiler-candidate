@@ -1194,12 +1194,14 @@ audit_mixed_abi() {
     [[ "$RUN_STATUS" -eq 65 ]] || fail "$stage_label mixed aggregate ABI check exited $RUN_STATUS"
     [[ ! -s "$error" ]] || fail "$stage_label mixed aggregate ABI check wrote stderr"
     /usr/bin/grep -Fq 'compilerError' "$output" \
-        && /usr/bin/grep -Fq 'kind=representationSensitiveABICapabilityBlocked' "$output" \
-        || fail "$stage_label mixed aggregate ABI check missed capability diagnostic"
+        && /usr/bin/grep -Fq 'kind=unsupportedReachableLowering' "$output" \
+        && /usr/bin/grep -Fq 'function=brokenPair' "$output" \
+        && /usr/bin/grep -Fq 'typedBodyPipelineFailure stage=52001' "$output" \
+        || fail "$stage_label mixed aggregate body check missed authoritative typed-body diagnostic"
     if /usr/bin/grep -Fq 'define ' "$output" || /usr/bin/grep -Fq 'call ' "$output"; then
         fail "$stage_label mixed aggregate ABI check emitted LLVM before rejection"
     fi
-    echo "$stage_label mixed aggregate ABI rejection: pass (exit 65, pre-emission)"
+    echo "$stage_label mixed aggregate body rejection: pass (exit 65, authoritative typed-body failure before LLVM output)"
 }
 
 body_syntax_typed_kind_count() {
@@ -5543,21 +5545,7 @@ main() {
         '    return result.second' \
         '}' > "$PLACEMENT_GUARD_SOURCE"
 
-    MIXED_ABI_SOURCE="$WORK_ROOT/MixedABINegative.range"
-    /usr/bin/printf '%s\n' \
-        'construct ABIPair {' \
-        '    let first: Int' \
-        '    let second: Int' \
-        '}' \
-        '' \
-        'function brokenPair(): ABIPair {' \
-        '    return 1' \
-        '}' \
-        '' \
-        '@main {' \
-        '    let value: ABIPair(brokenPair())' \
-        '    return value.first' \
-        '}' > "$MIXED_ABI_SOURCE"
+    MIXED_ABI_SOURCE="$REPO_ROOT/Testing/ABI/Fail/MixedAggregateReturn.range"
 
     LEGACY_LANGUAGE_SOURCE="$WORK_ROOT/LegacyLanguageMarker.range"
     local legacy_language_marker="@""language"

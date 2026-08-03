@@ -22,6 +22,10 @@ function compilerSourceRequestsMacroSnapshot(source: String): Bool {
     return hasRangePrefix(source: source, start: 0, prefix: String("compilerMacroSnapshot"))
 }
 
+function compilerSourceRequestsMacroGraph(source: String): Bool {
+    return hasRangePrefix(source: source, start: 0, prefix: String("compilerMacroGraph"))
+}
+
 function compilerSourceRequestsMacroSyntaxSnapshot(source: String): Bool {
     return hasRangePrefix(source: source, start: 0, prefix: String("compilerMacroSyntaxSnapshot"))
 }

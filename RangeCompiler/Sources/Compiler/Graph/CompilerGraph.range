@@ -1798,6 +1798,64 @@ function compilerPlotterSummary(source: String): String {
     return plotterSummary
 }
 
+function compilerMacroGraphRelationshipSlotsSnapshot(tables: CompilerSyntaxTables): String {
+    state output: String("")
+    state slotID: Int(0)
+    while slotID < compilerIntTableRowCount(table: tables.slots) {
+        if compilerIntTableValue(table: tables.slots, row: slotID, column: 3) == compilerSyntaxSlotRelationshipValues() {
+            output: "\(output)macroGraphRelationshipSlot\trow=\(slotID)\ttargetMemberSyntaxID=\(compilerIntTableValue(table: tables.slots, row: slotID, column: 2))\tminimum=\(compilerIntTableValue(table: tables.slots, row: slotID, column: 5))\tmaximumKind=\(compilerIntTableValue(table: tables.slots, row: slotID, column: 6))\tmaximum=\(compilerIntTableValue(table: tables.slots, row: slotID, column: 7))\tordering=\(compilerIntTableValue(table: tables.slots, row: slotID, column: 8))\tseparatorKind=\(compilerIntTableValue(table: tables.slots, row: slotID, column: 9))\tenclosureKind=\(compilerIntTableValue(table: tables.slots, row: slotID, column: 11))\tadmission=\(compilerIntTableValue(table: tables.slots, row: slotID, column: compilerSyntaxSlotAdmissionEnvironmentColumn()))\n"
+        }
+        slotID: slotID + 1
+    }
+    return output
+}
+
+function compilerMacroGraphSummary(source: String): String {
+    let tables: CompilerSyntaxTables(compilerSyntaxTablesCreate(source: source))
+    let captureStatus: Int(compilerTypedDeclarationsCapture(source: source, tables: tables))
+    let baseDelta: CompilerGraphDelta(compilerGraphDeltaCreate())
+    state output: String("")
+    if captureStatus != 0 || !compilerSyntaxTablesIsValid(tables: tables) {
+        output: compilerInvalidTypedDeclarationsDiagnostic(tables: tables)
+    } else {
+        let linkStatus: Int(compilerMacroLink(tables: tables))
+        if linkStatus != 0 || compilerIntTableRowCount(table: tables.macroDiagnostics) != 0 {
+            output: compilerMacroRenderDiagnostics(tables: tables)
+        } else {
+            let index: CompilerDeclarationIndex(compilerDeclarationIndexCreate(tables: tables))
+            if !index.isValid {
+                output: String("compilerError\tkind=invalidDeclarationIndex\n")
+            } else {
+                let execution: CompilerMacroExecutionResult(compilerMacroExecution(tables: tables, index: index))
+                if execution.status != 0 {
+                    output: compilerMacroRenderExecutionError(tables: tables, result: execution)
+                } else {
+                    let slotRegistrationStatus: Int(compilerGraphRegisterSlotRelationships(tables: tables))
+                    state baseBuildStatus: Int(0 - 1)
+                    state baseDeltaValid: Bool(false)
+                    if slotRegistrationStatus == 0 {
+                        baseBuildStatus: compilerPlotterBuild(tables: tables, delta: baseDelta)
+                        if baseBuildStatus == 0 {
+                            baseDeltaValid: compilerGraphDeltaIsValid(tables: tables, delta: baseDelta)
+                        }
+                    }
+                    output: "\(compilerMacroRenderExecutionSnapshot(tables: tables, result: execution))macroGraphExecution\tvalid=true\tslotRegistrationStatus=\(slotRegistrationStatus)\ttablesValid=\(compilerSyntaxTablesIsValid(tables: tables))\tbaseBuildStatus=\(baseBuildStatus)\tbaseDeltaValid=\(baseDeltaValid)\tsyntaxCount=\(compilerIntTableRowCount(table: tables.syntaxIndex))\trelationshipRegistrationCount=\(compilerIntTableRowCount(table: tables.relationshipRegistrations))\tslotCount=\(compilerIntTableRowCount(table: tables.slots))\tregisteredRelationshipCount=\(compilerIntTableRowCount(table: tables.relationships))\tbaseIdentityCount=\(compilerIntTableRowCount(table: baseDelta.identities))\tbaseRelationshipCount=\(compilerIntTableRowCount(table: baseDelta.relationships))\n\(compilerMacroGraphRelationshipSlotsSnapshot(tables: tables))"
+                }
+                if compilerGraphDeltaDestroy(delta: execution.graphDelta) != 0 {
+                    output: String("compilerError\tkind=macroGraphOwnershipFailure\n")
+                }
+            }
+            if compilerDeclarationIndexDestroy(index: index) != 0 {
+                output: String("compilerError\tkind=macroGraphOwnershipFailure\n")
+            }
+        }
+    }
+    let baseDeltaDestroyStatus: Int(compilerGraphDeltaDestroy(delta: baseDelta))
+    let tablesDestroyStatus: Int(compilerSyntaxTablesDestroy(tables: tables))
+    if baseDeltaDestroyStatus != 0 || tablesDestroyStatus != 0 { return String("compilerError\tkind=macroGraphOwnershipFailure\n") }
+    return output
+}
+
 
 
 function compilerSemanticResolutionColumnCount(): Int { return 3 }

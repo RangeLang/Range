@@ -7,6 +7,9 @@ MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
 READER="$REPO_ROOT/RangeCompiler/Sources/Compiler/Driver/CompilerBuildPlan.range"
 CORE_BUFFER="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/Buffer.range"
 CORE_BYTE_SPAN="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/ByteSpan.range"
+CORE_MANY="$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Many.range"
+CORE_RELATIONSHIP="$REPO_ROOT/RangeCompiler/Sources/Core/Syntax/Program/Relationship.range"
+CORE_UNICODE_SCALAR="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/UnicodeScalar.range"
 CORE_CHARACTER="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/Character.range"
 CORE_STRING="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/String.range"
 CORE_TEXT_ENCODING="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/TextEncoding.range"
@@ -64,6 +67,9 @@ verify_manifest() {
     [[ -f "$READER" ]] || fail "missing build-plan reader"
     [[ -f "$CORE_BUFFER" ]] || fail "missing Buffer storage witness"
     [[ -f "$CORE_BYTE_SPAN" ]] || fail "missing ByteSpan model"
+    [[ -f "$CORE_MANY" ]] || fail "missing many relationship macro"
+    [[ -f "$CORE_RELATIONSHIP" ]] || fail "missing relationship model"
+    [[ -f "$CORE_UNICODE_SCALAR" ]] || fail "missing UnicodeScalar model"
     [[ -f "$CORE_CHARACTER" ]] || fail "missing Character model"
     [[ -f "$CORE_STRING" ]] || fail "missing String storage witness"
     [[ -f "$CORE_TEXT_ENCODING" ]] || fail "missing TextEncoding model"
@@ -133,6 +139,25 @@ write_bundle() {
     /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/System/Memory/ByteSpan.range\n' >> "$output"
     /bin/cat "$CORE_BYTE_SPAN" >> "$output"
     [[ -z "$(/usr/bin/tail -c 1 "$CORE_BYTE_SPAN")" ]] || /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=FocusedRelationshipPrerequisites.range' \
+        'construct Identifier {}' \
+        '' \
+        'enum DelimiterPair {' \
+        '    case parentheses' \
+        '    case braces' \
+        '    case brackets' \
+        '    case angles' \
+        '}' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/Syntax/Program/Relationship.range\n' >> "$output"
+    /bin/cat "$CORE_RELATIONSHIP" >> "$output"
+    [[ -z "$(/usr/bin/tail -c 1 "$CORE_RELATIONSHIP")" ]] || /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/Macro/Many.range\n' >> "$output"
+    /bin/cat "$CORE_MANY" >> "$output"
+    [[ -z "$(/usr/bin/tail -c 1 "$CORE_MANY")" ]] || /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/System/Text/UnicodeScalar.range\n' >> "$output"
+    /bin/cat "$CORE_UNICODE_SCALAR" >> "$output"
+    [[ -z "$(/usr/bin/tail -c 1 "$CORE_UNICODE_SCALAR")" ]] || /usr/bin/printf '\n' >> "$output"
     /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/System/Text/Character.range\n' >> "$output"
     /bin/cat "$CORE_CHARACTER" >> "$output"
     [[ -z "$(/usr/bin/tail -c 1 "$CORE_CHARACTER")" ]] || /usr/bin/printf '\n' >> "$output"
