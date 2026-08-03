@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dev } from "$app/environment";
   import { getContext, onDestroy, onMount } from "svelte";
   import type { Snippet } from "svelte";
   import {
@@ -31,6 +32,7 @@
     entryStartDistance: number;
     centerRadius: number;
     progress: number;
+    exitOpacity: number;
   };
 
   const soundManager = getContext<RangeSoundManager | undefined>(
@@ -63,6 +65,11 @@
   let playing = $state(false);
   let audioEnabled = $state(false);
   let transportState = $state<TransportState>("stopped");
+  let autoScrolling = $state(false);
+  let autoScrollFrame: number | undefined;
+  let nextAutoScrollTick = 0;
+  let autoScrollAnchor: Element | undefined;
+  let autoScrollAnchorPasses = 0;
   let step = $state(-1);
   let rhythmTick = 0;
   let triangleBeat = $state(-1);
@@ -90,6 +97,9 @@
   const voiceBuses = new Map<IntroMixChannel, GainNode>();
   const transportLayerLevels = new Map<IntroMixChannel, number>();
   let transportRestoreGeneration = 0;
+  let dwellTarget: Element | undefined;
+  let dwellTimer: number | undefined;
+  let dwellPatternIndex = 0;
   let rhythmElement: HTMLDivElement;
   let shaderCanvas: HTMLCanvasElement;
   let identityTrack: HTMLDivElement;
@@ -103,6 +113,53 @@
   let stopShaderAnimation = () => {};
   const activeOscillators = new Set<OscillatorNode>();
   const figureAudioStates = new WeakMap<HTMLElement, FigureAudioState>();
+
+  const dwellSelectors = [
+    ".identityExpression",
+    ".triangleLabel",
+    ".enumCase",
+    ".squareLabel",
+  ];
+
+  function playDwellPattern() {
+    if (!audioEnabled || !playing) return;
+    const roots = [261.63, 293.66, 329.63, 392, 440, 493.88];
+    const root = roots[dwellPatternIndex % roots.length];
+    const complement = roots[(dwellPatternIndex + 2) % roots.length];
+    dwellPatternIndex += 1;
+    playTone("identity", root, "sine", 0.032, 0.34);
+    window.setTimeout(() => {
+      if (audioEnabled && playing) {
+        playTone("value", complement, "triangle", 0.026, 0.3);
+      }
+    }, 145);
+  }
+
+  function trackNodeDwell(event: PointerEvent) {
+    if (!audioEnabled || !playing) return;
+    const pointX = event.clientX;
+    const pointY = event.clientY;
+    let closest: Element | undefined;
+    let closestDistance = 86;
+    for (const selector of dwellSelectors) {
+      for (const candidate of document.querySelectorAll(selector)) {
+        const rect = candidate.getBoundingClientRect();
+        const distance = Math.hypot(
+          pointX - (rect.left + rect.width / 2),
+          pointY - (rect.top + rect.height / 2),
+        );
+        if (distance < closestDistance) {
+          closest = candidate;
+          closestDistance = distance;
+        }
+      }
+    }
+    if (closest === dwellTarget) return;
+    window.clearTimeout(dwellTimer);
+    dwellTarget = closest;
+    if (!closest) return;
+    dwellTimer = window.setTimeout(playDwellPattern, 720);
+  }
 
   const vertexSource = `
     attribute vec2 a_position;
@@ -119,6 +176,7 @@
     uniform vec2 u_origin;
     uniform float u_time;
     uniform float u_shape;
+    uniform float u_opacity;
     uniform vec3 u_accent;
 
     vec2 segmentInfo(vec2 point, vec2 start, vec2 end, float offset) {
@@ -333,7 +391,7 @@
         alpha = capsuleAlpha;
       }
 
-      gl_FragColor = vec4(color, alpha);
+      gl_FragColor = vec4(color, alpha * u_opacity);
     }
   `;
 
@@ -448,6 +506,19 @@
     return macroSidechain * environmentDissolve;
   }
 
+  function propertiesLayerLevel() {
+    if (macroLayerPresence >= 0.9) return 0;
+    return squareFigure
+      ? figureScrollPosition(squareFigure).exitOpacity
+      : 1;
+  }
+
+  function channelLayerLevel(channel: IntroMixChannel) {
+    if (channel === "identity") return identityLayerLevel();
+    if (channel === "properties") return propertiesLayerLevel();
+    return 1;
+  }
+
   function updateIdentityLayer(timeConstant: number) {
     if (!audioEnabled || !audioContext) return;
     const identityBus = voiceBuses.get("identity");
@@ -462,6 +533,20 @@
     );
   }
 
+  function updatePropertiesLayer(timeConstant: number) {
+    if (!audioEnabled || !audioContext) return;
+    const propertiesBus = voiceBuses.get("properties");
+    if (!propertiesBus) return;
+    propertiesBus.gain.cancelScheduledValues(audioContext.currentTime);
+    propertiesBus.gain.setTargetAtTime(
+      mixLevel("properties")
+        * propertiesLayerLevel()
+        * (transportLayerLevels.get("properties") ?? 1),
+      audioContext.currentTime,
+      timeConstant,
+    );
+  }
+
   function voiceOutput(channel: IntroMixChannel) {
     const master = masterOutput();
     if (!master || !audioContext) return;
@@ -471,10 +556,9 @@
     let bus = voiceBuses.get(channel);
     if (!bus) {
       bus = audioContext.createGain();
-      const sidechainLevel = channel === "identity" ? identityLayerLevel() : 1;
       bus.gain.setValueAtTime(
         mixLevel(channel)
-          * sidechainLevel
+          * channelLayerLevel(channel)
           * (transportLayerLevels.get(channel) ?? 1),
         audioContext.currentTime,
       );
@@ -492,10 +576,9 @@
     const now = audioContext.currentTime;
     masterGain?.gain.setTargetAtTime(introMix.master, now, 0.025);
     for (const [channel, bus] of voiceBuses) {
-      const sidechainLevel = channel === "identity" ? identityLayerLevel() : 1;
       bus.gain.setTargetAtTime(
         mixLevel(channel)
-          * sidechainLevel
+          * channelLayerLevel(channel)
           * (transportLayerLevels.get(channel) ?? 1),
         now,
         0.025,
@@ -618,12 +701,18 @@
     const height = rect.height;
     const entryStartDistance = -(window.innerHeight + height) * 0.5;
     const centerRadius = Math.max(18, height * 0.14);
+    const exitEndDistance = Math.max(window.innerHeight * 0.25, height * 0.65);
     return {
       distancePastCenter,
       height,
       entryStartDistance,
       centerRadius,
       progress: smoothRange(entryStartDistance, centerRadius, distancePastCenter),
+      exitOpacity: 1 - smoothRange(
+        centerRadius,
+        exitEndDistance,
+        distancePastCenter,
+      ),
     };
   }
 
@@ -644,6 +733,10 @@
     target.style.setProperty(
       "--scroll-distance",
       `${position.distancePastCenter.toFixed(1)}px`,
+    );
+    target.style.setProperty(
+      "--scroll-exit-opacity",
+      position.exitOpacity.toFixed(4),
     );
   }
 
@@ -693,6 +786,8 @@
       state.lastDistance = distancePastCenter;
       exposeFigureScrollPosition(target, state, position);
     }
+    stopShaderAnimation();
+    updatePropertiesLayer(0.025);
   }
 
   function playTrianglePercussion(
@@ -865,6 +960,7 @@
 
   function pulseSquare(beat: number) {
     squareBeat = beat;
+    if (propertiesLayerLevel() <= 0.001) return;
     playSquarePercussion(beat, centeredRhythmVolume(squareFigure));
   }
 
@@ -901,7 +997,13 @@
     if (step % 3 === 0) pulseSquare(step / 3);
 
     // Identity and value alternate across the same shared cycle.
-    if (step % 6 === 0) pulseLine(step === 0 ? "identity" : "value");
+    if (step % 6 === 0) {
+      pulseLine(step === 0 ? "identity" : "value");
+      if (autoScrolling && rhythmTick >= nextAutoScrollTick) {
+        advanceAutoScroll();
+        nextAutoScrollTick = rhythmTick + 24;
+      }
+    }
 
     // Enum makes one split at the midpoint of each two-loop phrase.
     if (rhythmTick % 24 === 13) {
@@ -955,12 +1057,9 @@
     transportLayerLevels.set(channel, level);
     const bus = voiceBuses.get(channel);
     if (!bus || !audioContext) return;
-    const sidechainLevel = channel === "identity"
-      ? Math.max(0.28, 1 - macroLayerPresence * 0.72)
-      : 1;
     bus.gain.cancelScheduledValues(audioContext.currentTime);
     bus.gain.setTargetAtTime(
-      mixLevel(channel) * sidechainLevel * level,
+      mixLevel(channel) * channelLayerLevel(channel) * level,
       audioContext.currentTime,
       timeConstant,
     );
@@ -970,6 +1069,9 @@
     transportRestoreGeneration += 1;
     transportState = "stopped";
     audioEnabled = false;
+    window.clearTimeout(dwellTimer);
+    dwellTimer = undefined;
+    dwellTarget = undefined;
     soundManager?.setEnabled(false);
     setScoreGain(0.0001, 0.08);
     stopRhythm();
@@ -1022,13 +1124,141 @@
     else stopTransport();
   }
 
+  function stopAutoScroll() {
+    autoScrolling = false;
+    nextAutoScrollTick = 0;
+    autoScrollAnchor = undefined;
+    autoScrollAnchorPasses = 0;
+    if (autoScrollFrame !== undefined) {
+      window.cancelAnimationFrame(autoScrollFrame);
+      autoScrollFrame = undefined;
+    }
+  }
+
+  function autoScrollTargets() {
+    if (!rhythmElement) return [];
+    const rhythmSelectors = [
+      ".lineFigure",
+      ".triangleFigure",
+      ".enumFigure",
+      ".squareFigure",
+    ].join(",");
+    const targets: Element[] = [
+      ...rhythmElement.querySelectorAll<HTMLElement>(rhythmSelectors),
+    ];
+    const macroCloud = document.querySelector<HTMLElement>(
+      '[data-range-layout="macro-cloud"]',
+    );
+    if (macroCloud) targets.push(macroCloud);
+    const environment = macroCloud?.querySelector<SVGGraphicsElement>(
+      '[aria-label="Environment"]',
+    );
+    if (environment) targets.push(environment);
+    const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    return targets
+      .map((element) => {
+        const bounds = element.getBoundingClientRect();
+        const macroGraphic = element === macroCloud
+          ? macroCloud.querySelector<SVGGraphicsElement>(".macroCloudGraphic")
+          : undefined;
+        const macroBounds = macroGraphic?.getBoundingClientRect();
+        const target = macroBounds
+          ? window.scrollY + macroBounds.top + macroBounds.height * (237 / 1_180) - window.innerHeight * 0.5
+          : window.scrollY + bounds.top + bounds.height * 0.5 - window.innerHeight * 0.5;
+        return {
+          element,
+          position: Math.min(maximumScroll, Math.max(0, target)),
+        };
+      })
+      .filter(({ position }, index, targets) => (
+        index === 0 || Math.abs(position - targets[index - 1].position) > 24
+      ));
+  }
+
+  function autoScrollPassesFor(element: Element) {
+    const macroCloud = document.querySelector('[data-range-layout="macro-cloud"]');
+    if (
+      element === triangleFigure
+      || element === enumFigure
+      || element === squareFigure
+      || element === macroCloud
+    ) return 2;
+    return 1;
+  }
+
+  function animateAutoScroll(target: number) {
+    if (autoScrollFrame !== undefined) window.cancelAnimationFrame(autoScrollFrame);
+    const start = window.scrollY;
+    const distance = target - start;
+    const startedAt = performance.now();
+    // Travel continuously for two complete Identity -> Value phrases.
+    const duration = subdivisionMilliseconds * 24;
+
+    const render = (timestamp: number) => {
+      if (!autoScrolling) return;
+      const progress = Math.min(1, (timestamp - startedAt) / duration);
+      // Keep a small non-zero velocity at each centered figure, then accelerate
+      // through the open distance before easing into the next sound anchor.
+      const eased = progress - 0.82 * Math.sin(progress * Math.PI * 2) / (Math.PI * 2);
+      window.scrollTo(0, start + distance * eased);
+      if (progress < 1) {
+        autoScrollFrame = window.requestAnimationFrame(render);
+      } else {
+        autoScrollFrame = undefined;
+        window.scrollTo(0, target);
+      }
+    };
+    autoScrollFrame = window.requestAnimationFrame(render);
+  }
+
+  function advanceAutoScroll() {
+    const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    if (window.scrollY >= maximumScroll - 1) {
+      stopAutoScroll();
+      return;
+    }
+    const targets = autoScrollTargets();
+    const centeredTarget = targets.find(({ element }) => element === autoScrollAnchor);
+    const centeredPasses = autoScrollAnchor
+      ? autoScrollPassesFor(autoScrollAnchor)
+      : 1;
+    if (centeredTarget && autoScrollAnchorPasses < centeredPasses) {
+      autoScrollAnchorPasses += 1;
+      const centeredDrift = autoScrollAnchorPasses % 2 === 0 ? 10 : -10;
+      animateAutoScroll(centeredTarget.position + centeredDrift);
+      return;
+    }
+
+    const nextTarget = targets.find(({ position }) => position > window.scrollY + 40);
+    if (nextTarget === undefined) {
+      stopAutoScroll();
+      return;
+    }
+    autoScrollAnchor = nextTarget.element;
+    autoScrollAnchorPasses = 1;
+    animateAutoScroll(nextTarget.position);
+  }
+
+  function toggleAutoScroll() {
+    if (autoScrolling) {
+      stopAutoScroll();
+      return;
+    }
+    autoScrolling = true;
+    nextAutoScrollTick = rhythmTick + 24;
+    advanceAutoScroll();
+  }
+
   onMount(() => {
     trackFigureAudioStates();
+    window.addEventListener("pointermove", trackNodeDwell, { passive: true });
     const stopTrackingLayout = layoutTracker?.observe(
       '[data-range-layout="range-rhythm"]',
       trackFigureAudioStates,
     );
     return () => {
+      window.removeEventListener("pointermove", trackNodeDwell);
+      window.clearTimeout(dwellTimer);
       stopTrackingLayout?.();
     };
   });
@@ -1050,6 +1280,7 @@
       const wasPresent = macroLayerPresence;
       macroLayerPresence = presence;
       updateIdentityLayer(presence > wasPresent ? 0.018 : 0.24);
+      updatePropertiesLayer(presence >= 0.9 ? 0.008 : 0.08);
     },
   ));
 
@@ -1099,6 +1330,7 @@
     const originLocation = context.getUniformLocation(program, "u_origin");
     const timeLocation = context.getUniformLocation(program, "u_time");
     const shapeLocation = context.getUniformLocation(program, "u_shape");
+    const opacityLocation = context.getUniformLocation(program, "u_opacity");
     const accentLocation = context.getUniformLocation(program, "u_accent");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0;
@@ -1158,6 +1390,10 @@
       context.uniform2f(originLocation, x, y);
       context.uniform1f(timeLocation, time);
       context.uniform1f(shapeLocation, shape);
+      context.uniform1f(
+        opacityLocation,
+        shape === 2 ? figureScrollPosition(squareFigure).exitOpacity : 1,
+      );
       context.drawArrays(context.TRIANGLES, 0, 6);
     };
 
@@ -1241,6 +1477,7 @@
   });
 
   onDestroy(() => {
+    stopAutoScroll();
     soundManager?.setEnabled(false);
     clearEnumVisuals();
     for (const oscillator of activeOscillators) {
@@ -1288,6 +1525,18 @@
   </div>
 
   <div class="rhythmAudioControl">
+    {#if dev}
+      <button
+        type="button"
+        class="autoScrollButton"
+        class:autoScrollRunning={autoScrolling}
+        aria-label={autoScrolling ? "Stop automatic scrolling" : "Start automatic scrolling"}
+        aria-pressed={autoScrolling}
+        onclick={toggleAutoScroll}
+      >
+        {autoScrolling ? "Stop auto" : "Auto-scroll"}
+      </button>
+    {/if}
     <button
       type="button"
       class="transportButton"
@@ -1464,6 +1713,11 @@
     margin: 30px 0 38px;
   }
 
+  .squareFigure {
+    opacity: var(--scroll-exit-opacity, 1);
+    will-change: opacity;
+  }
+
   .identityDetail + .functionIntro {
     margin-top: 20px;
   }
@@ -1544,7 +1798,32 @@
     z-index: 30;
     top: 20px;
     right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     pointer-events: none;
+  }
+
+  .autoScrollButton {
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid color-mix(in oklch, var(--ink), transparent 78%);
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--paper), transparent 6%);
+    color: color-mix(in oklch, var(--ink), transparent 18%);
+    font-family: var(--font-geist-mono), monospace;
+    font-size: 11px;
+    letter-spacing: 0.035em;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  .autoScrollButton:hover,
+  .autoScrollButton:focus-visible,
+  .autoScrollButton.autoScrollRunning {
+    border-color: color-mix(in oklch, var(--range), transparent 48%);
+    color: var(--range);
+    outline: none;
   }
 
   .transportButton {
@@ -1555,6 +1834,9 @@
     justify-content: center;
     gap: 8px;
     width: 82px;
+    min-width: 82px;
+    max-width: 82px;
+    flex: 0 0 82px;
     min-height: 36px;
     padding: 0 13px;
     border: 1px solid color-mix(in oklch, var(--range), transparent 70%);
@@ -1566,7 +1848,7 @@
     letter-spacing: 0.045em;
     cursor: pointer;
     pointer-events: auto;
-    box-shadow: 0 4px 14px color-mix(in oklch, var(--ink), transparent 92%);
+    box-shadow: none;
     transition:
       color 420ms cubic-bezier(0.22, 0.61, 0.36, 1),
       border-color 420ms cubic-bezier(0.22, 0.61, 0.36, 1),
@@ -1590,7 +1872,7 @@
   }
 
   .transportButton:hover {
-    box-shadow: 0 6px 18px color-mix(in oklch, var(--ink), transparent 88%);
+    box-shadow: none;
   }
 
   .transportButton:focus-visible,
@@ -1608,7 +1890,7 @@
   }
 
   .transportButton:focus-visible {
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--ink), transparent 82%);
+    box-shadow: none;
   }
 
   .transportGlyph {
@@ -1616,7 +1898,7 @@
     height: 7px;
     border-radius: 50%;
     background: white;
-    box-shadow: 0 0 10px color-mix(in oklch, white, transparent 35%);
+    box-shadow: none;
     transition:
       background 420ms cubic-bezier(0.22, 0.61, 0.36, 1),
       border-radius 420ms cubic-bezier(0.22, 0.61, 0.36, 1),
@@ -1626,7 +1908,7 @@
   .transportButton.transportRunning .transportGlyph {
     border-radius: 1px;
     background: var(--range);
-    box-shadow: 0 0 10px color-mix(in oklch, var(--range), transparent 35%);
+    box-shadow: none;
   }
 
   .shapeStage {

@@ -5,6 +5,9 @@ FROM oven/bun:1.3.14-alpine AS dependencies
 WORKDIR /app
 
 COPY Website/package.json Website/bun.lock ./
+# `sveltely` is a vendored file dependency. It must exist while Bun resolves
+# the frozen lockfile, before the later stage copies the rest of the Website.
+COPY Website/src/lib/frameworks/sveltely ./src/lib/frameworks/sveltely
 RUN bun install --frozen-lockfile
 
 FROM oven/bun:1.3.14-alpine AS build

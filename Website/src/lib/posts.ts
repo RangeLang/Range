@@ -105,6 +105,24 @@ export const posts: Post[] = [
 
 export const draftPosts: Post[] = [
   {
+    slug: "class-v-struct",
+    href: "/posts/class-v-struct",
+    previewHref: "/posts/class-v-struct?preview=range-draft",
+    category: "Observation",
+    cardTitle: "Class v. Struct",
+    cardDescription:
+      "The old argument is tired, but it keeps walking back into the room.",
+    description:
+      "Values should be understandable in isolation, and some things should keep a stable identity as they move through a system.",
+    palette: 9,
+    cardPalette: {
+      foreground: "rgb(33 25 18)",
+      mutedForeground: "rgb(82 69 57)",
+      background: "rgb(238 218 188)",
+      contrast: 12.4,
+    },
+  },
+  {
     slug: "intro-to-range-2",
     href: "/posts/intro-to-range-2",
     previewHref: "/posts/intro-to-range-2?preview=range-draft",

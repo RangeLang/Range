@@ -10,9 +10,15 @@
     createRangeLayoutTracker,
     RANGE_LAYOUT_TRACKER_CONTEXT,
   } from "$lib/layout/layout-tracker";
+  import {
+    createRangeOnboardingMachine,
+    RANGE_ONBOARDING_MACHINE_CONTEXT,
+  } from "$lib/interaction/onboarding-machine";
   import { postForPath, postImageUrl } from "$lib/posts";
   import Footer from "$lib/components/Footer.svelte";
+  import SiteHeader from "$lib/components/SiteHeader.svelte";
   import SoundOnboarding from "$lib/components/SoundOnboarding.svelte";
+  import "sveltely/style.css";
   import "../../app/globals.css";
 
   const siteTitle = "Range — An Applied Programming Language";
@@ -25,11 +31,16 @@
       ? `${activePost.cardTitle} — ${activePost.cardDescription}`
       : "Range — an applied programming language",
   );
+  let isHome = $derived(page.url.pathname === "/");
+  let isPreview = $derived(page.url.pathname.startsWith("/__preview/"));
+  let hasCompactHeader = $derived(page.url.pathname.startsWith("/posts/"));
 
   const soundManager = createRangeSoundManager();
   const layoutTracker = createRangeLayoutTracker();
+  const onboardingMachine = createRangeOnboardingMachine();
   setContext(RANGE_SOUND_MANAGER_CONTEXT, soundManager);
   setContext(RANGE_LAYOUT_TRACKER_CONTEXT, layoutTracker);
+  setContext(RANGE_ONBOARDING_MACHINE_CONTEXT, onboardingMachine);
   if (typeof window !== "undefined") {
     window.__rangeSoundManager = soundManager;
     window.__rangeLayoutTracker = layoutTracker;
@@ -102,7 +113,47 @@
 </svelte:head>
 
 <range-site-shell>
-  <SoundOnboarding />
-  {@render children()}
-  <Footer />
+  {#if !isPreview}
+    <SoundOnboarding />
+  {/if}
+  <range-site-content data-range-site-content>
+    {#if !isHome && !isPreview}
+      <div class="persistentSiteHeader" class:compact={hasCompactHeader}>
+        <SiteHeader />
+      </div>
+    {/if}
+    <range-route-view>
+      {@render children()}
+    </range-route-view>
+    {#if !isPreview}
+      <Footer />
+    {/if}
+  </range-site-content>
 </range-site-shell>
+
+<style>
+  .persistentSiteHeader {
+    --page-gutter: 24px;
+    width: min(1180px, calc(100% - (2 * var(--page-gutter))));
+    margin: 0 auto;
+    padding-top: 48px;
+    transition: width 760ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .persistentSiteHeader.compact {
+    width: min(820px, calc(100% - (2 * var(--page-gutter))));
+  }
+
+  @media (max-width: 640px) {
+    .persistentSiteHeader {
+      --page-gutter: 14px;
+      padding-top: 28px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .persistentSiteHeader {
+      transition: none;
+    }
+  }
+</style>

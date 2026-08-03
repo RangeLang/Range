@@ -38,7 +38,8 @@
 }
 
 range-site-shell,
-range-home-page,
+range-site-content,
+range-route-view,
 range-benchmarks-page,
 range-benchmark-page,
 range-benchmark-chart,
@@ -48,8 +49,18 @@ range-site-footer {
   display: block;
 }
 
+range-site-shell,
+range-site-content,
+range-route-view {
+  min-height: 100vh;
+}
+
 html {
+  height: auto;
+  min-height: 100%;
   background: var(--paper);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 html.range-layout-pending body {
@@ -57,17 +68,21 @@ html.range-layout-pending body {
 }
 
 body {
+  height: auto;
   margin: 0;
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-range-sans);
+  min-height: 100vh;
+  overflow: visible;
+  user-select: text;
 }
 
 main {
   --page-gutter: 24px;
   width: min(1180px, calc(100% - (2 * var(--page-gutter))));
   margin: 0 auto;
-  padding: 48px 0 36px;
+  padding: 0 0 36px;
 }
 
 .pageHeader {
@@ -163,18 +178,31 @@ range-typed-text[data-collapsing] > [data-collapse-content] {
   outline: none;
 }
 
-.landingPage {
+[data-range-home-page] {
   min-height: 100vh;
-}
-
-.landingSequence {
+  padding-top: 48px;
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
   --range-index-gap: 10px;
 }
 
-.landingSequence > range-scale {
+html[data-range-onboarding="active"] [data-range-site-content] {
+  opacity: 0;
+  filter: blur(18px);
+  transform: scale(1.018);
+}
+
+html[data-range-onboarding="revealing"] [data-range-site-content] {
+  position: relative;
+  z-index: 1001;
+  transform-origin: center;
+  will-change: opacity, filter, transform;
+  opacity: var(--range-homepage-opacity, 0);
+  filter: blur(var(--range-homepage-blur, 18px));
+  transform: scale(var(--range-homepage-scale, 1.018));
+}
+
+[data-range-home-page] > range-scale {
+  position: absolute;
   z-index: 4;
   pointer-events: auto;
   touch-action: none;
@@ -243,9 +271,9 @@ range-spline-nav a:focus-visible {
 .landingHero {
   display: grid;
   align-content: center;
+  justify-items: start;
   min-height: 520px;
   padding: 80px 0;
-  border-bottom: 1px solid var(--line);
 }
 
 .landingHero h1 {

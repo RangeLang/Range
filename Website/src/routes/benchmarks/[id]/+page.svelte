@@ -2,14 +2,12 @@
   import { formatMemory } from "$lib/benchmarks";
   import Chart from "$lib/components/Chart.svelte";
   import Procedure from "$lib/components/Procedure.svelte";
-  import SiteHeader from "$lib/components/SiteHeader.svelte";
 
   let { data: pageData } = $props();
 </script>
 
 <range-benchmark-page>
   <main>
-    <SiteHeader />
     <header class="benchmarkDetailHeader"><a class="backLink" href="/benchmarks">Benchmarks</a><div><p>{pageData.category.name}</p><h1>{pageData.subcategory.name} · {pageData.leaf.name}</h1><span>{pageData.leaf.description}</span></div></header>
     <section class="benchmarkDetailChart" aria-label="Benchmark comparison"><Chart benchmark={pageData.benchmark} id={`benchmark-${pageData.leaf.id}`} /></section>
     <section class="measurementsSection" aria-labelledby="measurements-title">

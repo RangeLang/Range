@@ -7,6 +7,10 @@ const config = {
     files: {
       assets: "public",
     },
+    alias: {
+      sveltely: "src/lib/frameworks/sveltely",
+      "sveltely/*": "src/lib/frameworks/sveltely/*",
+    },
     version: {
       pollInterval: 10_000,
     },

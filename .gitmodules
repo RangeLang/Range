@@ -1,0 +1,3 @@
+[submodule "Website/src/lib/frameworks/sveltely"]
+	path = Website/src/lib/frameworks/sveltely
+	url = https://github.com/GoldenWebNet/Sveltely.git

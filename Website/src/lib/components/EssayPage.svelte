@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import SiteHeader from "$lib/components/SiteHeader.svelte";
   import ArticleHeader from "$lib/components/ArticleHeader.svelte";
 
   let {
@@ -48,8 +47,6 @@
 
 <range-essay-page>
   <main class="essayPage">
-    <SiteHeader />
-
     <article>
       <ArticleHeader
         {title}

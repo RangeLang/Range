@@ -1,6 +1,5 @@
 <script lang="ts">
   import CodabilitySheet from "$lib/components/CodabilitySheet.svelte";
-  import SiteHeader from "$lib/components/SiteHeader.svelte";
 </script>
 
 <svelte:head>
@@ -18,8 +17,6 @@
 </svelte:head>
 
 <main class="codabilityArticle">
-  <SiteHeader />
-
   <article>
     <CodabilitySheet />
   </article>

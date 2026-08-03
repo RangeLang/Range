@@ -2,7 +2,6 @@
   import { benchmarkFromLeaf, data } from "$lib/benchmarks";
   import Chart from "$lib/components/Chart.svelte";
   import Procedure from "$lib/components/Procedure.svelte";
-  import SiteHeader from "$lib/components/SiteHeader.svelte";
 
   let { data: pageData } = $props();
   let count = $derived(pageData.active.subcategories.reduce((sum: number, item: any) => sum + item.leaves.length, 0));
@@ -10,7 +9,6 @@
 
 <range-benchmarks-page>
   <main>
-    <SiteHeader />
     <header class="pageHeader"><h1><span>Range</span><range-typed-text text="Performance" delay="300" interval="45">Performance</range-typed-text></h1></header>
     <section class="benchmarkProject" aria-labelledby="benchmark-project-title">
       <div class="sectionHeader"><h2 id="benchmark-project-title">Benchmark suite</h2><div class="benchmarkHeaderMeta"><p class="dateLabel">{new Date(data.generatedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}</p></div></div>

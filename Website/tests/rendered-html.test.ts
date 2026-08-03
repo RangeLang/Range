@@ -71,6 +71,7 @@ describe("SvelteKit routes", () => {
     expect(html).toContain("a love letter to electrons, logic and abstraction");
     expect(html).toContain("<range-spline-nav");
     expect(html).toContain("<range-scale");
+    expect(html).toContain('data-range-home-page="true"');
     expect(html).toContain('class="landingLowerScale"');
     expect(html).toContain('<range-scale reversed=""');
     expect(html).toContain("<range-optical-guide");
@@ -315,6 +316,44 @@ describe("SvelteKit routes", () => {
 
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe("/");
+  });
+
+  test("opens the sound sheet from mouse hover into a concrete shader sphere", async () => {
+    const [onboarding, shader] = await Promise.all([
+      readFile(
+        new URL(
+          "../src/lib/components/SoundOnboarding.svelte",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../src/lib/components/OnboardingSphereShader.svelte",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ]);
+
+    expect(onboarding).toContain("onpointerenter={unlockFromHover}");
+    expect(onboarding).toContain('if (event.pointerType !== "mouse") return;');
+    expect(onboarding).toContain("onpointerdown={unlockFromPointer}");
+    expect(onboarding).toContain("class:exploring={phase === \"exploring\"");
+    expect(onboarding).toContain("concreteness={concreteness}");
+    expect(onboarding).not.toContain('class="torus"');
+    expect(onboarding).not.toContain('class="connector"');
+    expect(onboarding).not.toContain('class="handle"');
+    expect(shader).toContain('data-shader="onboarding-sphere"');
+    expect(shader).toContain("float glitter(vec2 point");
+    expect(shader).toContain("uniform vec2 u_pointer");
+    expect(shader).toContain("uniform float u_concreteness");
+    expect(shader).toContain("float reveal = 1.0 - smoothstep");
+    expect(shader).toContain("vec2 glassDisplacement = glassField");
+    expect(shader).toContain("vec2 underPoint = spherePoint + glassDisplacement");
+    expect(shader).toContain("float glassFresnel = pow");
+    expect(shader).toContain("float glassSpecular = pow");
+    expect(shader).toContain("mix(abstractSurface, concreteSurface, concreteness)");
   });
 
   test("retires the former Updates namespace", async () => {
@@ -1157,6 +1196,7 @@ test("attaches the lower scale to the leading title stem", async () => {
   expect(lowerScaleRule).toContain("touch-action: none");
   expect(lowerScaleRule).toContain("transform: scaleY(-1)");
   expect(guide).toContain("#titleInkBounds(element)");
+  expect(guide).toContain('this.closest("[data-range-home-page]")');
   expect(guide).toContain(
     "const guide = upperScale.getBoundingClientRect().left",
   );

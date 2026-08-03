@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "vite dev",
+    "performance": "vite dev --host 127.0.0.1 --open /performance",
     "build": "vite build",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "generate:og": "bun run build && bun scripts/generate-post-og-images.ts",
@@ -14,9 +15,11 @@
     "test": "bun run build && bun test tests"
   },
   "dependencies": {
+    "@lucide/svelte": "^0.563.1",
     "d3-hierarchy": "3.1.2",
     "d3-voronoi-map": "2.1.1",
-    "drizzle-orm": "0.45.2"
+    "drizzle-orm": "0.45.2",
+    "sveltely": "file:src/lib/frameworks/sveltely"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "5.5.7",

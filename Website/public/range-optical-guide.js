@@ -29,7 +29,7 @@ class RangeOpticalGuide extends HTMLElement {
     this.#canvas = document.createElement("canvas");
     this.#context = this.#canvas.getContext("2d");
     this.#resizeObserver = new ResizeObserver(() => this.#schedule());
-    const sequence = this.closest(".landingSequence");
+    const sequence = this.closest("[data-range-home-page]");
     if (sequence) this.#resizeObserver.observe(sequence);
     document.fonts.ready.then(() => this.#schedule());
     this.#align();
@@ -134,7 +134,7 @@ class RangeOpticalGuide extends HTMLElement {
   }
 
   #align() {
-    const sequence = this.closest(".landingSequence");
+    const sequence = this.closest("[data-range-home-page]");
     const reference = sequence?.querySelector(".rangeTitleWord");
     const wordmark = sequence?.querySelector(".landingWordmark .rangeWord");
     const copy = sequence?.querySelector(".landingHero p");
