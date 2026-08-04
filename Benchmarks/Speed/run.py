@@ -23,12 +23,12 @@ BENCH = ROOT / "Benchmarks" / "Speed"
 BUILD = BENCH / ".build"
 RESULTS = BENCH / "results"
 SITE_RESULTS = ROOT / "Website" / "public" / "benchmarks.json"
-SEED_MANIFEST = ROOT / "RangeCompiler" / "Bootstrap" / "RangeCompilerSeed.json"
+BOOTSTRAP_MANIFEST = ROOT / "RangeCompiler" / "Bootstrap" / "RangeCompilerBootstrap.json"
 STAGE2_COMPILER = (
-    ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "stage2" / "RangeCompiler"
+    ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "current" / "RangeCompiler"
 )
 STAGE3_COMPILER = (
-    ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "stage3" / "RangeCompiler"
+    ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "reproduced" / "RangeCompiler"
 )
 ITERATIONS = int(os.environ.get("N", "1000000"))
 RUNS = int(os.environ.get("RUNS", "5"))
@@ -1956,7 +1956,7 @@ def prepare_range_project(case: BenchmarkCase) -> Path:
 
 
 def range_runtime_inputs() -> list[str]:
-    manifest = json.loads(SEED_MANIFEST.read_text(encoding="utf-8"))
+    manifest = json.loads(BOOTSTRAP_MANIFEST.read_text(encoding="utf-8"))
     return [str(ROOT / item["path"]) for item in manifest["runtimeSources"]]
 
 
@@ -2141,7 +2141,7 @@ def build_case(
             [str(native_compiler), "emit-llvm", str(range_source), str(range_llvm)],
         )
     else:
-        print(f"{case.name} Range: no byte-identical Stage 2/3 compiler; using pinned seed")
+        print(f"{case.name} Range: no byte-identical current build/3 compiler; using pinned bootstrap")
         emitted = timed_setup(
             f"{case.name} Range emit",
             [str(range_cli), "emit-llvm", str(range_source), str(range_llvm)],

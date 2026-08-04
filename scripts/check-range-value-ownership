@@ -5,14 +5,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Source the candidate harness so this checkpoint uses its canonical source
 # discovery, value ownership fixture writer, compiler invocation, and LLVM helpers.
 source "$SCRIPT_DIR/check-range-compiler-candidate"
-source "$SCRIPT_DIR/resolve-range-stage2-compiler"
+source "$SCRIPT_DIR/resolve-range-compiler-build"
 
-# Value ownership is the tight compiler-development loop. Its Stage 2 artifact is
+# Value ownership is the tight compiler-development loop. Its current build artifact is
 # deliberately disposable and fast to link; optimized/LTO artifacts remain the
 # responsibility of smoke, candidate, fixed-point, and promotion gates.
-RANGE_STAGE2_PROFILE="development"
-SEED_COMPILER_OPTIMIZATION="-O2"
-SEED_COMPILER_LTO="-flto=thin"
+RANGE_BUILD_PROFILE="development"
+BOOTSTRAP_COMPILER_OPTIMIZATION="-O2"
+BOOTSTRAP_COMPILER_LTO="-flto=thin"
 COMPILER_OPTIMIZATION="-O0"
 COMPILER_LTO="-fno-lto"
 
@@ -24,11 +24,11 @@ Usage:
   scripts/check-range-value-ownership --help
 
 DIR defaults to RangeCompiler/Sources/Compiler. The command resolves a
-content-addressed development Stage 2 compiler (-O0, no LTO) for the current
-accepted seed, runtime, and compiler sources, then validates only the ordinary
+content-addressed development current build compiler (-O0, no LTO) for the current
+accepted bootstrap, runtime, and compiler sources, then validates only the ordinary
 value-ownership boundary-forward-mixed case.
 The controls mode runs the complete neighboring value-ownership positive and
-negative fixture set against the same cached Stage 2 compiler. Both modes first verify
+negative fixture set against the same cached current build compiler. Both modes first verify
 the focused @project scalar-default and @storage/@literal fixtures against
 that compiler.
 USAGE
@@ -45,7 +45,7 @@ check_project_defaults_fixture() {
     local actual_status
 
     [[ -f "$fixture" ]] || fail "missing project-defaults fixture: $relative"
-    if "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
+    if "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
         actual_status=0
     else
         actual_status=$?
@@ -66,7 +66,7 @@ check_project_integer_lowering() {
     local llvm="$WORK_ROOT/project-defaults-$label.ll"
 
     [[ -f "$fixture" ]] || fail "missing project-defaults lowering fixture: $relative"
-    "$STAGE2_EXECUTABLE" emit-llvm "$fixture" "$llvm" \
+    "$BUILD_EXECUTABLE" emit-llvm "$fixture" "$llvm" \
         || fail "ProjectDefaults $label did not emit LLVM"
     /usr/bin/grep -Fq "$expected_instruction" "$llvm" \
         || fail "ProjectDefaults $label omitted expected lowering: $expected_instruction"
@@ -80,7 +80,7 @@ check_target_pointer_bits_runtime() {
     local executable="$WORK_ROOT/project-defaults-target-pointer-bits-runtime"
     local actual_status
 
-    "$STAGE2_EXECUTABLE" emit-llvm "$fixture" "$llvm" \
+    "$BUILD_EXECUTABLE" emit-llvm "$fixture" "$llvm" \
         || fail "ProjectDefaults target-pointer-bits-runtime did not emit LLVM"
     /usr/bin/grep -Fq 'call i32 @targetPointerBits()' "$llvm" \
         || fail "ProjectDefaults target-pointer-bits-runtime omitted the builtin call"
@@ -105,7 +105,7 @@ check_unregistered_string_reads_rejected() {
         output="$WORK_ROOT/$(/usr/bin/basename "$relative").out"
         error="$WORK_ROOT/$(/usr/bin/basename "$relative").err"
         actual_status=0
-        "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
             || actual_status=$?
         [[ "$actual_status" -eq 65 && ! -s "$error" ]] \
             || fail "$relative rejected at the wrong boundary"
@@ -123,7 +123,7 @@ check_range_native_project_macro() {
     local error="$WORK_ROOT/project-defaults-range-native.err"
     local integer_count bool_count override_integer_count override_bool_count
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "Range-native project macro did not compile"
     [[ ! -s "$error" ]] || fail "Range-native project macro wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1' "$output" \
@@ -138,7 +138,7 @@ check_range_native_project_macro() {
     bool_count="$(/usr/bin/grep -F -c $'name=bool\tmemberKind=state\ttype=Bool' "$output" || true)"
     [[ "$integer_count" -eq 1 && "$bool_count" -eq 1 ]] \
         || fail "Range-native project macro did not expand exactly one integer and one bool default"
-    "$STAGE2_EXECUTABLE" compile "$override_fixture" > "$override_output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$override_fixture" > "$override_output" 2> "$error" \
         || fail "Range-native project override did not compile"
     [[ ! -s "$error" ]] || fail "Range-native project override wrote stderr"
     /usr/bin/grep -Fq $'projectDefaults\tvalid=true\ttargetPointerBits=64\tintegerBits=4\tintegerOverridden=true\tboolOverridden=false' "$override_output" \
@@ -158,7 +158,7 @@ check_removed_for_statement_rejected() {
     local error="$WORK_ROOT/control-flow-removed-for.err"
     local actual_status
 
-    if "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
+    if "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
         actual_status=0
     else
         actual_status=$?
@@ -184,7 +184,7 @@ check_macro_environment() {
     local output="$WORK_ROOT/macro-environment.out"
     local error="$WORK_ROOT/macro-environment.err"
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "single-binding macro environment did not compile"
     [[ ! -s "$error" ]] || fail "single-binding macro environment wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1\teventCount=1' "$output" \
@@ -201,7 +201,7 @@ check_non_generic_stored_assignment() {
     local output="$WORK_ROOT/macro-non-generic-stored-assignment.out"
     local error="$WORK_ROOT/macro-non-generic-stored-assignment.err"
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "non-generic stored Assignment did not compile"
     [[ ! -s "$error" ]] || fail "non-generic stored Assignment wrote stderr"
     /usr/bin/grep -Fq $'typedSyntax\tvalid=true\tidentityScope=pathStable,pathlessSnapshotLocal\tfileCount=1\tsyntaxCount=4\tdeclarationCount=2\tmemberCount=2\tfunctionCount=0\tparameterCount=0\tgenericParameterCount=0' "$output" \
@@ -219,7 +219,7 @@ check_block_value_shape_identity() {
     local error="$WORK_ROOT/block-value-shape-identity.err"
     local shape
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "Block value/shape identity fixture did not compile"
     [[ ! -s "$error" ]] || fail "Block value/shape identity fixture wrote stderr"
     /usr/bin/grep -Fq $'typedSyntax\tvalid=true' "$output" \
@@ -244,7 +244,7 @@ check_block_source_layout() {
     local output="$WORK_ROOT/block-source-layout.out"
     local error="$WORK_ROOT/block-source-layout.err"
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "Block source-layout fixture did not compile"
     [[ ! -s "$error" ]] || fail "Block source-layout fixture wrote stderr"
     /usr/bin/grep -Fq $'typedSyntax\tvalid=true\tidentityScope=pathStable,pathlessSnapshotLocal\tfileCount=1\tsyntaxCount=8\tdeclarationCount=1\tmemberCount=0\tfunctionCount=1\tparameterCount=0\tgenericParameterCount=0\ttypeReferenceCount=0\tslotCount=2\tslotOccurrenceCount=3\tbodyNodeCount=7\tbodyEdgeCount=7\tsourceGapCount=4' "$output" \
@@ -279,7 +279,7 @@ check_postfix_zero_or_one_occurrence() {
     local output="$WORK_ROOT/postfix-zero-or-one-occurrence.out"
     local error="$WORK_ROOT/postfix-zero-or-one-occurrence.err"
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "postfix zero-or-one occurrence fixture did not compile"
     [[ ! -s "$error" ]] || fail "postfix zero-or-one occurrence fixture wrote stderr"
     /usr/bin/grep -Fq $'typedSyntax\tvalid=true' "$output" \
@@ -297,7 +297,7 @@ check_legacy_macro_modifiers_rejected() {
     local actual_status
 
     for modifier in Open Closed; do
-        if "$STAGE2_EXECUTABLE" compile "$REPO_ROOT/Testing/Macros/Fail/Legacy${modifier}MacroModifier.range" > "$output" 2> "$error"; then
+        if "$BUILD_EXECUTABLE" compile "$REPO_ROOT/Testing/Macros/Fail/Legacy${modifier}MacroModifier.range" > "$output" 2> "$error"; then
             actual_status=0
         else
             actual_status=$?
@@ -317,7 +317,7 @@ check_legacy_environment_expand_rejected() {
     local error="$WORK_ROOT/macro-legacy-environment-expand.err"
     local actual_status
 
-    if "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
+    if "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
         actual_status=0
     else
         actual_status=$?
@@ -339,7 +339,7 @@ check_macro_result_values() {
     local application_output="$WORK_ROOT/macro-application-value.out"
     local error="$WORK_ROOT/macro-result.err"
 
-    "$STAGE2_EXECUTABLE" compile "$recursive_fixture" > "$recursive_output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$recursive_fixture" > "$recursive_output" 2> "$error" \
         || fail "recursive macro result did not compile"
     [[ ! -s "$error" ]] || fail "recursive macro result wrote stderr"
     /usr/bin/grep -Fq $'macroResult\trow=0\tinvocationRow=0\tapplicationRow=0\tkind=3' "$recursive_output" \
@@ -355,7 +355,7 @@ check_macro_result_values() {
     /usr/bin/grep -Fq $'childCount=0\tparentRow=2\tordinal=0' "$recursive_output" \
         || fail "recursive macro result lost its scalar leaf position"
 
-    "$STAGE2_EXECUTABLE" compile "$branch_fixture" > "$branch_output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$branch_fixture" > "$branch_output" 2> "$error" \
         || fail "branch-join macro result did not compile"
     [[ ! -s "$error" ]] || fail "branch-join macro result wrote stderr"
     /usr/bin/grep -Fq $'macroGraphGeneratedMember\trow=0\tkind=member' "$branch_output" \
@@ -363,7 +363,7 @@ check_macro_result_values() {
     /usr/bin/grep -Fq $'macroResult\trow=0\tinvocationRow=0\tapplicationRow=1\tkind=3' "$branch_output" \
         || fail "branch-join macro did not pass its result through the function boundary"
 
-    "$STAGE2_EXECUTABLE" compile "$application_fixture" > "$application_output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$application_fixture" > "$application_output" 2> "$error" \
         || fail "Macro.Application.value fixture did not compile"
     [[ ! -s "$error" ]] || fail "Macro.Application.value fixture wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2' "$application_output" \
@@ -380,7 +380,7 @@ check_macro_generic_boundary_materialization() {
     local output="$WORK_ROOT/macro-generic-boundary-materialization.out"
     local error="$WORK_ROOT/macro-generic-boundary-materialization.err"
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "generic compile-time boundary materialization did not compile"
     [[ ! -s "$error" ]] || fail "generic compile-time boundary materialization wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1' "$output" \
@@ -399,7 +399,7 @@ check_macro_parenthesized_boundary_rejection() {
     local output="$WORK_ROOT/macro-parenthesized-boundary-value.out"
     local error="$WORK_ROOT/macro-parenthesized-boundary-value.err"
 
-    if "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
+    if "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
         fail "parenthesized compile-time boundary value unexpectedly compiled"
     fi
     [[ ! -s "$error" ]] || fail "parenthesized compile-time boundary rejection wrote stderr"
@@ -415,14 +415,14 @@ check_canonical_target_members() {
     local error="$WORK_ROOT/macro-canonical-target-members.err"
     local actual_status
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "canonical target members macro did not compile"
     [[ ! -s "$error" ]] || fail "canonical target members macro wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1' "$output" \
         || fail "canonical target members macro did not execute through one environment"
     /usr/bin/grep -Fq $'name=canonicalTargetMembersWorked\tmemberKind=let\ttype=Int' "$output" \
         || fail "canonical target members macro did not observe the deferred member collection"
-    if "$STAGE2_EXECUTABLE" compile "$lowercase_fixture" > "$output" 2> "$error"; then
+    if "$BUILD_EXECUTABLE" compile "$lowercase_fixture" > "$output" 2> "$error"; then
         actual_status=0
     else
         actual_status=$?
@@ -439,7 +439,7 @@ check_value_relationship_selection() {
     local output="$WORK_ROOT/macro-value-relationship-selection.out"
     local error="$WORK_ROOT/macro-value-relationship-selection.err"
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "value relationship selection macro did not compile"
     [[ ! -s "$error" ]] || fail "value relationship selection macro wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2\tcapabilityHandleCount=2' "$output" \
@@ -456,7 +456,7 @@ check_value_relationship_registration() {
     local output="$WORK_ROOT/macro-value-relationship-registration.out"
     local error="$WORK_ROOT/macro-value-relationship-registration.err"
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "value relationship registration macro did not compile"
     [[ ! -s "$error" ]] || fail "value relationship registration macro wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2' "$output" \
@@ -544,7 +544,7 @@ check_error_capability_registration() {
     write_error_capability_bundle "$pass_bundle" "$pass_fixture"
     write_error_capability_bundle "$missing_bundle" "$missing_fixture"
 
-    "$STAGE2_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
+    "$BUILD_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
         || fail "Core @error capability did not compile: $(/usr/bin/head -n 1 "$pass_output")"
     [[ ! -s "$pass_error" ]] || fail "Core @error capability wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2' "$pass_output" \
@@ -552,7 +552,7 @@ check_error_capability_registration() {
     [[ "$(/usr/bin/grep -Ec '^macroContribution\t' "$pass_output")" -eq 0 ]] \
         || fail "validation-only @error unexpectedly emitted a graph contribution"
 
-    if "$STAGE2_EXECUTABLE" compile "$missing_bundle" > "$missing_output" 2> "$missing_error"; then
+    if "$BUILD_EXECUTABLE" compile "$missing_bundle" > "$missing_output" 2> "$missing_error"; then
         actual_status=0
     else
         actual_status=$?
@@ -622,7 +622,7 @@ check_compiler_registration() {
     write_compiler_registration_bundle "$pass_bundle" "$pass_fixture"
     write_compiler_registration_bundle "$missing_bundle" "$missing_fixture"
 
-    "$STAGE2_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
+    "$BUILD_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
         || fail "Core compiler registration did not compile: $(/usr/bin/head -n 1 "$pass_output")"
     [[ ! -s "$pass_error" ]] || fail "Core compiler registration wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=3' "$pass_output" \
@@ -642,7 +642,7 @@ check_compiler_registration() {
         || fail "@phase did not return a registration containing its usage function target"
 
     actual_status=0
-    "$STAGE2_EXECUTABLE" compile "$missing_bundle" > "$missing_output" 2> "$missing_error" \
+    "$BUILD_EXECUTABLE" compile "$missing_bundle" > "$missing_output" 2> "$missing_error" \
         || actual_status=$?
     [[ "$actual_status" -eq 65 && ! -s "$missing_error" ]] \
         || fail "@compiler missing-phase control rejected at the wrong boundary"
@@ -701,7 +701,7 @@ check_hashable_function_synthesis() {
     write_hashable_bundle "$pass_bundle" "$pass_fixture"
     write_hashable_bundle "$missing_bundle" "$missing_fixture"
 
-    "$STAGE2_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
+    "$BUILD_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
         || fail "Core @hashable function synthesis did not compile: $(/usr/bin/head -n 1 "$pass_output")"
     [[ ! -s "$pass_error" ]] || fail "Core @hashable function synthesis wrote stderr"
     /usr/bin/grep -Eq $'macroGraphGeneratedFunction\trow=0\tkind=function\townerSyntaxID=[0-9]+\tplacement=1.*\tname=hash\treturnType=Int' "$pass_output" \
@@ -710,7 +710,7 @@ check_hashable_function_synthesis() {
         || fail "@hashable generated declarations other than hash"
 
     actual_status=0
-    "$STAGE2_EXECUTABLE" compile "$missing_bundle" > "$missing_output" 2> "$missing_error" \
+    "$BUILD_EXECUTABLE" compile "$missing_bundle" > "$missing_output" 2> "$missing_error" \
         || actual_status=$?
     [[ "$actual_status" -eq 65 && ! -s "$missing_error" ]] \
         || fail "@hashable missing-id control rejected at the wrong boundary"
@@ -803,14 +803,14 @@ check_many_relationship_registration() {
     /bin/cat "$fixture" >> "$bundle"
     /usr/bin/printf '\n' >> "$bundle"
 
-    "$STAGE2_EXECUTABLE" compile "$bundle" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$bundle" > "$output" 2> "$error" \
         || fail "Core many and contents registrations did not compile: $(/usr/bin/head -n 1 "$output")"
     [[ ! -s "$error" ]] || fail "Core many and contents registrations wrote stderr"
-    "$STAGE2_EXECUTABLE" compile "$bundle" > "$repeat_output" 2> "$repeat_error" \
+    "$BUILD_EXECUTABLE" compile "$bundle" > "$repeat_output" 2> "$repeat_error" \
         || fail "repeated Core many and contents registrations did not compile: $(/usr/bin/head -n 1 "$repeat_output")"
     [[ ! -s "$repeat_error" ]] || fail "repeated Core many and contents registrations wrote stderr"
     /usr/bin/sed '1s/compilerMacroSnapshot/compilerMacroGraph/' "$bundle" > "$plotter_bundle"
-    "$STAGE2_EXECUTABLE" compile "$plotter_bundle" > "$plotter_output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$plotter_bundle" > "$plotter_output" 2> "$error" \
         || fail "Core relationship registrations did not project into the macro graph: $(/usr/bin/head -n 1 "$plotter_output")"
     [[ ! -s "$error" ]] || fail "Core relationship macro graph wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true' "$output" \
@@ -867,7 +867,7 @@ check_enum_parameter_materialization() {
 
     [[ -f "$fixture" ]] \
         || fail "missing enum parameter materialization fixture"
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "enum parameter materialization fixture did not compile"
     [[ ! -s "$error" ]] \
         || fail "enum parameter materialization fixture wrote stderr"
@@ -885,7 +885,7 @@ check_block_relationship_reification() {
 
     [[ -f "$fixture" ]] \
         || fail "missing block relationship reification fixture"
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "block relationship reification fixture did not compile"
     [[ ! -s "$error" ]] \
         || fail "block relationship reification fixture wrote stderr"
@@ -912,7 +912,7 @@ check_duplicate_block_form_rejected() {
 
     [[ -f "$fixture" ]] \
         || fail "missing duplicate block-form fixture"
-    if "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
+    if "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
         actual_exit=0
     else
         actual_exit=$?
@@ -933,7 +933,7 @@ check_collection_closure_execution() {
     local output="$WORK_ROOT/macro-collection-closure-execution.out"
     local error="$WORK_ROOT/macro-collection-closure-execution.err"
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "typed collection closure execution did not compile"
     [[ ! -s "$error" ]] || fail "typed collection closure execution wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1' "$output" \
@@ -948,7 +948,7 @@ check_inline_mapped_syntax() {
     local output="$WORK_ROOT/macro-inline-mapped-syntax.out"
     local error="$WORK_ROOT/macro-inline-mapped-syntax.err"
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "inline mapped syntax did not compile"
     [[ ! -s "$error" ]] || fail "inline mapped syntax wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1' "$output" \
@@ -968,7 +968,7 @@ check_stored_member_defaults() {
     local syntax_output="$WORK_ROOT/member-stored-member-defaults.out"
     local syntax_error="$WORK_ROOT/member-stored-member-defaults.err"
 
-    "$STAGE2_EXECUTABLE" compile "$syntax_fixture" > "$syntax_output" 2> "$syntax_error" \
+    "$BUILD_EXECUTABLE" compile "$syntax_fixture" > "$syntax_output" 2> "$syntax_error" \
         || fail "stored-member default syntax did not compile"
     [[ ! -s "$syntax_error" ]] || fail "stored-member default syntax wrote stderr"
     /usr/bin/grep -Fq $'name=count\tnameStart=' "$syntax_output" \
@@ -983,7 +983,7 @@ check_stored_member_defaults() {
         && /usr/bin/grep -Fq $'type=String\ttypeStart=' "$syntax_output" \
         && /usr/bin/grep -Fq $'value=\tvalueStart=-1\tvalueEnd=-1' "$syntax_output" \
         || fail "stored let without an initializer did not retain an absent default"
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "stored-member defaults did not compile"
     [[ ! -s "$error" ]] || fail "stored-member defaults wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=3\tcapabilityHandleCount=3' "$output" \
@@ -1018,7 +1018,7 @@ check_coding_core_surface() {
         [[ -f "$REPO_ROOT/$source_file" ]] || fail "missing Range-authored coding source: $source_file"
     done
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "Range-authored coding core surface did not compile"
     [[ ! -s "$error" ]] || fail "Range-authored coding core surface wrote stderr"
     /usr/bin/grep -Fq $'typedSyntax\tvalid=true' "$output" \
@@ -1045,7 +1045,7 @@ check_codable_construct_collection() {
     local output="$WORK_ROOT/macro-codable-construct-collection.out"
     local error="$WORK_ROOT/macro-codable-construct-collection.err"
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "construct-attached Codable collection did not compile"
     [[ ! -s "$error" ]] || fail "construct-attached Codable collection wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=3\tcapabilityHandleCount=3' "$output" \
@@ -1096,7 +1096,7 @@ check_inline_core_codable() {
     /bin/cp "$fixture" "$bundle"
     /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/Macro/Codable.range' >> "$bundle"
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" >> "$bundle"
-    "$STAGE2_EXECUTABLE" compile "$bundle" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$bundle" > "$output" 2> "$error" \
         || fail "actual inline Core Codable did not compile"
     [[ ! -s "$error" ]] || fail "actual inline Core Codable wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1' "$output" \
@@ -1116,7 +1116,7 @@ check_codable_composite_atomic_rollback() {
     local output="$WORK_ROOT/macro-codable-composite-atomic-rollback.out"
     local error="$WORK_ROOT/macro-codable-composite-atomic-rollback.err"
 
-    if "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
+    if "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
         fail "malformed second Codable body unexpectedly compiled"
     fi
     [[ ! -s "$error" ]] || fail "Codable atomic rollback wrote stderr"
@@ -1139,7 +1139,7 @@ check_typed_parameter_defaults() {
     local legacy_error="$WORK_ROOT/macro-explicit-optional-nil-default.err"
     local legacy_status
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "typed macro parameter defaults did not compile"
     [[ ! -s "$error" ]] || fail "typed macro parameter defaults wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=3\tcapabilityHandleCount=3' "$output" \
@@ -1148,7 +1148,7 @@ check_typed_parameter_defaults() {
         || fail "typed macro parameter defaults did not preserve optional String and Bool values"
 
     legacy_status=0
-    "$STAGE2_EXECUTABLE" compile "$legacy_fixture" > "$legacy_output" 2> "$legacy_error" \
+    "$BUILD_EXECUTABLE" compile "$legacy_fixture" > "$legacy_output" 2> "$legacy_error" \
         || legacy_status=$?
     [[ "$legacy_status" -eq 65 ]] \
         || fail "explicit optional nil default exited $legacy_status instead of 65"
@@ -1165,7 +1165,7 @@ check_graph_capabilities() {
     local error="$WORK_ROOT/graph-capabilities.err"
     local actual_status relative expected
 
-    "$STAGE2_EXECUTABLE" compile "$pass_fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$pass_fixture" > "$output" 2> "$error" \
         || fail "graph capabilities did not compile"
     [[ ! -s "$error" ]] || fail "graph capabilities wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2' "$output" \
@@ -1178,7 +1178,7 @@ check_graph_capabilities() {
         if [[ "$relative" == *MissingDeclaration.range ]]; then
             expected=graphDeclarationCapabilityMissing
         fi
-        if "$STAGE2_EXECUTABLE" compile "$REPO_ROOT/$relative" > "$output" 2> "$error"; then
+        if "$BUILD_EXECUTABLE" compile "$REPO_ROOT/$relative" > "$output" 2> "$error"; then
             actual_status=0
         else
             actual_status=$?
@@ -1254,7 +1254,7 @@ check_command_group() {
     local actual_status
 
     write_command_group_bundle "$snapshot_bundle" compilerMacroSnapshot "$pass_fixture"
-    "$STAGE2_EXECUTABLE" compile "$snapshot_bundle" > "$snapshot_output" 2> "$snapshot_error" \
+    "$BUILD_EXECUTABLE" compile "$snapshot_bundle" > "$snapshot_output" 2> "$snapshot_error" \
         || fail "@commandGroup snapshot did not compile"
     [[ ! -s "$snapshot_error" ]] || fail "@commandGroup snapshot wrote stderr"
     /usr/bin/grep -E -q $'macroGraphGeneratedEnum\trow=[0-9]+\tkind=enum\townerSyntaxID=[0-9]+.*\tname=Command\t' "$snapshot_output" \
@@ -1263,7 +1263,7 @@ check_command_group() {
         || fail "@commandGroup snapshot omitted its target-owned runCommandLine function"
 
     write_command_group_bundle "$native_bundle" "" "$pass_fixture"
-    "$STAGE2_EXECUTABLE" compile "$native_bundle" > "$native_llvm" 2> "$native_error" \
+    "$BUILD_EXECUTABLE" compile "$native_bundle" > "$native_llvm" 2> "$native_error" \
         || fail "@commandGroup ordinary program did not emit LLVM"
     [[ ! -s "$native_error" ]] || fail "@commandGroup ordinary program wrote stderr"
     validate_llvm "$native_llvm"
@@ -1284,7 +1284,7 @@ check_command_group() {
     [[ ! -s "$run_output" && ! -s "$run_error" ]] || fail "@commandGroup unknown route wrote output"
 
     write_command_group_bundle "$fail_bundle" compilerMacroSnapshot "$fail_fixture"
-    if "$STAGE2_EXECUTABLE" compile "$fail_bundle" > "$fail_output" 2> "$fail_error"; then
+    if "$BUILD_EXECUTABLE" compile "$fail_bundle" > "$fail_output" 2> "$fail_error"; then
         actual_status=0
     else
         actual_status=$?
@@ -1325,7 +1325,7 @@ check_macro_body_capture() {
     /usr/bin/printf '\n' >> "$pass_bundle"
     /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "${pass_fixture#"$REPO_ROOT/"}" >> "$pass_bundle"
     /bin/cat "$pass_fixture" >> "$pass_bundle"
-    "$STAGE2_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$error" \
         || fail "@capture body String did not compile"
     [[ ! -s "$error" ]] || fail "@capture body String wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1' "$pass_output" \
@@ -1333,7 +1333,7 @@ check_macro_body_capture() {
     /usr/bin/grep -Fq $'scalar=1\tchildCount=0\tparentRow=-1' "$pass_output" \
         || fail "@capture body String did not preserve the raw recipe text"
 
-    if "$STAGE2_EXECUTABLE" compile "$type_fixture" > "$type_output" 2> "$error"; then
+    if "$BUILD_EXECUTABLE" compile "$type_fixture" > "$type_output" 2> "$error"; then
         actual_status=0
     else
         actual_status=$?
@@ -1343,7 +1343,7 @@ check_macro_body_capture() {
     /usr/bin/grep -Fq $'compilerError\tkind=macroExecution\tdiagnosticKind=macroExecutionBodyInvalid' "$type_output" \
         || fail "non-String @capture did not fail at parameter materialization"
 
-    if "$STAGE2_EXECUTABLE" compile "$body_fixture" > "$body_output" 2> "$error"; then
+    if "$BUILD_EXECUTABLE" compile "$body_fixture" > "$body_output" 2> "$error"; then
         actual_status=0
     else
         actual_status=$?
@@ -1377,7 +1377,7 @@ check_syntax_recipes() {
     /usr/bin/printf '%s\n' \
         'macro syntax(@capture template: String): Declaration -> Void {}' >> "$pass_bundle"
     /bin/cat "$pass_fixture" >> "$pass_bundle"
-    "$STAGE2_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
+    "$BUILD_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
         || fail "syntax recipe capture fixture did not compile"
     [[ ! -s "$pass_error" ]] || fail "syntax recipe capture fixture wrote stderr"
     /usr/bin/grep -Fq $'syntaxRecipes\tvalid=true\trecipeCount=1' "$pass_output" \
@@ -1395,7 +1395,7 @@ check_syntax_recipes() {
     /usr/bin/printf '%s\n' \
         'macro syntax(@capture template: String): Declaration -> Void {}' >> "$nested_bundle"
     /bin/cat "$nested_fixture" >> "$nested_bundle"
-    "$STAGE2_EXECUTABLE" compile "$nested_bundle" > "$nested_output" 2> "$nested_error" \
+    "$BUILD_EXECUTABLE" compile "$nested_bundle" > "$nested_output" 2> "$nested_error" \
         || fail "nested syntax recipe fixture did not compile"
     [[ ! -s "$nested_error" ]] || fail "nested syntax recipe fixture wrote stderr"
     /usr/bin/grep -Fq $'syntaxRecipes\tvalid=true\trecipeCount=2' "$nested_output" \
@@ -1434,7 +1434,7 @@ check_syntax_recipes() {
     /usr/bin/printf '%s\n' \
         'macro syntax(@capture template: String): Declaration -> Void {}' >> "$closure_bundle"
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Syntax/Expressions/Closure.range" >> "$closure_bundle"
-    "$STAGE2_EXECUTABLE" compile "$closure_bundle" > "$closure_output" 2> "$closure_error" \
+    "$BUILD_EXECUTABLE" compile "$closure_bundle" > "$closure_output" 2> "$closure_error" \
         || fail "canonical Core Closure syntax recipes did not compile"
     [[ ! -s "$closure_error" ]] || fail "canonical Core Closure syntax recipes wrote stderr"
     /usr/bin/grep -Fq $'syntaxRecipes\tvalid=true\trecipeCount=8' "$closure_output" \
@@ -1454,7 +1454,7 @@ check_syntax_recipes() {
     /usr/bin/printf '%s\n' \
         'macro syntax(@capture template: String): Declaration -> Void {}' >> "$fail_bundle"
     /bin/cat "$fail_fixture" >> "$fail_bundle"
-    if "$STAGE2_EXECUTABLE" compile "$fail_bundle" > "$fail_output" 2> "$fail_error"; then
+    if "$BUILD_EXECUTABLE" compile "$fail_bundle" > "$fail_output" 2> "$fail_error"; then
         actual_status=0
     else
         actual_status=$?
@@ -1571,7 +1571,7 @@ check_range_authored_syntax_template() {
     /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' \
         "${mismatch_fixture#"$REPO_ROOT/"}" >> "$mismatch_bundle"
     /bin/cat "$mismatch_fixture" >> "$mismatch_bundle"
-    "$STAGE2_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
+    "$BUILD_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
         || fail "Range-authored syntax template value did not compile"
     [[ ! -s "$pass_error" ]] || fail "Range-authored syntax template value wrote stderr"
     /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1' "$pass_output" \
@@ -1599,7 +1599,7 @@ check_range_authored_syntax_template() {
     /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=2.*parentRow=0.*ordinal=8' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain its derived literal suffix count"
 
-    if "$STAGE2_EXECUTABLE" compile "$fail_bundle" > "$fail_output" 2> "$fail_error"; then
+    if "$BUILD_EXECUTABLE" compile "$fail_bundle" > "$fail_output" 2> "$fail_error"; then
         actual_status=0
     else
         actual_status=$?
@@ -1612,7 +1612,7 @@ check_range_authored_syntax_template() {
     /usr/bin/grep -Fq 'Every syntax capture must name a let member of its declaration.' "$fail_output" \
         || fail "Range-authored unknown syntax capture omitted its diagnostic message"
 
-    if ! "$STAGE2_EXECUTABLE" compile "$match_bundle" > "$match_output" 2> "$match_error"; then
+    if ! "$BUILD_EXECUTABLE" compile "$match_bundle" > "$match_output" 2> "$match_error"; then
         fail "Range-authored single-capture syntax match did not compile"
     fi
     [[ ! -s "$match_error" ]] \
@@ -1637,7 +1637,7 @@ check_range_authored_syntax_template() {
         || fail "Range-authored single-capture syntax match did not start its slice at name"
     /usr/bin/grep -E -q $'macroResult\trow=100.*invocationRow=1.*kind=1.*scalar=438.*parentRow=97.*ordinal=2' "$match_output" \
         || fail "Range-authored single-capture syntax match did not end its slice after name"
-    if "$STAGE2_EXECUTABLE" compile "$mismatch_bundle" > "$mismatch_output" 2> "$mismatch_error"; then
+    if "$BUILD_EXECUTABLE" compile "$mismatch_bundle" > "$mismatch_output" 2> "$mismatch_error"; then
         actual_status=0
     else
         actual_status=$?
@@ -1659,7 +1659,7 @@ check_legacy_bracket_collection_type_rejected() {
     local error="$WORK_ROOT/legacy-bracket-collection-type.err"
     local actual_status
 
-    if "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
+    if "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
         actual_status=0
     else
         actual_status=$?
@@ -1677,7 +1677,7 @@ check_canonical_member_family() {
     local output="$WORK_ROOT/member-family-canonical.out"
     local error="$WORK_ROOT/member-family-canonical.err"
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "Canonical @member family did not compile"
     [[ ! -s "$error" ]] || fail "Canonical @member family wrote stderr"
     /usr/bin/grep -Fq $'macroFamilyMemory\tvalid=true\tfamilyCount=1\tmemberCount=4\trepresentationCount=1\tpartitionCount=1\tvalueCount=4' "$output" \
@@ -1762,7 +1762,7 @@ check_canonical_declaration_envelopes() {
         /bin/cat "$REPO_ROOT/$relative" >> "$bundle"
         /usr/bin/printf '\n' >> "$bundle"
     done
-    "$STAGE2_EXECUTABLE" compile "$bundle" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$bundle" > "$output" 2> "$error" \
         || fail "Canonical declaration-envelope models did not compile: $(/usr/bin/head -n 1 "$output")"
     [[ ! -s "$error" ]] || fail "Canonical declaration-envelope models wrote stderr"
     for expectation in "${expectations[@]}"; do
@@ -1810,7 +1810,7 @@ check_missing_nominal_graph_warning() {
     local error="$WORK_ROOT/graph-missing-nominal.err"
     local warning_count missing_record_count strict_status
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "Graph missing-nominal fixture did not compile"
     [[ ! -s "$error" ]] || fail "Graph missing-nominal fixture wrote stderr"
     /usr/bin/grep -Fq $'graphDelta\tvalid=true\tnodeCount=5\tfactCount=2\tgeneratedFunctionCount=0\tnominalCount=5\tnominalReferenceCount=4\twarningCount=1' "$output" \
@@ -1833,7 +1833,7 @@ check_missing_nominal_graph_warning() {
         || fail "Graph artifact did not emit exactly one missing-nominal reference and warning"
     /usr/bin/grep -v '^compilerPlotter$' "$fixture" > "$strict_fixture"
     set +e
-    "$STAGE2_EXECUTABLE" compile "$strict_fixture" > "$strict_output" 2> "$error"
+    "$BUILD_EXECUTABLE" compile "$strict_fixture" > "$strict_output" 2> "$error"
     strict_status=$?
     set -e
     [[ "$strict_status" -eq 65 ]] || fail "Ordinary compilation did not reject the unresolved nominal"
@@ -1843,7 +1843,7 @@ check_missing_nominal_graph_warning() {
     ! /usr/bin/grep -Fq 'define ' "$strict_output" \
         || fail "Ordinary unresolved-nominal compilation emitted LLVM"
 
-    "$STAGE2_EXECUTABLE" compile "$declarations_fixture" > "$declarations_output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$declarations_fixture" > "$declarations_output" 2> "$error" \
         || fail "Graph nominal-declaration fixture did not compile"
     [[ ! -s "$error" ]] || fail "Graph nominal-declaration fixture wrote stderr"
     /usr/bin/grep -Fq $'graphDelta\tvalid=true\tnodeCount=17\tfactCount=15\tgeneratedFunctionCount=0\tnominalCount=9\tnominalReferenceCount=6\twarningCount=0' "$declarations_output" \
@@ -1866,7 +1866,7 @@ check_missing_nominal_graph_warning() {
             || fail "Graph artifact omitted nominal declaration $declaration"
     done
 
-    "$STAGE2_EXECUTABLE" compile "$local_declarations_fixture" > "$local_declarations_output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$local_declarations_fixture" > "$local_declarations_output" 2> "$error" \
         || fail "Graph local nominal-declaration fixture did not compile"
     [[ ! -s "$error" ]] || fail "Graph local nominal-declaration fixture wrote stderr"
     /usr/bin/grep -F $'graphNominal\t' "$local_declarations_output" | /usr/bin/grep -F $'keyword=let\tname=copy' > /dev/null \
@@ -1880,7 +1880,7 @@ check_missing_nominal_graph_warning() {
     /usr/bin/grep -Fq $'warningCount=0' "$local_declarations_output" \
         || fail "Graph local nominal-declaration fixture emitted an unexpected warning"
 
-    "$STAGE2_EXECUTABLE" compile "$lowercase_fixture" > "$lowercase_output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$lowercase_fixture" > "$lowercase_output" 2> "$error" \
         || fail "Graph lowercase missing-nominal fixture did not compile"
     [[ ! -s "$error" ]] || fail "Graph lowercase missing-nominal fixture wrote stderr"
     /usr/bin/grep -Fq $'role=parameterType\texpectedKinds=construct,enum\tname=missingType\ttargetKind=missing\ttargetID=-1\ttargetNominalID=-1\tdeclared=false' "$lowercase_output" \
@@ -1890,7 +1890,7 @@ check_missing_nominal_graph_warning() {
     [[ "$(/usr/bin/grep -F -c $'graphWarning\tseverity=warning\tkind=missingNominal' "$lowercase_output" || true)" -eq 1 ]] \
         || fail "Graph artifact did not emit exactly one lowercase missing-nominal warning"
 
-    "$STAGE2_EXECUTABLE" compile "$macro_fixture" > "$macro_output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$macro_fixture" > "$macro_output" 2> "$error" \
         || fail "Graph macro-nominal fixture did not compile"
     [[ ! -s "$error" ]] || fail "Graph macro-nominal fixture wrote stderr"
     /usr/bin/grep -Fq $'graphDelta\tvalid=true\tnodeCount=1\tfactCount=0\tgeneratedFunctionCount=0\tnominalCount=2\tnominalReferenceCount=2\twarningCount=1' "$macro_output" \
@@ -1922,7 +1922,7 @@ check_missing_nominal_graph_warning() {
     [[ "$(/usr/bin/grep -F -c $'graphWarning\tseverity=warning\tkind=missingNominal' "$macro_output" || true)" -eq 1 ]] \
         || fail "Graph artifact did not emit exactly one missing macro warning"
 
-    "$STAGE2_EXECUTABLE" compile "$macro_mismatch_fixture" > "$macro_mismatch_output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$macro_mismatch_fixture" > "$macro_mismatch_output" 2> "$error" \
         || fail "Graph macro target-mismatch fixture did not compile"
     [[ ! -s "$error" ]] || fail "Graph macro target-mismatch fixture wrote stderr"
     /usr/bin/grep -Fq $'role=macroApplication\texpectedKinds=macro\tname=observed\ttargetKind=targetMismatch\ttargetID=1\ttargetNominalID=1\tdeclared=true\tapplicable=false' "$macro_mismatch_output" \
@@ -1936,7 +1936,7 @@ check_missing_nominal_graph_warning() {
     /usr/bin/grep -Fq $'graphWarning\tseverity=warning\tkind=nominalTargetMismatch' "$macro_mismatch_output" \
         || fail "Graph artifact mislabeled a macro target mismatch as a missing declaration"
 
-    "$STAGE2_EXECUTABLE" compile "$ambiguous_fixture" > "$ambiguous_output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$ambiguous_fixture" > "$ambiguous_output" 2> "$error" \
         || fail "Graph ambiguous-nominal fixture did not compile"
     [[ ! -s "$error" ]] || fail "Graph ambiguous-nominal fixture wrote stderr"
     /usr/bin/grep -Fq $'role=macroApplication\texpectedKinds=macro\tname=repeated\ttargetKind=ambiguous\ttargetID=-1\ttargetNominalID=-1\tdeclared=true\tapplicable=false' "$ambiguous_output" \
@@ -1958,7 +1958,7 @@ check_slot_graph_projection() {
     local error="$WORK_ROOT/graph-slot-registration.err"
     local member_slot_count parameter_slot_count contents_slot_count payload_slot_count slot_relationship_count occurrence_relationship_count
 
-    "$STAGE2_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
         || fail "Graph slot-registration fixture did not compile"
     [[ ! -s "$error" ]] || fail "Graph slot-registration fixture wrote stderr"
 
@@ -2068,7 +2068,7 @@ check_storage_literals() {
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/UnicodeScalar.range" >> "$core_bundle"
     /usr/bin/printf '%s\n' 'compilerSourceFile\trole=core\tpath=Core/System/Text/Character.range' >> "$core_bundle"
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/Character.range" >> "$core_bundle"
-    "$STAGE2_EXECUTABLE" compile "$core_bundle" > "$core_output" 2> "$core_error" \
+    "$BUILD_EXECUTABLE" compile "$core_bundle" > "$core_output" 2> "$core_error" \
         || { /bin/cat "$core_output" "$core_error" >&2; fail "Range-authored storage core sources did not compile"; }
     [[ ! -s "$core_error" ]] \
         || fail "Range-authored storage core sources wrote stderr"
@@ -2105,7 +2105,7 @@ check_storage_literals() {
     check_project_defaults_fixture text-invalid-physical-storage \
         Testing/Storage/Fail/TextStorageInvalidPhysicalStorage.range 65 \
         $'compilerError\tkind=invalidTextLiteralStorage\treason=invalidPhysicalStorage'
-    if "$STAGE2_EXECUTABLE" emit-llvm \
+    if "$BUILD_EXECUTABLE" emit-llvm \
         "$REPO_ROOT/Testing/Storage/Fail/LiteralRequiresStorage.range" \
         "$llvm_output" > "$command_output" 2> "$command_error"; then
         actual_status=0
@@ -2121,7 +2121,7 @@ check_storage_literals() {
     [[ ! -s "$llvm_output" ]] \
         || fail "Storage literal LLVM rejection emitted an LLVM artifact"
     echo "Storage literal LLVM rejection: pass"
-    "$STAGE2_EXECUTABLE" emit-llvm \
+    "$BUILD_EXECUTABLE" emit-llvm \
         "$REPO_ROOT/Testing/Storage/Pass/SignednessFirstUnsignedByte.range" \
         "$unsigned_llvm" \
         || fail "Storage signedness-first unsigned byte did not emit LLVM"
@@ -2129,7 +2129,7 @@ check_storage_literals() {
         || fail "Storage signedness-first unsigned byte omitted i8 equality"
     validate_llvm "$unsigned_llvm"
     echo "Storage signedness-first unsigned byte: pass"
-    "$STAGE2_EXECUTABLE" emit-llvm \
+    "$BUILD_EXECUTABLE" emit-llvm \
         "$REPO_ROOT/Testing/Storage/Pass/SignedUnaryNumericLiteral.range" \
         "$signed_unary_llvm" \
         || fail "Storage signed unary numeric literal did not emit LLVM"
@@ -2137,7 +2137,7 @@ check_storage_literals() {
         || fail "Storage signed unary numeric literal omitted its signed i8 value"
     validate_llvm "$signed_unary_llvm"
     echo "Storage signed unary numeric literal: pass"
-    if "$STAGE2_EXECUTABLE" emit-llvm \
+    if "$BUILD_EXECUTABLE" emit-llvm \
         "$REPO_ROOT/Testing/Storage/Fail/ReorderedSignedIntegerArguments.range" \
         "$reordered_signed_llvm" > "$command_output" 2> "$command_error"; then
         actual_status=0
@@ -2149,7 +2149,7 @@ check_storage_literals() {
     [[ ! -s "$command_error" && ! -s "$reordered_signed_llvm" ]] \
         || fail "Storage reordered signed integer arguments emitted an unexpected artifact"
     echo "Storage ordered generic arguments: pass"
-    if "$STAGE2_EXECUTABLE" emit-llvm \
+    if "$BUILD_EXECUTABLE" emit-llvm \
         "$REPO_ROOT/Testing/Storage/Fail/UnsignedUnaryNegation.range" \
         "$unsigned_negation_llvm" > "$command_output" 2> "$command_error"; then
         actual_status=0
@@ -2179,7 +2179,7 @@ check_defaulted_generic_optional() {
         llvm="$WORK_ROOT/$(basename "$fixture" .range).ll"
         executable="$WORK_ROOT/$(basename "$fixture" .range)"
         [[ -f "$fixture" ]] || fail "missing generic Optional fixture: $relative"
-        "$STAGE2_EXECUTABLE" emit-llvm "$fixture" "$llvm" \
+        "$BUILD_EXECUTABLE" emit-llvm "$fixture" "$llvm" \
             || fail "generic Optional fixture did not emit LLVM: $relative"
         /usr/bin/grep -Fq 'alloca { i32,' "$llvm" \
             || fail "generic Optional fixture omitted its specialized enum layout: $relative"
@@ -2194,7 +2194,7 @@ check_defaulted_generic_optional() {
     fixture="$REPO_ROOT/Testing/Generics/Fail/MissingRequiredGenericEnumArgument.range"
     local rejection="$WORK_ROOT/MissingRequiredGenericEnumArgument.out"
     local rejection_error="$WORK_ROOT/MissingRequiredGenericEnumArgument.err"
-    if "$STAGE2_EXECUTABLE" "$fixture" > "$rejection" 2> "$rejection_error"; then
+    if "$BUILD_EXECUTABLE" "$fixture" > "$rejection" 2> "$rejection_error"; then
         actual_status=0
     else
         actual_status=$?
@@ -2220,10 +2220,10 @@ check_boundary_forward_mixed() {
 
     write_value_ownership_bundle "$bundle" boundary-forward-mixed
     echo "checkpoint value-ownership:fixture-authored: pass"
-    run_capture "$STAGE2_EXECUTABLE" "$bundle" "$first" "$first_error"
+    run_capture "$BUILD_EXECUTABLE" "$bundle" "$first" "$first_error"
     require_successful_output "focused value ownership boundary-forward-mixed" "$first" "$first_error"
     echo "checkpoint value-ownership:first-emitted: pass"
-    run_capture "$STAGE2_EXECUTABLE" "$bundle" "$second" "$second_error"
+    run_capture "$BUILD_EXECUTABLE" "$bundle" "$second" "$second_error"
     require_successful_output "focused repeated value ownership boundary-forward-mixed" "$second" "$second_error"
     echo "checkpoint value-ownership:repeat-emitted: pass"
     /usr/bin/cmp -s "$first" "$second" \
@@ -2260,7 +2260,7 @@ check_boundary_forward_mixed() {
     echo "checkpoint value-ownership:executed-exit-7: pass"
     echo "checkpoint value-ownership:complete: pass"
     echo "Focused value ownership boundary-forward-mixed check succeeded."
-    printf 'stage2_cache_key=%s\n' "$STAGE2_CACHE_KEY"
+    printf 'build_cache_key=%s\n' "$BUILD_CACHE_KEY"
 }
 
 main_value_ownership() {
@@ -2311,9 +2311,9 @@ main_value_ownership() {
     SOURCE_BUNDLE="$WORK_ROOT/RangeCompilerSourceSet.range"
     write_source_bundle "$SOURCE_BUNDLE"
     echo "checkpoint value-ownership:source-snapshot: pass"
-    resolve_stage2_compiler 0
-    echo "checkpoint value-ownership:stage2-cache-$STAGE2_CACHE_STATUS: pass"
-    echo "checkpoint value-ownership:stage2-resolved: pass"
+    resolve_compiler_build 0
+    echo "checkpoint value-ownership:build-cache-$BUILD_CACHE_STATUS: pass"
+    echo "checkpoint value-ownership:current-resolved: pass"
     check_removed_for_statement_rejected
     check_unregistered_string_reads_rejected
     check_macro_environment
@@ -2355,12 +2355,12 @@ main_value_ownership() {
     check_storage_literals
     check_defaulted_generic_optional
     if [[ "$controls" -eq 1 ]]; then
-        audit_value_ownership Controls "$STAGE2_EXECUTABLE" "$WORK_ROOT/controls"
+        audit_value_ownership Controls "$BUILD_EXECUTABLE" "$WORK_ROOT/controls"
         echo "checkpoint value-ownership:controls-complete: pass"
     else
         check_boundary_forward_mixed
     fi
-    range_stage2_mark_development_producer_validated \
+    range_build_mark_development_producer_validated \
         || fail "could not publish the validated development compiler producer"
     echo "checkpoint value-ownership:development-producer-validated: pass"
 }

@@ -3,17 +3,17 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerBootstrap.json"
 
 usage() {
     cat >&2 <<'USAGE'
 Usage:
-  scripts/promote-range-compiler-seed \
+  scripts/promote-range-compiler \
     --llvm FIRST_LLVM --reproduced-llvm SECOND_LLVM \
     --executable FIRST_EXECUTABLE --reproduced-executable SECOND_EXECUTABLE
 
 Promotes only byte-identical fixed-point LLVM and executable pairs, then
-updates the accepted-seed manifest from the exact current source/runtime set.
+updates the accepted-bootstrap manifest from the exact current source/runtime set.
 USAGE
 }
 
@@ -79,27 +79,27 @@ done
     exit 65
 }
 
-promotion_root="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-seed-promotion.XXXXXX")"
+promotion_root="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-bootstrap-promotion.XXXXXX")"
 trap '/bin/rm -rf "$promotion_root"' EXIT
-next_manifest="$promotion_root/RangeCompilerSeed.json"
-next_seed="$promotion_root/RangeCompilerSeed.ll"
+next_manifest="$promotion_root/RangeCompilerBootstrap.json"
+next_bootstrap="$promotion_root/RangeCompilerBootstrap.ll"
 next_executable="$promotion_root/range"
 /bin/cp "$MANIFEST" "$next_manifest"
-/bin/cp "$first_llvm" "$next_seed"
+/bin/cp "$first_llvm" "$next_bootstrap"
 /bin/cp "$first_executable" "$next_executable"
 /bin/chmod +x "$next_executable"
 
-seed_hash="$(sha256 "$next_seed")"
-seed_bytes="$(bytes "$next_seed")"
+bootstrap_hash="$(sha256 "$next_bootstrap")"
+bootstrap_bytes="$(bytes "$next_bootstrap")"
 executable_hash="$(sha256 "$next_executable")"
 executable_bytes="$(bytes "$next_executable")"
-compiler_version="bootstrap-${seed_hash:0:12}"
+compiler_version="bootstrap-${bootstrap_hash:0:12}"
 
 /usr/bin/plutil -replace compiler.version -string "$compiler_version" "$next_manifest"
-/usr/bin/plutil -replace seed.bytes -integer "$seed_bytes" "$next_manifest"
-/usr/bin/plutil -replace seed.sha256 -string "$seed_hash" "$next_manifest"
-/usr/bin/plutil -replace expectedStage3LLVM.bytes -integer "$seed_bytes" "$next_manifest"
-/usr/bin/plutil -replace expectedStage3LLVM.sha256 -string "$seed_hash" "$next_manifest"
+/usr/bin/plutil -replace bootstrap.bytes -integer "$bootstrap_bytes" "$next_manifest"
+/usr/bin/plutil -replace bootstrap.sha256 -string "$bootstrap_hash" "$next_manifest"
+/usr/bin/plutil -replace reproducedLLVM.bytes -integer "$bootstrap_bytes" "$next_manifest"
+/usr/bin/plutil -replace reproducedLLVM.sha256 -string "$bootstrap_hash" "$next_manifest"
 /usr/bin/plutil -replace executable.bytes -integer "$executable_bytes" "$next_manifest"
 /usr/bin/plutil -replace executable.sha256 -string "$executable_hash" "$next_manifest"
 /usr/bin/plutil -replace producer.clang -string "$(clang --version | /usr/bin/head -1)" "$next_manifest"
@@ -159,14 +159,14 @@ for ((runtime_index = 0; runtime_index < runtime_source_count; runtime_index += 
 done
 
 /usr/bin/plutil -p "$next_manifest" >/dev/null
-/bin/mv "$next_seed" "$REPO_ROOT/$(manifest_value seed.path)"
+/bin/mv "$next_bootstrap" "$REPO_ROOT/$(manifest_value bootstrap.path)"
 /bin/mv "$next_executable" "$REPO_ROOT/$(manifest_value executable.path)"
 /bin/chmod +x "$REPO_ROOT/$(manifest_value executable.path)"
 /bin/mv "$next_manifest" "$MANIFEST"
 
-echo "Range compiler seed promoted."
+echo "Range compiler bootstrap promoted."
 echo "version=$compiler_version"
-echo "seed_sha256=$seed_hash"
-echo "seed_bytes=$seed_bytes"
+echo "bootstrap_sha256=$bootstrap_hash"
+echo "bootstrap_bytes=$bootstrap_bytes"
 echo "executable_sha256=$executable_hash"
 echo "executable_bytes=$executable_bytes"

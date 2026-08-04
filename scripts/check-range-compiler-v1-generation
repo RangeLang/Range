@@ -3,10 +3,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerBootstrap.json"
 COMPILER_ROOT="$REPO_ROOT/RangeCompiler/Sources/Compiler"
-PRODUCER="$COMPILER_ROOT/.range/Build/stage2/RangeCompiler"
-PRODUCER_LLVM="$COMPILER_ROOT/.range/Build/stage2/RangeCompiler.ll"
+PRODUCER="$COMPILER_ROOT/.range/Build/current/RangeCompiler"
+PRODUCER_LLVM="$COMPILER_ROOT/.range/Build/current/RangeCompiler.ll"
 BUILD_PLAN="$COMPILER_ROOT/.range/Build/RangeCompiler.build-plan.tsv"
 FIXTURE="$REPO_ROOT/Testing/Basics/Pass/ReturnInteger.range"
 SCHEMA_VERSION="compiler-v1-generation-v2"
@@ -91,7 +91,7 @@ prove_compiler_runs() {
     [[ "$status" -eq 7 ]] || fail "$label runtime fixture exited $status instead of 7"
 }
 
-[[ -f "$MANIFEST" ]] || fail "missing seed manifest"
+[[ -f "$MANIFEST" ]] || fail "missing bootstrap manifest"
 [[ -x "$PRODUCER" ]] || fail "missing current V1 producer; run scripts/range check-compiler-smoke first"
 [[ -f "$PRODUCER_LLVM" ]] || fail "missing current V1 producer LLVM; run scripts/range check-compiler-smoke first"
 [[ -f "$BUILD_PLAN" ]] || fail "missing canonical compiler build plan; run scripts/range check-build-plan first"
@@ -124,7 +124,7 @@ load_status=0
 }
 
 source_key="$(/usr/bin/sed -n 's/^sourceSet.*sha256=\([^[:space:]]*\).*$/\1/p' "$BUILD_PLAN")"
-artifact_root="${RANGE_STAGE2_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Library/Caches}/Range/stage2-compiler}/function-artifacts/per-function-artifacts-v1"
+artifact_root="${RANGE_BUILD_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Library/Caches}/Range/compiler-build}/function-artifacts/per-function-artifacts-v1"
 artifact_input="$artifact_root/$source_key/FunctionArtifacts.cache"
 {
     /usr/bin/head -n 1 "$bundle"

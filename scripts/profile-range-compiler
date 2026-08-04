@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerBootstrap.json"
 COMPILER_DIRECTORY="${1:-$REPO_ROOT/RangeCompiler/Sources/Compiler}"
 
 fail() {
@@ -33,7 +33,7 @@ source_bundle="$profile_root/CompilerSourceSet.range"
 llvm_output="$profile_root/Compiler.ll"
 trace_output="$profile_root/Trace.tsv"
 resource_output="$profile_root/Resources.txt"
-compiler_llvm="${RANGE_COMPILER_PROFILE_LLVM:-$REPO_ROOT/$(manifest_value seed.path)}"
+compiler_llvm="${RANGE_COMPILER_PROFILE_LLVM:-$REPO_ROOT/$(manifest_value bootstrap.path)}"
 provided_source_bundle="${RANGE_COMPILER_PROFILE_SOURCE_BUNDLE:-}"
 profile_artifact_input="${RANGE_COMPILER_PROFILE_ARTIFACT_INPUT:-}"
 profile_artifact_output="${RANGE_COMPILER_PROFILE_ARTIFACT_OUTPUT:-$profile_root/FunctionArtifacts.next}"

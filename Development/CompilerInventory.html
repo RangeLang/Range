@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Range compiler timeline</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --ink: light-dark(#1d2736, #e9eef7);
+      --muted: light-dark(#657083, #aab4c5);
+      --line: light-dark(#aeb7c6, #556174);
+      --accent: light-dark(#145ec0, #80b8ff);
+      --artifact: light-dark(#7040ad, #c99bff);
+      --stale: light-dark(#ad3434, #ff9b9b);
+      --pending: light-dark(#99610b, #f0c875);
+      --rule: color-mix(in srgb, currentColor 16%, transparent);
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 320px; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { width: 100%; padding: 28px 28px 36px; }
+    header { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; max-width: 1480px; margin: 0 auto 18px; }
+    h1 { margin: 0; font-size: clamp(22px, 3vw, 31px); line-height: 1.05; letter-spacing: -.035em; font-weight: 500; }
+    header p { margin: 0; color: var(--muted); font-size: 12px; }
+    .key { display: flex; flex-wrap: wrap; gap: 15px; max-width: 1480px; margin: 0 auto 12px; color: var(--muted); font-size: 11px; }
+    .key span { display: inline-flex; align-items: center; gap: 6px; }
+    .key i { display: inline-block; width: 16px; height: 1px; background: var(--line); }
+    .key i.dot { width: 9px; height: 9px; border: 1.5px solid var(--accent); border-radius: 50%; background: transparent; }
+    .key i.square { width: 9px; height: 9px; border: 1.5px solid var(--artifact); background: transparent; }
+    .key i.branch { height: 12px; width: 9px; border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); background: transparent; }
+
+    .timeline-scroll { width: 100%; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-color: var(--line) transparent; }
+    .timeline-canvas { position: relative; width: 1750px; height: 820px; margin: 0 auto; }
+    .timeline-canvas svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .timeline-canvas line, .timeline-canvas path { fill: none; stroke: var(--line); stroke-width: 1.25; vector-effect: non-scaling-stroke; }
+    .timeline-canvas .axis-line { stroke: var(--accent); stroke-width: 1.5; }
+    .timeline-canvas .artifact-line { stroke: var(--artifact); }
+    .timeline-canvas .pending-line { stroke: var(--pending); stroke-dasharray: 5 5; }
+    .timeline-canvas .branch-line { stroke: var(--line); }
+    .timeline-canvas .cache-line { stroke: var(--artifact); stroke-dasharray: 3 4; }
+
+    .axis-label { position: absolute; left: 0; width: 165px; color: var(--muted); font-size: 10px; letter-spacing: .1em; line-height: 1.35; text-transform: uppercase; }
+    .axis-label strong { display: block; color: var(--ink); font-size: 11px; font-weight: 500; letter-spacing: .08em; }
+    .axis-label span { display: block; margin-top: 3px; letter-spacing: .04em; text-transform: none; }
+
+    button.node { position: absolute; display: block; padding: 0; border: 0; background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+    button.node:focus-visible { outline: 1px solid var(--accent); outline-offset: 5px; }
+    button.node .mark { position: absolute; left: 0; top: 0; width: 14px; height: 14px; border: 1.75px solid var(--accent); border-radius: 50%; background: transparent; }
+    button.node.artifact .mark { border-color: var(--artifact); border-radius: 1px; transform: rotate(45deg); }
+    button.node.stale .mark { border-color: var(--stale); }
+    button.node.pending .mark { border-color: var(--pending); }
+    button.node .copy { display: block; margin-left: 24px; padding-top: 15px; width: 204px; }
+    button.node .eyebrow { display: block; margin-bottom: 2px; color: var(--muted); font-size: 10px; letter-spacing: .09em; line-height: 1.2; text-transform: uppercase; }
+    button.node .title { display: block; font-size: 14px; line-height: 1.2; font-weight: 500; }
+    button.node .meta { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+    button.node:hover .title, button.node:hover .meta { color: var(--accent); }
+    button.node.artifact:hover .title, button.node.artifact:hover .meta { color: var(--artifact); }
+    button.node.stale:hover .title, button.node.stale:hover .meta { color: var(--stale); }
+    button.node.pending:hover .title, button.node.pending:hover .meta { color: var(--pending); }
+
+    .selection { display: flex; align-items: baseline; gap: 13px; min-height: 40px; max-width: 1480px; margin: 8px auto 0; border-top: 1px solid var(--rule); padding-top: 10px; }
+    .selection strong { font-size: 13px; font-weight: 500; }
+    .selection .state { color: var(--muted); font-size: 10px; letter-spacing: .09em; text-transform: uppercase; white-space: nowrap; }
+    .selection p { margin: 0; color: var(--muted); font-size: 12px; }
+    .selection .state.stale { color: var(--stale); }
+    .selection .state.pending { color: var(--pending); }
+
+    @media (max-width: 700px) {
+      main { padding: 20px 12px 28px; }
+      header { display: block; margin-bottom: 14px; }
+      header p { margin-top: 7px; }
+      .timeline-canvas { margin-left: 0; }
+      .selection { display: block; }
+      .selection .state { display: block; margin: 3px 0; }
+    }
+  </style>
+</head>
+<body>
+  <main id="compiler-timeline">
+    <header>
+      <h1>Range compiler lineage</h1>
+      <p>each horizontal line has its own meaning · artifacts can create new lines</p>
+    </header>
+
+    <div class="key" aria-label="Timeline legend">
+      <span><i class="dot" aria-hidden="true"></i> execution or value</span>
+      <span><i class="square" aria-hidden="true"></i> produced artifact</span>
+      <span><i class="branch" aria-hidden="true"></i> new axis created here</span>
+      <span>scroll horizontally for the complete lineage</span>
+    </div>
+
+    <section class="timeline-scroll" aria-label="Branching Range compiler timeline">
+      <div id="timeline-canvas" class="timeline-canvas">
+        <svg id="timeline-lines" viewBox="0 0 1750 820" role="img" aria-label="Branching compiler timeline">
+          <title>Branching Range compiler timeline</title>
+          <desc>Independent horizontal axes show bootstrap, self-hosting, persistent graph, and program output. Artifacts and compiler points branch into the axes they create.</desc>
+        </svg>
+        <div id="timeline-axes"></div>
+      </div>
+    </section>
+
+    <section class="selection" aria-live="polite">
+      <strong id="selection-title">current build · Range-authored compiler</strong>
+      <span id="selection-state" class="state">observed</span>
+      <p id="selection-copy">The current Range compiler emitted and linked natively. The latest cold development build spent 656 seconds in LLVM emission and finished in 659 seconds; an unchanged warm invocation reused the artifact in 3.94 seconds.</p>
+    </section>
+  </main>
+
+  <script>
+    const root = document.getElementById('compiler-timeline');
+    const canvas = document.getElementById('timeline-canvas');
+    const lines = document.getElementById('timeline-lines');
+    const axesLayer = document.getElementById('timeline-axes');
+    const title = root.querySelector('#selection-title');
+    const state = root.querySelector('#selection-state');
+    const copy = root.querySelector('#selection-copy');
+
+    const axes = [
+      {
+        id: 'bootstrap',
+        label: 'bootstrap line',
+        description: 'implementation → first artifact',
+        y: 100,
+        nodes: [
+          { id: 'stage0', x: 200, kind: 'point', eyebrow: 'Stage 0 · source', title: 'Swift bootstrap', meta: 'historical implementation' },
+          { id: 'artifact1', x: 540, kind: 'artifact', status: 'stale', eyebrow: 'Stage 1 · artifact', title: 'RangeCompilerBootstrap.ll + range', meta: '8.54 MB · manifest stale' }
+        ]
+      },
+      {
+        id: 'self-hosting',
+        label: 'self-hosting line',
+        description: 'artifact → compiler generation',
+        y: 320,
+        nodes: [
+          { id: 'stage1', x: 540, kind: 'point', status: 'stale', eyebrow: 'Stage 1 · execution', title: 'Bootstrap artifact runs', meta: 'accepted bootstrap boundary' },
+          { id: 'artifact2', x: 900, kind: 'artifact', eyebrow: 'current build · artifact', title: 'RangeCompiler', meta: '5.34 MB · cold 659s · warm 3.94s' },
+          { id: 'current', x: 1110, kind: 'point', eyebrow: 'current build · execution', title: 'Range-authored compiler', meta: 'native smoke passed' },
+          { id: 'artifact3', x: 1450, kind: 'artifact', status: 'pending', eyebrow: 'reproduced build · artifact', title: 'Candidate fixed point', meta: 'identity proof not run' }
+        ]
+      },
+      {
+        id: 'persistent-graph',
+        label: 'persistent graph line',
+        description: 'inside the current build artifact',
+        y: 520,
+        nodes: [
+          { id: 'file', x: 900, kind: 'point', eyebrow: 'input', title: 'File', meta: 'path + bytes + identity' },
+          { id: 'shape', x: 1080, kind: 'point', eyebrow: 'shape delta', title: 'Shape', meta: 'typed syntax snapshot' },
+          { id: 'behavior', x: 1260, kind: 'point', eyebrow: 'behavior delta', title: 'Behavior', meta: 'semantic/native boundary' },
+          { id: 'compiled', x: 1440, kind: 'point', eyebrow: 'output delta', title: 'Compiled', meta: 'LLVM text + artifact' },
+          { id: 'cache', x: 1260, y: 650, kind: 'artifact', eyebrow: 'reuse branch', title: 'Function artifact cache v8', meta: 'skips discovery, effects, ABI, emission' }
+        ]
+      },
+      {
+        id: 'program-output',
+        label: 'program output line',
+        description: 'current build consumer',
+        y: 735,
+        nodes: [
+          { id: 'program', x: 1110, kind: 'point', eyebrow: 'input', title: 'Range program', meta: '.range source' },
+          { id: 'llvm', x: 1300, kind: 'artifact', eyebrow: 'emission', title: 'LLVM module', meta: 'cold bottleneck' },
+          { id: 'executable', x: 1490, kind: 'artifact', eyebrow: 'runtime', title: 'Executable', meta: 'linked result' }
+        ]
+      }
+    ];
+
+    const axisEdges = [
+      ['bootstrap', 'stage0', 'artifact1', 'axis-line'],
+      ['self-hosting', 'stage1', 'artifact2', 'axis-line'],
+      ['self-hosting', 'artifact2', 'current', 'axis-line'],
+      ['self-hosting', 'current', 'artifact3', 'pending-line'],
+      ['persistent-graph', 'file', 'shape', 'axis-line'],
+      ['persistent-graph', 'shape', 'behavior', 'axis-line'],
+      ['persistent-graph', 'behavior', 'compiled', 'axis-line'],
+      ['program-output', 'program', 'llvm', 'axis-line'],
+      ['program-output', 'llvm', 'executable', 'axis-line']
+    ];
+
+    const branches = [
+      ['bootstrap', 'artifact1', 'self-hosting', 'stage1', 'branch-line'],
+      ['self-hosting', 'artifact2', 'persistent-graph', 'file', 'branch-line'],
+      ['self-hosting', 'current', 'program-output', 'program', 'branch-line'],
+      ['persistent-graph', 'behavior', 'persistent-graph', 'cache', 'cache-line']
+    ];
+
+    const details = {
+      stage0: ['Stage 0 · Swift bootstrap', 'historical source', 'Stage 0 is the historical Swift-written bootstrap compiler. Its source is not an active file in this checkout; it is shown as the producer of the first artifact.'],
+      artifact1: ['Stage 1 · accepted bootstrap artifact', 'stale boundary', 'The accepted pair is RangeCompiler/Bootstrap/RangeCompilerBootstrap.ll and RangeCompiler/Bootstrap/range. Bootstrap integrity currently rejects the changed Process.range input.'],
+      stage1: ['Stage 1 · bootstrap artifact runs', 'stale boundary', 'The accepted bootstrap executable is the producer used to build the current current build compiler. It is an artifact becoming an execution line, not a second handwritten compiler.'],
+      artifact2: ['current build · RangeCompiler artifact', 'observed', 'The current development executable is 5,339,984 bytes and its emitted LLVM is 8,663,224 bytes. This artifact creates the persistent graph line below.'],
+      current: ['current build · Range-authored compiler', 'observed', 'The current Range compiler emitted and linked natively. The latest cold development build spent 656 seconds in LLVM emission and finished in 659 seconds; an unchanged warm invocation reused the artifact in 3.94 seconds.'],
+      artifact3: ['reproduced build · candidate artifact', 'pending', 'The current build compiler should produce this artifact by recompiling the same source bundle. The full candidate/progression proof has not run in this snapshot.'],
+      file: ['Persistent graph · File', 'observed', 'The graph line begins with path, source bytes, and identity.'],
+      shape: ['Persistent graph · Shape', 'observed', 'Shape is the typed syntax snapshot produced from the File delta.'],
+      behavior: ['Persistent graph · Behavior', 'observed', 'Behavior is the semantic/native boundary where exact cache identity can be checked.'],
+      compiled: ['Persistent graph · Compiled', 'observed', 'Compiled is the persisted LLVM text and artifact identity.'],
+      cache: ['Persistent graph · cache branch', 'observed', 'The v8 cache checks source, root, record, and text integrity. An exact hit can skip body discovery, effects, ABI planning, and LLVM emission.'],
+      program: ['Program output · Range program', 'observed', 'An ordinary .range program enters through the current build compiler line.'],
+      llvm: ['Program output · LLVM module', 'observed', 'LLVM emission is the measured cold-build bottleneck: 656 of 659 seconds in the latest current build rebuild.'],
+      executable: ['Program output · Executable', 'observed', 'The linked result is a native Range program. The focused V1 proof ran ordinary fixtures with exits 7 and 8.']
+    };
+
+    const positions = new Map();
+    const nodeById = new Map();
+
+    function axisById(id) {
+      return axes.find((axis) => axis.id === id);
+    }
+
+    function nodeByKey(axisId, id) {
+      return axisById(axisId).nodes.find((node) => node.id === id);
+    }
+
+    function pointFor(axisId, id) {
+      const node = nodeByKey(axisId, id);
+      return positions.get(node.id);
+    }
+
+    function lineElement(x1, y1, x2, y2, className) {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1);
+      line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2);
+      line.setAttribute('y2', y2);
+      line.setAttribute('class', className);
+      lines.appendChild(line);
+    }
+
+    function drawAxisLine(axisId, fromId, toId, className) {
+      const from = pointFor(axisId, fromId);
+      const to = pointFor(axisId, toId);
+      lineElement(from.x, from.y, to.x, to.y, className);
+    }
+
+    function drawBranch(parentAxisId, parentId, childAxisId, childId, className) {
+      const from = pointFor(parentAxisId, parentId);
+      const to = pointFor(childAxisId, childId);
+      if (from.x === to.x) {
+        lineElement(from.x, from.y, to.x, to.y, className);
+        return;
+      }
+      const bendX = from.x + (to.x - from.x) * 0.35;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', `M ${from.x} ${from.y} H ${bendX} V ${to.y} H ${to.x}`);
+      path.setAttribute('class', className);
+      lines.appendChild(path);
+    }
+
+    function addAxisLabel(axis) {
+      const label = document.createElement('div');
+      label.className = 'axis-label';
+      label.style.top = `${axis.y - 10}px`;
+      label.innerHTML = `<strong>${axis.label}</strong><span>${axis.description}</span>`;
+      axesLayer.appendChild(label);
+    }
+
+    function addNode(axis, node) {
+      const y = node.y ?? axis.y;
+      positions.set(node.id, { x: node.x, y });
+      nodeById.set(node.id, node);
+      const button = document.createElement('button');
+      button.className = `node ${node.kind}${node.status ? ` ${node.status}` : ''}`;
+      button.type = 'button';
+      button.dataset.key = node.id;
+      button.style.left = `${node.x - 7}px`;
+      button.style.top = `${y - 7}px`;
+      button.innerHTML = `<span class="mark" aria-hidden="true"></span><span class="copy"><span class="eyebrow">${node.eyebrow}</span><span class="title">${node.title}</span><span class="meta">${node.meta}</span></span>`;
+      button.addEventListener('click', () => select(node.id));
+      axesLayer.appendChild(button);
+    }
+
+    function render() {
+      axes.forEach((axis) => {
+        addAxisLabel(axis);
+        axis.nodes.forEach((node) => addNode(axis, node));
+      });
+      axisEdges.forEach(([axisId, fromId, toId, className]) => drawAxisLine(axisId, fromId, toId, className));
+      branches.forEach(([fromAxis, fromId, toAxis, toId, className]) => drawBranch(fromAxis, fromId, toAxis, toId, className));
+    }
+
+    function select(key) {
+      const item = details[key];
+      if (!item) return;
+      title.textContent = item[0];
+      state.textContent = item[1];
+      state.className = 'state ' + (item[1] === 'pending' ? 'pending' : item[1].includes('stale') ? 'stale' : '');
+      copy.textContent = item[2];
+    }
+
+    render();
+    select('current');
+  </script>
+</body>
+</html>

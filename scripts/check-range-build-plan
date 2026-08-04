@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerSeed.json"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerBootstrap.json"
 READER="$REPO_ROOT/RangeCompiler/Sources/Compiler/Driver/CompilerBuildPlan.range"
 CORE_BUFFER="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/Buffer.range"
 CORE_BYTE_SPAN="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/ByteSpan.range"
@@ -45,15 +45,15 @@ verify_manifest_file() {
 }
 
 verify_manifest() {
-    [[ -f "$MANIFEST" ]] || fail "missing seed manifest"
-    [[ "$(manifest_value formatVersion)" == 1 ]] || fail "unsupported seed manifest format"
-    [[ "$(manifest_value target.platform)" == macOS ]] || fail "unsupported seed platform"
-    [[ "$(manifest_value target.pointerBits)" == 64 ]] || fail "unsupported seed pointer width"
+    [[ -f "$MANIFEST" ]] || fail "missing bootstrap manifest"
+    [[ "$(manifest_value formatVersion)" == 1 ]] || fail "unsupported bootstrap manifest format"
+    [[ "$(manifest_value target.platform)" == macOS ]] || fail "unsupported bootstrap platform"
+    [[ "$(manifest_value target.pointerBits)" == 64 ]] || fail "unsupported bootstrap pointer width"
     [[ "$(manifest_value runtimeABI)" == 2 ]] || fail "unsupported runtime ABI"
-    [[ "$(uname -m)" == "$(manifest_value target.architecture)" ]] || fail "seed architecture mismatch"
-    verify_manifest_file seed "compiler seed"
-    local seed_path="$REPO_ROOT/$(manifest_value seed.path)"
-    [[ "$(bytes "$seed_path")" == "$(manifest_value seed.bytes)" ]] || fail "compiler seed byte length mismatch"
+    [[ "$(uname -m)" == "$(manifest_value target.architecture)" ]] || fail "bootstrap architecture mismatch"
+    verify_manifest_file bootstrap "compiler bootstrap"
+    local bootstrap_path="$REPO_ROOT/$(manifest_value bootstrap.path)"
+    [[ "$(bytes "$bootstrap_path")" == "$(manifest_value bootstrap.bytes)" ]] || fail "compiler bootstrap byte length mismatch"
     verify_manifest_file executable "accepted compiler executable"
     local executable_path="$REPO_ROOT/$(manifest_value executable.path)"
     [[ -x "$executable_path" ]] || fail "accepted compiler executable is not executable"
@@ -184,8 +184,8 @@ write_positive_plan() {
     /usr/bin/printf 'rangeBuildPlan\tversion=1\n' > "$output"
     /usr/bin/printf 'target\tplatform=macOS\tarchitecture=%s\tpointerBits=64\truntimeABI=2\n' "$(manifest_value target.architecture)" >> "$output"
     /usr/bin/printf 'tool\tid=clang\tpath=repo/tool/clang\tsha256=%s\tbytes=1\n' "$hash" >> "$output"
-    /usr/bin/printf 'input\tid=accepted-seed\tpath=repo/%s\tsha256=%s\tbytes=%s\n' \
-        "$(manifest_value seed.path)" "$(manifest_value seed.sha256)" "$(manifest_value seed.bytes)" >> "$output"
+    /usr/bin/printf 'input\tid=accepted-bootstrap\tpath=repo/%s\tsha256=%s\tbytes=%s\n' \
+        "$(manifest_value bootstrap.path)" "$(manifest_value bootstrap.sha256)" "$(manifest_value bootstrap.bytes)" >> "$output"
     runtime_count="$(manifest_value runtimeSources)"
     for ((index = 0; index < runtime_count; index += 1)); do
         path="$(manifest_value "runtimeSources.$index.path")"
@@ -257,8 +257,8 @@ main() {
     write_bundle "$harness" "$bundle"
 
     local key_material="$WORK_ROOT/cache-key"
-    /usr/bin/printf 'schema=%s\nseed=%s\nbundle=%s\n' \
-        "$SCHEMA_VERSION" "$(manifest_value seed.sha256)" "$(sha256 "$bundle")" > "$key_material"
+    /usr/bin/printf 'schema=%s\nbootstrap=%s\nbundle=%s\n' \
+        "$SCHEMA_VERSION" "$(manifest_value bootstrap.sha256)" "$(sha256 "$bundle")" > "$key_material"
     local index runtime_count
     runtime_count="$(manifest_value runtimeSources)"
     for ((index = 0; index < runtime_count; index += 1)); do
@@ -275,18 +275,18 @@ main() {
         echo "checkpoint build-plan:cache-hit: pass"
     else
         local build_cache="$WORK_ROOT/cache-entry"
-        local seed="$REPO_ROOT/$(manifest_value seed.path)"
-        local seed_executable="$WORK_ROOT/RangeCompilerSeed"
+        local bootstrap="$REPO_ROOT/$(manifest_value bootstrap.path)"
+        local bootstrap_executable="$WORK_ROOT/RangeCompilerBootstrap"
         local reader_llvm="$WORK_ROOT/RangeBuildPlanReader.ll"
         local -a runtimes=()
         for ((index = 0; index < runtime_count; index += 1)); do
             runtimes+=("$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")")
         done
-        clang -O2 -flto=thin -Wno-override-module -x ir "$seed" -x c "${runtimes[@]}" -o "$seed_executable"
-        if ! "$seed_executable" "$bundle" > "$reader_llvm"; then
-            fail "seed rejected focused reader bundle: $(/usr/bin/head -c 400 "$reader_llvm")"
+        clang -O2 -flto=thin -Wno-override-module -x ir "$bootstrap" -x c "${runtimes[@]}" -o "$bootstrap_executable"
+        if ! "$bootstrap_executable" "$bundle" > "$reader_llvm"; then
+            fail "bootstrap rejected focused reader bundle: $(/usr/bin/head -c 400 "$reader_llvm")"
         fi
-        [[ -s "$reader_llvm" ]] || fail "seed emitted empty focused reader LLVM"
+        [[ -s "$reader_llvm" ]] || fail "bootstrap emitted empty focused reader LLVM"
         clang -Wno-override-module -x ir -c "$reader_llvm" -o "$WORK_ROOT/reader.o"
         /bin/rm -f "$WORK_ROOT/reader.o"
         /bin/mkdir -p "$build_cache"
