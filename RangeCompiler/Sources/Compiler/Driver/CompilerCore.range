@@ -170,13 +170,22 @@ construct CompilerSourceStore {
     let isValid: Bool
 }
 
+// Deprecated identity hash key. Use CompilerIdentity for stable identity;
+// CompilerValueFingerprint for changing values. Will be replaced by Core UUID.
 construct CompilerFingerprint {
     let first: Int
     let second: Int
 }
 
-// Physical hash key for a changing value. Semantic graph identity remains the
-// Core-authored Identifier; CompilerFingerprint is its transitional index key.
+// Stable identity token for compiler-internal use. Same wire ABI as
+// CompilerFingerprint; will become UUID when Core Identity operations
+// are operational.
+construct CompilerIdentity {
+    let first: Int
+    let second: Int
+}
+
+// Physical hash key for a changing value.
 construct CompilerValueFingerprint {
     let first: Int
     let second: Int

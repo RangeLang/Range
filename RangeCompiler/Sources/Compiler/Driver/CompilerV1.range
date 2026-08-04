@@ -7,7 +7,7 @@ construct CompilerV1Error {
 }
 
 construct CompilerV1ShapeDelta {
-    let identity: CompilerFingerprint
+    let identity: CompilerIdentity
     let before: CompilerValueFingerprint
     let after: CompilerValueFingerprint
     let snapshot: String
@@ -16,14 +16,14 @@ construct CompilerV1ShapeDelta {
 construct CompilerV1SyntaxFacts {
     let isValid: Bool
     let syntax: CompilerValueFingerprint
-    let shapeIdentity: CompilerFingerprint
+    let shapeIdentity: CompilerIdentity
     let shape: CompilerValueFingerprint
     let snapshot: String
     let snapshotStart: Int
 }
 
 construct CompilerV1BehaviorDelta {
-    let identity: CompilerFingerprint
+    let identity: CompilerIdentity
     let input: CompilerValueFingerprint
     let before: CompilerValueFingerprint
     let after: CompilerValueFingerprint
@@ -32,7 +32,7 @@ construct CompilerV1BehaviorDelta {
 }
 
 construct CompilerV1CompiledDelta {
-    let identity: CompilerFingerprint
+    let identity: CompilerIdentity
     let input: CompilerValueFingerprint
     let before: CompilerValueFingerprint
     let after: CompilerValueFingerprint
@@ -47,14 +47,14 @@ function compilerV1Load(input: String, before: CompilerValueFingerprint): Compil
     return delta
 }
 
-function compilerV1NativeBehaviorSnapshot(identity: CompilerFingerprint, output: String): String {
+function compilerV1NativeBehaviorSnapshot(identity: CompilerIdentity, output: String): String {
     let product: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: identity, tag: 13, text: output))
     return "compilerV1Behavior\tvalid=true\tproduct=\(product.first):\(product.second)\n"
 }
 
 function compilerV1SyntaxFactsInvalid(): CompilerV1SyntaxFacts {
     let absent: CompilerValueFingerprint(compilerV1AbsentValue())
-    let absentIdentity: CompilerFingerprint(compilerV1AbsentIdentity())
+    let absentIdentity: CompilerIdentity(compilerV1AbsentIdentity())
     return CompilerV1SyntaxFacts(
         isValid: false,
         syntax: absent,
@@ -82,8 +82,8 @@ function compilerV1SyntaxFactsCapture(source: CompilerV1SourceDelta): CompilerV1
     if tablesDestroyStatus != 0 {
         snapshot: String("compilerError\tkind=compilerV1SyntaxFactsOwnershipFailure\n")
     }
-    let shapeIdentity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: source.identity, value: 2))
-    let syntaxIdentity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: shapeIdentity, value: 15))
+    let shapeIdentity: CompilerIdentity(compilerV1IdentityAppendInt(identity: source.identity, value: 2))
+    let syntaxIdentity: CompilerIdentity(compilerV1IdentityAppendInt(identity: shapeIdentity, value: 15))
     let syntax: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: syntaxIdentity, tag: 16, text: snapshot))
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.syntaxFacts.end"))
     return CompilerV1SyntaxFacts(
@@ -155,7 +155,7 @@ function compilerV1SyntaxFactsDecode(encoded: String): CompilerV1SyntaxFacts {
         syntax: CompilerValueFingerprint(
             first: compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 2),
             second: compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 3)),
-        shapeIdentity: CompilerFingerprint(
+        shapeIdentity: CompilerIdentity(
             first: compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 4),
             second: compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 5)),
         shape: CompilerValueFingerprint(
@@ -167,7 +167,7 @@ function compilerV1SyntaxFactsDecode(encoded: String): CompilerV1SyntaxFacts {
 }
 
 function compilerV1SyntaxFactsIntegrityIsValid(facts: CompilerV1SyntaxFacts): Bool {
-    let expectedSyntaxIdentity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: facts.shapeIdentity, value: 15))
+    let expectedSyntaxIdentity: CompilerIdentity(compilerV1IdentityAppendInt(identity: facts.shapeIdentity, value: 15))
     let snapshot: String(compilerV1SyntaxFactsSnapshot(facts: facts))
     let expectedSyntax: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: expectedSyntaxIdentity, tag: 16, text: snapshot))
     let expectedShape: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: facts.shapeIdentity, tag: 12, text: snapshot))
@@ -177,7 +177,7 @@ function compilerV1SyntaxFactsIntegrityIsValid(facts: CompilerV1SyntaxFacts): Bo
 }
 
 function compilerV1SyntaxFactsMatchSource(facts: CompilerV1SyntaxFacts, source: CompilerV1SourceDelta): Bool {
-    let expectedShapeIdentity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: source.identity, value: 2))
+    let expectedShapeIdentity: CompilerIdentity(compilerV1IdentityAppendInt(identity: source.identity, value: 2))
     return compilerV1SyntaxFactsIntegrityIsValid(facts: facts)
         && facts.shapeIdentity.first == expectedShapeIdentity.first
         && facts.shapeIdentity.second == expectedShapeIdentity.second
@@ -266,7 +266,7 @@ function compilerV1Behavior(source: CompilerV1SourceDelta, shape: CompilerV1Shap
         snapshot: String("compilerError\tkind=compilerV1BehaviorOwnershipFailure\n")
         compiledOutput: snapshot
     }
-    let identity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: shape.identity, value: 3))
+    let identity: CompilerIdentity(compilerV1IdentityAppendInt(identity: shape.identity, value: 3))
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.behavior.end"))
     return CompilerV1BehaviorDelta(
         identity: identity,
@@ -280,7 +280,7 @@ function compilerV1Behavior(source: CompilerV1SourceDelta, shape: CompilerV1Shap
 
 function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1BehaviorDelta, before: CompilerValueFingerprint): CompilerV1CompiledDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.compile.begin"))
-    let identity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: behavior.identity, value: 4))
+    let identity: CompilerIdentity(compilerV1IdentityAppendInt(identity: behavior.identity, value: 4))
     if behavior.input.first != shape.after.first
         || behavior.input.second != shape.after.second {
         return CompilerV1CompiledDelta(
@@ -307,16 +307,16 @@ function compilerV1Report(error: CompilerV1Error): Int {
     return 65
 }
 
-function compilerV1CompiledIdentityForFile(file: CompilerFingerprint): CompilerFingerprint {
-    let shape: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: file, value: 2))
-    let behavior: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: shape, value: 3))
-    return compilerFingerprintAppendInt(fingerprint: behavior, value: 4)
+function compilerV1CompiledIdentityForFile(file: CompilerIdentity): CompilerIdentity {
+    let shape: CompilerIdentity(compilerV1IdentityAppendInt(identity: file, value: 2))
+    let behavior: CompilerIdentity(compilerV1IdentityAppendInt(identity: shape, value: 3))
+    return compilerV1IdentityAppendInt(identity: behavior, value: 4)
 }
 
 function compilerV1CompiledValueMatches(input: String, expectedFirst: Int, expectedSecond: Int, outputPath: String): Int {
     let cachedOutput: String(readFile(path: outputPath))
-    let file: CompilerFingerprint(compilerV1IdentityForFile(path: input))
-    let compiledIdentity: CompilerFingerprint(compilerV1CompiledIdentityForFile(file: file))
+    let file: CompilerIdentity(compilerV1IdentityForFile(path: input))
+    let compiledIdentity: CompilerIdentity(compilerV1CompiledIdentityForFile(file: file))
     let cachedCompiled: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: compiledIdentity, tag: 14, text: cachedOutput))
     state matches: Int(0)
     if cachedCompiled.first == expectedFirst && cachedCompiled.second == expectedSecond {
@@ -327,7 +327,7 @@ function compilerV1CompiledValueMatches(input: String, expectedFirst: Int, expec
 
 function compilerV1SourceValueMatches(input: String, expectedFirst: Int, expectedSecond: Int): Int {
     let source: String(readFile(path: input))
-    let file: CompilerFingerprint(compilerV1IdentityForFile(path: input))
+    let file: CompilerIdentity(compilerV1IdentityForFile(path: input))
     let current: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: file, tag: 11, text: source))
     state matches: Int(0)
     if current.first == expectedFirst && current.second == expectedSecond {
@@ -346,7 +346,7 @@ function compilerV1SourceIsEmpty(input: String): Int {
 }
 
 function compilerV1FileIdentityPart(input: String, part: Int): Int {
-    let identity: CompilerFingerprint(compilerV1IdentityForFile(path: input))
+    let identity: CompilerIdentity(compilerV1IdentityForFile(path: input))
     state value: Int(identity.first)
     if part == 1 {
         value: identity.second

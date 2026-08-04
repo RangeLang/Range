@@ -21,7 +21,7 @@ fail() {
 
 /usr/bin/grep -Fq 'construct CompilerValueFingerprint {' "$COMPILER_CORE" \
     || fail "Compiler V1 has no distinct changing-value representation"
-/usr/bin/grep -Fq 'return CompilerFingerprint(first: 0, second: 0)' "$COMPILER_V1_GRAPH" \
+/usr/bin/grep -Fq 'return CompilerIdentity(first: 0, second: 0)' "$COMPILER_V1_GRAPH" \
     || fail "Compiler V1 changed the absent identity wire sentinel"
 if /usr/bin/grep -Eq 'let (before|after|input): CompilerFingerprint' "$COMPILER_V1" "$COMPILER_V1_GRAPH" \
     || /usr/bin/grep -Eq 'let (source|shape|behavior|compiled): CompilerFingerprint' "$COMPILER_V1_GRAPH"; then
