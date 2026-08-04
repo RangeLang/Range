@@ -17,9 +17,9 @@ manifest_value() {
     /usr/bin/plutil -extract "$1" raw -o - "$MANIFEST"
 }
 
-"$REPO_ROOT/scripts/range" check-compiler-smoke > "$WORK_ROOT/current.out"
-compiler="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/current/RangeCompiler"
-[[ -x "$compiler" ]] || fail "current graph compiler is not executable"
+"$REPO_ROOT/scripts/range" check-compiler-smoke > "$WORK_ROOT/candidate.out"
+compiler="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/candidate/RangeCompiler"
+[[ -x "$compiler" ]] || fail "candidate graph compiler is not executable"
 [[ -f "$FIXTURE" ]] || fail "missing graph fixture"
 
 # Compare the real project commands: the graph line consumes the same

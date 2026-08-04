@@ -4,7 +4,7 @@
   "license": "Apache-2.0",
   "private": true,
   "scripts": {
-    "test:native": "scripts/range compiler progression",
+    "test:native": "scripts/range check-compiler-candidate",
     "speed": "python3 Benchmarks/Speed/run.py",
     "benchmarks": "python3 Benchmarks/Speed/run.py",
     "benchmarks:site": "python3 Benchmarks/Speed/run.py"

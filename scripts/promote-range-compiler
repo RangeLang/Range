@@ -9,8 +9,10 @@ usage() {
     cat >&2 <<'USAGE'
 Usage:
   scripts/promote-range-compiler \
-    --llvm FIRST_LLVM --reproduced-llvm SECOND_LLVM \
-    --executable FIRST_EXECUTABLE --reproduced-executable SECOND_EXECUTABLE
+    --approve \
+    --candidate-llvm CANDIDATE_LLVM --reproduction-llvm REPRODUCTION_LLVM \
+    --candidate-executable CANDIDATE_EXECUTABLE \
+    --reproduction-executable REPRODUCTION_EXECUTABLE
 
 Promotes only byte-identical fixed-point LLVM and executable pairs, then
 updates the accepted-bootstrap manifest from the exact current source/runtime set.
@@ -29,30 +31,35 @@ manifest_value() {
     /usr/bin/plutil -extract "$1" raw -o - "$MANIFEST"
 }
 
-first_llvm=""
-second_llvm=""
-first_executable=""
-second_executable=""
+approved=false
+candidate_llvm=""
+reproduction_llvm=""
+candidate_executable=""
+reproduction_executable=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --llvm)
+        --approve)
+            approved=true
+            shift
+            ;;
+        --candidate-llvm)
             [[ $# -ge 2 ]] || { usage; exit 64; }
-            first_llvm="$2"
+            candidate_llvm="$2"
             shift 2
             ;;
-        --reproduced-llvm)
+        --reproduction-llvm)
             [[ $# -ge 2 ]] || { usage; exit 64; }
-            second_llvm="$2"
+            reproduction_llvm="$2"
             shift 2
             ;;
-        --executable)
+        --candidate-executable)
             [[ $# -ge 2 ]] || { usage; exit 64; }
-            first_executable="$2"
+            candidate_executable="$2"
             shift 2
             ;;
-        --reproduced-executable)
+        --reproduction-executable)
             [[ $# -ge 2 ]] || { usage; exit 64; }
-            second_executable="$2"
+            reproduction_executable="$2"
             shift 2
             ;;
         *)
@@ -62,19 +69,23 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-[[ -f "$first_llvm" && -f "$second_llvm" ]] || {
+[[ "$approved" == true ]] || {
+    echo "Promotion requires explicit --approve confirmation." >&2
+    exit 64
+}
+[[ -f "$candidate_llvm" && -f "$reproduction_llvm" ]] || {
     echo "Promotion requires both fixed-point LLVM artifacts." >&2
     exit 66
 }
-[[ -x "$first_executable" && -x "$second_executable" ]] || {
+[[ -x "$candidate_executable" && -x "$reproduction_executable" ]] || {
     echo "Promotion requires both fixed-point executables." >&2
     exit 66
 }
-/usr/bin/cmp -s "$first_llvm" "$second_llvm" || {
+/usr/bin/cmp -s "$candidate_llvm" "$reproduction_llvm" || {
     echo "Refusing promotion: LLVM artifacts are not byte-identical." >&2
     exit 65
 }
-/usr/bin/cmp -s "$first_executable" "$second_executable" || {
+/usr/bin/cmp -s "$candidate_executable" "$reproduction_executable" || {
     echo "Refusing promotion: executables are not byte-identical." >&2
     exit 65
 }
@@ -85,8 +96,8 @@ next_manifest="$promotion_root/RangeCompilerBootstrap.json"
 next_bootstrap="$promotion_root/RangeCompilerBootstrap.ll"
 next_executable="$promotion_root/range"
 /bin/cp "$MANIFEST" "$next_manifest"
-/bin/cp "$first_llvm" "$next_bootstrap"
-/bin/cp "$first_executable" "$next_executable"
+/bin/cp "$candidate_llvm" "$next_bootstrap"
+/bin/cp "$candidate_executable" "$next_executable"
 /bin/chmod +x "$next_executable"
 
 bootstrap_hash="$(sha256 "$next_bootstrap")"
@@ -98,11 +109,12 @@ compiler_version="bootstrap-${bootstrap_hash:0:12}"
 /usr/bin/plutil -replace compiler.version -string "$compiler_version" "$next_manifest"
 /usr/bin/plutil -replace bootstrap.bytes -integer "$bootstrap_bytes" "$next_manifest"
 /usr/bin/plutil -replace bootstrap.sha256 -string "$bootstrap_hash" "$next_manifest"
-/usr/bin/plutil -replace reproducedLLVM.bytes -integer "$bootstrap_bytes" "$next_manifest"
-/usr/bin/plutil -replace reproducedLLVM.sha256 -string "$bootstrap_hash" "$next_manifest"
+/usr/bin/plutil -replace reproductionLLVM.bytes -integer "$bootstrap_bytes" "$next_manifest"
+/usr/bin/plutil -replace reproductionLLVM.sha256 -string "$bootstrap_hash" "$next_manifest"
 /usr/bin/plutil -replace executable.bytes -integer "$executable_bytes" "$next_manifest"
 /usr/bin/plutil -replace executable.sha256 -string "$executable_hash" "$next_manifest"
 /usr/bin/plutil -replace producer.clang -string "$(clang --version | /usr/bin/head -1)" "$next_manifest"
+/usr/bin/plutil -replace producer.fixedPointCommand -string "scripts/range check-compiler-candidate" "$next_manifest"
 
 compiler_source_paths=()
 compiler_source_roles=()

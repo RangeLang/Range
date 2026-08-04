@@ -583,35 +583,35 @@ compiler_next() {
 
 compiler_progression() {
     local cache_only="${1:-false}"
-    local next_metadata source_key bootstrap_llvm bootstrap_executable previous_llvm previous_executable bundle
-    local progression_key cache_root current_llvm current_executable metadata temporary diagnostic
+    local next_metadata source_key bootstrap_llvm bootstrap_executable candidate_llvm candidate_executable bundle
+    local progression_key cache_root reproduction_llvm reproduction_executable metadata temporary diagnostic
     local bootstrap_llvm_hash bootstrap_llvm_bytes bootstrap_executable_hash bootstrap_executable_bytes
-    local previous_llvm_hash previous_llvm_bytes previous_executable_hash previous_executable_bytes
-    local current_llvm_hash current_llvm_bytes current_executable_hash current_executable_bytes
-    local bootstrap_to_previous_llvm_bytes previous_to_current_llvm_bytes
-    local bootstrap_to_previous_executable_bytes previous_to_current_executable_bytes
+    local candidate_llvm_hash candidate_llvm_bytes candidate_executable_hash candidate_executable_bytes
+    local reproduction_llvm_hash reproduction_llvm_bytes reproduction_executable_hash reproduction_executable_bytes
+    local bootstrap_to_candidate_llvm_bytes candidate_to_reproduction_llvm_bytes
+    local bootstrap_to_candidate_executable_bytes candidate_to_reproduction_executable_bytes
     local llvm_fixed_point executable_fixed_point fixed_point compiler_exit_code
-    local cached_source cached_bootstrap_llvm cached_previous_llvm cached_current_llvm
-    local cached_current_llvm_hash cached_current_llvm_bytes cached_current_executable_hash cached_current_executable_bytes
+    local cached_source cached_bootstrap_llvm cached_candidate_llvm cached_reproduction_llvm
+    local cached_reproduction_llvm_hash cached_reproduction_llvm_bytes cached_reproduction_executable_hash cached_reproduction_executable_bytes
     local cached_llvm_fixed_point cached_executable_fixed_point cached_fixed_point
     local runtime
     local -a runtimes
 
-    # First the accepted bootstrap builds `previous`; then `previous` builds
-    # `current` from the exact source bundle retained by compiler-next.
+    # First the accepted bootstrap builds `candidate`; then `candidate` builds
+    # `reproduction` from the exact source bundle retained by compiler-next.
     next_metadata="$(compiler_next "$cache_only")"
     source_key="$(/usr/bin/printf '%s\n' "$next_metadata" | /usr/bin/sed -n 's/^source=//p')"
-    previous_executable="$(/usr/bin/printf '%s\n' "$next_metadata" | /usr/bin/sed -n 's/^executable=//p')"
-    if [[ -z "$source_key" || -z "$previous_executable" || ! -x "$previous_executable" ]]; then
-        echo "Compiler progression could not resolve the previous compiler candidate." >&2
+    candidate_executable="$(/usr/bin/printf '%s\n' "$next_metadata" | /usr/bin/sed -n 's/^executable=//p')"
+    if [[ -z "$source_key" || -z "$candidate_executable" || ! -x "$candidate_executable" ]]; then
+        echo "Compiler progression could not resolve the compiler candidate." >&2
         return 65
     fi
 
-    previous_llvm="$(dirname "$previous_executable")/RangeCompiler.ll"
-    bundle="$(dirname "$previous_executable")/CompilerSourceSet.range"
+    candidate_llvm="$(dirname "$candidate_executable")/RangeCompiler.ll"
+    bundle="$(dirname "$candidate_executable")/CompilerSourceSet.range"
     bootstrap_llvm="$REPO_ROOT/$(manifest_value bootstrap.path)"
     bootstrap_executable="$(ensure_bootstrap_compiler)"
-    if [[ ! -f "$previous_llvm" || ! -f "$bundle" ]]; then
+    if [[ ! -f "$candidate_llvm" || ! -f "$bundle" ]]; then
         echo "Compiler progression candidate is incomplete." >&2
         return 65
     fi
@@ -625,15 +625,15 @@ compiler_progression() {
     bootstrap_llvm_bytes="$(/usr/bin/stat -f %z "$bootstrap_llvm")"
     bootstrap_executable_hash="$(sha256 "$bootstrap_executable")"
     bootstrap_executable_bytes="$(/usr/bin/stat -f %z "$bootstrap_executable")"
-    previous_llvm_hash="$(sha256 "$previous_llvm")"
-    previous_llvm_bytes="$(/usr/bin/stat -f %z "$previous_llvm")"
-    previous_executable_hash="$(sha256 "$previous_executable")"
-    previous_executable_bytes="$(/usr/bin/stat -f %z "$previous_executable")"
+    candidate_llvm_hash="$(sha256 "$candidate_llvm")"
+    candidate_llvm_bytes="$(/usr/bin/stat -f %z "$candidate_llvm")"
+    candidate_executable_hash="$(sha256 "$candidate_executable")"
+    candidate_executable_bytes="$(/usr/bin/stat -f %z "$candidate_executable")"
 
     progression_key="$({
         /usr/bin/printf 'source=%s\n' "$source_key"
-        /usr/bin/printf 'previousLLVM=%s\n' "$previous_llvm_hash"
-        /usr/bin/printf 'previousExecutable=%s\n' "$previous_executable_hash"
+        /usr/bin/printf 'candidateLLVM=%s\n' "$candidate_llvm_hash"
+        /usr/bin/printf 'candidateExecutable=%s\n' "$candidate_executable_hash"
         /usr/bin/printf 'bundle=%s\n' "$(sha256 "$bundle")"
         for runtime in "${runtimes[@]}"; do
             /usr/bin/printf 'runtime\t%s\t%s\n' "${runtime#"$REPO_ROOT/"}" "$(sha256 "$runtime")"
@@ -644,36 +644,36 @@ compiler_progression() {
     } | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
 
     cache_root="$REPO_ROOT/.range/Compiler/Progression/$progression_key"
-    current_llvm="$cache_root/RangeCompiler.ll"
-    current_executable="$cache_root/RangeCompiler"
+    reproduction_llvm="$cache_root/RangeCompiler.ll"
+    reproduction_executable="$cache_root/RangeCompiler"
     metadata="$cache_root/Progression.txt"
 
-    if [[ -x "$current_executable" && -f "$current_llvm" && -f "$metadata" ]]; then
+    if [[ -x "$reproduction_executable" && -f "$reproduction_llvm" && -f "$metadata" ]]; then
         cached_source="$(/usr/bin/sed -n 's/^source=//p' "$metadata")"
         cached_bootstrap_llvm="$(/usr/bin/sed -n 's/^bootstrapLLVMHash=//p' "$metadata")"
-        cached_previous_llvm="$(/usr/bin/sed -n 's/^previousLLVMHash=//p' "$metadata")"
-        cached_current_llvm="$(/usr/bin/sed -n 's/^currentLLVM=//p' "$metadata")"
-        cached_current_llvm_hash="$(/usr/bin/sed -n 's/^currentLLVMHash=//p' "$metadata")"
-        cached_current_llvm_bytes="$(/usr/bin/sed -n 's/^currentLLVMBytes=//p' "$metadata")"
-        cached_current_executable_hash="$(/usr/bin/sed -n 's/^currentExecutableHash=//p' "$metadata")"
-        cached_current_executable_bytes="$(/usr/bin/sed -n 's/^currentExecutableBytes=//p' "$metadata")"
+        cached_candidate_llvm="$(/usr/bin/sed -n 's/^candidateLLVMHash=//p' "$metadata")"
+        cached_reproduction_llvm="$(/usr/bin/sed -n 's/^reproductionLLVM=//p' "$metadata")"
+        cached_reproduction_llvm_hash="$(/usr/bin/sed -n 's/^reproductionLLVMHash=//p' "$metadata")"
+        cached_reproduction_llvm_bytes="$(/usr/bin/sed -n 's/^reproductionLLVMBytes=//p' "$metadata")"
+        cached_reproduction_executable_hash="$(/usr/bin/sed -n 's/^reproductionExecutableHash=//p' "$metadata")"
+        cached_reproduction_executable_bytes="$(/usr/bin/sed -n 's/^reproductionExecutableBytes=//p' "$metadata")"
         cached_llvm_fixed_point="$(/usr/bin/sed -n 's/^llvmFixedPoint=//p' "$metadata")"
         cached_executable_fixed_point="$(/usr/bin/sed -n 's/^executableFixedPoint=//p' "$metadata")"
         cached_fixed_point="$(/usr/bin/sed -n 's/^fixedPoint=//p' "$metadata")"
         llvm_fixed_point=false
         executable_fixed_point=false
-        if /usr/bin/cmp -s "$previous_llvm" "$current_llvm"; then llvm_fixed_point=true; fi
-        if /usr/bin/cmp -s "$previous_executable" "$current_executable"; then executable_fixed_point=true; fi
+        if /usr/bin/cmp -s "$candidate_llvm" "$reproduction_llvm"; then llvm_fixed_point=true; fi
+        if /usr/bin/cmp -s "$candidate_executable" "$reproduction_executable"; then executable_fixed_point=true; fi
         fixed_point=false
         if [[ "$llvm_fixed_point" == true && "$executable_fixed_point" == true ]]; then fixed_point=true; fi
         if [[ "$cached_source" == "$source_key"
             && "$cached_bootstrap_llvm" == "$bootstrap_llvm_hash"
-            && "$cached_previous_llvm" == "$previous_llvm_hash"
-            && "$cached_current_llvm" == "$current_llvm"
-            && "$cached_current_llvm_hash" == "$(sha256 "$current_llvm")"
-            && "$cached_current_llvm_bytes" == "$(/usr/bin/stat -f %z "$current_llvm")"
-            && "$cached_current_executable_hash" == "$(sha256 "$current_executable")"
-            && "$cached_current_executable_bytes" == "$(/usr/bin/stat -f %z "$current_executable")"
+            && "$cached_candidate_llvm" == "$candidate_llvm_hash"
+            && "$cached_reproduction_llvm" == "$reproduction_llvm"
+            && "$cached_reproduction_llvm_hash" == "$(sha256 "$reproduction_llvm")"
+            && "$cached_reproduction_llvm_bytes" == "$(/usr/bin/stat -f %z "$reproduction_llvm")"
+            && "$cached_reproduction_executable_hash" == "$(sha256 "$reproduction_executable")"
+            && "$cached_reproduction_executable_bytes" == "$(/usr/bin/stat -f %z "$reproduction_executable")"
             && "$cached_llvm_fixed_point" == "$llvm_fixed_point"
             && "$cached_executable_fixed_point" == "$executable_fixed_point"
             && "$cached_fixed_point" == "$fixed_point" ]]; then
@@ -684,7 +684,7 @@ compiler_progression() {
     fi
 
     if [[ "$cache_only" == true ]]; then
-        echo "No validated compiler-progression cache entry exists for the current compiler candidate." >&2
+        echo "No validated compiler-progression cache entry exists for the compiler candidate." >&2
         echo "Run 'scripts/range compiler progression' only when an uncached fixed-point proof is intentional." >&2
         return 75
     fi
@@ -693,7 +693,7 @@ compiler_progression() {
     temporary="$cache_root/.build.$$"
     diagnostic="$temporary/diagnostic.txt"
     /bin/mkdir -p "$temporary"
-    if "$previous_executable" emit-llvm "$bundle" "$temporary/RangeCompiler.ll" > "$diagnostic"; then
+    if "$candidate_executable" emit-llvm "$bundle" "$temporary/RangeCompiler.ll" > "$diagnostic"; then
         compiler_exit_code=0
     else
         compiler_exit_code=$?
@@ -713,18 +713,18 @@ compiler_progression() {
         return 65
     fi
 
-    current_llvm_hash="$(sha256 "$temporary/RangeCompiler.ll")"
-    current_llvm_bytes="$(/usr/bin/stat -f %z "$temporary/RangeCompiler.ll")"
-    current_executable_hash="$(sha256 "$temporary/RangeCompiler")"
-    current_executable_bytes="$(/usr/bin/stat -f %z "$temporary/RangeCompiler")"
-    bootstrap_to_previous_llvm_bytes=$((previous_llvm_bytes - bootstrap_llvm_bytes))
-    previous_to_current_llvm_bytes=$((current_llvm_bytes - previous_llvm_bytes))
-    bootstrap_to_previous_executable_bytes=$((previous_executable_bytes - bootstrap_executable_bytes))
-    previous_to_current_executable_bytes=$((current_executable_bytes - previous_executable_bytes))
+    reproduction_llvm_hash="$(sha256 "$temporary/RangeCompiler.ll")"
+    reproduction_llvm_bytes="$(/usr/bin/stat -f %z "$temporary/RangeCompiler.ll")"
+    reproduction_executable_hash="$(sha256 "$temporary/RangeCompiler")"
+    reproduction_executable_bytes="$(/usr/bin/stat -f %z "$temporary/RangeCompiler")"
+    bootstrap_to_candidate_llvm_bytes=$((candidate_llvm_bytes - bootstrap_llvm_bytes))
+    candidate_to_reproduction_llvm_bytes=$((reproduction_llvm_bytes - candidate_llvm_bytes))
+    bootstrap_to_candidate_executable_bytes=$((candidate_executable_bytes - bootstrap_executable_bytes))
+    candidate_to_reproduction_executable_bytes=$((reproduction_executable_bytes - candidate_executable_bytes))
     llvm_fixed_point=false
     executable_fixed_point=false
-    if /usr/bin/cmp -s "$previous_llvm" "$temporary/RangeCompiler.ll"; then llvm_fixed_point=true; fi
-    if /usr/bin/cmp -s "$previous_executable" "$temporary/RangeCompiler"; then executable_fixed_point=true; fi
+    if /usr/bin/cmp -s "$candidate_llvm" "$temporary/RangeCompiler.ll"; then llvm_fixed_point=true; fi
+    if /usr/bin/cmp -s "$candidate_executable" "$temporary/RangeCompiler"; then executable_fixed_point=true; fi
     fixed_point=false
     if [[ "$llvm_fixed_point" == true && "$executable_fixed_point" == true ]]; then fixed_point=true; fi
 
@@ -738,35 +738,35 @@ compiler_progression() {
         /usr/bin/printf 'bootstrapExecutable=%s\n' "$bootstrap_executable"
         /usr/bin/printf 'bootstrapExecutableHash=%s\n' "$bootstrap_executable_hash"
         /usr/bin/printf 'bootstrapExecutableBytes=%s\n' "$bootstrap_executable_bytes"
-        /usr/bin/printf 'previousLLVM=%s\n' "$previous_llvm"
-        /usr/bin/printf 'previousLLVMHash=%s\n' "$previous_llvm_hash"
-        /usr/bin/printf 'previousLLVMBytes=%s\n' "$previous_llvm_bytes"
-        /usr/bin/printf 'previousExecutable=%s\n' "$previous_executable"
-        /usr/bin/printf 'previousExecutableHash=%s\n' "$previous_executable_hash"
-        /usr/bin/printf 'previousExecutableBytes=%s\n' "$previous_executable_bytes"
-        /usr/bin/printf 'currentLLVM=%s\n' "$current_llvm"
-        /usr/bin/printf 'currentLLVMHash=%s\n' "$current_llvm_hash"
-        /usr/bin/printf 'currentLLVMBytes=%s\n' "$current_llvm_bytes"
-        /usr/bin/printf 'currentExecutable=%s\n' "$current_executable"
-        /usr/bin/printf 'currentExecutableHash=%s\n' "$current_executable_hash"
-        /usr/bin/printf 'currentExecutableBytes=%s\n' "$current_executable_bytes"
-        /usr/bin/printf 'bootstrapToPreviousLLVMBytes=%+d\n' "$bootstrap_to_previous_llvm_bytes"
-        /usr/bin/printf 'previousToCurrentLLVMBytes=%+d\n' "$previous_to_current_llvm_bytes"
-        /usr/bin/printf 'bootstrapToPreviousExecutableBytes=%+d\n' "$bootstrap_to_previous_executable_bytes"
-        /usr/bin/printf 'previousToCurrentExecutableBytes=%+d\n' "$previous_to_current_executable_bytes"
+        /usr/bin/printf 'candidateLLVM=%s\n' "$candidate_llvm"
+        /usr/bin/printf 'candidateLLVMHash=%s\n' "$candidate_llvm_hash"
+        /usr/bin/printf 'candidateLLVMBytes=%s\n' "$candidate_llvm_bytes"
+        /usr/bin/printf 'candidateExecutable=%s\n' "$candidate_executable"
+        /usr/bin/printf 'candidateExecutableHash=%s\n' "$candidate_executable_hash"
+        /usr/bin/printf 'candidateExecutableBytes=%s\n' "$candidate_executable_bytes"
+        /usr/bin/printf 'reproductionLLVM=%s\n' "$reproduction_llvm"
+        /usr/bin/printf 'reproductionLLVMHash=%s\n' "$reproduction_llvm_hash"
+        /usr/bin/printf 'reproductionLLVMBytes=%s\n' "$reproduction_llvm_bytes"
+        /usr/bin/printf 'reproductionExecutable=%s\n' "$reproduction_executable"
+        /usr/bin/printf 'reproductionExecutableHash=%s\n' "$reproduction_executable_hash"
+        /usr/bin/printf 'reproductionExecutableBytes=%s\n' "$reproduction_executable_bytes"
+        /usr/bin/printf 'bootstrapToCandidateLLVMBytes=%+d\n' "$bootstrap_to_candidate_llvm_bytes"
+        /usr/bin/printf 'candidateToReproductionLLVMBytes=%+d\n' "$candidate_to_reproduction_llvm_bytes"
+        /usr/bin/printf 'bootstrapToCandidateExecutableBytes=%+d\n' "$bootstrap_to_candidate_executable_bytes"
+        /usr/bin/printf 'candidateToReproductionExecutableBytes=%+d\n' "$candidate_to_reproduction_executable_bytes"
         /usr/bin/printf 'llvmFixedPoint=%s\n' "$llvm_fixed_point"
         /usr/bin/printf 'executableFixedPoint=%s\n' "$executable_fixed_point"
         /usr/bin/printf 'fixedPoint=%s\n' "$fixed_point"
     } > "$temporary/Progression.txt"
 
-    /bin/mv "$temporary/RangeCompiler.ll" "$current_llvm"
-    /bin/mv "$temporary/RangeCompiler" "$current_executable"
+    /bin/mv "$temporary/RangeCompiler.ll" "$reproduction_llvm"
+    /bin/mv "$temporary/RangeCompiler" "$reproduction_executable"
     /bin/mv "$temporary/Progression.txt" "$metadata"
     /bin/rm -f "$diagnostic"
     /bin/rmdir "$temporary"
     /bin/cat "$metadata"
     if [[ "$fixed_point" != true ]]; then
-        echo "Compiler progression failed: previous and current artifacts differ." >&2
+        echo "Compiler progression failed: candidate and reproduction artifacts differ." >&2
         return 65
     fi
 }

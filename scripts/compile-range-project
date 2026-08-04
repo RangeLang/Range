@@ -173,13 +173,13 @@ accepted_compiler="$REPO_ROOT/$(manifest_value executable.path)"
 # pretending that the marker text is already a canonical Shape.
 compiler="$accepted_compiler"
 if [[ "$graph_mode" -eq 1 || "$shape_mode" -eq 1 ]]; then
-    # Resolve the current Range-authored current build producer, rather than using
+    # Resolve the Range-authored candidate producer, rather than using
     # the promoted bootstrap executable. This keeps the graph line on the
-    # current compiler source while the ordinary line remains the accepted
+    # candidate source while the ordinary line remains the accepted
     # oracle.
     "$SCRIPT_DIR/range" check-compiler-smoke >/dev/null
-    graph_compiler="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/current/RangeCompiler"
-    [[ -x "$graph_compiler" ]] || compile_project_fail "current graph compiler is not executable"
+    graph_compiler="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/candidate/RangeCompiler"
+    [[ -x "$graph_compiler" ]] || compile_project_fail "candidate graph compiler is not executable"
     compiler="$graph_compiler"
     graph_compiler_hash="$(/usr/bin/shasum -a 256 "$graph_compiler" | /usr/bin/awk '{print $1}')"
 fi

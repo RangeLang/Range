@@ -107,7 +107,7 @@
     </section>
 
     <section class="selection" aria-live="polite">
-      <strong id="selection-title">current build · Range-authored compiler</strong>
+      <strong id="selection-title">candidate · Range-authored compiler</strong>
       <span id="selection-state" class="state">observed</span>
       <p id="selection-copy">The current Range compiler emitted and linked natively. The latest cold development build spent 656 seconds in LLVM emission and finished in 659 seconds; an unchanged warm invocation reused the artifact in 3.94 seconds.</p>
     </section>
@@ -148,7 +148,7 @@
       {
         id: 'persistent-graph',
         label: 'persistent graph line',
-        description: 'inside the current build artifact',
+        description: 'inside the candidate artifact',
         y: 520,
         nodes: [
           { id: 'file', x: 900, kind: 'point', eyebrow: 'input', title: 'File', meta: 'path + bytes + identity' },
@@ -161,7 +161,7 @@
       {
         id: 'program-output',
         label: 'program output line',
-        description: 'current build consumer',
+        description: 'candidate consumer',
         y: 735,
         nodes: [
           { id: 'program', x: 1110, kind: 'point', eyebrow: 'input', title: 'Range program', meta: '.range source' },
@@ -202,8 +202,8 @@
       behavior: ['Persistent graph · Behavior', 'observed', 'Behavior is the semantic/native boundary where exact cache identity can be checked.'],
       compiled: ['Persistent graph · Compiled', 'observed', 'Compiled is the persisted LLVM text and artifact identity.'],
       cache: ['Persistent graph · cache branch', 'observed', 'The v8 cache checks source, root, record, and text integrity. An exact hit can skip body discovery, effects, ABI planning, and LLVM emission.'],
-      program: ['Program output · Range program', 'observed', 'An ordinary .range program enters through the current build compiler line.'],
-      llvm: ['Program output · LLVM module', 'observed', 'LLVM emission is the measured cold-build bottleneck: 656 of 659 seconds in the latest current build rebuild.'],
+      program: ['Program output · Range program', 'observed', 'An ordinary .range program enters through the candidate compiler line.'],
+      llvm: ['Program output · LLVM module', 'observed', 'LLVM emission is the measured cold-build bottleneck: 656 of 659 seconds in the latest candidate rebuild.'],
       executable: ['Program output · Executable', 'observed', 'The linked result is a native Range program. The focused V1 proof ran ordinary fixtures with exits 7 and 8.']
     };
 

@@ -24,11 +24,11 @@ BUILD = BENCH / ".build"
 RESULTS = BENCH / "results"
 SITE_RESULTS = ROOT / "Website" / "public" / "benchmarks.json"
 BOOTSTRAP_MANIFEST = ROOT / "RangeCompiler" / "Bootstrap" / "RangeCompilerBootstrap.json"
-CURRENT_COMPILER = (
-    ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "current" / "RangeCompiler"
+CANDIDATE_COMPILER = (
+    ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "candidate" / "RangeCompiler"
 )
-REPRODUCED_COMPILER = (
-    ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "reproduced" / "RangeCompiler"
+REPRODUCTION_COMPILER = (
+    ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "reproduction" / "RangeCompiler"
 )
 ITERATIONS = int(os.environ.get("N", "1000000"))
 RUNS = int(os.environ.get("RUNS", "5"))
@@ -1969,11 +1969,11 @@ def verified_range_compiler() -> Path | None:
         return compiler
 
     if (
-        CURRENT_COMPILER.is_file()
-        and REPRODUCED_COMPILER.is_file()
-        and filecmp.cmp(CURRENT_COMPILER, REPRODUCED_COMPILER, shallow=False)
+        CANDIDATE_COMPILER.is_file()
+        and REPRODUCTION_COMPILER.is_file()
+        and filecmp.cmp(CANDIDATE_COMPILER, REPRODUCTION_COMPILER, shallow=False)
     ):
-        return REPRODUCED_COMPILER
+        return REPRODUCTION_COMPILER
     return None
 
 

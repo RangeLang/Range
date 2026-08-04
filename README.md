@@ -136,16 +136,19 @@ Range peak memory: **5.3 GB** · peers: **1.8–4.2 MB**.
 scripts/range compile Testing/Basics/Pass/ReturnInteger.range
 range run GPUCanvas
 scripts/range check-compiler-candidate
-scripts/range check-compiler
+scripts/range compiler promote --approve
+scripts/range check-compiler-integrity
 ```
 
 The ordinary file/directory wrapper bundles canonical Core sources through the
 accepted compiler; `range run` additionally links the manifest-declared runtime
 inputs and executes `@main`. See the
 [speed benchmark](Benchmarks/Speed/README.md) for performance comparisons.
-The two compiler checks above are maintainer proofs: the first validates the
-candidate/reproduction fixed point, and the second verifies the currently
-accepted bootstrap.
+The candidate check validates the two-build fixed point. The explicitly
+approved promotion command runs that proof, installs the candidate, and checks
+the new bootstrap's manifest and file integrity without compiling a third
+generation. `scripts/range check-compiler` remains an optional independent
+reproduction audit.
 
 ## License
 

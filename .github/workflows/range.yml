@@ -19,7 +19,7 @@ jobs:
         run: bash -n scripts/range scripts/range-native scripts/check-range-compiler-candidate scripts/verify-range-compiler
 
       - name: Verify accepted bootstrap
-        run: scripts/range check-compiler
+        run: scripts/range check-compiler-integrity
 
       - name: Verify candidate reproduction
         run: scripts/range check-compiler-candidate

@@ -194,8 +194,8 @@ done
 # The revision's shape value is a faithful projection of the persisted Source
 # artifact: an independent V1 derivation over the same bundle must reproduce
 # the exact shape node value, and that shape product contains no LLVM.
-compiler="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/current/RangeCompiler"
-[[ -x "$compiler" ]] || fail "current graph compiler is not executable"
+compiler="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/candidate/RangeCompiler"
+[[ -x "$compiler" ]] || fail "candidate graph compiler is not executable"
 "$compiler" inspect-v1 "$source_bundle_path" > "$WORK_ROOT/inspect.out"
 shape_delta_after="$(/usr/bin/sed -n 's/^compilerV1Delta\tphase=shape\t.*\tafter=\([0-9]*:[0-9]*\)$/\1/p' "$WORK_ROOT/inspect.out" | /usr/bin/head -1)"
 [[ -n "$shape_delta_after" ]] || fail "inspect-v1 omitted the shape delta over the persisted Source artifact"
@@ -308,4 +308,3 @@ done
 
 affected_views="$(node_changed_count "$project_updated_revision")"
 echo "Range compiler graph revision: pass (deterministic revision identity, parent chaining, node/edge/digest record, cold/warm reuse, measured stage costs, Shape consumes the persisted Source artifact, shape-only reducer parity, bounded literal-edit invalidation with $affected_views affected views, failed-candidate last-known-good preservation, recovery)"
-

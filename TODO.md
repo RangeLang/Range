@@ -58,7 +58,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     declare `stringLength` and `stringByteAt` explicitly as neutral `@builtin`
     Core functions, and flatten `processArgumentRecord` so registered calls do
     not remain nested inside interpolation.
-    - The cached current-build compiler compiled the complete current source graph
+    - The cached candidate compiler compiled the complete current source graph
       through this boundary, exited `0`, and produced 8,536,874 bytes of LLVM
       with SHA-256
       `0be0ae3777cae8721e7e209679b6ff853884cda1b98a27b8c914ff7c5c1eb6fa`;
@@ -290,7 +290,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   `environment.target.Declaration...`; expansion target splices now use
   `#environment.target.Declaration.identifier`.
 - [ ] Finish the general uppercase inline-construct projection without
-  regressing bounded current-build production.
+  regressing bounded candidate production.
   - The current draft adds resolution kind
     `compilerBodyResolutionInlineConstructProjection`, resolves a directly
     nested construct by parent syntax ID and name, interns its construct type,
@@ -317,7 +317,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - Run `scripts/range check-build-plan`, then
     `scripts/range check-value-ownership`; do not infer later-gate success from the
     build-plan result.
-  - The uninterrupted recovery run completed the development current-build producer
+  - The uninterrupted recovery run completed the development candidate producer
     in 583 seconds (`llvm-emission=580`, `llvm-validation=2`,
     `current-link=1`; 17 artifacts reused and 2,639 rebuilt).
   - `check-value-ownership` then reached the inline-projection proofs: the uppercase
@@ -336,7 +336,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] Remove the redundant `@field` marker, its unused Foundation macro, and
     its compiler target alias; declaration bodies already expose `[@member]`,
     while `@property` and `@stored` describe the meaningful subsets.
-    - The development current build rebuilt one artifact and reused 2,655, completed
+    - The development candidate rebuilt one artifact and reused 2,655, completed
       in 324 seconds, and passed every affected macro/Codable fixture before
       reaching the unchanged graph-capability `macroMissingTarget` boundary.
   - [x] Remove declaration-owned `replace` methods from
@@ -1677,20 +1677,27 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     including aggregates with multiple independently owned String leaves.
 - [x] Reconcile the accepted bootstrap manifest with the current compiler inputs.
   - The accepted compiler and its complete manifested input set pass
-    `scripts/verify-range-compiler`.
+    `scripts/range check-compiler-integrity`.
 - [x] Run the complete validation ladder and promote one reproducible accepted
   compiler after the manifest is repaired.
   - [x] `scripts/range check-build-plan`
   - [x] `scripts/range check-value-ownership --controls`
   - [x] `scripts/range check-compiler-smoke`
   - [x] `scripts/range check-compiler-candidate`
-  - [x] `scripts/range check-compiler`
+  - [x] `scripts/range check-compiler-integrity`
   - Accepted compiler + source produces the candidate; candidate + the same
     source produces the reproduction. Byte-identical LLVM and executables
     authorize promotion. A third build is redundant after equality.
   - Promotion replaces the accepted compiler; prior checkpoints remain in Git
     history instead of continuing as active authorities.
-- [x] Resolve the accepted-bootstrap current build once per compiler-source change.
+  - [x] Expose `scripts/range compiler promote --approve` as the single
+    promotion command. It runs the candidate/reproduction proof, promotes only
+    byte-identical LLVM/executables, and finishes with integrity verification
+    instead of compiling a third generation.
+  - [x] Rename disposable build artifacts to `.range/Build/candidate` and
+    `.range/Build/reproduction`, including build-plan IDs, checkpoints, cache
+    metadata, benchmark discovery, and focused proof consumers.
+- [x] Resolve the accepted-bootstrap candidate once per compiler-source change.
   - [x] Share one content-addressed resolver between value-ownership, smoke, and the
     ordinary compiler-candidate path; keep bootstrap-bridge production
     separate because it has a different producer.
@@ -1698,7 +1705,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     compiler source bundle and inventory, target/toolchain identity, and exact
     Clang invocation flags.
   - [x] Keep value-ownership and smoke proofs independent while reusing the same
-    current-build executable and cache key.
+    candidate executable and cache key.
     - The final verified shared-cache reuse completed value-ownership in 3.49
       seconds and smoke in 3.72 seconds with cache key
       `22ef98c2c4267c598b7677af4ff9725b46e831fbe705632aeda60b2f25586660`.
@@ -1710,7 +1717,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       cache, so development artifacts cannot satisfy optimized gates.
     - Emit phase timings on cache misses. The first measured development miss
       spent 18 seconds linking the optimized bootstrap, 593 seconds emitting
-      LLVM, 1 second validating LLVM, and 2 seconds linking the current build.
+      LLVM, 1 second validating LLVM, and 2 seconds linking the candidate.
   - [ ] Make compiler LLVM emission incremental or cacheable below the full
     source-bundle key.
     - [ ] Make compiler performance observable at authored phase and work-unit boundaries.
@@ -1775,7 +1782,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - Phase timings show self-emission, not Clang or linking, dominates a
       compiler-source cache miss; preserve full candidate/fixed-point proofs.
     - The `@stored` selector proof measured 916 seconds emitting LLVM, 2
-      seconds validating it, and 2 seconds linking the current build. The identical
+      seconds validating it, and 2 seconds linking the candidate. The identical
       follow-up value-ownership run reused the immutable artifact and completed in
       about 4 seconds.
     - [x] Add a validated rolling development producer and skip the duplicate
@@ -1839,7 +1846,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           not LLVM validation or linking, remain the dominant cost.
         - The independent optimized candidate measured 714 seconds for Range
           LLVM emission, 1 second for validation, 22 seconds for linking, and
-          755 seconds total before its complete current-build audit passed. The reproduction
+          755 seconds total before its complete candidate audit passed. The reproduction
           then compiled, validated, and linked the full 29-file compiler, but
           required about 25 minutes of CPU in the same global emission path.
         - Candidate and reproduction executables were byte-identical at SHA-256
@@ -1919,7 +1926,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       manifest-recorded SDK/runtime link plan after object production.
     - [ ] Replace `Core/Package/LinkPlan.range`'s authored `clang` process with
       that backend plus direct-link plan.
-    - [ ] Remove Clang identity and flags from current-build cache/build-plan keys
+    - [ ] Remove Clang identity and flags from candidate cache/build-plan keys
       only after object generation, runtime compilation, validation, and
       linking have independent versioned owners.
 
@@ -1998,16 +2005,16 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         next independent capability slice.
       - Keep the proof boundary explicit: value-ownership and its controls must pass
         before advancing to smoke, candidate reproduction, or accepted-bootstrap
-        verification.
+        integrity verification.
     - [x] Run the supported ladder in order: build plan, ordinary value with
       controls, compiler smoke, compiler candidate/reproduction, and accepted
-      bootstrap verification.
+      bootstrap integrity verification.
       - [x] Build plan, complete value-ownership controls, Compiler V1, and
         compiler smoke pass on the current source snapshot.
-      - [x] The optimized candidate passes the complete current-build audit and
-        reproduced-build compile/validate/link boundary.
+      - [x] The optimized candidate passes the complete candidate audit and
+        reproduction compile/validate/link boundary.
       - [x] Promote the independently verified candidate/reproduction artifact
-        and rerun the accepted-bootstrap verifier and complete candidate gate.
+        and rerun accepted-bootstrap integrity verification.
         - Promotion rebuilt the manifest from the live Core inventory and all
           29 current compiler sources instead of retaining its stale 26-entry
           source list.
@@ -2042,7 +2049,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         found no callers.
         - The slice removed 172 Range lines and no direct RawBuffer calls.
           Native compiler smoke rebuilt in 672 seconds (668 emission, 2 LLVM
-          validation, 2 linking), and the linked current-build executable remained
+          validation, 2 linking), and the linked candidate executable remained
           byte-identical at SHA-256
           `1ebc06443ced5d0349ee76a2e4210fc5d7f6f243bd005c49101ad91fee77e427`.
     - [ ] Remove only a complete unreachable chain: its record
@@ -2084,7 +2091,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         commit, and diagnostics consume its named fields.
       - [ ] Replace the private 24-column backing table and pending-table copy
         with a typed delta store and an explicit resolved-member product.
-        - The development current-build compiler accepted the 18-field scalar delta
+        - The development candidate compiler accepted the 18-field scalar delta
           aggregate; canonical-target and project macro fixtures committed one
           and two generated members respectively through that boundary.
       - [ ] Record delta provenance and observations as typed identities rather
@@ -2274,7 +2281,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - Changing File contents preserves the File identity while changing its
           value fingerprint. Shape and later phases are now capable of update
           semantics instead of treating each changed value as a new graph node.
-        - The development current build rebuilt all 2,952 function artifacts and
+        - The development candidate rebuilt all 2,952 function artifacts and
           passed the complete value-ownership gate in 654 seconds: 651 seconds
           Range LLVM emission, 2 seconds validation, and 1 second linking.
           `scripts/check-range-compiler-v1` then passed stable phase identities,
@@ -2316,7 +2323,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         special case or a second graph.
       - Prove the source Delta inspection, legacy LLVM byte parity, linked
         execution, and missing-input error through `scripts/check-range-compiler-v1`.
-      - The focused V1 gate passed after a development current-build cache miss:
+      - The focused V1 gate passed after a development candidate cache miss:
         LLVM emission took 711 seconds, validation 1 second, and linking 2
         seconds; 12 function artifacts were reused and 2,913 rebuilt. The V1
         LLVM was byte-identical to the legacy path, linked, and ran with exit
@@ -2618,7 +2625,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     deterministic-rejection behavior; it changes representation vocabulary,
     not accepted value semantics.
   - The changed Range-authored compiler emitted in 363 seconds, validated in
-    2 seconds, linked in 2 seconds, and completed its development current build
+    2 seconds, linked in 2 seconds, and completed its development candidate
     build in 367 seconds while reusing 2,895 of 2,917 function artifacts.
   - [ ] Re-run the complete value-ownership fixture set after the independent
     construct-attached Codable collection accepts its retained `Array<@stored>`

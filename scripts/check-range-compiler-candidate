@@ -13,18 +13,18 @@ usage() {
     cat <<'USAGE'
 Usage:
   scripts/check-range-compiler-candidate [DIR]
-  scripts/check-range-compiler-candidate --checkpoint self-reproduce [DIR]
+  scripts/check-range-compiler-candidate --checkpoint candidate-plan [DIR]
   scripts/check-range-compiler-candidate --bootstrap-bridge-source PHASE1_DIR FINAL_DIR
   scripts/check-range-compiler-candidate --help
 
-DIR defaults to RangeCompiler/Sources/Compiler. The self-reproduce checkpoint
-resolves the shared immutable development current build artifact (-O0, no LTO), then
-independently proves that current build can read the canonical candidate build plan
-and source set. The full candidate path remains optimized with ThinLTO.
+DIR defaults to RangeCompiler/Sources/Compiler. The candidate-plan checkpoint
+resolves the shared immutable development candidate artifact (-O0, no LTO),
+then proves that it can read the canonical candidate build plan and source set.
+The full candidate/reproduction path remains optimized with ThinLTO.
 
 The bootstrap bridge mode uses the manifested bootstrap to compile an immutable
 old-syntax Phase1 source bundle, audits that one-shot bridge, and uses it only
-to produce the final current build candidate. It never modifies or accepts the bootstrap.
+to produce the final compiler candidate. It never modifies or accepts the bootstrap.
 USAGE
 }
 
@@ -213,7 +213,7 @@ write_expected_inventory() {
 
 write_candidate_build_plan() {
     local output="$1"
-    local current_producer_id="$2"
+    local candidate_producer_id="$2"
     local bootstrap_relative bootstrap_path runtime_count index path identity logical_path
 
     bootstrap_relative="$(manifest_value bootstrap.path)"
@@ -243,39 +243,39 @@ write_candidate_build_plan() {
             "$(bytes "${SOURCE_FILES[$index]}")" >> "$output"
     done
     for logical_path in \
-        candidate/.range/Build/current/RangeCompiler.ll \
-        candidate/.range/Build/current/RangeCompiler \
-        candidate/.range/Build/reproduced/RangeCompiler.ll \
-        candidate/.range/Build/reproduced/RangeCompiler; do
+        candidate/.range/Build/candidate/RangeCompiler.ll \
+        candidate/.range/Build/candidate/RangeCompiler \
+        candidate/.range/Build/reproduction/RangeCompiler.ll \
+        candidate/.range/Build/reproduction/RangeCompiler; do
         case "$logical_path" in
-            *current/RangeCompiler.ll) identity=current-llvm ;;
-            *current/RangeCompiler) identity=current-executable ;;
-            *reproduced/RangeCompiler.ll) identity=reproduced-llvm ;;
-            *) identity=reproduced-executable ;;
+            *candidate/RangeCompiler.ll) identity=candidate-llvm ;;
+            *candidate/RangeCompiler) identity=candidate-executable ;;
+            *reproduction/RangeCompiler.ll) identity=reproduction-llvm ;;
+            *) identity=reproduction-executable ;;
         esac
         /usr/bin/printf 'artifact\tid=%s\tpath=%s\tsha256=%s\tbytes=%s\n' \
             "$identity" "$logical_path" "$(sha256_text "$logical_path")" "$(bytes_text "$logical_path")" >> "$output"
     done
-    /usr/bin/printf 'application\tindex=0\tid=current\tkind=compile\tinput=%s\tartifact=current-llvm\n' "$current_producer_id" >> "$output"
+    /usr/bin/printf 'application\tindex=0\tid=candidate\tkind=compile\tinput=%s\tartifact=candidate-llvm\n' "$candidate_producer_id" >> "$output"
     /usr/bin/printf '%s\n' \
-        $'application\tindex=1\tid=reproduced\tkind=compile\tinput=current-executable\tartifact=reproduced-llvm' >> "$output"
-    /usr/bin/printf 'gate\tid=current-producer-dependency\tkind=dependency\tleft=current\tright=%s\n' "$current_producer_id" >> "$output"
+        $'application\tindex=1\tid=reproduction\tkind=compile\tinput=candidate-executable\tartifact=reproduction-llvm' >> "$output"
+    /usr/bin/printf 'gate\tid=candidate-producer-dependency\tkind=dependency\tleft=candidate\tright=%s\n' "$candidate_producer_id" >> "$output"
     /usr/bin/printf '%s\n' \
-        $'gate\tid=current-source-dependency\tkind=dependency\tleft=current\tright=candidate-sources' \
-        $'gate\tid=current-runtime-dependency\tkind=dependency\tleft=current\tright=runtime-set' \
-        $'gate\tid=current-validate\tkind=llvm-validate\tleft=current\tright=current-llvm' \
-        $'gate\tid=current-link\tkind=link\tleft=current-llvm\tright=current-executable' \
-        $'gate\tid=reproduced-source-dependency\tkind=dependency\tleft=reproduced\tright=candidate-sources' \
-        $'gate\tid=reproduced-runtime-dependency\tkind=dependency\tleft=reproduced\tright=runtime-set' \
-        $'gate\tid=reproduced-validate\tkind=llvm-validate\tleft=reproduced\tright=reproduced-llvm' \
-        $'gate\tid=reproduced-link\tkind=link\tleft=reproduced-llvm\tright=reproduced-executable' \
-        $'assert\tid=llvm-byte-identity\tkind=byte-identical\tsubject=current-llvm\texpected=reproduced-llvm' \
-        $'assert\tid=executable-byte-identity\tkind=byte-identical\tsubject=current-executable\texpected=reproduced-executable' >> "$output"
+        $'gate\tid=candidate-source-dependency\tkind=dependency\tleft=candidate\tright=candidate-sources' \
+        $'gate\tid=candidate-runtime-dependency\tkind=dependency\tleft=candidate\tright=runtime-set' \
+        $'gate\tid=candidate-validate\tkind=llvm-validate\tleft=candidate\tright=candidate-llvm' \
+        $'gate\tid=candidate-link\tkind=link\tleft=candidate-llvm\tright=candidate-executable' \
+        $'gate\tid=reproduction-source-dependency\tkind=dependency\tleft=reproduction\tright=candidate-sources' \
+        $'gate\tid=reproduction-runtime-dependency\tkind=dependency\tleft=reproduction\tright=runtime-set' \
+        $'gate\tid=reproduction-validate\tkind=llvm-validate\tleft=reproduction\tright=reproduction-llvm' \
+        $'gate\tid=reproduction-link\tkind=link\tleft=reproduction-llvm\tright=reproduction-executable' \
+        $'assert\tid=llvm-byte-identity\tkind=byte-identical\tsubject=candidate-llvm\texpected=reproduction-llvm' \
+        $'assert\tid=executable-byte-identity\tkind=byte-identical\tsubject=candidate-executable\texpected=reproduction-executable' >> "$output"
 }
 
 validate_candidate_build_plan() {
     local plan="$1"
-    local current_producer_id="$2"
+    local candidate_producer_id="$2"
     local runtime_count index path expected actual_count final_byte identity artifact_id
 
     [[ -s "$plan" ]] || fail "candidate build plan is empty"
@@ -329,33 +329,33 @@ validate_candidate_build_plan() {
         /usr/bin/grep -Fqx "$expected" "$plan" || fail "candidate build plan source $index role/root/path/marker/hash/bytes are missing or stale"
     done
     [[ "$(/usr/bin/grep -c $'^artifact\t' "$plan")" -eq 4 ]] || fail "candidate build plan must contain four artifacts"
-    [[ "$(/usr/bin/grep -c $'^application\t' "$plan")" -eq 2 ]] || fail "candidate build plan must contain Current and Reproduced applications"
+    [[ "$(/usr/bin/grep -c $'^application\t' "$plan")" -eq 2 ]] || fail "candidate build plan must contain Candidate and Reproduction applications"
     [[ "$(/usr/bin/grep -c $'^gate\t' "$plan")" -eq 9 ]] || fail "candidate build plan gate/dependency count is invalid"
     [[ "$(/usr/bin/grep -c $'^assert\t' "$plan")" -eq 2 ]] || fail "candidate build plan fixed-point assertion count is invalid"
-    /usr/bin/grep -Fqx "application"$'\t'"index=0"$'\t'"id=current"$'\t'"kind=compile"$'\t'"input=$current_producer_id"$'\t'"artifact=current-llvm" "$plan" \
-        || fail "candidate build plan Current application is invalid"
+    /usr/bin/grep -Fqx "application"$'\t'"index=0"$'\t'"id=candidate"$'\t'"kind=compile"$'\t'"input=$candidate_producer_id"$'\t'"artifact=candidate-llvm" "$plan" \
+        || fail "candidate build plan Candidate application is invalid"
     for expected in \
-        $'application\tindex=1\tid=reproduced\tkind=compile\tinput=current-executable\tartifact=reproduced-llvm' \
-        $'gate\tid=current-source-dependency\tkind=dependency\tleft=current\tright=candidate-sources' \
-        $'gate\tid=current-runtime-dependency\tkind=dependency\tleft=current\tright=runtime-set' \
-        $'gate\tid=current-validate\tkind=llvm-validate\tleft=current\tright=current-llvm' \
-        $'gate\tid=current-link\tkind=link\tleft=current-llvm\tright=current-executable' \
-        $'gate\tid=reproduced-source-dependency\tkind=dependency\tleft=reproduced\tright=candidate-sources' \
-        $'gate\tid=reproduced-runtime-dependency\tkind=dependency\tleft=reproduced\tright=runtime-set' \
-        $'gate\tid=reproduced-validate\tkind=llvm-validate\tleft=reproduced\tright=reproduced-llvm' \
-        $'gate\tid=reproduced-link\tkind=link\tleft=reproduced-llvm\tright=reproduced-executable' \
-        $'assert\tid=llvm-byte-identity\tkind=byte-identical\tsubject=current-llvm\texpected=reproduced-llvm' \
-        $'assert\tid=executable-byte-identity\tkind=byte-identical\tsubject=current-executable\texpected=reproduced-executable'; do
+        $'application\tindex=1\tid=reproduction\tkind=compile\tinput=candidate-executable\tartifact=reproduction-llvm' \
+        $'gate\tid=candidate-source-dependency\tkind=dependency\tleft=candidate\tright=candidate-sources' \
+        $'gate\tid=candidate-runtime-dependency\tkind=dependency\tleft=candidate\tright=runtime-set' \
+        $'gate\tid=candidate-validate\tkind=llvm-validate\tleft=candidate\tright=candidate-llvm' \
+        $'gate\tid=candidate-link\tkind=link\tleft=candidate-llvm\tright=candidate-executable' \
+        $'gate\tid=reproduction-source-dependency\tkind=dependency\tleft=reproduction\tright=candidate-sources' \
+        $'gate\tid=reproduction-runtime-dependency\tkind=dependency\tleft=reproduction\tright=runtime-set' \
+        $'gate\tid=reproduction-validate\tkind=llvm-validate\tleft=reproduction\tright=reproduction-llvm' \
+        $'gate\tid=reproduction-link\tkind=link\tleft=reproduction-llvm\tright=reproduction-executable' \
+        $'assert\tid=llvm-byte-identity\tkind=byte-identical\tsubject=candidate-llvm\texpected=reproduction-llvm' \
+        $'assert\tid=executable-byte-identity\tkind=byte-identical\tsubject=candidate-executable\texpected=reproduction-executable'; do
         /usr/bin/grep -Fqx "$expected" "$plan" || fail "candidate build plan is missing required record: $expected"
     done
-    /usr/bin/grep -Fqx "gate"$'\t'"id=current-producer-dependency"$'\t'"kind=dependency"$'\t'"left=current"$'\t'"right=$current_producer_id" "$plan" \
-        || fail "candidate build plan Current producer dependency is invalid"
-    for artifact_id in current-llvm current-executable reproduced-llvm reproduced-executable; do
+    /usr/bin/grep -Fqx "gate"$'\t'"id=candidate-producer-dependency"$'\t'"kind=dependency"$'\t'"left=candidate"$'\t'"right=$candidate_producer_id" "$plan" \
+        || fail "candidate build plan Candidate producer dependency is invalid"
+    for artifact_id in candidate-llvm candidate-executable reproduction-llvm reproduction-executable; do
         case "$artifact_id" in
-            current-llvm) path=candidate/.range/Build/current/RangeCompiler.ll ;;
-            current-executable) path=candidate/.range/Build/current/RangeCompiler ;;
-            reproduced-llvm) path=candidate/.range/Build/reproduced/RangeCompiler.ll ;;
-            *) path=candidate/.range/Build/reproduced/RangeCompiler ;;
+            candidate-llvm) path=candidate/.range/Build/candidate/RangeCompiler.ll ;;
+            candidate-executable) path=candidate/.range/Build/candidate/RangeCompiler ;;
+            reproduction-llvm) path=candidate/.range/Build/reproduction/RangeCompiler.ll ;;
+            *) path=candidate/.range/Build/reproduction/RangeCompiler ;;
         esac
         expected="$(/usr/bin/printf 'artifact\tid=%s\tpath=%s\tsha256=%s\tbytes=%s' \
             "$artifact_id" "$path" "$(sha256_text "$path")" "$(bytes_text "$path")")"
@@ -5176,8 +5176,8 @@ main() {
         :
     elif [[ "$#" -eq 1 && "$1" != -* ]]; then
         compiler_input="$1"
-    elif [[ ( "$#" -eq 2 || "$#" -eq 3 ) && "$1" == "--checkpoint" && "$2" == "self-reproduce" ]]; then
-        checkpoint_mode=self-reproduce
+    elif [[ ( "$#" -eq 2 || "$#" -eq 3 ) && "$1" == "--checkpoint" && "$2" == "candidate-plan" ]]; then
+        checkpoint_mode=candidate-plan
         if [[ "$#" -eq 3 ]]; then
             compiler_input="$3"
         fi
@@ -5189,7 +5189,7 @@ main() {
         exit 64
     fi
 
-    if [[ "$checkpoint_mode" == self-reproduce ]]; then
+    if [[ "$checkpoint_mode" == candidate-plan ]]; then
         RANGE_BUILD_PROFILE="development"
         COMPILER_OPTIMIZATION="-O0"
         COMPILER_LTO="-fno-lto"
@@ -5207,7 +5207,7 @@ main() {
     fi
 
     verify_manifest
-    if [[ "$checkpoint_mode" != self-reproduce ]]; then
+    if [[ "$checkpoint_mode" != candidate-plan ]]; then
         audit_no_temporary_debug_probes "$compiler_directory/Driver/CompilerCore.range" "final compiler"
         audit_no_body_syntax_sink "$compiler_directory/Driver/CompilerCore.range" "final compiler"
         audit_typed_only_lowering_invariant "$compiler_directory" "final compiler"
@@ -5557,15 +5557,15 @@ main() {
         '    return 0' \
         '}' > "$LEGACY_LANGUAGE_SOURCE"
 
-    local build_root current_directory reproduced_directory
-    local current_llvm current_executable reproduced_llvm reproduced_executable
+    local build_root candidate_directory reproduction_directory
+    local candidate_llvm candidate_executable reproduction_llvm reproduction_executable
     build_root="$compiler_directory/.range/Build"
-    current_directory="$build_root/current"
-    reproduced_directory="$build_root/reproduced"
-    current_llvm="$current_directory/RangeCompiler.ll"
-    current_executable="$current_directory/RangeCompiler"
-    reproduced_llvm="$reproduced_directory/RangeCompiler.ll"
-    reproduced_executable="$reproduced_directory/RangeCompiler"
+    candidate_directory="$build_root/candidate"
+    reproduction_directory="$build_root/reproduction"
+    candidate_llvm="$candidate_directory/RangeCompiler.ll"
+    candidate_executable="$candidate_directory/RangeCompiler"
+    reproduction_llvm="$reproduction_directory/RangeCompiler.ll"
+    reproduction_executable="$reproduction_directory/RangeCompiler"
 
     if [[ -d "$build_root" ]]; then
         /bin/chmod -R u+w "$build_root"
@@ -5573,12 +5573,12 @@ main() {
     /bin/rm -rf "$build_root"
     /bin/mkdir -p "$build_root"
     CANDIDATE_BUILD_PLAN="$build_root/RangeCompiler.build-plan.tsv"
-    local current_producer_id=accepted-bootstrap
+    local candidate_producer_id=accepted-bootstrap
     if [[ -n "$bootstrap_bridge_source_directory" ]]; then
-        current_producer_id=bootstrap-bridge
+        candidate_producer_id=bootstrap-bridge
     fi
-    write_candidate_build_plan "$CANDIDATE_BUILD_PLAN" "$current_producer_id"
-    validate_candidate_build_plan "$CANDIDATE_BUILD_PLAN" "$current_producer_id"
+    write_candidate_build_plan "$CANDIDATE_BUILD_PLAN" "$candidate_producer_id"
+    validate_candidate_build_plan "$CANDIDATE_BUILD_PLAN" "$candidate_producer_id"
     CANDIDATE_BUILD_PLAN_SHA256="$(sha256 "$CANDIDATE_BUILD_PLAN")"
     echo "checkpoint compiler-candidate:plan-authored: pass"
     echo "candidate build plan: pass (version 1, deterministic logical paths)"
@@ -5616,142 +5616,142 @@ main() {
         audit_placement_symbol_guard BootstrapBridge "$bootstrap_bridge_executable" "$bootstrap_bridge_artifact_directory"
         echo "bootstrap bridge ownership capability: pass (binding aliases, value ownership, placement guard, one-shot producer only)"
 
-        emit_candidate_llvm "$bootstrap_bridge_executable" "$SOURCE_BUNDLE" "$current_llvm" current
-        echo "checkpoint compiler-candidate:current-emitted: pass"
+        emit_candidate_llvm "$bootstrap_bridge_executable" "$SOURCE_BUNDLE" "$candidate_llvm" candidate
+        echo "checkpoint compiler-candidate:candidate-emitted: pass"
         assert_candidate_build_plan_unchanged
-        validate_llvm "$current_llvm"
-        echo "checkpoint compiler-candidate:current-validated: pass"
-        link_llvm "$current_llvm" "$current_executable"
-        echo "checkpoint compiler-candidate:current-linked: pass"
-        echo "current build candidate validate/link: pass"
+        validate_llvm "$candidate_llvm"
+        echo "checkpoint compiler-candidate:candidate-validated: pass"
+        link_llvm "$candidate_llvm" "$candidate_executable"
+        echo "checkpoint compiler-candidate:candidate-linked: pass"
+        echo "compiler candidate validate/link: pass"
     else
-        local require_current_llvm=1
-        if [[ "$checkpoint_mode" == self-reproduce ]]; then
-            require_current_llvm=0
+        local require_candidate_llvm=1
+        if [[ "$checkpoint_mode" == candidate-plan ]]; then
+            require_candidate_llvm=0
         fi
-        resolve_compiler_build "$require_current_llvm"
-        /bin/mkdir -p "$current_directory"
-        /bin/cp "$BUILD_EXECUTABLE" "$current_executable"
-        /bin/chmod +x "$current_executable"
+        resolve_compiler_build "$require_candidate_llvm"
+        /bin/mkdir -p "$candidate_directory"
+        /bin/cp "$BUILD_EXECUTABLE" "$candidate_executable"
+        /bin/chmod +x "$candidate_executable"
         if [[ -n "$BUILD_LLVM" ]]; then
-            /bin/cp "$BUILD_LLVM" "$current_llvm"
+            /bin/cp "$BUILD_LLVM" "$candidate_llvm"
         fi
         echo "checkpoint compiler-candidate:build-cache-$BUILD_CACHE_STATUS: pass"
-        echo "checkpoint compiler-candidate:current-resolved: pass"
-        echo "current build candidate artifact: shared content-addressed cache"
+        echo "checkpoint compiler-candidate:candidate-resolved: pass"
+        echo "compiler candidate artifact: shared content-addressed cache"
     fi
     assert_candidate_build_plan_unchanged
-    audit_candidate_build_plan_snapshot Current "$current_executable"
-    echo "checkpoint compiler-candidate:self-reproduce-plan-read: pass"
-    echo "current build plan snapshot: deterministic"
-    local current_loaded_source_bundle="$WORK_ROOT/Current.RangeLoadedSourceSet.range"
-    materialize_candidate_source_bundle Current "$current_executable" "$current_loaded_source_bundle"
-    echo "checkpoint compiler-candidate:current-source-loaded: pass"
-    if [[ "$checkpoint_mode" == self-reproduce ]]; then
-        echo "Range compiler current build plan checkpoint succeeded."
+    audit_candidate_build_plan_snapshot Candidate "$candidate_executable"
+    echo "checkpoint compiler-candidate:candidate-plan-read: pass"
+    echo "candidate build plan snapshot: deterministic"
+    local candidate_loaded_source_bundle="$WORK_ROOT/Candidate.RangeLoadedSourceSet.range"
+    materialize_candidate_source_bundle Candidate "$candidate_executable" "$candidate_loaded_source_bundle"
+    echo "checkpoint compiler-candidate:candidate-source-loaded: pass"
+    if [[ "$checkpoint_mode" == candidate-plan ]]; then
+        echo "Range compiler candidate build plan checkpoint succeeded."
         printf 'compiler_directory=%s\n' "$compiler_directory"
         printf 'source_inventory_count=%s\n' "${#SOURCE_FILES[@]}"
         printf 'build_cache_key=%s\n' "${BUILD_CACHE_KEY:-bootstrap-bridge}"
         report_artifact candidate_build_plan "$CANDIDATE_BUILD_PLAN"
-        if [[ -f "$current_llvm" ]]; then
-            report_artifact current_llvm "$current_llvm"
+        if [[ -f "$candidate_llvm" ]]; then
+            report_artifact candidate_llvm "$candidate_llvm"
         else
-            echo "current_llvm=not-materialized-from-legacy-executable-cache"
+            echo "candidate_llvm=not-materialized-from-legacy-executable-cache"
         fi
-        report_artifact current_executable "$current_executable"
-        echo "checkpoint compiler-candidate:self-reproduce-complete: pass"
+        report_artifact candidate_executable "$candidate_executable"
+        echo "checkpoint compiler-candidate:candidate-plan-complete: pass"
         return 0
     fi
-    audit_build Current "$current_executable" "$current_directory"
-    echo "checkpoint compiler-candidate:current-audited: pass"
+    audit_build Candidate "$candidate_executable" "$candidate_directory"
+    echo "checkpoint compiler-candidate:candidate-audited: pass"
     assert_candidate_build_plan_unchanged
 
-    emit_candidate_llvm "$current_executable" "$current_loaded_source_bundle" "$reproduced_llvm" reproduced
-    echo "checkpoint compiler-candidate:reproduced-emitted: pass"
-    validate_llvm "$reproduced_llvm"
-    echo "checkpoint compiler-candidate:reproduced-validated: pass"
-    link_llvm "$reproduced_llvm" "$reproduced_executable"
-    echo "checkpoint compiler-candidate:reproduced-linked: pass"
-    local reproduced_loaded_source_bundle="$WORK_ROOT/Reproduced.RangeLoadedSourceSet.range"
-    materialize_candidate_source_bundle Reproduced "$reproduced_executable" "$reproduced_loaded_source_bundle"
-    /usr/bin/cmp -s "$current_loaded_source_bundle" "$reproduced_loaded_source_bundle" \
-        || fail "current and reproduced Range-loaded source bundles differ"
-    echo "checkpoint compiler-candidate:reproduced-source-loaded: pass"
-    /usr/bin/cmp -s "$current_llvm" "$reproduced_llvm" || fail "current and reproduced LLVM are not byte-identical"
-    /usr/bin/cmp -s "$current_executable" "$reproduced_executable" || fail "current and reproduced executables are not byte-identical"
-    echo "checkpoint compiler-candidate:reproduced-fixed-point: pass"
-    echo "reproduced build candidate validate/link and fixed point: pass"
+    emit_candidate_llvm "$candidate_executable" "$candidate_loaded_source_bundle" "$reproduction_llvm" reproduction
+    echo "checkpoint compiler-candidate:reproduction-emitted: pass"
+    validate_llvm "$reproduction_llvm"
+    echo "checkpoint compiler-candidate:reproduction-validated: pass"
+    link_llvm "$reproduction_llvm" "$reproduction_executable"
+    echo "checkpoint compiler-candidate:reproduction-linked: pass"
+    local reproduction_loaded_source_bundle="$WORK_ROOT/Reproduction.RangeLoadedSourceSet.range"
+    materialize_candidate_source_bundle Reproduction "$reproduction_executable" "$reproduction_loaded_source_bundle"
+    /usr/bin/cmp -s "$candidate_loaded_source_bundle" "$reproduction_loaded_source_bundle" \
+        || fail "candidate and reproduction Range-loaded source bundles differ"
+    echo "checkpoint compiler-candidate:reproduction-source-loaded: pass"
+    /usr/bin/cmp -s "$candidate_llvm" "$reproduction_llvm" || fail "candidate and reproduction LLVM are not byte-identical"
+    /usr/bin/cmp -s "$candidate_executable" "$reproduction_executable" || fail "candidate and reproduction executables are not byte-identical"
+    echo "checkpoint compiler-candidate:reproduction-fixed-point: pass"
+    echo "compiler reproduction validate/link and fixed point: pass"
     assert_candidate_build_plan_unchanged
-    audit_candidate_build_plan_snapshot Reproduced "$reproduced_executable"
-    /usr/bin/cmp -s "$WORK_ROOT/Current.build-plan.first.snapshot" "$WORK_ROOT/Reproduced.build-plan.first.snapshot" \
-        || fail "current and reproduced build plan snapshots differ"
-    echo "checkpoint compiler-candidate:reproduced-plan-read: pass"
-    echo "current/reproduced build plan snapshot: deterministic and byte-identical"
-    audit_build Reproduced "$reproduced_executable" "$reproduced_directory"
-    echo "checkpoint compiler-candidate:reproduced-audited: pass"
+    audit_candidate_build_plan_snapshot Reproduction "$reproduction_executable"
+    /usr/bin/cmp -s "$WORK_ROOT/Candidate.build-plan.first.snapshot" "$WORK_ROOT/Reproduction.build-plan.first.snapshot" \
+        || fail "candidate and reproduction build plan snapshots differ"
+    echo "checkpoint compiler-candidate:reproduction-plan-read: pass"
+    echo "candidate/reproduction build plan snapshot: deterministic and byte-identical"
+    audit_build Reproduction "$reproduction_executable" "$reproduction_directory"
+    echo "checkpoint compiler-candidate:reproduction-audited: pass"
     assert_candidate_build_plan_unchanged
 
-    compare_binding_reference_builds Current "$current_directory" Reproduced "$reproduced_directory"
-    compare_value_ownership_builds Current "$current_directory" Reproduced "$reproduced_directory"
-    compare_body_syntax_split_builds Current "$current_directory" Reproduced "$reproduced_directory"
-    compare_placement_symbol_guard_builds Current "$current_directory" Reproduced "$reproduced_directory"
+    compare_binding_reference_builds Candidate "$candidate_directory" Reproduction "$reproduction_directory"
+    compare_value_ownership_builds Candidate "$candidate_directory" Reproduction "$reproduction_directory"
+    compare_body_syntax_split_builds Candidate "$candidate_directory" Reproduction "$reproduction_directory"
+    compare_placement_symbol_guard_builds Candidate "$candidate_directory" Reproduction "$reproduction_directory"
     if [[ -n "$bootstrap_bridge_source_directory" ]]; then
-        compare_binding_reference_builds BootstrapBridge "$bootstrap_bridge_artifact_directory" Current "$current_directory"
-        compare_value_ownership_builds BootstrapBridge "$bootstrap_bridge_artifact_directory" Current "$current_directory"
-        compare_placement_symbol_guard_builds BootstrapBridge "$bootstrap_bridge_artifact_directory" Current "$current_directory"
+        compare_binding_reference_builds BootstrapBridge "$bootstrap_bridge_artifact_directory" Candidate "$candidate_directory"
+        compare_value_ownership_builds BootstrapBridge "$bootstrap_bridge_artifact_directory" Candidate "$candidate_directory"
+        compare_placement_symbol_guard_builds BootstrapBridge "$bootstrap_bridge_artifact_directory" Candidate "$candidate_directory"
     fi
 
-    /usr/bin/cmp -s "$WORK_ROOT/Current.macro.execution-native.first.ll" "$WORK_ROOT/Reproduced.macro.execution-native.first.ll" \
-        || fail "current and reproduced native macro integration LLVM differs"
-    /usr/bin/cmp -s "$WORK_ROOT/Current.macro.execution-native.repeat.ll" "$WORK_ROOT/Reproduced.macro.execution-native.repeat.ll" \
-        || fail "current and reproduced repeated native macro integration LLVM differs"
-    /usr/bin/cmp -s "$current_directory/MacroExecution.ll" "$reproduced_directory/MacroExecution.ll" \
-        || fail "current and reproduced native macro integration artifacts differ"
-    /usr/bin/cmp -s "$current_directory/MacroExecution" "$reproduced_directory/MacroExecution" \
-        || fail "current and reproduced native macro integration executables differ"
-    echo "current/reproduced native macro integration: byte-identical LLVM/executable"
+    /usr/bin/cmp -s "$WORK_ROOT/Candidate.macro.execution-native.first.ll" "$WORK_ROOT/Reproduction.macro.execution-native.first.ll" \
+        || fail "candidate and reproduction native macro integration LLVM differs"
+    /usr/bin/cmp -s "$WORK_ROOT/Candidate.macro.execution-native.repeat.ll" "$WORK_ROOT/Reproduction.macro.execution-native.repeat.ll" \
+        || fail "candidate and reproduction repeated native macro integration LLVM differs"
+    /usr/bin/cmp -s "$candidate_directory/MacroExecution.ll" "$reproduction_directory/MacroExecution.ll" \
+        || fail "candidate and reproduction native macro integration artifacts differ"
+    /usr/bin/cmp -s "$candidate_directory/MacroExecution" "$reproduction_directory/MacroExecution" \
+        || fail "candidate and reproduction native macro integration executables differ"
+    echo "candidate/reproduction native macro integration: byte-identical LLVM/executable"
 
-    /usr/bin/cmp -s "$WORK_ROOT/Current.macro.expansion-commit.first.ll" "$WORK_ROOT/Reproduced.macro.expansion-commit.first.ll" \
-        || fail "current and reproduced committed macro expansion LLVM differs"
-    /usr/bin/cmp -s "$WORK_ROOT/Current.macro.expansion-commit.repeat.ll" "$WORK_ROOT/Reproduced.macro.expansion-commit.repeat.ll" \
-        || fail "current and reproduced repeated committed macro expansion LLVM differs"
-    /usr/bin/cmp -s "$current_directory/MacroExpansion.ll" "$reproduced_directory/MacroExpansion.ll" \
-        || fail "current and reproduced committed macro expansion artifacts differ"
-    /usr/bin/cmp -s "$current_directory/MacroExpansion" "$reproduced_directory/MacroExpansion" \
-        || fail "current and reproduced committed macro expansion executables differ"
-    echo "current/reproduced committed macro expansion: byte-identical LLVM/executable"
+    /usr/bin/cmp -s "$WORK_ROOT/Candidate.macro.expansion-commit.first.ll" "$WORK_ROOT/Reproduction.macro.expansion-commit.first.ll" \
+        || fail "candidate and reproduction committed macro expansion LLVM differs"
+    /usr/bin/cmp -s "$WORK_ROOT/Candidate.macro.expansion-commit.repeat.ll" "$WORK_ROOT/Reproduction.macro.expansion-commit.repeat.ll" \
+        || fail "candidate and reproduction repeated committed macro expansion LLVM differs"
+    /usr/bin/cmp -s "$candidate_directory/MacroExpansion.ll" "$reproduction_directory/MacroExpansion.ll" \
+        || fail "candidate and reproduction committed macro expansion artifacts differ"
+    /usr/bin/cmp -s "$candidate_directory/MacroExpansion" "$reproduction_directory/MacroExpansion" \
+        || fail "candidate and reproduction committed macro expansion executables differ"
+    echo "candidate/reproduction committed macro expansion: byte-identical LLVM/executable"
 
-    /usr/bin/cmp -s "$WORK_ROOT/Current.macro.registrable.native.ll" "$WORK_ROOT/Reproduced.macro.registrable.native.ll" \
-        || fail "current and reproduced actual registrable LLVM differs"
-    /usr/bin/cmp -s "$current_directory/Registrable.ll" "$reproduced_directory/Registrable.ll" \
-        || fail "current and reproduced actual registrable artifacts differ"
-    /usr/bin/cmp -s "$current_directory/Registrable" "$reproduced_directory/Registrable" \
-        || fail "current and reproduced actual registrable executables differ"
-    echo "current/reproduced actual registrable macro: byte-identical LLVM/executable"
+    /usr/bin/cmp -s "$WORK_ROOT/Candidate.macro.registrable.native.ll" "$WORK_ROOT/Reproduction.macro.registrable.native.ll" \
+        || fail "candidate and reproduction actual registrable LLVM differs"
+    /usr/bin/cmp -s "$candidate_directory/Registrable.ll" "$reproduction_directory/Registrable.ll" \
+        || fail "candidate and reproduction actual registrable artifacts differ"
+    /usr/bin/cmp -s "$candidate_directory/Registrable" "$reproduction_directory/Registrable" \
+        || fail "candidate and reproduction actual registrable executables differ"
+    echo "candidate/reproduction actual registrable macro: byte-identical LLVM/executable"
 
     local macro_snapshot_suffix
     for macro_snapshot_suffix in positive.first.out positive.reordered.out generated.snapshot.out generated.snapshot.repeat.out generated.reordered.out generated.native.first.ll generated.native.repeat.ll generated.bare.out generated.user-global.out generated.root-collision.out generated.member-collision.out generated.malformed-extension.out generated.outside.out registrable.snapshot.out registrable.reordered.out registrable.native.ll registrable.authored-field-collision.out registrable.generated-field-collision.out registrable.root-storage.out registrable.malformed-splice.out registrable.immutable-field-mutation.out unresolved.out duplicate.out malformed-declaration.out malformed-application.out mismatch.out execution-positive.out execution-positive.repeat.out execution-query.out execution-query.repeat.out execution-query-reordered.out execution-query-zero.out execution-member-present.out execution-member-present.repeat.out execution-expansion.out execution-expansion.repeat.out execution-multiple.out execution-error.out execution-denied.out execution-query-invalid.out execution-expansion-duplicate.out execution-target-denied.out execution-fuel.out execution-malformed-header.out execution-duplicate-header.out; do
-        /usr/bin/cmp -s "$WORK_ROOT/Current.macro.$macro_snapshot_suffix" "$WORK_ROOT/Reproduced.macro.$macro_snapshot_suffix" \
-            || fail "current and reproduced macro snapshot differs: $macro_snapshot_suffix"
+        /usr/bin/cmp -s "$WORK_ROOT/Candidate.macro.$macro_snapshot_suffix" "$WORK_ROOT/Reproduction.macro.$macro_snapshot_suffix" \
+            || fail "candidate and reproduction macro snapshot differs: $macro_snapshot_suffix"
     done
-    echo "current/reproduced focused macro snapshots: byte-identical"
+    echo "candidate/reproduction focused macro snapshots: byte-identical"
 
     local macro_family_suffix
     for macro_family_suffix in positive.out positive.repeat.out reordered.out unknown.out typed.out general.out positive.runtime reordered.runtime ordinary.first.ll ordinary.repeat.ll; do
-        /usr/bin/cmp -s "$WORK_ROOT/Current.macro-family.$macro_family_suffix" "$WORK_ROOT/Reproduced.macro-family.$macro_family_suffix" \
-            || fail "current and reproduced macro-family MemoryGraph differs: $macro_family_suffix"
+        /usr/bin/cmp -s "$WORK_ROOT/Candidate.macro-family.$macro_family_suffix" "$WORK_ROOT/Reproduction.macro-family.$macro_family_suffix" \
+            || fail "candidate and reproduction macro-family MemoryGraph differs: $macro_family_suffix"
     done
-    /usr/bin/cmp -s "$current_directory/MacroFamily.ll" "$reproduced_directory/MacroFamily.ll" \
-        || fail "current and reproduced macro-family LLVM artifacts differ"
-    /usr/bin/cmp -s "$current_directory/MacroFamily" "$reproduced_directory/MacroFamily" \
-        || fail "current and reproduced macro-family executables differ"
-    echo "current/reproduced macro-family MemoryGraph: byte-identical"
+    /usr/bin/cmp -s "$candidate_directory/MacroFamily.ll" "$reproduction_directory/MacroFamily.ll" \
+        || fail "candidate and reproduction macro-family LLVM artifacts differ"
+    /usr/bin/cmp -s "$candidate_directory/MacroFamily" "$reproduction_directory/MacroFamily" \
+        || fail "candidate and reproduction macro-family executables differ"
+    echo "candidate/reproduction macro-family MemoryGraph: byte-identical"
 
-    /usr/bin/cmp -s "$WORK_ROOT/Current.builtin.legacy.out" "$WORK_ROOT/Reproduced.builtin.legacy.out" \
-        || fail "current and reproduced legacy builtin-marker rejection differs"
-    echo "current/reproduced builtin marker rejection: byte-identical"
+    /usr/bin/cmp -s "$WORK_ROOT/Candidate.builtin.legacy.out" "$WORK_ROOT/Reproduction.builtin.legacy.out" \
+        || fail "candidate and reproduction legacy builtin-marker rejection differs"
+    echo "candidate/reproduction builtin marker rejection: byte-identical"
     assert_candidate_build_plan_unchanged
-    validate_candidate_build_plan "$CANDIDATE_BUILD_PLAN" "$current_producer_id"
+    validate_candidate_build_plan "$CANDIDATE_BUILD_PLAN" "$candidate_producer_id"
 
     echo "checkpoint compiler-candidate:complete: pass"
     echo "Range compiler candidate check succeeded."
@@ -5776,20 +5776,20 @@ main() {
         printf 'source_inventory_path_%s=%s\n' "$index" "${SOURCE_RELATIVE_PATHS[$index]}"
     done
     report_artifact candidate_build_plan "$CANDIDATE_BUILD_PLAN"
-    report_artifact current_llvm "$current_llvm"
-    report_artifact reproduced_llvm "$reproduced_llvm"
-    report_artifact current_executable "$current_executable"
-    report_artifact reproduced_executable "$reproduced_executable"
-    report_artifact current_macro_execution_llvm "$current_directory/MacroExecution.ll"
-    report_artifact reproduced_macro_execution_llvm "$reproduced_directory/MacroExecution.ll"
-    report_artifact current_macro_execution_executable "$current_directory/MacroExecution"
-    report_artifact reproduced_macro_execution_executable "$reproduced_directory/MacroExecution"
-    report_artifact current_macro_expansion_llvm "$current_directory/MacroExpansion.ll"
-    report_artifact reproduced_macro_expansion_llvm "$reproduced_directory/MacroExpansion.ll"
-    report_artifact current_macro_expansion_executable "$current_directory/MacroExpansion"
-    report_artifact reproduced_macro_expansion_executable "$reproduced_directory/MacroExpansion"
-    echo "current_reproduced_llvm=byte-identical"
-    echo "current_reproduced_executable=byte-identical"
+    report_artifact candidate_llvm "$candidate_llvm"
+    report_artifact reproduction_llvm "$reproduction_llvm"
+    report_artifact candidate_executable "$candidate_executable"
+    report_artifact reproduction_executable "$reproduction_executable"
+    report_artifact current_macro_execution_llvm "$candidate_directory/MacroExecution.ll"
+    report_artifact reproduction_macro_execution_llvm "$reproduction_directory/MacroExecution.ll"
+    report_artifact current_macro_execution_executable "$candidate_directory/MacroExecution"
+    report_artifact reproduction_macro_execution_executable "$reproduction_directory/MacroExecution"
+    report_artifact current_macro_expansion_llvm "$candidate_directory/MacroExpansion.ll"
+    report_artifact reproduction_macro_expansion_llvm "$reproduction_directory/MacroExpansion.ll"
+    report_artifact current_macro_expansion_executable "$candidate_directory/MacroExpansion"
+    report_artifact reproduction_macro_expansion_executable "$reproduction_directory/MacroExpansion"
+    echo "candidate_reproduction_llvm=byte-identical"
+    echo "candidate_reproduction_executable=byte-identical"
     echo "typed_only_lowering=pass"
     echo "candidate_fixed_point=pass"
 }

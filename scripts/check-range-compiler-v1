@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerBootstrap.json"
-COMPILER="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/current/RangeCompiler"
+COMPILER="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/candidate/RangeCompiler"
 FIXTURE="$REPO_ROOT/Testing/Basics/Pass/ReturnInteger.range"
 LLVM_PLAN="$REPO_ROOT/RangeCompiler/Sources/Compiler/LLVM/CompilerLLVMPlan.range"
 FUNCTION_ARTIFACTS="$REPO_ROOT/RangeCompiler/Sources/Compiler/LLVM/CompilerFunctionArtifacts.range"
@@ -154,7 +154,7 @@ for field in recordsFirst recordsSecond; do
 done
 
 "$REPO_ROOT/scripts/range" check-compiler-smoke
-[[ -x "$COMPILER" ]] || fail "missing resolved current build compiler"
+[[ -x "$COMPILER" ]] || fail "missing resolved candidate compiler"
 
 "$COMPILER" compile "$FIXTURE" > "$WORK_ROOT/legacy.ll"
 "$COMPILER" compile-v1 "$FIXTURE" > "$WORK_ROOT/v1.ll"
@@ -274,7 +274,7 @@ profile_artifact="$WORK_ROOT/behavior-profile.artifact"
 profile_next_artifact="$WORK_ROOT/behavior-profile.next.artifact"
 write_profile_behavior_fixture "$profile_source"
 RANGE_COMPILER_PROFILE_SOURCE_BUNDLE="$profile_source" \
-    RANGE_COMPILER_PROFILE_LLVM="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/current/RangeCompiler.ll" \
+    RANGE_COMPILER_PROFILE_LLVM="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/candidate/RangeCompiler.ll" \
     RANGE_COMPILER_PROFILE_ARTIFACT_OUTPUT="$profile_artifact" \
     "$REPO_ROOT/scripts/profile-range-compiler" > "$WORK_ROOT/behavior-profile-cold.out"
 [[ -s "$profile_artifact" ]] || fail "profiled cold Behavior compilation omitted its artifact"
@@ -283,7 +283,7 @@ RANGE_COMPILER_PROFILE_SOURCE_BUNDLE="$profile_source" \
 /usr/bin/grep -Fq $'compilerPhase\tname=functionEmission.end' "$WORK_ROOT/behavior-profile-cold.out" \
     || fail "profiled cold Behavior compilation did not report LLVM emission"
 RANGE_COMPILER_PROFILE_SOURCE_BUNDLE="$profile_source" \
-    RANGE_COMPILER_PROFILE_LLVM="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/current/RangeCompiler.ll" \
+    RANGE_COMPILER_PROFILE_LLVM="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/candidate/RangeCompiler.ll" \
     RANGE_COMPILER_PROFILE_ARTIFACT_INPUT="$profile_artifact" \
     RANGE_COMPILER_PROFILE_ARTIFACT_OUTPUT="$profile_next_artifact" \
     "$REPO_ROOT/scripts/profile-range-compiler" > "$WORK_ROOT/behavior-profile-hit.out"

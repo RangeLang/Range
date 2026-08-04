@@ -92,7 +92,7 @@ fi
 build_root="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-bootstrap-verify.XXXXXX")"
 trap '/bin/rm -rf "$build_root"' EXIT
 bundle="$build_root/RangeCompilerSourceSet.range"
-reproduced="$build_root/RangeCompilerReproduced.ll"
+reproduction="$build_root/RangeCompilerReproduction.ll"
 
 /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$bundle"
 for ((index = 0; index < compiler_source_count; index += 1)); do
@@ -108,24 +108,24 @@ for ((index = 0; index < compiler_source_count; index += 1)); do
     fi
 done
 
-"$accepted_executable" "$bundle" > "$reproduced"
+"$accepted_executable" "$bundle" > "$reproduction"
 
-if ! /usr/bin/cmp -s "$bootstrap" "$reproduced"; then
-    echo "Bootstrap fixed-point verification failed: reproduced build LLVM differs." >&2
-    /usr/bin/cmp -l "$bootstrap" "$reproduced" | /usr/bin/head -1 >&2 || true
+if ! /usr/bin/cmp -s "$bootstrap" "$reproduction"; then
+    echo "Bootstrap fixed-point verification failed: reproduction LLVM differs." >&2
+    /usr/bin/cmp -l "$bootstrap" "$reproduction" | /usr/bin/head -1 >&2 || true
     exit 1
 fi
 
-reproduced_hash="$(sha256 "$reproduced")"
-reproduced_bytes="$(/usr/bin/stat -f %z "$reproduced")"
-if [[ "$reproduced_hash" != "$(manifest_value reproducedLLVM.sha256)"
-    || "$reproduced_bytes" != "$(manifest_value reproducedLLVM.bytes)" ]]; then
-    echo "Verified reproduced build does not match its manifest result." >&2
+reproduction_hash="$(sha256 "$reproduction")"
+reproduction_bytes="$(/usr/bin/stat -f %z "$reproduction")"
+if [[ "$reproduction_hash" != "$(manifest_value reproductionLLVM.sha256)"
+    || "$reproduction_bytes" != "$(manifest_value reproductionLLVM.bytes)" ]]; then
+    echo "Verified reproduction does not match its manifest result." >&2
     exit 1
 fi
 
 echo "Range compiler bootstrap verified."
-echo "sha256=$reproduced_hash"
-echo "bytes=$reproduced_bytes"
+echo "sha256=$reproduction_hash"
+echo "bytes=$reproduction_bytes"
 echo "producer_clang=$(manifest_value producer.clang)"
 echo "compiler_executable_sha256=$(sha256 "$accepted_executable")"

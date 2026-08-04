@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/check-range-compiler-candidate"
 source "$SCRIPT_DIR/resolve-range-compiler-build"
 
-# Value ownership is the tight compiler-development loop. Its current build artifact is
+# Value ownership is the tight compiler-development loop. Its candidate artifact is
 # deliberately disposable and fast to link; optimized/LTO artifacts remain the
 # responsibility of smoke, candidate, fixed-point, and promotion gates.
 RANGE_BUILD_PROFILE="development"
@@ -24,11 +24,11 @@ Usage:
   scripts/check-range-value-ownership --help
 
 DIR defaults to RangeCompiler/Sources/Compiler. The command resolves a
-content-addressed development current build compiler (-O0, no LTO) for the current
+content-addressed development candidate compiler (-O0, no LTO) for the current
 accepted bootstrap, runtime, and compiler sources, then validates only the ordinary
 value-ownership boundary-forward-mixed case.
 The controls mode runs the complete neighboring value-ownership positive and
-negative fixture set against the same cached current build compiler. Both modes first verify
+negative fixture set against the same cached candidate compiler. Both modes first verify
 the focused @project scalar-default and @storage/@literal fixtures against
 that compiler.
 USAGE
@@ -2313,7 +2313,7 @@ main_value_ownership() {
     echo "checkpoint value-ownership:source-snapshot: pass"
     resolve_compiler_build 0
     echo "checkpoint value-ownership:build-cache-$BUILD_CACHE_STATUS: pass"
-    echo "checkpoint value-ownership:current-resolved: pass"
+    echo "checkpoint value-ownership:candidate-resolved: pass"
     check_removed_for_statement_rejected
     check_unregistered_string_reads_rejected
     check_macro_environment

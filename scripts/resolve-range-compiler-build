@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Shared accepted-bootstrap current build artifact resolver.
+# Shared accepted-bootstrap candidate artifact resolver.
 #
 # Callers must initialize the candidate harness globals and helpers before
 # calling resolve_compiler_build:
@@ -12,7 +12,7 @@
 #
 # resolve_compiler_build 0 may reuse the executable-only cache written by the
 # former value-ownership-local resolver. resolve_compiler_build 1 requires the
-# current shared entry containing both immutable LLVM and executable artifacts.
+# candidate entry containing both immutable LLVM and executable artifacts.
 
 RANGE_BUILD_CACHE_SCHEMA=2
 RANGE_BUILD_CACHE_ROOT="${RANGE_BUILD_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Library/Caches}/Range/compiler-build}"
@@ -110,7 +110,7 @@ range_build_write_cache_key_material() {
     fi
 
     /usr/bin/printf 'schema=%s\n' "$RANGE_BUILD_CACHE_SCHEMA" > "$output"
-    /usr/bin/printf 'pipeline=accepted-bootstrap-current\n' >> "$output"
+    /usr/bin/printf 'pipeline=accepted-bootstrap-candidate\n' >> "$output"
     /usr/bin/printf 'profile=%s\n' "$RANGE_BUILD_PROFILE" >> "$output"
     /usr/bin/printf 'targetPlatform=%s\n' "$(manifest_value target.platform)" >> "$output"
     /usr/bin/printf 'targetArchitecture=%s\n' "$(manifest_value target.architecture)" >> "$output"
@@ -135,8 +135,8 @@ range_build_write_cache_key_material() {
     /usr/bin/printf 'compilerEmitProducerKind=%s\ncompilerEmitProducerHash=%s\ncompilerEmitProducerBytes=%s\n' \
         "$RANGE_BUILD_PRODUCER_KIND" \
         "$(sha256 "$RANGE_BUILD_PRODUCER_PATH")" "$(bytes "$RANGE_BUILD_PRODUCER_PATH")" >> "$output"
-    /usr/bin/printf 'llvmValidateArgv=-Wno-override-module|-x|ir|-c|current-llvm|-o|object\n' >> "$output"
-    /usr/bin/printf 'currentLinkArgv=%s|%s|-Wno-override-module|current-llvm|runtime-set|-o|output\n' \
+    /usr/bin/printf 'llvmValidateArgv=-Wno-override-module|-x|ir|-c|candidate-llvm|-o|object\n' >> "$output"
+    /usr/bin/printf 'candidateLinkArgv=%s|%s|-Wno-override-module|candidate-llvm|runtime-set|-o|output\n' \
         "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" >> "$output"
     /usr/bin/printf 'bootstrapPath=%s\nbootstrapHash=%s\nbootstrapBytes=%s\n' \
         "$bootstrap_relative" "$(sha256 "$bootstrap")" "$(bytes "$bootstrap")" >> "$output"
@@ -293,14 +293,14 @@ resolve_compiler_build() {
     local legacy_key_material="$WORK_ROOT/build-cache-key.legacy"
     local cache_key cache_directory
     local legacy_cache_key legacy_cache_directory
-    local build_directory bootstrap bootstrap_executable current_source_bundle current_llvm current_executable
+    local build_directory bootstrap bootstrap_executable candidate_source_bundle candidate_llvm candidate_executable
     local lock_directory publish_directory invalid_directory
     local function_artifact_directory function_artifact_cache function_artifact_next function_artifact_source_key
     local lock_status build_status publish_status
     local range_build_phase_started range_build_build_started
 
     [[ "$require_llvm" == "0" || "$require_llvm" == "1" ]] \
-        || fail "shared current build resolver expected require_llvm 0 or 1"
+        || fail "shared candidate resolver expected require_llvm 0 or 1"
 
     range_build_select_producer
     range_build_write_cache_key_material "$key_material"
@@ -344,7 +344,7 @@ resolve_compiler_build() {
         BUILD_EXECUTABLE="$cache_directory/RangeCompiler"
         return 0
     fi
-    [[ "$lock_status" -eq 0 ]] || fail "timed out waiting for shared current build cache key $cache_key"
+    [[ "$lock_status" -eq 0 ]] || fail "timed out waiting for shared candidate cache key $cache_key"
     if range_build_cache_entry_is_valid "$cache_directory" "$cache_key"; then
         range_build_release_cache_lock "$lock_directory"
         BUILD_CACHE_KEY="$cache_key"
@@ -358,15 +358,15 @@ resolve_compiler_build() {
     build_directory="$WORK_ROOT/build-cache-entry"
     if ! /bin/mkdir -p "$build_directory"; then
         range_build_release_cache_lock "$lock_directory"
-        fail "could not create shared current-build directory"
+        fail "could not create shared candidate directory"
     fi
     bootstrap="$REPO_ROOT/$(manifest_value bootstrap.path)"
     bootstrap_executable="$WORK_ROOT/RangeCompilerBootstrap"
-    current_source_bundle="$SOURCE_BUNDLE"
-    current_llvm="$build_directory/RangeCompiler.ll"
-    current_executable="$build_directory/RangeCompiler"
+    candidate_source_bundle="$SOURCE_BUNDLE"
+    candidate_llvm="$build_directory/RangeCompiler.ll"
+    candidate_executable="$build_directory/RangeCompiler"
     if [[ "$RANGE_BUILD_PROFILE" == "development" ]]; then
-        current_source_bundle="$build_directory/RangeCompilerDevelopmentSourceSet.range"
+        candidate_source_bundle="$build_directory/RangeCompilerDevelopmentSourceSet.range"
         # Artifact edges still carry positional function IDs. Keep cross-run
         # reuse for an identical source graph, but never apply those edges to
         # a declaration inventory whose rows may have shifted.
@@ -385,7 +385,7 @@ resolve_compiler_build() {
                 /usr/bin/printf '// range-function-artifact-output %s\n' "$function_artifact_next"
             fi
             /usr/bin/tail -n +2 "$SOURCE_BUNDLE"
-        } > "$current_source_bundle"
+        } > "$candidate_source_bundle"
     fi
     range_build_build_started="$(date +%s)"
     set +e
@@ -400,43 +400,43 @@ resolve_compiler_build() {
         fi
         echo "buildTiming profile=$RANGE_BUILD_PROFILE phase=bootstrap-link seconds=$(($(date +%s) - range_build_phase_started))"
         range_build_phase_started="$(date +%s)"
-        emit_candidate_llvm "$bootstrap_executable" "$current_source_bundle" "$current_llvm" shared-current
+        emit_candidate_llvm "$bootstrap_executable" "$candidate_source_bundle" "$candidate_llvm" shared-candidate
         echo "buildTiming profile=$RANGE_BUILD_PROFILE phase=llvm-emission seconds=$(($(date +%s) - range_build_phase_started))"
         range_build_phase_started="$(date +%s)"
-        validate_llvm "$current_llvm"
+        validate_llvm "$candidate_llvm"
         if [[ "$RANGE_BUILD_PRODUCER_CAPABILITY" == "per-function-artifacts-v1" ]]; then
             [[ -f "$function_artifact_next" ]]
-            echo "currentArtifacts reused=$(/usr/bin/grep -ac '|reused=1$' "$function_artifact_next") rebuilt=$(/usr/bin/grep -ac '|reused=0$' "$function_artifact_next")"
+            echo "candidateArtifacts reused=$(/usr/bin/grep -ac '|reused=1$' "$function_artifact_next") rebuilt=$(/usr/bin/grep -ac '|reused=0$' "$function_artifact_next")"
             /bin/mv "$function_artifact_next" "$function_artifact_cache"
         fi
         echo "buildTiming profile=$RANGE_BUILD_PROFILE phase=llvm-validation seconds=$(($(date +%s) - range_build_phase_started))"
         range_build_phase_started="$(date +%s)"
-        link_llvm "$current_llvm" "$current_executable"
-        echo "buildTiming profile=$RANGE_BUILD_PROFILE phase=current-link seconds=$(($(date +%s) - range_build_phase_started))"
+        link_llvm "$candidate_llvm" "$candidate_executable"
+        echo "buildTiming profile=$RANGE_BUILD_PROFILE phase=candidate-link seconds=$(($(date +%s) - range_build_phase_started))"
     )
     build_status=$?
     set -e
     if [[ "$build_status" -ne 0 ]]; then
         range_build_release_cache_lock "$lock_directory"
-        fail "shared current build artifact build failed"
+        fail "shared candidate artifact build failed"
     fi
     echo "buildTiming profile=$RANGE_BUILD_PROFILE phase=total seconds=$(($(date +%s) - range_build_build_started))"
 
     if ! publish_directory="$(/usr/bin/mktemp -d "$RANGE_BUILD_CACHE_ROOT/.build-publish.XXXXXX")"; then
         range_build_release_cache_lock "$lock_directory"
-        fail "could not create shared current build publication directory"
+        fail "could not create shared candidate publication directory"
     fi
     set +e
     (
         set -e
-        /bin/cp "$current_llvm" "$publish_directory/RangeCompiler.ll"
-        /bin/cp "$current_executable" "$publish_directory/RangeCompiler"
+        /bin/cp "$candidate_llvm" "$publish_directory/RangeCompiler.ll"
+        /bin/cp "$candidate_executable" "$publish_directory/RangeCompiler"
         /bin/chmod +x "$publish_directory/RangeCompiler"
         /bin/cp "$key_material" "$publish_directory/KeyMaterial.txt"
         /usr/bin/printf 'schema=%s\ncacheKey=%s\nkeyMaterialHash=%s\nllvmHash=%s\nllvmBytes=%s\nexecutableHash=%s\nexecutableBytes=%s\n' \
             "$RANGE_BUILD_CACHE_SCHEMA" "$cache_key" "$(sha256 "$key_material")" \
-            "$(sha256 "$current_llvm")" "$(bytes "$current_llvm")" \
-            "$(sha256 "$current_executable")" "$(bytes "$current_executable")" \
+            "$(sha256 "$candidate_llvm")" "$(bytes "$candidate_llvm")" \
+            "$(sha256 "$candidate_executable")" "$(bytes "$candidate_executable")" \
             > "$publish_directory/Metadata.txt"
         if [[ -e "$cache_directory" ]]; then
             invalid_directory="$RANGE_BUILD_CACHE_ROOT/.build-invalid.$cache_key.$$"
@@ -449,7 +449,7 @@ resolve_compiler_build() {
     set -e
     range_build_release_cache_lock "$lock_directory"
     if [[ "$publish_status" -ne 0 ]]; then
-        fail "shared current build artifact publication failed integrity validation"
+        fail "shared candidate artifact publication failed integrity validation"
     fi
 
     BUILD_CACHE_KEY="$cache_key"

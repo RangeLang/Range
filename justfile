@@ -20,8 +20,8 @@ candidate:
 
 check:
   bash -n scripts/range scripts/range-native scripts/resolve-range-compiler-build scripts/check-range-value-ownership scripts/check-range-compiler-cache scripts/check-range-compiler-candidate scripts/verify-range-compiler
-  scripts/range check-compiler
-  scripts/range compiler progression
+  scripts/range check-compiler-integrity
+  scripts/range check-compiler-candidate
 
 check-fast:
   bash -n scripts/range scripts/range-native scripts/resolve-range-compiler-build scripts/check-range-value-ownership scripts/check-range-unsigned8 scripts/check-range-float-widths scripts/check-range-compiler-cache scripts/check-range-compiler-candidate scripts/verify-range-compiler

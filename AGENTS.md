@@ -35,9 +35,12 @@
 - Do not promote after every compiler edit. Develop against the accepted
   compiler, run focused gates, and roll the bootstrap only at a deliberate
   stable checkpoint with explicit maintainer approval.
-- The canonical proof is `scripts/range check-compiler-candidate`. After an
-  approved promotion, run `scripts/range check-compiler` to independently
-  reproduce and verify the newly accepted compiler.
+- The canonical proof is `scripts/range check-compiler-candidate`. Promote an
+  approved fixed point with `scripts/range compiler promote --approve`; that
+  command runs the proof, replaces the accepted artifacts, and finishes with
+  `scripts/range check-compiler-integrity` without compiling a third generation.
+- `scripts/range check-compiler` remains available only as an optional
+  independent reproduction audit. It is not part of the promotion path.
 
 ## Testing Structure
 
@@ -61,7 +64,7 @@
     and rejection set)
   - `scripts/range check-compiler-smoke`
   - `scripts/range check-compiler-candidate`
-  - `scripts/range check-compiler`
+  - `scripts/range check-compiler-integrity`
 - `scripts/range compiler next` and `scripts/range compiler progression` are
   maintainer diagnostics for inspecting candidate production and cached
   convergence. They are not additional required generations after the

@@ -18,6 +18,7 @@ Usage:
   range compiler next --cached-only
   range compiler progression
   range compiler progression --cached-only
+  range compiler promote --approve
   range compiler profile [COMPILER-DIR]
   range compiler COMMAND [ARGS...]
   range check-build-plan
@@ -105,6 +106,23 @@ case "$command" in
                     exit 1
                 fi
                 ;;
+            promote)
+                if [[ $# -ne 1 || "$1" != "--approve" ]]; then
+                    usage
+                    exit 1
+                fi
+                compiler_directory="$REPO_ROOT/RangeCompiler/Sources/Compiler"
+                candidate_directory="$compiler_directory/.range/Build/candidate"
+                reproduction_directory="$compiler_directory/.range/Build/reproduction"
+                "$REPO_ROOT/scripts/check-range-compiler-candidate" "$compiler_directory"
+                "$REPO_ROOT/scripts/promote-range-compiler" \
+                    --approve \
+                    --candidate-llvm "$candidate_directory/RangeCompiler.ll" \
+                    --reproduction-llvm "$reproduction_directory/RangeCompiler.ll" \
+                    --candidate-executable "$candidate_directory/RangeCompiler" \
+                    --reproduction-executable "$reproduction_directory/RangeCompiler"
+                "$REPO_ROOT/scripts/verify-range-compiler" --integrity-only
+                ;;
             profile)
                 if [[ $# -gt 1 ]]; then usage; exit 1; fi
                 "$REPO_ROOT/scripts/profile-range-compiler" "$@"
@@ -129,9 +147,9 @@ case "$command" in
     check-compiler-smoke)
         if [[ $# -gt 1 ]]; then usage; exit 1; fi
         if [[ $# -eq 1 ]]; then
-            "$REPO_ROOT/scripts/check-range-compiler-candidate" --checkpoint self-reproduce "$1"
+            "$REPO_ROOT/scripts/check-range-compiler-candidate" --checkpoint candidate-plan "$1"
         else
-            "$REPO_ROOT/scripts/check-range-compiler-candidate" --checkpoint self-reproduce
+            "$REPO_ROOT/scripts/check-range-compiler-candidate" --checkpoint candidate-plan
         fi
         ;;
     check-compiler-v1)
