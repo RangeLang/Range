@@ -159,16 +159,16 @@
       float radialDistance = sqrt(radialSquared);
       // Resolve the circular cutout in this same fragment pass. The sky canvas
       // stays viewport-sized; only this alpha mask follows the interaction.
-      float sphereResolution = u_viewport_mask > 0.5
-        ? max(u_sphere_diameter, 1.0)
-        : min(u_resolution.x, u_resolution.y);
-      // The sphere silhouette is a hard geometric boundary. Keep only one
-      // pixel of antialiasing; all visible feathering belongs to the internal
-      // website-reveal cutout.
-      float edgeFeather = 1.0 / max(sphereResolution, 1.0);
+      // Resolve the silhouette across exactly one physical pixel. This keeps
+      // the circle sharp while preventing the stair-step edge of a binary mask.
+      float edgeWidth = 1.0 / sphereRadius;
       float sphereAlpha = u_full_bleed > 0.5
         ? 1.0
-        : 1.0 - smoothstep(1.0 - edgeFeather, 1.0, radialDistance);
+        : 1.0 - smoothstep(
+            1.0 - edgeWidth * 0.5,
+            1.0 + edgeWidth * 0.5,
+            radialDistance
+          );
       float maskAlpha = u_invert_mask > 0.5
         ? 1.0 - sphereAlpha
         : sphereAlpha;
@@ -438,8 +438,9 @@
     let layoutDirty = true;
 
     const measure = () => {
-      // One physical sample per CSS pixel cuts Retina fill-rate by up to 75%.
-      density = 1;
+      // Preserve native edge resolution on Retina displays while keeping the
+      // shader fill rate bounded on unusually dense screens.
+      density = Math.min(window.devicePixelRatio || 1, 2);
       const width = Math.max(1, Math.round(canvas.clientWidth * density));
       const height = Math.max(1, Math.round(canvas.clientHeight * density));
       if (canvas.width !== width || canvas.height !== height) {
