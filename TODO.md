@@ -2131,11 +2131,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     on a failed candidate and measure load, delta-apply, query, and
     invalidation-frontier costs before promoting a new authority.
   - [x] Persist a Range-shaped revision artifact as the accepted graph authority.
-    - `range compile-graph` now writes revision schema v3: deterministic
+    - `range compile-graph` now writes revision schema v4: deterministic
       revision identity over parent + File fingerprint + Source provenance + node values + status,
-      a 4-node index (source/shape/behavior/compile with before/after/changed
-      value fingerprints), the 3 cardinality-one pipeline edges
-      (add/replace operations), and 4 view digests.
+      a 5-node index (source/syntax/shape/behavior/compile with
+      before/after/changed value fingerprints), the 4 cardinality-one pipeline
+      edges (add/replace operations), and 5 view digests.
     - A failed candidate never writes a revision; the last accepted revision
       is preserved. Unchanged input reuses the artifact without rewriting it.
     - `scripts/range check-compiler-graph-revision` proves cold insertion,
@@ -2158,22 +2158,27 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       read; successful migration removes a legacy copy if present.
     - A warm reuse rewrites neither the revision nor the bundle (verified by
       inode). A failed candidate preserves both accepted artifacts.
-    - Each graph run reports `rangeGraphMetrics`: `sourceMs`/`loadMs`/
+    - Each graph run reports `rangeGraphMetrics`: `sourceMs`/`syntaxMs`/`loadMs`/
       `reducerMs`/`queryMs`/`materializeMs` wall costs, `viewsAffected`,
-      `sourceArtifact`, and per-phase `consumed`/`derived` flags. A phase
+      `sourceArtifact`/`syntaxArtifact`, and per-phase `consumed`/`derived` flags. A phase
       whose before/after values are equal consumed the persisted revision; a
       phase that commits a new value derived its product.
-    - On a literal edit the report shows `source=derived`, `shape=consumed`,
-      `behavior=derived`, `compile=derived`, and `viewsAffected=3`: the shape
-      stage leaves the prior accepted value untouched and emits no delta, so
-      the shape value is a projection of the persisted Source artifact rather
-      than a fresh capture.
-    - The proof independently re-derives the shape value with
-      `inspect-v1` over the persisted bundle and asserts it equals the
-      revision's shape node, and that the shape projection contains no LLVM.
-    - The eager body capture inside the V1 `compilerV1Shape` reducer remains
-      the deferred pure-projection cutover: storing the typed syntax tables as
-      graph facts so emission reads them instead of re-capturing.
+    - On a literal edit the report shows `source=derived`, `syntax=consumed`,
+      `shape=consumed`, `behavior=derived`, `compile=derived`, and
+      `viewsAffected=3`: the syntax and Shape stages leave the prior accepted
+      values untouched and emit no delta, so
+      the shape value is a projection of persisted syntax facts rather than a
+      fresh Source capture.
+    - `syntax-facts.tsv` persists the validated typed Shape snapshot plus its
+      syntax and Shape fingerprints; Source provenance remains in revision v4.
+      The proof makes Source unavailable,
+      runs `project-shape-v1` using only those facts, and obtains the exact
+      `compile-shape` bytes and revision Shape value with no Behavior or LLVM.
+      `resume-v1-facts` also requires a transient Source-to-syntax binding, so
+      stale facts from another generation at the same path fail closed.
+    - `compilerV1Shape` now only projects persisted facts. Behavior retains a
+      transitional Source recapture for the complete pre-link macro/lowering
+      tables; serializing and loading those tables is the next storage cutover.
   - [x] Add the Shape-only reducer as its own compiler command.
     - `compilerV1ShapeOnly` captures the typed declarations and main root,
       renders only the shape snapshot, and stops; `range compile-shape`
@@ -2185,9 +2190,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       proof asserts the emitted `after` equals the revision shape node and the
       payload equals the `inspect-v1` shape region, with no LLVM or downstream
       phase deltas.
-    - Wiring the graph line to persist a `shape.tsv` payload via this reducer
-      is the next storage cutover once Behavior/Compile are routed through the
-      same artifact.
+    - The graph line now persists the equivalent payload in
+      `syntax-facts.tsv`; `project-shape-v1` owns the facts-only projection.
 
 - [x] Add the first Range-authored compiler-description values.
   - Core now defines `PhaseRegistration` and `CompilerRegistration` as
@@ -2216,10 +2220,10 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       shape/behavior/plot artifacts, and checks the typed missing-input error.
     - [x] Expose the persistent graph line as an opt-in compiler command.
       - `range compile-graph <FILE-OR-DIR>` resolves the current Range-authored build
-        producer and runs its `compile-v1` File -> Source -> Shape -> Behavior ->
+        producer and runs its `compile-v1` File -> Source -> Syntax -> Shape -> Behavior ->
         Compiled pipeline; ordinary `range compile` remains the accepted
         bootstrap oracle while the cutover is compared. The durable cache
-        boundary implemented today is only File -> Source.
+        boundary implemented today reaches persisted Syntax and facts-only Shape.
       - `scripts/range check-compiler-graph` proves direct legacy LLVM parity,
         project source-set parity, Source/Shape/Behavior/Compiled inspection,
         cold insertion, unchanged reuse, and edited replacement in 7 seconds
@@ -2246,6 +2250,15 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         durable Shape authority, and lowering still uses V1's in-process tables.
         Add an independent Shape validation/proof before routing later phases
         through it.
+        - [x] Persist the first graph-level V1 syntax-fact artifact and make
+          Shape a pure projection over it. Revision v4 owns its digest and
+          value; warm reuse preserves its inode, literal edits preserve its
+          value when structure is unchanged, failed candidates preserve its
+          accepted bytes, and `project-shape-v1` reproduces Shape with Source
+          unavailable.
+        - [ ] Extend the artifact from the complete typed Shape snapshot to all
+          reloadable pre-link syntax tables so Behavior no longer recaptures
+          Source before macro linking and lowering.
         - [x] Persist the first source-local syntax Shape artifact through
           `range shape <FILE-OR-DIR>`. The versioned artifact contains the
           Core-authored `@syntax` recipe order, literals, typed captures, and

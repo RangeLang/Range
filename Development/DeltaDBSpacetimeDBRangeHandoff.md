@@ -173,18 +173,24 @@ oracle yet.
 
 The bounded revision cutover is implemented without rewriting Body/CFG/MIR:
 
-1. Graph `revision.tsv` schema v3 owns parent identity, File fingerprint,
-   Source profile, canonical input, compiler identity, bundle digest, accepted
-   phase values, node changes, edge changes, view digests, and accepted status.
-   Shape retains the source-only v2 subset.
+1. Graph `revision.tsv` schema v4 owns parent identity, File fingerprint,
+   Source profile, canonical input, compiler identity, Source and syntax-fact
+   digests, accepted phase values, node changes, edge changes, view digests,
+   and accepted status. Shape retains the source-only v2 subset.
 2. Graph revisions persist the node index and typed edge-delta stream. The V1
    execution record is materialized transiently from the revision only while
    invoking the compatibility `resume-v1` command; it is not cached.
 3. `source.tsv` is removed as a parallel authority. Reuse validates the actual
    Source bundle against the digest and provenance in `revision.tsv`.
-4. Focused cold, warm, unchanged, edited, failed-candidate, and recovery proofs
-   cover revision and bundle preservation, phase costs, and affected-view
-   counts.
+4. `syntax-facts.tsv` persists the validated typed Shape snapshot and its
+   syntax and Shape fingerprints. Source provenance remains on the revision's
+   Source-to-syntax edge, so structurally identical facts remain byte-identical
+   across non-structural edits. Shape decodes and projects this artifact without
+   opening or recapturing Source. A transient binding pairs the current Source
+   value with the accepted syntax value before `resume-v1-facts` runs.
+5. Focused cold, warm, unchanged, edited, failed-candidate, and recovery proofs
+   cover revision, Source, syntax-fact and LLVM preservation, phase costs,
+   Source-free Shape projection, and affected-view counts.
 
 Execution is now a transient candidate operation: success commits staged LLVM
 and revision artifacts, while failure emits diagnostics without replacing the
@@ -193,7 +199,10 @@ cache and is removed after success.
 
 ## Next implementation slice
 
-Move Shape to a pure projection over persisted typed syntax facts.
+Extend the syntax-fact artifact from the complete typed Shape snapshot to the
+full reloadable pre-link syntax tables. Behavior currently recaptures those
+downstream-only tables from Source before macro linking; it should instead load
+the accepted syntax facts, then persist its own product for Compile.
 
 The first success criterion is not byte identity. It is deterministic revision
 identity, correct before/after values, bounded invalidation, and preservation of

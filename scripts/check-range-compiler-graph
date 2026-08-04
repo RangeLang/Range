@@ -111,4 +111,4 @@ if /usr/bin/cmp -s "$WORK_ROOT/direct-graph.ll" "$WORK_ROOT/persistent.ll"; then
     fail "edited graph execution retained the stale compiled artifact"
 fi
 
-echo "Range compiler graph: pass (project source-set parity, durable File -> Source cold insertion/warm reuse, artifact inspection, edited replacement, failed-candidate recovery)"
+echo "Range compiler graph: pass (project source-set parity, durable Source -> Syntax -> Shape cold insertion/warm reuse, artifact inspection, edited replacement, failed-candidate recovery)"

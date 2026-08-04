@@ -102,8 +102,8 @@ cold_revision="$(find_revision "$cold_cache")"
 
 cold_identity="$(revision_identity "$cold_revision")"
 [[ "$cold_identity" =~ ^[0-9a-f]{64}$ ]] || fail "cold revision identity is not a 64-character hash: $cold_identity"
-[[ "$(header_value "$cold_revision" version)" == "3" ]] \
-    || fail "cold revision does not use the transient-execution schema"
+[[ "$(header_value "$cold_revision" version)" == "4" ]] \
+    || fail "cold revision does not use the persisted syntax-facts schema"
 [[ "$(header_value "$cold_revision" file)" =~ ^[0-9]+:[0-9]+$ ]] \
     || fail "cold revision omitted the accepted File fingerprint"
 [[ "$(revision_parent "$cold_revision")" == "absent" ]] \
@@ -121,43 +121,53 @@ graph_compiler_hash="$(/usr/bin/shasum -a 256 "$graph_compiler" | /usr/bin/awk '
     || fail "cold revision does not own the Source compiler provenance"
 [[ "$(node_value "$cold_revision" source before)" == "0:0" ]] \
     || fail "cold source node did not begin from an absent value"
-[[ "$(node_changed_count "$cold_revision")" -eq 4 ]] \
+[[ "$(node_changed_count "$cold_revision")" -eq 5 ]] \
     || fail "cold revision did not mark every node changed"
-[[ "$(/usr/bin/grep -c $'^rangeRevisionNode\t' "$cold_revision")" -eq 4 ]] \
-    || fail "cold revision node index count is not 4"
-[[ "$(/usr/bin/grep -c $'^rangeRevisionEdge\t' "$cold_revision")" -eq 3 ]] \
-    || fail "cold revision edge-delta stream count is not 3"
-[[ "$(/usr/bin/grep -c $'^rangeRevisionDigest\t' "$cold_revision")" -eq 4 ]] \
-    || fail "cold revision view digest count is not 4"
-[[ "$(/usr/bin/grep -Fc $'\tcardinality=one\toperation=add' "$cold_revision")" -eq 3 ]] \
+[[ "$(/usr/bin/grep -c $'^rangeRevisionNode\t' "$cold_revision")" -eq 5 ]] \
+    || fail "cold revision node index count is not 5"
+[[ "$(/usr/bin/grep -c $'^rangeRevisionEdge\t' "$cold_revision")" -eq 4 ]] \
+    || fail "cold revision edge-delta stream count is not 4"
+[[ "$(/usr/bin/grep -c $'^rangeRevisionDigest\t' "$cold_revision")" -eq 5 ]] \
+    || fail "cold revision view digest count is not 5"
+[[ "$(/usr/bin/grep -Fc $'\tcardinality=one\toperation=add' "$cold_revision")" -eq 4 ]] \
     || fail "cold revision pipeline edges are not all add operations"
 
 cold_source_bundle="$(/usr/bin/find "$cold_cache" -type f -name ProjectSourceSet.range -print -quit)"
+cold_syntax_facts="$(/usr/bin/find "$cold_cache" -type f -name syntax-facts.tsv -print -quit)"
+[[ -n "$cold_syntax_facts" && -f "$cold_syntax_facts" ]] \
+    || fail "cold graph execution omitted its typed syntax facts"
 cold_compiled="$WORK_ROOT/cold-a.ll"
 cold_source_digest="$(/usr/bin/shasum -a 256 "$cold_source_bundle" | /usr/bin/awk '{print $1}')"
+cold_syntax_digest="$(/usr/bin/shasum -a 256 "$cold_syntax_facts" | /usr/bin/awk '{print $1}')"
 cold_compiled_digest="$(/usr/bin/shasum -a 256 "$cold_compiled" | /usr/bin/awk '{print $1}')"
 [[ "$(header_value "$cold_revision" source)" == "$cold_source_digest" ]] \
     || fail "cold revision source digest does not match the persisted Source artifact"
 [[ "$(/usr/bin/sed -n 's/^rangeRevisionDigest\tview=source\tdigest=\([0-9a-f]*\)$/\1/p' "$cold_revision")" == "$cold_source_digest" ]] \
     || fail "cold revision source view digest disagrees with the persisted Source artifact"
+[[ "$(/usr/bin/sed -n 's/^rangeRevisionDigest\tview=syntax\tdigest=\([0-9a-f]*\)$/\1/p' "$cold_revision")" == "$cold_syntax_digest" ]] \
+    || fail "cold revision syntax view digest disagrees with the persisted facts artifact"
+[[ "$(header_value "$cold_syntax_facts" syntaxFirst):$(header_value "$cold_syntax_facts" syntaxSecond)" == "$(node_value "$cold_revision" syntax after)" ]] \
+    || fail "cold revision syntax value disagrees with the persisted facts artifact"
+[[ "$(header_value "$cold_syntax_facts" shapeFirst):$(header_value "$cold_syntax_facts" shapeSecond)" == "$(node_value "$cold_revision" shape after)" ]] \
+    || fail "cold revision shape value disagrees with the persisted facts projection"
 [[ -z "$(/usr/bin/find "$cold_cache" -type f -name source.tsv -print -quit)" ]] \
     || fail "cold graph cache retained the superseded source.tsv authority"
 [[ -z "$(/usr/bin/find "$cold_cache" -type f -name execution.tsv -print -quit)" ]] \
     || fail "cold graph cache persisted transient execution state"
 
 # Every phase of a cold generation derives a new value, so the revision reports
-# all four nodes derived and a full four-view invalidation frontier.
+# all five nodes derived and a full five-view invalidation frontier.
 /usr/bin/grep -Fq $'rangeGraphMetrics\t' "$WORK_ROOT/cold-a.out" \
     || fail "cold graph execution omitted its stage metrics report"
-for metric in loadMs reducerMs queryMs materializeMs sourceMs; do
+for metric in loadMs reducerMs queryMs materializeMs sourceMs syntaxMs; do
     [[ "$(field_value "$WORK_ROOT/cold-a.out" "$metric")" =~ ^[0-9]+$ ]] \
         || fail "cold graph metrics omitted the $metric cost"
 done
-[[ "$(field_value "$WORK_ROOT/cold-a.out" viewsAffected)" == "4" ]] \
+[[ "$(field_value "$WORK_ROOT/cold-a.out" viewsAffected)" == "5" ]] \
     || fail "cold graph execution did not report a full invalidation frontier"
 [[ "$(field_value "$WORK_ROOT/cold-a.out" sourceArtifact)" == "0" ]] \
     || fail "cold graph execution did not report a derived Source artifact"
-for node in source shape behavior compile; do
+for node in source syntax shape behavior compile; do
     [[ "$(field_value "$WORK_ROOT/cold-a.out" "$node")" == "derived" ]] \
         || fail "cold graph execution did not report a derived $node phase"
 done
@@ -177,7 +187,7 @@ rederived_revision="$(find_revision "$cold_cache")"
 cold_revision="$rederived_revision"
 
 # A v2 cache migrates through its legacy execution record once. The accepted
-# phase values and File fingerprint move into v3, and the parallel record is
+# phase values, File fingerprint, and captured syntax facts move into v4, and the parallel record is
 # removed after the successful reuse.
 legacy_execution="$(dirname "$cold_revision")/execution.tsv"
 legacy_file="$(header_value "$cold_revision" file)"
@@ -191,22 +201,25 @@ legacy_compiled="$(node_value "$cold_revision" compile after)"
     "${legacy_shape%%:*}" "${legacy_shape#*:}" \
     "${legacy_behavior%%:*}" "${legacy_behavior#*:}" \
     "${legacy_compiled%%:*}" "${legacy_compiled#*:}" > "$legacy_execution"
-/usr/bin/perl -0pi -e 's/rangeRevision\tversion=3/rangeRevision\tversion=2/; s/\tfile=[^\t]*//' "$cold_revision"
+/usr/bin/perl -0pi -e 's/rangeRevision\tversion=4/rangeRevision\tversion=2/; s/\tfile=[^\t]*//' "$cold_revision"
+/bin/rm -f "$(dirname "$cold_revision")/syntax-facts.tsv"
 compile_graph "$cold_cache" "$FIXTURE" "$WORK_ROOT/cold-a-migrated.ll" "$WORK_ROOT/cold-a-migrated.out"
 /usr/bin/grep -Fq $'compilerV1Execution\tstatus=reused\tchanged=0' "$WORK_ROOT/cold-a-migrated.out" \
     || fail "legacy graph cache migration did not reuse its accepted artifact"
 [[ "$(field_value "$WORK_ROOT/cold-a-migrated.out" executionSource)" == "legacy" ]] \
     || fail "legacy graph cache migration did not consume execution.tsv"
-[[ "$(header_value "$cold_revision" version)" == "3" ]] \
-    || fail "legacy graph cache migration did not write revision schema v3"
+[[ "$(header_value "$cold_revision" version)" == "4" ]] \
+    || fail "legacy graph cache migration did not write revision schema v4"
 [[ "$(header_value "$cold_revision" file)" == "$legacy_file" ]] \
     || fail "legacy graph cache migration lost the accepted File fingerprint"
 [[ ! -e "$legacy_execution" ]] \
     || fail "legacy graph cache migration retained execution.tsv"
 
 source_bundle_path="$(/usr/bin/find "$cold_cache" -type f -name ProjectSourceSet.range -print -quit)"
+syntax_facts_path="$(/usr/bin/find "$cold_cache" -type f -name syntax-facts.tsv -print -quit)"
 revision_inode="$(/usr/bin/stat -f %i "$cold_revision")"
 source_bundle_inode="$(/usr/bin/stat -f %i "$source_bundle_path")"
+syntax_facts_inode="$(/usr/bin/stat -f %i "$syntax_facts_path")"
 
 # Unchanged input must reuse the accepted artifact without rewriting the
 # revision record.
@@ -223,7 +236,7 @@ compile_graph "$cold_cache" "$FIXTURE" "$WORK_ROOT/cold-a-warm.ll" "$WORK_ROOT/c
     || fail "warm graph execution reported a non-empty invalidation frontier"
 [[ "$(field_value "$WORK_ROOT/cold-a-warm.out" sourceArtifact)" == "1" ]] \
     || fail "warm graph execution did not consume the persisted Source artifact"
-for node in source shape behavior compile; do
+for node in source syntax shape behavior compile; do
     [[ "$(field_value "$WORK_ROOT/cold-a-warm.out" "$node")" == "consumed" ]] \
         || fail "warm graph execution did not report a consumed $node phase"
 done
@@ -231,12 +244,16 @@ done
     || fail "warm graph execution did not materialize transient execution state"
 [[ "$(field_value "$WORK_ROOT/cold-a-warm.out" executionSource)" == "revision" ]] \
     || fail "warm graph execution did not derive transient state from the revision"
+[[ "$(field_value "$WORK_ROOT/cold-a-warm.out" syntaxArtifact)" == "1" ]] \
+    || fail "warm graph execution did not consume persisted syntax facts"
 [[ "$(field_value "$WORK_ROOT/cold-a-warm.out" revisionBytes)" -gt 0 ]] \
     || fail "warm graph execution did not load its persisted revision record"
 [[ "$revision_inode" == "$(/usr/bin/stat -f %i "$(find_revision "$cold_cache")")" ]] \
     || fail "warm graph execution rewrote the revision-owned Source metadata"
 [[ "$source_bundle_inode" == "$(/usr/bin/stat -f %i "$(find "$cold_cache" -name ProjectSourceSet.range -print -quit)")" ]] \
     || fail "warm graph execution rewrote the persisted Source bundle"
+[[ "$syntax_facts_inode" == "$(/usr/bin/stat -f %i "$(find "$cold_cache" -name syntax-facts.tsv -print -quit)")" ]] \
+    || fail "warm graph execution rewrote the persisted syntax facts"
 [[ -z "$(/usr/bin/find "$cold_cache" -type f -name source.tsv -print -quit)" ]] \
     || fail "warm graph execution recreated source.tsv"
 [[ -z "$(/usr/bin/find "$cold_cache" -type f -name execution.tsv -print -quit)" ]] \
@@ -262,6 +279,21 @@ fi
 # over the persisted Source artifact reproduces the exact shape node value and
 # byte-identical snapshot without any behavior or compiled product.
 "$compiler" compile-shape "$source_bundle_path" > "$WORK_ROOT/shape-only.out"
+source_bundle_unavailable="$WORK_ROOT/ProjectSourceSet.unavailable.range"
+/bin/mv "$source_bundle_path" "$source_bundle_unavailable"
+"$compiler" project-shape-v1 "$syntax_facts_path" > "$WORK_ROOT/projected-shape.out"
+/bin/mv "$source_bundle_unavailable" "$source_bundle_path"
+/usr/bin/cmp -s "$WORK_ROOT/projected-shape.out" "$WORK_ROOT/shape-only.out" \
+    || fail "persisted syntax facts did not project the byte-identical Shape without Source"
+/bin/cp "$syntax_facts_path" "$WORK_ROOT/syntax-facts.tampered.tsv"
+/usr/bin/perl -0pi -e 's/typedSyntax/txpedSyntax/' "$WORK_ROOT/syntax-facts.tampered.tsv"
+tampered_status=0
+"$compiler" project-shape-v1 "$WORK_ROOT/syntax-facts.tampered.tsv" > "$WORK_ROOT/tampered-shape.out" \
+    || tampered_status=$?
+[[ "$tampered_status" -eq 65 ]] \
+    || fail "tampered syntax facts did not fail projection with status 65"
+/usr/bin/grep -Fq $'compilerError\tkind=invalidCompilerV1SyntaxFacts' "$WORK_ROOT/tampered-shape.out" \
+    || fail "tampered syntax facts omitted their typed validation error"
 /usr/bin/grep -Eq $'^compilerV1Shape\tversion=1\tidentity=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+$' "$WORK_ROOT/shape-only.out" \
     || fail "shape reducer omitted its versioned delta header"
 [[ "$(/usr/bin/sed -n 's/^compilerV1Shape\tversion=1\t.*\tafter=\([0-9]*:[0-9]*\)$/\1/p' "$WORK_ROOT/shape-only.out")" == "$(node_value "$cold_revision" shape after)" ]] \
@@ -291,6 +323,9 @@ project_cold_revision="$(find_revision "$project_cache")"
 [[ -n "$project_cold_revision" && -f "$project_cold_revision" ]] \
     || fail "project cold graph execution omitted its revision artifact"
 project_cold_identity="$(revision_identity "$project_cold_revision")"
+project_cold_syntax="$(/usr/bin/find "$project_cache" -type f -name syntax-facts.tsv -print -quit)"
+project_cold_syntax_inode="$(/usr/bin/stat -f %i "$project_cold_syntax")"
+project_cold_syntax_hash="$(/usr/bin/shasum -a 256 "$project_cold_syntax" | /usr/bin/awk '{print $1}')"
 /bin/cp "$project_cold_revision" "$WORK_ROOT/revision.project-cold.tsv"
 project_cold_revision="$WORK_ROOT/revision.project-cold.tsv"
 
@@ -303,7 +338,7 @@ project_updated_revision="$(find_revision "$project_cache")"
     && fail "edited graph execution reused the prior revision identity"
 [[ "$(revision_parent "$project_updated_revision")" == "$project_cold_identity" ]] \
     || fail "updated revision parent is not the prior accepted revision"
-for node in source shape behavior compile; do
+for node in source syntax shape behavior compile; do
     before="$(node_value "$project_updated_revision" "$node" before)"
     cold_after="$(node_value "$project_cold_revision" "$node" after)"
     [[ "$before" == "$cold_after" ]] \
@@ -311,6 +346,12 @@ for node in source shape behavior compile; do
 done
 [[ "$(node_value "$project_updated_revision" shape changed)" == "0" ]] \
     || fail "literal-value edit invalidated the reusable shape node"
+[[ "$(node_value "$project_updated_revision" syntax changed)" == "0" ]] \
+    || fail "literal-value edit invalidated the reusable syntax facts"
+[[ "$project_cold_syntax_inode" == "$(/usr/bin/stat -f %i "$(/usr/bin/find "$project_cache" -type f -name syntax-facts.tsv -print -quit)")" ]] \
+    || fail "literal-value edit rewrote byte-identical syntax facts"
+[[ "$project_cold_syntax_hash" == "$(/usr/bin/shasum -a 256 "$(/usr/bin/find "$project_cache" -type f -name syntax-facts.tsv -print -quit)" | /usr/bin/awk '{print $1}')" ]] \
+    || fail "literal-value edit changed the reusable syntax-fact digest"
 [[ "$(node_changed_count "$project_updated_revision")" -eq 3 ]] \
     || fail "literal-value edit produced an unexpected affected-view count"
 /usr/bin/cmp -s "$WORK_ROOT/project-cold.ll" "$WORK_ROOT/project-updated.ll" \
@@ -325,6 +366,8 @@ done
     || fail "edited graph execution did not derive the source phase"
 [[ "$(field_value "$WORK_ROOT/project-updated.out" shape)" == "consumed" ]] \
     || fail "edited graph execution did not consume the persisted shape value"
+[[ "$(field_value "$WORK_ROOT/project-updated.out" syntax)" == "consumed" ]] \
+    || fail "edited graph execution did not preserve the syntax-fact value"
 [[ "$(field_value "$WORK_ROOT/project-updated.out" behavior)" == "derived" ]] \
     || fail "edited graph execution did not derive the behavior phase"
 [[ "$(field_value "$WORK_ROOT/project-updated.out" compile)" == "derived" ]] \
@@ -333,6 +376,8 @@ done
 # A failed candidate must preserve the last accepted revision.
 /usr/bin/perl -0pi -e 's/return 8/return missingValue/' "$project/ReturnInteger.range"
 /bin/cp "$project_updated_revision" "$WORK_ROOT/revision.last-known-good.tsv"
+project_syntax_facts="$(/usr/bin/find "$project_cache" -type f -name syntax-facts.tsv -print -quit)"
+project_syntax_hash="$(/usr/bin/shasum -a 256 "$project_syntax_facts" | /usr/bin/awk '{print $1}')"
 fail_status=0
 compile_graph "$project_cache" "$project" "$WORK_ROOT/project-failed.ll" "$WORK_ROOT/project-failed.out" \
     || fail_status=$?
@@ -342,6 +387,8 @@ compile_graph "$project_cache" "$project" "$WORK_ROOT/project-failed.ll" "$WORK_
     || fail "failed graph candidate omitted its typed compiler error"
 /usr/bin/cmp -s "$project_updated_revision" "$WORK_ROOT/revision.last-known-good.tsv" \
     || fail "failed graph candidate damaged the last accepted revision"
+[[ "$project_syntax_hash" == "$(/usr/bin/shasum -a 256 "$project_syntax_facts" | /usr/bin/awk '{print $1}')" ]] \
+    || fail "failed graph candidate damaged the accepted syntax facts"
 
 # Recovery to the last-known-good input must reuse the accepted artifact.
 /usr/bin/perl -0pi -e 's/return missingValue/return 8/' "$project/ReturnInteger.range"
@@ -352,7 +399,7 @@ compile_graph "$project_cache" "$project" "$WORK_ROOT/project-recovered.ll" "$WO
     || fail "recovered graph execution rewrote the accepted revision"
 [[ "$(field_value "$WORK_ROOT/project-recovered.out" viewsAffected)" == "0" ]] \
     || fail "recovered graph execution reported a non-empty invalidation frontier"
-for node in source shape behavior compile; do
+for node in source syntax shape behavior compile; do
     [[ "$(field_value "$WORK_ROOT/project-recovered.out" "$node")" == "consumed" ]] \
         || fail "recovered graph execution did not consume the persisted $node phase"
 done
@@ -360,4 +407,4 @@ done
     || fail "graph revision lifecycle persisted transient execution state"
 
 affected_views="$(node_changed_count "$project_updated_revision")"
-echo "Range compiler graph revision: pass (revision-owned Source and execution provenance, transient resume state, deterministic revision identity, parent chaining, node/edge/digest record, cold/warm reuse, measured stage costs, Shape consumes the persisted Source artifact, shape-only reducer parity, bounded literal-edit invalidation with $affected_views affected views, failed-candidate last-known-good preservation, recovery)"
+echo "Range compiler graph revision: pass (revision-owned Source and syntax facts, transient resume state, deterministic revision identity, parent chaining, node/edge/digest record, cold/warm reuse, Source-free Shape projection, measured stage costs, bounded literal-edit invalidation with $affected_views affected views, failed-candidate last-known-good preservation, recovery)"

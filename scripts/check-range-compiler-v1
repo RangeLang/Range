@@ -17,14 +17,16 @@ fail() {
     exit 1
 }
 
+/usr/bin/grep -Fq 'function compilerV1SyntaxFactsCapture(source: CompilerV1SourceDelta)' "$COMPILER_V1" \
+    || fail "V1 does not expose typed syntax capture as its own product"
 /usr/bin/grep -Fq 'compilerTypedDeclarationsCapture(source: source.value.source, tables: tables)' "$COMPILER_V1" \
-    || fail "V1 Shape does not own declaration capture"
+    || fail "V1 syntax facts do not own declaration capture"
 /usr/bin/grep -Fq 'compilerTypedSyntaxCaptureMainRoot(source: source.value.source, tables: tables)' "$COMPILER_V1" \
-    || fail "V1 Shape does not retain main in its declaration graph"
+    || fail "V1 syntax facts do not retain main in their declaration graph"
 if /usr/bin/grep -Fq 'compilerTypedSyntaxCapture(source: source.value.source, tables: tables)' "$COMPILER_V1"; then
     fail "V1 Shape still eagerly captures every function body"
 fi
-/usr/bin/grep -Fq 'behaviorSnapshot: compilerV1NativeBehaviorSnapshot(identity: source.identity, output: compiledOutput)' "$COMPILER_V1" \
+/usr/bin/grep -Fq 'snapshot: compilerV1NativeBehaviorSnapshot(identity: source.identity, output: compiledOutput)' "$COMPILER_V1" \
     || fail "V1 Behavior is not derived from successful reachable lowering"
 if /usr/bin/grep -Fq 'compilerSemanticBuild(tables: tables, delta: delta, semantics: semantics)' "$COMPILER_V1"; then
     fail "V1 still treats the incomplete whole-program SemanticGraph as Behavior authority"
@@ -33,16 +35,18 @@ if /usr/bin/grep -Fq 'compilerTypedSyntaxSummary(source: source.value.source)' "
     || /usr/bin/grep -Fq 'compilerSemanticSummary(source: source)' "$COMPILER_V1"; then
     fail "V1 still rebuilds Shape or Behavior through independent source summaries"
 fi
-/usr/bin/grep -Fq 'function compilerV1Behavior(shape: CompilerV1ShapeDelta, before: CompilerFingerprint)' "$COMPILER_V1" \
-    || fail "V1 Behavior still accepts source instead of the frozen Shape artifact"
-/usr/bin/grep -Fq 'let snapshot: String("\(shape.behaviorSnapshot)")' "$COMPILER_V1" \
-    || fail "V1 Behavior does not consume the Shape-owned behavior snapshot"
+/usr/bin/grep -Fq 'function compilerV1Shape(facts: CompilerV1SyntaxFacts, before: CompilerFingerprint)' "$COMPILER_V1" \
+    || fail "V1 Shape does not consume frozen syntax facts"
+/usr/bin/grep -Fq 'snapshot: compilerV1SyntaxFactsSnapshot(facts: facts)' "$COMPILER_V1" \
+    || fail "V1 Shape does not project its snapshot from syntax facts"
+/usr/bin/grep -Fq 'function compilerV1Behavior(source: CompilerV1SourceDelta, shape: CompilerV1ShapeDelta, before: CompilerFingerprint)' "$COMPILER_V1" \
+    || fail "V1 Behavior does not own the transitional downstream recapture"
 /usr/bin/grep -Fq 'compiledOutput: compilerNativeSourceSetLLVMTextForLinkedTables(source: source.value.source, declarationTables: tables)' "$COMPILER_V1" \
-    || fail "V1 does not lower from Shape's retained captured tables"
+    || fail "V1 Behavior does not retain reachable lowering"
 /usr/bin/grep -Fq 'function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1BehaviorDelta, before: CompilerFingerprint)' "$COMPILER_V1" \
     || fail "V1 Compiled still accepts source instead of frozen Shape and Behavior products"
-/usr/bin/grep -Fq 'let output: String("\(shape.compiledOutput)")' "$COMPILER_V1" \
-    || fail "V1 Compiled does not consume Shape's retained lowering product"
+/usr/bin/grep -Fq 'let output: String("\(behavior.compiledOutput)")' "$COMPILER_V1" \
+    || fail "V1 Compiled does not consume Behavior's retained lowering product"
 if /usr/bin/grep -Fq 'compileRangeNativeProgramOutput(source: source)' "$COMPILER_V1"; then
     fail "V1 Compiled still invokes the source-based native program entry"
 fi
@@ -160,6 +164,20 @@ done
 "$COMPILER" compile-v1 "$FIXTURE" > "$WORK_ROOT/v1.ll"
 /usr/bin/cmp -s "$WORK_ROOT/legacy.ll" "$WORK_ROOT/v1.ll" \
     || fail "V1 plot artifact differs from the legacy compiler output"
+
+/bin/cp "$FIXTURE" "$WORK_ROOT/Bound.range"
+"$COMPILER" capture-syntax-v1 "$WORK_ROOT/Bound.range" "$WORK_ROOT/bound-facts.tsv" > "$WORK_ROOT/bound-binding.tsv"
+"$COMPILER" resume-v1-facts "$WORK_ROOT/bound-execution.tsv" "$WORK_ROOT/bound-binding.tsv" \
+    "$WORK_ROOT/bound-facts.tsv" "$WORK_ROOT/Bound.range" "$WORK_ROOT/bound.ll" > "$WORK_ROOT/bound-cold.out"
+/usr/bin/perl -0pi -e 's/@main/construct Added {\n    let value: Int\n}\n\n@main/' "$WORK_ROOT/Bound.range"
+stale_facts_status=0
+"$COMPILER" resume-v1-facts "$WORK_ROOT/bound-execution.tsv" "$WORK_ROOT/bound-binding.tsv" \
+    "$WORK_ROOT/bound-facts.tsv" "$WORK_ROOT/Bound.range" "$WORK_ROOT/bound-stale.ll" > "$WORK_ROOT/bound-stale.out" \
+    || stale_facts_status=$?
+[[ "$stale_facts_status" -eq 65 ]] \
+    || fail "stale same-path syntax facts exited $stale_facts_status instead of 65"
+/usr/bin/grep -Fq $'compilerError\tkind=compilerV1SyntaxFactsSourceMismatch' "$WORK_ROOT/bound-stale.out" \
+    || fail "stale same-path syntax facts omitted their binding error"
 
 /bin/cp "$FIXTURE" "$WORK_ROOT/Persistent.range"
 "$COMPILER" resume-v1 "$WORK_ROOT/execution.tsv" "$WORK_ROOT/Persistent.range" "$WORK_ROOT/persistent.ll" > "$WORK_ROOT/persistent-cold.out"
