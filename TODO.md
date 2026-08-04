@@ -2132,8 +2132,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     invalidation-frontier costs before promoting a new authority.
   - [x] Persist a transitional Range-shaped revision artifact beside the V1
     execution record.
-    - `range compile-graph` now writes `revision.tsv` next to `execution.tsv`:
-      deterministic revision identity over parent + node values + status,
+    - `range compile-graph` now writes revision schema v2 next to `execution.tsv`:
+      deterministic revision identity over parent + Source provenance + node values + status,
       a 4-node index (source/shape/behavior/compile with before/after/changed
       value fingerprints), the 3 cardinality-one pipeline edges
       (add/replace operations), and 4 view digests.
@@ -2149,9 +2149,12 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       identity is the next Range-owned cutover.
   - [x] Shape consumes the persisted Source artifact and reports per-stage
     load, delta-apply, query, and materialization costs.
-    - The graph line's Source stage consumes the persisted bundle and
-      `source.tsv` when their metadata still matches this input and compiler;
-      a reuse no longer rewrites either artifact (verified by inode).
+    - The graph and Shape lines consume the persisted bundle only when the
+      Source provenance in `revision.tsv` matches its profile, canonical input,
+      compiler, and actual bundle digest. `source.tsv` is no longer written or
+      read; successful migration removes a legacy copy if present.
+    - A warm reuse rewrites neither the revision nor the bundle (verified by
+      inode). A failed candidate preserves both accepted artifacts.
     - Each graph run reports `rangeGraphMetrics`: `sourceMs`/`loadMs`/
       `reducerMs`/`queryMs`/`materializeMs` wall costs, `viewsAffected`,
       `sourceArtifact`, and per-phase `consumed`/`derived` flags. A phase

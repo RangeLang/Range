@@ -23,3 +23,9 @@ jobs:
 
       - name: Verify candidate reproduction
         run: scripts/range check-compiler-candidate
+
+      - name: Verify graph Source revision
+        run: scripts/range check-compiler-graph-revision
+
+      - name: Verify Shape Source revision
+        run: scripts/range check-shape

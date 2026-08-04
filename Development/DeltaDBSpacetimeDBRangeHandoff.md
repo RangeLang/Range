@@ -169,23 +169,29 @@ Relevant implementation surfaces are
 These are transitional proofs, not permission to delete the accepted compiler
 oracle yet.
 
+## Implemented revision checkpoint
+
+The bounded revision cutover is implemented without rewriting Body/CFG/MIR:
+
+1. `revision.tsv` schema v2 owns parent identity, Source profile, canonical
+   input, compiler identity, bundle digest, node changes, edge changes, view
+   digests, and accepted status.
+2. Graph revisions persist the node index and typed edge-delta stream beside
+   the transitional V1 execution record. Shape uses a source-only revision with
+   the same provenance header and Source digest.
+3. `source.tsv` is removed as a parallel authority. Reuse validates the actual
+   Source bundle against the digest and provenance in `revision.tsv`.
+4. Focused cold, warm, unchanged, edited, failed-candidate, and recovery proofs
+   cover revision and bundle preservation, phase costs, and affected-view
+   counts.
+
 ## Next implementation slice
 
-The next bounded cutover is a durable graph revision artifact, not a rewrite of
-Body/CFG/MIR:
-
-1. Define a Range-owned revision record containing a parent revision, source
-   identity, node changes, edge changes, view digests, and phase status.
-2. Persist a separate node index and typed edge-delta stream beside the existing
-   V1 execution record. Keep compatibility with the current record while the
-   new artifact is proven.
-3. Make Shape consume the persisted Source artifact and emit only the Shape
-   delta it owns. Do not make Shape eagerly capture every function body.
-4. Add focused cold, warm, unchanged, edited, failed-candidate, and recovery
-   proofs. Measure load, delta-apply, query, materialization, and affected-view
-   counts.
-5. Only after those proofs pass, route Usage and later views through the same
-   artifact and then remove one superseded legacy producer at a time.
+Fold the accepted phase values and status still retained by `execution.tsv`
+into `revision.tsv`. Execution then becomes a transient candidate operation:
+success atomically commits a revision, while failure emits diagnostics without
+replacing the accepted revision. After that, move Shape to a pure projection
+over persisted typed syntax facts.
 
 The first success criterion is not byte identity. It is deterministic revision
 identity, correct before/after values, bounded invalidation, and preservation of

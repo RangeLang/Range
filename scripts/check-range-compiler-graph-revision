@@ -102,10 +102,21 @@ cold_revision="$(find_revision "$cold_cache")"
 
 cold_identity="$(revision_identity "$cold_revision")"
 [[ "$cold_identity" =~ ^[0-9a-f]{64}$ ]] || fail "cold revision identity is not a 64-character hash: $cold_identity"
+[[ "$(header_value "$cold_revision" version)" == "2" ]] \
+    || fail "cold revision does not use the Source-provenance schema"
 [[ "$(revision_parent "$cold_revision")" == "absent" ]] \
     || fail "cold revision parent is not absent"
 [[ "$(header_value "$cold_revision" status)" == "accepted" ]] \
     || fail "cold revision phase status is not accepted"
+[[ "$(header_value "$cold_revision" sourceProfile)" == "project" ]] \
+    || fail "cold revision source profile is not project"
+fixture_identity="$(cd "$(dirname "$FIXTURE")" && pwd)/$(basename "$FIXTURE")"
+[[ "$(header_value "$cold_revision" input)" == "$fixture_identity" ]] \
+    || fail "cold revision does not own the canonical Source input identity"
+graph_compiler="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/candidate/RangeCompiler"
+graph_compiler_hash="$(/usr/bin/shasum -a 256 "$graph_compiler" | /usr/bin/awk '{print $1}')"
+[[ "$(header_value "$cold_revision" compiler)" == "$graph_compiler_hash" ]] \
+    || fail "cold revision does not own the Source compiler provenance"
 [[ "$(node_value "$cold_revision" source before)" == "0:0" ]] \
     || fail "cold source node did not begin from an absent value"
 [[ "$(node_changed_count "$cold_revision")" -eq 4 ]] \
@@ -127,6 +138,8 @@ cold_compiled_digest="$(/usr/bin/shasum -a 256 "$cold_compiled" | /usr/bin/awk '
     || fail "cold revision source digest does not match the persisted Source artifact"
 [[ "$(/usr/bin/sed -n 's/^rangeRevisionDigest\tview=source\tdigest=\([0-9a-f]*\)$/\1/p' "$cold_revision")" == "$cold_source_digest" ]] \
     || fail "cold revision source view digest disagrees with the persisted Source artifact"
+[[ -z "$(/usr/bin/find "$cold_cache" -type f -name source.tsv -print -quit)" ]] \
+    || fail "cold graph cache retained the superseded source.tsv authority"
 
 # Every phase of a cold generation derives a new value, so the revision reports
 # all four nodes derived and a full four-view invalidation frontier.
@@ -149,18 +162,18 @@ done
 # revision artifact. The V1 File identity derives from the source bundle path,
 # so the revision record is deterministic per location; content-addressed node
 # identity is a later Range-owned cutover and remains documented as such.
+/bin/cp "$cold_revision" "$WORK_ROOT/cold-a.revision.tsv"
 /bin/rm -rf "$cold_cache"
 compile_graph "$cold_cache" "$FIXTURE" "$WORK_ROOT/cold-a-rederived.ll" "$WORK_ROOT/cold-a-rederived.out"
 rederived_revision="$(find_revision "$cold_cache")"
 [[ -n "$rederived_revision" && -f "$rederived_revision" ]] \
     || fail "rederived cold graph execution omitted its revision artifact"
-/usr/bin/cmp -s "$cold_revision" "$rederived_revision" \
+/usr/bin/cmp -s "$WORK_ROOT/cold-a.revision.tsv" "$rederived_revision" \
     || fail "repeated cold run changed the revision artifact"
 cold_revision="$rederived_revision"
 
-source_tsv_path="$(/usr/bin/find "$cold_cache" -type f -name source.tsv -print -quit)"
 source_bundle_path="$(/usr/bin/find "$cold_cache" -type f -name ProjectSourceSet.range -print -quit)"
-source_tsv_inode="$(/usr/bin/stat -f %i "$source_tsv_path")"
+revision_inode="$(/usr/bin/stat -f %i "$cold_revision")"
 source_bundle_inode="$(/usr/bin/stat -f %i "$source_bundle_path")"
 
 # Unchanged input must reuse the accepted artifact without rewriting the
@@ -186,10 +199,12 @@ done
     || fail "warm graph execution did not load its persisted execution record"
 [[ "$(field_value "$WORK_ROOT/cold-a-warm.out" revisionBytes)" -gt 0 ]] \
     || fail "warm graph execution did not load its persisted revision record"
-[[ "$source_tsv_inode" == "$(/usr/bin/stat -f %i "$(find "$cold_cache" -name source.tsv -print -quit)")" ]] \
-    || fail "warm graph execution rewrote the persisted Source metadata"
+[[ "$revision_inode" == "$(/usr/bin/stat -f %i "$(find_revision "$cold_cache")")" ]] \
+    || fail "warm graph execution rewrote the revision-owned Source metadata"
 [[ "$source_bundle_inode" == "$(/usr/bin/stat -f %i "$(find "$cold_cache" -name ProjectSourceSet.range -print -quit)")" ]] \
     || fail "warm graph execution rewrote the persisted Source bundle"
+[[ -z "$(/usr/bin/find "$cold_cache" -type f -name source.tsv -print -quit)" ]] \
+    || fail "warm graph execution recreated source.tsv"
 
 # The revision's shape value is a faithful projection of the persisted Source
 # artifact: an independent V1 derivation over the same bundle must reproduce
@@ -307,4 +322,4 @@ for node in source shape behavior compile; do
 done
 
 affected_views="$(node_changed_count "$project_updated_revision")"
-echo "Range compiler graph revision: pass (deterministic revision identity, parent chaining, node/edge/digest record, cold/warm reuse, measured stage costs, Shape consumes the persisted Source artifact, shape-only reducer parity, bounded literal-edit invalidation with $affected_views affected views, failed-candidate last-known-good preservation, recovery)"
+echo "Range compiler graph revision: pass (revision-owned Source provenance, deterministic revision identity, parent chaining, node/edge/digest record, cold/warm reuse, measured stage costs, Shape consumes the persisted Source artifact, shape-only reducer parity, bounded literal-edit invalidation with $affected_views affected views, failed-candidate last-known-good preservation, recovery)"

@@ -13,6 +13,23 @@ fail() {
     exit 1
 }
 
+header_value() {
+    local file="$1"
+    local key="$2"
+    /usr/bin/awk -F '\t' -v key="$key" '
+        NR == 1 {
+            for (field = 2; field <= NF; field += 1) {
+                if (index($field, key "=") == 1) {
+                    value = $field
+                    sub(/^[^=]*=/, "", value)
+                    print value
+                    exit
+                }
+            }
+        }
+    ' "$file"
+}
+
 [[ -f "$PASS_FIXTURE" ]] || fail "missing Shape pass fixture"
 [[ -f "$FAIL_FIXTURE" ]] || fail "missing Shape fail fixture"
 
@@ -40,14 +57,33 @@ if [[ -n "$(find "$shape_cache" -type f -name '*.ll' -print -quit)" ]]; then
     fail "Shape cache unexpectedly contains LLVM"
 fi
 source_bundle="$(find "$source_cache" -type f -name ProjectSourceSet.range -print -quit)"
-source_metadata="$(find "$source_cache" -type f -name source.tsv -print -quit)"
-[[ -n "$source_bundle" && -f "$source_bundle" && -f "$source_metadata" ]] \
+source_revision="$(find "$source_cache" -type f -name revision.tsv -print -quit)"
+[[ -n "$source_bundle" && -f "$source_bundle" && -f "$source_revision" ]] \
     || fail "Shape did not persist its File -> Source artifact"
 source_set_hash="$(/usr/bin/shasum -a 256 "$source_bundle" | /usr/bin/awk '{print $1}')"
+[[ "$(header_value "$source_revision" version)" == "2" ]] \
+    || fail "Shape Source revision does not use the provenance schema"
+[[ "$(header_value "$source_revision" sourceProfile)" == "shape-local" ]] \
+    || fail "Shape Source revision has the wrong profile"
+pass_identity="$(cd "$(dirname "$PASS_FIXTURE")" && pwd)/$(basename "$PASS_FIXTURE")"
+[[ "$(header_value "$source_revision" input)" == "$pass_identity" ]] \
+    || fail "Shape Source revision has the wrong input identity"
+compiler="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/candidate/RangeCompiler"
+compiler_hash="$(/usr/bin/shasum -a 256 "$compiler" | /usr/bin/awk '{print $1}')"
+[[ "$(header_value "$source_revision" compiler)" == "$compiler_hash" ]] \
+    || fail "Shape Source revision has the wrong compiler provenance"
+[[ "$(header_value "$source_revision" source)" == "$source_set_hash" ]] \
+    || fail "Shape Source revision has the wrong bundle digest"
+/usr/bin/grep -Fqx "rangeRevisionDigest"$'\t'"view=source"$'\t'"digest=$source_set_hash" "$source_revision" \
+    || fail "Shape Source revision omitted its Source digest"
+[[ -z "$(find "$source_cache" -type f -name source.tsv -print -quit)" ]] \
+    || fail "Shape persisted the superseded source.tsv authority"
 /usr/bin/grep -Fq $'compilerSyntaxRecipes' "$source_bundle" \
     || fail "persisted Shape Source artifact omitted the syntax recipe package"
 /usr/bin/grep -Fq "sourceSet=$source_set_hash" "$WORK_ROOT/cold.out" \
     || fail "Shape artifact does not identify its persisted Source artifact"
+source_revision_inode="$(/usr/bin/stat -f %i "$source_revision")"
+source_bundle_inode="$(/usr/bin/stat -f %i "$source_bundle")"
 
 RANGE_SHAPE_CACHE_DIR="$shape_cache" RANGE_SOURCE_CACHE_DIR="$source_cache" \
     "$REPO_ROOT/scripts/range" shape "$PASS_FIXTURE" \
@@ -56,6 +92,26 @@ RANGE_SHAPE_CACHE_DIR="$shape_cache" RANGE_SOURCE_CACHE_DIR="$source_cache" \
     || fail "unchanged Shape execution did not reuse its artifact"
 /usr/bin/cmp -s "$WORK_ROOT/cold.out" "$WORK_ROOT/warm.out" \
     || fail "unchanged Shape execution changed its artifact"
+[[ "$source_revision_inode" == "$(/usr/bin/stat -f %i "$(find "$source_cache" -name revision.tsv -print -quit)")" ]] \
+    || fail "unchanged Shape execution rewrote its Source revision"
+[[ "$source_bundle_inode" == "$(/usr/bin/stat -f %i "$(find "$source_cache" -name ProjectSourceSet.range -print -quit)")" ]] \
+    || fail "unchanged Shape execution rewrote its Source bundle"
+
+# A cache created by the superseded metadata format may already have a valid
+# Shape payload. Reusing that payload must still migrate Source authority to a
+# revision and remove source.tsv.
+/bin/rm -f "$source_revision"
+/usr/bin/printf 'legacy source metadata\n' > "$(dirname "$source_revision")/source.tsv"
+RANGE_SHAPE_CACHE_DIR="$shape_cache" RANGE_SOURCE_CACHE_DIR="$source_cache" \
+    "$REPO_ROOT/scripts/range" shape "$PASS_FIXTURE" \
+    > "$WORK_ROOT/migrated.out" 2> "$WORK_ROOT/migrated.err"
+/usr/bin/grep -Fqx $'rangeShapeExecution\tstatus=reused\tchanged=0\tpayload='"$cold_payload" "$WORK_ROOT/migrated.err" \
+    || fail "Shape metadata migration did not reuse the accepted payload"
+[[ -f "$source_revision" ]] || fail "Shape metadata migration did not create revision.tsv"
+[[ ! -e "$(dirname "$source_revision")/source.tsv" ]] \
+    || fail "Shape metadata migration retained source.tsv"
+/usr/bin/cmp -s "$WORK_ROOT/cold.out" "$WORK_ROOT/migrated.out" \
+    || fail "Shape metadata migration changed the accepted Shape artifact"
 
 /bin/mkdir -p "$WORK_ROOT/project"
 /bin/cp "$PASS_FIXTURE" "$WORK_ROOT/project/ShapeArtifact.range"
@@ -76,6 +132,8 @@ RANGE_SHAPE_CACHE_DIR="$WORK_ROOT/project-cache" RANGE_SOURCE_CACHE_DIR="$WORK_R
 RANGE_SHAPE_CACHE_DIR="$WORK_ROOT/failure-cache" RANGE_SOURCE_CACHE_DIR="$WORK_ROOT/failure-source-cache" \
     "$REPO_ROOT/scripts/range" shape "$WORK_ROOT/failure-project" \
     > "$WORK_ROOT/failure-cold.out" 2> "$WORK_ROOT/failure-cold.err"
+failure_source_revision="$(find "$WORK_ROOT/failure-source-cache" -name revision.tsv -print -quit)"
+/bin/cp "$failure_source_revision" "$WORK_ROOT/failure-source-revision.accepted.tsv"
 /bin/cp "$FAIL_FIXTURE" "$WORK_ROOT/failure-project/ShapeArtifact.range"
 failure_exit=0
 RANGE_SHAPE_CACHE_DIR="$WORK_ROOT/failure-cache" RANGE_SOURCE_CACHE_DIR="$WORK_ROOT/failure-source-cache" \
@@ -85,6 +143,8 @@ RANGE_SHAPE_CACHE_DIR="$WORK_ROOT/failure-cache" RANGE_SOURCE_CACHE_DIR="$WORK_R
 [[ "$failure_exit" -eq 65 ]] || fail "invalid Shape candidate exited $failure_exit instead of 65"
 /usr/bin/grep -Fq $'compilerError\tkind=syntaxRecipeUnknownCapture' "$WORK_ROOT/failure.err" \
     || fail "invalid Shape candidate omitted the typed syntax-recipe error"
+/usr/bin/cmp -s "$failure_source_revision" "$WORK_ROOT/failure-source-revision.accepted.tsv" \
+    || fail "invalid Shape candidate damaged the accepted Source revision"
 /bin/cp "$PASS_FIXTURE" "$WORK_ROOT/failure-project/ShapeArtifact.range"
 RANGE_SHAPE_CACHE_DIR="$WORK_ROOT/failure-cache" RANGE_SOURCE_CACHE_DIR="$WORK_ROOT/failure-source-cache" \
     "$REPO_ROOT/scripts/range" shape "$WORK_ROOT/failure-project" \

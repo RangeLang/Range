@@ -56,16 +56,19 @@ stage_flag() {
     fi
 }
 
-# The revision record is a transitional, Range-shaped history point persisted
-# beside the V1 execution record. It keeps each phase product as a stable node
-# carrying before/after value fingerprints, the phase-to-phase pipeline as
-# cardinality-one edges, and content digests for each view. A failed candidate
-# never writes a revision; the last accepted revision is preserved.
+# The revision record is the single Source provenance authority. Graph revisions
+# also keep each phase product as a stable node carrying before/after value
+# fingerprints, the phase-to-phase pipeline as cardinality-one edges, and
+# content digests for each view. A failed candidate never writes a revision;
+# the last accepted revision is preserved.
 write_graph_revision() {
     local output="$1"
     local status_source="$2"
     local source_bundle="$3"
     local compiled_output="$4"
+    local source_profile="$5"
+    local source_input="$6"
+    local source_compiler="$7"
     local status changed
     local source_before source_after shape_before shape_after
     local behavior_before behavior_after compiled_before compiled_after
@@ -84,13 +87,14 @@ write_graph_revision() {
 
     parent="absent"
     if [[ -f "$output" ]]; then
-        parent="$(/usr/bin/sed -n 's/^rangeRevision\tversion=1\tidentity=\([0-9a-f][0-9a-f]*\)\t.*/\1/p' "$output" | /usr/bin/head -1)"
+        parent="$(/usr/bin/sed -n 's/^rangeRevision\tversion=[0-9][0-9]*\tidentity=\([0-9a-f][0-9a-f]*\)\t.*/\1/p' "$output" | /usr/bin/head -1)"
         [[ -n "$parent" ]] || parent="absent"
     fi
     source_hash="$(/usr/bin/shasum -a 256 "$source_bundle" | /usr/bin/awk '{print $1}')"
     compiled_hash="$(/usr/bin/shasum -a 256 "$compiled_output" | /usr/bin/awk '{print $1}')"
-    identity_input="$(/usr/bin/printf 'revision=1\nparent=%s\nsource=%s\nshape=%s\nbehavior=%s\ncompiled=%s\nstatus=accepted\n' \
-        "$parent" "$source_after" "$shape_after" "$behavior_after" "$compiled_after")"
+    identity_input="$(/usr/bin/printf 'revision=2\nparent=%s\nsource=%s\nsourceProfile=%s\ninput=%s\ncompiler=%s\nshape=%s\nbehavior=%s\ncompiled=%s\nstatus=accepted\n' \
+        "$parent" "$source_hash" "$source_profile" "$source_input" "$source_compiler" \
+        "$shape_after" "$behavior_after" "$compiled_after")"
     identity="$(/usr/bin/printf '%s' "$identity_input" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
     if [[ "$status" == "cold" ]]; then
         operation="add"
@@ -99,8 +103,8 @@ write_graph_revision() {
     fi
 
     {
-        /usr/bin/printf 'rangeRevision\tversion=1\tidentity=%s\tparent=%s\tsource=%s\tstatus=accepted\n' \
-            "$identity" "$parent" "$source_hash"
+        /usr/bin/printf 'rangeRevision\tversion=2\tidentity=%s\tparent=%s\tsource=%s\tsourceProfile=%s\tinput=%s\tcompiler=%s\tstatus=accepted\n' \
+            "$identity" "$parent" "$source_hash" "$source_profile" "$source_input" "$source_compiler"
         /usr/bin/printf 'rangeRevisionNode\tid=source\tbefore=%s\tafter=%s\tchanged=%s\n' \
             "$source_before" "$source_after" "$(node_changed "$source_before" "$source_after")"
         /usr/bin/printf 'rangeRevisionNode\tid=shape\tbefore=%s\tafter=%s\tchanged=%s\n' \
@@ -118,6 +122,49 @@ write_graph_revision() {
         /usr/bin/printf 'rangeRevisionDigest\tview=compiled\tdigest=%s\n' "$compiled_hash"
     } > "$output.tmp.$$"
     /bin/mv "$output.tmp.$$" "$output"
+}
+
+source_revision_matches() {
+    local revision="$1"
+    local bundle="$2"
+    local profile="$3"
+    local input="$4"
+    local compiler="$5"
+    local expected_source="$6"
+
+    [[ -f "$revision" && -f "$bundle" ]] || return 1
+    [[ "$(revision_field "$revision" version)" == "2" ]] || return 1
+    [[ "$(revision_field "$revision" sourceProfile)" == "$profile" ]] || return 1
+    [[ "$(revision_field "$revision" input)" == "$input" ]] || return 1
+    [[ "$(revision_field "$revision" compiler)" == "$compiler" ]] || return 1
+    [[ "$(revision_field "$revision" source)" == "$expected_source" ]] || return 1
+    [[ "$(revision_field "$revision" status)" == "accepted" ]] || return 1
+    [[ "$(/usr/bin/shasum -a 256 "$bundle" | /usr/bin/awk '{print $1}')" == "$expected_source" ]] || return 1
+    /usr/bin/grep -Fqx "rangeRevisionDigest"$'\t'"view=source"$'\t'"digest=$expected_source" "$revision"
+}
+
+write_source_revision() {
+    local output="$1"
+    local previous="$2"
+    local source_hash="$3"
+    local source_profile="$4"
+    local source_input="$5"
+    local source_compiler="$6"
+    local parent="absent"
+    local identity_input identity
+
+    if [[ -f "$previous" ]]; then
+        parent="$(revision_field "$previous" identity)"
+        [[ "$parent" =~ ^[0-9a-f]{64}$ ]] || parent="absent"
+    fi
+    identity_input="$(/usr/bin/printf 'revision=2\nparent=%s\nsource=%s\nsourceProfile=%s\ninput=%s\ncompiler=%s\nstatus=accepted\n' \
+        "$parent" "$source_hash" "$source_profile" "$source_input" "$source_compiler")"
+    identity="$(/usr/bin/printf '%s' "$identity_input" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
+    {
+        /usr/bin/printf 'rangeRevision\tversion=2\tidentity=%s\tparent=%s\tsource=%s\tsourceProfile=%s\tinput=%s\tcompiler=%s\tstatus=accepted\n' \
+            "$identity" "$parent" "$source_hash" "$source_profile" "$source_input" "$source_compiler"
+        /usr/bin/printf 'rangeRevisionDigest\tview=source\tdigest=%s\n' "$source_hash"
+    } > "$output"
 }
 
 compiler_command="compile"
@@ -151,7 +198,7 @@ source_cache_root="${RANGE_SOURCE_CACHE_DIR:-${RANGE_GRAPH_CACHE_DIR:-$REPO_ROOT
 source_cache_key="$(/usr/bin/printf 'path=%s\nprofile=%s\n' "$input_identity" "$source_profile" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
 source_cache_directory="$source_cache_root/$source_cache_key"
 source_bundle_artifact="$source_cache_directory/ProjectSourceSet.range"
-source_metadata_artifact="$source_cache_directory/source.tsv"
+source_revision_artifact="$source_cache_directory/revision.tsv"
 
 WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compile.XXXXXX")"
 trap '/bin/rm -rf "$WORK_ROOT"' EXIT
@@ -256,16 +303,27 @@ else
     append_source project "$(basename "$source_path")" "$source_path"
 fi
 
+persist_source_revision() {
+    local source_bundle="$1"
+    local source_hash="$2"
+
+    /bin/mkdir -p "$source_cache_directory"
+    /bin/cp "$source_bundle" "$source_bundle_artifact.tmp"
+    write_source_revision "$source_revision_artifact.tmp" "$source_revision_artifact" \
+        "$source_hash" "$source_profile" "$input_identity" "$graph_compiler_hash"
+    /bin/mv "$source_bundle_artifact.tmp" "$source_bundle_artifact"
+    /bin/mv "$source_revision_artifact.tmp" "$source_revision_artifact"
+    /bin/rm -f "$source_cache_directory/source.tsv"
+}
+
 if [[ "$shape_mode" -eq 1 ]]; then
     # Shape consumes the persisted File -> Source value when its provenance
     # matches this input and compiler. A changed source is evaluated from the
     # candidate bundle above, but it is not promoted until Shape succeeds.
     source_candidate_hash="$(/usr/bin/shasum -a 256 "$project_bundle" | /usr/bin/awk '{print $1}')"
     source_cache_reused=0
-    source_metadata_expected="$(/usr/bin/printf 'rangeSource\tversion=1\tprofile=%s\tinput=%s\tcompiler=%s\tsourceSet=%s' \
-        "$source_profile" "$input_identity" "$graph_compiler_hash" "$source_candidate_hash")"
-    if [[ -f "$source_bundle_artifact" && -f "$source_metadata_artifact" ]] \
-        && /usr/bin/grep -Fqx "$source_metadata_expected" "$source_metadata_artifact"; then
+    if source_revision_matches "$source_revision_artifact" "$source_bundle_artifact" \
+        "$source_profile" "$input_identity" "$graph_compiler_hash" "$source_candidate_hash"; then
         /bin/cp "$source_bundle_artifact" "$project_bundle"
         source_cache_reused=1
     fi
@@ -296,6 +354,9 @@ if [[ "$shape_mode" -eq 1 ]]; then
                 "$graph_compiler_hash" "$shape_payload_hash" > "$shape_expected_artifact"
             /bin/cat "$shape_payload" >> "$shape_expected_artifact"
             if /usr/bin/cmp -s "$shape_expected_artifact" "$shape_artifact"; then
+                if [[ "$source_cache_reused" -eq 0 ]]; then
+                    persist_source_revision "$project_bundle" "$shape_source_set_hash"
+                fi
                 /usr/bin/printf 'rangeShapeExecution\tstatus=reused\tchanged=0\tpayload=%s\n' "$shape_payload_hash" >&2
                 /bin/cat "$shape_artifact"
                 exit 0
@@ -327,13 +388,7 @@ if [[ "$shape_mode" -eq 1 ]]; then
     /bin/mv "$shape_artifact.tmp" "$shape_artifact"
     /bin/mv "$shape_payload_hash_file.tmp" "$shape_payload_hash_file"
     /bin/mv "$shape_input.tmp" "$shape_input"
-    /bin/mkdir -p "$source_cache_directory"
-    /bin/cp "$project_bundle" "$source_bundle_artifact.tmp"
-    /usr/bin/printf 'rangeSource\tversion=1\tprofile=%s\tinput=%s\tcompiler=%s\tsourceSet=%s\n' \
-        "$source_profile" "$input_identity" "$graph_compiler_hash" "$shape_source_set_hash" \
-        > "$source_metadata_artifact.tmp"
-    /bin/mv "$source_bundle_artifact.tmp" "$source_bundle_artifact"
-    /bin/mv "$source_metadata_artifact.tmp" "$source_metadata_artifact"
+    persist_source_revision "$project_bundle" "$shape_source_set_hash"
     /usr/bin/printf 'rangeShapeExecution\tstatus=%s\tchanged=1\tpayload=%s\n' \
         "$shape_previous_state" "$shape_payload_hash" >&2
     /bin/cat "$shape_artifact"
@@ -350,33 +405,25 @@ elif [[ "$graph_mode" -eq 1 ]]; then
     graph_output="$graph_cache_directory/compiled.ll"
     graph_revision="$graph_cache_directory/revision.tsv"
     graph_bundle_backup="$WORK_ROOT/ProjectSourceSet.previous.range"
-    graph_metadata_backup="$WORK_ROOT/source.previous.tsv"
 
     # Source stage: the candidate File -> Source bundle is consumed from the
-    # persisted artifact when its metadata still matches this input and
+    # persisted artifact when its revision provenance matches this input and
     # compiler, instead of being re-derived and rewritten on every run.
     metrics_source_start_ms="$(now_ms)"
     graph_source_candidate_hash="$(/usr/bin/shasum -a 256 "$project_bundle" | /usr/bin/awk '{print $1}')"
-    graph_source_expected="$(/usr/bin/printf 'rangeSource\tversion=1\tprofile=%s\tinput=%s\tcompiler=%s\tsourceSet=%s' \
-        "$source_profile" "$graph_input_identity" "$graph_compiler_hash" "$graph_source_candidate_hash")"
     graph_source_consumed=0
-    if [[ -f "$source_metadata_artifact" ]] \
-        && /usr/bin/grep -Fqx "$graph_source_expected" "$source_metadata_artifact"; then
+    if source_revision_matches "$graph_revision" "$graph_bundle" \
+        "$source_profile" "$graph_input_identity" "$graph_compiler_hash" "$graph_source_candidate_hash"; then
         graph_source_consumed=1
     fi
     metrics_source_end_ms="$(now_ms)"
     graph_source_ms=$((metrics_source_end_ms - metrics_source_start_ms))
 
     graph_had_bundle=0
-    graph_had_metadata=0
     if [[ "$graph_source_consumed" -eq 0 ]]; then
         if [[ -f "$graph_bundle" ]]; then
             /bin/cp "$graph_bundle" "$graph_bundle_backup"
             graph_had_bundle=1
-        fi
-        if [[ -f "$source_metadata_artifact" ]]; then
-            /bin/cp "$source_metadata_artifact" "$graph_metadata_backup"
-            graph_had_metadata=1
         fi
         /bin/cp "$project_bundle" "$graph_bundle.tmp"
         /bin/mv "$graph_bundle.tmp" "$graph_bundle"
@@ -410,29 +457,20 @@ elif [[ "$graph_mode" -eq 1 ]]; then
         elif [[ "$graph_source_consumed" -eq 0 ]]; then
             /bin/rm -f "$graph_bundle"
         fi
-        if [[ "$graph_had_metadata" -eq 1 ]]; then
-            /bin/cp "$graph_metadata_backup" "$source_metadata_artifact"
-        elif [[ "$graph_source_consumed" -eq 0 ]]; then
-            /bin/rm -f "$source_metadata_artifact"
-        fi
         /bin/cat "$WORK_ROOT/graph-execution.out" >&2
         exit "$graph_status"
     fi
     /bin/cat "$WORK_ROOT/graph-execution.out" >&2
 
-    if /usr/bin/grep -Fq $'compilerV1Execution\tstatus=reused\tchanged=0' "$WORK_ROOT/graph-execution.out"; then
+    if /usr/bin/grep -Fq $'compilerV1Execution\tstatus=reused\tchanged=0' "$WORK_ROOT/graph-execution.out" \
+        && [[ "$graph_source_consumed" -eq 1 ]]; then
         [[ -f "$graph_revision" ]] \
             || compile_project_fail "unchanged graph execution is missing its accepted revision artifact"
     else
-        write_graph_revision "$graph_revision" "$WORK_ROOT/graph-execution.out" "$graph_bundle" "$graph_output"
+        write_graph_revision "$graph_revision" "$WORK_ROOT/graph-execution.out" "$graph_bundle" "$graph_output" \
+            "$source_profile" "$graph_input_identity" "$graph_compiler_hash"
     fi
-    if [[ "$graph_source_consumed" -eq 0 ]]; then
-        source_bundle_hash="$(/usr/bin/shasum -a 256 "$graph_bundle" | /usr/bin/awk '{print $1}')"
-        /usr/bin/printf 'rangeSource\tversion=1\tprofile=%s\tinput=%s\tcompiler=%s\tsourceSet=%s\n' \
-            "$source_profile" "$graph_input_identity" "$graph_compiler_hash" "$source_bundle_hash" \
-            > "$source_metadata_artifact.tmp"
-        /bin/mv "$source_metadata_artifact.tmp" "$source_metadata_artifact"
-    fi
+    /bin/rm -f "$graph_cache_directory/source.tsv"
 
     # Query stage: read the committed revision record and report which phases
     # committed a new delta versus consumed the prior accepted value. A phase

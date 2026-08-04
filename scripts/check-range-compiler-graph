@@ -33,6 +33,8 @@ RANGE_GRAPH_CACHE_DIR="$WORK_ROOT/graph-cache" \
     || fail "graph compiler output differs from the legacy oracle"
 /usr/bin/grep -Eq $'^compilerV1Execution\tstatus=cold\tchanged=1\t' "$WORK_ROOT/graph-cold.out" \
     || fail "graph project compile did not persist a cold File -> Source generation"
+[[ -z "$(/usr/bin/find "$WORK_ROOT/graph-cache" -type f -name source.tsv -print -quit)" ]] \
+    || fail "graph project compile persisted the superseded source.tsv authority"
 RANGE_GRAPH_CACHE_DIR="$WORK_ROOT/graph-cache" \
     "$REPO_ROOT/scripts/range" compile-graph "$FIXTURE" \
     > "$WORK_ROOT/graph-warm.ll" 2> "$WORK_ROOT/graph-warm.out"
