@@ -1,0 +1,14 @@
+@builtin(.write)
+function rawBufferAppendUnsigned8(buffer: RawBuffer, value: Int<.unsigned, 8>): Int
+
+@builtin(.read)
+function uuidByteAtIndex(uuid: RawBuffer, index: Int): Int
+
+@main {
+    let buf: RawBuffer(rawBufferCreate(capacity: 16, stride: 1))
+    let value: Int<.unsigned, 8>(42)
+    rawBufferAppendUnsigned8(buffer: buf, value: value)
+    let result: Int(uuidByteAtIndex(uuid: buf, index: 0))
+    rawBufferDestroy(buffer: buf)
+    return result == 42
+}

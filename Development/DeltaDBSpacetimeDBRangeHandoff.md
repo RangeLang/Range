@@ -192,6 +192,11 @@ The bounded revision cutover is implemented without rewriting Body/CFG/MIR:
    cover revision, Source, syntax-fact and LLVM preservation, phase costs,
    Source-free Shape projection, and affected-view counts.
 
+Compiler V1 also separates changing phase values from transitional identity
+hash keys at the type level. Core `Identifier` remains the authored graph
+identity. The four-way reconciler remains deferred until UUID-backed structural
+identity equality can confirm hash-index matches.
+
 Execution is now a transient candidate operation: success commits staged LLVM
 and revision artifacts, while failure emits diagnostics without replacing the
 accepted graph. A legacy execution record is consumed once when migrating a v2

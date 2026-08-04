@@ -175,6 +175,13 @@ construct CompilerFingerprint {
     let second: Int
 }
 
+// Physical hash key for a changing value. Semantic graph identity remains the
+// Core-authored Identifier; CompilerFingerprint is its transitional index key.
+construct CompilerValueFingerprint {
+    let first: Int
+    let second: Int
+}
+
 construct CompilerSourceGapMetrics {
     let lineBreakCount: Int
     let indentationSpaceCount: Int

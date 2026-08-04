@@ -49,6 +49,14 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [ ] Prove UUID copy, move, equality, hashing, formatting, and stable graph
     serialization before replacing the compiler's paired integer
     fingerprints and row-local identities.
+    - [x] Separate changing Compiler V1 values from transitional identity hash
+      keys at the type level. `CompilerValueFingerprint` now owns phase
+      inputs/before/after values while Core `Identifier` remains semantic
+      identity. The paired value token remains identity-scoped and is not a
+      cross-identity payload-interning key.
+    - [ ] Wire the four reconciliation outcomes (reuse, update, insert, delete)
+      only after UUID-backed `Identifier` lookup confirms structural equality;
+      do not treat a paired hash match as semantic or value equality.
   - [ ] Expose `.count`, `map`, `filter`, and related operations as direct
     queries/transforms over crystallized relationship values in Compiler V1;
     do not route them back through body resolution, CFG, or MIR.
@@ -410,6 +418,31 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       pointer while retaining touch and keyboard entry.
     - [x] Reveal a glitter-surface shader sphere whose surface becomes more
       concrete as the pointer visits each exploration segment.
+    - [x] Make fisheye directional during transitions: outward while the
+      sphere expands and inward while it collapses.
+  - [x] Compose the onboarding exit as one viewport-centered expanding sky
+    sphere with a concentric inner website cutout.
+    - [x] Keep the sky in its normal circular shader mask while its diameter
+      expands to the measured viewport diagonal.
+    - [x] Grow the inner cutout from the sphere center on the same normalized
+      timeline, then finish without a lingering overlay.
+    - [x] Defocus the entire sky layer across the shared exit tail, including
+      the transparent cutout edge, so the handoff resolves as one blur.
+    - [x] Shorten the cutout motion and add one audible low sine swell that
+      rises at exit start and fades with the same leave envelope.
+    - [x] Start the page fade reveal with the 600ms circular cutout so the two
+      handoff layers overlap without a competing page blur or scale motion.
+    - [x] Use one shared growth curve for the expanding sky sphere and its
+      concentric inner website cutout.
+    - [x] Keep the page reveal as a centered opacity handoff and remove the
+      full-page blur/scale pass so it does not travel vertically or paint in
+      pieces.
+    - [x] Keep the fisheye one-way and outward-facing through breathing, with
+      a positive floor instead of an inward cave-in.
+    - [x] Make the onboarding machine own the small, medium, and fullscreen
+      stages so the exit uses the measured viewport diagonal without overshoot.
+    - [x] Keep a quiet audible breathing floor and drive its level from the
+      sphere's actual anchor-stage size envelope.
   - [x] Add a source-first Command Group macro breakdown at
     `/features/macros/command-group-registration`.
     - Show the complete live Core macro, a representative annotated command

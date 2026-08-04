@@ -8,38 +8,38 @@ construct CompilerV1Error {
 
 construct CompilerV1ShapeDelta {
     let identity: CompilerFingerprint
-    let before: CompilerFingerprint
-    let after: CompilerFingerprint
+    let before: CompilerValueFingerprint
+    let after: CompilerValueFingerprint
     let snapshot: String
 }
 
 construct CompilerV1SyntaxFacts {
     let isValid: Bool
-    let syntax: CompilerFingerprint
+    let syntax: CompilerValueFingerprint
     let shapeIdentity: CompilerFingerprint
-    let shape: CompilerFingerprint
+    let shape: CompilerValueFingerprint
     let snapshot: String
     let snapshotStart: Int
 }
 
 construct CompilerV1BehaviorDelta {
     let identity: CompilerFingerprint
-    let input: CompilerFingerprint
-    let before: CompilerFingerprint
-    let after: CompilerFingerprint
+    let input: CompilerValueFingerprint
+    let before: CompilerValueFingerprint
+    let after: CompilerValueFingerprint
     let snapshot: String
     let compiledOutput: String
 }
 
 construct CompilerV1CompiledDelta {
     let identity: CompilerFingerprint
-    let input: CompilerFingerprint
-    let before: CompilerFingerprint
-    let after: CompilerFingerprint
+    let input: CompilerValueFingerprint
+    let before: CompilerValueFingerprint
+    let after: CompilerValueFingerprint
     let output: String
 }
 
-function compilerV1Load(input: String, before: CompilerFingerprint): CompilerV1SourceDelta {
+function compilerV1Load(input: String, before: CompilerValueFingerprint): CompilerV1SourceDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.load.begin"))
     let source: String(readFile(path: input))
     let delta: CompilerV1SourceDelta(compilerV1SourceDelta(path: input, source: source, before: before))
@@ -48,16 +48,17 @@ function compilerV1Load(input: String, before: CompilerFingerprint): CompilerV1S
 }
 
 function compilerV1NativeBehaviorSnapshot(identity: CompilerFingerprint, output: String): String {
-    let product: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: identity, tag: 13, text: output))
+    let product: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: identity, tag: 13, text: output))
     return "compilerV1Behavior\tvalid=true\tproduct=\(product.first):\(product.second)\n"
 }
 
 function compilerV1SyntaxFactsInvalid(): CompilerV1SyntaxFacts {
-    let absent: CompilerFingerprint(compilerV1AbsentValue())
+    let absent: CompilerValueFingerprint(compilerV1AbsentValue())
+    let absentIdentity: CompilerFingerprint(compilerV1AbsentIdentity())
     return CompilerV1SyntaxFacts(
         isValid: false,
         syntax: absent,
-        shapeIdentity: absent,
+        shapeIdentity: absentIdentity,
         shape: absent,
         snapshot: String("compilerError\tkind=invalidCompilerV1SyntaxFacts\n"),
         snapshotStart: 0
@@ -83,13 +84,13 @@ function compilerV1SyntaxFactsCapture(source: CompilerV1SourceDelta): CompilerV1
     }
     let shapeIdentity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: source.identity, value: 2))
     let syntaxIdentity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: shapeIdentity, value: 15))
-    let syntax: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: syntaxIdentity, tag: 16, text: snapshot))
+    let syntax: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: syntaxIdentity, tag: 16, text: snapshot))
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.syntaxFacts.end"))
     return CompilerV1SyntaxFacts(
         isValid: !compilerNativeOutputIsError(output: snapshot),
         syntax: syntax,
         shapeIdentity: shapeIdentity,
-        shape: compilerFingerprintAppendText(fingerprint: shapeIdentity, tag: 12, text: snapshot),
+        shape: compilerV1ValueFingerprint(identity: shapeIdentity, tag: 12, text: snapshot),
         snapshot: snapshot,
         snapshotStart: 0
     )
@@ -151,13 +152,13 @@ function compilerV1SyntaxFactsDecode(encoded: String): CompilerV1SyntaxFacts {
     }
     return CompilerV1SyntaxFacts(
         isValid: true,
-        syntax: CompilerFingerprint(
+        syntax: CompilerValueFingerprint(
             first: compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 2),
             second: compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 3)),
         shapeIdentity: CompilerFingerprint(
             first: compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 4),
             second: compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 5)),
-        shape: CompilerFingerprint(
+        shape: CompilerValueFingerprint(
             first: compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 6),
             second: compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 7)),
         snapshot: "\(encoded)",
@@ -168,17 +169,18 @@ function compilerV1SyntaxFactsDecode(encoded: String): CompilerV1SyntaxFacts {
 function compilerV1SyntaxFactsIntegrityIsValid(facts: CompilerV1SyntaxFacts): Bool {
     let expectedSyntaxIdentity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: facts.shapeIdentity, value: 15))
     let snapshot: String(compilerV1SyntaxFactsSnapshot(facts: facts))
-    let expectedSyntax: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: expectedSyntaxIdentity, tag: 16, text: snapshot))
-    let expectedShape: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: facts.shapeIdentity, tag: 12, text: snapshot))
+    let expectedSyntax: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: expectedSyntaxIdentity, tag: 16, text: snapshot))
+    let expectedShape: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: facts.shapeIdentity, tag: 12, text: snapshot))
     return facts.isValid
-        && compilerV1FingerprintEqual(left: facts.syntax, right: expectedSyntax)
-        && compilerV1FingerprintEqual(left: facts.shape, right: expectedShape)
+        && compilerV1ValueFingerprintEqual(left: facts.syntax, right: expectedSyntax)
+        && compilerV1ValueFingerprintEqual(left: facts.shape, right: expectedShape)
 }
 
 function compilerV1SyntaxFactsMatchSource(facts: CompilerV1SyntaxFacts, source: CompilerV1SourceDelta): Bool {
     let expectedShapeIdentity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: source.identity, value: 2))
     return compilerV1SyntaxFactsIntegrityIsValid(facts: facts)
-        && compilerV1FingerprintEqual(left: facts.shapeIdentity, right: expectedShapeIdentity)
+        && facts.shapeIdentity.first == expectedShapeIdentity.first
+        && facts.shapeIdentity.second == expectedShapeIdentity.second
 }
 
 function compilerV1SyntaxBindingEncode(source: CompilerV1SourceDelta, facts: CompilerV1SyntaxFacts): String {
@@ -214,7 +216,7 @@ function compilerV1SyntaxBindingMatches(bindingPath: String, sourceFirst: Int, s
         && compilerV1ExecutionFieldAtPath(executionPath: bindingPath, ordinal: 5) == syntaxSecond
 }
 
-function compilerV1Shape(facts: CompilerV1SyntaxFacts, before: CompilerFingerprint): CompilerV1ShapeDelta {
+function compilerV1Shape(facts: CompilerV1SyntaxFacts, before: CompilerValueFingerprint): CompilerV1ShapeDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.shape.begin"))
     state snapshot: String("compilerError\tkind=invalidCompilerV1SyntaxFacts\n")
     if compilerV1SyntaxFactsIntegrityIsValid(facts: facts) {
@@ -224,17 +226,17 @@ function compilerV1Shape(facts: CompilerV1SyntaxFacts, before: CompilerFingerpri
     return CompilerV1ShapeDelta(
         identity: facts.shapeIdentity,
         before: before,
-        after: compilerFingerprintAppendText(fingerprint: facts.shapeIdentity, tag: 12, text: snapshot),
+        after: compilerV1ValueFingerprint(identity: facts.shapeIdentity, tag: 12, text: snapshot),
         snapshot: snapshot
     )
 }
 
-function compilerV1ShapeOnly(source: CompilerV1SourceDelta, before: CompilerFingerprint): CompilerV1ShapeDelta {
+function compilerV1ShapeOnly(source: CompilerV1SourceDelta, before: CompilerValueFingerprint): CompilerV1ShapeDelta {
     let facts: CompilerV1SyntaxFacts(compilerV1SyntaxFactsCapture(source: source))
     return compilerV1Shape(facts: facts, before: before)
 }
 
-function compilerV1Behavior(source: CompilerV1SourceDelta, shape: CompilerV1ShapeDelta, before: CompilerFingerprint): CompilerV1BehaviorDelta {
+function compilerV1Behavior(source: CompilerV1SourceDelta, shape: CompilerV1ShapeDelta, before: CompilerValueFingerprint): CompilerV1BehaviorDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.behavior.begin"))
     let tables: CompilerSyntaxTables(compilerSyntaxTablesCreate(source: source.value.source))
     state captureStatus: Int(compilerTypedDeclarationsCapture(source: source.value.source, tables: tables))
@@ -270,13 +272,13 @@ function compilerV1Behavior(source: CompilerV1SourceDelta, shape: CompilerV1Shap
         identity: identity,
         input: shape.after,
         before: before,
-        after: compilerFingerprintAppendText(fingerprint: identity, tag: 13, text: snapshot),
+        after: compilerV1ValueFingerprint(identity: identity, tag: 13, text: snapshot),
         snapshot: snapshot,
         compiledOutput: compiledOutput
     )
 }
 
-function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1BehaviorDelta, before: CompilerFingerprint): CompilerV1CompiledDelta {
+function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1BehaviorDelta, before: CompilerValueFingerprint): CompilerV1CompiledDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.compile.begin"))
     let identity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: behavior.identity, value: 4))
     if behavior.input.first != shape.after.first
@@ -295,7 +297,7 @@ function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1Beha
         identity: identity,
         input: behavior.after,
         before: before,
-        after: compilerFingerprintAppendText(fingerprint: identity, tag: 14, text: output),
+        after: compilerV1ValueFingerprint(identity: identity, tag: 14, text: output),
         output: output
     )
 }
@@ -315,7 +317,7 @@ function compilerV1CompiledValueMatches(input: String, expectedFirst: Int, expec
     let cachedOutput: String(readFile(path: outputPath))
     let file: CompilerFingerprint(compilerV1IdentityForFile(path: input))
     let compiledIdentity: CompilerFingerprint(compilerV1CompiledIdentityForFile(file: file))
-    let cachedCompiled: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: compiledIdentity, tag: 14, text: cachedOutput))
+    let cachedCompiled: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: compiledIdentity, tag: 14, text: cachedOutput))
     state matches: Int(0)
     if cachedCompiled.first == expectedFirst && cachedCompiled.second == expectedSecond {
         matches: 1
@@ -326,7 +328,7 @@ function compilerV1CompiledValueMatches(input: String, expectedFirst: Int, expec
 function compilerV1SourceValueMatches(input: String, expectedFirst: Int, expectedSecond: Int): Int {
     let source: String(readFile(path: input))
     let file: CompilerFingerprint(compilerV1IdentityForFile(path: input))
-    let current: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: file, tag: 11, text: source))
+    let current: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: file, tag: 11, text: source))
     state matches: Int(0)
     if current.first == expectedFirst && current.second == expectedSecond {
         matches: 1
@@ -382,10 +384,10 @@ function compilerV1ExecutionFieldAtPath(executionPath: String, ordinal: Int): In
     return value
 }
 
-function compilerV1ExecutionFingerprintAtPath(executionPath: String, firstOrdinal: Int, secondOrdinal: Int): CompilerFingerprint {
+function compilerV1ExecutionValueFingerprintAtPath(executionPath: String, firstOrdinal: Int, secondOrdinal: Int): CompilerValueFingerprint {
     let first: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: firstOrdinal))
     let second: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: secondOrdinal))
-    return CompilerFingerprint(first: first, second: second)
+    return CompilerValueFingerprint(first: first, second: second)
 }
 
 function compilerV1ExecutionCompiledMatches(executionPath: String, input: String, outputPath: String): Int {
@@ -399,9 +401,9 @@ function compilerV1ExecutionCompiledMatches(executionPath: String, input: String
 function compilerV1ExecutionApply(sourceDelta: CompilerV1SourceDelta, facts: CompilerV1SyntaxFacts, executionPath: String, outputPath: String): Int {
     let priorFileFirst: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 2))
     let priorFileSecond: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 3))
-    let shapeBefore: CompilerFingerprint(compilerV1ExecutionFingerprintAtPath(executionPath: executionPath, firstOrdinal: 6, secondOrdinal: 7))
-    let behaviorBefore: CompilerFingerprint(compilerV1ExecutionFingerprintAtPath(executionPath: executionPath, firstOrdinal: 8, secondOrdinal: 9))
-    let compiledBefore: CompilerFingerprint(compilerV1ExecutionFingerprintAtPath(executionPath: executionPath, firstOrdinal: 10, secondOrdinal: 11))
+    let shapeBefore: CompilerValueFingerprint(compilerV1ExecutionValueFingerprintAtPath(executionPath: executionPath, firstOrdinal: 6, secondOrdinal: 7))
+    let behaviorBefore: CompilerValueFingerprint(compilerV1ExecutionValueFingerprintAtPath(executionPath: executionPath, firstOrdinal: 8, secondOrdinal: 9))
+    let compiledBefore: CompilerValueFingerprint(compilerV1ExecutionValueFingerprintAtPath(executionPath: executionPath, firstOrdinal: 10, secondOrdinal: 11))
     if !compilerV1SyntaxFactsMatchSource(facts: facts, source: sourceDelta) {
         return compilerV1Report(error: CompilerV1Error(message: "compilerError\tkind=compilerV1SyntaxFactsSourceMismatch\n"))
     }
@@ -435,7 +437,7 @@ function compilerV1ExecutionApply(sourceDelta: CompilerV1SourceDelta, facts: Com
 }
 
 function compilerV1ExecutionUpdate(input: String, executionPath: String, outputPath: String): Int {
-    let sourceBefore: CompilerFingerprint(compilerV1ExecutionFingerprintAtPath(executionPath: executionPath, firstOrdinal: 4, secondOrdinal: 5))
+    let sourceBefore: CompilerValueFingerprint(compilerV1ExecutionValueFingerprintAtPath(executionPath: executionPath, firstOrdinal: 4, secondOrdinal: 5))
     let sourceDelta: CompilerV1SourceDelta(compilerV1Load(input: input, before: sourceBefore))
     let facts: CompilerV1SyntaxFacts(compilerV1SyntaxFactsCapture(source: sourceDelta))
     return compilerV1ExecutionApply(sourceDelta: sourceDelta, facts: facts, executionPath: executionPath, outputPath: outputPath)
@@ -463,7 +465,7 @@ function rangeCompilerV1ResumeFactsCLI(executionPath: String, bindingPath: Strin
     if compilerV1ExecutionFileMatches(executionPath: executionPath, input: input) == 0 {
         return compilerV1Report(error: CompilerV1Error(message: "range: Compiler V1 execution belongs to a different File identity"))
     }
-    let sourceBefore: CompilerFingerprint(compilerV1ExecutionFingerprintAtPath(executionPath: executionPath, firstOrdinal: 4, secondOrdinal: 5))
+    let sourceBefore: CompilerValueFingerprint(compilerV1ExecutionValueFingerprintAtPath(executionPath: executionPath, firstOrdinal: 4, secondOrdinal: 5))
     let sourceDelta: CompilerV1SourceDelta(compilerV1Load(input: input, before: sourceBefore))
     let facts: CompilerV1SyntaxFacts(compilerV1SyntaxFactsDecode(encoded: readFile(path: factsPath)))
     if !compilerV1SyntaxFactsMatchSource(facts: facts, source: sourceDelta)

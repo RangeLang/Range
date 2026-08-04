@@ -5,33 +5,43 @@ construct CompilerV1FileValue {
 
 construct CompilerV1SourceDelta {
     let identity: CompilerFingerprint
-    let before: CompilerFingerprint
-    let after: CompilerFingerprint
+    let before: CompilerValueFingerprint
+    let after: CompilerValueFingerprint
     let value: CompilerV1FileValue
 }
 
 construct CompilerV1Execution {
     let isValid: Bool
     let file: CompilerFingerprint
-    let source: CompilerFingerprint
-    let shape: CompilerFingerprint
-    let behavior: CompilerFingerprint
-    let compiled: CompilerFingerprint
+    let source: CompilerValueFingerprint
+    let shape: CompilerValueFingerprint
+    let behavior: CompilerValueFingerprint
+    let compiled: CompilerValueFingerprint
 }
 
-function compilerV1AbsentValue(): CompilerFingerprint {
+function compilerV1AbsentValue(): CompilerValueFingerprint {
+    return CompilerValueFingerprint(first: 0, second: 0)
+}
+
+function compilerV1AbsentIdentity(): CompilerFingerprint {
     return CompilerFingerprint(first: 0, second: 0)
 }
 
-function compilerV1FingerprintEqual(left: CompilerFingerprint, right: CompilerFingerprint): Bool {
+function compilerV1ValueFingerprintEqual(left: CompilerValueFingerprint, right: CompilerValueFingerprint): Bool {
     return left.first == right.first && left.second == right.second
 }
 
+function compilerV1ValueFingerprint(identity: CompilerFingerprint, tag: Int, text: String): CompilerValueFingerprint {
+    let fingerprint: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: identity, tag: tag, text: text))
+    return CompilerValueFingerprint(first: fingerprint.first, second: fingerprint.second)
+}
+
 function compilerV1ExecutionEmpty(): CompilerV1Execution {
-    let absent: CompilerFingerprint(compilerV1AbsentValue())
+    let absent: CompilerValueFingerprint(compilerV1AbsentValue())
+    let absentIdentity: CompilerFingerprint(compilerV1AbsentIdentity())
     return CompilerV1Execution(
         isValid: true,
-        file: absent,
+        file: absentIdentity,
         source: absent,
         shape: absent,
         behavior: absent,
@@ -40,10 +50,11 @@ function compilerV1ExecutionEmpty(): CompilerV1Execution {
 }
 
 function compilerV1ExecutionInvalid(): CompilerV1Execution {
-    let absent: CompilerFingerprint(compilerV1AbsentValue())
+    let absent: CompilerValueFingerprint(compilerV1AbsentValue())
+    let absentIdentity: CompilerFingerprint(compilerV1AbsentIdentity())
     return CompilerV1Execution(
         isValid: false,
-        file: absent,
+        file: absentIdentity,
         source: absent,
         shape: absent,
         behavior: absent,
@@ -90,19 +101,19 @@ function compilerV1ExecutionDecode(source: String): CompilerV1Execution {
             first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 2),
             second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 3)
         ),
-        source: CompilerFingerprint(
+        source: CompilerValueFingerprint(
             first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 4),
             second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 5)
         ),
-        shape: CompilerFingerprint(
+        shape: CompilerValueFingerprint(
             first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 6),
             second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 7)
         ),
-        behavior: CompilerFingerprint(
+        behavior: CompilerValueFingerprint(
             first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 8),
             second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 9)
         ),
-        compiled: CompilerFingerprint(
+        compiled: CompilerValueFingerprint(
             first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 10),
             second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 11)
         )
@@ -128,12 +139,12 @@ function compilerV1IdentityForFile(path: String): CompilerFingerprint {
     return compilerFingerprintAppendText(fingerprint: compilerFingerprintInitial(), tag: 1, text: path)
 }
 
-function compilerV1SourceDelta(path: String, source: String, before: CompilerFingerprint): CompilerV1SourceDelta {
+function compilerV1SourceDelta(path: String, source: String, before: CompilerValueFingerprint): CompilerV1SourceDelta {
     let identity: CompilerFingerprint(compilerV1IdentityForFile(path: path))
     return CompilerV1SourceDelta(
         identity: identity,
         before: before,
-        after: compilerFingerprintAppendText(fingerprint: identity, tag: 11, text: source),
+        after: compilerV1ValueFingerprint(identity: identity, tag: 11, text: source),
         value: CompilerV1FileValue(path: "\(path)", source: "\(source)")
     )
 }

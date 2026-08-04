@@ -117,7 +117,8 @@ function compilerBodyRuntimeBuiltinTargetPointerBits(): Int { return 45 }
 function compilerBodyRuntimeBuiltinBufferTruncateInt(): Int { return 46 }
 function compilerBodyRuntimeBuiltinSyntaxText(): Int { return 47 }
 function compilerBodyRuntimeBuiltinSyntaxSlice(): Int { return 48 }
-function compilerBodyRuntimeBuiltinCount(): Int { return 48 }
+function compilerBodyRuntimeBuiltinUUIDByteAtIndex(): Int { return 49 }
+function compilerBodyRuntimeBuiltinCount(): Int { return 49 }
 
 function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("stringTransientRegionMark") { return compilerBodyRuntimeBuiltinStringTransientRegionMark() }
@@ -168,6 +169,7 @@ function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("bufferTruncateInt") { return compilerBodyRuntimeBuiltinBufferTruncateInt() }
     if name == String("syntaxText") { return compilerBodyRuntimeBuiltinSyntaxText() }
     if name == String("syntaxSlice") { return compilerBodyRuntimeBuiltinSyntaxSlice() }
+    if name == String("uuidByteAtIndex") { return compilerBodyRuntimeBuiltinUUIDByteAtIndex() }
     return compilerBodyRuntimeBuiltinNone()
 }
 
@@ -220,6 +222,7 @@ function compilerBodyRuntimeBuiltinName(id: Int): String {
     if id == compilerBodyRuntimeBuiltinBufferTruncateInt() { return String("bufferTruncateInt") }
     if id == compilerBodyRuntimeBuiltinSyntaxText() { return String("syntaxText") }
     if id == compilerBodyRuntimeBuiltinSyntaxSlice() { return String("syntaxSlice") }
+    if id == compilerBodyRuntimeBuiltinUUIDByteAtIndex() { return String("uuidByteAtIndex") }
     return String("")
 }
 
@@ -318,7 +321,8 @@ function compilerBodyRuntimeBuiltinParameterType(id: Int, ordinal: Int): String 
         if ordinal == 1 { return String("i32") }
         return String("ptr")
     }
-    if id == compilerBodyRuntimeBuiltinStringViewFrom()
+    if id == compilerBodyRuntimeBuiltinUUIDByteAtIndex()
+        || id == compilerBodyRuntimeBuiltinStringViewFrom()
         || id == compilerBodyRuntimeBuiltinStringSliceUnchecked()
         || id == compilerBodyRuntimeBuiltinStringCharacterAt()
         || id == compilerBodyRuntimeBuiltinStringByteAt()
