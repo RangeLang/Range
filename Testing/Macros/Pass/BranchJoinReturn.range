@@ -4,18 +4,18 @@ construct Array<Element> {}
 
 macro member(): Declaration | Member -> Void {}
 
-construct Identifier {
+construct Identity {
     let name: String
 }
 
 @member
 construct State {
-    let identifier: Identifier
+    let identity: Identity
 }
 
 construct Construct {
     construct Declaration {
-        let identifier: Identifier
+        let identity: Identity
         let members: Array<@member>
     }
 }

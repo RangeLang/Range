@@ -4,7 +4,7 @@ construct Parameter {
     construct Declaration {
         let macros: Array<Macro.Application>
         let externalName: String?
-        let identifier: Identifier
+        let identity: Identity
         let type: TypeReference?
         let defaultValue: @syntax?
     }

@@ -8,20 +8,20 @@ construct ProjectDefaults {}
 
 macro member(): Declaration | Member -> Void {}
 
-construct Identifier {
+construct Identity {
     let name: String
 }
 
 construct Construct {
     construct Declaration {
-        let identifier: Identifier
+        let identity: Identity
         let members: Array<@member>
     }
 }
 
 @member
 construct State {
-    let identifier: Identifier
+    let identity: Identity
 }
 
 macro project(): Construct -> ProjectDefaults { environment in

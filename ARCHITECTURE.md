@@ -5,7 +5,7 @@ implementation work remains in [TODO.md](TODO.md).
 
 ## Identity and uniqueness
 
-`Identifier` is the language-facing identity of a graph value. It carries a
+`Identity` is the language-facing identity of a graph value. It carries a
 human name, a canonical stable ID, its direct parent identity, and an optional
 source witness. Names are presentation; the stable ID and parent relationship
 establish semantic identity.
@@ -29,7 +29,7 @@ Syntax is represented as one ordered form rather than separate prefix, infix,
 postfix, invocation, trailing-closure, and delimiter-specific parser species.
 A form contains two kinds of parts:
 
-- an **anchor**, consisting of an introducer or literal and an `Identifier`;
+- an **anchor**, consisting of an introducer or literal and an `Identity`;
 - a **slot**, consisting of a role identity, an enclosure, and a nested syntax
   child.
 

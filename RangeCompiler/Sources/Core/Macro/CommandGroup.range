@@ -10,11 +10,11 @@ macro commandGroup(): Construct { environment in
     }
 
     #environment {
-        extension #environment.target.Declaration.identifier {
+        extension #environment.target.Declaration.identity {
             enum Command {
                 case invalid
                 #commands.map { commandDeclaration in
-                    case #commandDeclaration.identifier
+                    case #commandDeclaration.identity
                 }
             }
 

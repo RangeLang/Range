@@ -4,10 +4,10 @@ construct Array<Element> {}
 construct TypeReference {}
 construct Expression {}
 
-construct Identifier {
+construct Identity {
     let name: String
     let id: String
-    let parent: Identifier?
+    let parent: Identity?
     let source: @syntax?
 }
 
@@ -16,8 +16,8 @@ construct Macro {
 }
 
 construct MacroApplication {
-    let identifier: Identifier
-    let target: Identifier
+    let identity: Identity
+    let target: Identity
     let genericArguments: Array<TypeReference>
     let argumentClause: String
     let arguments: Array<Expression>
@@ -48,7 +48,7 @@ enum RelationshipOrdering {
 
 enum RelationshipSeparator {
     case none
-    case syntax(identifier: Identifier)
+    case syntax(identifier: Identity)
 }
 
 enum DelimiterPair {

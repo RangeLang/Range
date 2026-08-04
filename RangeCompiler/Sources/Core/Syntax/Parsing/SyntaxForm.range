@@ -1,10 +1,10 @@
 construct SyntaxFormAnchor {
     let introducer: String
-    let identifier: Identifier
+    let identity: Identity
 }
 
 construct SyntaxFormSlot {
-    let role: Identifier
+    let role: Identity
     let enclosure: DelimiterPair
     let child: @syntax
 }

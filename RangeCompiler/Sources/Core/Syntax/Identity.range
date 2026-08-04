@@ -1,4 +1,4 @@
-macro identifierSyntaxName(): Init { environment in
+macro identitySyntaxName(): Init { environment in
     environment.target.application.replace(with:
         environment.target.Declaration.expression(arguments: [
             String(environment.target.application.arguments[0].expression)
@@ -7,11 +7,11 @@ macro identifierSyntaxName(): Init { environment in
 }
 
 @syntax
-@identifierSyntaxName
+@identitySyntaxName
 @hashable
-construct Identifier {
+construct Identity {
     let name: String
     let id: UUID
-    let parent: Identifier?
+    let parent: Identity?
     let source: @syntax?
 }

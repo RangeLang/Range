@@ -9,7 +9,7 @@ construct Enum {
     @member
     construct Declaration {
         let macros: Array<Macro.Application>
-        let identifier: Identifier
+        let identity: Identity
         let generics: Array<Parameter.Declaration>
         let cases: Array<Case>
     }
@@ -23,7 +23,7 @@ construct Enum {
     @member
     construct Case {
         let macros: Array<Macro.Application>
-        let identifier: Identifier
+        let identity: Identity
         let value: @syntax?
     }
 
@@ -31,7 +31,7 @@ construct Enum {
         $identifier.$selectedCase
     }
     construct Application {
-        let identifier: Identifier
-        let selectedCase: Identifier?
+        let identity: Identity
+        let selectedCase: Identity?
     }
 }

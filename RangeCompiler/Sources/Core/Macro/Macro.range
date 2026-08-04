@@ -29,7 +29,7 @@ construct Macro {
     @syntax
     construct Declaration {
         let macros: Array<Macro.Application>
-        let identifier: Identifier
+        let identity: Identity
         let packageVisibility: String
         let generics: Array<Parameter.Declaration>
         let parameters: Array<Parameter.Declaration>
@@ -41,8 +41,8 @@ construct Macro {
 
     @syntax
     construct Application<Value = Nil> {
-        let identifier: Identifier
-        let target: Identifier
+        let identity: Identity
+        let target: Identity
         let genericArguments: Array<TypeReference>
         let argumentClause: String
         let arguments: Array<Expression>

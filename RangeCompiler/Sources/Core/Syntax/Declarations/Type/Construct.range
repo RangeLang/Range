@@ -9,7 +9,7 @@ construct Construct {
     @member
     construct Declaration {
         let macros: Array<Macro.Application>
-        let identifier: Identifier
+        let identity: Identity
         let generics: Array<Parameter.Declaration>
         let members: Array<@member>
     }

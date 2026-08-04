@@ -2,7 +2,7 @@
 @syntax
 construct LocalBinding {
     let mutable: Bool
-    let identifier: Identifier
+    let identity: Identity
     let type: TypeReference
     let expression: Expression
 }

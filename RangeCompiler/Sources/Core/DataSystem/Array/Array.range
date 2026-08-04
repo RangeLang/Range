@@ -19,7 +19,7 @@ construct Array<Element> {
     }
 
     function filter<T>(all: T): Array<T>
-    function filter(named identifier: Identifier): Array<Element>
+    function filter(named identity: Identity): Array<Element>
 
     function destroy(): Int {
         return storage.destroy()

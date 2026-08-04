@@ -3,7 +3,7 @@
 @member
 construct Derived<T> {
     let macros: Array<Macro.Application>
-    let identifier: Identifier
+    let identity: Identity
     let type: TypeReference
     let body: Block?
 

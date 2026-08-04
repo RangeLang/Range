@@ -1700,7 +1700,7 @@ check_canonical_declaration_envelopes() {
         RangeCompiler/Sources/Core/Macro/Many.range
         RangeCompiler/Sources/Core/System/Memory/Buffer.range
         RangeCompiler/Sources/Core/Coding/UUID.range
-        RangeCompiler/Sources/Core/Syntax/Identifier.range
+        RangeCompiler/Sources/Core/Syntax/Identity.range
         RangeCompiler/Sources/Core/Syntax/Parsing/SyntaxForm.range
         RangeCompiler/Sources/Core/Syntax/Declarations/Type/Construct.range
         RangeCompiler/Sources/Core/Syntax/Declarations/Type/Function.range
@@ -1716,10 +1716,10 @@ check_canonical_declaration_envelopes() {
         'Macro.range|macros'
         'Macro.range|identifier'
         'Macro.range|target'
-        'Identifier.range|name'
-        'Identifier.range|id'
-        'Identifier.range|parent'
-        'Identifier.range|source'
+        'Identity.range|name'
+        'Identity.range|id'
+        'Identity.range|parent'
+        'Identity.range|source'
         'SyntaxForm.range|introducer'
         'SyntaxForm.range|identifier'
         'SyntaxForm.range|role'
@@ -1781,7 +1781,7 @@ check_canonical_declaration_envelopes() {
     fi
     /usr/bin/grep -F $'graphNominal\t' "$output" \
         | /usr/bin/grep -F $'keyword=let\tname=parent\t' \
-        | /usr/bin/grep -F 'path=RangeCompiler/Sources/Core/Syntax/Identifier.range' \
+        | /usr/bin/grep -F 'path=RangeCompiler/Sources/Core/Syntax/Identity.range' \
         > /dev/null \
         || fail "Canonical Identifier omitted its direct parent relationship"
     if /usr/bin/grep -Fq 'GraphIdentity' "$bundle" || /usr/bin/grep -Fq 'RangeGraphIdentity' "$bundle"; then

@@ -6,20 +6,20 @@ compilerSourceFile\trole=core\tpath=Core/Macro/CodableCompositeAtomicRollback.ra
 macro member(): Declaration | Member -> Void {}
 macro syntax(): Declaration -> Void {}
 
-construct Identifier {
+construct Identity {
     let name: String
 }
 
 construct Construct {
     construct Declaration {
-        let identifier: Identifier
+        let identity: Identity
         let members: Array<@member>
     }
 }
 
 @syntax
 construct Let {
-    let identifier: Identifier
+    let identity: Identity
 }
 
 macro validEncodeBody(properties: Array<Let>) -> Int { environment in

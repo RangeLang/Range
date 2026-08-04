@@ -40,35 +40,35 @@ construct RangeGraphTopology {
 
 @builtin
 construct RangeGraphNode {
-    let identifier: Identifier
+    let identity: Identity
     let sourcePath: String
     let labels: Array<String>
 }
 
 @builtin
 construct RangeGraphRelationship {
-    let origin: Identifier
-    let role: Identifier
-    let destination: Identifier
+    let origin: Identity
+    let role: Identity
+    let destination: Identity
     let registration: RelationshipRegistration
 }
 
 construct RangeGraphDelta {
-    let origin: Identifier
+    let origin: Identity
     let changes: Array<Change>
     let dependencies: Array<Dependency>
     let diagnostics: Array<Diagnostic>
 
     enum Change {
-        case insert(value: @syntax, parent: Identifier?, ordinal: Int)
-        case replace(target: Identifier, value: @syntax)
-        case remove(target: Identifier)
+        case insert(value: @syntax, parent: Identity?, ordinal: Int)
+        case replace(target: Identity, value: @syntax)
+        case remove(target: Identity)
         case relate(relationship: RangeGraphRelationship)
     }
 
     construct Dependency {
-        let observer: Identifier
-        let observed: Identifier
+        let observer: Identity
+        let observed: Identity
         let kind: String
     }
 

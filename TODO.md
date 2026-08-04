@@ -6,7 +6,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 - [ ] Recognize source shape from Core-authored, queryable syntax rules before
   usage, type, ownership, and representation analysis.
   - [x] Define identifier start and alphanumeric continuation rules beside
-    `Identifier` in Core and make Range-authored syntax-template derivation
+    `Identity` in Core and make Range-authored syntax-template derivation
     and matching query them; no separate `IdentifierShape` wrapper exists.
   - [ ] Load Core syntax shapes into an immutable early source-shape graph and
     make declaration recipes consume it before member type linking and macro
@@ -51,11 +51,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     fingerprints and row-local identities.
     - [x] Separate changing Compiler V1 values from transitional identity hash
       keys at the type level. `CompilerValueFingerprint` now owns phase
-      inputs/before/after values while Core `Identifier` remains semantic
+      inputs/before/after values while Core `Identity` remains semantic
       identity. The paired value token remains identity-scoped and is not a
       cross-identity payload-interning key.
     - [ ] Wire the four reconciliation outcomes (reuse, update, insert, delete)
-      only after UUID-backed `Identifier` lookup confirms structural equality;
+      only after UUID-backed `Identity` lookup confirms structural equality;
       do not treat a paired hash match as semantic or value equality.
   - [ ] Expose `.count`, `map`, `filter`, and related operations as direct
     queries/transforms over crystallized relationship values in Compiler V1;
@@ -1245,7 +1245,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - [x] Give every macro-attachable declaration an ordered
         `macros: [Macro.Application]` source shape.
       - [x] Unify authored identifier and semantic graph identity as one
-        `Identifier` carrying its nominal `name`, stable `id`, direct
+        `Identity` carrying its nominal `name`, stable `id`, direct
         `parent: Identifier?`, and
         a canonical `source: @syntax?` witness; declarations no longer expose
         parallel
@@ -1253,8 +1253,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - The owning declaration's existing `type` is the named value's
           representation (`state count: Int` means nominal `Count` represented
           by `Int`); the source syntax provides `State`, `Let`, and other
-          metadata without duplicating either fact in `Identifier`.
-      - [ ] Derive stable `Identifier` hashing through `@hashable` without
+          metadata without duplicating either fact in `Identity`.
+      - [ ] Derive stable `Identity` hashing through `@hashable` without
         making the hash the semantic identity.
         - [x] Make `@hashable` synthesize a target-owned `hash() -> Int`
           directly from the canonical `id` declaration instead of emitting an
@@ -1275,7 +1275,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - [ ] Derive generated identities from macro application, target,
           emitted role, ordinal, and nominal type rather than allocation order
           or reconstructed source text.
-      - [ ] Materialize every syntax-facing `Identifier` directly from the
+      - [ ] Materialize every syntax-facing `Identity` directly from the
         compiler's existing stable fingerprint, parent relationship, and
         canonical syntax node when its source-backed view is projected; do not
         reconstruct identity from the name or copy source text into a parallel
@@ -1484,7 +1484,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
                     `<>` once their parser paths emit occurrence-backed syntax.
                 - [ ] Represent every syntax form as ordered anchors and shaped
                   child slots.
-                  - An anchor is an introducer or literal plus an `Identifier`;
+                  - An anchor is an introducer or literal plus an `Identity`;
                     a slot is a role identity, delimiter enclosure, and nested
                     syntax child. `@foo() {}` and `#environment {}` must use
                     this same representation.

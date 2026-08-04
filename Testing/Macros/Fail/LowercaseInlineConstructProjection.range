@@ -1,10 +1,10 @@
 compilerMacroSnapshot
 compilerSourceFile\trole=core\tpath=Core/Macro/LowercaseInlineConstructProjection.range
-construct Identifier {}
+construct Identity {}
 
 construct Construct {
     construct Declaration {
-        let identifier: Identifier
+        let identity: Identity
     }
 }
 

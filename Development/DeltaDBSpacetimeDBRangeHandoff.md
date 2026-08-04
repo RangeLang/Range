@@ -193,7 +193,7 @@ The bounded revision cutover is implemented without rewriting Body/CFG/MIR:
    Source-free Shape projection, and affected-view counts.
 
 Compiler V1 also separates changing phase values from transitional identity
-hash keys at the type level. Core `Identifier` remains the authored graph
+hash keys at the type level. Core `Identity` remains the authored graph
 identity. The four-way reconciler remains deferred until UUID-backed structural
 identity equality can confirm hash-index matches.
 

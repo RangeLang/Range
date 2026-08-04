@@ -8,13 +8,13 @@ macro member(): Declaration | Member -> Void {}
 macro syntax(): Declaration -> Void {}
 macro stored(): Construct -> Void {}
 
-construct Identifier {
+construct Identity {
     let name: String
 }
 
 construct Construct {
     construct Declaration {
-        let identifier: Identifier
+        let identity: Identity
         let members: Array<@member>
     }
 }
@@ -22,13 +22,13 @@ construct Construct {
 @syntax
 @stored
 construct Let {
-    let identifier: Identifier
+    let identity: Identity
 }
 
 @syntax
 @stored
 construct State {
-    let identifier: Identifier
+    let identity: Identity
 }
 
 construct Binding {}

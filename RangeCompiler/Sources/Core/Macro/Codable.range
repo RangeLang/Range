@@ -4,11 +4,11 @@ macro codable(): Construct { environment in
     )
 
     #environment {
-        extension #environment.target.Declaration.identifier {
+        extension #environment.target.Declaration.identity {
             function encode<Format>(to encoder: Encoder<Format>): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer<Format>(encoder.keyedContainer())
                 #fields.map { property in
-                    switch container.encode(#property.identifier, forKey: #property.identifier.name) {
+                    switch container.encode(#property.identity, forKey: #property.identity.name) {
                     case .success:
                         break
                     case .failure(error):
@@ -21,9 +21,9 @@ macro codable(): Construct { environment in
             function decode<Format>(from decoder: Decoder<Format>): Result<Self, DecodingError> {
                 let container: KeyedDecodingContainer<Format>(decoder.keyedContainer())
                 #fields.map { property in
-                    switch container.decode(#property.type.self, forKey: #property.identifier.name, default: #property.value) {
-                    case .success(#property.identifier):
-                        #property.identifier: #property.identifier
+                    switch container.decode(#property.type.self, forKey: #property.identity.name, default: #property.value) {
+                    case .success(#property.identity):
+                        #property.identity: #property.identity
                     case .failure(error):
                         return .failure(cause: error)
                     }

@@ -6,18 +6,18 @@ macro project(): Construct -> ProjectDefaults { environment in
     )
     let integerCount: Int(
         members.filter { member in
-            return member.identifier.name == "integer"
+            return member.identity.name == "integer"
         }.count
     )
     let boolCount: Int(
         members.filter { member in
-            return member.identifier.name == "bool"
+            return member.identity.name == "bool"
         }.count
     )
 
     if integerCount == 0 && boolCount == 0 {
         #environment {
-            extension #environment.target.Declaration.identifier {
+            extension #environment.target.Declaration.identity {
                 state integer: Int
                 state bool: Bool
             }
@@ -25,14 +25,14 @@ macro project(): Construct -> ProjectDefaults { environment in
     }
     if integerCount == 0 && boolCount != 0 {
         #environment {
-            extension #environment.target.Declaration.identifier {
+            extension #environment.target.Declaration.identity {
                 state integer: Int
             }
         }
     }
     if boolCount == 0 && integerCount != 0 {
         #environment {
-            extension #environment.target.Declaration.identifier {
+            extension #environment.target.Declaration.identity {
                 state bool: Bool
             }
         }

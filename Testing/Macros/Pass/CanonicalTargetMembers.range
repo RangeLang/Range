@@ -7,11 +7,11 @@ compilerSourceFile\trole=core\tpath=Core/Macro/CanonicalTargetMembers.range
 macro member(): Declaration | Member -> Void {}
 macro stored(): Construct -> Void {}
 
-construct Identifier {}
+construct Identity {}
 
 construct Construct {
     construct Declaration {
-        let identifier: Identifier
+        let identity: Identity
         let members: Array<@member>
     }
 }

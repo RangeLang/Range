@@ -4,6 +4,6 @@
 }
 @statement
 construct Assignment {
-    let identifier: Identifier
+    let identity: Identity
     let value: @stored
 }

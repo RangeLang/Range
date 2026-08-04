@@ -15,7 +15,7 @@ enum RelationshipOrdering {
 
 enum RelationshipSeparator {
     case none
-    case syntax(identifier: Identifier)
+    case syntax(identity: Identity)
 }
 
 enum RelationshipEnclosure {

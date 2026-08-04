@@ -4,7 +4,7 @@ construct Function {
     @member
     construct Declaration {
         let macros: Array<Macro.Application>
-        let identifier: Identifier
+        let identity: Identity
         let generics: Array<Parameter.Declaration>
         let parameters: Array<Parameter.Declaration>
         let returnType: TypeReference?
@@ -13,7 +13,7 @@ construct Function {
 
     @syntax
     construct Application {
-        let identifier: Identifier
+        let identity: Identity
         let arguments: Array<Parameter.Application>
     }
 }

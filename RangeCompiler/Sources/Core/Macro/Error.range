@@ -4,7 +4,7 @@ macro error(): Construct { environment in
     )
     let messageCount: Int(
         members.filter { member in
-            return member.identifier.name == "message"
+            return member.identity.name == "message"
         }.count
     )
     if messageCount != 1 {

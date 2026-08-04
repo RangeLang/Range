@@ -4,7 +4,7 @@
 @member
 construct Let<Value> {
   let macros: Array<Macro.Application>
-  let identifier: Identifier
+  let identity: Identity
   @value
   let value: Value
 

@@ -2,11 +2,11 @@ compilerTypedSyntaxSnapshot
 macro syntax(): Declaration -> Void {}
 macro stored(): Construct -> Void {}
 
-construct Identifier {}
+construct Identity {}
 
 @stored
 @syntax
 construct Assignment {
-    let identifier: Identifier
+    let identity: Identity
     let value: @stored
 }

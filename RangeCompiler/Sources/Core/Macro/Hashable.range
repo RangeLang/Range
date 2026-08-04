@@ -4,7 +4,7 @@ macro hashable(): Construct { environment in
     )
     let idCount: Int(
         members.filter { member in
-            return member.identifier.name == "id"
+            return member.identity.name == "id"
         }.count
     )
     if idCount != 1 {
@@ -12,7 +12,7 @@ macro hashable(): Construct { environment in
     }
 
     #environment {
-        extension #environment.target.Declaration.identifier {
+        extension #environment.target.Declaration.identity {
             function hash(): Int {
                 state result: Int(17)
                 state index: Int(0)
