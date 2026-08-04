@@ -19,6 +19,13 @@ The supported implementation is the Range-authored self-hosted compiler. It
 emits native LLVM and must reproduce byte-identical LLVM and linked compiler
 executables before a compiler change is accepted.
 
+Compiler checkpoints use one rolling authority. The accepted compiler builds
+a candidate from the current source, then that candidate rebuilds the same
+source once. Byte-identical candidate and reproduction LLVM/executables permit
+the candidate to replace the accepted compiler; no third build or active
+archive of older compilers is required. Promotion is a deliberate maintainer
+checkpoint, not a step after every source edit.
+
 ## Performance
 
 Native LLVM · `-O3` · July 2026
@@ -128,15 +135,17 @@ Range peak memory: **5.3 GB** · peers: **1.8–4.2 MB**.
 ```sh
 scripts/range compile Testing/Basics/Pass/ReturnInteger.range
 range run GPUCanvas
-scripts/range compiler next
-scripts/range compiler progression
-scripts/range check-stage2-compiler
+scripts/range check-compiler-candidate
+scripts/range check-compiler
 ```
 
 The ordinary file/directory wrapper bundles canonical Core sources through the
 accepted compiler; `range run` additionally links the manifest-declared runtime
 inputs and executes `@main`. See the
 [speed benchmark](Benchmarks/Speed/README.md) for performance comparisons.
+The two compiler checks above are maintainer proofs: the first validates the
+candidate/reproduction fixed point, and the second verifies the currently
+accepted bootstrap.
 
 ## License
 

@@ -58,11 +58,12 @@ semantics. Go's Noise arithmetic is written directly in the hot loop because Go
 does not expose a force-inline attribute and its compiler otherwise leaves the
 larger helper as a call while the other optimized artifacts inline it.
 
-The Range setup prefers the repository's Stage 3 native compiler only when its
-executable is byte-identical to Stage 2. If that fixed-point pair is unavailable,
-the runner falls back to the pinned native seed. Set `RANGE_BENCH_COMPILER` to
-test a specific compiler artifact explicitly. The emitted `Main.ll` is relinked
-with `clang -O3` and the manifest-pinned Range runtime sources. This keeps
+The Range setup prefers the reproduced native compiler only when its executable
+is byte-identical to the current candidate. If that fixed-point pair is
+unavailable, the runner falls back to the accepted bootstrap. Set
+`RANGE_BENCH_COMPILER` to test a specific compiler artifact explicitly. The
+emitted `Main.ll` is relinked with `clang -O3` and the manifest-pinned Range
+runtime sources. This keeps
 Range's measured native artifact at the same optimization level as the C, C++,
 and Rust rows without changing Range's normal command-line defaults.
 

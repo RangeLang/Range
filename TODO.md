@@ -58,7 +58,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     declare `stringLength` and `stringByteAt` explicitly as neutral `@builtin`
     Core functions, and flatten `processArgumentRecord` so registered calls do
     not remain nested inside interpolation.
-    - The cached Stage 2 compiler compiled the complete current source graph
+    - The cached current-build compiler compiled the complete current source graph
       through this boundary, exited `0`, and produced 8,536,874 bytes of LLVM
       with SHA-256
       `0be0ae3777cae8721e7e209679b6ff853884cda1b98a27b8c914ff7c5c1eb6fa`;
@@ -290,7 +290,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   `environment.target.Declaration...`; expansion target splices now use
   `#environment.target.Declaration.identifier`.
 - [ ] Finish the general uppercase inline-construct projection without
-  regressing bounded Stage 2 production.
+  regressing bounded current-build production.
   - The current draft adds resolution kind
     `compilerBodyResolutionInlineConstructProjection`, resolves a directly
     nested construct by parent syntax ID and name, interns its construct type,
@@ -317,9 +317,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - Run `scripts/range check-build-plan`, then
     `scripts/range check-value-ownership`; do not infer later-gate success from the
     build-plan result.
-  - The uninterrupted recovery run completed the development Stage 2 producer
+  - The uninterrupted recovery run completed the development current-build producer
     in 583 seconds (`llvm-emission=580`, `llvm-validation=2`,
-    `stage2-link=1`; 17 artifacts reused and 2,639 rebuilt).
+    `current-link=1`; 17 artifacts reused and 2,639 rebuilt).
   - `check-value-ownership` then reached the inline-projection proofs: the uppercase
     canonical-target fixture passed, and the lowercase fixture correctly
     exited 65 with empty stderr and
@@ -336,7 +336,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] Remove the redundant `@field` marker, its unused Foundation macro, and
     its compiler target alias; declaration bodies already expose `[@member]`,
     while `@property` and `@stored` describe the meaningful subsets.
-    - The development Stage 2 rebuilt one artifact and reused 2,655, completed
+    - The development current build rebuilt one artifact and reused 2,655, completed
       in 324 seconds, and passed every affected macro/Codable fixture before
       reaching the unchanged graph-capability `macroMissingTarget` boundary.
   - [x] Remove declaration-owned `replace` methods from
@@ -863,8 +863,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 - [ ] Move unsized scalar defaults into the `@project` macro.
   - [x] Add the host-backed target pointer-width builtin and a bootstrap-safe
     resolver hook for missing `integer`/`bool` defaults.
-  - [x] After seed promotion, make the resolver hook call
-    `targetPointerBits()` directly instead of its accepted-seed 64-bit value.
+  - [x] After bootstrap promotion, make the resolver hook call
+    `targetPointerBits()` directly instead of its accepted-bootstrap 64-bit value.
   - [x] Define lowercase `project` in Range and execute its real macro body.
     - The authored macro uses `#environment { ... }` as its contextual
       expansion boundary and maps `environment.system.defaults` into generated
@@ -914,13 +914,13 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       physical storage through supported fixtures.
     - [ ] Replace `String`'s bootstrap `@builtin(.storage)` annotation with
       `@storage(.text(...))` after the formula-capable macro sources enter the
-      reproducible seed manifest.
+      reproducible bootstrap manifest.
   - [ ] Synthesize signed and unsigned integer representations from
     `signedness` and `bits`, including unary minus only for signed storage.
   - [ ] Replace the native integer literal and LLVM lowering branches with
     macro-produced representation facts.
   - [ ] Add the Range-authored `Signedness`, `Int`, and `literal` sources to
-    the bootstrap manifest after the parser-capable seed is reproducibly
+    the bootstrap manifest after the parser-capable bootstrap is reproducibly
     promoted.
   - [ ] Expose compiler declarations through one canonical typed meta-model.
     - [x] Define lowercase `member` for `Declaration | Member` and annotate the
@@ -968,7 +968,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           passed value instead of consulting the invocation out of band.
           - Verification: the root environment and canonical-target-members
             fixtures pass, and the compiler candidate remains a byte-identical
-            Stage 2/Stage 3 fixed point.
+            candidate/reproduction fixed point.
         - [x] Route every direct call on the environment's `target`, `graph`,
           and `diagnostics` projections through capability resolution,
           including denied operations, while leaving deeper source-backed
@@ -1095,8 +1095,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - [x] Remove nominal-reference, protocol, and conformance storage from
           syntax declarations; declaration and application capabilities are
           expressed by attached macros instead of inherited nominal contracts.
-          - [ ] Promote the source removal through the accepted bootstrap seed
-            after compiler progression reaches the corresponding checkpoint;
+          - [ ] Promote the source removal through the accepted bootstrap
+            after the candidate/reproduction proof reaches the corresponding checkpoint;
             do not hand-edit the generated LLVM snapshot.
         - [x] Materialize construct macro targets through path-addressable
           inline representations such as `Construct.Declaration`; uppercase
@@ -1299,7 +1299,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - [x] Add macro-time `#value.member` prefix chains at expansion
           boundaries without introducing an `@splice` macro or special
           collection operation.
-          - [x] Remove the seed-compatible `#(...)` spelling and reject it
+          - [x] Remove the bootstrap-compatible `#(...)` spelling and reject it
             structurally. Compile-time values use only prefix mentions such
             as `#properties.map` and
             `#environment.target.Declaration.identifier`; no braced splice program
@@ -1566,7 +1566,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
               merge nested expansion graph deltas before commit.
               - The source store appends immutable generated files through
                 in-place String storage growth, avoiding unsupported stored
-                String reassignment in the accepted seed.
+                String reassignment in the accepted bootstrap.
               - `CodableConstructCollection.range` proves two opaque child
                 artifacts replace the helper calls before the generated
                 encode/decode functions are parsed and committed.
@@ -1651,7 +1651,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 - [ ] Remove source-alias ownership conflicts from parser fallback tokens.
   - [x] Replace the enum-payload and balanced-range loop token/cursor
     aggregates with scalar token coordinates and cursor indices.
-  - [x] Prove the change advances `scripts/range compiler progression` past
+  - [x] Prove the change advances the candidate/reproduction proof past
     `compilerCoreParseConstructDeclarationParts`.
   - [x] Remove representation-sensitive Optional ABI boundaries from the
     single-character operator and bracket lexer classifiers.
@@ -1675,38 +1675,42 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     destroy only the unselected branch's live leaves.
   - Prove both locally created and boundary-forwarded payload/fallback pairs,
     including aggregates with multiple independently owned String leaves.
-- [x] Reconcile the accepted seed manifest with the current compiler inputs.
-  - The accepted seed and its complete manifested input set pass
-    `scripts/verify-range-compiler-seed`.
-- [ ] Run the complete validation ladder and promote one reproducible accepted
-  seed after the manifest is repaired.
+- [x] Reconcile the accepted bootstrap manifest with the current compiler inputs.
+  - The accepted compiler and its complete manifested input set pass
+    `scripts/verify-range-compiler`.
+- [x] Run the complete validation ladder and promote one reproducible accepted
+  compiler after the manifest is repaired.
   - [x] `scripts/range check-build-plan`
   - [x] `scripts/range check-value-ownership --controls`
   - [x] `scripts/range check-compiler-smoke`
   - [x] `scripts/range check-compiler-candidate`
-  - [x] `scripts/range check-stage2-compiler`
-  - [x] `scripts/range compiler progression`
-- [x] Resolve accepted-seed Stage 2 once per compiler-source change.
+  - [x] `scripts/range check-compiler`
+  - Accepted compiler + source produces the candidate; candidate + the same
+    source produces the reproduction. Byte-identical LLVM and executables
+    authorize promotion. A third build is redundant after equality.
+  - Promotion replaces the accepted compiler; prior checkpoints remain in Git
+    history instead of continuing as active authorities.
+- [x] Resolve the accepted-bootstrap current build once per compiler-source change.
   - [x] Share one content-addressed resolver between value-ownership, smoke, and the
     ordinary compiler-candidate path; keep bootstrap-bridge production
     separate because it has a different producer.
-  - [x] Key the immutable artifact by the accepted seed, ordered runtime set,
+  - [x] Key the immutable artifact by the accepted bootstrap, ordered runtime set,
     compiler source bundle and inventory, target/toolchain identity, and exact
     Clang invocation flags.
   - [x] Keep value-ownership and smoke proofs independent while reusing the same
-    Stage 2 executable and cache key.
+    current-build executable and cache key.
     - The final verified shared-cache reuse completed value-ownership in 3.49
       seconds and smoke in 3.72 seconds with cache key
       `22ef98c2c4267c598b7677af4ff9725b46e831fbe705632aeda60b2f25586660`.
-  - [x] Add a profile-sensitive development Stage 2 for value-ownership and smoke.
-    - Keep the accepted-seed producer optimized, but validate and link the
-      disposable Stage 2 with `-O0` and no LTO. Candidate, fixed-point, and
+  - [x] Add a profile-sensitive development build for value-ownership and smoke.
+    - Keep the accepted-bootstrap producer optimized, but validate and link the
+      disposable development build with `-O0` and no LTO. Candidate, fixed-point, and
       promotion paths retain `-O2` plus ThinLTO.
     - Key the profile and both producer/output flag sets into the immutable
       cache, so development artifacts cannot satisfy optimized gates.
     - Emit phase timings on cache misses. The first measured development miss
-      spent 18 seconds linking the optimized seed, 593 seconds emitting LLVM,
-      1 second validating LLVM, and 2 seconds linking Stage 2.
+      spent 18 seconds linking the optimized bootstrap, 593 seconds emitting
+      LLVM, 1 second validating LLVM, and 2 seconds linking the current build.
   - [ ] Make compiler LLVM emission incremental or cacheable below the full
     source-bundle key.
     - [ ] Make compiler performance observable at authored phase and work-unit boundaries.
@@ -1763,7 +1767,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           and MIR context into decimal ranges, and reconstructs the diagnostic
           later. This loses error identity and prevents safe failed-product
           reuse.
-      - An 8-second live sample of the frozen Stage 3 run placed 6,377 of 6,468
+      - An 8-second live sample of the frozen reproduction run placed 6,377 of 6,468
         samples in per-function emission, 3,420 in memory construction, and
         3,259 in owned-path validation; the sampled process had reached a 16.9
         GB peak physical footprint. Treat this as hotspot evidence, not an
@@ -1771,14 +1775,14 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - Phase timings show self-emission, not Clang or linking, dominates a
       compiler-source cache miss; preserve full candidate/fixed-point proofs.
     - The `@stored` selector proof measured 916 seconds emitting LLVM, 2
-      seconds validating it, and 2 seconds linking Stage 2. The identical
+      seconds validating it, and 2 seconds linking the current build. The identical
       follow-up value-ownership run reused the immutable artifact and completed in
       about 4 seconds.
     - [x] Add a validated rolling development producer and skip the duplicate
       ownership/effect reconstruction only for marked development source sets.
       - value-ownership publishes a development compiler as a future producer only
         after all focused proofs pass. Optimized candidate, fixed-point, and
-        promotion gates continue from the accepted seed and retain the full
+        promotion gates continue from the accepted bootstrap and retain the full
         independent effect-validation pass.
       - The producer identity is part of the immutable cache key; the normal
         source snapshot remains unchanged and the marker exists only in the
@@ -1835,21 +1839,21 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           not LLVM validation or linking, remain the dominant cost.
         - The independent optimized candidate measured 714 seconds for Range
           LLVM emission, 1 second for validation, 22 seconds for linking, and
-          755 seconds total before its complete Stage 2 audit passed. Stage 3
+          755 seconds total before its complete current-build audit passed. The reproduction
           then compiled, validated, and linked the full 29-file compiler, but
           required about 25 minutes of CPU in the same global emission path.
-        - Stage 2 and Stage 3 executables were byte-identical at SHA-256
+        - Candidate and reproduction executables were byte-identical at SHA-256
           `12252dcd0c72aed205657df039841f75c4d1dc8b4a9b992365ae229b470162cf`
-          and 3,522,096 bytes even though their LLVM differed. Stage 3 and an
-          explicit Stage 4 were byte-identical at SHA-256
+          and 3,522,096 bytes even though their LLVM differed. The reproduction
+          and an explicit diagnostic rebuild were byte-identical at SHA-256
           `90f3adabfc443c33860451a869ce7302bdcc17449bee0ce046f810a3b8423882`
-          and 8,536,584 bytes; Stage 4 also passed Clang validation. That
-          independently reproduced artifact is now the accepted seed at
+          and 8,536,584 bytes; the diagnostic rebuild also passed Clang validation. That
+          independently reproduced artifact is now the accepted bootstrap at
           version `bootstrap-90f3adabfc44`.
       - [x] Pin development producers explicitly and remove the legacy
         `single-pass-v1` producer fallback.
         - Normal successful development gates no longer advance the producer.
-          `RANGE_STAGE2_ADVANCE_DEVELOPMENT_PRODUCER=1` is required after a
+          `RANGE_BUILD_ADVANCE_DEVELOPMENT_PRODUCER=1` is required after a
           focused validation pass.
         - `per-function-artifacts-v1` requires a bundle on every source-key
           miss; missing or malformed artifact state is a hard failure.
@@ -1880,7 +1884,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     executable entry; bound cleanup of quarantined invalid entries then.
   - [x] Confirm artifact-level reuse is insufficient for compiler-source
     misses; pursue the per-function fragment task above.
-- [ ] Promote the latest accepted seed as the runnable `range` compiler.
+- [ ] Promote the latest accepted bootstrap as the runnable `range` compiler.
   - [ ] Make `range compile <folder>` discover the project, Core, Foundation,
     framework, and generated source graph and compile it with the immutable
     accepted compiler artifact.
@@ -1891,7 +1895,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       discovery behind the Range-authored project macro.
   - [x] Give the artifact a compiler version plus content hash, target, runtime
     ABI, and source-manifest identity; keep its LLVM as reproducibility
-    evidence rather than the only usable seed.
+    evidence rather than the only usable bootstrap.
   - [ ] Make compiler generation N produce the candidate executable for
     generation N+1, then promote only after the fixed-point and candidate
     gates pass.
@@ -1899,7 +1903,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     all proof gates without reusing proof results.
 - [ ] Remove Clang as a compiler-semantic dependency.
   - [x] Stop requiring the consumer's exact Clang version to equal the
-    producer version recorded in the accepted-seed manifest.
+    producer version recorded in the accepted-bootstrap manifest.
   - [ ] Keep fixed-point LLVM generation independent of the installed C
     compiler; test runtime linking as a separate target-toolchain capability.
   - [ ] Move the remaining C runtime surface into Range-authored Core/runtime
@@ -1915,14 +1919,14 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       manifest-recorded SDK/runtime link plan after object production.
     - [ ] Replace `Core/Package/LinkPlan.range`'s authored `clang` process with
       that backend plus direct-link plan.
-    - [ ] Remove Clang identity and flags from Stage 2 cache/build-plan keys
+    - [ ] Remove Clang identity and flags from current-build cache/build-plan keys
       only after object generation, runtime compilation, validation, and
       linking have independent versioned owners.
 
 ## Repository Layout
 
 - [ ] Adopt the proposed top-level ownership layout.
-  - [ ] Move the accepted compiler seed and manifest from
+  - [ ] Move the accepted compiler bootstrap and manifest from
     `RangeCompiler/Bootstrap` to `Bootstrap`.
   - [ ] Move the Range-authored compiler phases from
     `RangeCompiler/Sources/Compiler` to `Compiler`.
@@ -1938,8 +1942,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     folder, with RangeView at `Frameworks/RangeView`.
   - [ ] Update `Project.range`, source manifests, build-plan logic, scripts,
     fixtures, and documentation to the canonical paths.
-  - [ ] Reach a Stage 2/Stage 3 byte-identical fixed point, promote the
-    path-aware seed, and independently reproduce it before completing the
+  - [ ] Reach a candidate/reproduction byte-identical fixed point, promote the
+    path-aware bootstrap, and independently reproduce it before completing the
     checkpoint.
 
 - [ ] Review the Core and Foundation boundary without collapsing it by folder
@@ -1964,7 +1968,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - Require each deletion or representation slice to remove its superseded
     path in the same checkpoint instead of retaining parallel compiler models.
   - [ ] Phase 0: restore a reproducible current compiler baseline.
-    - `scripts/range check-build-plan` passes, but the current accepted-seed
+    - `scripts/range check-build-plan` passes, but the current accepted-bootstrap
       verifier reports changed compiler inputs across Syntax, Body, Driver,
       and LLVM; the accepted artifact is not proof of the current source tree.
     - [x] Re-run the manifest integrity check and record the exact current
@@ -1977,7 +1981,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         `Lexer`; all manifested Core and runtime inputs still match.
     - [ ] Resolve the current source capability blocker through the narrowest
       relevant value-ownership proof, including its exact rejection controls.
-      - The current development Stage 2 now treats undeclared built-in target
+      - The current development build now treats undeclared built-in target
         category markers as scalar syntax metadata rather than macro-family
         storage, and ownership construction ignores compile-time projection
         values before requiring runtime tracked-storage metadata.
@@ -1993,34 +1997,34 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         `pipelineFailureCode=1`; generated project configuration remains the
         next independent capability slice.
       - Keep the proof boundary explicit: value-ownership and its controls must pass
-        before advancing to smoke, candidate, Stage 2, or progression gates.
-    - [ ] Run the supported ladder in order: build plan, ordinary value with
-      controls, compiler smoke, compiler candidate, Stage 2, and compiler
-      progression.
+        before advancing to smoke, candidate reproduction, or accepted-bootstrap
+        verification.
+    - [x] Run the supported ladder in order: build plan, ordinary value with
+      controls, compiler smoke, compiler candidate/reproduction, and accepted
+      bootstrap verification.
       - [x] Build plan, complete value-ownership controls, Compiler V1, and
         compiler smoke pass on the current source snapshot.
-      - [x] The optimized candidate passes the complete Stage 2 audit and
-        Stage 3 compile/validate/link boundary.
-      - [x] Promote the independently verified Stage 3/Stage 4 artifact and
-        rerun the native seed verifier and complete candidate gate.
+      - [x] The optimized candidate passes the complete current-build audit and
+        reproduced-build compile/validate/link boundary.
+      - [x] Promote the independently verified candidate/reproduction artifact
+        and rerun the accepted-bootstrap verifier and complete candidate gate.
         - Promotion rebuilt the manifest from the live Core inventory and all
           29 current compiler sources instead of retaining its stale 26-entry
           source list.
-        - `scripts/range check-stage2-compiler` reproduced LLVM SHA-256
+        - `scripts/range check-compiler` reproduced LLVM SHA-256
           `90f3adabfc443c33860451a869ce7302bdcc17449bee0ce046f810a3b8423882`
           at 8,536,584 bytes and executable SHA-256
           `e7bfc578bcf5f2fd1b4faf4a7b0e8450d51776f2ac8e43dea80c455f5be3b6a1`
           at 3,522,096 bytes in 818.31 seconds without Swift.
         - The post-promotion candidate completed in 866 seconds: 23 seconds
-          seed linking, 819 seconds Range LLVM emission, 2 seconds validation,
-          and 22 seconds linking. Its Stage 2 and Stage 3 LLVM were
-          byte-identical to the accepted seed; its two candidate executables
+          bootstrap linking, 819 seconds Range LLVM emission, 2 seconds
+          validation, and 22 seconds linking. Its candidate and reproduction
+          LLVM were byte-identical to the accepted bootstrap; its two executables
           were byte-identical at SHA-256
           `12252dcd0c72aed205657df039841f75c4d1dc8b4a9b992365ae229b470162cf`.
-      - [ ] Run `scripts/range compiler progression` when a sustained uncached
-        CPU-heavy proof is intentional.
-        - Two attempts were interrupted after they made the workstation
-          unresponsive. No progression result is claimed for this checkpoint.
+      - [x] Remove `scripts/range compiler progression` from the required
+        promotion ladder. Keep it only as an optional convergence diagnostic;
+        candidate/reproduction equality is the complete fixed-point proof.
     - [x] Confirm fixed-point LLVM and executable identity and promote the
       complete 29-source inventory only after explicit approval.
   - [ ] Phase 1: delete the obsolete string-record compiler path.
@@ -2038,7 +2042,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         found no callers.
         - The slice removed 172 Range lines and no direct RawBuffer calls.
           Native compiler smoke rebuilt in 672 seconds (668 emission, 2 LLVM
-          validation, 2 linking), and the linked Stage 2 executable remained
+          validation, 2 linking), and the linked current-build executable remained
           byte-identical at SHA-256
           `1ebc06443ced5d0349ee76a2e4210fc5d7f6f243bd005c49101ad91fee77e427`.
     - [ ] Remove only a complete unreachable chain: its record
@@ -2080,7 +2084,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         commit, and diagnostics consume its named fields.
       - [ ] Replace the private 24-column backing table and pending-table copy
         with a typed delta store and an explicit resolved-member product.
-        - The development Stage 2 compiler accepted the 18-field scalar delta
+        - The development current-build compiler accepted the 18-field scalar delta
           aggregate; canonical-target and project macro fixtures committed one
           and two generated members respectively through that boundary.
       - [ ] Record delta provenance and observations as typed identities rather
@@ -2198,7 +2202,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       validates and links that LLVM, executes it with exit `7`, inspects the
       shape/behavior/plot artifacts, and checks the typed missing-input error.
     - [x] Expose the persistent graph line as an opt-in compiler command.
-      - `range compile-graph <FILE-OR-DIR>` resolves the current Range-authored Stage 2
+      - `range compile-graph <FILE-OR-DIR>` resolves the current Range-authored build
         producer and runs its `compile-v1` File -> Source -> Shape -> Behavior ->
         Compiled pipeline; ordinary `range compile` remains the accepted
         bootstrap oracle while the cutover is compared. The durable cache
@@ -2270,7 +2274,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - Changing File contents preserves the File identity while changing its
           value fingerprint. Shape and later phases are now capable of update
           semantics instead of treating each changed value as a new graph node.
-        - The development Stage 2 rebuilt all 2,952 function artifacts and
+        - The development current build rebuilt all 2,952 function artifacts and
           passed the complete value-ownership gate in 654 seconds: 651 seconds
           Range LLVM emission, 2 seconds validation, and 1 second linking.
           `scripts/check-range-compiler-v1` then passed stable phase identities,
@@ -2312,7 +2316,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         special case or a second graph.
       - Prove the source Delta inspection, legacy LLVM byte parity, linked
         execution, and missing-input error through `scripts/check-range-compiler-v1`.
-      - The focused V1 gate passed after a development Stage 2 cache miss:
+      - The focused V1 gate passed after a development current-build cache miss:
         LLVM emission took 711 seconds, validation 1 second, and linking 2
         seconds; 12 function artifacts were reused and 2,913 rebuilt. The V1
         LLVM was byte-identical to the legacy path, linked, and ran with exit
@@ -2394,14 +2398,14 @@ owns the actionable checkboxes for the active and deliberately deferred work.
               cold insertion, closed-module reuse without discovery/candidate/
               effects/ABI/emission phases, root and callee tamper rejection,
               malformed-cache repair, and legacy LLVM/runtime parity.
-            - The native Stage 2 cold build emitted LLVM in 656 seconds and
+            - The native current cold build emitted LLVM in 656 seconds and
               completed in 659 seconds (`2,981` artifacts rebuilt). The
               unchanged warm invocation was a cache hit in 3.94 seconds with
               identical LLVM hash `2c2783799b1524d7d9423a2a9caac430eb9a168878d2307ad018cf365174603e`
               and executable hash
               `929a33f21ec6c05595c366300b53854dafc20020dd743f34792bddb66e60b424`.
           - [ ] Run the full candidate/progression ladder before promoting the
-            new cache schema or seed.
+            new cache schema or bootstrap.
           - The first post-edit native smoke probe reached the normal LLVM
             producer at roughly 10.7 GB resident memory after 3:37 and was
             stopped before completion; the completed v8 run stayed within the
@@ -2614,7 +2618,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     deterministic-rejection behavior; it changes representation vocabulary,
     not accepted value semantics.
   - The changed Range-authored compiler emitted in 363 seconds, validated in
-    2 seconds, linked in 2 seconds, and completed its development Stage 2
+    2 seconds, linked in 2 seconds, and completed its development current build
     build in 367 seconds while reusing 2,895 of 2,917 function artifacts.
   - [ ] Re-run the complete value-ownership fixture set after the independent
     construct-attached Codable collection accepts its retained `Array<@stored>`
@@ -2627,18 +2631,18 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] Migrate `CompilerIntTable.values` from `RawBuffer` to `Buffer<Int>` as
     the first compiler-owned table.
   - [x] Prove the migrated table through the full fixed-point gate and promote
-    the independently verified accepted seed.
+    the independently verified accepted bootstrap.
   - [ ] Widen the migration to the compiler's remaining integer and text
     buffers in separately proven slices.
     - [x] Migrate the function-selection bitmap to `Buffer<Int>` and promote
-      its independently verified fixed-point seed.
+      its independently verified fixed-point bootstrap.
     - [x] Migrate function-call edge owner/target storage, including probe,
       typed, and emission edge pairs, to `Buffer<Int>` and promote its
-      independently verified fixed-point seed.
+      independently verified fixed-point bootstrap.
     - [x] Migrate every remaining compiler-owned integer buffer, including
       syntax indexes, failure vectors, Body/ownership scratch state, LLVM
       reachability state, ABI plans, and instance-edge storage, then promote
-      and independently verify the byte-identical fixed-point seed.
+      and independently verify the byte-identical fixed-point bootstrap.
     - [ ] Replace the remaining byte-oriented text builders with a typed
       `Buffer<Int<8, .unsigned>>`-backed `String`.
       - [ ] Move function-local compiler text builders only after mutable
@@ -2670,9 +2674,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           members through that canonical declaration without changing the
           primitive runtime type identity, and prove `"Range".byte(index: 0)`
           dispatches through the authored method.
-        - [x] Promote the baseline into the accepted self-hosted seed and
-          verify candidate Stage 2/Stage 3 byte identity, accepted-seed
-          integrity, and compiler progression fixed point.
+        - [x] Promote the baseline into the accepted self-hosted bootstrap and
+          verify candidate/reproduction byte identity, accepted-bootstrap
+          integrity, and candidate/reproduction fixed point.
         - [x] Replace the pointer-compatible shell with a transparent
           `Buffer<Int<8, .unsigned>>` field while preserving the one-pointer
           String ABI.
@@ -2687,7 +2691,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
             ordinary constructs, or transparent storage projections, and
             protect all three decisions with one focused compiler proof.
           - [x] Promote the generalized representation checkpoint into the
-            accepted seed and independently verify compiler progression.
+            accepted bootstrap and independently verify compiler reproduction.
           - [ ] Forward receiver effects through arbitrary transparent derived
             members so `storage.count` is as ownership-complete as the
             explicit `storage.bytes.count` projection.
@@ -2701,7 +2705,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           direct typed loads for reads and nested mutation.
         - [x] Reject the legacy name-keyed `rangeConstructGet*` lookup path and
           prove nested value ownership and Array mutation use the direct link.
-        - [x] Promote and independently verify a byte-identical Stage 2/Stage 3
+        - [x] Promote and independently verify a byte-identical candidate/reproduction
           fixed point.
         - [x] Make mutation target the final stored cell rather than requiring
           every traversed identity relationship to be `state`.
@@ -2712,8 +2716,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
             `let editor` can update `state name`, and reload identities with
             graph-recorded member writes so later reads observe the update
             without forcing every compiler member read through storage.
-          - [x] Promote the target-cell checkpoint into the accepted seed and
-            verify seed reproduction plus LLVM/executable progression fixed
+          - [x] Promote the target-cell checkpoint into the accepted bootstrap and
+            verify bootstrap reproduction plus LLVM/executable fixed-point
             point.
         - [x] Move identity allocation from the temporary host `malloc`
           baseline into a compiler-owned arena with an explicit bulk lifetime.
@@ -2724,7 +2728,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           - [x] Emit one arena begin at `main` entry and an arena destroy before
             every return, while retaining lazy allocation only as a bridge for
             pre-arena bootstrap seeds.
-          - [x] Promote the arena-aware compiler seed after proving the extra
+          - [x] Promote the arena-aware compiler bootstrap after proving the extra
             bootstrap turn reaches a byte-identical LLVM fixed point.
         - [ ] Benchmark representative shallow, deeply nested, and
           mutation-heavy construct workloads before claiming a universal
@@ -2770,8 +2774,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       `Optional.none(value: Nil.nil)` case.
     - [x] Prove explicit custom absence values, the default `Nil` spelling,
       generic arity rejection, LLVM emission, and the compiler fixed point.
-      - Promoted accepted seed `bootstrap-154b7b1459b9`; its manifest-driven
-        Stage 3 reproduces LLVM hash
+      - Promoted accepted bootstrap `bootstrap-154b7b1459b9`; its manifest-driven
+        reproduction produces LLVM hash
         `154b7b1459b90de1b3d38fb5d8ba28e97810407b0d225ecc77e0e369019dc7a3`.
 
 ## GPU Drawing

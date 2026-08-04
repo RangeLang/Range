@@ -24,10 +24,10 @@ BUILD = BENCH / ".build"
 RESULTS = BENCH / "results"
 SITE_RESULTS = ROOT / "Website" / "public" / "benchmarks.json"
 BOOTSTRAP_MANIFEST = ROOT / "RangeCompiler" / "Bootstrap" / "RangeCompilerBootstrap.json"
-STAGE2_COMPILER = (
+CURRENT_COMPILER = (
     ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "current" / "RangeCompiler"
 )
-STAGE3_COMPILER = (
+REPRODUCED_COMPILER = (
     ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "reproduced" / "RangeCompiler"
 )
 ITERATIONS = int(os.environ.get("N", "1000000"))
@@ -1969,11 +1969,11 @@ def verified_range_compiler() -> Path | None:
         return compiler
 
     if (
-        STAGE2_COMPILER.is_file()
-        and STAGE3_COMPILER.is_file()
-        and filecmp.cmp(STAGE2_COMPILER, STAGE3_COMPILER, shallow=False)
+        CURRENT_COMPILER.is_file()
+        and REPRODUCED_COMPILER.is_file()
+        and filecmp.cmp(CURRENT_COMPILER, REPRODUCED_COMPILER, shallow=False)
     ):
-        return STAGE3_COMPILER
+        return REPRODUCED_COMPILER
     return None
 
 
@@ -2141,7 +2141,7 @@ def build_case(
             [str(native_compiler), "emit-llvm", str(range_source), str(range_llvm)],
         )
     else:
-        print(f"{case.name} Range: no byte-identical current build/3 compiler; using pinned bootstrap")
+        print(f"{case.name} Range: no byte-identical candidate/reproduction compiler; using accepted bootstrap")
         emitted = timed_setup(
             f"{case.name} Range emit",
             [str(range_cli), "emit-llvm", str(range_source), str(range_llvm)],

@@ -319,7 +319,7 @@ ensure_bootstrap_compiler() {
     local -a runtimes
     bootstrap_hash="$(manifest_value bootstrap.sha256)"
     manifest_hash="$(sha256 "$MANIFEST")"
-    cache_root="$REPO_ROOT/.range/NativeSeed/$bootstrap_hash-$manifest_hash-${COMPILER_OPTIMIZATION#-}-${COMPILER_LTO#-}"
+    cache_root="$REPO_ROOT/.range/NativeBootstrap/$bootstrap_hash-$manifest_hash-${COMPILER_OPTIMIZATION#-}-${COMPILER_LTO#-}"
     executable="$cache_root/RangeCompiler"
     bootstrap="$REPO_ROOT/$(manifest_value bootstrap.path)"
     if [[ ! -x "$executable" ]]; then

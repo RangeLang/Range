@@ -8,18 +8,21 @@ Milestones are ordered by dependency and leverage, not by how visible or
 interesting they are. A later milestone may be explored early, but it is not
 complete until every earlier dependency it relies on is complete.
 
-## Current Snapshot — July 25, 2026
+## Current Snapshot — August 4, 2026
 
 Range has a real self-hosted compiler kernel, not merely a language sketch:
 
 - The Range-authored compiler contains approximately 34,500 lines across its
   Driver, Syntax, Body, Graph, and LLVM phases.
-- The current Stage 2 compiler smoke gate emits, validates, and links a native
-  compiler. The build-plan gate, focused String proof, and complete value-ownership
-  positive/rejection controls pass.
-- The accepted-seed manifest is not currently reproducible:
-  `check-seed-integrity` stops at a stale hash for
-  `CompilerBodyMIR.range`. This is the first active baseline blocker.
+- The current compiler candidate gate emits, validates, and links a native
+  compiler. The build-plan gate, focused String proof, and complete
+  value-ownership positive/rejection controls pass.
+- Accepted bootstrap `bootstrap-766c37373e04` matches its complete compiler
+  and runtime source manifest and independently reproduces byte-identical LLVM.
+- Compiler promotion has one fixed-point comparison: the accepted compiler
+  builds a candidate, the candidate builds one reproduction from the same
+  source, and matching LLVM/executables allow the candidate to replace the
+  accepted compiler. A third build is not required after equality.
 - `CompilerIntTable` is already backed by `Buffer<Int>`, but phase code still
   performs approximately 3,787 numeric row/column reads and 285 raw appends.
   The problem is no longer the underlying allocation; it is the untyped schema
@@ -42,12 +45,16 @@ Range has a real self-hosted compiler kernel, not merely a language sketch:
 This is the highest priority because every structural migration needs a trusted
 before-and-after compiler.
 
+Status: complete. Keep it complete by preserving the accepted compiler ->
+candidate -> reproduction invariant at every promoted checkpoint.
+
 Outcome:
 
-- The seed manifest matches every accepted compiler and runtime input.
+- The bootstrap manifest matches every accepted compiler and runtime input.
 - The complete supported validation ladder passes from build-plan through
-  compiler progression.
-- Stage 2 and Stage 3 reproduce byte-identical LLVM and linked executables.
+  accepted-bootstrap verification.
+- Candidate and reproduction builds produce byte-identical LLVM and linked
+  executables.
 - The accepted candidate, its source inventory, its runtime inventory, and its
   hashes are recorded together.
 - `TODO.md` contains no stale statements about gates that now pass.
@@ -203,7 +210,7 @@ Exit proof:
 ## Milestone 6 — Complete the Usable Language and Compiler Driver
 
 This is the point at which a random developer can download Range, point it at a
-project, and receive a native program without knowing about seed stages.
+project, and receive a native program without knowing about bootstrap mechanics.
 
 Outcome:
 
@@ -237,7 +244,7 @@ Outcome:
   compiler source discovery.
 - Build artifacts, the Website, benchmarks, and editor support have explicit
   package boundaries.
-- Every manifest, fixture, script, and seed path is migrated in one
+- Every manifest, fixture, script, and bootstrap path is migrated in one
   fixed-point-verified checkpoint.
 
 Doing this earlier would create broad path churn while compiler/runtime
@@ -275,7 +282,9 @@ Outcome:
 
 The practical sequence from today is:
 
-1. Repair seed integrity and re-establish the accepted fixed point.
+1. Preserve the accepted compiler -> candidate -> reproduction invariant and
+   promote only byte-identical candidate/reproduction pairs after explicit
+   approval.
 2. Delete the obsolete string-record parser/summary/lowering path after
    proving that no supported command or fixture consumes it.
 3. Implement automatic destruction so normal String code does not call

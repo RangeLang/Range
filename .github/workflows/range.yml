@@ -16,10 +16,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Validate native scripts
-        run: bash -n scripts/range scripts/range-native scripts/check-range-compiler-candidate scripts/verify-range-compiler-seed
+        run: bash -n scripts/range scripts/range-native scripts/check-range-compiler-candidate scripts/verify-range-compiler
 
-      - name: Verify accepted seed
-        run: scripts/range check-stage2-compiler
+      - name: Verify accepted bootstrap
+        run: scripts/range check-compiler
 
-      - name: Verify self-hosted fixed point
-        run: scripts/range compiler progression
+      - name: Verify candidate reproduction
+        run: scripts/range check-compiler-candidate

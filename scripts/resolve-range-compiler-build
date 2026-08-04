@@ -138,7 +138,7 @@ range_build_write_cache_key_material() {
     /usr/bin/printf 'llvmValidateArgv=-Wno-override-module|-x|ir|-c|current-llvm|-o|object\n' >> "$output"
     /usr/bin/printf 'currentLinkArgv=%s|%s|-Wno-override-module|current-llvm|runtime-set|-o|output\n' \
         "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" >> "$output"
-    /usr/bin/printf 'bootstrapPath=%s\nseedHash=%s\nseedBytes=%s\n' \
+    /usr/bin/printf 'bootstrapPath=%s\nbootstrapHash=%s\nbootstrapBytes=%s\n' \
         "$bootstrap_relative" "$(sha256 "$bootstrap")" "$(bytes "$bootstrap")" >> "$output"
     for index in "${!RUNTIME_INPUTS[@]}"; do
         /usr/bin/printf 'runtime=%s\tpath=%s\tsha256=%s\tbytes=%s\n' \
@@ -165,7 +165,7 @@ range_build_write_legacy_cache_key_material() {
     /usr/bin/printf 'compilerOptimization=%s\n' "$COMPILER_OPTIMIZATION" >> "$output"
     /usr/bin/printf 'compilerLTO=%s\n' "$COMPILER_LTO" >> "$output"
     /usr/bin/printf 'clang=%s\n' "$(clang --version | /usr/bin/head -1)" >> "$output"
-    /usr/bin/printf 'bootstrapPath=%s\nseedHash=%s\nseedBytes=%s\n' \
+    /usr/bin/printf 'bootstrapPath=%s\nbootstrapHash=%s\nbootstrapBytes=%s\n' \
         "$bootstrap_relative" "$(sha256 "$bootstrap")" "$(bytes "$bootstrap")" >> "$output"
     for index in "${!RUNTIME_INPUTS[@]}"; do
         /usr/bin/printf 'runtime=%s\tpath=%s\tsha256=%s\tbytes=%s\n' \

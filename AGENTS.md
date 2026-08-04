@@ -13,6 +13,32 @@
   documentation; `TODO.md` should describe current or deliberately deferred
   work.
 
+## Compiler Self-Hosting
+
+- Keep exactly one accepted compiler authority: the committed bootstrap LLVM,
+  executable, and manifest under `RangeCompiler/Bootstrap/`.
+- Use one two-build proof for a compiler-source checkpoint:
+
+  ```text
+  accepted compiler + source -> candidate
+  candidate + same source -> reproduction
+  ```
+
+- Compare both candidate/reproduction LLVM and linked executables byte for
+  byte. If both pairs match, another build from the same deterministic inputs
+  is redundant. The candidate may replace the accepted compiler.
+- If either pair differs, do not promote either output. An additional
+  generation may diagnose convergence, but it is not part of the promotion
+  proof and does not turn a failed comparison into an accepted checkpoint.
+- Do not retain older compilers as active authorities. Promotion replaces the
+  accepted artifacts; Git history preserves prior checkpoints.
+- Do not promote after every compiler edit. Develop against the accepted
+  compiler, run focused gates, and roll the bootstrap only at a deliberate
+  stable checkpoint with explicit maintainer approval.
+- The canonical proof is `scripts/range check-compiler-candidate`. After an
+  approved promotion, run `scripts/range check-compiler` to independently
+  reproduce and verify the newly accepted compiler.
+
 ## Testing Structure
 
 - `Testing/` is the repository's single active test-fixture root.
@@ -35,8 +61,11 @@
     and rejection set)
   - `scripts/range check-compiler-smoke`
   - `scripts/range check-compiler-candidate`
-  - `scripts/range check-stage2-compiler`
-  - `scripts/range compiler progression`
+  - `scripts/range check-compiler`
+- `scripts/range compiler next` and `scripts/range compiler progression` are
+  maintainer diagnostics for inspecting candidate production and cached
+  convergence. They are not additional required generations after the
+  candidate/reproduction comparison passes.
 - A passing gate proves only that gate and its prerequisites. Do not report it
   as proof that later gates ran or passed.
 

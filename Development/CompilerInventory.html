@@ -126,23 +126,23 @@
       {
         id: 'bootstrap',
         label: 'bootstrap line',
-        description: 'implementation → first artifact',
+        description: 'historical implementation → first accepted compiler',
         y: 100,
         nodes: [
-          { id: 'stage0', x: 200, kind: 'point', eyebrow: 'Stage 0 · source', title: 'Swift bootstrap', meta: 'historical implementation' },
-          { id: 'artifact1', x: 540, kind: 'artifact', status: 'stale', eyebrow: 'Stage 1 · artifact', title: 'RangeCompilerBootstrap.ll + range', meta: '8.54 MB · manifest stale' }
+          { id: 'historicalBootstrap', x: 200, kind: 'point', eyebrow: 'historical source', title: 'Swift bootstrap', meta: 'historical implementation' },
+          { id: 'artifact1', x: 540, kind: 'artifact', eyebrow: 'accepted compiler · artifact', title: 'RangeCompilerBootstrap.ll + range', meta: '8.68 MB · verified' }
         ]
       },
       {
         id: 'self-hosting',
         label: 'self-hosting line',
-        description: 'artifact → compiler generation',
+        description: 'accepted compiler → candidate → reproduction',
         y: 320,
         nodes: [
-          { id: 'stage1', x: 540, kind: 'point', status: 'stale', eyebrow: 'Stage 1 · execution', title: 'Bootstrap artifact runs', meta: 'accepted bootstrap boundary' },
-          { id: 'artifact2', x: 900, kind: 'artifact', eyebrow: 'current build · artifact', title: 'RangeCompiler', meta: '5.34 MB · cold 659s · warm 3.94s' },
-          { id: 'current', x: 1110, kind: 'point', eyebrow: 'current build · execution', title: 'Range-authored compiler', meta: 'native smoke passed' },
-          { id: 'artifact3', x: 1450, kind: 'artifact', status: 'pending', eyebrow: 'reproduced build · artifact', title: 'Candidate fixed point', meta: 'identity proof not run' }
+          { id: 'acceptedBootstrap', x: 540, kind: 'point', eyebrow: 'accepted compiler · execution', title: 'Accepted compiler runs', meta: 'bootstrap boundary' },
+          { id: 'artifact2', x: 900, kind: 'artifact', eyebrow: 'candidate · artifact', title: 'Compiler candidate', meta: '3.52 MB executable · 8.68 MB LLVM' },
+          { id: 'candidate', x: 1110, kind: 'point', eyebrow: 'candidate · execution', title: 'Range-authored candidate', meta: 'native proofs passed' },
+          { id: 'artifact3', x: 1450, kind: 'artifact', eyebrow: 'reproduction · artifact', title: 'Reproduced compiler', meta: 'byte-identical proof passed' }
         ]
       },
       {
@@ -172,10 +172,10 @@
     ];
 
     const axisEdges = [
-      ['bootstrap', 'stage0', 'artifact1', 'axis-line'],
-      ['self-hosting', 'stage1', 'artifact2', 'axis-line'],
-      ['self-hosting', 'artifact2', 'current', 'axis-line'],
-      ['self-hosting', 'current', 'artifact3', 'pending-line'],
+      ['bootstrap', 'historicalBootstrap', 'artifact1', 'axis-line'],
+      ['self-hosting', 'acceptedBootstrap', 'artifact2', 'axis-line'],
+      ['self-hosting', 'artifact2', 'candidate', 'axis-line'],
+      ['self-hosting', 'candidate', 'artifact3', 'axis-line'],
       ['persistent-graph', 'file', 'shape', 'axis-line'],
       ['persistent-graph', 'shape', 'behavior', 'axis-line'],
       ['persistent-graph', 'behavior', 'compiled', 'axis-line'],
@@ -184,19 +184,19 @@
     ];
 
     const branches = [
-      ['bootstrap', 'artifact1', 'self-hosting', 'stage1', 'branch-line'],
+      ['bootstrap', 'artifact1', 'self-hosting', 'acceptedBootstrap', 'branch-line'],
       ['self-hosting', 'artifact2', 'persistent-graph', 'file', 'branch-line'],
-      ['self-hosting', 'current', 'program-output', 'program', 'branch-line'],
+      ['self-hosting', 'candidate', 'program-output', 'program', 'branch-line'],
       ['persistent-graph', 'behavior', 'persistent-graph', 'cache', 'cache-line']
     ];
 
     const details = {
-      stage0: ['Stage 0 · Swift bootstrap', 'historical source', 'Stage 0 is the historical Swift-written bootstrap compiler. Its source is not an active file in this checkout; it is shown as the producer of the first artifact.'],
-      artifact1: ['Stage 1 · accepted bootstrap artifact', 'stale boundary', 'The accepted pair is RangeCompiler/Bootstrap/RangeCompilerBootstrap.ll and RangeCompiler/Bootstrap/range. Bootstrap integrity currently rejects the changed Process.range input.'],
-      stage1: ['Stage 1 · bootstrap artifact runs', 'stale boundary', 'The accepted bootstrap executable is the producer used to build the current current build compiler. It is an artifact becoming an execution line, not a second handwritten compiler.'],
-      artifact2: ['current build · RangeCompiler artifact', 'observed', 'The current development executable is 5,339,984 bytes and its emitted LLVM is 8,663,224 bytes. This artifact creates the persistent graph line below.'],
-      current: ['current build · Range-authored compiler', 'observed', 'The current Range compiler emitted and linked natively. The latest cold development build spent 656 seconds in LLVM emission and finished in 659 seconds; an unchanged warm invocation reused the artifact in 3.94 seconds.'],
-      artifact3: ['reproduced build · candidate artifact', 'pending', 'The current build compiler should produce this artifact by recompiling the same source bundle. The full candidate/progression proof has not run in this snapshot.'],
+      historicalBootstrap: ['Swift bootstrap', 'historical source', 'The historical Swift-written bootstrap produced the first Range-authored compiler artifact. Its source is not an active compiler authority in this checkout.'],
+      artifact1: ['Accepted compiler artifact', 'verified boundary', 'RangeCompiler/Bootstrap/RangeCompilerBootstrap.ll and RangeCompiler/Bootstrap/range are the single accepted authority. Their manifest and independent reproduction proof pass.'],
+      acceptedBootstrap: ['Accepted compiler runs', 'verified boundary', 'The accepted compiler builds a candidate from the current canonical source bundle. It remains authoritative until the candidate reproduces itself byte-identically.'],
+      artifact2: ['Compiler candidate artifact', 'observed', 'The accepted compiler emitted this candidate from the current source. It is not promoted merely because the accepted compiler produced it.'],
+      candidate: ['Range-authored candidate', 'observed', 'The candidate recompiles the exact same source once. Candidate and reproduction LLVM and executables must match byte for byte.'],
+      artifact3: ['Reproduced compiler artifact', 'verified', 'The reproduction is byte-identical to the candidate. That equality authorizes replacing the accepted compiler; another build from the same deterministic inputs is redundant.'],
       file: ['Persistent graph · File', 'observed', 'The graph line begins with path, source bytes, and identity.'],
       shape: ['Persistent graph · Shape', 'observed', 'Shape is the typed syntax snapshot produced from the File delta.'],
       behavior: ['Persistent graph · Behavior', 'observed', 'Behavior is the semantic/native boundary where exact cache identity can be checked.'],
