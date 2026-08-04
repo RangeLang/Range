@@ -19,7 +19,6 @@ construct StarField {
   description="One declaration in the environment can be both sides of the split."
   category="Language design"
   date="August 4, 2026"
-  {heroShader}
 >
   <section>
     <h2>Two words for one act</h2>

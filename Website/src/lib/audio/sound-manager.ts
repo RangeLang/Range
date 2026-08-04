@@ -55,6 +55,7 @@ export function createRangeSoundManager(): RangeSoundManager {
   let environmentCompressor: DynamicsCompressorNode | undefined;
   let environmentWet: GainNode | undefined;
   let environmentNoiseSource: AudioBufferSourceNode | undefined;
+  let environmentNoiseStarted = false;
   let environmentNoiseFilter: BiquadFilterNode | undefined;
   let environmentNoiseGain: GainNode | undefined;
   let masterLimiter: DynamicsCompressorNode | undefined;
@@ -166,7 +167,6 @@ export function createRangeSoundManager(): RangeSoundManager {
     masterLimiter.connect(masterOutput).connect(
       audioContext.destination,
     );
-    environmentNoiseSource.start();
     applyEnvironmentSpace(layerPresence.get("environment") ?? 0, true);
     return audioContext;
   }
@@ -174,7 +174,19 @@ export function createRangeSoundManager(): RangeSoundManager {
   async function resume() {
     const context = createGraph();
     if (!context) return undefined;
-    if (context.state === "suspended") await context.resume();
+    if (context.state === "suspended") {
+      const activation = navigator.userActivation;
+      if (activation && !activation.isActive) return undefined;
+      await context.resume();
+    }
+    if (
+      context.state === "running"
+      && environmentNoiseSource
+      && !environmentNoiseStarted
+    ) {
+      environmentNoiseSource.start();
+      environmentNoiseStarted = true;
+    }
     // WebKit may briefly report `interrupted` after a successful user-gesture
     // resume. The context is still valid and becomes running as the page gains
     // audio focus, so only reject a context that has actually been closed.
@@ -291,6 +303,7 @@ export function createRangeSoundManager(): RangeSoundManager {
     environmentCompressor = undefined;
     environmentWet = undefined;
     environmentNoiseSource = undefined;
+    environmentNoiseStarted = false;
     environmentNoiseFilter = undefined;
     environmentNoiseGain = undefined;
     masterLimiter = undefined;

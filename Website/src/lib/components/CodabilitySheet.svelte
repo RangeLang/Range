@@ -208,7 +208,7 @@
     /environment\.expand(?=\s*\{)/g,
     "#environment",
   );
-  const extensionMarker = "extension #environment.target.Declaration.identifier {";
+  const extensionMarker = "extension #environment.target.Declaration.identity {";
   const expansionSection = sourceBlock(declarationSource, "#environment");
   const macroDeclarationSection = "macro codable(): Construct { environment in";
   const macroSection = sourceBlock(declarationSource, macroDeclarationSection);
@@ -226,7 +226,7 @@
     "function encode<Format>(to encoder: Encoder<Format>): Result<Void, EncodingError> {",
   );
   const encodeMapSection = `#fields.map { property in
-                    switch container.encode(self.#property.identifier, forKey: #property.identifier.name) {
+                    switch container.encode(#property.identity, forKey: #property.identity.name) {
                     case .success:
                         break
                     case .failure(error):
@@ -291,9 +291,9 @@
       title: "Code splicing",
       phase: "inside expansion",
       result: "an extension of the target construct",
-      accent: "#environment.target.Declaration.identifier",
+      accent: "#environment.target.Declaration.identity",
       accentDescription:
-        "`Declaration.identifier` is the target construct’s canonical declared name. The # prefix splices that compile-time identifier into the generated extension.",
+        "`Declaration.identity` is the target construct’s canonical declared identity. The # prefix splices that compile-time identity into the generated extension.",
       kind: "section",
       step: 4,
       scopeToken: extensionSection,
@@ -313,7 +313,7 @@
       token: encodeMapSection,
       title: "Synthesizing each field",
       description:
-        "For every stored property, the macro splices `self.#property.identifier` as the value and its declared identifier name as the coding key.",
+        "For every stored property, the macro splices `#property.identity` as the value and uses its declared identity name as the coding key.",
       kind: "section",
       step: 6,
       scopeToken: encodeMapSection,
@@ -329,12 +329,12 @@
     },
     {
       id: "value-mention",
-      token: "#property.identifier",
-      title: "Identifier mention",
+      token: "#property.identity",
+      title: "Identity mention",
       phase: "inside expansion",
       result: "a generated field reference",
       description:
-        "Mentions the compile-time Identifier value directly in generated syntax, preserving its canonical declaration identity.",
+        "Mentions the compile-time Identity value directly in generated syntax, preserving its canonical declaration identity.",
     },
     {
       id: "type-mention",
