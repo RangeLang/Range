@@ -35,6 +35,8 @@ RANGE_GRAPH_CACHE_DIR="$WORK_ROOT/graph-cache" \
     || fail "graph project compile did not persist a cold File -> Source generation"
 [[ -z "$(/usr/bin/find "$WORK_ROOT/graph-cache" -type f -name source.tsv -print -quit)" ]] \
     || fail "graph project compile persisted the superseded source.tsv authority"
+[[ -z "$(/usr/bin/find "$WORK_ROOT/graph-cache" -type f -name execution.tsv -print -quit)" ]] \
+    || fail "graph project compile persisted transient execution state"
 RANGE_GRAPH_CACHE_DIR="$WORK_ROOT/graph-cache" \
     "$REPO_ROOT/scripts/range" compile-graph "$FIXTURE" \
     > "$WORK_ROOT/graph-warm.ll" 2> "$WORK_ROOT/graph-warm.out"
@@ -42,6 +44,8 @@ RANGE_GRAPH_CACHE_DIR="$WORK_ROOT/graph-cache" \
     || fail "warm graph project compile changed its compiled artifact"
 /usr/bin/grep -Fqx $'compilerV1Execution\tstatus=reused\tchanged=0' "$WORK_ROOT/graph-warm.out" \
     || fail "warm graph project compile did not reuse File -> Source"
+[[ -z "$(/usr/bin/find "$WORK_ROOT/graph-cache" -type f -name execution.tsv -print -quit)" ]] \
+    || fail "warm graph project compile recreated execution.tsv"
 
 /bin/mkdir -p "$WORK_ROOT/failed-project"
 /bin/cp "$FIXTURE" "$WORK_ROOT/failed-project/ReturnInteger.range"
@@ -66,6 +70,8 @@ RANGE_GRAPH_CACHE_DIR="$WORK_ROOT/failure-cache" \
     || fail "failed graph candidate damaged the last-known-good artifact"
 /usr/bin/grep -Fqx $'compilerV1Execution\tstatus=reused\tchanged=0' "$WORK_ROOT/failure-recovered.out" \
     || fail "failed graph candidate did not restore the accepted File -> Source"
+[[ -z "$(/usr/bin/find "$WORK_ROOT/failure-cache" -type f -name execution.tsv -print -quit)" ]] \
+    || fail "failed graph lifecycle persisted transient execution state"
 
 "$compiler" compile-v1 "$FIXTURE" > "$WORK_ROOT/direct-graph.ll"
 

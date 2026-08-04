@@ -173,25 +173,27 @@ oracle yet.
 
 The bounded revision cutover is implemented without rewriting Body/CFG/MIR:
 
-1. `revision.tsv` schema v2 owns parent identity, Source profile, canonical
-   input, compiler identity, bundle digest, node changes, edge changes, view
-   digests, and accepted status.
-2. Graph revisions persist the node index and typed edge-delta stream beside
-   the transitional V1 execution record. Shape uses a source-only revision with
-   the same provenance header and Source digest.
+1. Graph `revision.tsv` schema v3 owns parent identity, File fingerprint,
+   Source profile, canonical input, compiler identity, bundle digest, accepted
+   phase values, node changes, edge changes, view digests, and accepted status.
+   Shape retains the source-only v2 subset.
+2. Graph revisions persist the node index and typed edge-delta stream. The V1
+   execution record is materialized transiently from the revision only while
+   invoking the compatibility `resume-v1` command; it is not cached.
 3. `source.tsv` is removed as a parallel authority. Reuse validates the actual
    Source bundle against the digest and provenance in `revision.tsv`.
 4. Focused cold, warm, unchanged, edited, failed-candidate, and recovery proofs
    cover revision and bundle preservation, phase costs, and affected-view
    counts.
 
+Execution is now a transient candidate operation: success commits staged LLVM
+and revision artifacts, while failure emits diagnostics without replacing the
+accepted graph. A legacy execution record is consumed once when migrating a v2
+cache and is removed after success.
+
 ## Next implementation slice
 
-Fold the accepted phase values and status still retained by `execution.tsv`
-into `revision.tsv`. Execution then becomes a transient candidate operation:
-success atomically commits a revision, while failure emits diagnostics without
-replacing the accepted revision. After that, move Shape to a pure projection
-over persisted typed syntax facts.
+Move Shape to a pure projection over persisted typed syntax facts.
 
 The first success criterion is not byte identity. It is deterministic revision
 identity, correct before/after values, bounded invalidation, and preservation of

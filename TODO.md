@@ -2130,10 +2130,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - Commit each compiler view atomically; preserve the last accepted revision
     on a failed candidate and measure load, delta-apply, query, and
     invalidation-frontier costs before promoting a new authority.
-  - [x] Persist a transitional Range-shaped revision artifact beside the V1
-    execution record.
-    - `range compile-graph` now writes revision schema v2 next to `execution.tsv`:
-      deterministic revision identity over parent + Source provenance + node values + status,
+  - [x] Persist a Range-shaped revision artifact as the accepted graph authority.
+    - `range compile-graph` now writes revision schema v3: deterministic
+      revision identity over parent + File fingerprint + Source provenance + node values + status,
       a 4-node index (source/shape/behavior/compile with before/after/changed
       value fingerprints), the 3 cardinality-one pipeline edges
       (add/replace operations), and 4 view digests.
@@ -2144,8 +2143,12 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       node.before equals the prior accepted node.after), bounded literal-edit
       invalidation with measured affected-view counts, failed-candidate
       last-known-good preservation, and recovery.
+    - The accepted File and phase fingerprints live in `revision.tsv`.
+      `execution.tsv` is synthesized only as a temporary `resume-v1` command
+      input and is never persisted in a graph cache. Existing v2 caches consume
+      and remove their legacy execution record after one successful migration.
     - The V1 File identity derives from the source bundle path, so the
-      transition record is deterministic per location; content-addressed node
+      revision is deterministic per location; content-addressed node
       identity is the next Range-owned cutover.
   - [x] Shape consumes the persisted Source artifact and reports per-stage
     load, delta-apply, query, and materialization costs.
@@ -2228,9 +2231,10 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - [x] Give the graph source-set a stable File identity and persistent
         File -> Source artifact.
         - `scripts/compile-range-project --graph` stores the canonical source-set
-          bundle, `resume-v1` execution record, and compiled artifact under an
-          ignored Source cache keyed by the project path. The bundle also carries
-          the graph compiler hash, so a producer change invalidates the value.
+          bundle, accepted revision, and compiled artifact under an ignored
+          Source cache keyed by the project path. It derives transient
+          `resume-v1` input from the revision. The bundle also carries the graph
+          compiler hash, so a producer change invalidates the value.
         - Cold, warm, edited, failed-candidate, and recovery paths are covered
           by `scripts/range check-compiler-graph`; a failed candidate restores
           the previous accepted bundle before returning its typed error.

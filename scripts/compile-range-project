@@ -31,6 +31,53 @@ revision_field() {
     ' "$source"
 }
 
+revision_node_value() {
+    local source="$1"
+    local id="$2"
+    local key="$3"
+    /usr/bin/awk -F '\t' -v id="$id" -v key="$key" '
+        $1 == "rangeRevisionNode" && $2 == "id=" id {
+            for (field = 3; field <= NF; field += 1) {
+                if (index($field, key "=") == 1) {
+                    value = $field
+                    sub(/^[^=]*=/, "", value)
+                    print value
+                    exit
+                }
+            }
+        }
+    ' "$source"
+}
+
+fingerprint_first() {
+    /usr/bin/printf '%s' "${1%%:*}"
+}
+
+fingerprint_second() {
+    /usr/bin/printf '%s' "${1#*:}"
+}
+
+write_transient_execution_from_revision() {
+    local revision="$1"
+    local output="$2"
+    local file source shape behavior compiled
+
+    file="$(revision_field "$revision" file)"
+    source="$(revision_node_value "$revision" source after)"
+    shape="$(revision_node_value "$revision" shape after)"
+    behavior="$(revision_node_value "$revision" behavior after)"
+    compiled="$(revision_node_value "$revision" compile after)"
+    for value in "$file" "$source" "$shape" "$behavior" "$compiled"; do
+        [[ "$value" =~ ^[0-9]+:[0-9]+$ ]] || return 1
+    done
+    /usr/bin/printf 'compilerV1Execution\tversion=1\tfileFirst=%s\tfileSecond=%s\tsourceFirst=%s\tsourceSecond=%s\tshapeFirst=%s\tshapeSecond=%s\tbehaviorFirst=%s\tbehaviorSecond=%s\tcompiledFirst=%s\tcompiledSecond=%s\n' \
+        "$(fingerprint_first "$file")" "$(fingerprint_second "$file")" \
+        "$(fingerprint_first "$source")" "$(fingerprint_second "$source")" \
+        "$(fingerprint_first "$shape")" "$(fingerprint_second "$shape")" \
+        "$(fingerprint_first "$behavior")" "$(fingerprint_second "$behavior")" \
+        "$(fingerprint_first "$compiled")" "$(fingerprint_second "$compiled")" > "$output"
+}
+
 node_changed() {
     local before="$1" after="$2"
     if [[ "$before" == "$after" ]]; then
@@ -63,37 +110,56 @@ stage_flag() {
 # the last accepted revision is preserved.
 write_graph_revision() {
     local output="$1"
-    local status_source="$2"
-    local source_bundle="$3"
-    local compiled_output="$4"
-    local source_profile="$5"
-    local source_input="$6"
-    local source_compiler="$7"
+    local previous="$2"
+    local status_source="$3"
+    local execution_state="$4"
+    local source_bundle="$5"
+    local compiled_output="$6"
+    local source_profile="$7"
+    local source_input="$8"
+    local source_compiler="$9"
     local status changed
     local source_before source_after shape_before shape_after
     local behavior_before behavior_after compiled_before compiled_after
     local parent source_hash compiled_hash identity_input identity operation
+    local file_first file_second file_value
 
     status="$(revision_field "$status_source" status)"
     changed="$(revision_field "$status_source" changed)"
-    source_before="$(revision_field "$status_source" sourceBefore)"
-    source_after="$(revision_field "$status_source" sourceAfter)"
-    shape_before="$(revision_field "$status_source" shapeBefore)"
-    shape_after="$(revision_field "$status_source" shapeAfter)"
-    behavior_before="$(revision_field "$status_source" behaviorBefore)"
-    behavior_after="$(revision_field "$status_source" behaviorAfter)"
-    compiled_before="$(revision_field "$status_source" compiledBefore)"
-    compiled_after="$(revision_field "$status_source" compiledAfter)"
+    if [[ "$status" == "reused" && -f "$previous" ]]; then
+        source_before="$(revision_node_value "$previous" source after)"
+        source_after="$source_before"
+        shape_before="$(revision_node_value "$previous" shape after)"
+        shape_after="$shape_before"
+        behavior_before="$(revision_node_value "$previous" behavior after)"
+        behavior_after="$behavior_before"
+        compiled_before="$(revision_node_value "$previous" compile after)"
+        compiled_after="$compiled_before"
+    else
+        source_before="$(revision_field "$status_source" sourceBefore)"
+        source_after="$(revision_field "$status_source" sourceAfter)"
+        shape_before="$(revision_field "$status_source" shapeBefore)"
+        shape_after="$(revision_field "$status_source" shapeAfter)"
+        behavior_before="$(revision_field "$status_source" behaviorBefore)"
+        behavior_after="$(revision_field "$status_source" behaviorAfter)"
+        compiled_before="$(revision_field "$status_source" compiledBefore)"
+        compiled_after="$(revision_field "$status_source" compiledAfter)"
+    fi
+    file_first="$(revision_field "$execution_state" fileFirst)"
+    file_second="$(revision_field "$execution_state" fileSecond)"
+    [[ "$file_first" =~ ^[0-9]+$ && "$file_second" =~ ^[0-9]+$ ]] \
+        || compile_project_fail "transient execution omitted its File fingerprint"
+    file_value="$file_first:$file_second"
 
     parent="absent"
-    if [[ -f "$output" ]]; then
-        parent="$(/usr/bin/sed -n 's/^rangeRevision\tversion=[0-9][0-9]*\tidentity=\([0-9a-f][0-9a-f]*\)\t.*/\1/p' "$output" | /usr/bin/head -1)"
+    if [[ -f "$previous" ]]; then
+        parent="$(/usr/bin/sed -n 's/^rangeRevision\tversion=[0-9][0-9]*\tidentity=\([0-9a-f][0-9a-f]*\)\t.*/\1/p' "$previous" | /usr/bin/head -1)"
         [[ -n "$parent" ]] || parent="absent"
     fi
     source_hash="$(/usr/bin/shasum -a 256 "$source_bundle" | /usr/bin/awk '{print $1}')"
     compiled_hash="$(/usr/bin/shasum -a 256 "$compiled_output" | /usr/bin/awk '{print $1}')"
-    identity_input="$(/usr/bin/printf 'revision=2\nparent=%s\nsource=%s\nsourceProfile=%s\ninput=%s\ncompiler=%s\nshape=%s\nbehavior=%s\ncompiled=%s\nstatus=accepted\n' \
-        "$parent" "$source_hash" "$source_profile" "$source_input" "$source_compiler" \
+    identity_input="$(/usr/bin/printf 'revision=3\nparent=%s\nfile=%s\nsource=%s\nsourceProfile=%s\ninput=%s\ncompiler=%s\nshape=%s\nbehavior=%s\ncompiled=%s\nstatus=accepted\n' \
+        "$parent" "$file_value" "$source_hash" "$source_profile" "$source_input" "$source_compiler" \
         "$shape_after" "$behavior_after" "$compiled_after")"
     identity="$(/usr/bin/printf '%s' "$identity_input" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
     if [[ "$status" == "cold" ]]; then
@@ -103,8 +169,8 @@ write_graph_revision() {
     fi
 
     {
-        /usr/bin/printf 'rangeRevision\tversion=2\tidentity=%s\tparent=%s\tsource=%s\tsourceProfile=%s\tinput=%s\tcompiler=%s\tstatus=accepted\n' \
-            "$identity" "$parent" "$source_hash" "$source_profile" "$source_input" "$source_compiler"
+        /usr/bin/printf 'rangeRevision\tversion=3\tidentity=%s\tparent=%s\tfile=%s\tsource=%s\tsourceProfile=%s\tinput=%s\tcompiler=%s\tstatus=accepted\n' \
+            "$identity" "$parent" "$file_value" "$source_hash" "$source_profile" "$source_input" "$source_compiler"
         /usr/bin/printf 'rangeRevisionNode\tid=source\tbefore=%s\tafter=%s\tchanged=%s\n' \
             "$source_before" "$source_after" "$(node_changed "$source_before" "$source_after")"
         /usr/bin/printf 'rangeRevisionNode\tid=shape\tbefore=%s\tafter=%s\tchanged=%s\n' \
@@ -133,7 +199,7 @@ source_revision_matches() {
     local expected_source="$6"
 
     [[ -f "$revision" && -f "$bundle" ]] || return 1
-    [[ "$(revision_field "$revision" version)" == "2" ]] || return 1
+    [[ "$(revision_field "$revision" version)" =~ ^(2|3)$ ]] || return 1
     [[ "$(revision_field "$revision" sourceProfile)" == "$profile" ]] || return 1
     [[ "$(revision_field "$revision" input)" == "$input" ]] || return 1
     [[ "$(revision_field "$revision" compiler)" == "$compiler" ]] || return 1
@@ -401,10 +467,13 @@ elif [[ "$graph_mode" -eq 1 ]]; then
     graph_cache_directory="$source_cache_directory"
     /bin/mkdir -p "$graph_cache_directory"
     graph_bundle="$graph_cache_directory/ProjectSourceSet.range"
-    graph_execution="$graph_cache_directory/execution.tsv"
+    graph_legacy_execution="$graph_cache_directory/execution.tsv"
     graph_output="$graph_cache_directory/compiled.ll"
     graph_revision="$graph_cache_directory/revision.tsv"
     graph_bundle_backup="$WORK_ROOT/ProjectSourceSet.previous.range"
+    graph_transient_execution="$WORK_ROOT/execution.tsv"
+    graph_output_candidate="$WORK_ROOT/compiled.candidate.ll"
+    graph_revision_candidate="$WORK_ROOT/revision.candidate.tsv"
 
     # Source stage: the candidate File -> Source bundle is consumed from the
     # persisted artifact when its revision provenance matches this input and
@@ -413,7 +482,8 @@ elif [[ "$graph_mode" -eq 1 ]]; then
     graph_source_candidate_hash="$(/usr/bin/shasum -a 256 "$project_bundle" | /usr/bin/awk '{print $1}')"
     graph_source_consumed=0
     if source_revision_matches "$graph_revision" "$graph_bundle" \
-        "$source_profile" "$graph_input_identity" "$graph_compiler_hash" "$graph_source_candidate_hash"; then
+        "$source_profile" "$graph_input_identity" "$graph_compiler_hash" "$graph_source_candidate_hash" \
+        && [[ "$(revision_field "$graph_revision" file)" =~ ^[0-9]+:[0-9]+$ ]]; then
         graph_source_consumed=1
     fi
     metrics_source_end_ms="$(now_ms)"
@@ -429,25 +499,36 @@ elif [[ "$graph_mode" -eq 1 ]]; then
         /bin/mv "$graph_bundle.tmp" "$graph_bundle"
     fi
 
-    # Load stage: read the persisted execution and revision records the
-    # reducer chain will query or resume.
+    # Load stage: materialize the resume command's transient compatibility
+    # input from the accepted revision. A legacy execution record is consumed
+    # once to migrate an existing v2 graph cache.
     metrics_load_start_ms="$(now_ms)"
-    graph_execution_bytes=0
+    graph_execution_source=empty
     graph_revision_bytes=0
-    if [[ -f "$graph_execution" ]]; then
-        graph_execution_bytes="$(/usr/bin/stat -f %z "$graph_execution")"
+    if [[ -f "$graph_revision" ]] \
+        && write_transient_execution_from_revision "$graph_revision" "$graph_transient_execution"; then
+        graph_execution_source=revision
+    elif [[ -f "$graph_legacy_execution" ]]; then
+        /bin/cp "$graph_legacy_execution" "$graph_transient_execution"
+        graph_execution_source=legacy
+    else
+        : > "$graph_transient_execution"
     fi
+    graph_transient_bytes="$(/usr/bin/stat -f %z "$graph_transient_execution")"
     if [[ -f "$graph_revision" ]]; then
         graph_revision_bytes="$(/usr/bin/stat -f %z "$graph_revision")"
+    fi
+    if [[ -f "$graph_output" ]]; then
+        /bin/cp "$graph_output" "$graph_output_candidate"
     fi
     metrics_load_end_ms="$(now_ms)"
     graph_load_ms=$((metrics_load_end_ms - metrics_load_start_ms))
 
-    # Reducer stage: the V1 reducer chain applies its delta over the persisted
-    # execution record. On reuse it leaves the accepted revision untouched.
+    # Reducer stage: V1 updates only transient candidate state. On reuse it
+    # leaves the accepted revision and output untouched.
     metrics_reducer_start_ms="$(now_ms)"
     graph_status=0
-    "$compiler" resume-v1 "$graph_execution" "$graph_bundle" "$graph_output" \
+    "$compiler" resume-v1 "$graph_transient_execution" "$graph_bundle" "$graph_output_candidate" \
         > "$WORK_ROOT/graph-execution.out" || graph_status=$?
     metrics_reducer_end_ms="$(now_ms)"
     graph_reducer_ms=$((metrics_reducer_end_ms - metrics_reducer_start_ms))
@@ -463,14 +544,18 @@ elif [[ "$graph_mode" -eq 1 ]]; then
     /bin/cat "$WORK_ROOT/graph-execution.out" >&2
 
     if /usr/bin/grep -Fq $'compilerV1Execution\tstatus=reused\tchanged=0' "$WORK_ROOT/graph-execution.out" \
-        && [[ "$graph_source_consumed" -eq 1 ]]; then
+        && [[ "$graph_source_consumed" -eq 1 && "$graph_execution_source" == "revision" ]]; then
         [[ -f "$graph_revision" ]] \
             || compile_project_fail "unchanged graph execution is missing its accepted revision artifact"
+        /bin/rm -f "$graph_output_candidate" "$graph_revision_candidate"
     else
-        write_graph_revision "$graph_revision" "$WORK_ROOT/graph-execution.out" "$graph_bundle" "$graph_output" \
+        write_graph_revision "$graph_revision_candidate" "$graph_revision" "$WORK_ROOT/graph-execution.out" \
+            "$graph_transient_execution" "$graph_bundle" "$graph_output_candidate" \
             "$source_profile" "$graph_input_identity" "$graph_compiler_hash"
+        /bin/mv "$graph_output_candidate" "$graph_output"
+        /bin/mv "$graph_revision_candidate" "$graph_revision"
     fi
-    /bin/rm -f "$graph_cache_directory/source.tsv"
+    /bin/rm -f "$graph_cache_directory/source.tsv" "$graph_legacy_execution"
 
     # Query stage: read the committed revision record and report which phases
     # committed a new delta versus consumed the prior accepted value. A phase
@@ -510,10 +595,10 @@ elif [[ "$graph_mode" -eq 1 ]]; then
     metrics_materialize_end_ms="$(now_ms)"
     graph_materialize_ms=$((metrics_materialize_end_ms - metrics_materialize_start_ms))
 
-    /usr/bin/printf 'rangeGraphMetrics\tversion=1\tloadMs=%s\treducerMs=%s\tqueryMs=%s\tmaterializeMs=%s\tsourceMs=%s\tviewsAffected=%s\tsourceArtifact=%s\tsource=%s\tshape=%s\tbehavior=%s\tcompile=%s\texecutionBytes=%s\trevisionBytes=%s\n' \
+    /usr/bin/printf 'rangeGraphMetrics\tversion=1\tloadMs=%s\treducerMs=%s\tqueryMs=%s\tmaterializeMs=%s\tsourceMs=%s\tviewsAffected=%s\tsourceArtifact=%s\tsource=%s\tshape=%s\tbehavior=%s\tcompile=%s\ttransientBytes=%s\trevisionBytes=%s\texecutionSource=%s\n' \
         "$graph_load_ms" "$graph_reducer_ms" "$graph_query_ms" "$graph_materialize_ms" "$graph_source_ms" "$graph_views_affected" \
         "$graph_source_consumed" "$graph_source_flag" "$graph_shape_flag" "$graph_behavior_flag" "$graph_compile_flag" \
-        "$graph_execution_bytes" "$graph_revision_bytes" >&2
+        "$graph_transient_bytes" "$graph_revision_bytes" "$graph_execution_source" >&2
     exit 0
 fi
 
