@@ -1,4 +1,15 @@
+@builtin(.storage)
 construct UUID {
-    @many(16)
-    let bytes: Int<.unsigned, 8>
+    state bytes: Int<.unsigned, 8>
+
+    derived count: Int {
+        16
+    }
+
+    function byte(index: Int): Int {
+        return uuidByteAtIndex(uuid: self, index: index)
+    }
 }
+
+@builtin(.read)
+function uuidByteAtIndex(uuid: UUID, index: Int): Int
