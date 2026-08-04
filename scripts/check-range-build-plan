@@ -14,7 +14,7 @@ CORE_CHARACTER="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/Character.rang
 CORE_STRING="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/String.range"
 CORE_TEXT_ENCODING="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/TextEncoding.range"
 SCHEMA_VERSION="focused-build-plan-harness-v4"
-CACHE_ROOT="${RANGE_BUILD_PLAN_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/Library/Caches}/Range/build-plan}"
+CACHE_ROOT="${RANGE_BUILD_PLAN_CACHE_DIR:-$REPO_ROOT/.range/Compiler/BuildCache/build-plan}"
 
 fail() {
     echo "Range build-plan check failed: $*" >&2
