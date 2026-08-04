@@ -2112,6 +2112,66 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 
 ## Compiler Storage
 
+- [ ] Implement the persistent graph revision model described in
+  [DeltaDBSpacetimeDBRangeHandoff.md](Development/DeltaDBSpacetimeDBRangeHandoff.md).
+  - Keep stable node identities and typed edge deltas as one logical graph,
+    with cardinality-specialized physical indexes.
+  - Commit each compiler view atomically; preserve the last accepted revision
+    on a failed candidate and measure load, delta-apply, query, and
+    invalidation-frontier costs before promoting a new authority.
+  - [x] Persist a transitional Range-shaped revision artifact beside the V1
+    execution record.
+    - `range compile-graph` now writes `revision.tsv` next to `execution.tsv`:
+      deterministic revision identity over parent + node values + status,
+      a 4-node index (source/shape/behavior/compile with before/after/changed
+      value fingerprints), the 3 cardinality-one pipeline edges
+      (add/replace operations), and 4 view digests.
+    - A failed candidate never writes a revision; the last accepted revision
+      is preserved. Unchanged input reuses the artifact without rewriting it.
+    - `scripts/range check-compiler-graph-revision` proves cold insertion,
+      same-location determinism, warm reuse, parent chaining (updated
+      node.before equals the prior accepted node.after), bounded literal-edit
+      invalidation with measured affected-view counts, failed-candidate
+      last-known-good preservation, and recovery.
+    - The V1 File identity derives from the source bundle path, so the
+      transition record is deterministic per location; content-addressed node
+      identity is the next Range-owned cutover.
+  - [x] Shape consumes the persisted Source artifact and reports per-stage
+    load, delta-apply, query, and materialization costs.
+    - The graph line's Source stage consumes the persisted bundle and
+      `source.tsv` when their metadata still matches this input and compiler;
+      a reuse no longer rewrites either artifact (verified by inode).
+    - Each graph run reports `rangeGraphMetrics`: `sourceMs`/`loadMs`/
+      `reducerMs`/`queryMs`/`materializeMs` wall costs, `viewsAffected`,
+      `sourceArtifact`, and per-phase `consumed`/`derived` flags. A phase
+      whose before/after values are equal consumed the persisted revision; a
+      phase that commits a new value derived its product.
+    - On a literal edit the report shows `source=derived`, `shape=consumed`,
+      `behavior=derived`, `compile=derived`, and `viewsAffected=3`: the shape
+      stage leaves the prior accepted value untouched and emits no delta, so
+      the shape value is a projection of the persisted Source artifact rather
+      than a fresh capture.
+    - The proof independently re-derives the shape value with
+      `inspect-v1` over the persisted bundle and asserts it equals the
+      revision's shape node, and that the shape projection contains no LLVM.
+    - The eager body capture inside the V1 `compilerV1Shape` reducer remains
+      the deferred pure-projection cutover: storing the typed syntax tables as
+      graph facts so emission reads them instead of re-capturing.
+  - [x] Add the Shape-only reducer as its own compiler command.
+    - `compilerV1ShapeOnly` captures the typed declarations and main root,
+      renders only the shape snapshot, and stops; `range compile-shape`
+      consumes a Source artifact and emits only the shape delta. No macro
+      link, no LLVM emission, no behavior product.
+    - Because the capture sequence and render point match `compilerV1Shape`
+      exactly, the reducer's `after` fingerprint and snapshot are
+      byte-identical to the shape value the full V1 pipeline persists: the
+      proof asserts the emitted `after` equals the revision shape node and the
+      payload equals the `inspect-v1` shape region, with no LLVM or downstream
+      phase deltas.
+    - Wiring the graph line to persist a `shape.tsv` payload via this reducer
+      is the next storage cutover once Behavior/Compile are routed through the
+      same artifact.
+
 - [x] Add the first Range-authored compiler-description values.
   - Core now defines `PhaseRegistration` and `CompilerRegistration` as
     ordinary typed macro results. `@phase` returns its function target without
@@ -2137,6 +2197,54 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       byte-identical to the legacy output for an ordinary Range program,
       validates and links that LLVM, executes it with exit `7`, inspects the
       shape/behavior/plot artifacts, and checks the typed missing-input error.
+    - [x] Expose the persistent graph line as an opt-in compiler command.
+      - `range compile-graph <FILE-OR-DIR>` resolves the current Range-authored Stage 2
+        producer and runs its `compile-v1` File -> Source -> Shape -> Behavior ->
+        Compiled pipeline; ordinary `range compile` remains the accepted
+        bootstrap oracle while the cutover is compared. The durable cache
+        boundary implemented today is only File -> Source.
+      - `scripts/range check-compiler-graph` proves direct legacy LLVM parity,
+        project source-set parity, Source/Shape/Behavior/Compiled inspection,
+        cold insertion, unchanged reuse, and edited replacement in 7 seconds
+        without rebuilding LLVM.
+      - Graph project bundles carry the explicit `// range-development-compiler`
+        marker already used by the V1 generation proof. This is a Source
+        artifact consumed by later Shape derivation; it does not yet make graph
+        compilation the default or remove the bootstrap oracle.
+      - [x] Give the graph source-set a stable File identity and persistent
+        File -> Source artifact.
+        - `scripts/compile-range-project --graph` stores the canonical source-set
+          bundle, `resume-v1` execution record, and compiled artifact under an
+          ignored Source cache keyed by the project path. The bundle also carries
+          the graph compiler hash, so a producer change invalidates the value.
+        - Cold, warm, edited, failed-candidate, and recovery paths are covered
+          by `scripts/range check-compiler-graph`; a failed candidate restores
+          the previous accepted bundle before returning its typed error.
+      - [ ] Derive and persist canonical Shape as a separate graph artifact.
+        Shape begins after Source: Core `@syntax` and syntax-template rules must
+        derive the typed declaration, member, relationship, and cardinality
+        facts from the Source artifact. The current `resume-v1` record contains
+        only phase fingerprints for inspection; its Shape fingerprint is not a
+        durable Shape authority, and lowering still uses V1's in-process tables.
+        Add an independent Shape validation/proof before routing later phases
+        through it.
+        - [x] Persist the first source-local syntax Shape artifact through
+          `range shape <FILE-OR-DIR>`. The versioned artifact contains the
+          Core-authored `@syntax` recipe order, literals, typed captures, and
+          one/many/zero-or-one cardinality, with no Behavior or LLVM rows.
+          `scripts/range check-shape` proves cold insertion, warm reuse, an
+          edited literal, invalid-candidate isolation, and recovery.
+          - [x] Make Shape consume the persisted File -> Source bundle when
+            its input/compiler provenance matches, and promote a changed
+            Source bundle only after Shape succeeds. The focused proof now
+            inspects the Source bundle and its source-set hash in the Shape
+            artifact, so Shape no longer rebuilds an accepted Source value on
+            every invocation.
+        - [ ] Extend Shape input from the source-local proof to the complete
+          Core/project Source artifact after the accepted Core syntax package
+          has a complete recipe-finalization boundary. The current accepted
+          Core manifest is intentionally not forced through that finalizer by
+          the first Shape command.
     - [ ] Separate compilation from building as explicit products and phases.
       - Compilation consumes source, Shape, and Behavior and ends at a typed
         compiled-program artifact containing target-independent meaning plus

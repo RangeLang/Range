@@ -90,6 +90,35 @@ function compilerV1Shape(source: CompilerV1SourceDelta, before: CompilerFingerpr
     )
 }
 
+function compilerV1ShapeOnly(source: CompilerV1SourceDelta, before: CompilerFingerprint): CompilerV1ShapeDelta {
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.shapeOnly.begin"))
+    let tables: CompilerSyntaxTables(compilerSyntaxTablesCreate(source: source.value.source))
+    state captureStatus: Int(compilerTypedDeclarationsCapture(source: source.value.source, tables: tables))
+    if captureStatus == 0 {
+        captureStatus: compilerTypedSyntaxCaptureMainRoot(source: source.value.source, tables: tables)
+    }
+    state snapshot: String("")
+    if captureStatus != 0 || !compilerSyntaxTablesIsValid(tables: tables) {
+        snapshot: String("compilerError\tkind=invalidTypedSyntaxSnapshot\n")
+    } else {
+        snapshot: compilerTypedSyntaxRenderSnapshot(tables: tables)
+    }
+    let tablesDestroyStatus: Int(compilerSyntaxTablesDestroy(tables: tables))
+    if tablesDestroyStatus != 0 {
+        snapshot: String("compilerError\tkind=compilerV1ShapeOwnershipFailure\n")
+    }
+    let identity: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: source.identity, value: 2))
+    compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.shapeOnly.end"))
+    return CompilerV1ShapeDelta(
+        identity: identity,
+        before: before,
+        after: compilerFingerprintAppendText(fingerprint: identity, tag: 12, text: snapshot),
+        snapshot: snapshot,
+        behaviorSnapshot: String(""),
+        compiledOutput: String("")
+    )
+}
+
 function compilerV1Behavior(shape: CompilerV1ShapeDelta, before: CompilerFingerprint): CompilerV1BehaviorDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.behavior.begin"))
     let snapshot: String("\(shape.behaviorSnapshot)")
@@ -275,6 +304,21 @@ function rangeCompilerV1ResumeCLI(executionPath: String, input: String, outputPa
         return 0
     }
     return compilerV1ExecutionUpdate(input: input, executionPath: executionPath, outputPath: outputPath)
+}
+
+function rangeCompilerV1ShapeCLI(input: String): Int {
+    let sourceDelta: CompilerV1SourceDelta(compilerV1Load(input: input, before: compilerV1AbsentValue()))
+    let source: String(sourceDelta.value.source)
+    if source == String("") {
+        return compilerV1Report(error: CompilerV1Error(message: "range: unable to read non-empty input at \(sourceDelta.value.path)"))
+    }
+    let shape: CompilerV1ShapeDelta(compilerV1ShapeOnly(source: sourceDelta, before: compilerV1AbsentValue()))
+    if compilerNativeOutputIsError(output: shape.snapshot) {
+        return compilerV1Report(error: CompilerV1Error(message: shape.snapshot))
+    }
+    print(value: "compilerV1Shape\tversion=1\tidentity=\(shape.identity.first):\(shape.identity.second)\tbefore=\(shape.before.first):\(shape.before.second)\tafter=\(shape.after.first):\(shape.after.second)\n")
+    print(value: shape.snapshot)
+    return 0
 }
 
 function rangeCompilerV1CLI(compiler: CompilerV1, input: String, inspect: Bool): Int {

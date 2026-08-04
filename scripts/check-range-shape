@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PASS_FIXTURE="$REPO_ROOT/Testing/Syntax/Pass/ShapeArtifact.range"
+FAIL_FIXTURE="$REPO_ROOT/Testing/Syntax/Fail/ShapeArtifactUnknownCapture.range"
+WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-shape.XXXXXX")"
+trap '/bin/rm -rf "$WORK_ROOT"' EXIT
+
+fail() {
+    echo "Range Shape check failed: $*" >&2
+    exit 1
+}
+
+[[ -f "$PASS_FIXTURE" ]] || fail "missing Shape pass fixture"
+[[ -f "$FAIL_FIXTURE" ]] || fail "missing Shape fail fixture"
+
+shape_cache="$WORK_ROOT/cache"
+source_cache="$WORK_ROOT/source-cache"
+RANGE_SHAPE_CACHE_DIR="$shape_cache" RANGE_SOURCE_CACHE_DIR="$source_cache" \
+    "$REPO_ROOT/scripts/range" shape "$PASS_FIXTURE" \
+    > "$WORK_ROOT/cold.out" 2> "$WORK_ROOT/cold.err"
+/usr/bin/grep -Eq $'^rangeShapeExecution\tstatus=cold\tchanged=1\tpayload=[0-9a-f]{64}$' "$WORK_ROOT/cold.err" \
+    || fail "cold Shape execution did not insert the expected deterministic payload"
+cold_payload="$(/usr/bin/awk -F '\t' '/^rangeShapeExecution\t/ { sub(/^payload=/, "", $4); print $4; exit }' "$WORK_ROOT/cold.err")"
+[[ "$cold_payload" =~ ^[0-9a-f]{64}$ ]] || fail "cold Shape execution omitted its payload hash"
+/usr/bin/grep -Fq $'rangeShape\tversion=1\tsourceSet=' "$WORK_ROOT/cold.out" \
+    || fail "Shape artifact omitted its versioned header"
+/usr/bin/grep -Fq $'name=attributes\tmemberRow=0\ttype=Array<String>\toccurrence=many' "$WORK_ROOT/cold.out" \
+    || fail "Shape artifact omitted the many relationship"
+/usr/bin/grep -Fq $'name=name\tmemberRow=1\ttype=String\toccurrence=one' "$WORK_ROOT/cold.out" \
+    || fail "Shape artifact omitted the one relationship"
+/usr/bin/grep -Fq $'name=result\tmemberRow=3\ttype=String?\toccurrence=zeroOrOne' "$WORK_ROOT/cold.out" \
+    || fail "Shape artifact omitted the optional relationship"
+if /usr/bin/grep -Eq '^(define |declare |target triple|compilerV1Delta)' "$WORK_ROOT/cold.out"; then
+    fail "Shape artifact leaked compiled or V1 phase output"
+fi
+if [[ -n "$(find "$shape_cache" -type f -name '*.ll' -print -quit)" ]]; then
+    fail "Shape cache unexpectedly contains LLVM"
+fi
+source_bundle="$(find "$source_cache" -type f -name ProjectSourceSet.range -print -quit)"
+source_metadata="$(find "$source_cache" -type f -name source.tsv -print -quit)"
+[[ -n "$source_bundle" && -f "$source_bundle" && -f "$source_metadata" ]] \
+    || fail "Shape did not persist its File -> Source artifact"
+source_set_hash="$(/usr/bin/shasum -a 256 "$source_bundle" | /usr/bin/awk '{print $1}')"
+/usr/bin/grep -Fq $'compilerSyntaxRecipes' "$source_bundle" \
+    || fail "persisted Shape Source artifact omitted the syntax recipe package"
+/usr/bin/grep -Fq "sourceSet=$source_set_hash" "$WORK_ROOT/cold.out" \
+    || fail "Shape artifact does not identify its persisted Source artifact"
+
+RANGE_SHAPE_CACHE_DIR="$shape_cache" RANGE_SOURCE_CACHE_DIR="$source_cache" \
+    "$REPO_ROOT/scripts/range" shape "$PASS_FIXTURE" \
+    > "$WORK_ROOT/warm.out" 2> "$WORK_ROOT/warm.err"
+/usr/bin/grep -Fqx $'rangeShapeExecution\tstatus=reused\tchanged=0\tpayload='"$cold_payload" "$WORK_ROOT/warm.err" \
+    || fail "unchanged Shape execution did not reuse its artifact"
+/usr/bin/cmp -s "$WORK_ROOT/cold.out" "$WORK_ROOT/warm.out" \
+    || fail "unchanged Shape execution changed its artifact"
+
+/bin/mkdir -p "$WORK_ROOT/project"
+/bin/cp "$PASS_FIXTURE" "$WORK_ROOT/project/ShapeArtifact.range"
+RANGE_SHAPE_CACHE_DIR="$WORK_ROOT/project-cache" RANGE_SOURCE_CACHE_DIR="$WORK_ROOT/project-source-cache" \
+    "$REPO_ROOT/scripts/range" shape "$WORK_ROOT/project" \
+    > "$WORK_ROOT/project-cold.out" 2> "$WORK_ROOT/project-cold.err"
+/usr/bin/perl -0pi -e 's/route/endpoint/' "$WORK_ROOT/project/ShapeArtifact.range"
+RANGE_SHAPE_CACHE_DIR="$WORK_ROOT/project-cache" RANGE_SOURCE_CACHE_DIR="$WORK_ROOT/project-source-cache" \
+    "$REPO_ROOT/scripts/range" shape "$WORK_ROOT/project" \
+    > "$WORK_ROOT/project-updated.out" 2> "$WORK_ROOT/project-updated.err"
+/usr/bin/grep -Eq $'^rangeShapeExecution\tstatus=updated\tchanged=1\tpayload=[0-9a-f]{64}$' "$WORK_ROOT/project-updated.err" \
+    || fail "edited source did not produce an updated Shape artifact"
+/usr/bin/grep -Fq $'kind=identifier\ttext=endpoint' "$WORK_ROOT/project-updated.out" \
+    || fail "updated Shape artifact retained the old literal"
+
+/bin/mkdir -p "$WORK_ROOT/failure-project"
+/bin/cp "$PASS_FIXTURE" "$WORK_ROOT/failure-project/ShapeArtifact.range"
+RANGE_SHAPE_CACHE_DIR="$WORK_ROOT/failure-cache" RANGE_SOURCE_CACHE_DIR="$WORK_ROOT/failure-source-cache" \
+    "$REPO_ROOT/scripts/range" shape "$WORK_ROOT/failure-project" \
+    > "$WORK_ROOT/failure-cold.out" 2> "$WORK_ROOT/failure-cold.err"
+/bin/cp "$FAIL_FIXTURE" "$WORK_ROOT/failure-project/ShapeArtifact.range"
+failure_exit=0
+RANGE_SHAPE_CACHE_DIR="$WORK_ROOT/failure-cache" RANGE_SOURCE_CACHE_DIR="$WORK_ROOT/failure-source-cache" \
+    "$REPO_ROOT/scripts/range" shape "$WORK_ROOT/failure-project" \
+    > "$WORK_ROOT/failure.out" 2> "$WORK_ROOT/failure.err" \
+    || failure_exit=$?
+[[ "$failure_exit" -eq 65 ]] || fail "invalid Shape candidate exited $failure_exit instead of 65"
+/usr/bin/grep -Fq $'compilerError\tkind=syntaxRecipeUnknownCapture' "$WORK_ROOT/failure.err" \
+    || fail "invalid Shape candidate omitted the typed syntax-recipe error"
+/bin/cp "$PASS_FIXTURE" "$WORK_ROOT/failure-project/ShapeArtifact.range"
+RANGE_SHAPE_CACHE_DIR="$WORK_ROOT/failure-cache" RANGE_SOURCE_CACHE_DIR="$WORK_ROOT/failure-source-cache" \
+    "$REPO_ROOT/scripts/range" shape "$WORK_ROOT/failure-project" \
+    > "$WORK_ROOT/recovered.out" 2> "$WORK_ROOT/recovered.err"
+/usr/bin/grep -Fqx $'rangeShapeExecution\tstatus=reused\tchanged=0\tpayload='"$cold_payload" "$WORK_ROOT/recovered.err" \
+    || fail "failed Shape candidate did not preserve the accepted artifact"
+/usr/bin/cmp -s "$WORK_ROOT/failure-cold.out" "$WORK_ROOT/recovered.out" \
+    || fail "failed Shape candidate damaged the accepted artifact"
+
+echo "Range Shape: pass (Core @syntax recipe artifact, many/one/optional cardinality, no LLVM, cold/warm/edit, failed-candidate recovery)"

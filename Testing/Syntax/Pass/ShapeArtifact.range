@@ -1,0 +1,13 @@
+macro syntax(@capture template: String): Declaration -> Void {}
+
+@syntax {
+    $attributes
+    route $name($arguments) -> $result
+}
+
+construct RouteDeclaration {
+    let attributes: Array<String>
+    let name: String
+    let arguments: Array<String>
+    let result: String?
+}

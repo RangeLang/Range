@@ -1,0 +1,9 @@
+macro syntax(@capture template: String): Declaration -> Void {}
+
+@syntax {
+    route $missing
+}
+
+construct RouteDeclaration {
+    let name: String
+}

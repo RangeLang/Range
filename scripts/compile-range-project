@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Reuse the compiler proof harness's canonical accepted-seed verification and
+# Reuse the compiler proof harness's canonical accepted-bootstrap verification and
 # manifest helpers. Ordinary compilation runs the promoted native compiler
 # directly; candidate construction remains isolated in the proof commands.
 source "$SCRIPT_DIR/check-range-compiler-candidate"
@@ -14,9 +14,144 @@ compile_project_fail() {
     exit 1
 }
 
+revision_field() {
+    local source="$1"
+    local key="$2"
+    /usr/bin/awk -F '\t' -v key="$key" '
+        {
+            for (field = 2; field <= NF; field += 1) {
+                if (index($field, key "=") == 1) {
+                    value = $field
+                    sub(/^[^=]*=/, "", value)
+                    print value
+                    exit
+                }
+            }
+        }
+    ' "$source"
+}
+
+node_changed() {
+    local before="$1" after="$2"
+    if [[ "$before" == "$after" ]]; then
+        /usr/bin/printf '0'
+    else
+        /usr/bin/printf '1'
+    fi
+}
+
+now_ms() {
+    /usr/bin/python3 -c 'import time; print(int(time.time() * 1000))'
+}
+
+# Each pipeline phase is reported as either consumed or derived. A phase that
+# leaves the prior accepted value untouched (before == after) consumed the
+# persisted revision; a phase that commits a new value derived its product.
+stage_flag() {
+    local before="$1" after="$2"
+    if [[ "$before" == "$after" ]]; then
+        /usr/bin/printf 'consumed'
+    else
+        /usr/bin/printf 'derived'
+    fi
+}
+
+# The revision record is a transitional, Range-shaped history point persisted
+# beside the V1 execution record. It keeps each phase product as a stable node
+# carrying before/after value fingerprints, the phase-to-phase pipeline as
+# cardinality-one edges, and content digests for each view. A failed candidate
+# never writes a revision; the last accepted revision is preserved.
+write_graph_revision() {
+    local output="$1"
+    local status_source="$2"
+    local source_bundle="$3"
+    local compiled_output="$4"
+    local status changed
+    local source_before source_after shape_before shape_after
+    local behavior_before behavior_after compiled_before compiled_after
+    local parent source_hash compiled_hash identity_input identity operation
+
+    status="$(revision_field "$status_source" status)"
+    changed="$(revision_field "$status_source" changed)"
+    source_before="$(revision_field "$status_source" sourceBefore)"
+    source_after="$(revision_field "$status_source" sourceAfter)"
+    shape_before="$(revision_field "$status_source" shapeBefore)"
+    shape_after="$(revision_field "$status_source" shapeAfter)"
+    behavior_before="$(revision_field "$status_source" behaviorBefore)"
+    behavior_after="$(revision_field "$status_source" behaviorAfter)"
+    compiled_before="$(revision_field "$status_source" compiledBefore)"
+    compiled_after="$(revision_field "$status_source" compiledAfter)"
+
+    parent="absent"
+    if [[ -f "$output" ]]; then
+        parent="$(/usr/bin/sed -n 's/^rangeRevision\tversion=1\tidentity=\([0-9a-f][0-9a-f]*\)\t.*/\1/p' "$output" | /usr/bin/head -1)"
+        [[ -n "$parent" ]] || parent="absent"
+    fi
+    source_hash="$(/usr/bin/shasum -a 256 "$source_bundle" | /usr/bin/awk '{print $1}')"
+    compiled_hash="$(/usr/bin/shasum -a 256 "$compiled_output" | /usr/bin/awk '{print $1}')"
+    identity_input="$(/usr/bin/printf 'revision=1\nparent=%s\nsource=%s\nshape=%s\nbehavior=%s\ncompiled=%s\nstatus=accepted\n' \
+        "$parent" "$source_after" "$shape_after" "$behavior_after" "$compiled_after")"
+    identity="$(/usr/bin/printf '%s' "$identity_input" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
+    if [[ "$status" == "cold" ]]; then
+        operation="add"
+    else
+        operation="replace"
+    fi
+
+    {
+        /usr/bin/printf 'rangeRevision\tversion=1\tidentity=%s\tparent=%s\tsource=%s\tstatus=accepted\n' \
+            "$identity" "$parent" "$source_hash"
+        /usr/bin/printf 'rangeRevisionNode\tid=source\tbefore=%s\tafter=%s\tchanged=%s\n' \
+            "$source_before" "$source_after" "$(node_changed "$source_before" "$source_after")"
+        /usr/bin/printf 'rangeRevisionNode\tid=shape\tbefore=%s\tafter=%s\tchanged=%s\n' \
+            "$shape_before" "$shape_after" "$(node_changed "$shape_before" "$shape_after")"
+        /usr/bin/printf 'rangeRevisionNode\tid=behavior\tbefore=%s\tafter=%s\tchanged=%s\n' \
+            "$behavior_before" "$behavior_after" "$(node_changed "$behavior_before" "$behavior_after")"
+        /usr/bin/printf 'rangeRevisionNode\tid=compile\tbefore=%s\tafter=%s\tchanged=%s\n' \
+            "$compiled_before" "$compiled_after" "$(node_changed "$compiled_before" "$compiled_after")"
+        /usr/bin/printf 'rangeRevisionEdge\tid=source-shape\tfrom=source\tto=shape\tcardinality=one\toperation=%s\n' "$operation"
+        /usr/bin/printf 'rangeRevisionEdge\tid=shape-behavior\tfrom=shape\tto=behavior\tcardinality=one\toperation=%s\n' "$operation"
+        /usr/bin/printf 'rangeRevisionEdge\tid=behavior-compile\tfrom=behavior\tto=compile\tcardinality=one\toperation=%s\n' "$operation"
+        /usr/bin/printf 'rangeRevisionDigest\tview=source\tdigest=%s\n' "$source_hash"
+        /usr/bin/printf 'rangeRevisionDigest\tview=shape\tdigest=%s\n' "$shape_after"
+        /usr/bin/printf 'rangeRevisionDigest\tview=behavior\tdigest=%s\n' "$behavior_after"
+        /usr/bin/printf 'rangeRevisionDigest\tview=compiled\tdigest=%s\n' "$compiled_hash"
+    } > "$output.tmp.$$"
+    /bin/mv "$output.tmp.$$" "$output"
+}
+
+compiler_command="compile"
+graph_mode=0
+shape_mode=0
+if [[ "${1:-}" == "--graph" ]]; then
+    compiler_command="compile-v1"
+    graph_mode=1
+    shift
+elif [[ "${1:-}" == "--shape" ]]; then
+    shape_mode=1
+    shift
+fi
+
 input="${1:-}"
 [[ -n "$input" ]] || compile_project_fail "expected a .range file or project directory"
+[[ $# -eq 1 ]] || compile_project_fail "expected one .range file or project directory"
 [[ -e "$input" ]] || compile_project_fail "input does not exist: $input"
+
+if [[ -d "$input" ]]; then
+    input_identity="$(cd "$input" && pwd)"
+else
+    input_identity="$(cd "$(dirname "$input")" && pwd)/$(basename "$input")"
+fi
+if [[ "$shape_mode" -eq 1 ]]; then
+    source_profile="shape-local"
+else
+    source_profile="project"
+fi
+source_cache_root="${RANGE_SOURCE_CACHE_DIR:-${RANGE_GRAPH_CACHE_DIR:-$REPO_ROOT/.range/Compiler/Source}}"
+source_cache_key="$(/usr/bin/printf 'path=%s\nprofile=%s\n' "$input_identity" "$source_profile" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
+source_cache_directory="$source_cache_root/$source_cache_key"
+source_bundle_artifact="$source_cache_directory/ProjectSourceSet.range"
+source_metadata_artifact="$source_cache_directory/source.tsv"
 
 WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compile.XXXXXX")"
 trap '/bin/rm -rf "$WORK_ROOT"' EXIT
@@ -32,8 +167,31 @@ CORE_SOURCE_PATH="$WORK_ROOT/RawBuffer.range"
 accepted_compiler="$REPO_ROOT/$(manifest_value executable.path)"
 [[ -x "$accepted_compiler" ]] || compile_project_fail "accepted compiler is not executable"
 
+# Compiler V1 owns the graph and Shape lines, while ordinary compilation stays
+# on the accepted bootstrap oracle. The source-set marker is an explicit
+# Source artifact: it records the complete Core/project inventory rather than
+# pretending that the marker text is already a canonical Shape.
+compiler="$accepted_compiler"
+if [[ "$graph_mode" -eq 1 || "$shape_mode" -eq 1 ]]; then
+    # Resolve the current Range-authored current build producer, rather than using
+    # the promoted bootstrap executable. This keeps the graph line on the
+    # current compiler source while the ordinary line remains the accepted
+    # oracle.
+    "$SCRIPT_DIR/range" check-compiler-smoke >/dev/null
+    graph_compiler="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/current/RangeCompiler"
+    [[ -x "$graph_compiler" ]] || compile_project_fail "current graph compiler is not executable"
+    compiler="$graph_compiler"
+    graph_compiler_hash="$(/usr/bin/shasum -a 256 "$graph_compiler" | /usr/bin/awk '{print $1}')"
+fi
+
 project_bundle="$WORK_ROOT/ProjectSourceSet.range"
 /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$project_bundle"
+if [[ "$shape_mode" -eq 1 ]]; then
+    /usr/bin/printf '%s\n' 'compilerSyntaxRecipes' > "$project_bundle"
+elif [[ "$graph_mode" -eq 1 ]]; then
+    /usr/bin/printf '%s\n' '// range-development-compiler' >> "$project_bundle"
+    /usr/bin/printf '// range-compiler-authority %s\n' "$graph_compiler_hash" >> "$project_bundle"
+fi
 
 append_source() {
     local role="$1"
@@ -50,23 +208,29 @@ append_source() {
     fi
 }
 
-compiler_source_count="$(manifest_value compilerSources)"
-for ((index = 0; index < compiler_source_count; index += 1)); do
-    role="$(manifest_value "compilerSources.$index.role")"
-    [[ "$role" == core ]] || continue
-    relative="$(manifest_value "compilerSources.$index.path")"
-    source_path="$REPO_ROOT/$relative"
-    [[ -f "$source_path" ]] || compile_project_fail "missing accepted Core source: $relative"
-    append_source core "$relative" "$source_path"
-done
+# The first Shape product is intentionally source-local: it proves Core
+# @syntax recipe derivation without forcing the incomplete accepted Core
+# manifest through the recipe finalizer. Source-set Shape composition is a
+# later cutover once those Core syntax declarations have a complete package.
+if [[ "$shape_mode" -eq 0 ]]; then
+    compiler_source_count="$(manifest_value compilerSources)"
+    for ((index = 0; index < compiler_source_count; index += 1)); do
+        role="$(manifest_value "compilerSources.$index.role")"
+        [[ "$role" == core ]] || continue
+        relative="$(manifest_value "compilerSources.$index.path")"
+        source_path="$REPO_ROOT/$relative"
+        [[ -f "$source_path" ]] || compile_project_fail "missing accepted Core source: $relative"
+        append_source core "$relative" "$source_path"
+    done
 
-for relative in \
-    RangeCompiler/Sources/Core/System/Optional/Nil.range \
-    RangeCompiler/Sources/Core/System/Optional/Optional.range; do
-    source_path="$REPO_ROOT/$relative"
-    [[ -f "$source_path" ]] || compile_project_fail "missing language Core source: $relative"
-    append_source core "$relative" "$source_path"
-done
+    for relative in \
+        RangeCompiler/Sources/Core/System/Optional/Nil.range \
+        RangeCompiler/Sources/Core/System/Optional/Optional.range; do
+        source_path="$REPO_ROOT/$relative"
+        [[ -f "$source_path" ]] || compile_project_fail "missing language Core source: $relative"
+        append_source core "$relative" "$source_path"
+    done
+fi
 
 if [[ -d "$input" ]]; then
     project_root="$(cd "$input" && pwd)"
@@ -92,4 +256,227 @@ else
     append_source project "$(basename "$source_path")" "$source_path"
 fi
 
-exec "$accepted_compiler" compile "$project_bundle"
+if [[ "$shape_mode" -eq 1 ]]; then
+    # Shape consumes the persisted File -> Source value when its provenance
+    # matches this input and compiler. A changed source is evaluated from the
+    # candidate bundle above, but it is not promoted until Shape succeeds.
+    source_candidate_hash="$(/usr/bin/shasum -a 256 "$project_bundle" | /usr/bin/awk '{print $1}')"
+    source_cache_reused=0
+    source_metadata_expected="$(/usr/bin/printf 'rangeSource\tversion=1\tprofile=%s\tinput=%s\tcompiler=%s\tsourceSet=%s' \
+        "$source_profile" "$input_identity" "$graph_compiler_hash" "$source_candidate_hash")"
+    if [[ -f "$source_bundle_artifact" && -f "$source_metadata_artifact" ]] \
+        && /usr/bin/grep -Fqx "$source_metadata_expected" "$source_metadata_artifact"; then
+        /bin/cp "$source_bundle_artifact" "$project_bundle"
+        source_cache_reused=1
+    fi
+    shape_source_set_hash="$(/usr/bin/shasum -a 256 "$project_bundle" | /usr/bin/awk '{print $1}')"
+    # Shape is the first durable product after Source. The payload is emitted
+    # by the existing Core @syntax recipe path; this cache deliberately has no
+    # LLVM output and therefore cannot be mistaken for a compiled artifact.
+    shape_cache_root="${RANGE_SHAPE_CACHE_DIR:-$REPO_ROOT/.range/Compiler/Shape}"
+    shape_cache_key="$(/usr/bin/printf '%s' "$input_identity" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
+    shape_cache_directory="$shape_cache_root/$shape_cache_key"
+    /bin/mkdir -p "$shape_cache_directory"
+    shape_payload="$shape_cache_directory/shape.payload"
+    shape_artifact="$shape_cache_directory/shape.tsv"
+    shape_input="$shape_cache_directory/input.tsv"
+    shape_payload_hash_file="$shape_cache_directory/payload.sha256"
+    shape_input_candidate="$WORK_ROOT/shape.input.tsv"
+    /usr/bin/printf 'rangeShapeInput\tversion=1\tsourceSet=%s\tcompiler=%s\n' \
+        "$shape_source_set_hash" \
+        "$graph_compiler_hash" > "$shape_input_candidate"
+    shape_expected_artifact="$WORK_ROOT/shape.expected.tsv"
+    shape_payload_hash=""
+    if [[ -f "$shape_input" && -f "$shape_payload" && -f "$shape_artifact" && -f "$shape_payload_hash_file" ]] \
+        && /usr/bin/cmp -s "$shape_input_candidate" "$shape_input"; then
+        shape_payload_hash="$(/usr/bin/shasum -a 256 "$shape_payload" | /usr/bin/awk '{print $1}')"
+        if [[ "$shape_payload_hash" == "$(/usr/bin/sed -n '1p' "$shape_payload_hash_file")" ]]; then
+            /usr/bin/printf 'rangeShape\tversion=1\tsourceSet=%s\tcompiler=%s\tpayload=%s\n' \
+                "$shape_source_set_hash" \
+                "$graph_compiler_hash" "$shape_payload_hash" > "$shape_expected_artifact"
+            /bin/cat "$shape_payload" >> "$shape_expected_artifact"
+            if /usr/bin/cmp -s "$shape_expected_artifact" "$shape_artifact"; then
+                /usr/bin/printf 'rangeShapeExecution\tstatus=reused\tchanged=0\tpayload=%s\n' "$shape_payload_hash" >&2
+                /bin/cat "$shape_artifact"
+                exit 0
+            fi
+        fi
+    fi
+
+    shape_previous_state="cold"
+    if [[ -f "$shape_artifact" || -f "$shape_payload" || -f "$shape_input" ]]; then
+        shape_previous_state="updated"
+    fi
+    shape_payload_candidate="$WORK_ROOT/shape.payload"
+    shape_status=0
+    "$compiler" compile "$project_bundle" > "$shape_payload_candidate" || shape_status=$?
+    if [[ "$shape_status" -ne 0 ]]; then
+        /bin/cat "$shape_payload_candidate" >&2
+        exit "$shape_status"
+    fi
+    shape_payload_hash="$(/usr/bin/shasum -a 256 "$shape_payload_candidate" | /usr/bin/awk '{print $1}')"
+    /usr/bin/printf 'rangeShape\tversion=1\tsourceSet=%s\tcompiler=%s\tpayload=%s\n' \
+        "$shape_source_set_hash" \
+        "$graph_compiler_hash" "$shape_payload_hash" > "$shape_expected_artifact"
+    /bin/cat "$shape_payload_candidate" >> "$shape_expected_artifact"
+    /bin/cp "$shape_payload_candidate" "$shape_payload.tmp"
+    /bin/cp "$shape_expected_artifact" "$shape_artifact.tmp"
+    /usr/bin/printf '%s\n' "$shape_payload_hash" > "$shape_payload_hash_file.tmp"
+    /bin/cp "$shape_input_candidate" "$shape_input.tmp"
+    /bin/mv "$shape_payload.tmp" "$shape_payload"
+    /bin/mv "$shape_artifact.tmp" "$shape_artifact"
+    /bin/mv "$shape_payload_hash_file.tmp" "$shape_payload_hash_file"
+    /bin/mv "$shape_input.tmp" "$shape_input"
+    /bin/mkdir -p "$source_cache_directory"
+    /bin/cp "$project_bundle" "$source_bundle_artifact.tmp"
+    /usr/bin/printf 'rangeSource\tversion=1\tprofile=%s\tinput=%s\tcompiler=%s\tsourceSet=%s\n' \
+        "$source_profile" "$input_identity" "$graph_compiler_hash" "$shape_source_set_hash" \
+        > "$source_metadata_artifact.tmp"
+    /bin/mv "$source_bundle_artifact.tmp" "$source_bundle_artifact"
+    /bin/mv "$source_metadata_artifact.tmp" "$source_metadata_artifact"
+    /usr/bin/printf 'rangeShapeExecution\tstatus=%s\tchanged=1\tpayload=%s\n' \
+        "$shape_previous_state" "$shape_payload_hash" >&2
+    /bin/cat "$shape_artifact"
+    exit 0
+elif [[ "$graph_mode" -eq 1 ]]; then
+    graph_input_identity="$input_identity"
+    # The durable boundary here is File -> Source. Shape is a later product
+    # derived by Core @syntax/syntax-template rules; do not name this cache as
+    # if it were already the canonical shape authority.
+    graph_cache_directory="$source_cache_directory"
+    /bin/mkdir -p "$graph_cache_directory"
+    graph_bundle="$graph_cache_directory/ProjectSourceSet.range"
+    graph_execution="$graph_cache_directory/execution.tsv"
+    graph_output="$graph_cache_directory/compiled.ll"
+    graph_revision="$graph_cache_directory/revision.tsv"
+    graph_bundle_backup="$WORK_ROOT/ProjectSourceSet.previous.range"
+    graph_metadata_backup="$WORK_ROOT/source.previous.tsv"
+
+    # Source stage: the candidate File -> Source bundle is consumed from the
+    # persisted artifact when its metadata still matches this input and
+    # compiler, instead of being re-derived and rewritten on every run.
+    metrics_source_start_ms="$(now_ms)"
+    graph_source_candidate_hash="$(/usr/bin/shasum -a 256 "$project_bundle" | /usr/bin/awk '{print $1}')"
+    graph_source_expected="$(/usr/bin/printf 'rangeSource\tversion=1\tprofile=%s\tinput=%s\tcompiler=%s\tsourceSet=%s' \
+        "$source_profile" "$graph_input_identity" "$graph_compiler_hash" "$graph_source_candidate_hash")"
+    graph_source_consumed=0
+    if [[ -f "$source_metadata_artifact" ]] \
+        && /usr/bin/grep -Fqx "$graph_source_expected" "$source_metadata_artifact"; then
+        graph_source_consumed=1
+    fi
+    metrics_source_end_ms="$(now_ms)"
+    graph_source_ms=$((metrics_source_end_ms - metrics_source_start_ms))
+
+    graph_had_bundle=0
+    graph_had_metadata=0
+    if [[ "$graph_source_consumed" -eq 0 ]]; then
+        if [[ -f "$graph_bundle" ]]; then
+            /bin/cp "$graph_bundle" "$graph_bundle_backup"
+            graph_had_bundle=1
+        fi
+        if [[ -f "$source_metadata_artifact" ]]; then
+            /bin/cp "$source_metadata_artifact" "$graph_metadata_backup"
+            graph_had_metadata=1
+        fi
+        /bin/cp "$project_bundle" "$graph_bundle.tmp"
+        /bin/mv "$graph_bundle.tmp" "$graph_bundle"
+    fi
+
+    # Load stage: read the persisted execution and revision records the
+    # reducer chain will query or resume.
+    metrics_load_start_ms="$(now_ms)"
+    graph_execution_bytes=0
+    graph_revision_bytes=0
+    if [[ -f "$graph_execution" ]]; then
+        graph_execution_bytes="$(/usr/bin/stat -f %z "$graph_execution")"
+    fi
+    if [[ -f "$graph_revision" ]]; then
+        graph_revision_bytes="$(/usr/bin/stat -f %z "$graph_revision")"
+    fi
+    metrics_load_end_ms="$(now_ms)"
+    graph_load_ms=$((metrics_load_end_ms - metrics_load_start_ms))
+
+    # Reducer stage: the V1 reducer chain applies its delta over the persisted
+    # execution record. On reuse it leaves the accepted revision untouched.
+    metrics_reducer_start_ms="$(now_ms)"
+    graph_status=0
+    "$compiler" resume-v1 "$graph_execution" "$graph_bundle" "$graph_output" \
+        > "$WORK_ROOT/graph-execution.out" || graph_status=$?
+    metrics_reducer_end_ms="$(now_ms)"
+    graph_reducer_ms=$((metrics_reducer_end_ms - metrics_reducer_start_ms))
+    if [[ "$graph_status" -ne 0 ]]; then
+        if [[ "$graph_had_bundle" -eq 1 ]]; then
+            /bin/cp "$graph_bundle_backup" "$graph_bundle"
+        elif [[ "$graph_source_consumed" -eq 0 ]]; then
+            /bin/rm -f "$graph_bundle"
+        fi
+        if [[ "$graph_had_metadata" -eq 1 ]]; then
+            /bin/cp "$graph_metadata_backup" "$source_metadata_artifact"
+        elif [[ "$graph_source_consumed" -eq 0 ]]; then
+            /bin/rm -f "$source_metadata_artifact"
+        fi
+        /bin/cat "$WORK_ROOT/graph-execution.out" >&2
+        exit "$graph_status"
+    fi
+    /bin/cat "$WORK_ROOT/graph-execution.out" >&2
+
+    if /usr/bin/grep -Fq $'compilerV1Execution\tstatus=reused\tchanged=0' "$WORK_ROOT/graph-execution.out"; then
+        [[ -f "$graph_revision" ]] \
+            || compile_project_fail "unchanged graph execution is missing its accepted revision artifact"
+    else
+        write_graph_revision "$graph_revision" "$WORK_ROOT/graph-execution.out" "$graph_bundle" "$graph_output"
+    fi
+    if [[ "$graph_source_consumed" -eq 0 ]]; then
+        source_bundle_hash="$(/usr/bin/shasum -a 256 "$graph_bundle" | /usr/bin/awk '{print $1}')"
+        /usr/bin/printf 'rangeSource\tversion=1\tprofile=%s\tinput=%s\tcompiler=%s\tsourceSet=%s\n' \
+            "$source_profile" "$graph_input_identity" "$graph_compiler_hash" "$source_bundle_hash" \
+            > "$source_metadata_artifact.tmp"
+        /bin/mv "$source_metadata_artifact.tmp" "$source_metadata_artifact"
+    fi
+
+    # Query stage: read the committed revision record and report which phases
+    # committed a new delta versus consumed the prior accepted value. A phase
+    # whose before and after values are equal consumed the persisted revision.
+    metrics_query_start_ms="$(now_ms)"
+    graph_execution_status="$(revision_field "$WORK_ROOT/graph-execution.out" status)"
+    graph_views_affected=0
+    graph_source_flag="consumed"
+    graph_shape_flag="consumed"
+    graph_behavior_flag="consumed"
+    graph_compile_flag="consumed"
+    if [[ "$graph_execution_status" != "reused" ]]; then
+        for graph_node in source shape behavior compiled; do
+            graph_before="$(revision_field "$WORK_ROOT/graph-execution.out" "${graph_node}Before")"
+            graph_after="$(revision_field "$WORK_ROOT/graph-execution.out" "${graph_node}After")"
+            if [[ "$graph_before" == "$graph_after" ]]; then
+                graph_flag="consumed"
+            else
+                graph_flag="derived"
+                graph_views_affected=$((graph_views_affected + 1))
+            fi
+            case "$graph_node" in
+                source) graph_source_flag="$graph_flag" ;;
+                shape) graph_shape_flag="$graph_flag" ;;
+                behavior) graph_behavior_flag="$graph_flag" ;;
+                compiled) graph_compile_flag="$graph_flag" ;;
+            esac
+        done
+    fi
+    metrics_query_end_ms="$(now_ms)"
+    graph_query_ms=$((metrics_query_end_ms - metrics_query_start_ms))
+
+    # Materialize stage: the compiled view is emitted as the command product.
+    metrics_materialize_start_ms="$(now_ms)"
+    /bin/cat "$graph_output"
+    /usr/bin/printf '\n'
+    metrics_materialize_end_ms="$(now_ms)"
+    graph_materialize_ms=$((metrics_materialize_end_ms - metrics_materialize_start_ms))
+
+    /usr/bin/printf 'rangeGraphMetrics\tversion=1\tloadMs=%s\treducerMs=%s\tqueryMs=%s\tmaterializeMs=%s\tsourceMs=%s\tviewsAffected=%s\tsourceArtifact=%s\tsource=%s\tshape=%s\tbehavior=%s\tcompile=%s\texecutionBytes=%s\trevisionBytes=%s\n' \
+        "$graph_load_ms" "$graph_reducer_ms" "$graph_query_ms" "$graph_materialize_ms" "$graph_source_ms" "$graph_views_affected" \
+        "$graph_source_consumed" "$graph_source_flag" "$graph_shape_flag" "$graph_behavior_flag" "$graph_compile_flag" \
+        "$graph_execution_bytes" "$graph_revision_bytes" >&2
+    exit 0
+fi
+
+exec "$compiler" "$compiler_command" "$project_bundle"
