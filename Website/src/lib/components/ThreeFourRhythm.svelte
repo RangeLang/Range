@@ -32,7 +32,7 @@
     entryStartDistance: number;
     centerRadius: number;
     progress: number;
-    exitOpacity: number;
+    audioExitGain: number;
   };
 
   const soundManager = getContext<RangeSoundManager | undefined>(
@@ -176,7 +176,6 @@
     uniform vec2 u_origin;
     uniform float u_time;
     uniform float u_shape;
-    uniform float u_opacity;
     uniform vec3 u_accent;
 
     vec2 segmentInfo(vec2 point, vec2 start, vec2 end, float offset) {
@@ -391,7 +390,7 @@
         alpha = capsuleAlpha;
       }
 
-      gl_FragColor = vec4(color, alpha * u_opacity);
+      gl_FragColor = vec4(color, alpha);
     }
   `;
 
@@ -509,7 +508,7 @@
   function propertiesLayerLevel() {
     if (macroLayerPresence >= 0.9) return 0;
     return squareFigure
-      ? figureScrollPosition(squareFigure).exitOpacity
+      ? figureScrollPosition(squareFigure).audioExitGain
       : 1;
   }
 
@@ -708,7 +707,7 @@
       entryStartDistance,
       centerRadius,
       progress: smoothRange(entryStartDistance, centerRadius, distancePastCenter),
-      exitOpacity: 1 - smoothRange(
+      audioExitGain: 1 - smoothRange(
         centerRadius,
         exitEndDistance,
         distancePastCenter,
@@ -733,10 +732,6 @@
     target.style.setProperty(
       "--scroll-distance",
       `${position.distancePastCenter.toFixed(1)}px`,
-    );
-    target.style.setProperty(
-      "--scroll-exit-opacity",
-      position.exitOpacity.toFixed(4),
     );
   }
 
@@ -1330,7 +1325,6 @@
     const originLocation = context.getUniformLocation(program, "u_origin");
     const timeLocation = context.getUniformLocation(program, "u_time");
     const shapeLocation = context.getUniformLocation(program, "u_shape");
-    const opacityLocation = context.getUniformLocation(program, "u_opacity");
     const accentLocation = context.getUniformLocation(program, "u_accent");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0;
@@ -1390,10 +1384,6 @@
       context.uniform2f(originLocation, x, y);
       context.uniform1f(timeLocation, time);
       context.uniform1f(shapeLocation, shape);
-      context.uniform1f(
-        opacityLocation,
-        shape === 2 ? figureScrollPosition(squareFigure).exitOpacity : 1,
-      );
       context.drawArrays(context.TRIANGLES, 0, 6);
     };
 
@@ -1711,11 +1701,6 @@
 
   .shapeFigure {
     margin: 30px 0 38px;
-  }
-
-  .squareFigure {
-    opacity: var(--scroll-exit-opacity, 1);
-    will-change: opacity;
   }
 
   .identityDetail + .functionIntro {

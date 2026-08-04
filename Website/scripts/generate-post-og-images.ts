@@ -93,7 +93,7 @@ try {
         "--virtual-time-budget=1500",
         `--user-data-dir=${profile}`,
         `--screenshot=${output}`,
-        `${origin}/og-card/posts/${post.slug}`,
+        `${origin}/__og-card/posts/${post.slug}`,
       ],
       {
         cwd: websiteRoot,

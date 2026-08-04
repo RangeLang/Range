@@ -2,10 +2,10 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import {
   allPosts,
-  draftPosts,
   posts,
   postImagePath,
   postImageUrl,
+  publishedPosts,
 } from "../src/lib/posts";
 
 const port = 43_000 + (process.pid % 1_000);
@@ -110,8 +110,8 @@ describe("SvelteKit routes", () => {
     expect(html).toContain('data-active-post="0"');
     expect(html).not.toContain("data-range-focus-ring");
     const postPalettes = html.match(/data-post-palette="\d+"/g) ?? [];
-    expect(postPalettes).toHaveLength(posts.length);
-    expect(new Set(postPalettes).size).toBe(posts.length);
+    expect(postPalettes).toHaveLength(publishedPosts.length);
+    expect(new Set(postPalettes).size).toBe(publishedPosts.length);
     expect(html).not.toContain('variant="codability"');
     expect(html).not.toContain('variant="string"');
     expect(html).not.toContain("source() →");
@@ -141,7 +141,7 @@ describe("SvelteKit routes", () => {
       "{#each visiblePosts as post, index}",
     );
     expect(latestPostsSource).toContain(
-      "href={dev ? post.previewHref ?? post.href : post.href}",
+      "href={postHref(post)}",
     );
 
     const postCardSource = await readFile(
@@ -880,83 +880,11 @@ describe("SvelteKit routes", () => {
     expect(shader).toContain('document.addEventListener("visibilitychange"');
   });
 
-  test("keeps Intro to Range 2 hidden with typed relationship metadata", async () => {
-    const compilerPost = draftPosts.find(
-      (post) => post.slug === "intro-to-range-2",
-    );
-    expect(compilerPost).toBeDefined();
-
-    const [response, page, previewGate, essayPage, shader, cardResponse] =
-      await Promise.all([
-        render("/posts/intro-to-range-2", "manual"),
-        readFile(
-          new URL(
-            "../src/routes/posts/intro-to-range-2/+page.svelte",
-            import.meta.url,
-          ),
-          "utf8",
-        ),
-        readFile(
-          new URL(
-            "../src/routes/posts/intro-to-range-2/+page.server.ts",
-            import.meta.url,
-          ),
-          "utf8",
-        ),
-        readFile(
-          new URL("../src/lib/components/EssayPage.svelte", import.meta.url),
-          "utf8",
-        ),
-        readFile(
-          new URL(
-            "../src/lib/components/RelationshipDotsShader.svelte",
-            import.meta.url,
-          ),
-          "utf8",
-        ),
-        render("/og-card/posts/intro-to-range-2"),
-      ]);
-    const cardHtml = await cardResponse.text();
-
-    expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("/");
-    expect(previewGate).toContain(
-      'dev && url.searchParams.get("preview") === "range-draft"',
-    );
-    expect(page).toContain('title="Intro to Range: The Concrete"');
-    expect(page).toContain('heroShader="fibonacci-sphere"');
-    expect(page).toContain("the value produced by");
-    expect(page).toContain("let multiplicity: RelationshipMultiplicity");
-    expect(page).toContain("let ordering: RelationshipOrdering");
-    expect(page).toContain("let separator: RelationshipSeparator");
-    expect(page).toContain("let enclosure: RelationshipEnclosure");
-    expect(page).toContain("let origin: Identifier");
-    expect(page).toContain("let role: Identifier");
-    expect(page).toContain("let destination: Identifier");
-    expect(page).toContain("Multiplicity is not a container");
-    expect(page).toContain("LLVM then receives a concrete representation");
-    expect(page).toContain("Identity gives the compiler a universe");
-    expect(page).toContain("set-theoretic operations");
-    expect(page).toContain("It is cheap because the compiler is not manufacturing a new world");
-    expect(page).toContain("common identity-bearing universe");
-    expect(essayPage).toContain("<RelationshipDotsShader compact />");
-    expect(shader).toContain('data-shader="relationship-dots"');
-    expect(shader).toContain('data-dot-count="3"');
-    expect(shader.match(/float \w+Dot = dotMask/g)).toHaveLength(3);
-    expect(shader).toContain("distanceToSegment(point, origin, role)");
-    expect(shader).toContain("distanceToSegment(point, role, destination)");
-    expect(shader).toContain("1000 / 30");
-    expect(shader).toContain("new IntersectionObserver");
-    expect(cardResponse.status).toBe(200);
-    expect(cardHtml).toContain('data-shader="relationship-dots"');
-    expect(cardHtml).toContain("Intro to Range: The Concrete");
-  });
-
   test("renders the hidden observation's sphere shader social card", async () => {
-    const draftPost = draftPosts.find(
-      (post) => post.slug === "one-source-two-lenses",
+    const draftPost = posts.find(
+      (post) => post.slug === "one-source-two-lenses" && post.draft,
     )!;
-    const response = await render(`/og-card/posts/${draftPost.slug}`);
+    const response = await render(`/__og-card/posts/${draftPost.slug}`);
     const html = await response.text();
 
     expect(response.status).toBe(200);
@@ -1033,7 +961,7 @@ describe("SvelteKit routes", () => {
     for (const post of posts) {
       const [articleResponse, cardResponse] = await Promise.all([
         render(post.href),
-        render(`/og-card/posts/${post.slug}`),
+        render(`/__og-card/posts/${post.slug}`),
       ]);
       const [articleHtml, cardHtml] = await Promise.all([
         articleResponse.text(),

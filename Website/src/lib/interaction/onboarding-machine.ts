@@ -13,8 +13,11 @@ export type OnboardingPhase =
 
 export type OnboardingInput = "mouse" | "touch" | "keyboard";
 
+export type OnboardingStage = "small" | "medium" | "fullscreen";
+
 export type OnboardingSnapshot = {
   readonly phase: OnboardingPhase;
+  readonly stage: OnboardingStage;
   readonly input: OnboardingInput | undefined;
   readonly reveal: number;
   readonly startedAt: number;
@@ -28,6 +31,7 @@ export type OnboardingEvent =
   | { type: "END_DRAG" }
   | { type: "REVEAL"; amount: number; now: number }
   | { type: "BEGIN_LEAVE" }
+  | { type: "REACH_FULLSCREEN"; remaining: number }
   | { type: "LEAVE_FINISHED" }
   | { type: "RESET" };
 
@@ -52,12 +56,14 @@ export type RangeOnboardingMachine = {
 };
 
 const entryDuration = 4_200;
-// Grow for 1s, hold the completed fullscreen field for 260ms, then focus-swap
-// the complete homepage as one 800ms layer instead of blending its pieces.
-const exitDuration = 2_060;
+// Exit is one composited handoff: the sky sphere and its centered inner
+// website cutout grow together while the page resolves underneath them.
+const exitDuration = 600;
+const fullscreenHoldDuration = 80;
 
 const initialSnapshot: OnboardingSnapshot = {
   phase: "booting",
+  stage: "small",
   input: undefined,
   reveal: 0,
   startedAt: 0,
@@ -84,6 +90,7 @@ export function createRangeOnboardingMachine(): RangeOnboardingMachine {
         next = {
           ...initialSnapshot,
           phase: event.completed && !event.force ? "complete" : "prompting",
+          stage: event.completed && !event.force ? "fullscreen" : "small",
         };
         break;
       case "ACTIVATE":
@@ -100,7 +107,7 @@ export function createRangeOnboardingMachine(): RangeOnboardingMachine {
         break;
       case "ENTRY_FINISHED":
         if (snapshot.phase !== "entering") break;
-        next = { ...snapshot, phase: "exploring" };
+        next = { ...snapshot, phase: "exploring", stage: "medium" };
         break;
       case "START_DRAG":
         if (snapshot.phase !== "exploring") break;
@@ -134,11 +141,21 @@ export function createRangeOnboardingMachine(): RangeOnboardingMachine {
         }
         effects.push({ type: "PERSIST_COMPLETION" });
         effects.push({ type: "SCHEDULE_LEAVE_FINISH", delay: exitDuration });
-        next = { ...snapshot, phase: "leaving" };
+        next = { ...snapshot, phase: "leaving", stage: "medium" };
+        break;
+      case "REACH_FULLSCREEN":
+        if (snapshot.phase !== "leaving" || snapshot.stage === "fullscreen") {
+          break;
+        }
+        effects.push({
+          type: "SCHEDULE_LEAVE_FINISH",
+          delay: Math.max(0, event.remaining) + fullscreenHoldDuration,
+        });
+        next = { ...snapshot, stage: "fullscreen" };
         break;
       case "LEAVE_FINISHED":
-        if (snapshot.phase !== "leaving") break;
-        next = { ...snapshot, phase: "complete" };
+        if (snapshot.phase !== "leaving" || snapshot.stage !== "fullscreen") break;
+        next = { ...snapshot, phase: "complete", stage: "fullscreen" };
         break;
       case "RESET":
         completionScheduled = false;

@@ -187,18 +187,23 @@ range-typed-text[data-collapsing] > [data-collapse-content] {
 
 html[data-range-onboarding="active"] [data-range-site-content] {
   opacity: 0;
-  filter: blur(18px);
-  transform: scale(1.018);
+  transform: none;
+}
+
+html[data-range-onboarding="leaving"] [data-range-site-content] {
+  position: relative;
+  z-index: 0;
+  will-change: opacity;
+  opacity: var(--range-homepage-opacity, 1);
+  transform: none;
 }
 
 html[data-range-onboarding="revealing"] [data-range-site-content] {
   position: relative;
   z-index: 1001;
-  transform-origin: center;
-  will-change: opacity, filter, transform;
+  will-change: opacity;
   opacity: var(--range-homepage-opacity, 0);
-  filter: blur(var(--range-homepage-blur, 18px));
-  transform: scale(var(--range-homepage-scale, 1.018));
+  transform: none;
 }
 
 [data-range-home-page] > range-scale {

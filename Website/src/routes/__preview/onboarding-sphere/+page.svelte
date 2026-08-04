@@ -16,6 +16,7 @@
   let exitPlaying = $state(false);
   let siteRevealed = $state(false);
   let homepageSwapTimeline = $state(0);
+  let sphereStage = $state<"small" | "medium" | "fullscreen">("small");
   let renderedSize = $state(56);
   let renderedFisheye = $state(0);
   let renderedDistortion = $state(0);
@@ -48,8 +49,16 @@
   const exitDuration = 1_000;
   const fullscreenHoldDuration = 260;
   const homepageRevealDuration = 800;
+  // Flip to full-bleed before the exact diagonal so antialiasing cannot leave
+  // a one-frame white flash in the viewport corners.
+  const fullscreenCoverageEpsilon = 8;
   const firstInhaleDuration = 4_200;
   const anchorBreathPeriod = 13_500;
+  const animatedFisheyePeak = 0.55;
+  const breathingAmplitude = 56;
+  const breathingFisheyeFloor = 0.18;
+  const breathingWowFloor = 0.42;
+  const breathingHarmonicFrequencies = [110.0, 146.83] as const;
 
   function reset() {
     if (entranceFrame !== undefined) cancelAnimationFrame(entranceFrame);
@@ -70,6 +79,7 @@
     exitPlaying = false;
     siteRevealed = false;
     homepageSwapTimeline = 0;
+    sphereStage = "small";
     fisheyeTarget = 1.5;
     distortionTarget = 1;
     glitter = 1;
@@ -101,21 +111,25 @@
     return clamped * clamped * (3 - 2 * clamped);
   }
 
-  function anchoredBreathSignal(phaseValue: number) {
-    const envelope = smoothstep((Math.sin(phaseValue) + 1) * 0.5);
-    return (envelope * 2 - 1 - Math.sin(phaseValue * 2) * 0.16) / 1.1131;
-  }
-
-  function anchoredSphereSize(phaseValue: number) {
-    const anchor = targetSize();
-    const signal = anchoredBreathSignal(phaseValue);
-    const inhaleWeight = smoothstep((signal + 1) * 0.5);
-    const swingDistance = 56 + (anchor * 0.05 - 56) * inhaleWeight;
-    return anchor + signal * swingDistance;
-  }
-
   function anchoredGrowth(value: number) {
     return smoothstep(value);
+  }
+
+  function breathingFrame(phaseValue: number) {
+    // Keep the preview on the exact same symmetric size/lens/audio driver as
+    // the real onboarding surface.
+    const signal = Math.sin(phaseValue);
+    return {
+      signal,
+      envelope: (signal + 1) * 0.5,
+      size: targetSize() + signal * breathingAmplitude,
+      // Keep the space outward-facing throughout the breath; never produce a
+      // negative, concave fisheye as the sphere exhales.
+      fisheye: animatedFisheyePeak * (
+        breathingFisheyeFloor
+          + (1 - breathingFisheyeFloor) * ((signal + 1) * 0.5)
+      ),
+    };
   }
 
   function stopAnchorSuspension() {
@@ -148,28 +162,20 @@
         // breathing clock to catch up afterward.
         anchorPhase = -Math.PI / 2 + Math.PI * interactionProgress;
         const growth = anchoredGrowth(interactionProgress);
-        const earlySwing = anchoredBreathSignal(anchorPhase)
-          * 0.042
-          * (1 - smoothstep(growth))
-          * smoothstep((now - anchorStartedAt) / 1_200);
-        anchorScale = anchoredSphereSize(anchorPhase) / targetSize() + earlySwing;
-        shapeHashEnvelope((Math.sin(anchorPhase) + 1) / 2);
+        const breathing = breathingFrame(anchorPhase);
+        anchorScale = breathing.size / targetSize();
+        shapeHashEnvelope(breathing.envelope);
+        shapePreviewHarmonics(breathing.envelope);
         setGrowth(growth);
-        // Space expands with the sphere, overshoots softly, then settles.
-        setFisheye(
-          growth * 0.65
-            + Math.sin(growth * Math.PI) * 0.5
-            + (anchorScale - 1) * 3,
-        );
-        const fisheyeIn = smoothstep(interactionProgress / 0.38);
-        const fisheyeOut = 1 - smoothstep((interactionProgress - 0.42) / 0.58);
-        setDistortion(fisheyeIn * fisheyeOut * 0.85);
+        setFisheye(animatedFisheyePeak * growth);
+        setDistortion(0);
       } else if (entrancePlaying) {
         // At the exact inhale peak, transition into the normal breathing rate.
         anchorPhase = Math.PI / 2;
         anchorLastAt = now;
         entrancePlaying = false;
         anchorSettledAt = now;
+        sphereStage = "medium";
         holdPreviewSustain(previewSustain, 0.18);
         shapeTwinkleHarmonics(1);
       }
@@ -177,13 +183,14 @@
         const elapsed = now - anchorLastAt;
         anchorLastAt = now;
         anchorPhase += elapsed / anchorBreathPeriod * Math.PI * 2;
-        anchorScale = anchoredSphereSize(anchorPhase) / targetSize();
-        shapeHashEnvelope((Math.sin(anchorPhase) + 1) / 2);
+        const breathing = breathingFrame(anchorPhase);
+        anchorScale = breathing.size / targetSize();
+        shapeHashEnvelope(breathing.envelope);
+        shapePreviewWow(breathing.envelope);
+        shapePreviewHarmonics(breathing.envelope);
         setGrowth(1);
         twinkleTimeline = smoothstep((now - anchorSettledAt) / 1_800);
-        // Reverse the lens against size on an independent sine so the
-        // asymmetric anchor swing cannot introduce a visual velocity kink.
-        setFisheye(0.9 - Math.sin(anchorPhase) * 0.1);
+        setFisheye(breathing.fisheye);
       }
       anchorFrame = requestAnimationFrame(frame);
     };
@@ -303,7 +310,7 @@
       voices.push(voice);
     }
     const harmonics: OscillatorNode[] = [];
-    for (const frequency of [110.0, 146.83]) {
+    for (const frequency of breathingHarmonicFrequencies) {
       const harmonic = context.createOscillator();
       harmonic.type = "sine";
       harmonic.frequency.setValueAtTime(frequency, now);
@@ -362,6 +369,41 @@
     );
   }
 
+  function shapePreviewWow(envelope: number) {
+    if (!previewSustain || !previewAudioContext) return;
+    const amount = Math.min(1, Math.max(0, envelope));
+    const wowEnvelope = breathingWowFloor + (1 - breathingWowFloor) * amount;
+    previewSustain.toneGain.gain.setTargetAtTime(
+      0.18 * wowEnvelope,
+      previewAudioContext.currentTime,
+      0.55,
+    );
+  }
+
+  function shapePreviewHarmonics(envelope: number) {
+    if (!previewSustain || !previewAudioContext) return;
+    const amount = Math.min(1, Math.max(0, envelope));
+    const now = previewAudioContext.currentTime;
+    previewSustain.harmonicGain.gain.setTargetAtTime(
+      0.003 + amount * 0.009,
+      now,
+      0.55,
+    );
+    previewSustain.harmonicLfoGain.gain.setTargetAtTime(
+      amount * 0.004,
+      now,
+      0.55,
+    );
+    for (const [index, harmonic] of previewSustain.harmonics.entries()) {
+      const rise = 1 + amount * (index === 0 ? 0.18 : 0.24);
+      harmonic.frequency.setTargetAtTime(
+        breathingHarmonicFrequencies[index] * rise,
+        now,
+        0.55,
+      );
+    }
+  }
+
   function shapeHashEnvelope(envelope: number) {
     if (!previewSustain || !previewAudioContext) return;
     const amount = Math.min(1, Math.max(0, envelope));
@@ -401,8 +443,12 @@
   }
 
   function exitDiameter() {
-    // Match the real flow: the sphere covers the viewport before whiteout.
-    return typeof window === "undefined" ? renderedSize : window.innerHeight * 3.4;
+    // Match the real flow: the fullscreen state is the measured viewport
+    // diagonal, followed by the page handoff.
+    if (typeof window === "undefined") return renderedSize;
+    const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    return Math.hypot(viewportWidth, viewportHeight);
   }
 
   async function playEntrance() {
@@ -414,6 +460,7 @@
     starFadeTimeline = 0;
     siteRevealed = false;
     homepageSwapTimeline = 0;
+    sphereStage = "small";
     setGrowth(0);
     setFisheye(0);
     setDistortion(0);
@@ -436,7 +483,7 @@
     if (entrancePlaying || exitPlaying || growthTimeline < 0.999) return;
     if (collapseFrame !== undefined) cancelAnimationFrame(collapseFrame);
     stopAnchorSuspension();
-    const startingGrowth = growthTimeline;
+    const startingSize = renderedSize;
     const startingFisheye = fisheyeTimeline;
     const startingDistortion = renderedDistortion / Math.max(distortionTarget, 0.001);
     const startedAt = performance.now();
@@ -445,9 +492,9 @@
       const progress = Math.min(1, (now - startedAt) / 2_400);
       const eased = smoothstep(progress);
       const remaining = 1 - eased;
-      setGrowth(startingGrowth * remaining);
+      renderedSize = 56 + (startingSize - 56) * remaining;
       setFisheye(startingFisheye * remaining);
-      setDistortion(startingDistortion * remaining);
+      setDistortion(0);
       shapeTwinkleHarmonics(remaining);
       twinkleTimeline = remaining;
       shapePreviewSustain(remaining);
@@ -457,6 +504,7 @@
         entrancePlaying = false;
         whiteoutTimeline = 0;
         starFadeTimeline = 0;
+        sphereStage = "small";
         setGrowth(0);
         releasePreviewSustain();
       }
@@ -491,8 +539,17 @@
       whiteoutTimeline = 0;
       starFadeTimeline = 0;
       const easedSphere = smoothstep(sphereProgress);
-      renderedSize = startingSize + (exitDiameter() - startingSize) * easedSphere;
-      setFisheye(startingFisheye);
+      const finalDiameter = exitDiameter();
+      renderedSize = startingSize + (finalDiameter - startingSize) * easedSphere;
+      if (
+        sphereProgress >= 1 ||
+        finalDiameter - renderedSize <= fullscreenCoverageEpsilon
+      ) {
+        sphereStage = "fullscreen";
+      }
+      setFisheye(
+        startingFisheye + (animatedFisheyePeak - startingFisheye) * easedSphere,
+      );
       setDistortion(0);
       homepageSwapTimeline = smoothstep(homepageProgress);
       const revealTail = 1 - homepageSwapTimeline;
@@ -633,6 +690,7 @@
       >
         <OnboardingSphereShader
           fisheyeAmount={renderedFisheye}
+          fullBleed={sphereStage === "fullscreen"}
           distortionAmount={renderedDistortion}
           glitterAmount={glitter * (1 - smoothstep(starFadeTimeline))}
           fieldBrightness={brightness}

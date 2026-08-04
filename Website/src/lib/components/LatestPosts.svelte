@@ -3,14 +3,13 @@
   import { onMount } from "svelte";
   import PostCard from "$lib/components/PostCard.svelte";
   import PostNoiseShader from "$lib/components/PostNoiseShader.svelte";
-  import { allPosts, posts } from "$lib/posts";
+  import { allPosts, postHref, publishedPosts } from "$lib/posts";
 
   const withoutIntroSeries = (post: (typeof allPosts)[number]) =>
     !post.slug.startsWith("intro-to-range");
-  const developmentPosts = allPosts.filter(withoutIntroSeries);
   const visiblePosts = dev
-    ? developmentPosts
-    : posts.filter(withoutIntroSeries);
+    ? allPosts.filter(withoutIntroSeries)
+    : publishedPosts.filter(withoutIntroSeries);
 
   let hoveredPost = $state<number | null>(null);
   let focusedPost = $state<number | null>(null);
@@ -58,7 +57,7 @@
     {#each visiblePosts as post, index}
       <PostCard
         {post}
-        href={dev ? post.previewHref ?? post.href : post.href}
+        href={postHref(post)}
         onhoverchange={(hovered) => setHoveredPost(index, hovered)}
         onfocuschange={(focused) => setFocusedPost(index, focused)}
       />

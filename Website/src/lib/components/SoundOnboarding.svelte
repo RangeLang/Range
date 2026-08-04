@@ -39,17 +39,20 @@
   let liveBreathFilter: BiquadFilterNode | undefined;
   let liveNoise: AudioBufferSourceNode | undefined;
   let liveVoices: OscillatorNode[] = [];
+  let liveHarmonicVoices: OscillatorNode[] = [];
+  let liveHarmonicGains: GainNode[] = [];
   let liveLevel = 0.055;
   let lastBreathShapeAt = -Infinity;
   let sphereEpoch = typeof performance === "undefined" ? 0 : performance.now();
-  let fisheyeAmount = $state(0);
-  let lensDistortionAmount = $state(0);
   let exitDiameter = $state(0);
   let sphereSize = $state(56);
-  let whiteoutTimeline = $state(0);
+  let exitBlurTimeline = $state(0);
   let twinkleTimeline = $state(0);
   let starFadeTimeline = $state(0);
   let homepageSwapTimeline = $state(0);
+  let exitCutoutActive = $state(false);
+  let innerCutoutTimeline = $state(0);
+  let fisheyeAmount = $state(0);
   let sphereFrame: number | undefined;
   let exitFrame: number | undefined;
   let collapseFrame: number | undefined;
@@ -58,15 +61,31 @@
   let anchorStartedAt = 0;
   let anchorSettledAt = 0;
   let liveCollapsing = $state(false);
+  // The machine owns the discrete stage; the frame timeline only interpolates
+  // the circle inside the current state.
+  let sphereStage = $derived(machineSnapshot.stage);
   const entryDuration = 4_200;
-  const exitDuration = 1_000;
-  const fullscreenHoldDuration = 260;
-  const homepageRevealDuration = 800;
+  const exitDuration = 600;
+  const homepageRevealDuration = 480;
   const anchorBreathPeriod = 13_500;
+  // Flip the shader to full-bleed just before the measured diagonal so the
+  // antialiased corner pixels never expose a one-frame gap.
+  const fullscreenCoverageEpsilon = 8;
+  const mediumFisheye = 0.82;
+  const fullscreenFisheye = 0.82;
+  const breathingAmplitude = 56;
+  const breathingFisheyeFloor = 0.18;
+  const breathingWowFloor = 0.42;
 
   function smoothstep(value: number) {
     const clamped = Math.min(1, Math.max(0, value));
     return clamped * clamped * (3 - 2 * clamped);
+  }
+
+  function smootherstep(value: number) {
+    const clamped = Math.min(1, Math.max(0, value));
+    return clamped * clamped * clamped
+      * (clamped * (clamped * 6 - 15) + 10);
   }
 
   function setHomepageSwap(value: number) {
@@ -77,41 +96,36 @@
       "--range-homepage-opacity",
       incoming.toFixed(4),
     );
-    document.documentElement.style.setProperty(
-      "--range-homepage-blur",
-      `${((1 - incoming) * 18).toFixed(2)}px`,
-    );
-    document.documentElement.style.setProperty(
-      "--range-homepage-scale",
-      (1 + (1 - incoming) * 0.018).toFixed(5),
-    );
   }
 
-  function naturalBreathEnvelope(phaseValue: number) {
-    // Preserve one inhale and one exhale per cycle, but linger gently at each
-    // turn instead of reading as a mechanically uniform sine wave.
-    return smoothstep((Math.sin(phaseValue) + 1) * 0.5);
+  function setFisheyeAmount(value: number) {
+    fisheyeAmount = Math.min(1.5, Math.max(-1.5, value));
   }
 
-  function anchoredBreathSignal(phaseValue: number) {
-    // The second harmonic preserves a little forward inertia through the
-    // inhale peak, producing one soft overshoot before the exhale takes over.
-    return (
-      naturalBreathEnvelope(phaseValue) * 2 - 1
-        - Math.sin(phaseValue * 2) * 0.16
-    ) / 1.1131;
-  }
-
-  function anchoredSphereSize(phaseValue: number) {
-    const anchor = targetSphereSize();
-    const signal = anchoredBreathSignal(phaseValue);
-    const inhaleWeight = smoothstep((signal + 1) * 0.5);
-    const swingDistance = 56 + (anchor * 0.05 - 56) * inhaleWeight;
-    return anchor + signal * swingDistance;
+  function setSphereSize(nextSize: number) {
+    sphereSize = nextSize;
   }
 
   function targetSphereSize() {
+    if (typeof window === "undefined") return 56;
     return Math.min(window.innerHeight * 0.7, window.innerWidth * 0.76);
+  }
+
+  function breathingFrame(phaseValue: number) {
+    // One symmetric driver owns the idle motion. The sphere, fisheye, and
+    // audio all read these values from the same animation frame.
+    const signal = Math.sin(phaseValue);
+    return {
+      signal,
+      envelope: (signal + 1) * 0.5,
+      size: targetSphereSize() + signal * breathingAmplitude,
+      // Breathing can reduce the lens, but it never turns concave or caves
+      // inward. Forward motion stays in the positive fisheye direction.
+      fisheye: mediumFisheye * (
+        breathingFisheyeFloor
+          + (1 - breathingFisheyeFloor) * ((signal + 1) * 0.5)
+      ),
+    };
   }
 
   function stopSphereTimeline() {
@@ -127,11 +141,28 @@
     lastBreathShapeAt = now;
     const breath = Math.min(1, Math.max(0, envelope));
     const tail = Math.min(1, Math.max(0, residual));
-    const masterLevel = Math.max(0.0001, (0.0045 + liveLevel * 0.52 * breath) * tail);
-    const hashLevel = Math.max(0.0001, (0.01 + breath * 0.025) * tail);
+    // Keep the low wow pad present through the exhale. Growth is still the
+    // inhale and reaches the same peak; only the quiet-side floor is lifted.
+    const wowEnvelope = breathingWowFloor + (1 - breathingWowFloor) * breath;
+    const masterLevel = Math.max(
+      0.0001,
+      (0.0085 + liveLevel * 0.38 * wowEnvelope) * tail,
+    );
+    const hashLevel = Math.max(0.0001, (0.007 + breath * 0.022) * tail);
+    const harmonicLevel = (0.001 + breath * 0.011) * tail;
     liveBreathGain.gain.setTargetAtTime(masterLevel, now, 0.55);
     liveHashGain.gain.setTargetAtTime(hashLevel, now, 0.7);
     liveBreathFilter.frequency.setTargetAtTime(240 + breath * 320, now, 0.75);
+    for (const [index, voice] of liveHarmonicVoices.entries()) {
+      const baseFrequency = index === 0 ? 146.83 : 220.0;
+      const rise = 1 + breath * (index === 0 ? 0.18 : 0.24);
+      voice.frequency.setTargetAtTime(baseFrequency * rise, now, 0.55);
+      liveHarmonicGains[index]?.gain.setTargetAtTime(
+        harmonicLevel * (index === 0 ? 1 : 0.72),
+        now,
+        0.55,
+      );
+    }
   }
 
   function stopLiveBreath() {
@@ -156,8 +187,17 @@
         // The source may already have ended during teardown.
       }
     }
+    for (const voice of liveHarmonicVoices) {
+      try {
+        voice.stop(stopAt);
+      } catch {
+        // The voice may already have ended during teardown.
+      }
+    }
     liveNoise = undefined;
     liveVoices = [];
+    liveHarmonicVoices = [];
+    liveHarmonicGains = [];
     liveAttackGain = undefined;
     liveBreathGain = undefined;
     liveHashGain = undefined;
@@ -172,29 +212,22 @@
     anchorLastAt = anchorStartedAt;
     anchorSettledAt = 0;
     twinkleTimeline = 0;
-    whiteoutTimeline = 0;
     starFadeTimeline = 0;
+    exitCutoutActive = false;
+    innerCutoutTimeline = 0;
+    exitBlurTimeline = 0;
+    setFisheyeAmount(0);
     setHomepageSwap(0);
     const frame = (now: number) => {
       const entryProgress = Math.min(1, Math.max(0, (now - anchorStartedAt) / entryDuration));
       if (entryProgress < 1) {
         anchorPhase = -Math.PI / 2 + Math.PI * entryProgress;
-        const breathSignal = anchoredBreathSignal(anchorPhase);
-        shapeLiveBreath((Math.sin(anchorPhase) + 1) * 0.5);
+        const breathing = breathingFrame(anchorPhase);
+        shapeLiveBreath(breathing.envelope);
         const growth = smoothstep(entryProgress);
-        const earlySwing = breathSignal
-          * 0.042
-          * (1 - smoothstep(growth))
-          * smoothstep((now - anchorStartedAt) / 1_200);
-        const anchorScale = anchoredSphereSize(anchorPhase) / targetSphereSize()
-          + earlySwing;
-        sphereSize = 56 + (targetSphereSize() * anchorScale - 56) * growth;
-        fisheyeAmount = 1.5 * (
-          growth * 0.65 + Math.sin(growth * Math.PI) * 0.5 + (anchorScale - 1) * 3
-        );
-        const fisheyeIn = smoothstep(entryProgress / 0.38);
-        const fisheyeOut = 1 - smoothstep((entryProgress - 0.42) / 0.58);
-        lensDistortionAmount = fisheyeIn * fisheyeOut * 0.85;
+        const nextSize = 56 + (breathing.size - 56) * growth;
+        setSphereSize(nextSize);
+        setFisheyeAmount(mediumFisheye * growth);
       } else {
         if (anchorSettledAt === 0) {
           anchorPhase = Math.PI / 2;
@@ -204,12 +237,10 @@
         const elapsed = now - anchorLastAt;
         anchorLastAt = now;
         anchorPhase += elapsed / anchorBreathPeriod * Math.PI * 2;
-        shapeLiveBreath((Math.sin(anchorPhase) + 1) * 0.5);
-        sphereSize = anchoredSphereSize(anchorPhase);
-        // Run the lens opposite the size on a clean sine. Keeping it separate
-        // from the asymmetric size swing removes the midpoint velocity kink.
-        fisheyeAmount = 1.5 * (0.9 - Math.sin(anchorPhase) * 0.1);
-        lensDistortionAmount = 0;
+        const breathing = breathingFrame(anchorPhase);
+        setSphereSize(breathing.size);
+        setFisheyeAmount(breathing.fisheye);
+        shapeLiveBreath(breathing.envelope);
         twinkleTimeline = smoothstep((now - anchorSettledAt) / 1_800);
       }
       if (phase !== "leaving" && !liveCollapsing) sphereFrame = requestAnimationFrame(frame);
@@ -291,6 +322,21 @@
       voice.connect(voiceGain).connect(filter);
       voice.start(now);
       liveVoices.push(voice);
+    }
+    // Keep these partials warm and close to the body of the wow. Their
+    // frequency and level are moved by the shared breath envelope below.
+    liveHarmonicVoices = [];
+    liveHarmonicGains = [];
+    for (const frequency of [146.83, 220.0]) {
+      const voice = context.createOscillator();
+      const voiceGain = context.createGain();
+      voice.type = "sine";
+      voice.frequency.setValueAtTime(frequency, now);
+      voiceGain.gain.setValueAtTime(0.001, now);
+      voice.connect(voiceGain).connect(filter);
+      voice.start(now);
+      liveHarmonicVoices.push(voice);
+      liveHarmonicGains.push(voiceGain);
     }
     liveAttackGain = attackGain;
     liveBreathGain = breathGain;
@@ -379,40 +425,54 @@
     stopSphereTimeline();
     const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-    exitDiameter = Math.hypot(viewportWidth, viewportHeight) + 4;
+    // Cross the measured diagonal slightly so fractional viewport pixels and
+    // antialiasing cannot leave a visible corner gap.
+    exitDiameter = Math.hypot(viewportWidth, viewportHeight) + 16;
     const transition = onboardingMachine.send({ type: "BEGIN_LEAVE" });
     if (transition.snapshot.phase !== "leaving") return;
     const startedAt = performance.now();
     const startingSize = sphereSize;
-    const startingFisheye = fisheyeAmount / 1.5;
+    const startingFisheye = fisheyeAmount;
+    // Keep the sky as the same circular layer while its outer boundary grows;
+    // the centered inner window follows the exact same timeline.
+    exitCutoutActive = true;
+    innerCutoutTimeline = 0;
+    document.documentElement.dataset.rangeOnboarding = "leaving";
     setHomepageSwap(0);
-    let contentRevealStarted = false;
     const frame = (now: number) => {
       const elapsed = now - startedAt;
       const sphereProgress = Math.min(1, elapsed / exitDuration);
-      const homepageProgress = Math.min(1, Math.max(
-        0,
-        elapsed - exitDuration - fullscreenHoldDuration,
-      ) / homepageRevealDuration);
+      const homepageProgress = Math.min(1, elapsed / homepageRevealDuration);
       const easedSphere = smoothstep(sphereProgress);
-      sphereSize = startingSize + (exitDiameter - startingSize) * easedSphere;
-      // Keep the spatial lens alive for the complete fullscreen hold. The
-      // homepage replaces the whole field; there is no second lens tail.
-      fisheyeAmount = 1.5 * startingFisheye;
-      lensDistortionAmount = 0;
-      whiteoutTimeline = 0;
+      const nextSphereSize =
+        startingSize + (exitDiameter - startingSize) * easedSphere;
+      const cutoutProgress = Math.min(1, Math.max(
+        0,
+        (sphereProgress - 0.42) / 0.58,
+      ));
+      const easedCutout = smootherstep(cutoutProgress);
+      setSphereSize(nextSphereSize);
+      setFisheyeAmount(
+        startingFisheye + (fullscreenFisheye - startingFisheye) * easedSphere,
+      );
+      const coverageComplete = sphereProgress >= 1
+        || exitDiameter - nextSphereSize <= fullscreenCoverageEpsilon;
+      if (coverageComplete && machineSnapshot.stage !== "fullscreen") {
+        const fullscreenTransition = onboardingMachine.send({
+          type: "REACH_FULLSCREEN",
+          remaining: Math.max(0, exitDuration - elapsed),
+        });
+        runEffects(fullscreenTransition.effects);
+      }
       starFadeTimeline = 0;
       twinkleTimeline = 1;
-      if (!contentRevealStarted && homepageProgress > 0) {
-        contentRevealStarted = true;
-        document.documentElement.dataset.rangeOnboarding = "revealing";
+      innerCutoutTimeline = easedCutout;
+      exitBlurTimeline = easedCutout;
+      setHomepageSwap(smoothstep(homepageProgress));
+      shapeLiveBreath(1, 1);
+      if (sphereProgress < 1 || homepageProgress < 1) {
+        exitFrame = requestAnimationFrame(frame);
       }
-      const easedHomepage = smoothstep(homepageProgress);
-      setHomepageSwap(easedHomepage);
-      const revealTail = 1 - easedHomepage;
-      shapeLiveBreath(revealTail, revealTail);
-      const totalDuration = exitDuration + fullscreenHoldDuration + homepageRevealDuration;
-      if (elapsed < totalDuration) exitFrame = requestAnimationFrame(frame);
       else exitFrame = undefined;
     };
     exitFrame = requestAnimationFrame(frame);
@@ -431,19 +491,21 @@
     const frame = (now: number) => {
       const progress = Math.min(1, (now - startedAt) / 1_600);
       const remaining = 1 - smoothstep(progress);
-      sphereSize = 56 + (startingSize - 56) * remaining;
-      fisheyeAmount = startingFisheye * remaining;
-      lensDistortionAmount *= remaining;
+      const eased = smoothstep(progress);
+      setSphereSize(56 + (startingSize - 56) * remaining);
+      // Collapse is the exact reverse size path, so the lens follows that
+      // same path instead of adding an independent recoil curve.
+      setFisheyeAmount(startingFisheye * remaining);
       twinkleTimeline = remaining;
       shapeLiveBreath(remaining, 1);
       if (progress < 1) collapseFrame = requestAnimationFrame(frame);
       else {
         collapseFrame = undefined;
         liveCollapsing = false;
-        whiteoutTimeline = 0;
+        setFisheyeAmount(0);
         starFadeTimeline = 0;
         twinkleTimeline = 0;
-        lensDistortionAmount = 0;
+        exitBlurTimeline = 0;
         shapeLiveBreath(0.08, 1, true);
       }
     };
@@ -458,7 +520,7 @@
         ? document.documentElement.dataset.rangeOnboarding === "revealing"
           ? "ready"
           : previousPhase === "leaving" ? "revealing" : "ready"
-        : "active";
+        : snapshot.phase === "leaving" ? "leaving" : "active";
     });
     const skipPreview = import.meta.env.DEV
       && new URLSearchParams(window.location.search).get("onboarding") === "skip";
@@ -497,8 +559,6 @@
       if (collapseFrame !== undefined) cancelAnimationFrame(collapseFrame);
       delete document.documentElement.dataset.rangeOnboarding;
       document.documentElement.style.removeProperty("--range-homepage-opacity");
-      document.documentElement.style.removeProperty("--range-homepage-blur");
-      document.documentElement.style.removeProperty("--range-homepage-scale");
       stopLiveBreath();
       route?.dispose();
     };
@@ -509,8 +569,36 @@
   <div
     class="onboarding"
     class:leaving={phase === "leaving"}
+    data-sphere-stage={sphereStage}
     onpointerdown={collapseSettledSphere}
   >
+    <div
+      class="skyLayer"
+      aria-hidden="true"
+      style={`--sky-opacity: ${exitCutoutActive ? 1 : 1 - homepageSwapTimeline}; --sky-blur: ${exitCutoutActive ? 0 : homepageSwapTimeline * 18}px; --sky-scale: ${exitCutoutActive ? 1 : 1 + homepageSwapTimeline * 0.025};`}
+    >
+      <OnboardingSphereShader
+        viewportLayer
+        viewportMask
+        fullBleed={sphereStage === "fullscreen" && phase !== "leaving"}
+        sphereDiameter={sphereSize}
+        emptiness={phase === "leaving"
+          ? innerCutoutTimeline * 1.128
+          : innerCutoutTimeline}
+        emptinessFeather={phase === "leaving"
+          ? 0.035 + exitBlurTimeline * 0.093
+          : 0}
+        concreteness={concreteness}
+        timeOrigin={sphereEpoch}
+        fisheyeAmount={fisheyeAmount}
+        distortionAmount={0}
+        animateLens={phase === "entering" || phase === "exploring" || phase === "leaving"}
+        glitterAmount={1 - smoothstep(starFadeTimeline)}
+        twinkleAmount={twinkleTimeline}
+        whiteoutAmount={0}
+        coverOutside={phase === "leaving"}
+      />
+    </div>
     <button
       class="sphereControl"
       type="button"
@@ -519,23 +607,7 @@
       onpointerdown={unlockFromPointer}
       onclick={unlockFromKeyboard}
       style={`--sphere-size: ${sphereSize}px;`}
-    >
-      <span
-        class="fieldBackdrop"
-        aria-hidden="true"
-        style={`--sky-opacity: ${1 - homepageSwapTimeline}; --sky-blur: ${homepageSwapTimeline * 18}px; --sky-scale: ${1 + homepageSwapTimeline * 0.025};`}
-      >
-        <OnboardingSphereShader
-          concreteness={concreteness}
-          timeOrigin={sphereEpoch}
-          fisheyeAmount={fisheyeAmount}
-          distortionAmount={lensDistortionAmount}
-          glitterAmount={1 - smoothstep(starFadeTimeline)}
-          twinkleAmount={twinkleTimeline}
-          whiteoutAmount={smoothstep(whiteoutTimeline)}
-        />
-      </span>
-    </button>
+    ></button>
   </div>
 {/if}
 
@@ -554,12 +626,14 @@
 
   .onboarding.leaving {
     pointer-events: none;
+    background-color: transparent;
   }
 
   .sphereControl {
     position: absolute;
     top: 50%;
     left: 50%;
+    z-index: 1;
     display: block;
     width: var(--sphere-size);
     height: var(--sphere-size);
@@ -587,13 +661,11 @@
     outline-offset: 6px;
   }
 
-  .fieldBackdrop {
+  .skyLayer {
     position: absolute;
     z-index: 0;
     inset: 0;
     overflow: hidden;
-    border: 0;
-    border-radius: 50%;
     background: transparent;
     opacity: var(--sky-opacity, 1);
     filter: blur(var(--sky-blur, 0px));
@@ -603,24 +675,13 @@
   }
 
   /* Keep the discovery object visible before WebGL has completed its first draw. */
-  .onboarding:not(.leaving) .fieldBackdrop {
+  .onboarding:not(.leaving) .skyLayer:not([data-shader-rendered="true"]) + .sphereControl {
     background: radial-gradient(
       circle at 42% 38%,
       oklch(0.19 0.045 258),
       oklch(0.075 0.025 260) 68%,
       oklch(0.035 0.014 260)
     );
-  }
-
-  .onboarding :global(.fieldBackdrop[data-shader-rendered="true"]) {
-    background: transparent;
-    border-radius: 0;
-    overflow: visible;
-  }
-
-  .onboarding :global(.sphereControl:has(.fieldBackdrop[data-shader-rendered="true"])) {
-    border-radius: 0;
-    overflow: visible;
   }
 
   @media (prefers-reduced-motion: reduce) {

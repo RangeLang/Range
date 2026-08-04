@@ -4,7 +4,6 @@
   import PostNoiseShader from "$lib/components/PostNoiseShader.svelte";
   import FibonacciSphereShader from "$lib/components/FibonacciSphereShader.svelte";
   import SphereLineShader from "$lib/components/SphereLineShader.svelte";
-  import RelationshipDotsShader from "$lib/components/RelationshipDotsShader.svelte";
 
   let {
     post,
@@ -63,10 +62,6 @@
     {:else if post.socialShader === "sphere-lines"}
       <div class="socialSphereShader">
         <SphereLineShader palette={post.palette} topAligned />
-      </div>
-    {:else if post.socialShader === "relationship-dots"}
-      <div class="socialSphereShader">
-        <RelationshipDotsShader />
       </div>
     {:else}
       <PostNoiseShader palette={post.palette} {still} oncontrast={applyContrast} />

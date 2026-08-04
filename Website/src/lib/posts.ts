@@ -4,13 +4,13 @@ const socialImageVersion = "2026-08-02-2";
 export type Post = {
   slug: string;
   href: string;
-  previewHref?: string;
   category: string;
   cardTitle: string;
   cardDescription: string;
   description: string;
   palette: number;
-  socialShader?: "fibonacci-sphere" | "sphere-lines" | "relationship-dots";
+  draft?: boolean;
+  socialShader?: "fibonacci-sphere" | "sphere-lines";
   cardPalette: {
     foreground: string;
     mutedForeground: string;
@@ -18,6 +18,10 @@ export type Post = {
     contrast: number;
   };
 };
+
+export function postHref(post: Post) {
+  return post.draft ? `${post.href}?preview=range-draft` : post.href;
+}
 
 export const posts: Post[] = [
   {
@@ -101,13 +105,9 @@ export const posts: Post[] = [
       contrast: 4.61,
     },
   },
-];
-
-export const draftPosts: Post[] = [
   {
     slug: "class-v-struct",
     href: "/posts/class-v-struct",
-    previewHref: "/posts/class-v-struct?preview=range-draft",
     category: "Observation",
     cardTitle: "Class v. Struct",
     cardDescription:
@@ -115,6 +115,7 @@ export const draftPosts: Post[] = [
     description:
       "Values should be understandable in isolation, and some things should keep a stable identity as they move through a system.",
     palette: 9,
+    draft: true,
     cardPalette: {
       foreground: "rgb(33 25 18)",
       mutedForeground: "rgb(82 69 57)",
@@ -125,7 +126,6 @@ export const draftPosts: Post[] = [
   {
     slug: "intro-to-range-2",
     href: "/posts/intro-to-range-2",
-    previewHref: "/posts/intro-to-range-2?preview=range-draft",
     category: "Introduction",
     cardTitle: "Intro to Range: The Concrete",
     cardDescription:
@@ -133,7 +133,7 @@ export const draftPosts: Post[] = [
     description:
       "How the Range compiler uses typed relationship values to describe multiplicity, order, separators, and enclosure.",
     palette: 6,
-    socialShader: "relationship-dots",
+    draft: true,
     cardPalette: {
       foreground: "rgb(40 20 88)",
       mutedForeground: "rgb(76 64 103)",
@@ -144,8 +144,6 @@ export const draftPosts: Post[] = [
   {
     slug: "one-source-two-lenses",
     href: "/posts/one-source-two-lenses",
-    previewHref:
-      "/posts/one-source-two-lenses?preview=range-draft",
     category: "Observation",
     cardTitle: "One Source, Two Lenses",
     cardDescription:
@@ -153,6 +151,7 @@ export const draftPosts: Post[] = [
     description:
       "In Range, written source and intended meaning share one typed graph.",
     palette: 4,
+    draft: true,
     socialShader: "sphere-lines",
     cardPalette: {
       foreground: "rgb(15 21 31)",
@@ -164,7 +163,6 @@ export const draftPosts: Post[] = [
   {
     slug: "intro-to-range-3",
     href: "/posts/intro-to-range-3",
-    previewHref: "/posts/intro-to-range-3?preview=range-draft",
     category: "Introduction",
     cardTitle: "Intro to Range: The Meta",
     cardDescription:
@@ -172,6 +170,7 @@ export const draftPosts: Post[] = [
     description:
       "How Range macros operate on the identity-bearing graph to make reusable program structure.",
     palette: 7,
+    draft: true,
     cardPalette: {
       foreground: "rgb(54 23 0)",
       mutedForeground: "rgb(101 62 35)",
@@ -182,7 +181,6 @@ export const draftPosts: Post[] = [
   {
     slug: "intro-to-range-4",
     href: "/posts/intro-to-range-4",
-    previewHref: "/posts/intro-to-range-4?preview=range-draft",
     category: "Introduction",
     cardTitle: "Intro to Range: The Substrate",
     cardDescription:
@@ -190,6 +188,7 @@ export const draftPosts: Post[] = [
     description:
       "How one graph pattern can represent written syntax, databases, and anything else you need to express.",
     palette: 8,
+    draft: true,
     cardPalette: {
       foreground: "rgb(24 28 65)",
       mutedForeground: "rgb(67 70 109)",
@@ -197,9 +196,28 @@ export const draftPosts: Post[] = [
       contrast: 10.4,
     },
   },
+  {
+    slug: "requirement-and-provision",
+    href: "/posts/requirement-and-provision",
+    category: "Language design",
+    cardTitle: "Requirement and Provision: A Modern Split",
+    cardDescription:
+      "One declaration in the environment can be both sides of the split.",
+    description:
+      "Requirement and provision were never two features; they are two consumption states of one environment contribution.",
+    palette: 2,
+    draft: true,
+    cardPalette: {
+      foreground: "rgb(0 85 0)",
+      mutedForeground: "rgb(55 78 61)",
+      background: "rgb(255 160 240)",
+      contrast: 4.61,
+    },
+  },
 ];
 
-export const allPosts = [...posts, ...draftPosts];
+export const publishedPosts = posts.filter((post) => !post.draft);
+export const allPosts = posts;
 
 export function postForPath(pathname: string) {
   return allPosts.find((post) => post.href === pathname);

@@ -12,12 +12,18 @@
     glitterAmount = 1,
     fieldBrightness = 1,
     fullBleed = false,
+    viewportLayer = false,
+    viewportMask = false,
+    sphereDiameter = 0,
     emptiness = 0,
     emptinessFeather = 0.045,
     twinkleAmount = 0,
     dissolveAmount = 0,
     fieldOpacity = 1,
     whiteoutAmount = 0,
+    animateLens = false,
+    invertMask = false,
+    coverOutside = false,
   }: {
     pointerX?: number;
     pointerY?: number;
@@ -29,12 +35,18 @@
     glitterAmount?: number;
     fieldBrightness?: number;
     fullBleed?: boolean;
+    viewportLayer?: boolean;
+    viewportMask?: boolean;
+    sphereDiameter?: number;
     emptiness?: number;
     emptinessFeather?: number;
     twinkleAmount?: number;
     dissolveAmount?: number;
     fieldOpacity?: number;
     whiteoutAmount?: number;
+    animateLens?: boolean;
+    invertMask?: boolean;
+    coverOutside?: boolean;
   } = $props();
 
   let canvas: HTMLCanvasElement;
@@ -53,12 +65,18 @@
     void glitterAmount;
     void fieldBrightness;
     void fullBleed;
+    void viewportLayer;
+    void viewportMask;
+    void sphereDiameter;
     void emptiness;
     void emptinessFeather;
     void twinkleAmount;
     void dissolveAmount;
     void fieldOpacity;
     void whiteoutAmount;
+    void animateLens;
+    void invertMask;
+    void coverOutside;
     invalidateRender?.();
   });
   const vertexSource = `
@@ -82,12 +100,16 @@
     uniform float u_glitter_amount;
     uniform float u_field_brightness;
     uniform float u_full_bleed;
+    uniform float u_viewport_mask;
+    uniform float u_sphere_diameter;
     uniform float u_emptiness;
     uniform float u_emptiness_feather;
     uniform float u_twinkle_amount;
     uniform float u_dissolve_amount;
     uniform float u_field_opacity;
     uniform float u_whiteout_amount;
+    uniform float u_invert_mask;
+    uniform float u_cover_outside;
 
     float hash12(vec2 point) {
       vec3 point3 = fract(vec3(point.xyx) * 0.1031);
@@ -129,58 +151,79 @@
       fieldPoint.x *= u_viewport_resolution.x / max(u_viewport_resolution.y, 1.0);
 
       float concreteness = clamp(u_concreteness, 0.0, 1.0);
-      float sphereScale = 1.0;
-      vec2 spherePoint = point / sphereScale;
+      float sphereRadius = max(u_sphere_diameter * 0.5, 1.0);
+      vec2 spherePoint = u_viewport_mask > 0.5
+        ? (gl_FragCoord.xy - u_resolution * 0.5) / sphereRadius
+        : point;
       float radialSquared = dot(spherePoint, spherePoint);
       float radialDistance = sqrt(radialSquared);
-      // Resolve the circular coverage in this same fragment pass. A small
-      // resolution-derived feather is stable while the canvas is resizing and
-      // avoids resampling an opaque square through a separate CSS clip.
-      float edgeFeather = 5.0 / max(min(u_resolution.x, u_resolution.y), 1.0);
+      // Resolve the circular cutout in this same fragment pass. The sky canvas
+      // stays viewport-sized; only this alpha mask follows the interaction.
+      float sphereResolution = u_viewport_mask > 0.5
+        ? max(u_sphere_diameter, 1.0)
+        : min(u_resolution.x, u_resolution.y);
+      // The sphere silhouette is a hard geometric boundary. Keep only one
+      // pixel of antialiasing; all visible feathering belongs to the internal
+      // website-reveal cutout.
+      float edgeFeather = 1.0 / max(sphereResolution, 1.0);
       float sphereAlpha = u_full_bleed > 0.5
         ? 1.0
         : 1.0 - smoothstep(1.0 - edgeFeather, 1.0, radialDistance);
+      float maskAlpha = u_invert_mask > 0.5
+        ? 1.0 - sphereAlpha
+        : sphereAlpha;
 
       vec3 background = vec3(0.0);
 
-      if (radialSquared < 1.0 || u_full_bleed > 0.5) {
-        float surfaceZ = sqrt(max(0.0, 1.0 - radialSquared));
-        // This normal is already unit length, and the light vector is normalized
-        // ahead of time. Avoiding two per-pixel normalize calls matters at 70vh.
-        vec3 normal = vec3(spherePoint, surfaceZ);
-        vec3 lightDirection = vec3(-0.286, 0.350, 0.892);
-        float diffuse = max(dot(normal, lightDirection), 0.0);
-        float ambient = 0.26 + surfaceZ * 0.34;
-        float fisheyeStrength = clamp(
-          max(u_fisheye_amount, u_distortion_amount),
-          0.0,
-          1.5
-        );
-        float lensCurve = 1.8 + fisheyeStrength * 0.9;
-        float lensMix = smoothstep(0.0, 1.5, fisheyeStrength);
-        float fisheyeRadius = mix(
-          radialDistance,
-          atan(radialDistance * lensCurve) / atan(lensCurve),
-          lensMix
-        );
+      float fieldVisible = (radialSquared < 1.0
+        || u_full_bleed > 0.5
+        || u_invert_mask > 0.5)
+        ? 1.0
+        : 0.0;
+      if (fieldVisible > 0.5) {
+        float fisheyeStrength = clamp(u_fisheye_amount, -1.5, 1.5);
+        // Preserve signed fisheye values for onboarding. The legacy positive
+        // distortion input is only a fallback when no fisheye was supplied;
+        // max(negativeFisheye, 0) would erase the inward lens entirely.
+        if (abs(fisheyeStrength) < 0.0001) {
+          fisheyeStrength = clamp(u_distortion_amount, 0.0, 1.5);
+        } else if (fisheyeStrength > 0.0) {
+          fisheyeStrength = max(fisheyeStrength, u_distortion_amount);
+        }
+        float lensMagnitude = abs(fisheyeStrength);
+        float lensCurve = 1.8 + lensMagnitude * 0.9;
+        float convexRadius = atan(radialDistance * lensCurve) / atan(lensCurve);
+        float concaveInput = min(radialDistance, 1.0);
+        float concaveRadius = tan(concaveInput * atan(lensCurve)) / lensCurve;
+        float lensRadius = fisheyeStrength < 0.0
+          ? radialDistance <= 1.0 ? concaveRadius : radialDistance
+          : convexRadius;
+        float lensMix = smoothstep(0.0, 1.5, lensMagnitude);
+        float fisheyeRadius = mix(radialDistance, lensRadius, lensMix);
         vec2 fisheyePoint = radialDistance > 0.0001
           ? spherePoint * (fisheyeRadius / radialDistance)
           : spherePoint;
         // Field coordinates are viewport-anchored, so scale the lens displacement
         // by the sphere's real viewport coverage as it grows.
-        float sphereCoverage = max(
-          u_resolution.x / max(u_viewport_resolution.x, 1.0),
-          u_resolution.y / max(u_viewport_resolution.y, 1.0)
-        );
+        float sphereCoverage = u_viewport_mask > 0.5
+          ? u_sphere_diameter / max(
+              min(u_viewport_resolution.x, u_viewport_resolution.y),
+              1.0
+            )
+          : max(
+              u_resolution.x / max(u_viewport_resolution.x, 1.0),
+              u_resolution.y / max(u_viewport_resolution.y, 1.0)
+            );
         float fisheyeScale = min(2.0, sphereCoverage);
+        float lensVisible = (radialSquared < 1.0 || u_full_bleed > 0.5)
+          ? 1.0
+          : 0.0;
         vec2 underPoint = fieldPoint
           + (fisheyePoint - spherePoint)
-            * (0.45 + clamp(u_distortion_amount, 0.0, 1.0) * 0.35)
-            * fisheyeScale;
+            * (0.45 + clamp(u_distortion_amount, 0.0, 1.0) * 0.48)
+            * fisheyeScale
+            * lensVisible;
         float grain = valueNoise(underPoint * 4.5 + vec2(u_time * 0.012));
-        float facets = 0.5 + 0.5 * sin(
-          underPoint.x * 8.0 + underPoint.y * 6.0 + surfaceZ * 9.0
-        );
         float coarseGlitter = glitter(
           underPoint * 1.2 + vec2(u_time * 0.012, -u_time * 0.008),
           14.0,
@@ -205,16 +248,15 @@
         vec3 abstractSurface = mix(
           fieldDeep,
           fieldLight,
-          0.38 + surfaceZ * 0.08
+          0.38 + grain * 0.08
         );
         abstractSurface += (grain - 0.5) * vec3(0.08, 0.12, 0.22) * 0.025;
 
         vec3 concreteSurface = mix(
-          vec3(0.09, 0.12, 0.17),
-          vec3(0.31, 0.36, 0.43),
-          ambient * 0.52 + diffuse * 0.48
+          vec3(0.075, 0.095, 0.13),
+          vec3(0.17, 0.20, 0.26),
+          0.48 + grain * 0.12
         );
-        concreteSurface += vec3(0.075, 0.095, 0.13) * facets * 0.22;
         concreteSurface += (grain - 0.5) * 0.045;
 
         vec3 surface = mix(abstractSurface, concreteSurface, concreteness);
@@ -231,12 +273,6 @@
           * (0.34 + concreteness * 0.3)
           * u_glitter_amount;
         vec3 darkSkyWithStars = baseSurface + coarseStars + fineStars;
-        float starMask = clamp(
-          coarseGlitter * shimmer * glitterWeight
-            + fineGlitter * (0.34 + concreteness * 0.3),
-          0.0,
-          1.0
-        ) * clamp(u_glitter_amount, 0.0, 1.0);
         // Whiteout follows the field's own luminance. Highlights and stars
         // clear first; each darker band receives proportionally more delay,
         // while the shared smooth ramp still converges to exact white.
@@ -248,19 +284,16 @@
           min(1.0, darknessDelay + 0.62),
           whiteout
         );
-        vec3 whiteSkyWithStars = mix(
-          vec3(1.0),
-          vec3(0.48, 0.67, 0.94),
-          starMask * 0.72
-        );
-        background = mix(darkSkyWithStars, whiteSkyWithStars, localWhiteout);
+        // The exit tail resolves to actual white. Keep the color target
+        // neutral so the sky does not leave a blue star wash behind.
+        background = mix(darkSkyWithStars, vec3(1.0), localWhiteout);
       }
 
       float emptinessAlpha = u_emptiness <= 0.0001
         ? 1.0
         : smoothstep(
-            max(0.0, clamp(u_emptiness, 0.0, 1.0) - max(u_emptiness_feather, 0.0001)),
-            clamp(u_emptiness, 0.0, 1.0),
+            max(0.0, u_emptiness - max(u_emptiness_feather, 0.0001)),
+            max(u_emptiness, 0.0),
             length(spherePoint)
           );
       float dissolve = clamp(u_dissolve_amount, 0.0, 1.0);
@@ -272,11 +305,20 @@
           valueNoise(fieldPoint * 12.0 + vec2(3.7, 8.1))
         ));
       }
-      float alpha = sphereAlpha
+      float skyAlpha = maskAlpha
         * emptinessAlpha
         * dissolveAlpha
         * clamp(u_field_opacity, 0.0, 1.0);
-      gl_FragColor = vec4(background * alpha, alpha);
+      // During exit, preserve the white sheet outside the growing sphere while
+      // leaving the inner cutout transparent to the real page underneath.
+      // This prevents the page from leaking around the circle before coverage.
+      float outsideCoverAlpha = clamp(u_cover_outside, 0.0, 1.0)
+        * (1.0 - sphereAlpha);
+      float coverContribution = outsideCoverAlpha * (1.0 - skyAlpha);
+      float alpha = skyAlpha + coverContribution;
+      vec3 premultipliedColor = background * skyAlpha
+        + vec3(1.0) * coverContribution;
+      gl_FragColor = vec4(premultipliedColor, alpha);
     }
   `;
 
@@ -365,6 +407,14 @@
       "u_field_brightness",
     );
     const fullBleedLocation = context.getUniformLocation(program, "u_full_bleed");
+    const viewportMaskLocation = context.getUniformLocation(
+      program,
+      "u_viewport_mask",
+    );
+    const sphereDiameterLocation = context.getUniformLocation(
+      program,
+      "u_sphere_diameter",
+    );
     const emptinessLocation = context.getUniformLocation(program, "u_emptiness");
     const emptinessFeatherLocation = context.getUniformLocation(
       program,
@@ -374,6 +424,8 @@
     const dissolveLocation = context.getUniformLocation(program, "u_dissolve_amount");
     const fieldOpacityLocation = context.getUniformLocation(program, "u_field_opacity");
     const whiteoutLocation = context.getUniformLocation(program, "u_whiteout_amount");
+    const invertMaskLocation = context.getUniformLocation(program, "u_invert_mask");
+    const coverOutsideLocation = context.getUniformLocation(program, "u_cover_outside");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0;
     let visible = true;
@@ -396,9 +448,14 @@
       }
       viewportWidth = (window.visualViewport?.width ?? window.innerWidth) * density;
       viewportHeight = (window.visualViewport?.height ?? window.innerHeight) * density;
-      const canvasBounds = canvas.getBoundingClientRect();
-      fieldOriginX = canvasBounds.left * density;
-      fieldOriginY = viewportHeight - canvasBounds.bottom * density;
+      if (viewportLayer) {
+        fieldOriginX = 0;
+        fieldOriginY = 0;
+      } else {
+        const canvasBounds = canvas.getBoundingClientRect();
+        fieldOriginX = canvasBounds.left * density;
+        fieldOriginY = viewportHeight - canvasBounds.bottom * density;
+      }
       layoutDirty = false;
     };
 
@@ -415,17 +472,24 @@
       context.uniform2f(fieldOriginLocation, fieldOriginX, fieldOriginY);
       context.uniform1f(timeLocation, time);
       context.uniform1f(concretenessLocation, concreteness);
+      // The interaction timeline already owns the continuous breathing curve.
+      // Read the live values directly so the lens cannot trail the sphere by a
+      // second, shader-local response envelope.
       context.uniform1f(fisheyeLocation, fisheyeAmount);
       context.uniform1f(distortionLocation, distortionAmount);
       context.uniform1f(glitterLocation, glitterAmount);
       context.uniform1f(brightnessLocation, fieldBrightness);
       context.uniform1f(fullBleedLocation, fullBleed ? 1 : 0);
+      context.uniform1f(viewportMaskLocation, viewportMask ? 1 : 0);
+      context.uniform1f(sphereDiameterLocation, sphereDiameter * density);
       context.uniform1f(emptinessLocation, emptiness);
       context.uniform1f(emptinessFeatherLocation, emptinessFeather);
       context.uniform1f(twinkleLocation, twinkleAmount);
       context.uniform1f(dissolveLocation, dissolveAmount);
       context.uniform1f(fieldOpacityLocation, fieldOpacity);
       context.uniform1f(whiteoutLocation, whiteoutAmount);
+      context.uniform1f(invertMaskLocation, invertMask ? 1 : 0);
+      context.uniform1f(coverOutsideLocation, coverOutside ? 1 : 0);
       context.drawArrays(context.TRIANGLES, 0, 6);
       canvas.dataset.rendered = "true";
       canvas.parentElement?.setAttribute("data-shader-rendered", "true");
@@ -435,7 +499,7 @@
       frame = 0;
       if (!visible || document.hidden) return;
       draw(now);
-      if (!reducedMotion.matches && twinkleAmount > 0.0001) {
+      if (!reducedMotion.matches && (twinkleAmount > 0.0001 || animateLens)) {
         frame = requestAnimationFrame(render);
       }
     };
@@ -487,6 +551,7 @@
 <canvas
   class="onboardingSphereShader"
   class:compact
+  class:viewportLayer
   aria-hidden="true"
   data-shader="onboarding-sphere"
   data-concreteness={concreteness.toFixed(2)}
@@ -499,5 +564,14 @@
     width: 100%;
     height: 100%;
     background: transparent;
+  }
+
+  .onboardingSphereShader.viewportLayer {
+    position: fixed;
+    z-index: 0;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
   }
 </style>
