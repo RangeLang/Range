@@ -356,6 +356,74 @@ describe("SvelteKit routes", () => {
     expect(shader).toContain("mix(abstractSurface, concreteSurface, concreteness)");
   });
 
+  test("shares the onboarding sky with the cutout-free Intro hero", async () => {
+    const [sky, onboardingShader, intro, articleHeader] = await Promise.all([
+      readFile(
+        new URL("../src/lib/components/SkyShader.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../src/lib/components/OnboardingSphereShader.svelte",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../src/routes/posts/intro-to-range/+page.svelte",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL("../src/lib/components/ArticleHeader.svelte", import.meta.url),
+        "utf8",
+      ),
+    ]);
+
+    expect(sky).toContain("fullBleed = true");
+    expect(sky).toContain('data-shader="range-sky"');
+    expect(sky).toContain("const glitterIntensity = 1.15");
+    expect(sky).toContain("const twinkleIntensity = 1");
+    expect(sky).toContain("if (!reducedMotion.matches)");
+    expect(sky).toContain("float coarseSpark = pow(coarseWave, 3.0)");
+    expect(sky).toContain("float fineSpark = pow(fineWave, 5.0)");
+    expect(sky).toContain("u_time * 1.65 + coarsePhase");
+    expect(sky).toContain("u_time * 2.35 + finePhase");
+    expect(sky).toContain("orbitDuration = 35");
+    expect(sky).toContain("uniform float u_orbit_duration");
+    expect(sky).toContain("6.2831853 / max(u_orbit_duration, 0.001)");
+    expect(sky).toContain(
+      "vec2 orbitDirection = vec2(cos(directionAngle), sin(directionAngle))",
+    );
+    expect(sky).toContain(
+      "vec2 directedPoint = underPoint + orbitDirection * 0.028",
+    );
+    expect(sky).not.toContain("pointermove");
+    expect(sky).not.toContain("u_direction");
+    expect(sky).not.toContain("directionFollow");
+    expect(sky).not.toContain("underPoint * 1.2 + vec2(u_time");
+    expect(sky).not.toContain("underPoint * 2.0 + vec2(-u_time");
+    expect(onboardingShader).toContain(
+      'import SkyShader from "$lib/components/SkyShader.svelte"',
+    );
+    expect(onboardingShader).toContain("fullBleed = false");
+    expect(onboardingShader).toContain("orbitDuration = 28");
+    expect(onboardingShader).toContain(
+      "<SkyShader {fullBleed} {orbitDuration} {...props} />",
+    );
+    expect(intro).toContain(
+      'import SkyShader from "$lib/components/SkyShader.svelte"',
+    );
+    expect(intro).toContain("<SkyShader />");
+    expect(intro).not.toContain("OnboardingSphereShader");
+    expect(intro).not.toContain("glitterAmount");
+    expect(intro).not.toContain("twinkleAmount");
+    expect(articleHeader).toContain(".shader.unmasked {");
+    expect(articleHeader).toContain("inset: 0;");
+  });
+
   test("retires the former Updates namespace", async () => {
     const response = await render(
       "/updates/one-program-two-lenses",
@@ -1107,12 +1175,17 @@ test("renders the homepage description in the site monospace face", async () => 
 });
 
 test("attaches the lower scale to the leading title stem", async () => {
-  const [globals, guide] = await Promise.all([
+  const [globals, guide, layoutReady, app] = await Promise.all([
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(
       new URL("../public/range-optical-guide.js", import.meta.url),
       "utf8",
     ),
+    readFile(
+      new URL("../public/range-layout-ready.js", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../src/app.html", import.meta.url), "utf8"),
   ]);
 
   expect(globals).toContain("var(--range-lower-scale-x, 0px)");
@@ -1141,6 +1214,14 @@ test("attaches the lower scale to the leading title stem", async () => {
   expect(guide).toContain(
     "projectedLowerScaleCenter -\n      this.#leadingInkCenter(copy",
   );
+  expect(guide).toContain('document.fonts.addEventListener("loadingdone"');
+  expect(guide).toContain('window.addEventListener("range-layout-ready"');
+  expect(guide).toContain("#observeMeasurementTargets()");
+  expect(guide).toContain('sequence.querySelector(".rangeTitleWord")');
+  expect(layoutReady).toContain(
+    'window.dispatchEvent(new Event("range-layout-ready"))',
+  );
+  expect(app).toContain("range-optical-guide.js?guide=stem-axis-v12");
 });
 
 test("gates whole-page HTML-in-Canvas edge distortion behind feature detection", async () => {

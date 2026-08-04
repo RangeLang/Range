@@ -1,6 +1,7 @@
 const root = document.documentElement;
 
 function reveal() {
+  window.dispatchEvent(new Event("range-layout-ready"));
   root.classList.remove("range-layout-pending");
 }
 

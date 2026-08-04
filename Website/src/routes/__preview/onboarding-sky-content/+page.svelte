@@ -1,6 +1,6 @@
 <script lang="ts">
   import HomePageContent from "$lib/components/HomePageContent.svelte";
-  import OnboardingSphereShader from "$lib/components/OnboardingSphereShader.svelte";
+  import SkyShader from "$lib/components/SkyShader.svelte";
 </script>
 
 <svelte:head>
@@ -9,15 +9,7 @@
 
 <div class="statePreview" data-preview="onboarding-sky-content">
   <div class="sky" aria-hidden="true">
-    <OnboardingSphereShader
-      fullBleed
-      fisheyeAmount={1.1}
-      distortionAmount={0}
-      glitterAmount={1}
-      fieldBrightness={1}
-      twinkleAmount={0}
-      whiteoutAmount={0}
-    />
+    <SkyShader />
   </div>
   <div class="homepage">
     <HomePageContent />

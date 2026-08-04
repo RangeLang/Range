@@ -17,6 +17,11 @@ class RangeOpticalGuide extends HTMLElement {
   #context;
   #frame;
   #resizeObserver;
+  #handleFontLoadingDone = () => this.#schedule();
+  #handleLayoutReady = () => {
+    this.#align();
+    this.#schedule();
+  };
   #shifts = {
     actionEnd: 0,
     copy: 0,
@@ -29,8 +34,9 @@ class RangeOpticalGuide extends HTMLElement {
     this.#canvas = document.createElement("canvas");
     this.#context = this.#canvas.getContext("2d");
     this.#resizeObserver = new ResizeObserver(() => this.#schedule());
-    const sequence = this.closest("[data-range-home-page]");
-    if (sequence) this.#resizeObserver.observe(sequence);
+    this.#observeMeasurementTargets();
+    document.fonts.addEventListener("loadingdone", this.#handleFontLoadingDone);
+    window.addEventListener("range-layout-ready", this.#handleLayoutReady);
     document.fonts.ready.then(() => this.#schedule());
     this.#align();
     this.#schedule();
@@ -39,6 +45,27 @@ class RangeOpticalGuide extends HTMLElement {
   disconnectedCallback() {
     if (this.#frame !== undefined) cancelAnimationFrame(this.#frame);
     this.#resizeObserver?.disconnect();
+    document.fonts.removeEventListener("loadingdone", this.#handleFontLoadingDone);
+    window.removeEventListener("range-layout-ready", this.#handleLayoutReady);
+  }
+
+  #observeMeasurementTargets() {
+    const sequence = this.closest("[data-range-home-page]");
+    if (!sequence || !this.#resizeObserver) return;
+
+    const targets = [
+      sequence,
+      sequence.querySelector(".rangeTitleWord"),
+      sequence.querySelector(".landingWordmark .rangeWord"),
+      sequence.querySelector(".landingHero p"),
+      sequence.querySelector(".secondaryAction"),
+      sequence.querySelector(":scope > range-scale"),
+      sequence.querySelector(".landingLowerScale"),
+      sequence.querySelector(".landingLowerScale range-scale"),
+    ];
+    for (const target of targets) {
+      if (target) this.#resizeObserver.observe(target);
+    }
   }
 
   #schedule() {
@@ -134,6 +161,7 @@ class RangeOpticalGuide extends HTMLElement {
   }
 
   #align() {
+    this.#observeMeasurementTargets();
     const sequence = this.closest("[data-range-home-page]");
     const reference = sequence?.querySelector(".rangeTitleWord");
     const wordmark = sequence?.querySelector(".landingWordmark .rangeWord");

@@ -30,7 +30,6 @@
   let anchorLastAt = 0;
   let anchorStartedAt = 0;
   let anchorSettledAt = 0;
-  let twinkleTimeline = 0;
   let stage: HTMLElement | undefined;
   let previewAudioContext: AudioContext | undefined;
   let previewSustain: {
@@ -74,7 +73,6 @@
     anchorLastAt = 0;
     anchorStartedAt = 0;
     anchorSettledAt = 0;
-    twinkleTimeline = 0;
     entrancePlaying = false;
     exitPlaying = false;
     siteRevealed = false;
@@ -88,7 +86,6 @@
     setGrowth(0);
     setFisheye(0);
     setDistortion(0);
-    twinkleTimeline = 0;
     dissolveAmount = 0;
     whiteoutTimeline = 0;
     starFadeTimeline = 0;
@@ -189,7 +186,6 @@
         shapePreviewWow(breathing.envelope);
         shapePreviewHarmonics(breathing.envelope);
         setGrowth(1);
-        twinkleTimeline = smoothstep((now - anchorSettledAt) / 1_800);
         setFisheye(breathing.fisheye);
       }
       anchorFrame = requestAnimationFrame(frame);
@@ -496,7 +492,6 @@
       setFisheye(startingFisheye * remaining);
       setDistortion(0);
       shapeTwinkleHarmonics(remaining);
-      twinkleTimeline = remaining;
       shapePreviewSustain(remaining);
       if (progress < 1) collapseFrame = requestAnimationFrame(frame);
       else {
@@ -555,7 +550,6 @@
       const revealTail = 1 - homepageSwapTimeline;
       shapePreviewSustain(revealTail);
       shapeTwinkleHarmonics(revealTail);
-      twinkleTimeline = 1;
       if (homepageProgress > 0) siteRevealed = true;
       if (elapsed < duration) exitFrame = requestAnimationFrame(frame);
       else {
@@ -692,9 +686,8 @@
           fisheyeAmount={renderedFisheye}
           fullBleed={sphereStage === "fullscreen"}
           distortionAmount={renderedDistortion}
-          glitterAmount={glitter * (1 - smoothstep(starFadeTimeline))}
+          starOpacity={glitter * (1 - smoothstep(starFadeTimeline))}
           fieldBrightness={brightness}
-          twinkleAmount={twinkleTimeline}
           dissolveAmount={dissolveAmount}
           whiteoutAmount={smoothstep(whiteoutTimeline)}
         />

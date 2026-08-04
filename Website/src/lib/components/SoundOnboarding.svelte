@@ -43,11 +43,9 @@
   let liveHarmonicGains: GainNode[] = [];
   let liveLevel = 0.055;
   let lastBreathShapeAt = -Infinity;
-  let sphereEpoch = typeof performance === "undefined" ? 0 : performance.now();
   let exitDiameter = $state(0);
   let sphereSize = $state(56);
   let exitBlurTimeline = $state(0);
-  let twinkleTimeline = $state(0);
   let starFadeTimeline = $state(0);
   let homepageSwapTimeline = $state(0);
   let exitCutoutActive = $state(false);
@@ -211,7 +209,6 @@
     anchorStartedAt = performance.now();
     anchorLastAt = anchorStartedAt;
     anchorSettledAt = 0;
-    twinkleTimeline = 0;
     starFadeTimeline = 0;
     exitCutoutActive = false;
     innerCutoutTimeline = 0;
@@ -241,7 +238,6 @@
         setSphereSize(breathing.size);
         setFisheyeAmount(breathing.fisheye);
         shapeLiveBreath(breathing.envelope);
-        twinkleTimeline = smoothstep((now - anchorSettledAt) / 1_800);
       }
       if (phase !== "leaving" && !liveCollapsing) sphereFrame = requestAnimationFrame(frame);
       else sphereFrame = undefined;
@@ -465,7 +461,6 @@
         runEffects(fullscreenTransition.effects);
       }
       starFadeTimeline = 0;
-      twinkleTimeline = 1;
       innerCutoutTimeline = easedCutout;
       exitBlurTimeline = easedCutout;
       setHomepageSwap(smoothstep(homepageProgress));
@@ -496,7 +491,6 @@
       // Collapse is the exact reverse size path, so the lens follows that
       // same path instead of adding an independent recoil curve.
       setFisheyeAmount(startingFisheye * remaining);
-      twinkleTimeline = remaining;
       shapeLiveBreath(remaining, 1);
       if (progress < 1) collapseFrame = requestAnimationFrame(frame);
       else {
@@ -504,7 +498,6 @@
         liveCollapsing = false;
         setFisheyeAmount(0);
         starFadeTimeline = 0;
-        twinkleTimeline = 0;
         exitBlurTimeline = 0;
         shapeLiveBreath(0.08, 1, true);
       }
@@ -589,12 +582,9 @@
           ? 0.035 + exitBlurTimeline * 0.093
           : 0}
         concreteness={concreteness}
-        timeOrigin={sphereEpoch}
         fisheyeAmount={fisheyeAmount}
         distortionAmount={0}
-        animateLens={phase === "entering" || phase === "exploring" || phase === "leaving"}
-        glitterAmount={1 - smoothstep(starFadeTimeline)}
-        twinkleAmount={twinkleTimeline}
+        starOpacity={1 - smoothstep(starFadeTimeline)}
         whiteoutAmount={0}
         coverOutside={phase === "leaving"}
       />

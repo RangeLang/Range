@@ -1,7 +1,7 @@
 <script lang="ts">
   import CodeBlock from "$lib/components/CodeBlock.svelte";
   import EssayPage from "$lib/components/EssayPage.svelte";
-  import OnboardingSphereShader from "$lib/components/OnboardingSphereShader.svelte";
+  import SkyShader from "$lib/components/SkyShader.svelte";
   import MacroWordCloud from "$lib/components/MacroWordCloud.svelte";
   import ThreeFourRhythm from "$lib/components/ThreeFourRhythm.svelte";
 
@@ -35,12 +35,7 @@ function clamp(value: Int, min: Int, max: Int): Int {
 </script>
 
 {#snippet heroShader()}
-  <OnboardingSphereShader
-    fullBleed
-    fisheyeAmount={1.5}
-    glitterAmount={1.15}
-    fieldBrightness={0.92}
-  />
+  <SkyShader />
 {/snippet}
 
 <EssayPage

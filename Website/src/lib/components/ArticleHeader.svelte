@@ -121,6 +121,10 @@
     mask-image: none;
   }
 
+  .shader.unmasked {
+    inset: 0;
+  }
+
   .copy {
     position: relative;
     z-index: 1;
