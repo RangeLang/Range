@@ -2402,15 +2402,15 @@ function compilerSemanticGenericArgumentRangeInText(text: String, typeRange: Com
     return CompilerSourceRange(start: resultStart, end: resultEnd, next: resultEnd)
 }
 
-function compilerSemanticResolvedTypeIdentityFromTextRange(tables: CompilerSyntaxTables, text: String, typeRange: CompilerSourceRange): CompilerSemanticTypeIdentity {
+function compilerSemanticResolvedTypeIdentityFromTextRange(tables: CompilerSyntaxTables, text: String, typeRange: CompilerSourceRange): CompilerIdentity {
     let normalizedRange: CompilerSourceRange(compilerSemanticTrimStringRange(text: text, start: typeRange.start, end: typeRange.end))
-    if normalizedRange.start < 0 || normalizedRange.end <= normalizedRange.start { return CompilerSemanticTypeIdentity(fingerprint: CompilerFingerprint(first: 0, second: 0), isValid: false) }
+    if normalizedRange.start < 0 || normalizedRange.end <= normalizedRange.start { return compilerV1AbsentIdentity() }
     if compilerSemanticStringRangeEqualsText(text: text, start: normalizedRange.start, end: normalizedRange.end, literal: String("Int")) {
         state intFingerprint: CompilerFingerprint(compilerFingerprintInitial())
         intFingerprint: compilerFingerprintAppendInt(fingerprint: intFingerprint, value: compilerSemanticTypeInt())
         intFingerprint: compilerFingerprintAppendInt(fingerprint: intFingerprint, value: 0 - 1)
         intFingerprint: compilerFingerprintAppendInt(fingerprint: intFingerprint, value: 0)
-        return CompilerSemanticTypeIdentity(fingerprint: intFingerprint, isValid: true)
+        return CompilerIdentity(first: intFingerprint.first, second: intFingerprint.second)
     }
     let authoredTypeName: String(text.substring(start: normalizedRange.start, end: normalizedRange.end))
     if compilerIntegerTypeIsUnsigned8(typeName: authoredTypeName) {
@@ -2418,7 +2418,7 @@ function compilerSemanticResolvedTypeIdentityFromTextRange(tables: CompilerSynta
         intFingerprint: compilerFingerprintAppendInt(fingerprint: intFingerprint, value: compilerSemanticTypeInt())
         intFingerprint: compilerFingerprintAppendInt(fingerprint: intFingerprint, value: 8)
         intFingerprint: compilerFingerprintAppendText(fingerprint: intFingerprint, tag: 86, text: String("unsigned"))
-        return CompilerSemanticTypeIdentity(fingerprint: intFingerprint, isValid: true)
+        return CompilerIdentity(first: intFingerprint.first, second: intFingerprint.second)
     }
     if authoredTypeName == String("Float") || compilerFloatTypeIs32(typeName: authoredTypeName) || compilerFloatTypeIs64(typeName: authoredTypeName) {
         state floatFingerprint: CompilerFingerprint(compilerFingerprintInitial())
@@ -2426,7 +2426,7 @@ function compilerSemanticResolvedTypeIdentityFromTextRange(tables: CompilerSynta
         state floatBits: Int(64)
         if compilerFloatTypeIs32(typeName: authoredTypeName) { floatBits: 32 }
         floatFingerprint: compilerFingerprintAppendInt(fingerprint: floatFingerprint, value: floatBits)
-        return CompilerSemanticTypeIdentity(fingerprint: floatFingerprint, isValid: true)
+        return CompilerIdentity(first: floatFingerprint.first, second: floatFingerprint.second)
     }
     let outerRange: CompilerSourceRange(compilerSemanticGenericOuterNameRangeInText(text: text, typeRange: normalizedRange))
     let genericStart: Int(outerRange.next)
@@ -2435,11 +2435,11 @@ function compilerSemanticResolvedTypeIdentityFromTextRange(tables: CompilerSynta
         nameEnd: outerRange.end
     }
     let declarationNodeID: Int(compilerSemanticNamedDeclarationByTextRange(tables: tables, text: text, nameStart: normalizedRange.start, nameEnd: nameEnd, requiredKind: compilerSyntaxKindConstruct()))
-    if declarationNodeID < 0 { return CompilerSemanticTypeIdentity(fingerprint: CompilerFingerprint(first: 0, second: 0), isValid: false) }
+    if declarationNodeID < 0 { return compilerV1AbsentIdentity() }
     let declarationFingerprint: CompilerFingerprint(compilerSemanticDeclarationFingerprintForNode(tables: tables, declarationNodeID: declarationNodeID))
-    if declarationFingerprint.first == 0 && declarationFingerprint.second == 0 { return CompilerSemanticTypeIdentity(fingerprint: CompilerFingerprint(first: 0, second: 0), isValid: false) }
+    if declarationFingerprint.first == 0 && declarationFingerprint.second == 0 { return compilerV1AbsentIdentity() }
     let genericArity: Int(compilerSyntaxGenericParameterCountForOwner(tables: tables, ownerSyntaxID: declarationNodeID))
-    if genericArity == 0 && genericStart >= 0 { return CompilerSemanticTypeIdentity(fingerprint: CompilerFingerprint(first: 0, second: 0), isValid: false) }
+    if genericArity == 0 && genericStart >= 0 { return compilerV1AbsentIdentity() }
     state fingerprint: CompilerFingerprint(compilerFingerprintInitial())
     fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: compilerSemanticTypeConstruct())
     fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: declarationFingerprint.first)
@@ -2450,23 +2450,23 @@ function compilerSemanticResolvedTypeIdentityFromTextRange(tables: CompilerSynta
         argumentCount: argumentCount + 1
         argumentRange: compilerSemanticGenericArgumentRangeInText(text: text, typeRange: normalizedRange, ordinal: argumentCount)
     }
-    if argumentCount != genericArity { return CompilerSemanticTypeIdentity(fingerprint: CompilerFingerprint(first: 0, second: 0), isValid: false) }
+    if argumentCount != genericArity { return compilerV1AbsentIdentity() }
     fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: genericArity)
     state ordinal: Int(0)
     while ordinal < genericArity {
         let argumentIdentityRange: CompilerSourceRange(compilerSemanticGenericArgumentRangeInText(text: text, typeRange: normalizedRange, ordinal: ordinal))
-        if argumentIdentityRange.start < 0 { return CompilerSemanticTypeIdentity(fingerprint: CompilerFingerprint(first: 0, second: 0), isValid: false) }
-        let argumentIdentity: CompilerSemanticTypeIdentity(compilerSemanticResolvedTypeIdentityFromTextRange(tables: tables, text: text, typeRange: argumentIdentityRange))
-        if !argumentIdentity.isValid { return CompilerSemanticTypeIdentity(fingerprint: CompilerFingerprint(first: 0, second: 0), isValid: false) }
+        if argumentIdentityRange.start < 0 { return compilerV1AbsentIdentity() }
+        let argumentIdentity: CompilerIdentity(compilerSemanticResolvedTypeIdentityFromTextRange(tables: tables, text: text, typeRange: argumentIdentityRange))
+        if argumentIdentity.first == 0 && argumentIdentity.second == 0 { return compilerV1AbsentIdentity() }
         fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: ordinal)
-        fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: argumentIdentity.fingerprint.first)
-        fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: argumentIdentity.fingerprint.second)
+        fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: argumentIdentity.first)
+        fingerprint: compilerFingerprintAppendInt(fingerprint: fingerprint, value: argumentIdentity.second)
         ordinal: ordinal + 1
     }
-    return CompilerSemanticTypeIdentity(fingerprint: fingerprint, isValid: true)
+    return CompilerIdentity(first: fingerprint.first, second: fingerprint.second)
 }
 
-function compilerSemanticResolvedTypeIdentity(tables: CompilerSyntaxTables, typeName: String): CompilerSemanticTypeIdentity {
+function compilerSemanticResolvedTypeIdentity(tables: CompilerSyntaxTables, typeName: String): CompilerIdentity {
     return compilerSemanticResolvedTypeIdentityFromTextRange(
         tables: tables,
         text: typeName,
@@ -2479,9 +2479,9 @@ function compilerSemanticSpecializationFingerprintForNode(tables: CompilerSyntax
     if declarationNodeID < 0 { return CompilerFingerprint(first: 0, second: 0) }
     let genericArity: Int(compilerSyntaxGenericParameterCountForOwner(tables: tables, ownerSyntaxID: declarationNodeID))
     if genericArity <= 0 { return CompilerFingerprint(first: 0, second: 0) }
-    let identity: CompilerSemanticTypeIdentity(compilerSemanticResolvedTypeIdentity(tables: tables, typeName: typeName))
-    if !identity.isValid { return CompilerFingerprint(first: 0, second: 0) }
-    return identity.fingerprint
+    let identity: CompilerIdentity(compilerSemanticResolvedTypeIdentity(tables: tables, typeName: typeName))
+    if identity.first == 0 && identity.second == 0 { return CompilerFingerprint(first: 0, second: 0) }
+    return CompilerFingerprint(first: identity.first, second: identity.second)
 }
 
 function compilerSemanticNodeRequiresSpecializationIdentity(tables: CompilerSyntaxTables, nodeID: Int): Bool {

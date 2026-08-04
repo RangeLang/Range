@@ -557,11 +557,6 @@ construct CompilerSemanticType {
     let declarationNodeID: Int
 }
 
-construct CompilerSemanticTypeIdentity {
-    let fingerprint: CompilerFingerprint
-    let isValid: Bool
-}
-
 construct CompilerMemoryGraph {
     let layouts: CompilerIntTable
     let storages: CompilerIntTable
