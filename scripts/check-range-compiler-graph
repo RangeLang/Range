@@ -76,7 +76,7 @@ RANGE_GRAPH_CACHE_DIR="$WORK_ROOT/failure-cache" \
 "$compiler" compile-v1 "$FIXTURE" > "$WORK_ROOT/direct-graph.ll"
 
 "$compiler" inspect-v1 "$FIXTURE" > "$WORK_ROOT/inspect.out"
-for phase in source shape behavior compile; do
+for phase in source syntax shape behavior compile; do
     /usr/bin/grep -Fq $'compilerV1Delta\tphase='"$phase"$'\t' "$WORK_ROOT/inspect.out" \
         || fail "inspect-v1 omitted the $phase delta"
 done

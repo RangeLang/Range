@@ -88,19 +88,21 @@ fingerprint_second() {
 write_transient_execution_from_revision() {
     local revision="$1"
     local output="$2"
-    local file source shape behavior compiled
+    local file source syntax shape behavior compiled
 
     file="$(revision_field "$revision" file)"
     source="$(revision_node_value "$revision" source after)"
+    syntax="$(revision_node_value "$revision" syntax after)"
     shape="$(revision_node_value "$revision" shape after)"
     behavior="$(revision_node_value "$revision" behavior after)"
     compiled="$(revision_node_value "$revision" compile after)"
-    for value in "$file" "$source" "$shape" "$behavior" "$compiled"; do
+    for value in "$file" "$source" "$syntax" "$shape" "$behavior" "$compiled"; do
         [[ "$value" =~ ^[0-9]+:[0-9]+$ ]] || return 1
     done
-    /usr/bin/printf 'compilerV1Execution\tversion=1\tfileFirst=%s\tfileSecond=%s\tsourceFirst=%s\tsourceSecond=%s\tshapeFirst=%s\tshapeSecond=%s\tbehaviorFirst=%s\tbehaviorSecond=%s\tcompiledFirst=%s\tcompiledSecond=%s\n' \
+    /usr/bin/printf 'compilerV1Execution\tversion=2\tfileFirst=%s\tfileSecond=%s\tsourceFirst=%s\tsourceSecond=%s\tsyntaxFirst=%s\tsyntaxSecond=%s\tshapeFirst=%s\tshapeSecond=%s\tbehaviorFirst=%s\tbehaviorSecond=%s\tcompiledFirst=%s\tcompiledSecond=%s\n' \
         "$(fingerprint_first "$file")" "$(fingerprint_second "$file")" \
         "$(fingerprint_first "$source")" "$(fingerprint_second "$source")" \
+        "$(fingerprint_first "$syntax")" "$(fingerprint_second "$syntax")" \
         "$(fingerprint_first "$shape")" "$(fingerprint_second "$shape")" \
         "$(fingerprint_first "$behavior")" "$(fingerprint_second "$behavior")" \
         "$(fingerprint_first "$compiled")" "$(fingerprint_second "$compiled")" > "$output"
