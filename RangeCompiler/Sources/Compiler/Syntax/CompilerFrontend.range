@@ -7340,6 +7340,40 @@ function compilerGraphAppendMacroReferenceRelationships(tables: CompilerSyntaxTa
     return 0
 }
 
+function compilerMacroDirectManyCount(tables: CompilerSyntaxTables, applicationRow: Int): Int {
+    if applicationRow < 0 || applicationRow >= compilerIntTableRowCount(table: tables.macroApplications) { return 0 - 1 }
+    let targetSyntaxID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12))
+    if compilerMacroExecutionMemberRowForSyntaxID(tables: tables, syntaxID: targetSyntaxID) < 0 { return 0 - 1 }
+    let fileID: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 1))
+    let name: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 4), localEnd: compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 5)))
+    if name != String("many") { return 0 - 1 }
+    let argumentStart: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 8))
+    let argumentEnd: Int(compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 9))
+    if argumentStart < 0 || argumentEnd <= argumentStart { return 0 - 1 }
+    let argument: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: argumentStart, localEnd: argumentEnd))
+    let range: CompilerSourceRange(compilerSemanticTrimStringRange(text: argument, start: 0, end: stringLength(value: argument)))
+    if range.start < 0 { return 0 - 1 }
+    let count: Int(compilerCoreParseDecimalInt(value: argument.substring(start: range.start, end: range.end)))
+    if count <= 0 { return 0 - 1 }
+    return count
+}
+
+function compilerMacroDirectManyCountForTargetMember(tables: CompilerSyntaxTables, targetMemberSyntaxID: Int): Int {
+    state count: Int(0 - 1)
+    state applicationRow: Int(0)
+    while applicationRow < compilerIntTableRowCount(table: tables.macroApplications) {
+        if compilerIntTableValue(table: tables.macroApplications, row: applicationRow, column: 12) == targetMemberSyntaxID {
+            let candidate: Int(compilerMacroDirectManyCount(tables: tables, applicationRow: applicationRow))
+            if candidate > 0 {
+                if count > 0 { return 0 - 1 }
+                count: candidate
+            }
+        }
+        applicationRow: applicationRow + 1
+    }
+    return count
+}
+
 function compilerMacroLink(tables: CompilerSyntaxTables): Int {
     if compilerMacroFinalizeApplications(tables: tables) != 0 { return 0 - 1 }
     let index: CompilerMacroIndex(compilerMacroIndexCreate(tables: tables))
@@ -7365,7 +7399,8 @@ function compilerMacroLink(tables: CompilerSyntaxTables): Int {
         } else {
             let exactCount: Int(compilerMacroIndexMatchCount(tables: tables, index: index, name: name, targetKind: targetKind, compatibleOnly: true))
             let nameCount: Int(compilerMacroIndexMatchCount(tables: tables, index: index, name: name, targetKind: targetKind, compatibleOnly: false))
-            if compilerGraphAppendMacroReferenceRelationships(tables: tables, applicationRow: applicationRow, name: name) != 0 {
+            if compilerMacroDirectManyCount(tables: tables, applicationRow: applicationRow) > 0 {
+            } else if compilerGraphAppendMacroReferenceRelationships(tables: tables, applicationRow: applicationRow, name: name) != 0 {
                 status: 0 - 1
             } else if exactCount == 1 {
                 let declarationMatch: Int(compilerMacroIndexFirstMatch(tables: tables, index: index, name: name, targetKind: targetKind))

@@ -117,8 +117,7 @@ function compilerBodyRuntimeBuiltinTargetPointerBits(): Int { return 45 }
 function compilerBodyRuntimeBuiltinBufferTruncateInt(): Int { return 46 }
 function compilerBodyRuntimeBuiltinSyntaxText(): Int { return 47 }
 function compilerBodyRuntimeBuiltinSyntaxSlice(): Int { return 48 }
-function compilerBodyRuntimeBuiltinUUIDByteAtIndex(): Int { return 49 }
-function compilerBodyRuntimeBuiltinCount(): Int { return 49 }
+function compilerBodyRuntimeBuiltinCount(): Int { return 48 }
 
 function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("stringTransientRegionMark") { return compilerBodyRuntimeBuiltinStringTransientRegionMark() }
@@ -169,7 +168,6 @@ function compilerBodyRuntimeBuiltinID(name: String): Int {
     if name == String("bufferTruncateInt") { return compilerBodyRuntimeBuiltinBufferTruncateInt() }
     if name == String("syntaxText") { return compilerBodyRuntimeBuiltinSyntaxText() }
     if name == String("syntaxSlice") { return compilerBodyRuntimeBuiltinSyntaxSlice() }
-    if name == String("uuidByteAtIndex") { return compilerBodyRuntimeBuiltinUUIDByteAtIndex() }
     return compilerBodyRuntimeBuiltinNone()
 }
 
@@ -222,7 +220,6 @@ function compilerBodyRuntimeBuiltinName(id: Int): String {
     if id == compilerBodyRuntimeBuiltinBufferTruncateInt() { return String("bufferTruncateInt") }
     if id == compilerBodyRuntimeBuiltinSyntaxText() { return String("syntaxText") }
     if id == compilerBodyRuntimeBuiltinSyntaxSlice() { return String("syntaxSlice") }
-    if id == compilerBodyRuntimeBuiltinUUIDByteAtIndex() { return String("uuidByteAtIndex") }
     return String("")
 }
 
@@ -321,8 +318,7 @@ function compilerBodyRuntimeBuiltinParameterType(id: Int, ordinal: Int): String 
         if ordinal == 1 { return String("i32") }
         return String("ptr")
     }
-    if id == compilerBodyRuntimeBuiltinUUIDByteAtIndex()
-        || id == compilerBodyRuntimeBuiltinStringViewFrom()
+    if id == compilerBodyRuntimeBuiltinStringViewFrom()
         || id == compilerBodyRuntimeBuiltinStringSliceUnchecked()
         || id == compilerBodyRuntimeBuiltinStringCharacterAt()
         || id == compilerBodyRuntimeBuiltinStringByteAt()
@@ -725,7 +721,7 @@ function compilerNominalLLVMFieldTypeName(tables: CompilerSyntaxTables, typeName
     return compilerNominalLLVMFieldTypeNameAtDepth(tables: tables, typeName: typeName, depth: 0)
 }
 
-function compilerNominalLLVMMemberFieldTypeNameAtDepth(tables: CompilerSyntaxTables, memberRow: Int, depth: Int): String {
+function compilerNominalLLVMMemberElementFieldTypeNameAtDepth(tables: CompilerSyntaxTables, memberRow: Int, depth: Int): String {
     if memberRow < 0 || memberRow >= compilerIntTableRowCount(table: tables.members) { return String("") }
     let memberKind: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 12))
     if memberKind != compilerSyntaxMemberKindLet() && memberKind != compilerSyntaxMemberKindState() && memberKind != compilerSyntaxMemberKindBinding() { return String("") }
@@ -738,6 +734,9 @@ function compilerNominalLLVMMemberFieldTypeNameAtDepth(tables: CompilerSyntaxTab
     let targetID: Int(compilerIntTableValue(table: tables.typeReferences, row: typeReferenceID, column: compilerSyntaxTypeReferenceTargetIDColumn()))
     if referenceKind == compilerSyntaxTypeReferenceArray() { return String("%Range.Array") }
     if targetKind == compilerSyntaxTypeReferenceTargetBuiltin() {
+        let fileID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 1))
+        let typeName: String(compilerTypedSyntaxLocalText(tables: tables, fileID: fileID, localStart: compilerIntTableValue(table: tables.members, row: memberRow, column: 8), localEnd: compilerIntTableValue(table: tables.members, row: memberRow, column: 9)))
+        if compilerIntegerTypeIsUnsigned8(typeName: typeName) { return String("i8") }
         if targetID == compilerSyntaxBuiltinTypeInt() { return compilerProjectIntegerLLVMTypeName(tables: tables) }
         if targetID == compilerSyntaxBuiltinTypeBool() { return String("i1") }
         if targetID == compilerSyntaxBuiltinTypeString() { return String("ptr") }
@@ -763,6 +762,15 @@ function compilerNominalLLVMMemberFieldTypeNameAtDepth(tables: CompilerSyntaxTab
         if compilerEnumLLVMLayoutIsSupportedAtDepth(tables: tables, declarationRow: declarationRow, depth: depth + 1) { return "%Range.\(declarationName)" }
     }
     return String("")
+}
+
+function compilerNominalLLVMMemberFieldTypeNameAtDepth(tables: CompilerSyntaxTables, memberRow: Int, depth: Int): String {
+    let elementType: String(compilerNominalLLVMMemberElementFieldTypeNameAtDepth(tables: tables, memberRow: memberRow, depth: depth))
+    if elementType == String("") { return String("") }
+    let memberSyntaxID: Int(compilerIntTableValue(table: tables.members, row: memberRow, column: 0))
+    let count: Int(compilerMacroDirectManyCountForTargetMember(tables: tables, targetMemberSyntaxID: memberSyntaxID))
+    if count > 0 { return "[\(count) x \(elementType)]" }
+    return elementType
 }
 
 function compilerNominalLLVMMemberFieldTypeName(tables: CompilerSyntaxTables, memberRow: Int): String {

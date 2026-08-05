@@ -1,0 +1,8 @@
+construct UUIDManyDirectLayout {
+    @many(16)
+    let bytes: Int<.unsigned, 8>
+}
+
+@main {
+    return 7
+}

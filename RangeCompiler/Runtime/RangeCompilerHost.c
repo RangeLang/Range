@@ -300,14 +300,6 @@ int32_t stringByteAt(void *opaqueSource, int32_t index) {
     return (int32_t)(unsigned char)source[index];
 }
 
-int32_t uuidByteAtIndex(void *opaqueUUID, int32_t index) {
-    uint8_t *bytes = (uint8_t *)opaqueUUID;
-    if (!bytes || index < 0 || index >= 16) {
-        return 0;
-    }
-    return (int32_t)bytes[index];
-}
-
 int32_t stringFindByteOf(
     void *opaqueSource,
     int32_t start,
