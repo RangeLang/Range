@@ -30,19 +30,25 @@ fi
 
 /usr/bin/grep -Fq 'function compilerV1SyntaxFactsCapture(source: CompilerV1SourceDelta)' "$COMPILER_V1" \
     || fail "V1 does not expose typed syntax capture as its own product"
-/usr/bin/grep -Fq 'compilerTypedDeclarationsCapture(source: source.value.source, tables: tables)' "$COMPILER_V1" \
+/usr/bin/grep -Fq 'construct CompilerV1IdentifiedText {' "$COMPILER_V1_GRAPH" \
+    || fail "V1 has no shared identity : text building block"
+/usr/bin/grep -Fq 'construct CompilerV1Edge {' "$COMPILER_V1_GRAPH" \
+    || fail "V1 has no explicit graph edge between identified values"
+/usr/bin/grep -Fq 'function compilerV1ReconciliationDelete(): Int' "$COMPILER_V1_GRAPH" \
+    || fail "V1 reconciliation omits delete from its four operations"
+/usr/bin/grep -Fq 'compilerTypedDeclarationsCapture(source: source.source.value, tables: tables)' "$COMPILER_V1" \
     || fail "V1 syntax facts do not own declaration capture"
-/usr/bin/grep -Fq 'compilerTypedSyntaxCaptureMainRoot(source: source.value.source, tables: tables)' "$COMPILER_V1" \
+/usr/bin/grep -Fq 'compilerTypedSyntaxCaptureMainRoot(source: source.source.value, tables: tables)' "$COMPILER_V1" \
     || fail "V1 syntax facts do not retain main in their declaration graph"
-if /usr/bin/grep -Fq 'compilerTypedSyntaxCapture(source: source.value.source, tables: tables)' "$COMPILER_V1"; then
+if /usr/bin/grep -Fq 'compilerTypedSyntaxCapture(source: source.source.value, tables: tables)' "$COMPILER_V1"; then
     fail "V1 Shape still eagerly captures every function body"
 fi
-/usr/bin/grep -Fq 'snapshot: compilerV1NativeBehaviorSnapshot(identity: source.identity, output: compiledOutput)' "$COMPILER_V1" \
+/usr/bin/grep -Fq 'snapshot: compilerV1NativeBehaviorSnapshot(identity: source.file.identity, output: compiledOutput)' "$COMPILER_V1" \
     || fail "V1 Behavior is not derived from successful reachable lowering"
 if /usr/bin/grep -Fq 'compilerSemanticBuild(tables: tables, delta: delta, semantics: semantics)' "$COMPILER_V1"; then
     fail "V1 still treats the incomplete whole-program SemanticGraph as Behavior authority"
 fi
-if /usr/bin/grep -Fq 'compilerTypedSyntaxSummary(source: source.value.source)' "$COMPILER_V1" \
+if /usr/bin/grep -Fq 'compilerTypedSyntaxSummary(source: source.source.value)' "$COMPILER_V1" \
     || /usr/bin/grep -Fq 'compilerSemanticSummary(source: source)' "$COMPILER_V1"; then
     fail "V1 still rebuilds Shape or Behavior through independent source summaries"
 fi
@@ -52,7 +58,7 @@ fi
     || fail "V1 Shape does not project its snapshot from syntax facts"
 /usr/bin/grep -Fq 'function compilerV1Behavior(source: CompilerV1SourceDelta, shape: CompilerV1ShapeDelta, before: CompilerValueFingerprint)' "$COMPILER_V1" \
     || fail "V1 Behavior does not own the transitional downstream recapture"
-/usr/bin/grep -Fq 'compiledOutput: compilerNativeSourceSetLLVMTextForLinkedTables(source: source.value.source, declarationTables: tables)' "$COMPILER_V1" \
+/usr/bin/grep -Fq 'compiledOutput: compilerNativeSourceSetLLVMTextForLinkedTables(source: source.source.value, declarationTables: tables)' "$COMPILER_V1" \
     || fail "V1 Behavior does not retain reachable lowering"
 /usr/bin/grep -Fq 'function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1BehaviorDelta, before: CompilerValueFingerprint)' "$COMPILER_V1" \
     || fail "V1 Compiled still accepts source instead of frozen Shape and Behavior products"
@@ -192,7 +198,7 @@ stale_facts_status=0
 
 /bin/cp "$FIXTURE" "$WORK_ROOT/Persistent.range"
 "$COMPILER" resume-v1 "$WORK_ROOT/execution.tsv" "$WORK_ROOT/Persistent.range" "$WORK_ROOT/persistent.ll" > "$WORK_ROOT/persistent-cold.out"
-/usr/bin/grep -Eq $'^compilerV1Execution\tstatus=cold\tchanged=1\tsourceBefore=0:0\tsourceAfter=[0-9]+:[0-9]+\tshapeBefore=0:0\tshapeAfter=[0-9]+:[0-9]+\tbehaviorBefore=0:0\tbehaviorAfter=[0-9]+:[0-9]+\tcompiledBefore=0:0\tcompiledAfter=[0-9]+:[0-9]+$' "$WORK_ROOT/persistent-cold.out" \
+/usr/bin/grep -Eq $'^compilerV1Execution\tstatus=cold\tchanged=1\tsourceOperation=insert\tedgeOperation=insert\tsourceBefore=0:0\tsourceAfter=[0-9]+:[0-9]+\tshapeBefore=0:0\tshapeAfter=[0-9]+:[0-9]+\tbehaviorBefore=0:0\tbehaviorAfter=[0-9]+:[0-9]+\tcompiledBefore=0:0\tcompiledAfter=[0-9]+:[0-9]+$' "$WORK_ROOT/persistent-cold.out" \
     || fail "cold persistent execution did not insert every phase value"
 /usr/bin/grep -Eq $'^compilerV1Execution\tversion=1\tfileFirst=[0-9]+\tfileSecond=[0-9]+\tsourceFirst=[0-9]+\tsourceSecond=[0-9]+\tshapeFirst=[0-9]+\tshapeSecond=[0-9]+\tbehaviorFirst=[0-9]+\tbehaviorSecond=[0-9]+\tcompiledFirst=[0-9]+\tcompiledSecond=[0-9]+$' "$WORK_ROOT/execution.tsv" \
     || fail "cold persistent execution omitted its Range-owned state"
@@ -208,7 +214,7 @@ cold_behavior_after="$(/usr/bin/sed -n 's/^compilerV1Execution.*behaviorAfter=\(
 cold_compiled_after="$(/usr/bin/sed -n 's/^compilerV1Execution.*compiledAfter=\([^[:space:]]*\)$/\1/p' "$WORK_ROOT/persistent-cold.out")"
 
 "$COMPILER" resume-v1 "$WORK_ROOT/execution.tsv" "$WORK_ROOT/Persistent.range" "$WORK_ROOT/persistent.ll" > "$WORK_ROOT/persistent-unchanged.out"
-/usr/bin/grep -Fqx $'compilerV1Execution\tstatus=reused\tchanged=0' "$WORK_ROOT/persistent-unchanged.out" \
+/usr/bin/grep -Fqx $'compilerV1Execution\tstatus=reused\tchanged=0\tsourceOperation=reuse\tedgeOperation=reuse' "$WORK_ROOT/persistent-unchanged.out" \
     || fail "unchanged persistent execution did not reuse its compiled value"
 [[ "$cold_execution_hash" == "$(/usr/bin/shasum -a 256 "$WORK_ROOT/execution.tsv" | /usr/bin/awk '{print $1}')" ]] \
     || fail "unchanged persistent execution rewrote its state"
@@ -231,7 +237,7 @@ failed_candidate_status=0
 
 /usr/bin/perl -0pi -e 's/return 7/return 8/' "$WORK_ROOT/Persistent.range"
 "$COMPILER" resume-v1 "$WORK_ROOT/execution.tsv" "$WORK_ROOT/Persistent.range" "$WORK_ROOT/persistent.ll" > "$WORK_ROOT/persistent-updated.out"
-/usr/bin/grep -Eq $'^compilerV1Execution\tstatus=updated\tchanged=1\tsourceBefore=[0-9]+:[0-9]+\tsourceAfter=[0-9]+:[0-9]+\tshapeBefore=[0-9]+:[0-9]+\tshapeAfter=[0-9]+:[0-9]+\tbehaviorBefore=[0-9]+:[0-9]+\tbehaviorAfter=[0-9]+:[0-9]+\tcompiledBefore=[0-9]+:[0-9]+\tcompiledAfter=[0-9]+:[0-9]+$' "$WORK_ROOT/persistent-updated.out" \
+/usr/bin/grep -Eq $'^compilerV1Execution\tstatus=updated\tchanged=1\tsourceOperation=update\tedgeOperation=reuse\tsourceBefore=[0-9]+:[0-9]+\tsourceAfter=[0-9]+:[0-9]+\tshapeBefore=[0-9]+:[0-9]+\tshapeAfter=[0-9]+:[0-9]+\tbehaviorBefore=[0-9]+:[0-9]+\tbehaviorAfter=[0-9]+:[0-9]+\tcompiledBefore=[0-9]+:[0-9]+\tcompiledAfter=[0-9]+:[0-9]+$' "$WORK_ROOT/persistent-updated.out" \
     || fail "updated persistent execution did not carry phase value replacements"
 updated_source_before="$(/usr/bin/sed -n 's/^compilerV1Execution.*sourceBefore=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/persistent-updated.out")"
 updated_shape_before="$(/usr/bin/sed -n 's/^compilerV1Execution.*shapeBefore=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/persistent-updated.out")"
@@ -350,25 +356,45 @@ write_behavior_cache_fixture "$WORK_ROOT/behavior-callee-output.range" "$WORK_RO
 "$COMPILER" inspect-v1 "$FIXTURE" > "$WORK_ROOT/inspect.txt"
 /usr/bin/grep -Fq $'compilerV1\tversion=1' "$WORK_ROOT/inspect.txt" \
     || fail "V1 inspection omitted the compiler identity"
-/usr/bin/grep -Eq $'^compilerV1Delta\tphase=source\tidentity=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+\tvalue=File\tpath=.+\tbytes=[1-9][0-9]*$' "$WORK_ROOT/inspect.txt" \
-    || fail "V1 inspection omitted the loaded Identity : FileValue Delta"
+/usr/bin/grep -Eq $'^compilerV1Entity\tkind=file\tidentity=[0-9]+:[0-9]+\tvalue=.+$' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the identified File value"
+/usr/bin/grep -Eq $'^compilerV1Entity\tkind=source\tidentity=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+\tbytes=[1-9][0-9]*$' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the identified Source value"
+/usr/bin/grep -Eq $'^compilerV1Edge\tfrom=[0-9]+:[0-9]+\trelationship=[0-9]+:[0-9]+\tto=[0-9]+:[0-9]+\tcardinality=one$' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the File to Source edge"
+/usr/bin/grep -Eq $'^compilerV1Delta\tphase=source\tidentity=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the Source reconciliation delta"
 
 /bin/cp "$FIXTURE" "$WORK_ROOT/IdentityValue.range"
 "$COMPILER" inspect-v1 "$WORK_ROOT/IdentityValue.range" > "$WORK_ROOT/identity-before.txt"
-/usr/bin/printf '\n' >> "$WORK_ROOT/IdentityValue.range"
+/usr/bin/perl -0pi -e 's/^/\/\/ shifted provenance\n/' "$WORK_ROOT/IdentityValue.range"
 "$COMPILER" inspect-v1 "$WORK_ROOT/IdentityValue.range" > "$WORK_ROOT/identity-after.txt"
-before_identity="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=source[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
-after_identity="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=source[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
+before_file_identity="$(/usr/bin/sed -n 's/^compilerV1Entity[[:space:]]kind=file[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
+after_file_identity="$(/usr/bin/sed -n 's/^compilerV1Entity[[:space:]]kind=file[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
+before_identity="$(/usr/bin/sed -n 's/^compilerV1Entity[[:space:]]kind=source[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
+after_identity="$(/usr/bin/sed -n 's/^compilerV1Entity[[:space:]]kind=source[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
+before_edge="$(/usr/bin/sed -n 's/^compilerV1Edge[[:space:]]//p' "$WORK_ROOT/identity-before.txt")"
+after_edge="$(/usr/bin/sed -n 's/^compilerV1Edge[[:space:]]//p' "$WORK_ROOT/identity-after.txt")"
 before_value="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=source.*[[:space:]]after=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
 after_value="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=source.*[[:space:]]after=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
-before_bytes="$(/usr/bin/sed -n 's/^compilerV1Delta.*bytes=\([0-9][0-9]*\)$/\1/p' "$WORK_ROOT/identity-before.txt")"
-after_bytes="$(/usr/bin/sed -n 's/^compilerV1Delta.*bytes=\([0-9][0-9]*\)$/\1/p' "$WORK_ROOT/identity-after.txt")"
+before_bytes="$(/usr/bin/sed -n 's/^compilerV1Entity.*kind=source.*bytes=\([0-9][0-9]*\)$/\1/p' "$WORK_ROOT/identity-before.txt")"
+after_bytes="$(/usr/bin/sed -n 's/^compilerV1Entity.*kind=source.*bytes=\([0-9][0-9]*\)$/\1/p' "$WORK_ROOT/identity-after.txt")"
+[[ -n "$before_file_identity" && "$before_file_identity" == "$after_file_identity" ]] \
+    || fail "V1 File identity changed when only Source provenance shifted"
 [[ -n "$before_identity" && "$before_identity" == "$after_identity" ]] \
-    || fail "V1 File identity changed when only its value changed"
+    || fail "V1 Source identity changed when only its value changed"
+[[ "$before_file_identity" != "$before_identity" ]] \
+    || fail "V1 still conflates File and Source identity"
+[[ -n "$before_edge" && "$before_edge" == "$after_edge" ]] \
+    || fail "V1 replaced the File to Source edge when only Source value changed"
+/usr/bin/grep -Fq "from=$before_file_identity" "$WORK_ROOT/identity-before.txt" \
+    || fail "V1 File to Source edge does not begin at the File identity"
+/usr/bin/grep -Fq "to=$before_identity" "$WORK_ROOT/identity-before.txt" \
+    || fail "V1 File to Source edge does not end at the Source identity"
 [[ -n "$before_value" && -n "$after_value" && "$before_value" != "$after_value" ]] \
-    || fail "V1 File Delta did not change its value fingerprint"
+    || fail "V1 Source entity did not change its physical value fingerprint"
 [[ -n "$before_bytes" && -n "$after_bytes" && "$before_bytes" -ne "$after_bytes" ]] \
-    || fail "V1 File value did not change with its source contents"
+    || fail "V1 Source value did not change with its contents"
 /usr/bin/grep -Eq $'^compilerV1Delta\tphase=shape\tidentity=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
     || fail "V1 inspection omitted the Shape Delta"
 /usr/bin/grep -Fq $'typedSyntax\tvalid=true' "$WORK_ROOT/inspect.txt" \

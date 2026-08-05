@@ -42,7 +42,7 @@ RANGE_GRAPH_CACHE_DIR="$WORK_ROOT/graph-cache" \
     > "$WORK_ROOT/graph-warm.ll" 2> "$WORK_ROOT/graph-warm.out"
 /usr/bin/cmp -s "$WORK_ROOT/graph.ll" "$WORK_ROOT/graph-warm.ll" \
     || fail "warm graph project compile changed its compiled artifact"
-/usr/bin/grep -Fqx $'compilerV1Execution\tstatus=reused\tchanged=0' "$WORK_ROOT/graph-warm.out" \
+/usr/bin/grep -Fqx $'compilerV1Execution\tstatus=reused\tchanged=0\tsourceOperation=reuse\tedgeOperation=reuse' "$WORK_ROOT/graph-warm.out" \
     || fail "warm graph project compile did not reuse File -> Source"
 [[ -z "$(/usr/bin/find "$WORK_ROOT/graph-cache" -type f -name execution.tsv -print -quit)" ]] \
     || fail "warm graph project compile recreated execution.tsv"
@@ -68,7 +68,7 @@ RANGE_GRAPH_CACHE_DIR="$WORK_ROOT/failure-cache" \
     > "$WORK_ROOT/failure-recovered.ll" 2> "$WORK_ROOT/failure-recovered.out"
 /usr/bin/cmp -s "$WORK_ROOT/failure-cold.ll" "$WORK_ROOT/failure-recovered.ll" \
     || fail "failed graph candidate damaged the last-known-good artifact"
-/usr/bin/grep -Fqx $'compilerV1Execution\tstatus=reused\tchanged=0' "$WORK_ROOT/failure-recovered.out" \
+/usr/bin/grep -Fqx $'compilerV1Execution\tstatus=reused\tchanged=0\tsourceOperation=reuse\tedgeOperation=reuse' "$WORK_ROOT/failure-recovered.out" \
     || fail "failed graph candidate did not restore the accepted File -> Source"
 [[ -z "$(/usr/bin/find "$WORK_ROOT/failure-cache" -type f -name execution.tsv -print -quit)" ]] \
     || fail "failed graph lifecycle persisted transient execution state"
@@ -95,7 +95,7 @@ execution_hash="$(/usr/bin/shasum -a 256 "$WORK_ROOT/execution.tsv" | /usr/bin/a
 output_hash="$(/usr/bin/shasum -a 256 "$WORK_ROOT/persistent.ll" | /usr/bin/awk '{print $1}')"
 "$compiler" resume-v1 "$WORK_ROOT/execution.tsv" "$WORK_ROOT/Persistent.range" "$WORK_ROOT/persistent.ll" \
     > "$WORK_ROOT/warm.out"
-/usr/bin/grep -Fqx $'compilerV1Execution\tstatus=reused\tchanged=0' "$WORK_ROOT/warm.out" \
+/usr/bin/grep -Fqx $'compilerV1Execution\tstatus=reused\tchanged=0\tsourceOperation=reuse\tedgeOperation=reuse' "$WORK_ROOT/warm.out" \
     || fail "unchanged graph execution did not reuse its compiled artifact"
 [[ "$execution_hash" == "$(/usr/bin/shasum -a 256 "$WORK_ROOT/execution.tsv" | /usr/bin/awk '{print $1}')" ]] \
     || fail "unchanged graph execution rewrote its persistent state"

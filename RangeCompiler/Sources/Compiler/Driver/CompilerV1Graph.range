@@ -1,13 +1,20 @@
-construct CompilerV1FileValue {
-    let path: String
-    let source: String
+construct CompilerV1IdentifiedText {
+    let identity: CompilerIdentity
+    let value: String
+}
+
+construct CompilerV1Edge {
+    let from: CompilerIdentity
+    let relationship: CompilerIdentity
+    let to: CompilerIdentity
 }
 
 construct CompilerV1SourceDelta {
-    let identity: CompilerIdentity
+    let file: CompilerV1IdentifiedText
+    let source: CompilerV1IdentifiedText
+    let edge: CompilerV1Edge
     let before: CompilerValueFingerprint
     let after: CompilerValueFingerprint
-    let value: CompilerV1FileValue
 }
 
 construct CompilerV1Execution {
@@ -46,6 +53,30 @@ function compilerV1ValueFingerprintEqual(left: CompilerValueFingerprint, right: 
 function compilerV1ValueFingerprint(identity: CompilerIdentity, tag: Int, text: String): CompilerValueFingerprint {
     let fingerprint: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: CompilerFingerprint(first: identity.first, second: identity.second), tag: tag, text: text))
     return CompilerValueFingerprint(first: fingerprint.first, second: fingerprint.second)
+}
+
+function compilerV1ReconciliationInsert(): Int { return 1 }
+function compilerV1ReconciliationReuse(): Int { return 2 }
+function compilerV1ReconciliationUpdate(): Int { return 3 }
+function compilerV1ReconciliationDelete(): Int { return 4 }
+
+function compilerV1ReconciliationOperation(before: CompilerValueFingerprint, after: CompilerValueFingerprint): Int {
+    let absent: CompilerValueFingerprint(compilerV1AbsentValue())
+    if compilerV1ValueFingerprintEqual(left: after, right: absent) {
+        if compilerV1ValueFingerprintEqual(left: before, right: absent) { return compilerV1ReconciliationReuse() }
+        return compilerV1ReconciliationDelete()
+    }
+    if compilerV1ValueFingerprintEqual(left: before, right: absent) { return compilerV1ReconciliationInsert() }
+    if compilerV1ValueFingerprintEqual(left: before, right: after) { return compilerV1ReconciliationReuse() }
+    return compilerV1ReconciliationUpdate()
+}
+
+function compilerV1ReconciliationOperationName(operation: Int): String {
+    if operation == compilerV1ReconciliationInsert() { return String("insert") }
+    if operation == compilerV1ReconciliationReuse() { return String("reuse") }
+    if operation == compilerV1ReconciliationUpdate() { return String("update") }
+    if operation == compilerV1ReconciliationDelete() { return String("delete") }
+    return String("invalid")
 }
 
 function compilerV1ExecutionEmpty(): CompilerV1Execution {
@@ -139,7 +170,7 @@ function compilerV1ExecutionEncode(execution: CompilerV1Execution): String {
 function compilerV1ExecutionFromDeltas(source: CompilerV1SourceDelta, shape: CompilerV1ShapeDelta, behavior: CompilerV1BehaviorDelta, compiled: CompilerV1CompiledDelta): CompilerV1Execution {
     return CompilerV1Execution(
         isValid: true,
-        file: source.identity,
+        file: source.file.identity,
         source: source.after,
         shape: shape.after,
         behavior: behavior.after,
@@ -152,12 +183,27 @@ function compilerV1IdentityForFile(path: String): CompilerIdentity {
     return CompilerIdentity(first: fingerprint.first, second: fingerprint.second)
 }
 
+function compilerV1IdentityForSource(file: CompilerIdentity): CompilerIdentity {
+    return compilerV1IdentityAppendInt(identity: file, value: 1)
+}
+
+function compilerV1IdentityForFileSourceRelationship(): CompilerIdentity {
+    let fingerprint: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: compilerFingerprintInitial(), tag: 17, text: String("CompilerV1.FileSource")))
+    return CompilerIdentity(first: fingerprint.first, second: fingerprint.second)
+}
+
 function compilerV1SourceDelta(path: String, source: String, before: CompilerValueFingerprint): CompilerV1SourceDelta {
-    let identity: CompilerIdentity(compilerV1IdentityForFile(path: path))
+    let fileIdentity: CompilerIdentity(compilerV1IdentityForFile(path: path))
+    let sourceIdentity: CompilerIdentity(compilerV1IdentityForSource(file: fileIdentity))
     return CompilerV1SourceDelta(
-        identity: identity,
+        file: CompilerV1IdentifiedText(identity: fileIdentity, value: "\(path)"),
+        source: CompilerV1IdentifiedText(identity: sourceIdentity, value: "\(source)"),
+        edge: CompilerV1Edge(
+            from: fileIdentity,
+            relationship: compilerV1IdentityForFileSourceRelationship(),
+            to: sourceIdentity
+        ),
         before: before,
-        after: compilerV1ValueFingerprint(identity: identity, tag: 11, text: source),
-        value: CompilerV1FileValue(path: "\(path)", source: "\(source)")
+        after: compilerV1ValueFingerprint(identity: sourceIdentity, tag: 11, text: source)
     )
 }
