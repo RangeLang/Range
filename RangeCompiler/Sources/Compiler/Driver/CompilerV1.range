@@ -6,13 +6,6 @@ construct CompilerV1Error {
     let message: String
 }
 
-construct CompilerV1ShapeDelta {
-    let identity: CompilerIdentity
-    let before: CompilerValueFingerprint
-    let after: CompilerValueFingerprint
-    let snapshot: String
-}
-
 construct CompilerV1SyntaxFacts {
     let isValid: Bool
     let syntax: CompilerV1IdentifiedText
@@ -22,6 +15,8 @@ construct CompilerV1SyntaxFacts {
     let shapeIdentity: CompilerIdentity
     let shape: CompilerValueFingerprint
     let snapshotStart: Int
+    let snapshotEnd: Int
+    let recipe: String
 }
 
 construct CompilerV1BehaviorDelta {
@@ -65,7 +60,9 @@ function compilerV1SyntaxFactsInvalid(): CompilerV1SyntaxFacts {
         after: absent,
         shapeIdentity: absentIdentity,
         shape: absent,
-        snapshotStart: 0
+        snapshotStart: 0,
+        snapshotEnd: 0,
+        recipe: String("")
     )
 }
 
@@ -77,37 +74,59 @@ function compilerV1SyntaxFactsCapture(source: CompilerV1SourceDelta): CompilerV1
         captureStatus: compilerTypedSyntaxCaptureMainRoot(source: source.source.value, tables: tables)
     }
     state snapshot: String("")
+    state recipe: String("")
     if captureStatus != 0 || !compilerSyntaxTablesIsValid(tables: tables) {
         snapshot: String("compilerError\tkind=invalidTypedSyntaxSnapshot\n")
+        recipe: String("compilerError\tkind=invalidSyntaxRecipes\n")
     } else {
         snapshot: compilerTypedSyntaxRenderSnapshot(tables: tables)
+        if compilerMacroFinalizeApplications(tables: tables) == 0 {
+            recipe: compilerSyntaxRecipeRender(tables: tables)
+        } else {
+            recipe: String("compilerError\tkind=invalidSyntaxRecipes\n")
+        }
     }
     let tablesDestroyStatus: Int(compilerSyntaxTablesDestroy(tables: tables))
     if tablesDestroyStatus != 0 {
         snapshot: String("compilerError\tkind=compilerV1SyntaxFactsOwnershipFailure\n")
+        recipe: String("compilerError\tkind=invalidSyntaxRecipes\n")
     }
     let syntax: CompilerV1SyntaxDelta(compilerV1SyntaxDelta(source: source, snapshot: snapshot, before: compilerV1AbsentValue()))
     let shapeIdentity: CompilerIdentity(compilerV1IdentityAppendInt(identity: syntax.syntax.identity, value: 3))
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.syntaxFacts.end"))
     return CompilerV1SyntaxFacts(
-        isValid: !compilerNativeOutputIsError(output: snapshot),
+        isValid: !compilerNativeOutputIsError(output: snapshot) && !compilerNativeOutputIsError(output: recipe),
         syntax: syntax.syntax,
         edge: syntax.edge,
         before: syntax.before,
         after: syntax.after,
         shapeIdentity: shapeIdentity,
-        shape: compilerV1ValueFingerprint(identity: shapeIdentity, tag: 12, text: snapshot),
-        snapshotStart: 0
+        shape: compilerV1ValueFingerprint(identity: shapeIdentity, tag: 12, text: recipe),
+        snapshotStart: 0,
+        snapshotEnd: stringLength(value: snapshot),
+        recipe: recipe
     )
 }
 
 function compilerV1SyntaxFactsSnapshot(facts: CompilerV1SyntaxFacts): String {
-    return facts.syntax.value.substring(start: facts.snapshotStart, end: stringLength(value: facts.syntax.value))
+    return facts.syntax.value.substring(start: facts.snapshotStart, end: facts.snapshotEnd)
+}
+
+function compilerV1SyntaxFactsRecipe(facts: CompilerV1SyntaxFacts): String {
+    return facts.recipe
+}
+
+function compilerV1SyntaxFactsErrorMessage(facts: CompilerV1SyntaxFacts): String {
+    let recipe: String(compilerV1SyntaxFactsRecipe(facts: facts))
+    if compilerNativeOutputIsError(output: recipe) {
+        return recipe
+    }
+    return compilerV1SyntaxFactsSnapshot(facts: facts)
 }
 
 function compilerV1SyntaxFactsEncode(facts: CompilerV1SyntaxFacts): String {
     if facts.snapshotStart != 0 { return facts.syntax.value }
-    return "compilerV1SyntaxFacts\tversion=2\tsyntaxIdentityFirst=\(facts.syntax.identity.first)\tsyntaxIdentitySecond=\(facts.syntax.identity.second)\tedgeFromFirst=\(facts.edge.from.first)\tedgeFromSecond=\(facts.edge.from.second)\trelationshipFirst=\(facts.edge.relationship.first)\trelationshipSecond=\(facts.edge.relationship.second)\tsyntaxFirst=\(facts.after.first)\tsyntaxSecond=\(facts.after.second)\tshapeIdentityFirst=\(facts.shapeIdentity.first)\tshapeIdentitySecond=\(facts.shapeIdentity.second)\tshapeFirst=\(facts.shape.first)\tshapeSecond=\(facts.shape.second)\tbytes=\(facts.syntax.value.bytes.count)\n\(facts.syntax.value)"
+    return "compilerV1SyntaxFacts\tversion=2\tsyntaxIdentityFirst=\(facts.syntax.identity.first)\tsyntaxIdentitySecond=\(facts.syntax.identity.second)\tedgeFromFirst=\(facts.edge.from.first)\tedgeFromSecond=\(facts.edge.from.second)\trelationshipFirst=\(facts.edge.relationship.first)\trelationshipSecond=\(facts.edge.relationship.second)\tsyntaxFirst=\(facts.after.first)\tsyntaxSecond=\(facts.after.second)\tshapeIdentityFirst=\(facts.shapeIdentity.first)\tshapeIdentitySecond=\(facts.shapeIdentity.second)\tshapeFirst=\(facts.shape.first)\tshapeSecond=\(facts.shape.second)\tbytes=\(facts.snapshotEnd - facts.snapshotStart)\trecipeBytes=\(facts.recipe.bytes.count)\n\(facts.syntax.value)\n\(facts.recipe)"
 }
 
 function compilerV1SyntaxFactsFieldIsDecimal(source: String, end: Int, ordinal: Int): Bool {
@@ -124,7 +143,7 @@ function compilerV1SyntaxFactsFieldInt(source: String, end: Int, ordinal: Int): 
 
 function compilerV1SyntaxFactsHeaderIsValid(encoded: String, headerEnd: Int): Bool {
     if headerEnd < 0
-        || compilerBuildPlanFieldCount(source: encoded, start: 0, end: headerEnd) != 15
+        || compilerBuildPlanFieldCount(source: encoded, start: 0, end: headerEnd) != 16
         || compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 0) != String("compilerV1SyntaxFacts")
         || compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 1) != String("version=2")
         || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 2), start: 0, prefix: String("syntaxIdentityFirst="))
@@ -139,11 +158,12 @@ function compilerV1SyntaxFactsHeaderIsValid(encoded: String, headerEnd: Int): Bo
         || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 11), start: 0, prefix: String("shapeIdentitySecond="))
         || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 12), start: 0, prefix: String("shapeFirst="))
         || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 13), start: 0, prefix: String("shapeSecond="))
-        || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 14), start: 0, prefix: String("bytes=")) {
+        || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 14), start: 0, prefix: String("bytes="))
+        || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 15), start: 0, prefix: String("recipeBytes=")) {
         return false
     }
     state ordinal: Int(2)
-    while ordinal < 15 {
+    while ordinal < 16 {
         if !compilerV1SyntaxFactsFieldIsDecimal(source: encoded, end: headerEnd, ordinal: ordinal) {
             return false
         }
@@ -173,7 +193,13 @@ function compilerV1SyntaxFactsDecode(encoded: String): CompilerV1SyntaxFacts {
     }
     let snapshotStart: Int(headerEnd + 1)
     let snapshotBytes: Int(compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 14))
-    if snapshotBytes != stringLength(value: encoded) - snapshotStart {
+    let recipeBytes: Int(compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 15))
+    let snapshotEnd: Int(snapshotStart + snapshotBytes)
+    if snapshotEnd >= stringLength(value: encoded) {
+        return compilerV1SyntaxFactsInvalid()
+    }
+    let recipeStart: Int(snapshotEnd + 1)
+    if recipeStart + recipeBytes != stringLength(value: encoded) {
         return compilerV1SyntaxFactsInvalid()
     }
     let syntaxIdentity: CompilerIdentity(compilerV1SyntaxFactsIdentity(encoded: encoded, headerEnd: headerEnd, firstOrdinal: 2))
@@ -190,16 +216,19 @@ function compilerV1SyntaxFactsDecode(encoded: String): CompilerV1SyntaxFacts {
         after: syntax,
         shapeIdentity: shapeIdentity,
         shape: shape,
-        snapshotStart: snapshotStart
+        snapshotStart: snapshotStart,
+        snapshotEnd: snapshotEnd,
+        recipe: encoded.substring(start: recipeStart, end: stringLength(value: encoded))
     )
 }
 
 function compilerV1SyntaxFactsIntegrityIsValid(facts: CompilerV1SyntaxFacts): Bool {
     let snapshot: String(compilerV1SyntaxFactsSnapshot(facts: facts))
+    let recipe: String(compilerV1SyntaxFactsRecipe(facts: facts))
     let expectedSyntax: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: facts.syntax.identity, tag: 16, text: snapshot))
     let expectedShapeIdentity: CompilerIdentity(compilerV1IdentityAppendInt(identity: facts.syntax.identity, value: 3))
     let expectedRelationship: CompilerIdentity(compilerV1IdentityForSourceSyntaxRelationship())
-    let expectedShape: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: facts.shapeIdentity, tag: 12, text: snapshot))
+    let expectedShape: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: facts.shapeIdentity, tag: 12, text: recipe))
     return facts.isValid
         && facts.edge.to.first == facts.syntax.identity.first
         && facts.edge.to.second == facts.syntax.identity.second
@@ -256,16 +285,14 @@ function compilerV1SyntaxBindingMatches(bindingPath: String, sourceFirst: Int, s
 function compilerV1Shape(facts: CompilerV1SyntaxFacts, before: CompilerValueFingerprint): CompilerV1ShapeDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.shape.begin"))
     state snapshot: String("compilerError\tkind=invalidCompilerV1SyntaxFacts\n")
+    let recipe: String(compilerV1SyntaxFactsRecipe(facts: facts))
     if compilerV1SyntaxFactsIntegrityIsValid(facts: facts) {
-        snapshot: compilerV1SyntaxFactsSnapshot(facts: facts)
+        snapshot: recipe
+    } else if compilerNativeOutputIsError(output: recipe) {
+        snapshot: recipe
     }
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.shape.end"))
-    return CompilerV1ShapeDelta(
-        identity: facts.shapeIdentity,
-        before: before,
-        after: compilerV1ValueFingerprint(identity: facts.shapeIdentity, tag: 12, text: snapshot),
-        snapshot: snapshot
-    )
+    return compilerV1ShapeDelta(syntaxIdentity: facts.syntax.identity, snapshot: snapshot, before: before)
 }
 
 function compilerV1ShapeOnly(source: CompilerV1SourceDelta, before: CompilerValueFingerprint): CompilerV1ShapeDelta {
@@ -303,7 +330,7 @@ function compilerV1Behavior(source: CompilerV1SourceDelta, shape: CompilerV1Shap
         snapshot: String("compilerError\tkind=compilerV1BehaviorOwnershipFailure\n")
         compiledOutput: snapshot
     }
-    let identity: CompilerIdentity(compilerV1IdentityAppendInt(identity: shape.identity, value: 4))
+    let identity: CompilerIdentity(compilerV1IdentityAppendInt(identity: shape.shape.identity, value: 4))
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.behavior.end"))
     return CompilerV1BehaviorDelta(
         identity: identity,
@@ -469,6 +496,12 @@ function compilerV1SyntaxExecutionReport(syntax: CompilerV1SyntaxDelta, edgeOper
     return 0
 }
 
+function compilerV1ShapeExecutionReport(shape: CompilerV1ShapeDelta, edgeOperation: String): Int {
+    let operation: String(compilerV1ReconciliationOperationName(operation: compilerV1ReconciliationOperation(before: shape.before, after: shape.after)))
+    print(value: "compilerV1ShapeExecution\toperation=\(operation)\tedgeOperation=\(edgeOperation)\tbefore=\(shape.before.first):\(shape.before.second)\tafter=\(shape.after.first):\(shape.after.second)\n")
+    return 0
+}
+
 function compilerV1ExecutionApply(sourceDelta: CompilerV1SourceDelta, facts: CompilerV1SyntaxFacts, executionPath: String, outputPath: String): Int {
     let priorFileFirst: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 2))
     let priorFileSecond: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 3))
@@ -499,8 +532,8 @@ function compilerV1ExecutionApply(sourceDelta: CompilerV1SourceDelta, facts: Com
     }
     let syntax: CompilerV1SyntaxDelta(compilerV1SyntaxDeltaForFacts(facts: facts, before: syntaxBefore))
     let shape: CompilerV1ShapeDelta(compilerV1Shape(facts: facts, before: shapeBefore))
-    if compilerNativeOutputIsError(output: shape.snapshot) {
-        return compilerV1Report(error: CompilerV1Error(message: shape.snapshot))
+    if compilerNativeOutputIsError(output: shape.shape.value) {
+        return compilerV1Report(error: CompilerV1Error(message: shape.shape.value))
     }
     let behavior: CompilerV1BehaviorDelta(compilerV1Behavior(source: sourceDelta, shape: shape, before: behaviorBefore))
     if compilerNativeOutputIsError(output: behavior.snapshot) {
@@ -523,9 +556,11 @@ function compilerV1ExecutionApply(sourceDelta: CompilerV1SourceDelta, facts: Com
     if priorFileFirst == 0 && priorFileSecond == 0 {
         print(value: "compilerV1Execution\tstatus=cold\tchanged=1\tsourceOperation=\(sourceOperation)\tedgeOperation=insert\tsourceBefore=\(sourceDelta.before.first):\(sourceDelta.before.second)\tsourceAfter=\(sourceDelta.after.first):\(sourceDelta.after.second)\tshapeBefore=\(shape.before.first):\(shape.before.second)\tshapeAfter=\(shape.after.first):\(shape.after.second)\tbehaviorBefore=\(behavior.before.first):\(behavior.before.second)\tbehaviorAfter=\(behavior.after.first):\(behavior.after.second)\tcompiledBefore=\(compiled.before.first):\(compiled.before.second)\tcompiledAfter=\(compiled.after.first):\(compiled.after.second)\n")
         compilerV1SyntaxExecutionReport(syntax: syntax, edgeOperation: String("insert"))
+        compilerV1ShapeExecutionReport(shape: shape, edgeOperation: String("insert"))
     } else {
         print(value: "compilerV1Execution\tstatus=updated\tchanged=1\tsourceOperation=\(sourceOperation)\tedgeOperation=reuse\tsourceBefore=\(sourceDelta.before.first):\(sourceDelta.before.second)\tsourceAfter=\(sourceDelta.after.first):\(sourceDelta.after.second)\tshapeBefore=\(shape.before.first):\(shape.before.second)\tshapeAfter=\(shape.after.first):\(shape.after.second)\tbehaviorBefore=\(behavior.before.first):\(behavior.before.second)\tbehaviorAfter=\(behavior.after.first):\(behavior.after.second)\tcompiledBefore=\(compiled.before.first):\(compiled.before.second)\tcompiledAfter=\(compiled.after.first):\(compiled.after.second)\n")
         compilerV1SyntaxExecutionReport(syntax: syntax, edgeOperation: String("reuse"))
+        compilerV1ShapeExecutionReport(shape: shape, edgeOperation: String("reuse"))
     }
     return 0
 }
@@ -546,7 +581,7 @@ function rangeCompilerV1ResumeCLI(executionPath: String, input: String, outputPa
     }
     if compilerV1ExecutionSourceMatches(executionPath: executionPath, input: input) == 1
         && compilerV1ExecutionCompiledMatches(executionPath: executionPath, input: input, outputPath: outputPath) == 1 {
-        print(value: "compilerV1Execution\tstatus=reused\tchanged=0\tsourceOperation=reuse\tedgeOperation=reuse\ncompilerV1SyntaxExecution\toperation=reuse\tedgeOperation=reuse\n")
+        print(value: "compilerV1Execution\tstatus=reused\tchanged=0\tsourceOperation=reuse\tedgeOperation=reuse\ncompilerV1SyntaxExecution\toperation=reuse\tedgeOperation=reuse\ncompilerV1ShapeExecution\toperation=reuse\tedgeOperation=reuse\n")
         return 0
     }
     return compilerV1ExecutionUpdate(input: input, executionPath: executionPath, outputPath: outputPath)
@@ -573,7 +608,7 @@ function rangeCompilerV1ResumeFactsCLI(executionPath: String, bindingPath: Strin
     }
     if compilerV1ExecutionSourceMatches(executionPath: executionPath, input: input) == 1
         && compilerV1ExecutionCompiledMatches(executionPath: executionPath, input: input, outputPath: outputPath) == 1 {
-        print(value: "compilerV1Execution\tstatus=reused\tchanged=0\tsourceOperation=reuse\tedgeOperation=reuse\ncompilerV1SyntaxExecution\toperation=reuse\tedgeOperation=reuse\n")
+        print(value: "compilerV1Execution\tstatus=reused\tchanged=0\tsourceOperation=reuse\tedgeOperation=reuse\ncompilerV1SyntaxExecution\toperation=reuse\tedgeOperation=reuse\ncompilerV1ShapeExecution\toperation=reuse\tedgeOperation=reuse\n")
         return 0
     }
     return compilerV1ExecutionApply(sourceDelta: sourceDelta, facts: facts, executionPath: executionPath, outputPath: outputPath)
@@ -586,7 +621,7 @@ function rangeCompilerV1SyntaxFactsWriteCLI(input: String, outputPath: String): 
     }
     let facts: CompilerV1SyntaxFacts(compilerV1SyntaxFactsCapture(source: sourceDelta))
     if !facts.isValid {
-        return compilerV1Report(error: CompilerV1Error(message: compilerV1SyntaxFactsSnapshot(facts: facts)))
+        return compilerV1Report(error: CompilerV1Error(message: compilerV1SyntaxFactsErrorMessage(facts: facts)))
     }
     let status: Int(writeFile(path: outputPath, text: compilerV1SyntaxFactsEncode(facts: facts)))
     if status != 0 {
@@ -599,14 +634,14 @@ function rangeCompilerV1SyntaxFactsWriteCLI(input: String, outputPath: String): 
 function rangeCompilerV1ProjectShapeCLI(factsPath: String): Int {
     let facts: CompilerV1SyntaxFacts(compilerV1SyntaxFactsDecode(encoded: readFile(path: factsPath)))
     if !facts.isValid {
-        return compilerV1Report(error: CompilerV1Error(message: compilerV1SyntaxFactsSnapshot(facts: facts)))
+        return compilerV1Report(error: CompilerV1Error(message: compilerV1SyntaxFactsErrorMessage(facts: facts)))
     }
     let shape: CompilerV1ShapeDelta(compilerV1Shape(facts: facts, before: compilerV1AbsentValue()))
-    if compilerNativeOutputIsError(output: shape.snapshot) {
-        return compilerV1Report(error: CompilerV1Error(message: shape.snapshot))
+    if compilerNativeOutputIsError(output: shape.shape.value) {
+        return compilerV1Report(error: CompilerV1Error(message: shape.shape.value))
     }
-    print(value: "compilerV1Shape\tversion=1\tidentity=\(shape.identity.first):\(shape.identity.second)\tbefore=\(shape.before.first):\(shape.before.second)\tafter=\(shape.after.first):\(shape.after.second)\n")
-    print(value: shape.snapshot)
+    print(value: "compilerV1Shape\tversion=1\tidentity=\(shape.shape.identity.first):\(shape.shape.identity.second)\tbefore=\(shape.before.first):\(shape.before.second)\tafter=\(shape.after.first):\(shape.after.second)\n")
+    print(value: shape.shape.value)
     return 0
 }
 
@@ -617,11 +652,11 @@ function rangeCompilerV1ShapeCLI(input: String): Int {
         return compilerV1Report(error: CompilerV1Error(message: "range: unable to read non-empty input at \(sourceDelta.file.value)"))
     }
     let shape: CompilerV1ShapeDelta(compilerV1ShapeOnly(source: sourceDelta, before: compilerV1AbsentValue()))
-    if compilerNativeOutputIsError(output: shape.snapshot) {
-        return compilerV1Report(error: CompilerV1Error(message: shape.snapshot))
+    if compilerNativeOutputIsError(output: shape.shape.value) {
+        return compilerV1Report(error: CompilerV1Error(message: shape.shape.value))
     }
-    print(value: "compilerV1Shape\tversion=1\tidentity=\(shape.identity.first):\(shape.identity.second)\tbefore=\(shape.before.first):\(shape.before.second)\tafter=\(shape.after.first):\(shape.after.second)\n")
-    print(value: shape.snapshot)
+    print(value: "compilerV1Shape\tversion=1\tidentity=\(shape.shape.identity.first):\(shape.shape.identity.second)\tbefore=\(shape.before.first):\(shape.before.second)\tafter=\(shape.after.first):\(shape.after.second)\n")
+    print(value: shape.shape.value)
     return 0
 }
 
@@ -633,8 +668,8 @@ function rangeCompilerV1CLI(compiler: CompilerV1, input: String, inspect: Bool):
     }
     let facts: CompilerV1SyntaxFacts(compilerV1SyntaxFactsCapture(source: sourceDelta))
     let shape: CompilerV1ShapeDelta(compilerV1Shape(facts: facts, before: compilerV1AbsentValue()))
-    if compilerNativeOutputIsError(output: shape.snapshot) {
-        return compilerV1Report(error: CompilerV1Error(message: shape.snapshot))
+    if compilerNativeOutputIsError(output: shape.shape.value) {
+        return compilerV1Report(error: CompilerV1Error(message: shape.shape.value))
     }
     let behavior: CompilerV1BehaviorDelta(compilerV1Behavior(source: sourceDelta, shape: shape, before: compilerV1AbsentValue()))
     if compilerNativeOutputIsError(output: behavior.snapshot) {
@@ -655,8 +690,11 @@ function rangeCompilerV1CLI(compiler: CompilerV1, input: String, inspect: Bool):
         print(value: "compilerV1Entity\tkind=syntax\tidentity=\(facts.syntax.identity.first):\(facts.syntax.identity.second)\tbefore=\(facts.before.first):\(facts.before.second)\tafter=\(facts.after.first):\(facts.after.second)\tbytes=\(syntaxLength)\n")
         print(value: "compilerV1Edge\tfrom=\(facts.edge.from.first):\(facts.edge.from.second)\trelationship=\(facts.edge.relationship.first):\(facts.edge.relationship.second)\tto=\(facts.edge.to.first):\(facts.edge.to.second)\tcardinality=one\n")
         print(value: "compilerV1Delta\tphase=syntax\tidentity=\(facts.syntax.identity.first):\(facts.syntax.identity.second)\tbefore=\(facts.before.first):\(facts.before.second)\tafter=\(facts.after.first):\(facts.after.second)\n")
-        print(value: "compilerV1Delta\tphase=shape\tidentity=\(shape.identity.first):\(shape.identity.second)\tbefore=\(shape.before.first):\(shape.before.second)\tafter=\(shape.after.first):\(shape.after.second)\n")
-        print(value: shape.snapshot)
+        print(value: compilerV1SyntaxFactsSnapshot(facts: facts))
+        print(value: "compilerV1Entity\tkind=shape\tidentity=\(shape.shape.identity.first):\(shape.shape.identity.second)\tbefore=\(shape.before.first):\(shape.before.second)\tafter=\(shape.after.first):\(shape.after.second)\tbytes=\(shape.shape.value.bytes.count)\n")
+        print(value: "compilerV1Edge\tfrom=\(shape.edge.from.first):\(shape.edge.from.second)\trelationship=\(shape.edge.relationship.first):\(shape.edge.relationship.second)\tto=\(shape.edge.to.first):\(shape.edge.to.second)\tcardinality=one\n")
+        print(value: "compilerV1Delta\tphase=shape\tidentity=\(shape.shape.identity.first):\(shape.shape.identity.second)\tbefore=\(shape.before.first):\(shape.before.second)\tafter=\(shape.after.first):\(shape.after.second)\n")
+        print(value: shape.shape.value)
         print(value: "compilerV1Delta\tphase=behavior\tidentity=\(behavior.identity.first):\(behavior.identity.second)\tinput=\(behavior.input.first):\(behavior.input.second)\tbefore=\(behavior.before.first):\(behavior.before.second)\tafter=\(behavior.after.first):\(behavior.after.second)\n")
         print(value: behavior.snapshot)
         print(value: "compilerV1Delta\tphase=compile\tidentity=\(artifact.identity.first):\(artifact.identity.second)\tinput=\(artifact.input.first):\(artifact.input.second)\tbefore=\(artifact.before.first):\(artifact.before.second)\tafter=\(artifact.after.first):\(artifact.after.second)\n")

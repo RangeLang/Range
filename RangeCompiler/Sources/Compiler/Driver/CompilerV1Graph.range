@@ -24,6 +24,13 @@ construct CompilerV1SyntaxDelta {
     let after: CompilerValueFingerprint
 }
 
+construct CompilerV1ShapeDelta {
+    let shape: CompilerV1IdentifiedText
+    let edge: CompilerV1Edge
+    let before: CompilerValueFingerprint
+    let after: CompilerValueFingerprint
+}
+
 construct CompilerV1Execution {
     let isValid: Bool
     let file: CompilerIdentity
@@ -216,6 +223,11 @@ function compilerV1IdentityForSourceSyntaxRelationship(): CompilerIdentity {
     return CompilerIdentity(first: fingerprint.first, second: fingerprint.second)
 }
 
+function compilerV1IdentityForSyntaxShapeRelationship(): CompilerIdentity {
+    let fingerprint: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: compilerFingerprintInitial(), tag: 19, text: String("CompilerV1.SyntaxShape")))
+    return CompilerIdentity(first: fingerprint.first, second: fingerprint.second)
+}
+
 function compilerV1SyntaxDelta(source: CompilerV1SourceDelta, snapshot: String, before: CompilerValueFingerprint): CompilerV1SyntaxDelta {
     let syntaxIdentity: CompilerIdentity(compilerV1IdentityForSyntax(source: source.source.identity))
     return CompilerV1SyntaxDelta(
@@ -227,6 +239,20 @@ function compilerV1SyntaxDelta(source: CompilerV1SourceDelta, snapshot: String, 
         ),
         before: before,
         after: compilerV1ValueFingerprint(identity: syntaxIdentity, tag: 16, text: snapshot)
+    )
+}
+
+function compilerV1ShapeDelta(syntaxIdentity: CompilerIdentity, snapshot: String, before: CompilerValueFingerprint): CompilerV1ShapeDelta {
+    let shapeIdentity: CompilerIdentity(compilerV1IdentityAppendInt(identity: syntaxIdentity, value: 3))
+    return CompilerV1ShapeDelta(
+        shape: CompilerV1IdentifiedText(identity: shapeIdentity, value: "\(snapshot)"),
+        edge: CompilerV1Edge(
+            from: syntaxIdentity,
+            relationship: compilerV1IdentityForSyntaxShapeRelationship(),
+            to: shapeIdentity
+        ),
+        before: before,
+        after: compilerV1ValueFingerprint(identity: shapeIdentity, tag: 12, text: snapshot)
     )
 }
 

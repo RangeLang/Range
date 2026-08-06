@@ -1,0 +1,14 @@
+macro syntax(@capture template: String): Declaration -> Void {}
+
+@syntax {
+    route $name -> $result
+}
+
+construct RouteDeclaration {
+    let name: String
+    let result: String?
+}
+
+@main {
+    return 7
+}

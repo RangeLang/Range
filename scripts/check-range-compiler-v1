@@ -38,12 +38,18 @@ fi
     || fail "V1 has no identified Syntax reconciliation product"
 /usr/bin/grep -Fq 'function compilerV1IdentityForSourceSyntaxRelationship()' "$COMPILER_V1_GRAPH" \
     || fail "V1 has no stable Source to Syntax relationship identity"
+/usr/bin/grep -Fq 'function compilerV1IdentityForSyntaxShapeRelationship()' "$COMPILER_V1_GRAPH" \
+    || fail "V1 has no stable Syntax to Shape relationship identity"
+/usr/bin/grep -Fq 'construct CompilerV1ShapeDelta {' "$COMPILER_V1_GRAPH" \
+    || fail "V1 has no identified Shape reconciliation product"
 /usr/bin/grep -Fq 'function compilerV1ReconciliationDelete(): Int' "$COMPILER_V1_GRAPH" \
     || fail "V1 reconciliation omits delete from its four operations"
 /usr/bin/grep -Fq 'compilerTypedDeclarationsCapture(source: source.source.value, tables: tables)' "$COMPILER_V1" \
     || fail "V1 syntax facts do not own declaration capture"
 /usr/bin/grep -Fq 'compilerTypedSyntaxCaptureMainRoot(source: source.source.value, tables: tables)' "$COMPILER_V1" \
     || fail "V1 syntax facts do not retain main in their declaration graph"
+/usr/bin/grep -Fq 'recipe: compilerSyntaxRecipeRender(tables: tables)' "$COMPILER_V1" \
+    || fail "V1 syntax facts do not freeze the @syntax recipe verification at capture time"
 if /usr/bin/grep -Fq 'compilerTypedSyntaxCapture(source: source.source.value, tables: tables)' "$COMPILER_V1"; then
     fail "V1 Shape still eagerly captures every function body"
 fi
@@ -58,8 +64,8 @@ if /usr/bin/grep -Fq 'compilerTypedSyntaxSummary(source: source.source.value)' "
 fi
 /usr/bin/grep -Fq 'function compilerV1Shape(facts: CompilerV1SyntaxFacts, before: CompilerValueFingerprint)' "$COMPILER_V1" \
     || fail "V1 Shape does not consume frozen syntax facts"
-/usr/bin/grep -Fq 'snapshot: compilerV1SyntaxFactsSnapshot(facts: facts)' "$COMPILER_V1" \
-    || fail "V1 Shape does not project its snapshot from syntax facts"
+/usr/bin/grep -Fq 'snapshot: recipe' "$COMPILER_V1" \
+    || fail "V1 Shape does not project the @syntax recipe verification from frozen syntax facts"
 /usr/bin/grep -Fq 'function compilerV1Behavior(source: CompilerV1SourceDelta, shape: CompilerV1ShapeDelta, before: CompilerValueFingerprint)' "$COMPILER_V1" \
     || fail "V1 Behavior does not own the transitional downstream recapture"
 /usr/bin/grep -Fq 'compiledOutput: compilerNativeSourceSetLLVMTextForLinkedTables(source: source.source.value, declarationTables: tables)' "$COMPILER_V1" \
@@ -208,6 +214,8 @@ stale_facts_status=0
     || fail "cold persistent execution omitted its Range-owned state"
 /usr/bin/grep -Eq $'^compilerV1SyntaxExecution\toperation=insert\tedgeOperation=insert\tbefore=0:0\tafter=[0-9]+:[0-9]+$' "$WORK_ROOT/persistent-cold.out" \
     || fail "cold persistent execution did not insert Syntax and Source to Syntax"
+/usr/bin/grep -Eq $'^compilerV1ShapeExecution\toperation=insert\tedgeOperation=insert\tbefore=0:0\tafter=[0-9]+:[0-9]+$' "$WORK_ROOT/persistent-cold.out" \
+    || fail "cold persistent execution did not insert Shape and Syntax to Shape"
 /bin/cp "$WORK_ROOT/persistent.ll" "$WORK_ROOT/persistent-stdout.ll"
 /usr/bin/printf '\n' >> "$WORK_ROOT/persistent-stdout.ll"
 /usr/bin/cmp -s "$WORK_ROOT/v1.ll" "$WORK_ROOT/persistent-stdout.ll" \
@@ -225,6 +233,8 @@ cold_compiled_after="$(/usr/bin/sed -n 's/^compilerV1Execution.*compiledAfter=\(
     || fail "unchanged persistent execution did not reuse its compiled value"
 /usr/bin/grep -Fqx $'compilerV1SyntaxExecution\toperation=reuse\tedgeOperation=reuse' "$WORK_ROOT/persistent-unchanged.out" \
     || fail "unchanged persistent execution did not reuse Syntax and Source to Syntax"
+/usr/bin/grep -Fqx $'compilerV1ShapeExecution\toperation=reuse\tedgeOperation=reuse' "$WORK_ROOT/persistent-unchanged.out" \
+    || fail "unchanged persistent execution did not reuse Shape and Syntax to Shape"
 [[ "$cold_execution_hash" == "$(/usr/bin/shasum -a 256 "$WORK_ROOT/execution.tsv" | /usr/bin/awk '{print $1}')" ]] \
     || fail "unchanged persistent execution rewrote its state"
 [[ "$cold_llvm_hash" == "$(/usr/bin/shasum -a 256 "$WORK_ROOT/persistent.ll" | /usr/bin/awk '{print $1}')" ]] \
@@ -242,6 +252,8 @@ failed_candidate_status=0
     || fail "failed persistent candidate mutated the accepted execution graph"
 [[ "$cold_llvm_hash" == "$(/usr/bin/shasum -a 256 "$WORK_ROOT/persistent.ll" | /usr/bin/awk '{print $1}')" ]] \
     || fail "failed persistent candidate mutated the last-known-good LLVM"
+/usr/bin/grep -Eq $'^compilerV1Execution\tversion=2\t.*\tshapeFirst=[0-9]+\tshapeSecond=[0-9]+\t' "$WORK_ROOT/execution.tsv" \
+    || fail "failed persistent candidate dropped the accepted Shape state"
 /usr/bin/perl -0pi -e 's/return missingValue/return 7/' "$WORK_ROOT/Persistent.range"
 
 /usr/bin/perl -0pi -e 's/return 7/return 8/' "$WORK_ROOT/Persistent.range"
@@ -379,6 +391,8 @@ write_behavior_cache_fixture "$WORK_ROOT/behavior-callee-output.range" "$WORK_RO
     || fail "V1 inspection omitted the identified Syntax value"
 /usr/bin/grep -Eq $'^compilerV1Delta\tphase=syntax\tidentity=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
     || fail "V1 inspection omitted the Syntax reconciliation delta"
+/usr/bin/grep -Eq $'^compilerV1Entity\tkind=shape\tidentity=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+\tbytes=[1-9][0-9]*$' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 inspection omitted the identified Shape value"
 
 /bin/cp "$FIXTURE" "$WORK_ROOT/IdentityValue.range"
 "$COMPILER" inspect-v1 "$WORK_ROOT/IdentityValue.range" > "$WORK_ROOT/identity-before.txt"
@@ -392,12 +406,18 @@ before_syntax_identity="$(/usr/bin/sed -n 's/^compilerV1Entity[[:space:]]kind=sy
 after_syntax_identity="$(/usr/bin/sed -n 's/^compilerV1Entity[[:space:]]kind=syntax[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
 before_syntax_edge="$(/usr/bin/grep -F $'compilerV1Edge\t'"from=$before_identity" "$WORK_ROOT/identity-before.txt")"
 after_syntax_edge="$(/usr/bin/grep -F $'compilerV1Edge\t'"from=$after_identity" "$WORK_ROOT/identity-after.txt")"
+before_shape_identity="$(/usr/bin/sed -n 's/^compilerV1Entity[[:space:]]kind=shape[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
+after_shape_identity="$(/usr/bin/sed -n 's/^compilerV1Entity[[:space:]]kind=shape[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
+before_shape_edge="$(/usr/bin/grep -F $'compilerV1Edge\t'"from=$before_syntax_identity" "$WORK_ROOT/identity-before.txt")"
+after_shape_edge="$(/usr/bin/grep -F $'compilerV1Edge\t'"from=$after_syntax_identity" "$WORK_ROOT/identity-after.txt")"
 before_edge="$(/usr/bin/sed -n 's/^compilerV1Edge[[:space:]]//p' "$WORK_ROOT/identity-before.txt")"
 after_edge="$(/usr/bin/sed -n 's/^compilerV1Edge[[:space:]]//p' "$WORK_ROOT/identity-after.txt")"
 before_value="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=source.*[[:space:]]after=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
 after_value="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=source.*[[:space:]]after=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
 before_syntax_value="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=syntax.*[[:space:]]after=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
 after_syntax_value="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=syntax.*[[:space:]]after=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
+before_shape_value="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=shape.*[[:space:]]after=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
+after_shape_value="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=shape.*[[:space:]]after=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
 before_bytes="$(/usr/bin/sed -n 's/^compilerV1Entity.*kind=source.*bytes=\([0-9][0-9]*\)$/\1/p' "$WORK_ROOT/identity-before.txt")"
 after_bytes="$(/usr/bin/sed -n 's/^compilerV1Entity.*kind=source.*bytes=\([0-9][0-9]*\)$/\1/p' "$WORK_ROOT/identity-after.txt")"
 [[ -n "$before_file_identity" && "$before_file_identity" == "$after_file_identity" ]] \
@@ -406,28 +426,42 @@ after_bytes="$(/usr/bin/sed -n 's/^compilerV1Entity.*kind=source.*bytes=\([0-9][
     || fail "V1 Source identity changed when only its value changed"
 [[ -n "$before_syntax_identity" && "$before_syntax_identity" == "$after_syntax_identity" ]] \
     || fail "V1 Syntax identity changed when only Source value changed"
+[[ -n "$before_shape_identity" && "$before_shape_identity" == "$after_shape_identity" ]] \
+    || fail "V1 Shape identity changed when only Source value changed"
 [[ "$before_file_identity" != "$before_identity" ]] \
     || fail "V1 still conflates File and Source identity"
+[[ "$before_syntax_identity" != "$before_shape_identity" ]] \
+    || fail "V1 still conflates Syntax and Shape identity"
 [[ -n "$before_edge" && "$before_edge" == "$after_edge" ]] \
     || fail "V1 replaced the File to Source edge when only Source value changed"
 [[ -n "$before_syntax_edge" && "$before_syntax_edge" == "$after_syntax_edge" ]] \
     || fail "V1 replaced the Source to Syntax edge when only Syntax value changed"
+[[ -n "$before_shape_edge" && "$before_shape_edge" == "$after_shape_edge" ]] \
+    || fail "V1 replaced the Syntax to Shape edge when only Shape value changed"
 /usr/bin/grep -Fq "to=$before_syntax_identity" <<< "$before_syntax_edge" \
     || fail "V1 Source to Syntax edge does not end at Syntax identity"
 /usr/bin/grep -Fq "from=$before_file_identity" "$WORK_ROOT/identity-before.txt" \
     || fail "V1 File to Source edge does not begin at the File identity"
 /usr/bin/grep -Fq "to=$before_identity" "$WORK_ROOT/identity-before.txt" \
     || fail "V1 File to Source edge does not end at the Source identity"
+/usr/bin/grep -Fq "from=$before_syntax_identity" <<< "$before_shape_edge" \
+    || fail "V1 Syntax to Shape edge does not begin at the Syntax identity"
+/usr/bin/grep -Fq "to=$before_shape_identity" <<< "$before_shape_edge" \
+    || fail "V1 Syntax to Shape edge does not end at the Shape identity"
 [[ -n "$before_value" && -n "$after_value" && "$before_value" != "$after_value" ]] \
     || fail "V1 Source entity did not change its physical value fingerprint"
 [[ -n "$before_syntax_value" && -n "$after_syntax_value" && "$before_syntax_value" != "$after_syntax_value" ]] \
     || fail "V1 Syntax entity did not change its physical value fingerprint"
+[[ -n "$before_shape_value" && -n "$after_shape_value" && "$before_shape_value" == "$after_shape_value" ]] \
+    || fail "V1 Shape value changed when only Source provenance shifted"
 [[ -n "$before_bytes" && -n "$after_bytes" && "$before_bytes" -ne "$after_bytes" ]] \
     || fail "V1 Source value did not change with its contents"
 /usr/bin/grep -Eq $'^compilerV1Delta\tphase=shape\tidentity=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
     || fail "V1 inspection omitted the Shape Delta"
 /usr/bin/grep -Fq $'typedSyntax\tvalid=true' "$WORK_ROOT/inspect.txt" \
-    || fail "V1 shape artifact is not valid typed syntax"
+    || fail "V1 syntax artifact is not valid typed syntax"
+/usr/bin/grep -Fq $'syntaxRecipes\tvalid=true\trecipeCount=0' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 shape artifact did not retain the @syntax recipe verification"
 /usr/bin/grep -Eq $'^compilerV1Delta\tphase=behavior\tidentity=[0-9]+:[0-9]+\tinput=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
     || fail "V1 inspection omitted the Behavior Delta"
 shape_output="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=shape.*[[:space:]]after=\([^[:space:]]*\)$/\1/p' "$WORK_ROOT/inspect.txt")"
@@ -442,6 +476,39 @@ behavior_output="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=behavior.
 compile_input="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=compile.*[[:space:]]input=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/inspect.txt")"
 [[ -n "$behavior_output" && "$behavior_output" == "$compile_input" ]] \
     || fail "V1 Compiled Delta does not consume the Behavior value fingerprint"
+
+V1_SYNTAX_FIXTURE="$REPO_ROOT/Testing/Syntax/Pass/V1SyntaxRecipeVerification.range"
+V1_SYNTAX_FAIL_FIXTURE="$REPO_ROOT/Testing/Syntax/Fail/V1SyntaxRecipeUnknownCapture.range"
+"$COMPILER" capture-syntax-v1 "$V1_SYNTAX_FIXTURE" "$WORK_ROOT/v1-syntax-facts.tsv" > "$WORK_ROOT/v1-syntax-binding.tsv"
+/usr/bin/grep -Fq $'syntaxRecipes\tvalid=true\trecipeCount=1' "$WORK_ROOT/v1-syntax-facts.tsv" \
+    || fail "V1 syntax facts did not freeze the collected @syntax recipe"
+/usr/bin/grep -Fq $'syntaxRecipeCapture\trecipeRow=0\tordinal=1\tname=name\tmemberRow=0\ttype=String\toccurrence=one' "$WORK_ROOT/v1-syntax-facts.tsv" \
+    || fail "V1 syntax facts did not freeze the resolved @syntax capture"
+"$COMPILER" compile-shape "$V1_SYNTAX_FIXTURE" > "$WORK_ROOT/v1-syntax-shape.out"
+/usr/bin/grep -Fq $'syntaxRecipes\tvalid=true\trecipeCount=1' "$WORK_ROOT/v1-syntax-shape.out" \
+    || fail "V1 Shape did not project the verified @syntax recipe product"
+/usr/bin/grep -Fq $'syntaxRecipeCapture\trecipeRow=0\tordinal=3\tname=result\tmemberRow=1\ttype=String?\toccurrence=zeroOrOne' "$WORK_ROOT/v1-syntax-shape.out" \
+    || fail "V1 Shape lost the zero-or-one @syntax capture occurrence"
+if /usr/bin/grep -Eq '^(define |declare |target triple|@)' "$WORK_ROOT/v1-syntax-shape.out"; then
+    fail "V1 Shape leaked a compiled or behavior product into its recipe verification"
+fi
+"$COMPILER" compile-v1 "$V1_SYNTAX_FIXTURE" > "$WORK_ROOT/v1-syntax.ll" \
+    || fail "V1 compilation rejected the verified @syntax fixture"
+
+syntax_fail_status=0
+"$COMPILER" capture-syntax-v1 "$V1_SYNTAX_FAIL_FIXTURE" "$WORK_ROOT/v1-syntax-fail-facts.tsv" > "$WORK_ROOT/v1-syntax-fail.out" \
+    || syntax_fail_status=$?
+[[ "$syntax_fail_status" -eq 65 ]] \
+    || fail "V1 unknown @syntax capture exited $syntax_fail_status instead of 65"
+/usr/bin/grep -Fq $'compilerError\tkind=syntaxRecipeUnknownCapture\tapplicationRow=0\tordinal=1\tname=name' "$WORK_ROOT/v1-syntax-fail.out" \
+    || fail "V1 unknown @syntax capture omitted its recipe rejection"
+syntax_fail_inspect_status=0
+"$COMPILER" inspect-v1 "$V1_SYNTAX_FAIL_FIXTURE" > "$WORK_ROOT/v1-syntax-fail-inspect.out" 2> /dev/null \
+    || syntax_fail_inspect_status=$?
+[[ "$syntax_fail_inspect_status" -eq 65 ]] \
+    || fail "V1 inspection accepted the unknown @syntax capture"
+/usr/bin/grep -Fq $'compilerError\tkind=syntaxRecipeUnknownCapture' "$WORK_ROOT/v1-syntax-fail-inspect.out" \
+    || fail "V1 inspection did not reject at the @syntax verification boundary"
 
 runtime_inputs=()
 runtime_count="$(/usr/bin/plutil -extract runtimeSources raw -o - "$MANIFEST")"
