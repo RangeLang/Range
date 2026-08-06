@@ -36,6 +36,7 @@ construct CompilerV1CompiledDelta {
     let input: CompilerValueFingerprint
     let before: CompilerValueFingerprint
     let after: CompilerValueFingerprint
+    let snapshot: String
     let output: String
 }
 
@@ -50,6 +51,11 @@ function compilerV1Load(input: String, before: CompilerValueFingerprint): Compil
 function compilerV1NativeBehaviorSnapshot(identity: CompilerIdentity, output: String): String {
     let product: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: identity, tag: 13, text: output))
     return "compilerV1Behavior\tvalid=true\tproduct=\(product.first):\(product.second)\n"
+}
+
+function compilerV1NativeCompiledSnapshot(identity: CompilerIdentity, output: String): String {
+    let product: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: identity, tag: 14, text: output))
+    return "compilerV1Compiled\tvalid=true\tproduct=\(product.first):\(product.second)\n"
 }
 
 function compilerV1SyntaxFactsInvalid(): CompilerV1SyntaxFacts {
@@ -382,6 +388,7 @@ function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1Beha
             input: behavior.after,
             before: before,
             after: compilerV1AbsentValue(),
+            snapshot: String("compilerError\tkind=compilerV1BehaviorShapeMismatch\n"),
             output: String("compilerError\tkind=compilerV1BehaviorShapeMismatch\n")
         )
     }
@@ -392,6 +399,7 @@ function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1Beha
         input: behavior.after,
         before: before,
         after: compilerV1ValueFingerprint(identity: identity, tag: 14, text: output),
+        snapshot: compilerV1NativeCompiledSnapshot(identity: identity, output: output),
         output: output
     )
 }
@@ -532,6 +540,18 @@ function compilerV1ShapeExecutionReport(shape: CompilerV1ShapeDelta, edgeOperati
     return 0
 }
 
+function compilerV1BehaviorExecutionReport(behavior: CompilerV1BehaviorDelta, edgeOperation: String): Int {
+    let operation: String(compilerV1ReconciliationOperationName(operation: compilerV1ReconciliationOperation(before: behavior.before, after: behavior.after)))
+    print(value: "compilerV1BehaviorExecution\toperation=\(operation)\tedgeOperation=\(edgeOperation)\tbefore=\(behavior.before.first):\(behavior.before.second)\tafter=\(behavior.after.first):\(behavior.after.second)\n")
+    return 0
+}
+
+function compilerV1CompiledExecutionReport(compiled: CompilerV1CompiledDelta, edgeOperation: String): Int {
+    let operation: String(compilerV1ReconciliationOperationName(operation: compilerV1ReconciliationOperation(before: compiled.before, after: compiled.after)))
+    print(value: "compilerV1CompiledExecution\toperation=\(operation)\tedgeOperation=\(edgeOperation)\tbefore=\(compiled.before.first):\(compiled.before.second)\tafter=\(compiled.after.first):\(compiled.after.second)\n")
+    return 0
+}
+
 function compilerV1ExecutionApply(sourceDelta: CompilerV1SourceDelta, facts: CompilerV1SyntaxFacts, executionPath: String, outputPath: String): Int {
     let priorFileFirst: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 2))
     let priorFileSecond: Int(compilerV1ExecutionFieldAtPath(executionPath: executionPath, ordinal: 3))
@@ -587,10 +607,14 @@ function compilerV1ExecutionApply(sourceDelta: CompilerV1SourceDelta, facts: Com
         print(value: "compilerV1Execution\tstatus=cold\tchanged=1\tsourceOperation=\(sourceOperation)\tedgeOperation=insert\tsourceBefore=\(sourceDelta.before.first):\(sourceDelta.before.second)\tsourceAfter=\(sourceDelta.after.first):\(sourceDelta.after.second)\tshapeBefore=\(shape.before.first):\(shape.before.second)\tshapeAfter=\(shape.after.first):\(shape.after.second)\tbehaviorBefore=\(behavior.before.first):\(behavior.before.second)\tbehaviorAfter=\(behavior.after.first):\(behavior.after.second)\tcompiledBefore=\(compiled.before.first):\(compiled.before.second)\tcompiledAfter=\(compiled.after.first):\(compiled.after.second)\n")
         compilerV1SyntaxExecutionReport(syntax: syntax, edgeOperation: String("insert"))
         compilerV1ShapeExecutionReport(shape: shape, edgeOperation: String("insert"))
+        compilerV1BehaviorExecutionReport(behavior: behavior, edgeOperation: String("insert"))
+        compilerV1CompiledExecutionReport(compiled: compiled, edgeOperation: String("insert"))
     } else {
         print(value: "compilerV1Execution\tstatus=updated\tchanged=1\tsourceOperation=\(sourceOperation)\tedgeOperation=reuse\tsourceBefore=\(sourceDelta.before.first):\(sourceDelta.before.second)\tsourceAfter=\(sourceDelta.after.first):\(sourceDelta.after.second)\tshapeBefore=\(shape.before.first):\(shape.before.second)\tshapeAfter=\(shape.after.first):\(shape.after.second)\tbehaviorBefore=\(behavior.before.first):\(behavior.before.second)\tbehaviorAfter=\(behavior.after.first):\(behavior.after.second)\tcompiledBefore=\(compiled.before.first):\(compiled.before.second)\tcompiledAfter=\(compiled.after.first):\(compiled.after.second)\n")
         compilerV1SyntaxExecutionReport(syntax: syntax, edgeOperation: String("reuse"))
         compilerV1ShapeExecutionReport(shape: shape, edgeOperation: String("reuse"))
+        compilerV1BehaviorExecutionReport(behavior: behavior, edgeOperation: String("reuse"))
+        compilerV1CompiledExecutionReport(compiled: compiled, edgeOperation: String("reuse"))
     }
     return 0
 }
@@ -611,7 +635,7 @@ function rangeCompilerV1ResumeCLI(executionPath: String, input: String, outputPa
     }
     if compilerV1ExecutionSourceMatches(executionPath: executionPath, input: input) == 1
         && compilerV1ExecutionCompiledMatches(executionPath: executionPath, input: input, outputPath: outputPath) == 1 {
-        print(value: "compilerV1Execution\tstatus=reused\tchanged=0\tsourceOperation=reuse\tedgeOperation=reuse\ncompilerV1SyntaxExecution\toperation=reuse\tedgeOperation=reuse\ncompilerV1ShapeExecution\toperation=reuse\tedgeOperation=reuse\n")
+        print(value: "compilerV1Execution\tstatus=reused\tchanged=0\tsourceOperation=reuse\tedgeOperation=reuse\ncompilerV1SyntaxExecution\toperation=reuse\tedgeOperation=reuse\ncompilerV1ShapeExecution\toperation=reuse\tedgeOperation=reuse\ncompilerV1BehaviorExecution\toperation=reuse\tedgeOperation=reuse\ncompilerV1CompiledExecution\toperation=reuse\tedgeOperation=reuse\n")
         return 0
     }
     return compilerV1ExecutionUpdate(input: input, executionPath: executionPath, outputPath: outputPath)
@@ -638,7 +662,7 @@ function rangeCompilerV1ResumeFactsCLI(executionPath: String, bindingPath: Strin
     }
     if compilerV1ExecutionSourceMatches(executionPath: executionPath, input: input) == 1
         && compilerV1ExecutionCompiledMatches(executionPath: executionPath, input: input, outputPath: outputPath) == 1 {
-        print(value: "compilerV1Execution\tstatus=reused\tchanged=0\tsourceOperation=reuse\tedgeOperation=reuse\ncompilerV1SyntaxExecution\toperation=reuse\tedgeOperation=reuse\ncompilerV1ShapeExecution\toperation=reuse\tedgeOperation=reuse\n")
+        print(value: "compilerV1Execution\tstatus=reused\tchanged=0\tsourceOperation=reuse\tedgeOperation=reuse\ncompilerV1SyntaxExecution\toperation=reuse\tedgeOperation=reuse\ncompilerV1ShapeExecution\toperation=reuse\tedgeOperation=reuse\ncompilerV1BehaviorExecution\toperation=reuse\tedgeOperation=reuse\ncompilerV1CompiledExecution\toperation=reuse\tedgeOperation=reuse\n")
         return 0
     }
     return compilerV1ExecutionApply(sourceDelta: sourceDelta, facts: facts, executionPath: executionPath, outputPath: outputPath)
@@ -728,6 +752,7 @@ function rangeCompilerV1CLI(compiler: CompilerV1, input: String, inspect: Bool):
         print(value: "compilerV1Delta\tphase=behavior\tidentity=\(behavior.identity.first):\(behavior.identity.second)\tinput=\(behavior.input.first):\(behavior.input.second)\tbefore=\(behavior.before.first):\(behavior.before.second)\tafter=\(behavior.after.first):\(behavior.after.second)\n")
         print(value: behavior.snapshot)
         print(value: "compilerV1Delta\tphase=compile\tidentity=\(artifact.identity.first):\(artifact.identity.second)\tinput=\(artifact.input.first):\(artifact.input.second)\tbefore=\(artifact.before.first):\(artifact.before.second)\tafter=\(artifact.after.first):\(artifact.after.second)\n")
+        print(value: artifact.snapshot)
     }
     print(value: artifact.output)
     return 0

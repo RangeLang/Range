@@ -78,6 +78,8 @@ fi
     || fail "V1 Compiled still accepts source instead of frozen Shape and Behavior products"
 /usr/bin/grep -Fq 'let output: String("\(behavior.compiledOutput)")' "$COMPILER_V1" \
     || fail "V1 Compiled does not consume Behavior's retained lowering product"
+/usr/bin/grep -Fq 'snapshot: compilerV1NativeCompiledSnapshot(identity: identity, output: output)' "$COMPILER_V1" \
+    || fail "V1 Compiled does not pin its lowering product to a native snapshot"
 if /usr/bin/grep -Fq 'compileRangeNativeProgramOutput(source: source)' "$COMPILER_V1"; then
     fail "V1 Compiled still invokes the source-based native program entry"
 fi
@@ -239,6 +241,10 @@ cold_compiled_after="$(/usr/bin/sed -n 's/^compilerV1Execution.*compiledAfter=\(
     || fail "unchanged persistent execution did not reuse Syntax and Source to Syntax"
 /usr/bin/grep -Fqx $'compilerV1ShapeExecution\toperation=reuse\tedgeOperation=reuse' "$WORK_ROOT/persistent-unchanged.out" \
     || fail "unchanged persistent execution did not reuse Shape and Syntax to Shape"
+/usr/bin/grep -Fqx $'compilerV1BehaviorExecution\toperation=reuse\tedgeOperation=reuse' "$WORK_ROOT/persistent-unchanged.out" \
+    || fail "unchanged persistent execution did not reuse Behavior and its edge"
+/usr/bin/grep -Fqx $'compilerV1CompiledExecution\toperation=reuse\tedgeOperation=reuse' "$WORK_ROOT/persistent-unchanged.out" \
+    || fail "unchanged persistent execution did not reuse Compiled and its edge"
 [[ "$cold_execution_hash" == "$(/usr/bin/shasum -a 256 "$WORK_ROOT/execution.tsv" | /usr/bin/awk '{print $1}')" ]] \
     || fail "unchanged persistent execution rewrote its state"
 [[ "$cold_llvm_hash" == "$(/usr/bin/shasum -a 256 "$WORK_ROOT/persistent.ll" | /usr/bin/awk '{print $1}')" ]] \
@@ -258,6 +264,8 @@ failed_candidate_status=0
     || fail "failed persistent candidate mutated the last-known-good LLVM"
 /usr/bin/grep -Eq $'^compilerV1Execution\tversion=2\t.*\tshapeFirst=[0-9]+\tshapeSecond=[0-9]+\t' "$WORK_ROOT/execution.tsv" \
     || fail "failed persistent candidate dropped the accepted Shape state"
+/usr/bin/grep -Eq $'^compilerV1Execution\tversion=2\t.*\tbehaviorFirst=[0-9]+\tbehaviorSecond=[0-9]+\tcompiledFirst=[0-9]+\tcompiledSecond=[0-9]+$' "$WORK_ROOT/execution.tsv" \
+    || fail "failed persistent candidate dropped the accepted Behavior or Compiled state"
 /usr/bin/perl -0pi -e 's/return missingValue/return 7/' "$WORK_ROOT/Persistent.range"
 
 /usr/bin/perl -0pi -e 's/return 7/return 8/' "$WORK_ROOT/Persistent.range"
@@ -414,6 +422,14 @@ before_shape_identity="$(/usr/bin/sed -n 's/^compilerV1Entity[[:space:]]kind=sha
 after_shape_identity="$(/usr/bin/sed -n 's/^compilerV1Entity[[:space:]]kind=shape[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
 before_shape_edge="$(/usr/bin/grep -F $'compilerV1Edge\t'"from=$before_syntax_identity" "$WORK_ROOT/identity-before.txt")"
 after_shape_edge="$(/usr/bin/grep -F $'compilerV1Edge\t'"from=$after_syntax_identity" "$WORK_ROOT/identity-after.txt")"
+before_behavior_identity="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=behavior[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
+after_behavior_identity="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=behavior[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
+before_compiled_identity="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=compile[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
+after_compiled_identity="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=compile[[:space:]]identity=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
+before_behavior_input="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=behavior.*[[:space:]]input=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
+after_behavior_input="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=behavior.*[[:space:]]input=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
+before_compiled_input="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=compile.*[[:space:]]input=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
+after_compiled_input="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=compile.*[[:space:]]input=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-after.txt")"
 before_edge="$(/usr/bin/sed -n 's/^compilerV1Edge[[:space:]]//p' "$WORK_ROOT/identity-before.txt")"
 after_edge="$(/usr/bin/sed -n 's/^compilerV1Edge[[:space:]]//p' "$WORK_ROOT/identity-after.txt")"
 before_value="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=source.*[[:space:]]after=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/identity-before.txt")"
@@ -432,10 +448,22 @@ after_bytes="$(/usr/bin/sed -n 's/^compilerV1Entity.*kind=source.*bytes=\([0-9][
     || fail "V1 Syntax identity changed when only Source value changed"
 [[ -n "$before_shape_identity" && "$before_shape_identity" == "$after_shape_identity" ]] \
     || fail "V1 Shape identity changed when only Source value changed"
+[[ -n "$before_behavior_identity" && "$before_behavior_identity" == "$after_behavior_identity" ]] \
+    || fail "V1 Behavior identity changed when only Source provenance shifted"
+[[ -n "$before_compiled_identity" && "$before_compiled_identity" == "$after_compiled_identity" ]] \
+    || fail "V1 Compiled identity changed when only Source provenance shifted"
+[[ -n "$before_behavior_input" && "$before_behavior_input" == "$after_behavior_input" ]] \
+    || fail "V1 Behavior input edge changed when only Source provenance shifted"
+[[ -n "$before_compiled_input" && "$before_compiled_input" == "$after_compiled_input" ]] \
+    || fail "V1 Compiled input edge changed when only Source provenance shifted"
 [[ "$before_file_identity" != "$before_identity" ]] \
     || fail "V1 still conflates File and Source identity"
 [[ "$before_syntax_identity" != "$before_shape_identity" ]] \
     || fail "V1 still conflates Syntax and Shape identity"
+[[ "$before_shape_identity" != "$before_behavior_identity" ]] \
+    || fail "V1 still conflates Shape and Behavior identity"
+[[ "$before_behavior_identity" != "$before_compiled_identity" ]] \
+    || fail "V1 still conflates Behavior and Compiled identity"
 [[ -n "$before_edge" && "$before_edge" == "$after_edge" ]] \
     || fail "V1 replaced the File to Source edge when only Source value changed"
 [[ -n "$before_syntax_edge" && "$before_syntax_edge" == "$after_syntax_edge" ]] \
@@ -475,6 +503,8 @@ behavior_output="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=behavior.
     || fail "V1 Behavior Delta does not consume the Shape value fingerprint"
 /usr/bin/grep -Eq $'^compilerV1Behavior\tvalid=true\tproduct=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
     || fail "V1 behavior artifact is not tied to successful reachable lowering"
+/usr/bin/grep -Eq $'^compilerV1Compiled\tvalid=true\tproduct=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
+    || fail "V1 compiled artifact is not tied to the accepted Behavior projection"
 /usr/bin/grep -Eq $'^compilerV1Delta\tphase=compile\tidentity=[0-9]+:[0-9]+\tinput=[0-9]+:[0-9]+\tbefore=0:0\tafter=[0-9]+:[0-9]+$' "$WORK_ROOT/inspect.txt" \
     || fail "V1 inspection omitted the Compiled Delta"
 compile_input="$(/usr/bin/sed -n 's/^compilerV1Delta[[:space:]]phase=compile.*[[:space:]]input=\([^[:space:]]*\).*$/\1/p' "$WORK_ROOT/inspect.txt")"
@@ -542,4 +572,4 @@ missing_status=0
 /usr/bin/grep -Fq 'range: unable to read non-empty input at' "$WORK_ROOT/missing.out" \
     || fail "V1 missing-input control omitted its typed error message"
 
-echo "Compiler V1: pass (persistent Range-owned execution, cold insert, unchanged LLVM reuse, failed-candidate isolation, exact prior phase values on update, File-identity rejection, malformed-cache repair, linked exits 7/8)"
+echo "Compiler V1: pass (persistent Range-owned execution, cold insert, unchanged LLVM reuse, Behavior/Compiled projection reuse, failed-candidate isolation, exact prior phase values on update, File-identity rejection, malformed-cache repair, linked exits 7/8)"

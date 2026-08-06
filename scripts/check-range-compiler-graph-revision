@@ -363,6 +363,8 @@ project_updated_syntax="$(/usr/bin/find "$project_cache" -type f -name syntax-fa
     || fail "literal-value edit changed the reusable shape value"
 [[ "$(node_value "$project_cold_revision" behavior after)" != "$(header_value "$project_updated_syntax" behaviorFirst):$(header_value "$project_updated_syntax" behaviorSecond)" ]] \
     || fail "literal-value edit did not change the frozen behavior product"
+[[ "$(node_value "$project_updated_revision" compile after)" != "$(node_value "$project_cold_revision" compile after)" ]] \
+    || fail "literal-value edit did not change the compiled product"
 [[ "$(node_changed_count "$project_updated_revision")" -eq 3 ]] \
     || fail "literal-value edit produced an unexpected affected-view count"
 /usr/bin/cmp -s "$WORK_ROOT/project-cold.ll" "$WORK_ROOT/project-updated.ll" \
