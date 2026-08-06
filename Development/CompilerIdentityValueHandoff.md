@@ -8,15 +8,18 @@ Continue migrating Compiler V1 so each phase is modeled as an identified typed v
 File -> Source -> Syntax -> Shape -> Behavior -> Compiled
 ```
 
-The **Syntax -> Shape** slice is complete; the next slice is **Shape -> Behavior** (drop the transitional Source recapture).
+The **Syntax -> Shape** slice and the **Shape -> Behavior** slice are complete; the next slice is **Behavior -> Compiled**.
 
 ## Current State
 
-Latest commit:
+Latest commits:
 
 ```text
-c3a5d40d Model V1 syntax as identified graph values
+2157edf1 Promote bootstrap for frozen @syntax recipe shape
+04d6a184 Verify V1 shape with frozen @syntax recipe
 ```
+
+The Shape -> Behavior slice is committed with this handoff update.
 
 Branch: `development`
 
@@ -68,55 +71,72 @@ Implemented:
 - Cold insert, warm reuse, and update reporting.
 - Legacy version-1 execution compatibility for graph-cache migration.
 
-Identity chain now uses:
-
-```text
-File
-  -> Source: append 1
-  -> Syntax: append 2
-  -> Shape: append 3
-  -> Behavior: append 4
-  -> Compiled: append 5
-```
-
 ### Syntax -> Shape
 
-Uncommitted (candidate cache key `a165ced9fa73e89e...`, 30 sources).
+Commits:
 
-Shape is now the **`@syntax` macro verification product (recipe)**, computed and frozen at capture time:
+```text
+04d6a184 Verify V1 shape with frozen @syntax recipe
+2157edf1 Promote bootstrap for frozen @syntax recipe shape
+```
+
+Shape is the **`@syntax` macro verification product (recipe)**, computed and frozen at capture time:
 
 - `compilerV1SyntaxFacts` gained `snapshotEnd: Int` and `recipe: String`.
 - `compilerV1SyntaxFactsCapture` runs `compilerMacroFinalizeApplications(tables:)` and
   `compilerSyntaxRecipeRender(tables:)` after typed capture; the recipe text is frozen in the facts.
-- `compilerV1SyntaxFactsRecipe` exposes the recipe field (ordinal 9).
-- `compilerV1SyntaxFactsErrorMessage` reports the recipe error text when the recipe is a
-  `compilerError` (surface failure), otherwise the typed-syntax snapshot.
-- Encode is now `version=2` with 16 header fields ending in `bytes=` and `recipeBytes=`, and a
-  payload of exactly two sections separated by a double newline: snapshot, then recipe.
-- Decode parses the 16-field header, derives `snapshotEnd`/`recipeStart` from the exact lengths,
-  and returns the recipe as a substring of the encoded bytes.
-- Integrity now recomputes the shape fingerprint from the **recipe** text
-  (`appendInt(syntaxIdentity, 3)`, tag 12, relationship tag 18).
-- `compilerV1Shape` projects the recipe as its `snapshot` value when integrity holds, and falls back
-  to the recipe error text otherwise (or `compilerError\tkind=invalidCompilerV1SyntaxFacts`).
-- `inspect-v1` prints the typed-syntax snapshot after the `phase=syntax` delta and the shape product
-  after the `phase=shape` delta.
-- All facts consumers (`capture-syntax-v1`, `compile-shape`, `project-shape-v1`, decode, integrity)
-  surface failure via `compilerV1SyntaxFactsErrorMessage`.
+- Encode was `version=2` with 16 header fields and a payload of two sections (snapshot, recipe).
+- Integrity recomputed the shape fingerprint from the recipe text
+  (`appendInt(syntaxIdentity, 3)`, tag 12).
+- `compilerV1Shape` projected the recipe as its `snapshot` value when integrity holds.
+- Facts consumers surfaced failure via `compilerV1SyntaxFactsErrorMessage`.
 
-Facts format remains free to change: `scripts/check-range-compiler-v1` pins only the function
-signature `function compilerV1SyntaxFactsCapture(source: CompilerV1SourceDelta)` and the projection
-line `snapshot: recipe`; other consumers parse header fields by name.
-
-New fixtures:
+Fixtures added:
 
 ```text
 Testing/Syntax/Pass/V1SyntaxRecipeVerification.range
 Testing/Syntax/Fail/V1SyntaxRecipeUnknownCapture.range
 ```
 
-Scalar stored member types only: the V1 light capture rejects generic stored member types such as
-`Array<String>` / `Array<Int>` with `invalidTypedSyntaxSnapshot` (pre-existing limitation).
+### Shape -> Behavior
+
+Uncommitted candidate became the accepted compiler (see Bootstrap below).
+
+Behavior no longer recaptures Source. The full frontend pipeline (declaration capture, main-root
+capture, macro finalize, macro link, and LLVM lowering) runs **once** at capture time and freezes the
+LLVM lowering text in the facts; Behavior is now a pure projection of those facts:
+
+- `compilerV1SyntaxFacts` gained `behaviorIdentity: CompilerIdentity`, `behavior:
+  CompilerValueFingerprint`, and `behaviorText: String`.
+- Capture runs `compilerMacroLink(tables: tables)` (which first finalizes applications; finalize is
+  idempotent) and then `compilerNativeSourceSetLLVMTextForLinkedTables(...)`; the emitted LLVM text is
+  frozen as `behaviorText`. Macro diagnostics surface as `invalidTypedBehaviorSnapshot`.
+- Behavior identity is `appendInt(shapeIdentity, 4)`; Behavior product is tag 13 over the frozen
+  behavior text (the identity chain `File -> Source(1) -> Syntax(2) -> Shape(3) -> Behavior(4) ->
+  Compiled(5)` is unchanged).
+- `compilerV1Behavior(facts:shape:before:)` is a projection: it reads `behaviorText` from the facts
+  and produces the behavior snapshot and fingerprint without recapturing Source or re-linking.
+- `compilerV1Compile` still checks `behavior.input == shape.after` (identity of the Shape product)
+  before projecting the same behavior text as the Compiled product (tag 14).
+- Encode is now `version=3` with 21 header fields ending in `bytes=`, `recipeBytes=`,
+  `behaviorIdentityFirst/Second=`, `behaviorFirst/Second=`, `behaviorBytes=`; the payload has three
+  sections: snapshot, recipe, behavior text.
+- Decode validates the 21-field header and exact section bounds (`behaviorStart + behaviorBytes ==
+  stringLength`).
+- Integrity recomputes syntax (tag 16), shape (tag 12), and behavior (tag 13) fingerprints.
+- Cold compile now runs the frontend once (`frontend x 1`) instead of `frontend x 2`.
+
+Facts format remains free to change: `scripts/check-range-compiler-v1` pins only the function
+signatures/projection lines; the graph-revision reducer parses header fields by name and byte-compares
+the projected shape payload.
+
+Graph-revision behavior on a literal-value edit is now:
+
+- Source, Behavior, and Compiled phases derive new values; Syntax and Shape node values are reused
+  (their fingerprints are unchanged) — the bounded invalidation frontier stays at 3 affected views.
+- The syntax-facts **artifact** is rewritten because it now freezes the behavior product, so the
+  graph-revision gate asserts the rewritten facts preserve the syntax/shape values while the behavior
+  fingerprint changes, instead of asserting the artifact stays byte-identical.
 
 ## Schemas
 
@@ -138,7 +158,7 @@ It persists:
 Syntax facts are now:
 
 ```text
-compilerV1SyntaxFacts version=2
+compilerV1SyntaxFacts version=3
 ```
 
 They persist:
@@ -149,12 +169,15 @@ They persist:
 - Syntax value fingerprint
 - Shape identity
 - Shape value fingerprint
-- Typed syntax snapshot
-- `snapshotEnd` (byte length of the snapshot section)
-- Recipe text (the `@syntax` verification product) and its `recipeBytes`
+- Behavior identity
+- Behavior value fingerprint
+- Typed syntax snapshot and `bytes` (byte length of the snapshot section)
+- Recipe text (the `@syntax` verification product) and `recipeBytes`
+- Behavior text (the frozen LLVM lowering) and `behaviorBytes`
 
 Decoded Syntax facts retain encoded storage plus `snapshotStart`; `compilerV1SyntaxFactsSnapshot`
-exposes the actual Syntax value and `compilerV1SyntaxFactsRecipe` exposes the Shape recipe.
+exposes the actual Syntax value, `compilerV1SyntaxFactsRecipe` exposes the Shape recipe, and
+`compilerV1SyntaxFactsBehavior` exposes the Behavior product text.
 
 Syntax reconciliation is reported separately:
 
@@ -162,17 +185,18 @@ Syntax reconciliation is reported separately:
 compilerV1SyntaxExecution
 ```
 
-This separate record avoids exceeding current compiler owned-aggregate lowering limits in the existing execution report function.
-
 ## Bootstrap
 
 Promoted bootstrap:
 
 ```text
-version=bootstrap-23edc6ec8cd7
-LLVM SHA-256=23edc6ec8cd725f7f5bb7741bfc4b0c1ef5b14dd37a3be8ef6659e59775f9bf1
-executable SHA-256=a08c13ef3386eac68d069db55eaa6357d6e252afcbafb32d0cd5e7161498836a
+version=bootstrap-3ec2b7de1452
+LLVM SHA-256=3ec2b7de14527ba19f2235b9faa603feda1306075c078ef5f2e9b1ee123c1a19
 ```
+
+Promotion followed the canonical candidate/reproduction proof: candidate compiled from the accepted
+compiler, reproduction compiled from the candidate with the same source; both LLVM and linked
+executables were byte-identical before promotion.
 
 ## Verification
 
@@ -182,28 +206,23 @@ All passed:
 scripts/range check-compiler-v1
 scripts/range check-compiler-graph
 scripts/range check-compiler-graph-revision
-scripts/range check-compiler-candidate
-scripts/verify-range-compiler
 ```
 
-Candidate and reproduction LLVM and executables were byte-identical.
-
-The uncommitted Syntax -> Shape checkpoint passes the focused gates against the working candidate
-(cache key `a165ced9fa73e89e...`):
+`check-range-compiler-v1` pins the Shape -> Behavior projection lines:
 
 ```text
-scripts/check-range-compiler-v1
-scripts/check-range-compiler-graph
-scripts/check-range-compiler-graph-revision
+snapshot: compilerV1NativeBehaviorSnapshot(identity: identity, output: behaviorText)
+function compilerV1Behavior(facts: CompilerV1SyntaxFacts, shape: CompilerV1ShapeDelta, before: CompilerValueFingerprint)
+let behaviorText: String(compilerV1SyntaxFactsBehavior(facts: facts))
+behaviorText: compilerNativeSourceSetLLVMTextForLinkedTables(source: source.source.value, declarationTables: tables)
+compilerMacroLink(tables: tables)
 ```
 
-`check-range-compiler-v1` adds a shape-value stability proof (the recipe product is byte-stable
-under Source provenance-only edits) and an `@syntax` verification proof: the pass fixture freezes
-`recipeCount=1` with resolved captures, the fail fixture rejects at the recipe boundary with
-`compilerError kind=syntaxRecipeUnknownCapture` (exit 65) on both `capture-syntax-v1` and
-`inspect-v1`. Bootstrap promotion is deferred to a deliberate stable checkpoint.
+`check-range-compiler-graph-revision` proves the bounded literal-edit invalidation (3 affected views:
+Source, Behavior, Compiled) with the syntax-facts artifact rewritten to carry the new behavior product
+while the syntax and shape node values stay reusable.
 
-Do not run candidate-building checks concurrently. A concurrent graph/revision test run caused a shared candidate-build race reporting:
+Do not run candidate-building checks concurrently. A concurrent graph/revision test run caused a shared candidate-build race:
 
 ```text
 candidate build plan source count is 56, expected 30
@@ -213,17 +232,16 @@ Sequential reruns passed.
 
 ## Next Slice
 
-Implement **Shape -> Behavior**: remove Behavior's transitional Source recapture.
+Implement **Behavior -> Compiled**:
 
-1. Persist enough Syntax tables (declaration graph, macro applications) in the frozen facts so
-   Behavior consumes the accepted Syntax/Shape products directly instead of recreating
-   `CompilerSyntaxTables` from Source.
-2. Route Behavior through a `compilerV1Shape` value that holds the recipe verification product.
-3. Prove Behavior identity stays stable across Source provenance-only edits (same Shape product).
-4. Prove warm compilation reuses Behavior and its edge.
-5. Prove failed candidates preserve accepted Behavior state.
-6. Run all focused checks, fixed-point verification, and bootstrap promotion.
-7. Commit only scoped compiler, test, script, and bootstrap files.
+1. Reconcile the Compiled phase as an identified projection over the accepted Behavior value (it
+   already projects the same frozen behavior text; give it the same projection treatment as
+   Behavior received in this slice).
+2. Prove Compiled identity stays stable across Source provenance-only edits.
+3. Prove warm compilation reuses Compiled and its edge.
+4. Prove failed candidates preserve accepted Compiled state.
+5. Run all focused checks, fixed-point verification, and bootstrap promotion.
+6. Commit only scoped compiler, test, script, and bootstrap files.
 
 ## Existing Shape Model
 
@@ -247,7 +265,7 @@ function compilerV1Shape(
 ): CompilerV1ShapeDelta
 ```
 
-Shape now:
+Shape:
 
 - Uses identity derived from Syntax.
 - Projects `snapshot` = the `@syntax` recipe verification frozen in the facts (fallback to the recipe
@@ -255,21 +273,37 @@ Shape now:
 - Has persisted before/after fingerprints.
 - Can be produced without recapturing Source (`compilerV1ShapeOnly`).
 
-The next change is to make Behavior consume this accepted Shape product directly, not to redesign
-Shape parsing.
+## Existing Behavior Model
 
-## Later Boundary
+Current Behavior declaration:
 
-Behavior must stop recapturing Source:
+```range
+construct CompilerV1BehaviorDelta {
+    let identity: CompilerIdentity
+    let input: CompilerValueFingerprint
+    let before: CompilerValueFingerprint
+    let after: CompilerValueFingerprint
+    let snapshot: String
+    let compiledOutput: String
+}
+```
 
-Currently `compilerV1Behavior` still:
+Current production path:
 
-- Creates `CompilerSyntaxTables` from Source.
-- Repeats declaration and main capture.
-- Links macros from the recreated tables.
+```range
+function compilerV1Behavior(
+    facts: CompilerV1SyntaxFacts,
+    shape: CompilerV1ShapeDelta,
+    before: CompilerValueFingerprint
+): CompilerV1BehaviorDelta
+```
 
-The next cutover should persist and reload sufficient Syntax tables so Behavior consumes accepted
-Syntax/Shape products directly, with Shape's frozen recipe as the verification boundary.
+Behavior:
+
+- Uses identity derived from Shape (`appendInt(shapeIdentity, 4)`).
+- Reads the frozen LLVM lowering text from the facts via `compilerV1SyntaxFactsBehavior`; no Source
+  recapture or macro re-link.
+- Produces `after` = tag 13 over the behavior text, with `compiledOutput` carrying the same text.
 
 ## Relevant Files
 

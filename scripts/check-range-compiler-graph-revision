@@ -348,18 +348,31 @@ done
     || fail "literal-value edit invalidated the reusable shape node"
 [[ "$(node_value "$project_updated_revision" syntax changed)" == "0" ]] \
     || fail "literal-value edit invalidated the reusable syntax facts"
-[[ "$project_cold_syntax_inode" == "$(/usr/bin/stat -f %i "$(/usr/bin/find "$project_cache" -type f -name syntax-facts.tsv -print -quit)")" ]] \
-    || fail "literal-value edit rewrote byte-identical syntax facts"
-[[ "$project_cold_syntax_hash" == "$(/usr/bin/shasum -a 256 "$(/usr/bin/find "$project_cache" -type f -name syntax-facts.tsv -print -quit)" | /usr/bin/awk '{print $1}')" ]] \
-    || fail "literal-value edit changed the reusable syntax-fact digest"
+# The syntax facts artifact is legitimately rewritten because it now freezes
+# the behavior product, which the literal change rewrites. The syntax and
+# shape node values remain reusable: only the behavior fingerprint differs
+# between the accepted and rewritten artifacts.
+project_updated_syntax="$(/usr/bin/find "$project_cache" -type f -name syntax-facts.tsv -print -quit)"
+[[ "$project_cold_syntax_inode" != "$(/usr/bin/stat -f %i "$project_updated_syntax")" ]] \
+    || fail "literal-value edit did not rewrite the behavior-carrying syntax facts"
+[[ "$project_cold_syntax_hash" != "$(/usr/bin/shasum -a 256 "$project_updated_syntax" | /usr/bin/awk '{print $1}')" ]] \
+    || fail "literal-value edit did not change the behavior-carrying syntax-fact digest"
+[[ "$(node_value "$project_cold_revision" syntax after)" == "$(header_value "$project_updated_syntax" syntaxFirst):$(header_value "$project_updated_syntax" syntaxSecond)" ]] \
+    || fail "literal-value edit changed the reusable syntax-fact value"
+[[ "$(node_value "$project_cold_revision" shape after)" == "$(header_value "$project_updated_syntax" shapeFirst):$(header_value "$project_updated_syntax" shapeSecond)" ]] \
+    || fail "literal-value edit changed the reusable shape value"
+[[ "$(node_value "$project_cold_revision" behavior after)" != "$(header_value "$project_updated_syntax" behaviorFirst):$(header_value "$project_updated_syntax" behaviorSecond)" ]] \
+    || fail "literal-value edit did not change the frozen behavior product"
 [[ "$(node_changed_count "$project_updated_revision")" -eq 3 ]] \
     || fail "literal-value edit produced an unexpected affected-view count"
 /usr/bin/cmp -s "$WORK_ROOT/project-cold.ll" "$WORK_ROOT/project-updated.ll" \
     && fail "edited graph execution retained the stale compiled artifact"
 
 # On the literal edit the source stage derives a new value, the behavior and
-# compile stages derive new values, and the shape stage alone consumes the
-# persisted revision: its value is unchanged and no shape delta is emitted.
+# compile stages derive new values, and the syntax and shape stages consume
+# the persisted values: their fingerprints are unchanged and no shape delta is
+# emitted, even though the syntax-facts artifact is rewritten to carry the new
+# frozen behavior product.
 [[ "$(field_value "$WORK_ROOT/project-updated.out" viewsAffected)" == "3" ]] \
     || fail "edited graph execution reported an unexpected affected-view count"
 [[ "$(field_value "$WORK_ROOT/project-updated.out" source)" == "derived" ]] \

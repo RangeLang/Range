@@ -53,8 +53,8 @@ fi
 if /usr/bin/grep -Fq 'compilerTypedSyntaxCapture(source: source.source.value, tables: tables)' "$COMPILER_V1"; then
     fail "V1 Shape still eagerly captures every function body"
 fi
-/usr/bin/grep -Fq 'snapshot: compilerV1NativeBehaviorSnapshot(identity: source.file.identity, output: compiledOutput)' "$COMPILER_V1" \
-    || fail "V1 Behavior is not derived from successful reachable lowering"
+/usr/bin/grep -Fq 'snapshot: compilerV1NativeBehaviorSnapshot(identity: identity, output: behaviorText)' "$COMPILER_V1" \
+    || fail "V1 Behavior is not derived from the frozen lowering product"
 if /usr/bin/grep -Fq 'compilerSemanticBuild(tables: tables, delta: delta, semantics: semantics)' "$COMPILER_V1"; then
     fail "V1 still treats the incomplete whole-program SemanticGraph as Behavior authority"
 fi
@@ -66,10 +66,14 @@ fi
     || fail "V1 Shape does not consume frozen syntax facts"
 /usr/bin/grep -Fq 'snapshot: recipe' "$COMPILER_V1" \
     || fail "V1 Shape does not project the @syntax recipe verification from frozen syntax facts"
-/usr/bin/grep -Fq 'function compilerV1Behavior(source: CompilerV1SourceDelta, shape: CompilerV1ShapeDelta, before: CompilerValueFingerprint)' "$COMPILER_V1" \
-    || fail "V1 Behavior does not own the transitional downstream recapture"
-/usr/bin/grep -Fq 'compiledOutput: compilerNativeSourceSetLLVMTextForLinkedTables(source: source.source.value, declarationTables: tables)' "$COMPILER_V1" \
-    || fail "V1 Behavior does not retain reachable lowering"
+/usr/bin/grep -Fq 'function compilerV1Behavior(facts: CompilerV1SyntaxFacts, shape: CompilerV1ShapeDelta, before: CompilerValueFingerprint)' "$COMPILER_V1" \
+    || fail "V1 Behavior does not consume frozen syntax facts"
+/usr/bin/grep -Fq 'let behaviorText: String(compilerV1SyntaxFactsBehavior(facts: facts))' "$COMPILER_V1" \
+    || fail "V1 Behavior does not project the frozen lowering product"
+/usr/bin/grep -Fq 'behaviorText: compilerNativeSourceSetLLVMTextForLinkedTables(source: source.source.value, declarationTables: tables)' "$COMPILER_V1" \
+    || fail "V1 syntax facts do not freeze reachable lowering at capture time"
+/usr/bin/grep -Fq 'compilerMacroLink(tables: tables)' "$COMPILER_V1" \
+    || fail "V1 syntax facts do not link macros before freezing lowering"
 /usr/bin/grep -Fq 'function compilerV1Compile(shape: CompilerV1ShapeDelta, behavior: CompilerV1BehaviorDelta, before: CompilerValueFingerprint)' "$COMPILER_V1" \
     || fail "V1 Compiled still accepts source instead of frozen Shape and Behavior products"
 /usr/bin/grep -Fq 'let output: String("\(behavior.compiledOutput)")' "$COMPILER_V1" \

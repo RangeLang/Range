@@ -14,9 +14,12 @@ construct CompilerV1SyntaxFacts {
     let after: CompilerValueFingerprint
     let shapeIdentity: CompilerIdentity
     let shape: CompilerValueFingerprint
+    let behaviorIdentity: CompilerIdentity
+    let behavior: CompilerValueFingerprint
     let snapshotStart: Int
     let snapshotEnd: Int
     let recipe: String
+    let behaviorText: String
 }
 
 construct CompilerV1BehaviorDelta {
@@ -60,9 +63,12 @@ function compilerV1SyntaxFactsInvalid(): CompilerV1SyntaxFacts {
         after: absent,
         shapeIdentity: absentIdentity,
         shape: absent,
+        behaviorIdentity: absentIdentity,
+        behavior: absent,
         snapshotStart: 0,
         snapshotEnd: 0,
-        recipe: String("")
+        recipe: String(""),
+        behaviorText: String("")
     )
 }
 
@@ -75,9 +81,11 @@ function compilerV1SyntaxFactsCapture(source: CompilerV1SourceDelta): CompilerV1
     }
     state snapshot: String("")
     state recipe: String("")
+    state behaviorText: String("")
     if captureStatus != 0 || !compilerSyntaxTablesIsValid(tables: tables) {
         snapshot: String("compilerError\tkind=invalidTypedSyntaxSnapshot\n")
         recipe: String("compilerError\tkind=invalidSyntaxRecipes\n")
+        behaviorText: String("compilerError\tkind=invalidTypedBehaviorSnapshot\n")
     } else {
         snapshot: compilerTypedSyntaxRenderSnapshot(tables: tables)
         if compilerMacroFinalizeApplications(tables: tables) == 0 {
@@ -85,26 +93,41 @@ function compilerV1SyntaxFactsCapture(source: CompilerV1SourceDelta): CompilerV1
         } else {
             recipe: String("compilerError\tkind=invalidSyntaxRecipes\n")
         }
+        if compilerNativeOutputIsError(output: recipe) {
+            behaviorText: recipe
+        } else {
+            let macroLinkStatus: Int(compilerMacroLink(tables: tables))
+            if macroLinkStatus != 0 || compilerIntTableRowCount(table: tables.macroDiagnostics) != 0 {
+                behaviorText: compilerMacroRenderDiagnostics(tables: tables)
+            } else {
+                behaviorText: compilerNativeSourceSetLLVMTextForLinkedTables(source: source.source.value, declarationTables: tables)
+            }
+        }
     }
     let tablesDestroyStatus: Int(compilerSyntaxTablesDestroy(tables: tables))
     if tablesDestroyStatus != 0 {
         snapshot: String("compilerError\tkind=compilerV1SyntaxFactsOwnershipFailure\n")
         recipe: String("compilerError\tkind=invalidSyntaxRecipes\n")
+        behaviorText: String("compilerError\tkind=invalidTypedBehaviorSnapshot\n")
     }
     let syntax: CompilerV1SyntaxDelta(compilerV1SyntaxDelta(source: source, snapshot: snapshot, before: compilerV1AbsentValue()))
     let shapeIdentity: CompilerIdentity(compilerV1IdentityAppendInt(identity: syntax.syntax.identity, value: 3))
+    let behaviorIdentity: CompilerIdentity(compilerV1IdentityAppendInt(identity: shapeIdentity, value: 4))
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.syntaxFacts.end"))
     return CompilerV1SyntaxFacts(
-        isValid: !compilerNativeOutputIsError(output: snapshot) && !compilerNativeOutputIsError(output: recipe),
+        isValid: !compilerNativeOutputIsError(output: snapshot) && !compilerNativeOutputIsError(output: recipe) && !compilerNativeOutputIsError(output: behaviorText),
         syntax: syntax.syntax,
         edge: syntax.edge,
         before: syntax.before,
         after: syntax.after,
         shapeIdentity: shapeIdentity,
         shape: compilerV1ValueFingerprint(identity: shapeIdentity, tag: 12, text: recipe),
+        behaviorIdentity: behaviorIdentity,
+        behavior: compilerV1ValueFingerprint(identity: behaviorIdentity, tag: 13, text: behaviorText),
         snapshotStart: 0,
         snapshotEnd: stringLength(value: snapshot),
-        recipe: recipe
+        recipe: recipe,
+        behaviorText: behaviorText
     )
 }
 
@@ -116,7 +139,15 @@ function compilerV1SyntaxFactsRecipe(facts: CompilerV1SyntaxFacts): String {
     return facts.recipe
 }
 
+function compilerV1SyntaxFactsBehavior(facts: CompilerV1SyntaxFacts): String {
+    return facts.behaviorText
+}
+
 function compilerV1SyntaxFactsErrorMessage(facts: CompilerV1SyntaxFacts): String {
+    let behavior: String(compilerV1SyntaxFactsBehavior(facts: facts))
+    if compilerNativeOutputIsError(output: behavior) {
+        return behavior
+    }
     let recipe: String(compilerV1SyntaxFactsRecipe(facts: facts))
     if compilerNativeOutputIsError(output: recipe) {
         return recipe
@@ -126,7 +157,7 @@ function compilerV1SyntaxFactsErrorMessage(facts: CompilerV1SyntaxFacts): String
 
 function compilerV1SyntaxFactsEncode(facts: CompilerV1SyntaxFacts): String {
     if facts.snapshotStart != 0 { return facts.syntax.value }
-    return "compilerV1SyntaxFacts\tversion=2\tsyntaxIdentityFirst=\(facts.syntax.identity.first)\tsyntaxIdentitySecond=\(facts.syntax.identity.second)\tedgeFromFirst=\(facts.edge.from.first)\tedgeFromSecond=\(facts.edge.from.second)\trelationshipFirst=\(facts.edge.relationship.first)\trelationshipSecond=\(facts.edge.relationship.second)\tsyntaxFirst=\(facts.after.first)\tsyntaxSecond=\(facts.after.second)\tshapeIdentityFirst=\(facts.shapeIdentity.first)\tshapeIdentitySecond=\(facts.shapeIdentity.second)\tshapeFirst=\(facts.shape.first)\tshapeSecond=\(facts.shape.second)\tbytes=\(facts.snapshotEnd - facts.snapshotStart)\trecipeBytes=\(facts.recipe.bytes.count)\n\(facts.syntax.value)\n\(facts.recipe)"
+    return "compilerV1SyntaxFacts\tversion=3\tsyntaxIdentityFirst=\(facts.syntax.identity.first)\tsyntaxIdentitySecond=\(facts.syntax.identity.second)\tedgeFromFirst=\(facts.edge.from.first)\tedgeFromSecond=\(facts.edge.from.second)\trelationshipFirst=\(facts.edge.relationship.first)\trelationshipSecond=\(facts.edge.relationship.second)\tsyntaxFirst=\(facts.after.first)\tsyntaxSecond=\(facts.after.second)\tshapeIdentityFirst=\(facts.shapeIdentity.first)\tshapeIdentitySecond=\(facts.shapeIdentity.second)\tshapeFirst=\(facts.shape.first)\tshapeSecond=\(facts.shape.second)\tbytes=\(facts.snapshotEnd - facts.snapshotStart)\trecipeBytes=\(facts.recipe.bytes.count)\tbehaviorIdentityFirst=\(facts.behaviorIdentity.first)\tbehaviorIdentitySecond=\(facts.behaviorIdentity.second)\tbehaviorFirst=\(facts.behavior.first)\tbehaviorSecond=\(facts.behavior.second)\tbehaviorBytes=\(facts.behaviorText.bytes.count)\n\(facts.syntax.value)\n\(facts.recipe)\n\(facts.behaviorText)"
 }
 
 function compilerV1SyntaxFactsFieldIsDecimal(source: String, end: Int, ordinal: Int): Bool {
@@ -143,9 +174,9 @@ function compilerV1SyntaxFactsFieldInt(source: String, end: Int, ordinal: Int): 
 
 function compilerV1SyntaxFactsHeaderIsValid(encoded: String, headerEnd: Int): Bool {
     if headerEnd < 0
-        || compilerBuildPlanFieldCount(source: encoded, start: 0, end: headerEnd) != 16
+        || compilerBuildPlanFieldCount(source: encoded, start: 0, end: headerEnd) != 21
         || compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 0) != String("compilerV1SyntaxFacts")
-        || compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 1) != String("version=2")
+        || compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 1) != String("version=3")
         || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 2), start: 0, prefix: String("syntaxIdentityFirst="))
         || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 3), start: 0, prefix: String("syntaxIdentitySecond="))
         || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 4), start: 0, prefix: String("edgeFromFirst="))
@@ -159,11 +190,16 @@ function compilerV1SyntaxFactsHeaderIsValid(encoded: String, headerEnd: Int): Bo
         || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 12), start: 0, prefix: String("shapeFirst="))
         || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 13), start: 0, prefix: String("shapeSecond="))
         || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 14), start: 0, prefix: String("bytes="))
-        || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 15), start: 0, prefix: String("recipeBytes=")) {
+        || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 15), start: 0, prefix: String("recipeBytes="))
+        || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 16), start: 0, prefix: String("behaviorIdentityFirst="))
+        || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 17), start: 0, prefix: String("behaviorIdentitySecond="))
+        || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 18), start: 0, prefix: String("behaviorFirst="))
+        || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 19), start: 0, prefix: String("behaviorSecond="))
+        || !stringHasPrefix(source: compilerBuildPlanFieldText(source: encoded, start: 0, end: headerEnd, ordinal: 20), start: 0, prefix: String("behaviorBytes=")) {
         return false
     }
     state ordinal: Int(2)
-    while ordinal < 16 {
+    while ordinal < 21 {
         if !compilerV1SyntaxFactsFieldIsDecimal(source: encoded, end: headerEnd, ordinal: ordinal) {
             return false
         }
@@ -194,12 +230,18 @@ function compilerV1SyntaxFactsDecode(encoded: String): CompilerV1SyntaxFacts {
     let snapshotStart: Int(headerEnd + 1)
     let snapshotBytes: Int(compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 14))
     let recipeBytes: Int(compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 15))
+    let behaviorBytes: Int(compilerV1SyntaxFactsFieldInt(source: encoded, end: headerEnd, ordinal: 20))
     let snapshotEnd: Int(snapshotStart + snapshotBytes)
     if snapshotEnd >= stringLength(value: encoded) {
         return compilerV1SyntaxFactsInvalid()
     }
     let recipeStart: Int(snapshotEnd + 1)
-    if recipeStart + recipeBytes != stringLength(value: encoded) {
+    if recipeStart + recipeBytes >= stringLength(value: encoded) {
+        return compilerV1SyntaxFactsInvalid()
+    }
+    let recipeEnd: Int(recipeStart + recipeBytes)
+    let behaviorStart: Int(recipeEnd + 1)
+    if behaviorStart + behaviorBytes != stringLength(value: encoded) {
         return compilerV1SyntaxFactsInvalid()
     }
     let syntaxIdentity: CompilerIdentity(compilerV1SyntaxFactsIdentity(encoded: encoded, headerEnd: headerEnd, firstOrdinal: 2))
@@ -208,6 +250,8 @@ function compilerV1SyntaxFactsDecode(encoded: String): CompilerV1SyntaxFacts {
     let syntax: CompilerValueFingerprint(compilerV1SyntaxFactsFingerprint(encoded: encoded, headerEnd: headerEnd, firstOrdinal: 8))
     let shapeIdentity: CompilerIdentity(compilerV1SyntaxFactsIdentity(encoded: encoded, headerEnd: headerEnd, firstOrdinal: 10))
     let shape: CompilerValueFingerprint(compilerV1SyntaxFactsFingerprint(encoded: encoded, headerEnd: headerEnd, firstOrdinal: 12))
+    let behaviorIdentity: CompilerIdentity(compilerV1SyntaxFactsIdentity(encoded: encoded, headerEnd: headerEnd, firstOrdinal: 16))
+    let behavior: CompilerValueFingerprint(compilerV1SyntaxFactsFingerprint(encoded: encoded, headerEnd: headerEnd, firstOrdinal: 18))
     return CompilerV1SyntaxFacts(
         isValid: true,
         syntax: CompilerV1IdentifiedText(identity: syntaxIdentity, value: "\(encoded)"),
@@ -216,19 +260,25 @@ function compilerV1SyntaxFactsDecode(encoded: String): CompilerV1SyntaxFacts {
         after: syntax,
         shapeIdentity: shapeIdentity,
         shape: shape,
+        behaviorIdentity: behaviorIdentity,
+        behavior: behavior,
         snapshotStart: snapshotStart,
         snapshotEnd: snapshotEnd,
-        recipe: encoded.substring(start: recipeStart, end: stringLength(value: encoded))
+        recipe: encoded.substring(start: recipeStart, end: recipeEnd),
+        behaviorText: encoded.substring(start: behaviorStart, end: stringLength(value: encoded))
     )
 }
 
 function compilerV1SyntaxFactsIntegrityIsValid(facts: CompilerV1SyntaxFacts): Bool {
     let snapshot: String(compilerV1SyntaxFactsSnapshot(facts: facts))
     let recipe: String(compilerV1SyntaxFactsRecipe(facts: facts))
+    let behaviorText: String(compilerV1SyntaxFactsBehavior(facts: facts))
     let expectedSyntax: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: facts.syntax.identity, tag: 16, text: snapshot))
     let expectedShapeIdentity: CompilerIdentity(compilerV1IdentityAppendInt(identity: facts.syntax.identity, value: 3))
     let expectedRelationship: CompilerIdentity(compilerV1IdentityForSourceSyntaxRelationship())
     let expectedShape: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: facts.shapeIdentity, tag: 12, text: recipe))
+    let expectedBehaviorIdentity: CompilerIdentity(compilerV1IdentityAppendInt(identity: facts.shapeIdentity, value: 4))
+    let expectedBehavior: CompilerValueFingerprint(compilerV1ValueFingerprint(identity: facts.behaviorIdentity, tag: 13, text: behaviorText))
     return facts.isValid
         && facts.edge.to.first == facts.syntax.identity.first
         && facts.edge.to.second == facts.syntax.identity.second
@@ -236,8 +286,11 @@ function compilerV1SyntaxFactsIntegrityIsValid(facts: CompilerV1SyntaxFacts): Bo
         && facts.edge.relationship.second == expectedRelationship.second
         && facts.shapeIdentity.first == expectedShapeIdentity.first
         && facts.shapeIdentity.second == expectedShapeIdentity.second
+        && facts.behaviorIdentity.first == expectedBehaviorIdentity.first
+        && facts.behaviorIdentity.second == expectedBehaviorIdentity.second
         && compilerV1ValueFingerprintEqual(left: facts.after, right: expectedSyntax)
         && compilerV1ValueFingerprintEqual(left: facts.shape, right: expectedShape)
+        && compilerV1ValueFingerprintEqual(left: facts.behavior, right: expectedBehavior)
 }
 
 function compilerV1SyntaxFactsMatchSource(facts: CompilerV1SyntaxFacts, source: CompilerV1SourceDelta): Bool {
@@ -300,45 +353,22 @@ function compilerV1ShapeOnly(source: CompilerV1SourceDelta, before: CompilerValu
     return compilerV1Shape(facts: facts, before: before)
 }
 
-function compilerV1Behavior(source: CompilerV1SourceDelta, shape: CompilerV1ShapeDelta, before: CompilerValueFingerprint): CompilerV1BehaviorDelta {
+function compilerV1Behavior(facts: CompilerV1SyntaxFacts, shape: CompilerV1ShapeDelta, before: CompilerValueFingerprint): CompilerV1BehaviorDelta {
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.behavior.begin"))
-    let tables: CompilerSyntaxTables(compilerSyntaxTablesCreate(source: source.source.value))
-    state captureStatus: Int(compilerTypedDeclarationsCapture(source: source.source.value, tables: tables))
-    if captureStatus == 0 {
-        captureStatus: compilerTypedSyntaxCaptureMainRoot(source: source.source.value, tables: tables)
-    }
-    state snapshot: String("")
-    state compiledOutput: String("")
-    if captureStatus != 0 || !compilerSyntaxTablesIsValid(tables: tables) {
-        snapshot: String("compilerError\tkind=invalidTypedSyntaxSnapshot\n")
-        compiledOutput: snapshot
-    } else {
-        let macroLinkStatus: Int(compilerMacroLink(tables: tables))
-        if macroLinkStatus != 0 || compilerIntTableRowCount(table: tables.macroDiagnostics) != 0 {
-            compiledOutput: compilerMacroRenderDiagnostics(tables: tables)
-        } else {
-            compiledOutput: compilerNativeSourceSetLLVMTextForLinkedTables(source: source.source.value, declarationTables: tables)
-        }
-        if compilerNativeOutputIsError(output: compiledOutput) {
-            snapshot: compiledOutput
-        } else {
-            snapshot: compilerV1NativeBehaviorSnapshot(identity: source.file.identity, output: compiledOutput)
-        }
-    }
-    let tablesDestroyStatus: Int(compilerSyntaxTablesDestroy(tables: tables))
-    if tablesDestroyStatus != 0 {
-        snapshot: String("compilerError\tkind=compilerV1BehaviorOwnershipFailure\n")
-        compiledOutput: snapshot
-    }
+    let behaviorText: String(compilerV1SyntaxFactsBehavior(facts: facts))
     let identity: CompilerIdentity(compilerV1IdentityAppendInt(identity: shape.shape.identity, value: 4))
+    state snapshot: String(behaviorText)
+    if !compilerNativeOutputIsError(output: behaviorText) {
+        snapshot: compilerV1NativeBehaviorSnapshot(identity: identity, output: behaviorText)
+    }
     compilerMetricsFunctionBegin(functionID: 0 - 1, name: String("compilerV1.behavior.end"))
     return CompilerV1BehaviorDelta(
         identity: identity,
         input: shape.after,
         before: before,
-        after: compilerV1ValueFingerprint(identity: identity, tag: 13, text: snapshot),
+        after: compilerV1ValueFingerprint(identity: identity, tag: 13, text: behaviorText),
         snapshot: snapshot,
-        compiledOutput: compiledOutput
+        compiledOutput: behaviorText
     )
 }
 
@@ -535,7 +565,7 @@ function compilerV1ExecutionApply(sourceDelta: CompilerV1SourceDelta, facts: Com
     if compilerNativeOutputIsError(output: shape.shape.value) {
         return compilerV1Report(error: CompilerV1Error(message: shape.shape.value))
     }
-    let behavior: CompilerV1BehaviorDelta(compilerV1Behavior(source: sourceDelta, shape: shape, before: behaviorBefore))
+    let behavior: CompilerV1BehaviorDelta(compilerV1Behavior(facts: facts, shape: shape, before: behaviorBefore))
     if compilerNativeOutputIsError(output: behavior.snapshot) {
         return compilerV1Report(error: CompilerV1Error(message: behavior.snapshot))
     }
@@ -671,7 +701,7 @@ function rangeCompilerV1CLI(compiler: CompilerV1, input: String, inspect: Bool):
     if compilerNativeOutputIsError(output: shape.shape.value) {
         return compilerV1Report(error: CompilerV1Error(message: shape.shape.value))
     }
-    let behavior: CompilerV1BehaviorDelta(compilerV1Behavior(source: sourceDelta, shape: shape, before: compilerV1AbsentValue()))
+    let behavior: CompilerV1BehaviorDelta(compilerV1Behavior(facts: facts, shape: shape, before: compilerV1AbsentValue()))
     if compilerNativeOutputIsError(output: behavior.snapshot) {
         return compilerV1Report(error: CompilerV1Error(message: behavior.snapshot))
     }
