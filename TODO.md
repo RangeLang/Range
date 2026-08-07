@@ -454,6 +454,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [x] Set the homepage description in the site monospace face.
   - [x] Preserve the homepage optical-alignment contract through the Sveltely
     stack refactor by targeting its rendered semantic page attribute.
+    - [x] Re-measure before first reveal and after font or measured-descendant
+      geometry changes so a cold Vite start matches a refresh.
   - [x] Keep “Range Has a Dual Shape” hidden from the public Website.
     - Remove its homepage card and make its former route return 404.
   - [x] Render the benchmark run procedure as a minimal top-down tree, with
