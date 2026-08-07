@@ -43,6 +43,8 @@
   const soundIdleWait = 600;
   const soundFalloffDuration = 1200;
   const soundMotionVolumeDuration = 60;
+  const shaderWordmarkPrefix = "Ra";
+  const shaderWordmarkSuffix = "nge";
   const radians = (degrees: number) => (degrees * Math.PI) / 180;
   // Wide-gamut basis colors expressed in OKLCH. The blue is pulled inward
   // from the P3 boundary so it reads as radiant color rather than neon.
@@ -596,7 +598,18 @@
     const inkTop = verticalOverscan + (height - inkHeight) / 2;
     const baseline = inkTop + metrics.actualBoundingBoxAscent;
     const textX = horizontalOverscan;
-    sourceContext.fillText(text, textX, baseline);
+    if (text === shaderWordmarkPrefix + shaderWordmarkSuffix) {
+      const prefixMetrics = sourceContext.measureText(shaderWordmarkPrefix);
+      const suffixMetrics = sourceContext.measureText(shaderWordmarkSuffix);
+      const joinedSuffixX =
+        textX
+        + prefixMetrics.actualBoundingBoxRight
+        + suffixMetrics.actualBoundingBoxLeft;
+      sourceContext.fillText(shaderWordmarkPrefix, textX, baseline);
+      sourceContext.fillText(shaderWordmarkSuffix, joinedSuffixX, baseline);
+    } else {
+      sourceContext.fillText(text, textX, baseline);
+    }
 
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.activeTexture(gl.TEXTURE0);

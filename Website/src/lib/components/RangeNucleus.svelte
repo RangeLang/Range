@@ -261,6 +261,9 @@
     const rumbleCut = audioContext.createBiquadFilter();
     const resonance = audioContext.createBiquadFilter();
     const wet = audioContext.createGain();
+    input.channelCount = 1;
+    input.channelCountMode = "explicit";
+    input.channelInterpretation = "speakers";
     convolver.buffer = impulse;
     rumbleCut.type = "highpass";
     rumbleCut.frequency.value = 58;

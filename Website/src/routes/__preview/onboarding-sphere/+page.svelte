@@ -216,6 +216,7 @@
     const gain = context.createGain();
     const drive = context.createWaveShaper();
     const dryGain = context.createGain();
+    const reverbCenter = context.createGain();
     const reverb = context.createConvolver();
     const wetGain = context.createGain();
     const noise = context.createBufferSource();
@@ -251,12 +252,15 @@
     gain.gain.linearRampToValueAtTime(0.0025, now + 1.1);
     drive.curve = curve;
     drive.oversample = "2x";
+    reverbCenter.channelCount = 1;
+    reverbCenter.channelCountMode = "explicit";
+    reverbCenter.channelInterpretation = "speakers";
     reverb.buffer = impulse;
     dryGain.gain.setValueAtTime(0.82, now);
     wetGain.gain.setValueAtTime(0.18, now);
     filter.connect(drive);
     drive.connect(dryGain).connect(gain);
-    drive.connect(reverb).connect(wetGain).connect(gain);
+    drive.connect(reverbCenter).connect(reverb).connect(wetGain).connect(gain);
     gain.connect(context.destination);
     const noiseSamples = noiseBuffer.getChannelData(0);
     for (let index = 0; index < noiseSamples.length; index += 1) {

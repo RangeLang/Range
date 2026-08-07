@@ -844,6 +844,15 @@
   const macroFlowRows = makeMacroFlowRows();
   const environmentCell = makeEnvironmentCell();
   const cells = [...macroFlowRows.flatMap((row) => row.cells), environmentCell];
+
+  function macroPanForWord(word: string | undefined, fallback = 0) {
+    const cell = cells.find((candidate) => candidate.text === word);
+    if (!cell) return fallback;
+    return Math.max(
+      -0.92,
+      Math.min(0.92, ((cell.x / fieldWidth) * 2 - 1) * 0.96),
+    );
+  }
   let transportRunning = $state(false);
   let macroTransportGeneration = 0;
   let macroCloudElement: HTMLElement;
@@ -969,6 +978,9 @@
     tone.type = "lowpass";
     tone.frequency.value = cutoff;
     tone.Q.value = 0.55;
+    tone.channelCount = 1;
+    tone.channelCountMode = "explicit";
+    tone.channelInterpretation = "speakers";
     convolver.buffer = impulse;
     dry.gain.value = dryLevel;
     wet.gain.value = wetLevel;
@@ -1229,6 +1241,7 @@
     const macroRoot = 261.63; // C4: a lighter lead register.
     const environmentHit = word === "#environment";
     const backgroundSupport = word === "@background";
+    const wordPan = macroPanForWord(word);
     if (!macroChords[trackIndex]) {
       const oscillators: OscillatorNode[] = [];
       const filters: BiquadFilterNode[] = [];
@@ -1383,8 +1396,9 @@
             now + Math.max(0.16, holdSeconds * 0.92),
           );
         } else {
+          const voiceSpread = voiceIndex === 0 ? -0.06 : 0.06;
           panner.pan.setValueAtTime(
-            side * (backgroundSupport ? 0.12 : 0.24),
+            Math.max(-1, Math.min(1, wordPan + voiceSpread)),
             now,
           );
         }
@@ -1730,8 +1744,9 @@
     const interval = macroBackgroundIntervalPattern[intervalPosition]
       ?? macroBackgroundIntervalPattern[0];
     const accent = interval === 8 ? 0.2 : interval === 4 ? 0.17 : 0.138;
+    const fallbackPan = macroHatRollIndex % 2 === 0 ? -0.24 : 0.24;
     playMacroSnare(
-      macroHatRollIndex % 2 === 0 ? -0.24 : 0.24,
+      macroPanForWord(word, fallbackPan),
       now,
       0x534e4152 + macroHatRollIndex * 97,
       accent,

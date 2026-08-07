@@ -61,6 +61,13 @@
   } = $props();
 
   const subdivisionMilliseconds = RANGE_RHYTHM_SUBDIVISION_MS;
+  const identityValuePan = {
+    identity: -0.46,
+    value: 0.46,
+  } as const;
+  const trianglePanDepth = 0.68;
+  const trianglePanStep = Math.PI / 12;
+  const squareBeatPan = [-0.12, 0.12, 0.12, -0.12] as const;
   const enumCases = ["north", "east", "south", "west"] as const;
   let playing = $state(false);
   let audioEnabled = $state(false);
@@ -73,6 +80,7 @@
   let step = $state(-1);
   let rhythmTick = 0;
   let triangleBeat = $state(-1);
+  let trianglePanPhase = -Math.PI / 2;
   let squareBeat = $state(-1);
   let enumPulse = $state(-1);
   let enumCaseBeat = $state(-1);
@@ -89,6 +97,7 @@
   let masterGain: GainNode | undefined;
   let masterDryGain: GainNode | undefined;
   let masterLimiter: DynamicsCompressorNode | undefined;
+  let masterReverbCenter: GainNode | undefined;
   let masterReverb: ConvolverNode | undefined;
   let masterReverbWet: GainNode | undefined;
   let enumReverbSend: GainNode | undefined;
@@ -104,6 +113,7 @@
   let shaderCanvas: HTMLCanvasElement;
   let identityTrack: HTMLDivElement;
   let identityFigure: HTMLElement;
+  let rhythmAudioControl: HTMLDivElement;
   let triangleStage: HTMLDivElement;
   let triangleFigure: HTMLElement;
   let enumFigure: HTMLElement;
@@ -127,10 +137,24 @@
     const root = roots[dwellPatternIndex % roots.length];
     const complement = roots[(dwellPatternIndex + 2) % roots.length];
     dwellPatternIndex += 1;
-    playTone("identity", root, "sine", 0.032, 0.34);
+    playTone(
+      "identity",
+      root,
+      "sine",
+      0.032,
+      0.34,
+      identityValuePan.identity,
+    );
     window.setTimeout(() => {
       if (audioEnabled && playing) {
-        playTone("value", complement, "triangle", 0.026, 0.3);
+        playTone(
+          "identity",
+          complement,
+          "triangle",
+          0.026,
+          0.3,
+          identityValuePan.value,
+        );
       }
     }, 145);
   }
@@ -417,6 +441,7 @@
       !masterGain ||
       !masterDryGain ||
       !masterLimiter ||
+      !masterReverbCenter ||
       !masterReverb ||
       !masterReverbWet ||
       !scoreGain ||
@@ -425,6 +450,7 @@
       masterGain = audioContext.createGain();
       masterDryGain = audioContext.createGain();
       masterLimiter = audioContext.createDynamicsCompressor();
+      masterReverbCenter = audioContext.createGain();
       masterReverb = audioContext.createConvolver();
       masterReverbWet = audioContext.createGain();
       enumReverbSend = audioContext.createGain();
@@ -448,6 +474,9 @@
         audioContext.currentTime,
       );
       masterDryGain.gain.setValueAtTime(0.96, audioContext.currentTime);
+      masterReverbCenter.channelCount = 1;
+      masterReverbCenter.channelCountMode = "explicit";
+      masterReverbCenter.channelInterpretation = "speakers";
       masterReverbWet.gain.setValueAtTime(0.32, audioContext.currentTime);
       enumReverbSend.gain.setValueAtTime(0.78, audioContext.currentTime);
       masterLimiter.threshold.setValueAtTime(-16, audioContext.currentTime);
@@ -477,10 +506,11 @@
       scoreGain.connect(scoreEnvironmentFilter).connect(masterGain);
       masterGain.connect(masterDryGain).connect(masterLimiter);
       masterGain
+        .connect(masterReverbCenter)
         .connect(masterReverb)
         .connect(masterReverbWet)
         .connect(masterLimiter);
-      enumReverbSend.connect(masterReverb);
+      enumReverbSend.connect(masterReverbCenter);
       if (audioRoute) masterLimiter.connect(audioRoute.input);
     }
 
@@ -628,6 +658,9 @@
     type: OscillatorType,
     volume: number,
     duration = 0.22,
+    pan = 0,
+    panEnd = pan,
+    panDuration = duration,
   ) {
     if (!audioEnabled || !audioContext || volume <= 0.0005) return;
     const destination = voiceOutput(channel);
@@ -637,6 +670,7 @@
     const oscillator = audioContext.createOscillator();
     const filter = audioContext.createBiquadFilter();
     const gain = audioContext.createGain();
+    const stereo = audioContext.createStereoPanner();
     const peakVolume = Math.max(0.0001, volume);
     const velocity = Math.max(0, Math.min(1, volume / 0.16));
     const noteDuration = Math.max(0.05, duration * (0.7 + Math.sqrt(velocity) * 0.3));
@@ -648,9 +682,18 @@
     gain.gain.setValueAtTime(0.0001, now);
     gain.gain.exponentialRampToValueAtTime(peakVolume, now + 0.024);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + noteDuration - 0.01);
+    const startPan = Math.max(-1, Math.min(1, pan));
+    const endPan = Math.max(-1, Math.min(1, panEnd));
+    stereo.pan.setValueAtTime(startPan, now);
+    if (endPan !== startPan) {
+      stereo.pan.linearRampToValueAtTime(
+        endPan,
+        now + Math.min(noteDuration, Math.max(0.05, panDuration)),
+      );
+    }
     oscillator.connect(filter);
     filter.connect(gain);
-    gain.connect(destination);
+    gain.connect(stereo).connect(destination);
     activeOscillators.add(oscillator);
     oscillator.onended = () => activeOscillators.delete(oscillator);
     oscillator.start(now);
@@ -788,6 +831,7 @@
   function playTrianglePercussion(
     volumeScale: number,
     channel: IntroMixChannel = "forms",
+    pan = 0,
   ) {
     if (!audioEnabled || !audioContext || volumeScale <= 0.01) return;
     const destination = voiceOutput(channel);
@@ -827,6 +871,7 @@
     const highpass = audioContext.createBiquadFilter();
     const lowpass = audioContext.createBiquadFilter();
     const gain = audioContext.createGain();
+    const stereo = audioContext.createStereoPanner();
     strike.buffer = triangleBuffer;
     highpass.type = "highpass";
     highpass.frequency.setValueAtTime(1800 * pitchRatio, now);
@@ -836,13 +881,25 @@
     lowpass.frequency.setTargetAtTime(3400 * pitchRatio, now + 0.008, 0.045);
     lowpass.Q.setValueAtTime(0.18, now);
     gain.gain.setValueAtTime(0.2 * volumeScale, now);
-    strike.connect(highpass).connect(lowpass).connect(gain).connect(destination);
+    stereo.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), now);
+    strike
+      .connect(highpass)
+      .connect(lowpass)
+      .connect(gain)
+      .connect(stereo)
+      .connect(destination);
     strike.start(now);
   }
 
   function pulseTriangle(beat: number) {
     triangleBeat = beat;
-    playTrianglePercussion(centeredRhythmVolume(triangleFigure));
+    const pan = Math.sin(trianglePanPhase) * trianglePanDepth;
+    trianglePanPhase = (trianglePanPhase + trianglePanStep) % (Math.PI * 2);
+    playTrianglePercussion(
+      centeredRhythmVolume(triangleFigure),
+      "forms",
+      pan,
+    );
   }
 
   function nextEnumCase() {
@@ -857,11 +914,12 @@
     enumPulse = enumPulse === 0 ? 1 : 0;
     enumCaseBeat = nextEnumCase();
     const volume = centeredRhythmVolume(enumFigure);
-    playTrianglePercussion(volume * 0.56, "enums");
-    playEnumTailBend(volume);
+    const pan = Math.random() * 1.7 - 0.85;
+    playTrianglePercussion(volume * 0.56, "enums", pan);
+    playEnumTailBend(volume, pan);
   }
 
-  function playEnumTailBend(volumeScale: number) {
+  function playEnumTailBend(volumeScale: number, pan: number) {
     if (!audioEnabled || !audioContext || volumeScale <= 0.01) return;
     const destination = voiceOutput("enums");
     if (!destination) return;
@@ -871,6 +929,7 @@
     const oscillator = audioContext.createOscillator();
     const filter = audioContext.createBiquadFilter();
     const gain = audioContext.createGain();
+    const stereo = audioContext.createStereoPanner();
     oscillator.type = "sine";
     oscillator.frequency.setValueAtTime(278 * pitchRatio, startAt);
     oscillator.frequency.exponentialRampToValueAtTime(
@@ -883,7 +942,8 @@
     gain.gain.setValueAtTime(0.0001, startAt);
     gain.gain.linearRampToValueAtTime(0.026 * volumeScale, startAt + 0.045);
     gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.38);
-    oscillator.connect(filter).connect(gain).connect(destination);
+    stereo.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), startAt);
+    oscillator.connect(filter).connect(gain).connect(stereo).connect(destination);
     activeOscillators.add(oscillator);
     oscillator.onended = () => activeOscillators.delete(oscillator);
     oscillator.start(startAt);
@@ -898,6 +958,7 @@
   function playSquarePercussion(
     beat: number,
     volumeScale: number,
+    pan: number,
   ) {
     if (!audioEnabled || !audioContext || volumeScale <= 0.01) return;
     const destination = voiceOutput("properties");
@@ -930,6 +991,7 @@
     const knockFilter = audioContext.createBiquadFilter();
     const bodyGain = audioContext.createGain();
     const knockGain = audioContext.createGain();
+    const stereo = audioContext.createStereoPanner();
     const baseFrequency = (340 + (beat % 2) * 22) * pitchRatioFor("properties");
 
     strike.buffer = blockBuffer;
@@ -946,9 +1008,13 @@
     knockGain.gain.setValueAtTime(0.0001, now);
     knockGain.gain.linearRampToValueAtTime(0.24 * volumeScale, now + 0.001);
     knockGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.038);
+    stereo.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), now);
 
-    strike.connect(bodyFilter).connect(bodyGain).connect(destination);
-    strike.connect(knockFilter).connect(knockGain).connect(destination);
+    bodyGain.connect(stereo);
+    knockGain.connect(stereo);
+    stereo.connect(destination);
+    strike.connect(bodyFilter).connect(bodyGain);
+    strike.connect(knockFilter).connect(knockGain);
     strike.start(now);
     strike.stop(now + 0.065);
   }
@@ -956,16 +1022,21 @@
   function pulseSquare(beat: number) {
     squareBeat = beat;
     if (propertiesLayerLevel() <= 0.001) return;
-    playSquarePercussion(beat, centeredRhythmVolume(squareFigure));
+    const pan = squareBeatPan[beat % squareBeatPan.length] ?? 0;
+    playSquarePercussion(beat, centeredRhythmVolume(squareFigure), pan);
   }
 
   function pulseLine(side: "identity" | "value") {
+    const panStart = identityValuePan[side];
     playTone(
       "identity",
-      (side === "identity" ? 55 : 82.4069) * pitchRatioFor("identity"),
+      (side === "identity" ? 82.4069 : 55) * pitchRatioFor("identity"),
       "sine",
       0.16 * centeredRhythmVolume(identityFigure),
       2.1,
+      panStart,
+      side === "identity" ? identityValuePan.value : panStart,
+      subdivisionMilliseconds * 6 / 1_000,
     );
   }
 
@@ -1016,6 +1087,7 @@
     playing = true;
     step = -1;
     rhythmTick = 0;
+    trianglePanPhase = -Math.PI / 2;
     rhythmClockStartedAt = performance.now();
     nextStepAt = rhythmClockStartedAt;
     startShaderAnimation();
@@ -1455,6 +1527,10 @@
   });
 
   onMount(() => {
+    rhythmElement
+      .closest("range-essay-page")
+      ?.querySelector<HTMLElement>("[data-range-hero-overlay]")
+      ?.append(rhythmAudioControl);
     stopTransport();
     startRhythm();
     const unsubscribeSound = soundManager?.subscribe((enabled) => {
@@ -1484,6 +1560,7 @@
     scoreEnvironmentFilter?.disconnect();
     masterGain?.disconnect();
     masterDryGain?.disconnect();
+    masterReverbCenter?.disconnect();
     masterReverb?.disconnect();
     masterReverbWet?.disconnect();
     enumReverbSend?.disconnect();
@@ -1514,7 +1591,7 @@
     {@render identityIntro()}
   </div>
 
-  <div class="rhythmAudioControl">
+  <div class="rhythmAudioControl" bind:this={rhythmAudioControl}>
     {#if dev}
       <button
         type="button"
@@ -1537,7 +1614,6 @@
       title={transportState === "stopped" ? "Start" : "Stop"}
     >
       <span class="transportGlyph" aria-hidden="true"></span>
-      <span>{transportState === "stopped" ? "Start" : "Stop"}</span>
     </button>
   </div>
 
@@ -1779,10 +1855,10 @@
   }
 
   .rhythm > .rhythmAudioControl {
-    position: fixed;
-    z-index: 30;
-    top: 20px;
-    right: 20px;
+    display: none;
+  }
+
+  .rhythmAudioControl {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1817,13 +1893,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    width: 82px;
-    min-width: 82px;
-    max-width: 82px;
-    flex: 0 0 82px;
+    width: 36px;
+    min-width: 36px;
+    max-width: 36px;
+    flex: 0 0 36px;
     min-height: 36px;
-    padding: 0 13px;
+    padding: 0;
     border: 1px solid color-mix(in oklch, var(--range), transparent 70%);
     border-radius: 999px;
     background: var(--range);

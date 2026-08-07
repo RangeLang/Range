@@ -77,7 +77,7 @@ export const posts: Post[] = [
     slug: "somewhere-sometime-some-here",
     href: "/features/macros/somewhere-sometime-some-here",
     category: "Metaprogramming",
-    cardTitle: "Somewhere, Sometime, Some-here",
+    cardTitle: "Somewhere, Sometime",
     cardDescription: "Environment as place, phase, and local context.",
     description:
       "Somewhere gives a Range macro a place. Sometime gives it a phase. Some place gives it a boundary.",

@@ -48,6 +48,8 @@
 <range-essay-page>
   <main class="essayPage">
     <article>
+      <div class="heroOverlay" data-range-hero-overlay></div>
+
       <ArticleHeader
         {title}
         {description}
@@ -80,6 +82,46 @@
   .essayPage {
     width: min(820px, calc(100% - 48px));
     padding-bottom: 96px;
+  }
+
+  article {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+
+  article > :global(.articleHeader) {
+    grid-area: 1 / 1;
+  }
+
+  .heroOverlay {
+    position: sticky;
+    z-index: 3;
+    top: 20px;
+    grid-column: 1;
+    grid-row: 1 / 3;
+    align-self: start;
+    justify-self: end;
+    display: flex;
+    max-width: calc(100% - 40px);
+    margin: 20px 20px 0;
+    padding: 5px;
+    overflow: hidden;
+    border: 1px solid oklch(0.56 0 0 / 0.42);
+    border-radius: 999px;
+    background: oklch(1 0 0 / 0.055);
+    box-shadow: 0 10px 28px oklch(0.05 0 0 / 0.16);
+    backdrop-filter: blur(18px) saturate(1.12);
+    -webkit-mask-image: linear-gradient(black, black);
+    mask-image: linear-gradient(black, black);
+  }
+
+  .heroOverlay:empty {
+    display: none;
+  }
+
+  .essayBody {
+    grid-area: 2 / 1;
   }
 
   .essayBody {
@@ -147,6 +189,13 @@
 
     .essayBody {
       padding-top: 44px;
+    }
+
+    .heroOverlay {
+      top: 12px;
+      max-width: calc(100% - 24px);
+      margin: 12px 12px 0;
+      padding: 4px;
     }
 
     .essayBody :global(section + section) {

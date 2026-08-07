@@ -10,145 +10,118 @@
 
 </div>
 
-Range describes a program as a typed graph. Identity and value are its smallest
-unit of meaning; binding intents describe access; constructs, enums, and
-functions compose the graph. Macros receive program structure and return a
-transformed execution graph.
+Range is a native programming language for describing software as a typed
+graph. Instead of recovering meaning from syntax and then scattering it across
+separate compiler representations, Range keeps identity, value, access,
+ownership, and transformation connected in one program model.
 
-The supported implementation is the Range-authored self-hosted compiler. It
-emits native LLVM and must reproduce byte-identical LLVM and linked compiler
-executables before a compiler change is accepted.
+It is a language about the architecture of a program as much as its execution:
+what a value is, which identity it belongs to, how it may be reached, and what
+is allowed to transform it.
 
-Compiler checkpoints use one rolling authority. The accepted compiler builds
-a candidate from the current source, then that candidate rebuilds the same
-source once. Byte-identical candidate and reproduction LLVM/executables permit
-the candidate to replace the accepted compiler; no third build or active
-archive of older compilers is required. Promotion is a deliberate maintainer
-checkpoint, not a step after every source edit.
+## Identity : Value
 
-## Performance
+Range begins with one base concept: **Identity : Value**. It is the smallest
+unit of meaning in the graph. Lowering may represent identity and value
+separately, but the language does not confuse a value with the question of
+*which* value it is.
 
-Native LLVM · `-O3` · July 2026
+That distinction lets Range describe mutation, sharing, ownership, and
+specialization as relationships in the graph rather than conventions layered
+on top of it.
 
-![Range String performance improved from 491.2 ms and 5.3 GB to 4.1 ms and 1.9 MB](Benchmarks/Speed/range-strings-improvement.svg)
+## A small concrete language
 
-Range's owned String storage now carries its length, capacity, and data forward, allowing uniquely owned strings to grow in the same allocation.
+The concrete substrate is intentionally compact:
 
-| 100k appends | Before | After | Improvement |
-|---|---:|---:|---:|
-| Median wall time | 491.2 ms | **4.1 ms** | **~120× faster** |
-| Peak memory | 5.3 GB | **1.9 MB** | **~2,800× less** |
+- `construct` describes composed values.
+- `enum` describes alternatives.
+- `function` describes behavior between them.
 
-## Native comparison
+Properties state their storage and access relationship directly. `let` is
+immutable storage, `state` is mutable storage, `binding` is projected access,
+and `derived` is computed access.
 
-All results below are ordered fastest to slowest. Range is highlighted in bold.
+```range
+construct Counter {
+    let seed: Int
+    state count: Int
 
-| Strings · 100k appends | Median wall time |
-|---|---:|
-| C | 3.9 ms |
-| C++ | 3.9 ms |
-| **Range** | **4.1 ms** |
-| Rust | 4.2 ms |
-| Go | 4.8 ms |
-| Swift | 5.6 ms |
+    derived total: Int {
+        seed + count
+    }
+}
 
-Range peak memory: **1.9 MB**.
+function clamp(value: Int, min: Int, max: Int): Int {
+    if value < min { return min }
+    if value > max { return max }
+    return value
+}
+```
 
-<details>
-<summary><strong>Initial benchmark</strong> · July 18, 2026</summary>
+The goal is not to introduce a new kind for every programming pattern. Range
+builds richer ideas by composing a few explicit forms.
 
-### Loops · 20m iterations
+## The language can see itself
 
-| Language | Median wall time |
-|---|---:|
-| C++ | 61.3 ms |
-| C | 61.4 ms |
-| Rust | 61.9 ms |
-| Swift | 62.5 ms |
-| **Range** | **66.3 ms** |
-| Go | 79.6 ms |
+Macros begin where the concrete vocabulary ends. A Range macro receives typed
+program structure, queries the environment it has authority to observe, and
+returns a transformed execution graph. Macros therefore work with declarations,
+members, identities, and relationships—not an untyped token stream hidden from
+the rest of the language.
 
-### Noise · 50m samples
+This makes metaprogramming part of the same model as ordinary programming. The
+long-term aim is a language whose frameworks, compiler, editor intelligence,
+and program transformations all speak about the same graph.
 
-| Language | Median wall time |
-|---|---:|
-| C | 70.5 ms |
-| C++ | 70.9 ms |
-| Go | 78.9 ms |
-| **Range** | **82.4 ms** |
-| Rust | 82.9 ms |
-| Swift | 82.9 ms |
+## Written in Range
 
-### Function calls · 20m iterations
+The supported compiler is authored in Range and emits native LLVM. Compiler
+changes are accepted only at a reproducible fixed point: the accepted compiler
+builds a candidate, and that candidate rebuilds the same source into
+byte-identical LLVM and a byte-identical executable.
 
-| Language | Median wall time |
-|---|---:|
-| Go | 64.2 ms |
-| C++ | 67.4 ms |
-| C | 67.5 ms |
-| Rust | 67.9 ms |
-| Swift | 68.5 ms |
-| **Range** | **72.3 ms** |
+There is one rolling compiler authority under `RangeCompiler/Bootstrap/`. Old
+compilers remain history, not competing sources of truth.
 
-### Strings before lowering · 100k appends
+## Where Range is today
 
-| Language | Median wall time |
-|---|---:|
-| C++ | 3.6 ms |
-| Rust | 3.6 ms |
-| Go | 4.3 ms |
-| C | 4.4 ms |
-| Swift | 4.8 ms |
-| **Range** | **491.2 ms** |
+Range is early, self-hosting language infrastructure under active development.
+Its compiler already parses and reasons about real Range programs, executes
+typed macros, models ownership and graph relationships, and emits native code.
+Its supported language surface is still deliberately bounded, and focused
+fixtures prove individual capabilities rather than claiming a complete
+language or standard library.
 
-Range peak memory: **5.3 GB** · peers: **1.8–4.2 MB**.
+The [milestones](MILESTONES.md) describe the path from the current compiler
+kernel to a broadly usable language. Performance work and reproducible
+comparisons live in the dedicated [benchmark suite](Benchmarks/Speed/README.md)
+and on the [benchmark site](https://rangelang.org/benchmarks).
 
-</details>
+## Explore Range
 
-<details>
-<summary><strong>String scaling</strong> · 30 runs at each size</summary>
-
-| 100k appends | 1m appends | 5m appends | 10m appends |
-|---|---|---|---|
-| C · 4.2 ms | C++ · 8.2 ms | C · 20.0 ms | C · 36.1 ms |
-| C++ · 4.3 ms | C · 8.7 ms | C++ · 20.2 ms | Rust · 36.2 ms |
-| **Range · 4.3 ms** | Rust · 8.9 ms | Rust · 20.3 ms | C++ · 36.3 ms |
-| Rust · 4.4 ms | Go · 9.5 ms | Go · 21.3 ms | Go · 37.0 ms |
-| Go · 5.3 ms | **Range · 10.1 ms** | **Range · 27.2 ms** | **Range · 50.1 ms** |
-| Swift · 6.2 ms | Swift · 20.7 ms | Swift · 62.1 ms | Swift · 118.4 ms |
-
-</details>
-
-## Compiler status
-
-**4 of 6 tests emitted and passed.**
-
-| Result | Tests |
-|---|---|
-| Passed | Loops, Noise, Function Calls, Strings |
-| Did not emit | Collections · resolution stage 2 |
-| Did not emit | Constructs · constructor-argument parse reachability |
-| Emitted but failed | None |
-
-## Use Range
+Compile a focused program to LLVM:
 
 ```sh
 scripts/range compile Testing/Basics/Pass/ReturnInteger.range
-range run GPUCanvas
-scripts/range check-compiler-candidate
-scripts/range compiler promote --approve
-scripts/range check-compiler-integrity
 ```
 
-The ordinary file/directory wrapper bundles canonical Core sources through the
-accepted compiler; `range run` additionally links the manifest-declared runtime
-inputs and executes `@main`. See the
-[speed benchmark](Benchmarks/Speed/README.md) for performance comparisons.
-The candidate check validates the two-build fixed point. The explicitly
-approved promotion command runs that proof, installs the candidate, and checks
-the new bootstrap's manifest and file integrity without compiling a third
-generation. `scripts/range check-compiler` remains an optional independent
-reproduction audit.
+Build and run a Range program:
+
+```sh
+range run path/to/Program
+```
+
+Inspect the current compiler build plan or prove a compiler checkpoint:
+
+```sh
+scripts/range check-build-plan
+scripts/range check-compiler-candidate
+```
+
+The ordinary file and directory wrappers bundle the canonical Core sources
+through the accepted compiler. `range run` additionally links the
+manifest-declared runtime inputs and executes `@main`.
 
 ## License
 

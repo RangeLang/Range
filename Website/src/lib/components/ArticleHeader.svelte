@@ -247,5 +247,6 @@
     .copy {
       gap: 20px;
     }
+
   }
 </style>

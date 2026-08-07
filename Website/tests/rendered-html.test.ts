@@ -102,7 +102,7 @@ describe("SvelteKit routes", () => {
     expect(html).not.toContain("One Source, Two Lenses");
     expect(html).not.toContain("Intro to Range");
     expect(html).toContain("50% Declarative, 50% Imperative");
-    expect(html).toContain("Somewhere, Sometime, Some-here");
+    expect(html).toContain("Somewhere, Sometime");
     expect(html).toContain("Codability under 100");
     expect(html).toContain("Registration by declaration");
     expect(html).toContain("latestPostShader");
@@ -520,10 +520,11 @@ describe("SvelteKit routes", () => {
   test("renders the environment essay", async () => {
     const response = await render("/features/macros/somewhere-sometime-some-here");
     const html = await response.text();
+    const visibleHtml = html.replaceAll(/<!--.*?-->/g, "");
 
     expect(response.status).toBe(200);
-    expect(html).toContain("<title>Somewhere, Sometime, Some-here · Range</title>");
-    expect(html).toContain(">Somewhere, Sometime, Some-here</h1>");
+    expect(html).toContain("<title>Somewhere, Sometime · Range</title>");
+    expect(visibleHtml).toContain(">Somewhere, Sometime</h1>");
     expect(html).toContain('class="rangeSource language-range');
     expect(html).toContain(">Place</h2>");
     expect(html).not.toContain(">Some-here</h2>");
@@ -696,9 +697,7 @@ describe("SvelteKit routes", () => {
     expect(rhythm).toContain("knockGain.gain.linearRampToValueAtTime(0.08");
     expect(rhythm).toContain("bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.062)");
     expect(rhythm).toContain("strike.stop(now + 0.065)");
-    expect(rhythm).toContain(
-      "playSquarePercussion(beat, centeredRhythmVolume(squareFigure))",
-    );
+    expect(rhythm).toContain("squareBeatPan[beat % squareBeatPan.length]");
     expect(rhythm).toContain('side === "identity" ? 55 : 82.4069');
     expect(rhythm).toContain("function centeredRhythmVolume");
     expect(rhythm).toContain("window.innerHeight * 0.5");
@@ -1052,6 +1051,159 @@ describe("SvelteKit routes", () => {
       expect(cardHtml).not.toContain("latestPostCursor");
     }
   });
+});
+
+test("joins the shader wordmark without moving its fixed focus", async () => {
+  const rangeTitleSource = await readFile(
+    new URL("../src/lib/components/RangeTitle.svelte", import.meta.url),
+    "utf8",
+  );
+
+  expect(rangeTitleSource).toContain('const shaderWordmarkPrefix = "Ra"');
+  expect(rangeTitleSource).toContain('const shaderWordmarkSuffix = "nge"');
+  expect(rangeTitleSource).toContain(
+    "+ prefixMetrics.actualBoundingBoxRight\n        + suffixMetrics.actualBoundingBoxLeft",
+  );
+  expect(rangeTitleSource).toContain("const anchorX = 0.59");
+  expect(rangeTitleSource).not.toContain(
+    "(joinedSuffixX - textX) / Math.max(1, width)",
+  );
+});
+
+test("swaps the two fixed Intro clock notes while animating right", async () => {
+  const rhythm = await readFile(
+    new URL("../src/lib/components/ThreeFourRhythm.svelte", import.meta.url),
+    "utf8",
+  );
+
+  expect(rhythm).toContain("identity: -0.46");
+  expect(rhythm).toContain("value: 0.46");
+  expect(rhythm).toContain("audioContext.createStereoPanner()");
+  expect(rhythm).toContain("gain.connect(stereo).connect(destination)");
+  expect(rhythm).toContain("identityValuePan.identity");
+  expect(rhythm).toContain("identityValuePan.value");
+  expect(rhythm).toContain("stereo.pan.linearRampToValueAtTime(");
+  expect(rhythm).toContain('side === "identity" ? identityValuePan.value : panStart');
+  expect(rhythm).toContain('side === "identity" ? 82.4069 : 55');
+  expect(rhythm).toContain("subdivisionMilliseconds * 6 / 1_000");
+  expect(rhythm).not.toContain("frequencyEnd = frequency");
+});
+
+test("pans each complete enum hit to one random stereo position", async () => {
+  const rhythm = await readFile(
+    new URL("../src/lib/components/ThreeFourRhythm.svelte", import.meta.url),
+    "utf8",
+  );
+
+  expect(rhythm).toContain("const pan = Math.random() * 1.7 - 0.85");
+  expect(rhythm).toContain('playTrianglePercussion(volume * 0.56, "enums", pan)');
+  expect(rhythm).toContain("playEnumTailBend(volume, pan)");
+  expect(rhythm).toContain("function playEnumTailBend(volumeScale: number, pan: number)");
+  expect(rhythm).toContain("oscillator.connect(filter).connect(gain).connect(stereo).connect(destination)");
+});
+
+test("moves the triangle rhythm slowly across the stereo field", async () => {
+  const rhythm = await readFile(
+    new URL("../src/lib/components/ThreeFourRhythm.svelte", import.meta.url),
+    "utf8",
+  );
+
+  expect(rhythm).toContain("const trianglePanDepth = 0.68");
+  expect(rhythm).toContain("const trianglePanStep = Math.PI / 12");
+  expect(rhythm).toContain("const pan = Math.sin(trianglePanPhase) * trianglePanDepth");
+  expect(rhythm).toContain("trianglePanPhase = (trianglePanPhase + trianglePanStep)");
+  expect(rhythm).toContain('centeredRhythmVolume(triangleFigure),\n      "forms",\n      pan');
+});
+
+test("keeps square rhythm panning close to center by visual corner", async () => {
+  const rhythm = await readFile(
+    new URL("../src/lib/components/ThreeFourRhythm.svelte", import.meta.url),
+    "utf8",
+  );
+
+  expect(rhythm).toContain(
+    "const squareBeatPan = [-0.12, 0.12, 0.12, -0.12] as const",
+  );
+  expect(rhythm).toContain("const pan = squareBeatPan[beat % squareBeatPan.length] ?? 0");
+  expect(rhythm).toContain(
+    "playSquarePercussion(beat, centeredRhythmVolume(squareFigure), pan)",
+  );
+  expect(rhythm).toContain("bodyGain.connect(stereo)");
+  expect(rhythm).toContain("knockGain.connect(stereo)");
+});
+
+test("maps macro voices across the stereo field from their visual positions", async () => {
+  const cloud = await readFile(
+    new URL("../src/lib/components/MacroWordCloud.svelte", import.meta.url),
+    "utf8",
+  );
+
+  expect(cloud).toContain("function macroPanForWord(word: string | undefined, fallback = 0)");
+  expect(cloud).toContain("Math.min(0.92, ((cell.x / fieldWidth) * 2 - 1) * 0.96)");
+  expect(cloud).toContain("const wordPan = macroPanForWord(word)");
+  expect(cloud).toContain("wordPan + voiceSpread");
+  expect(cloud).toContain("macroPanForWord(word, fallbackPan)");
+});
+
+test("centers every reverb input while preserving dry stereo panning", async () => {
+  const [rhythm, cloud, nucleus, onboardingPreview] = await Promise.all([
+    readFile(
+      new URL("../src/lib/components/ThreeFourRhythm.svelte", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/lib/components/MacroWordCloud.svelte", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/lib/components/RangeNucleus.svelte", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/routes/__preview/onboarding-sphere/+page.svelte", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  expect(rhythm).toContain('masterReverbCenter.channelCountMode = "explicit"');
+  expect(rhythm).toContain("masterGain\n        .connect(masterReverbCenter)");
+  expect(rhythm).toContain("enumReverbSend.connect(masterReverbCenter)");
+  expect(cloud).toContain('tone.channelCountMode = "explicit"');
+  expect(cloud).toContain("input.connect(dry).connect(destination)");
+  expect(nucleus).toContain('input.channelCountMode = "explicit"');
+  expect(onboardingPreview).toContain('reverbCenter.channelCountMode = "explicit"');
+  expect(onboardingPreview).toContain("drive.connect(dryGain).connect(gain)");
+});
+
+test("keeps the bounded Intro controls sticky from the hero through the article", async () => {
+  const [essay, rhythm] = await Promise.all([
+    readFile(
+      new URL("../src/lib/components/EssayPage.svelte", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/lib/components/ThreeFourRhythm.svelte", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  expect(essay).toContain('class="heroOverlay" data-range-hero-overlay');
+  expect(essay).toContain("position: sticky");
+  expect(essay).toContain("top: 20px");
+  expect(essay).toContain("grid-row: 1 / 3");
+  expect(essay).toContain("justify-self: end");
+  expect(essay).toContain("max-width: calc(100% - 40px)");
+  expect(essay).toContain("border-radius: 999px");
+  expect(essay).toContain("background: oklch(1 0 0 / 0.055)");
+  expect(essay).toContain("backdrop-filter: blur(18px) saturate(1.12)");
+  expect(essay).toContain("mask-image: linear-gradient(black, black)");
+  expect(rhythm).toContain('closest("range-essay-page")');
+  expect(rhythm).toContain('querySelector<HTMLElement>("[data-range-hero-overlay]")');
+  expect(rhythm).toContain("?.append(rhythmAudioControl)");
+  expect(rhythm).not.toContain("position: fixed");
+  expect(rhythm).toContain('class="transportGlyph" aria-hidden="true"');
+  expect(rhythm).not.toContain('<span>{transportState === "stopped" ? "Start" : "Stop"}</span>');
+  expect(rhythm).toContain("width: 36px");
 });
 
 test("keeps every post social image generated at 1200 by 630", async () => {

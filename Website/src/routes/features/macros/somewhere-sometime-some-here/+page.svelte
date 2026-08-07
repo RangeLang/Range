@@ -36,7 +36,7 @@
 </script>
 
 <EssayPage
-  title="Somewhere, Sometime, Some-here"
+  title="Somewhere, Sometime"
   description="A macro environment is not a bag of helpers. It is a coordinate in the program: a place, a phase, and a deliberately local here."
   category="Metaprogramming"
   date="July 29, 2026"
