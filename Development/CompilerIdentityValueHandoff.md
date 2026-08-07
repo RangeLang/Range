@@ -12,27 +12,25 @@ The **Syntax -> Shape**, **Shape -> Behavior**, and **Behavior -> Compiled** sli
 
 ## Current State
 
-Latest commits:
+Latest commits (pushed to `development`):
 
 ```text
+657e0089 Rewrite requirement-and-provision post around macros
+9b6d5dea Mark homepage re-measure task complete
+022ebd76 Document V1 compiled frozen lowering projection
 8610b8f1 Promote bootstrap for frozen lowering compiled
 c12e3f6e Verify V1 compiled as frozen behavior projection
 ac677b44 Promote bootstrap for frozen lowering behavior
 b3c18c5e Verify V1 behavior as frozen lowering projection
 ```
 
-The Behavior -> Compiled slice is committed with this handoff update.
+The Behavior -> Compiled slice is committed with this handoff update, followed by the unrelated
+Website post and TODO edits, which were also committed and pushed. The working tree is clean.
 
 Branch: `development`
 
-Only unrelated user edits remain uncommitted:
-
-```text
-TODO.md
-Website/src/routes/posts/requirement-and-provision/+page.svelte
-```
-
-Do not modify, stage, or revert those files.
+Note: the GitHub remote reported that this repository has moved to
+`https://github.com/RangeLang/Range.git`; the current push still succeeded against the old URL.
 
 ## Completed Work
 
