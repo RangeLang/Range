@@ -9,6 +9,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <crt_externs.h>
+#include <dirent.h>
+#include <sys/stat.h>
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
 #endif
@@ -429,6 +431,72 @@ void *readFile(void *opaquePath) {
     fclose(file);
     void *result = rangeStringCreateTransientCopy(buffer, readCount);
     free(buffer);
+    return result ? result : rangeStringEmpty();
+}
+
+typedef struct RangeFileListing {
+    char *data;
+    size_t length;
+    size_t capacity;
+} RangeFileListing;
+
+static void rangeFileListingAppend(RangeFileListing *listing, const char *text, size_t length) {
+    if (length > SIZE_MAX - listing->length - 1) {
+        abort();
+    }
+    size_t required = listing->length + length + 1;
+    if (required > listing->capacity) {
+        size_t nextCapacity = listing->capacity == 0 ? 256 : listing->capacity;
+        while (nextCapacity < required) {
+            if (nextCapacity > SIZE_MAX / 2) abort();
+            nextCapacity *= 2;
+        }
+        char *next = realloc(listing->data, nextCapacity);
+        if (!next) abort();
+        listing->data = next;
+        listing->capacity = nextCapacity;
+    }
+    memcpy(listing->data + listing->length, text, length);
+    listing->length += length;
+    listing->data[listing->length] = 0;
+}
+
+static void rangeFileListingWalk(const char *path, RangeFileListing *listing) {
+    struct stat info;
+    if (stat(path, &info) != 0) return;
+    if (!S_ISDIR(info.st_mode)) {
+        rangeFileListingAppend(listing, path, strlen(path));
+        rangeFileListingAppend(listing, "\n", 1);
+        return;
+    }
+
+    DIR *directory = opendir(path);
+    if (!directory) return;
+    struct dirent *entry;
+    while ((entry = readdir(directory)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+        size_t pathLength = strlen(path);
+        size_t nameLength = strlen(entry->d_name);
+        size_t separatorLength = pathLength > 0 && path[pathLength - 1] == '/' ? 0 : 1;
+        char *child = malloc(pathLength + separatorLength + nameLength + 1);
+        if (!child) abort();
+        memcpy(child, path, pathLength);
+        if (separatorLength) child[pathLength] = '/';
+        memcpy(child + pathLength + separatorLength, entry->d_name, nameLength);
+        child[pathLength + separatorLength + nameLength] = 0;
+        rangeFileListingWalk(child, listing);
+        free(child);
+    }
+    closedir(directory);
+}
+
+void *listFiles(void *opaquePath) {
+    const char *path = rangeStringData(opaquePath);
+    if (!path || path[0] == 0) return rangeStringEmpty();
+    RangeFileListing listing = {0};
+    rangeFileListingWalk(path, &listing);
+    void *result = rangeStringCreateTransientCopy(listing.data ? listing.data : "", listing.length);
+    free(listing.data);
     return result ? result : rangeStringEmpty();
 }
 

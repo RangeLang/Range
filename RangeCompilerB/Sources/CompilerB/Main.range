@@ -1,0 +1,15 @@
+@extern
+function listFiles(path: String): String
+
+@main {
+    let argumentCount: Int(commandLineArgumentCount())
+    if argumentCount != 1 {
+        print(value: "usage: compiler-b <route>")
+        return 64
+    }
+
+    let route: String(commandLineArgument(index: 0))
+    let files: String(listFiles(path: route))
+    print(value: "route=\(route)\n\(files)")
+    return 0
+}

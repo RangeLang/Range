@@ -236,6 +236,10 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [ ] Move project and file gathering from shell source bundles into
       Compiler B's Range-authored driver. A selects and builds B but never
       discovers or interprets B's product inputs.
+      - [x] Start the standalone B entry slice: `Sources/CompilerB/Main.range`
+        accepts one route and calls the B-owned `listFiles` extern to print
+        recursive regular files. Full project-run proof is pending the
+        repository's existing bootstrap runtime-hash mismatch.
     - [ ] Replace B's inherited source, declaration, application, Block, and
       relationship tables with typed graph values carrying stable identities.
     - [ ] Derive Compiler B Resolution, CFG, Ownership, and MIR as whole Range
